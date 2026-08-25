@@ -1,0 +1,22 @@
+schema: intent-driven
+
+rules:
+  proposal:
+    - Must use grill-with-docs skill
+  design:
+    - Must use c4-diagrams skill
+  adr:
+    - Must use domain-modeling skill
+  specs:
+    - Must use gherkin-authoring skill
+  tasks:
+    - Must use planning-and-task-breakdown skill
+operations:
+  apply:
+    guidance:
+      - Must use incremental-implementation and test-driven-development skills
+      - As tasks are completed, group and commit source code changes incrementally. Avoid accumulating a large number of uncommitted changes.
+      - After committing changes, check how much context window remains. If it is unlikely to be sufficient for the upcoming tasks through the next commit, stop and suggest continuing the work in a new session.
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
