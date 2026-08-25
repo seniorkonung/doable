@@ -1,0 +1,40 @@
+name: doable
+version: 0.0.1
+targets:
+  - codex
+  - agent-skills
+dependencies:
+  apm:
+    - git: seniorkonung/agent-skills
+      ref: main
+      skills:
+        - code-review-and-quality
+        - idea-refine
+        - incremental-implementation
+        - observability-and-instrumentation
+        - planning-and-task-breakdown
+        - security-and-hardening
+        - shipping-and-launch
+        - test-driven-development
+    - git: fission-ai/openspec
+      ref: v1.10.0
+      skills:
+        - openspec-update-change
+        - openspec-verify-change
+        - openspec-sync-specs
+        - openspec-propose
+        - openspec-new-change
+        - openspec-explore
+        - openspec-continue-change
+        - openspec-archive-change
+        - openspec-apply-change
+    - intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams#0d2b903c231f8aaf7caa94fc1538d847681fa4bf
+    - intent-driven-dev/intent-driven-template/.agents/skills/gherkin-authoring#0d2b903c231f8aaf7caa94fc1538d847681fa4bf
+  mcp:
+    - name: dart
+      registry: false
+      transport: stdio
+      command: dart
+      args: ["mcp-server"]
+includes: auto
+scripts: {}

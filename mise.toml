@@ -1,0 +1,21 @@
+[tools]
+flutter = "3.47"
+"github:microsoft/apm" = "latest"
+lefthook = "2"
+"npm:@fission-ai/openspec" = "1.10"
+
+[tasks]
+prepare = "lefthook install"
+start = "flutter run"
+doctor = "flutter doctor -v"
+fmt = "dart format ."
+check = [
+    "dart format --output=none --set-exit-if-changed .",
+    "flutter analyze",
+    "flutter test"
+]
+doc = [
+    "dart pub get",
+    "dart analyze",
+    "dart doc ."
+]
