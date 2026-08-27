@@ -16,6 +16,7 @@ dependencies:
         - security-and-hardening
         - shipping-and-launch
         - test-driven-development
+        - discussion
     - git: fission-ai/openspec
       ref: v1.10.0
       skills:
