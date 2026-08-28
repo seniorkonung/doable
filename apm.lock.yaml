@@ -1,5 +1,5 @@
 lockfile_version: '2'
-generated_at: '2026-08-27T18:31:36.683401+00:00'
+generated_at: '2026-08-28T14:18:05.357872+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: fission-ai/openspec
@@ -84,7 +84,7 @@ dependencies:
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: 92dddb76b7e149742951b7c43b95e8b709f498bc
+  resolved_commit: f910e0389a33c99ad6a75e445c9a7a60e4b1623d
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
@@ -118,9 +118,9 @@ dependencies:
   - .codex/agents/test-engineer.toml
   deployed_file_hashes:
     .agents/skills/code-review-and-quality/SKILL.md: sha256:0ff65150158adfd41844534948cbe4271e6a7a3aa463700a8d99caf550e38223
-    .agents/skills/discussion/SKILL.md: sha256:e2955c622a54cc115184772a8829eae61c1317468749f93bcd5028335828066b
-    .agents/skills/discussion/references/document-format.md: sha256:7259d33bef84de3c3b976b1f3ff4e61e9b24e12312e3291647492eaf694cd668
-    .agents/skills/discussion/references/examples.md: sha256:17739bc08eef88c1d3a359acf133186ac9ddc384c4334c6152929949c5f1c24f
+    .agents/skills/discussion/SKILL.md: sha256:e9c3423b73b4d572af3d95c8820142e18bb44e226adc92f1c297905e9835ca9a
+    .agents/skills/discussion/references/document-format.md: sha256:9012f228e7a7759f14176e38b1b39946a3d810693a4a96319934b93ad71e80ac
+    .agents/skills/discussion/references/examples.md: sha256:e0a056cc213de20ee0e311c1404a21bfdda9e70d2d2cc2b73748de1b53359a6c
     .agents/skills/idea-refine/SKILL.md: sha256:ab5240e4593b9b0250952986ce3b9aba4a7629c4bf8f6335d13584cff6ba7300
     .agents/skills/idea-refine/examples.md: sha256:326c8e64083f29b3ea8b99e757198efafcf30a68c227156b521e1cddff5ed4ad
     .agents/skills/idea-refine/frameworks.md: sha256:161ebc18fdf2d996bc62a87a2d747cf1bf53548354f8925de25c732c27f00309
@@ -135,7 +135,7 @@ dependencies:
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:1052e27d15e36780dacec33544939e9fa088fe053a2d527508845ed1397d83f6
+  content_hash: sha256:8bf89a2dd387c725df8071ca7d3343a68ef558849f788a343a3189768ed7fd26
   skill_subset:
   - code-review-and-quality
   - discussion
@@ -175,7 +175,7 @@ dependencies:
   - agent-skills
   constraint: 0.6.5
   resolved_tag: 0.6.5
-  resolved_at: '2026-08-27T18:31:22+00:00'
+  resolved_at: '2026-08-28T14:17:53+00:00'
 - repo_url: mattpocock/skills
   name: mattpocock-skills
   host: github.com
@@ -370,7 +370,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:e2955c622a54cc115184772a8829eae61c1317468749f93bcd5028335828066b
+  content_hash: sha256:e9c3423b73b4d572af3d95c8820142e18bb44e226adc92f1c297905e9835ca9a
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/discussion/references/document-format.md
@@ -379,7 +379,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:7259d33bef84de3c3b976b1f3ff4e61e9b24e12312e3291647492eaf694cd668
+  content_hash: sha256:9012f228e7a7759f14176e38b1b39946a3d810693a4a96319934b93ad71e80ac
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/discussion/references/examples.md
@@ -388,7 +388,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:17739bc08eef88c1d3a359acf133186ac9ddc384c4334c6152929949c5f1c24f
+  content_hash: sha256:e0a056cc213de20ee0e311c1404a21bfdda9e70d2d2cc2b73748de1b53359a6c
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/domain-modeling
