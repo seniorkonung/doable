@@ -30,6 +30,7 @@ Doable сейчас является стандартным Flutter-каркас
 - поддерживать ручной выбор языка или платформы, отличные от Android;
 - определять окончательную визуальную композицию экранов и богатую навигацию по будущему графу;
 - добавлять прикладную аутентификацию, отдельный PIN-код или шифрование базы на уровне приложения;
+- публиковать или распространять приложение, готовить store listing, настраивать production signing keys либо инфраструктуру секретов сборки; release mode нужен только для автоматизированной CI-проверки и локальной проверки Android-поведения и manifest;
 - выполнять длительные фоновые миграции после открытия feature routes: текущая стратегия завершает совместимое обновление внутри bootstrap, а необходимость поэтапного backfill должна быть спроектирована отдельным change до появления такого объёма данных;
 - превращать каждую простую операцию над намерением в отдельный shallow module или заранее создавать универсальные abstractions для ещё не существующих сущностей.
 
@@ -110,11 +111,27 @@ abstract interface class IntentionRepository {
     IntentionCatalogOrder order,
   );
   Stream<Intention?> watchById(IntentionId id);
-  Future<Result<Intention>> execute(IntentionCommand command);
+  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command);
+}
+
+sealed class IntentionCommandSuccess {
+  const IntentionCommandSuccess();
+}
+
+final class IntentionSaved extends IntentionCommandSuccess {
+  const IntentionSaved(this.intention);
+  final Intention intention;
+}
+
+final class IntentionDeleted extends IntentionCommandSuccess {
+  const IntentionDeleted(this.id);
+  final IntentionId id;
 }
 ```
 
-`IntentionScope` различает активный каталог и архив. `IntentionCatalogOrder` содержит два явно названных варианта: сначала недавно созданные и сначала недавно изменённые. Закрытый набор `IntentionCommand` содержит создание, изменение данных, включение или выключение готовности к действию, архивирование, восстановление и физическое удаление. Наличие одной `execute` не стирает различия операций: варианты command имеют собственные обязательные параметры, а `Result` возвращает типизированный успех или предметную/инфраструктурную failure.
+`IntentionScope` различает активный каталог и архив. `IntentionCatalogOrder` содержит два явно названных варианта: сначала недавно созданные и сначала недавно изменённые. Закрытый набор `IntentionCommand` содержит создание, изменение данных, включение или выключение готовности к действию, архивирование, восстановление и физическое удаление. Наличие одной `execute` не стирает различия операций: варианты command имеют собственные обязательные параметры, а `Result` возвращает типизированный успех или предметную/инфраструктурную failure. Создание и любая сохраняющая command возвращают `IntentionSaved` с подтверждённым после commit намерением; no-op также возвращает текущий `IntentionSaved`, не выполняет запись и не меняет timestamps. Успешное физическое удаление возвращает `IntentionDeleted` с удалённым `IntentionId` только после commit; отсутствие идентификатора остаётся typed not-found failure.
+
+`watchCatalog` и `watchById` публикуют только подтверждённые snapshots. Ошибка чтения преобразуется adapter в один типизированный repository failure в error channel, после чего текущий stream завершается; Drift/SQLite exception никогда не пересекает seam. Явный retry создаёт новую подписку через целевую invalidation provider, а не продолжает или автоматически перезапускает завершившийся stream. Успешное удаление является обычным изменением данных: после commit каталоги исключают намерение, а `watchById` публикует `null`.
 
 Модуль владеет следующими правилами:
 
@@ -163,12 +180,13 @@ UI следует однонаправленному потоку: repository п
 - Приложение запускается внутри одного корневого `ProviderScope`. Database, repository, diagnostics и router публикуются через generated `keepAlive` providers, а их внешние ресурсы освобождаются через `ref.onDispose`.
 - Каждая View имеет собственную class-based `@riverpod` ViewModel на Notifier с неизменяемым state. Экранные и parameterized providers используют automatic disposal по умолчанию; широкой глобальной ViewModel нет.
 - Реактивное чтение repository streams оформляется generated functional Stream providers и представляется `AsyncValue`: `loading`, `error`, `data` и отдельный `empty`, выводимый только из успешного `AsyncData` с пустым результатом.
-- Каждая изменяющая операция имеет собственный неизменяемый `OperationState` со статусами `idle`, `running`, `succeeded`, `failed`. Повторный запуск той же операции во время `running` не допускается, но загрузка и независимые операции не делят один флаг. Экспериментальные Riverpod Mutations и offline persistence не используются.
+- Создание использует собственный неизменяемый `OperationState`. Parameterized Details ViewModel хранит для каждого `IntentionId` единый неизменяемый `OperationState` со статусами `idle`, `running`, `succeeded`, `failed` и видом текущей операции для изменения данных, готовности к действию, архивирования, восстановления или физического удаления. Пока состояние равно `running`, все изменяющие controls этого намерения недоступны, защитная проверка ViewModel не запускает и не ставит в очередь второй command, а чтение подтверждённых данных продолжается независимо. Gate освобождается после того, как ViewModel приняла подтверждённый `IntentionSaved` или `IntentionDeleted` либо сохранила прежний snapshot при failure; разные `IntentionId` имеют независимые состояния. Экспериментальные Riverpod Mutations и offline persistence не используются.
 - Последний подтверждённый snapshot остаётся видимым при failure записи; optimistic update постоянного состояния не используется.
 - View реагирует через `ref.listen` на одноразовый UI event навигацией, SnackBar или доступным сообщением и после обработки вызывает метод ViewModel для очистки event.
 - Generated ViewModel каталога хранит выбранный `IntentionCatalogOrder`, начинает с порядка по времени создания и тем самым переключает аргумент Stream provider; выбор не становится постоянной предметной настройкой.
 - View предоставляет локализованный и доступный элемент выбора порядка, явно называющий время создания и время обновления.
 - Riverpod 3 по умолчанию автоматически повторяет упавшие providers. Корневой `ProviderScope` задаёт `retry: (retryCount, error) => null`, чтобы loading/failure и повторная попытка оставались явным пользовательским поведением; retry выполняется только через целевую invalidation соответствующего provider.
+- Parameterized provider подробных данных отличает ожидание первого snapshot, успешное отсутствие `AsyncData(null)` и типизированную ошибку чтения. Устранимая ошибка показывает локализованный retry, который инвалидирует только provider данного `IntentionId` и создаёт новую `watchById`-подписку; уход последнего слушателя автоматически отменяет текущую подписку, а повторное открытие начинает новую вместо показа сохранённой ошибки.
 - Views используют `ConsumerWidget` или `ConsumerStatefulWidget`, наблюдают только presentation providers и сужают rebuild через `select` лишь после измеренного подтверждения проблемы. Hooks не добавляются.
 
 Для маршрутов используются `auto_route` 11.1.0, `auto_route_generator` 10.6.0 и `MaterialApp.router`. `AppRouter` объявляется через `@AutoRouterConfig`, страницы — через `@RoutePage`, а единственным представлением внутренних переходов служат generated `PageRouteInfo` с обязательными типизированными аргументами. Прикладной код не вызывает строковые `pushNamed`, `replaceNamed` или `navigateNamed` и не передаёт имена или path вручную. Router создаётся generated `keepAlive` provider внутри `ProviderScope`; глобальный экземпляр router не вводится.
@@ -297,13 +315,15 @@ Test surface совпадает с interfaces модулей:
 
 - unit tests предметных значений и `IntentionRepository` на in-memory SQLite покрывают Unicode-нормализацию названия, границы 1/255/256 для названия и 4096/4097 для описания с составными графемами, точное сохранение описания, одинаковые названия, стабильный UUID, временные метки, оба порядка каталога, готовность, архивирование, восстановление и удаление;
 - repository integration tests проверяют транзакционность, streams после commit, закрытую/повреждённую базу и преобразование storage exceptions в failures;
-- тесты generated Riverpod ViewModels и providers используют отдельный `ProviderContainer` с overrides на fake repository и проверяют loading/data/empty/failure, automatic disposal, независимые `OperationState`, явную повторную попытку и сохранение последнего подтверждённого snapshot;
+- тесты generated Riverpod ViewModels и providers используют отдельный `ProviderContainer` с overrides на fake repository и проверяют loading/data/empty/failure, automatic disposal, единый для `IntentionId` mutation `OperationState`, явную повторную попытку и сохранение последнего подтверждённого snapshot;
 - widget tests проверяют русскую, английскую и fallback локали, локализованную валидацию длины и выбор порядка каталога, все подтверждения, отсутствие перевода пользовательского текста, навигацию и not-found;
 - accessibility tests проверяют semantics labels/states, tap targets, contrast и layout при text scale 200%; критические потоки дополнительно проходят ручную проверку TalkBack на Android;
 - Drift schema snapshots и generated migration tests проверяют прямой переход с каждой опубликованной версии до текущей, итоговую схему, marker версии, сохранность данных, `foreign_key_check`, rollback при fault injection и отказ от открытия более новой схемы для записи;
-- Android integration tests проверяют создание, полный перезапуск процесса, изменение, архивирование, восстановление и физическое удаление на реальном SQLite-файле, а file-backed migration test — повторное открытие после прерывания upgrade.
+- file-backed repository integration test создаёт представительные активные и архивированные намерения, отменяет stream-подписки, закрывает `AppDatabase` и отбрасывает первый `IntentionRepository`, затем создаёт новый persistence object graph на том же SQLite-файле и проверяет прежние идентификаторы, текст, готовность к действию, архивное состояние и timestamps; отдельный file-backed migration test проверяет повторное открытие после прерывания upgrade.
 
-Тестовые названия и описания пишутся по-русски. Проверка change включает `flutter analyze`, полный `flutter test`, Android integration tests, генерацию локализации и Drift без diff, а также строгую валидацию OpenSpec.
+Тестовые названия и описания пишутся по-русски. Авторитетная CI-среда репозитория — GitHub Actions. Обязательный PR gate запускается на Linux runner из чистого checkout, устанавливает только явно зафиксированные версии используемых инструментов, разрешает Dart/Flutter-зависимости без изменения committed lockfile, повторяет генерацию локализации, Riverpod, AutoRoute, Drift code и schema/migration artifacts и падает при любом tracked или untracked результате генерации. Затем gate выполняет анализ, полный test suite с file-backed repository и migration tests, собирает release-mode APK, проверяет его manifest permissions и запускает `openspec validate --all --strict --no-interactive`. Статус этого workflow настраивается как обязательная проверка защищённой основной ветки.
+
+Android device/emulator job в этот change не входит. Release-mode APK и manifest проверяются на CI runner без запуска приложения на Android, а автоматизированные unit, widget, accessibility и file-backed tests не заявляются доказательством platform bootstrap после завершения процесса. Ручной TalkBack smoke test выполняется отдельно на Android до merge и фиксируется как внешнее evidence; принятый остаточный риск Android-specific wiring остаётся ограничен так, как описано ниже.
 
 ## Риски / Компромиссы
 
@@ -312,6 +332,7 @@ Test surface совпадает с interfaces модулей:
 - **[Automatic retry Riverpod может скрыть первый failure и нарушить явную модель повторной попытки]** → Отключить глобальный retry в `ProviderScope` и повторять только целевой provider по явному действию пользователя.
 - **[Реактивный запрос может повторно читать слишком большой каталог]** → Фильтровать active/archive на уровне SQL, запрашивать только нужные поля для summaries и профилировать до введения pagination; pagination добавлять отдельным требованием при подтверждённой необходимости.
 - **[Ошибка или остановка процесса во время миграции может временно сделать приложение недоступным]** → Охватывать DDL, DML, проверку целостности и продвижение marker версии одной проверяемой транзакцией, никогда не удалять базу автоматически и давать retry из последней целостной версии.
+- **[Автотесты не воспроизводят завершение Android-процесса и повторный platform bootstrap]** → Доказывать файловую долговечность полным закрытием persistence object graph и повторным открытием того же SQLite-файла, отдельно проверять crash recovery миграций и собирать release-mode APK. Остаточный риск ошибки только в Android-specific wiring принят для текущего change; device E2E и `adb`-orchestrator не вводятся без отдельного подтверждённого основания.
 - **[Старая версия приложения может встретить более новую схему после rollback APK]** → Возвращать non-retryable `incompatibleSchema` без feature query и записи, не выполнять downgrade и выпускать forward fix.
 - **[Перестроение будущей большой таблицы может превысить приемлемое время bootstrap или свободное место]** → Измерять migration step на репрезентативных fixtures в соответствующем change; до release отдельно проектировать поэтапный backfill, если короткая атомарная транзакция больше не подходит.
 - **[Отключённый Android backup повышает риск потери данных при удалении приложения или потере устройства]** → Явно считать это компромиссом локальной границы текущего change; перенос и синхронизацию проектировать отдельно вместе с пользовательским согласием и восстановлением.
@@ -327,9 +348,9 @@ Test surface совпадает с interfaces модулей:
 3. Создать `AppDatabase` schema version 1 с временными метками намерения, initial schema snapshot, атомарным migration harness, проверкой несовместимой более новой версии и production/in-memory executors; добавить Android backup exclusions до появления пользовательских данных.
 4. Реализовать глубокий `IntentionRepository`, предметные модели и failures, затем generated Riverpod ViewModels, immutable operation states и Views.
 5. Заменить экран-заглушку каталогом активных намерений только после прохождения repository, migration, localization и accessibility tests.
-6. Перед release выполнить анализ, полный test suite, Android integration tests, TalkBack/text-scale smoke tests и проверку release manifest на отсутствие новых разрешений.
+6. Перед merge провести обязательный GitHub Actions PR gate с воспроизводимой генерацией без изменений, анализом, полным test suite, file-backed проверками, release-mode сборкой, проверкой manifest и строгой OpenSpec-валидацией; отдельно выполнить и зафиксировать ручной TalkBack smoke test на Android.
 
-Для первого release миграция идёт от отсутствующей базы к schema version 1 и не затрагивает прежние пользовательские данные. До публикации rollback выполняется обычным возвратом исходников и lockfile. После публикации каждый следующий release хранит все опубликованные snapshots и шаги, поэтому пользователь может обновиться сразу с любой прежней версии схемы. Downgrade migrations не поддерживаются: rollback приложения допустим только при совпадающей или явно совместимой схеме, а при более новой схеме старое приложение отказывается от записи без удаления файла. Основная стратегия исправления после публикации — forward fix с более высоким номером версии приложения и совместимой схемой; ни один rollback или retry не удаляет базу автоматически.
+Для первой версии capability миграция идёт от отсутствующей базы к schema version 1 и не затрагивает прежние пользовательские данные. Пока приложение не опубликовано, rollback выполняется обычным возвратом исходников и lockfile, а ещё не опубликованный schema snapshot может быть заменён согласованно с кодом. После будущей публикации каждый следующий release хранит все опубликованные snapshots и шаги, поэтому пользователь может обновиться сразу с любой прежней версии схемы. Downgrade migrations не поддерживаются: rollback приложения допустим только при совпадающей или явно совместимой схеме, а при более новой схеме старое приложение отказывается от записи без удаления файла. Основная стратегия исправления после публикации — forward fix с более высоким номером версии приложения и совместимой схемой; ни один rollback или retry не удаляет базу автоматически. Локальный `flutter run --release` и локальный либо CI-запуск `flutter build apk --release` в текущем change не создают артефакт для распространения и не являются checkpoint готовности к публикации; signing и канал поставки должны быть определены отдельным change перед первой публикацией.
 
 ## Открытые вопросы
 
