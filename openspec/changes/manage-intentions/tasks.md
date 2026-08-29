@@ -59,16 +59,13 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention.dart`, `lib/src/intention/domain/intention_id.dart`, `lib/src/intention/domain/intention_text.dart`, `test/intention/domain/intention_text_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 2.2 Определить закрытые commands, typed `Result`/failures и небольшую seam `IntentionRepository`
+- [ ] 2.2 Определить закрытые commands, страничные типы каталога и storage-neutral seam `IntentionRepository`
   - **Критерии приёмки:**
-    - Interface предоставляет только `watchCatalog`, `watchById` и `execute`, не раскрывая Drift или SQLite types.
-    - Interface не раскрывает расположение данных, transport или состояние синхронизации; sync-specific методы, remote port, outbox, tombstones и revisions отсутствуют.
-    - Commands различают создание, изменение данных, включение и выключение готовности, архивирование, восстановление и физическое удаление.
-    - Закрытый success type различает `IntentionSaved` с подтверждённым намерением для create/change/no-op и `IntentionDeleted` с идентификатором только для подтверждённого удаления; отдельный `changed` flag отсутствует.
-    - Scope, два порядка каталога и стабильные repository-level validation/not-found/conflict/unavailable/corruption failures выражены типами без bootstrap- или Drift-specific деталей.
-    - Оба watch-метода допускают в error channel только типизированную repository failure, после неё завершают текущий stream и требуют новой подписки для retry.
+    - Interface предоставляет только ограниченный `getCatalogPage`, реактивный `watchById` и `execute`, не раскрывает Drift/SQLite, transport или sync-specific types и не имеет unbounded-варианта каталога.
+    - Query/page types выражают три scope, фильтр названия, поле и направление порядка, проверяемый конечный page size, opaque cursor, облегчённые summaries, точный count и конец выдачи.
+    - Commands и sealed results/failures исчерпывающе различают create/change/no-op/delete, validation/not-found/conflict/unavailable/corruption; только `watchById` использует typed error channel с новой подпиской для retry.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/application/intention_contract_test.dart` для исчерпывающих success/failure variants, no-op/delete payloads и stream failure lifecycle.
+    - Выполнить `flutter test test/intention/application/intention_contract_test.dart` для page bounds, query variants, success/failure variants, no-op/delete payloads и `watchById` failure lifecycle.
     - Выполнить `flutter analyze` и проверить исчерпывающую обработку sealed variants.
   - **Зависимости:** 2.1.
   - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_command.dart`, `lib/src/intention/application/intention_result.dart`, `test/intention/application/intention_contract_test.dart`.
@@ -76,8 +73,8 @@
 
 - [ ] 2.3 Ввести `DiagnosticsSink` с безопасными структурированными событиями и проверяемым запретом пользовательских данных
   - **Критерии приёмки:**
-    - Контракт поддерживает события bootstrap/migration, чтения и commands с типом операции, длительностью, outcome, failure code, ожидаемой и обнаруженной версиями схемы.
-    - Production adapter не записывает названия, описания, UUID, SQL-параметры или полные database exceptions.
+    - Контракт поддерживает события bootstrap/migration, страничного чтения, подробного чтения и commands с типом операции, длительностью, page size, outcome, failure code и версиями схемы там, где они применимы.
+    - Production adapter не записывает фильтр, названия, описания, UUID, cursors, SQL-параметры или полные database exceptions.
     - In-memory adapter позволяет проверять диагностику без внешней telemetry.
   - **Проверка:**
     - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` с canary-значениями пользовательского текста и UUID.
@@ -87,7 +84,7 @@
 
 - [ ] 2.4 Проверить предметный контракт до реализации постоянного adapter
   - **Критерии приёмки:**
-    - Граничные Unicode-инварианты, identity, все варианты command/result и завершение watch stream после typed failure проходят unit tests.
+    - Граничные Unicode-инварианты, identity, все варианты catalog query/page, command/result и завершение `watchById` после typed failure проходят unit tests.
     - Публичная seam не содержит storage-, transport-, sync- или Flutter-specific types и допускает замену adapter без изменения callers.
   - **Проверка:**
     - Выполнить `flutter test test/intention/domain test/intention/application test/shared/diagnostics`.
@@ -98,79 +95,122 @@
 
 ## 3. Версионируемый lifecycle локальных данных
 
-- [ ] 3.1 Реализовать `AppDatabase` schema version 1, production/in-memory executors и защиту от более новой версии хранилища
+- [ ] 3.1 Связать Android production connection с фактически исключённым из backup внутренним каталогом
   - **Критерии приёмки:**
-    - Таблица хранит UUID `TEXT PRIMARY KEY`, нормализованное название, nullable описание, готовность, архивное состояние и UTC timestamps в микросекундах без unique index по названию.
-    - Production connection Android host открывает один файл во внутреннем app-specific storage в background isolate, а `AppDatabase`, migrations и тестовый in-memory executor не зависят от Android paths или permissions.
-    - Отсутствующая или текущая версия открывается с `PRAGMA foreign_keys = ON`, а версия выше `AppDatabase.schemaVersion` возвращает typed `incompatibleSchema` до feature query и не изменяет, не удаляет и не пересоздаёт database.
+    - Production connection явно передаёт `getApplicationDocumentsDirectory` как `DriftNativeOptions.databaseDirectory` в `driftDatabase(name: 'doable', ...)`, открывает `root/app_flutter/doable.sqlite` в background isolate и не переносит Android-specific расположение в `AppDatabase` или предметные interfaces.
+    - Android 12+ data extraction rules и Android 11- full backup rules исключают весь `root/app_flutter/` из cloud backup и device-to-device transfer, охватывая SQLite-файл, WAL/SHM и соседние служебные файлы; прежнее исключение только `database` domain не считается достаточным.
+    - Contract test разрешает production directory/name в ожидаемые Android `domain/path`, структурно проверяет оба XML-файла и падает для несовпадающего domain или неполного пути.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/database_connection_test.dart test/android/backup_policy_test.dart`.
+    - Выполнить `flutter build apk --debug` и проверить подключение обоих наборов правил в merged manifest.
+  - **Зависимости:** 1.1, 1.3.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/database_connection.dart`, `android/app/src/main/res/xml/data_extraction_rules.xml`, `android/app/src/main/res/xml/backup_rules.xml`, `test/data/local/database_connection_test.dart`, `test/android/backup_policy_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 3.2 Реализовать основную `AppDatabase` schema version 1, in-memory executor и защиту от более новой версии
+  - **Критерии приёмки:**
+    - Таблица хранит UUID `TEXT PRIMARY KEY`, исходное название, внутренний search key, nullable описание, готовность, архивное состояние и UTC timestamps без unique index по названию.
+    - `AppDatabase` принимает `QueryExecutor`, не знает Android-путей, а in-memory executor позволяет проверять schema и migrations без platform host.
+    - Текущая версия открывается с `foreign_keys = ON`, а более новая возвращает typed `incompatibleSchema` до feature query без записи, downgrade или destructive recovery.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
     - Выполнить `flutter test test/data/local/app_database_test.dart test/data/local/database_version_compatibility_test.dart`.
-  - **Зависимости:** 1.1, 2.1.
-  - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/database_connection.dart`, `lib/src/data/local/app_database.g.dart`, `test/data/local/app_database_test.dart`, `test/data/local/database_version_compatibility_test.dart`.
-  - **Оценка:** M (5 файлов).
+  - **Зависимости:** 2.1, 3.1.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/app_database.g.dart`, `test/data/local/app_database_test.dart`, `test/data/local/database_version_compatibility_test.dart`.
+  - **Оценка:** M (4 файла).
 
-- [ ] 3.2 Зафиксировать schema snapshot версии 1 и generated step-by-step migration harness
+- [ ] 3.3 Добавить FTS5 trigram-индекс названий, cursor indexes и транзакционную проверку согласованности
   - **Критерии приёмки:**
-    - `drift_dev` конфигурация экспортирует и навсегда коммитит snapshot версии 1, который совпадает с фактической schema и становится исходной точкой всех следующих опубликованных переходов.
-    - Generated step-by-step helper и migration test harness позволяют добавлять один `fromNToN+1` для каждой будущей версии и проверять прямой переход с любого сохранённого snapshot до целевой версии.
-    - Повторный `make-migrations` и code generation не создают дополнительного diff.
+    - Drift schema включает FTS5 external-content table с регистронезависимым trigram без удаления диакритики и timestamp/id indexes для обоих полей порядка.
+    - Insert/update/delete triggers атомарно поддерживают FTS rows вместе с основной таблицей, а пользовательский title не заменяется внутренним search key.
+    - Tests доказывают consistency основной таблицы и FTS после create/rename/delete, rollback и повторного открытия.
   - **Проверка:**
-    - Выполнить `dart run drift_dev make-migrations` с зафиксированной проектной конфигурацией.
-    - Выполнить generated schema tests и повторить `dart run drift_dev make-migrations` без дополнительного diff.
-  - **Зависимости:** 3.1.
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs` с `sqlite_module: [fts5]`.
+    - Выполнить `flutter test test/data/local/intention_search_schema_test.dart`.
+  - **Зависимости:** 3.2.
+  - **Вероятно затронутые файлы:** `build.yaml`, `lib/src/data/local/app_database.drift`, `lib/src/data/local/app_database.dart`, `test/data/local/intention_search_schema_test.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 3.4 Зафиксировать schema snapshot версии 1 и generated step-by-step migration harness
+  - **Критерии приёмки:**
+    - Snapshot версии 1 точно содержит основную таблицу, indexes, FTS virtual table и triggers и становится исходной точкой опубликованных переходов.
+    - Generated helper и harness позволяют добавлять один `fromNToN+1` и проверять прямой переход с любого опубликованного snapshot.
+    - Повторные migration/code generation не создают дополнительного diff.
+  - **Проверка:**
+    - Выполнить `dart run drift_dev make-migrations`, generated schema tests и повторную генерацию без diff.
+  - **Зависимости:** 3.3.
   - **Вероятно затронутые файлы:** `build.yaml`, `drift_schemas/drift_schema_v1.json`, `lib/src/data/local/app_database.steps.dart`, `test/data/local/migrations/schema_v1_test.dart`, `test/data/local/migrations/generated/schema.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 3.3 Реализовать атомарный migration orchestrator и доказать rollback при ошибке или прерывании
+- [ ] 3.5 Реализовать атомарный migration orchestrator и доказать rollback при ошибке или прерывании
   - **Критерии приёмки:**
-    - Orchestrator выключает `foreign_keys` до транзакции, внутри одной write transaction выполняет generated DDL/DML migration steps и `foreign_key_check` до commit, а `beforeOpen` снова включает `foreign_keys`; `VACUUM` и destructive fallback отсутствуют.
-    - Fault injection после изменений таблицы, данных и индекса откатывает схему, fixture-данные и marker версии, после чего повторное открытие успешно начинает с прежней целостной версии.
-    - File-backed worker, принудительно завершённый до commit, и fixture с более новой версией доказывают соответственно crash recovery и отказ от feature query, записи, downgrade, удаления или пересоздания файла.
+    - Orchestrator выполняет generated DDL/DML/FTS steps и integrity checks в одной write transaction без `VACUUM` или destructive fallback.
+    - Fault injection откатывает таблицы, FTS, fixture-данные и marker версии, после чего повторное открытие начинает с прежней целостной версии.
+    - File-backed interruption и более новая schema доказывают crash recovery и полный отказ от feature query, записи, downgrade или пересоздания.
   - **Проверка:**
     - Выполнить `flutter test test/data/local/migrations/atomic_migration_test.dart test/data/local/migrations/migration_interruption_test.dart test/data/local/migrations/newer_schema_test.dart`.
-    - Повторно открыть каждый file-backed fixture и проверить schema, данные, marker версии и `PRAGMA foreign_key_check`.
-  - **Зависимости:** 3.1, 3.2.
+  - **Зависимости:** 3.2, 3.4.
   - **Вероятно затронутые файлы:** `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/migrations/atomic_migration_test.dart`, `test/data/local/migrations/migration_interruption_test.dart`, `test/data/local/migrations/newer_schema_test.dart`, `test/support/migration_process_worker.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 3.4 Проверить версионируемую SQLite-основу перед реализацией жизненного цикла
+- [ ] 3.6 Проверить версионируемую SQLite-основу и FTS consistency перед repository
   - **Критерии приёмки:**
-    - In-memory и файловое открытие используют schema version 1 и включённые foreign keys, а более новая версия даёт typed `incompatibleSchema` без изменения файла.
-    - Schema snapshot, generated steps, marker версии, atomic rollback, crash recovery и migration tests согласованы.
-    - Проверки покрывают требования `local-data-lifecycle` к совместимому обновлению, пропуску опубликованных версий, прерыванию migration и отказу от более новой схемы.
+    - In-memory и файловая schema version 1 согласуют основную таблицу, FTS, indexes, triggers и включённые foreign keys.
+    - Snapshot, generated steps, rollback, crash recovery и incompatible-schema behavior проходят совместно.
   - **Проверка:**
     - Выполнить `flutter test test/data/local`.
-    - Повторить `dart run drift_dev make-migrations` и `dart run build_runner build --delete-conflicting-outputs` без дополнительного diff.
-  - **Зависимости:** 3.1, 3.2, 3.3.
+    - Повторить Drift/code generation без дополнительного diff.
+  - **Зависимости:** 3.3, 3.4, 3.5.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
 ## 4. Постоянный жизненный цикл через `IntentionRepository`
 
-- [ ] 4.1 Реализовать создание намерения и реактивное чтение активного каталога, архива и подробных данных
+- [ ] 4.1 Реализовать создание намерения и реактивное чтение его подробных данных
   - **Критерии приёмки:**
     - Создание выдаёт новый UUID v4, принудительно создаёт активное неготовое намерение и атомарно записывает один UTC-момент в оба timestamp.
-    - Одинаковые названия сохраняются как независимые сущности, а `watchCatalog` фильтрует scope и детерминированно сортирует по creation/update timestamp с `id ASC` как tie-breaker.
-    - Streams публикуют начальный snapshot и только подтверждённое после commit состояние; `watchById` возвращает отсутствие для неизвестного идентификатора.
+    - Одинаковые названия сохраняются как независимые сущности, а исходный title и внутренний search key записываются согласованно без изменения пользовательского текста.
+    - `watchById` публикует начальный и последующие подтверждённые snapshots и возвращает отсутствие для неизвестного идентификатора.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_create_read_test.dart`.
-  - **Зависимости:** 2.2, 2.3, 3.4.
+  - **Зависимости:** 2.2, 2.3, 3.6.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/intention/data/intention_mapper.dart`, `test/intention/data/drift_intention_repository_create_read_test.dart`, `test/support/repository_harness.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 4.2 Реализовать атомарное изменение названия и описания с точной семантикой `updatedAt`
+- [ ] 4.2 Реализовать ограниченные cursor-страницы для трёх scopes и четырёх порядков
+  - **Критерии приёмки:**
+    - `getCatalogPage` возвращает не больше page size summaries, точный count и следующий cursor для active/archive/all без загрузки полного описания или offset.
+    - Created/updated × ascending/descending используют timestamp и `id ASC` как полный порядок и не дают пропусков или повторов при равных timestamps.
+    - Невалидный, чужой или устаревший cursor и неограниченный page size возвращают typed validation failure без выполнения unbounded query.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_catalog_page_test.dart`.
+  - **Зависимости:** 4.1.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/intention/data/intention_mapper.dart`, `test/intention/data/drift_intention_repository_catalog_page_test.dart`, `test/support/repository_harness.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 4.3 Реализовать FTS5-фильтр названия, точный count и large-fixture проверку
+  - **Критерии приёмки:**
+    - Фильтр выполняет буквальное регистронезависимое substring-сопоставление с trim, внутренними пробелами и различием `е`/`ё` и диакритики; запросы короче трёх символов используют согласованный fallback.
+    - Count и строки страницы видят один read snapshot, а фильтр и scope применяются до count, порядка и cursor boundary.
+    - Fixture из 50 000 строк подтверждает FTS query plan для строк от трёх символов, timestamp/cursor indexes без фильтра и materialization не больше page size.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_filter_test.dart test/intention/data/drift_intention_repository_large_catalog_test.dart`.
+  - **Зависимости:** 4.2.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_filter_test.dart`, `test/intention/data/drift_intention_repository_large_catalog_test.dart`, `test/support/large_intention_fixture.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 4.4 Реализовать атомарное изменение названия и описания с точной семантикой `updatedAt`
   - **Критерии приёмки:**
     - Допустимые изменения активного и архивированного намерения сохраняют идентификатор, `createdAt` и архивное состояние.
     - Фактическое изменение обновляет `updatedAt`, а no-op возвращает текущий `IntentionSaved` без записи и вместе с отклонённым значением или failure оставляет оба прежних timestamp.
-    - Ошибка не заменяет последний подтверждённый snapshot в streams.
+    - Rename атомарно обновляет исходный title, search key и FTS entry; failure не заменяет подтверждённый `watchById` snapshot или catalog summary.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_edit_test.dart`.
   - **Зависимости:** 4.1.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/intention/application/intention_command.dart`, `test/intention/data/drift_intention_repository_edit_test.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 4.3 Реализовать отдельные commands включения и выключения готовности к действию без автоматической классификации
+- [ ] 4.5 Реализовать отдельные commands включения и выключения готовности к действию без автоматической классификации
   - **Критерии приёмки:**
     - Новое намерение нельзя создать готовым, а готовность активного или архивированного намерения меняется только соответствующим явным command.
     - Изменение названия или описания никогда не меняет готовность побочным эффектом.
@@ -181,59 +221,59 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/intention/application/intention_command.dart`, `test/intention/data/drift_intention_repository_readiness_test.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 4.4 Проверить создание, чтение, изменение и готовность через публичную seam
+- [ ] 4.6 Проверить создание, страничное чтение, фильтр, изменение и готовность через публичную seam
   - **Критерии приёмки:**
     - Все выполненные операции наблюдаемы через `IntentionRepository`, а тесты не обращаются к внутренним Drift rows для доказательства пользовательского поведения.
-    - Активный каталог, архив и подробный поток остаются согласованными после каждого commit.
+    - Три scope, четыре порядка, фильтр, exact count, pages и подробный stream показывают только подтверждённое состояние после каждого commit.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/data/drift_intention_repository_create_read_test.dart test/intention/data/drift_intention_repository_edit_test.dart test/intention/data/drift_intention_repository_readiness_test.dart`.
-  - **Зависимости:** 4.1, 4.2, 4.3.
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_create_read_test.dart test/intention/data/drift_intention_repository_catalog_page_test.dart test/intention/data/drift_intention_repository_filter_test.dart test/intention/data/drift_intention_repository_edit_test.dart test/intention/data/drift_intention_repository_readiness_test.dart`.
+  - **Зависимости:** 4.1, 4.2, 4.3, 4.4, 4.5.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 4.5 Реализовать архивирование и восстановление намерения без изменения остальных предметных данных
+- [ ] 4.7 Реализовать архивирование и восстановление намерения без изменения остальных предметных данных
   - **Критерии приёмки:**
-    - Архивирование переносит намерение из активного каталога в архив, не меняя его название, описание, идентификатор или готовность.
-    - Восстановление возвращает архивированное намерение в активный каталог с теми же данными.
+    - Архивирование исключает намерение из active, включает в archive и сохраняет в all, не меняя title, description, identity или готовность.
+    - Восстановление выполняет обратное изменение scopes с теми же данными.
     - Каждое фактическое переключение атомарно обновляет `updatedAt`, а no-op не изменяет timestamps.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_archive_test.dart`.
-  - **Зависимости:** 4.1.
+  - **Зависимости:** 4.2.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/intention/application/intention_command.dart`, `test/intention/data/drift_intention_repository_archive_test.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 4.6 Реализовать физическое удаление активного или архивированного несвязанного намерения как отдельный command
+- [ ] 4.8 Реализовать физическое удаление активного или архивированного несвязанного намерения как отдельный command
   - **Критерии приёмки:**
-    - Удаление не требует архивирования, возвращает `IntentionDeleted` с тем же идентификатором только после commit и исключает сущность из обоих каталогов, а подробный поток публикует отсутствие.
+    - Удаление не требует архивирования, возвращает `IntentionDeleted` только после commit, исключает сущность из всех scopes и FTS, а подробный поток публикует отсутствие.
     - Отсутствующее намерение возвращает typed not-found, failure не скрывает запись, а удалённый UUID никогда не переиспользуется новым созданием.
     - Repository оставляет транзакционную точку проверки блокирующих зависимостей для последующих change связей, не моделируя связи заранее.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_delete_test.dart`.
-  - **Зависимости:** 4.1.
+  - **Зависимости:** 4.2.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/intention/application/intention_command.dart`, `test/intention/data/drift_intention_repository_delete_test.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 4.7 Завершить транзакционную классификацию storage failures и безопасную диагностику всех repository operations
+- [ ] 4.9 Завершить транзакционную классификацию storage failures и безопасную диагностику всех repository operations
   - **Критерии приёмки:**
     - Validation, not-found, UUID conflict, unavailable и corruption outcomes стабильно преобразуются в typed failures без утечки database exceptions.
     - Ошибки до commit не публикуют промежуточные snapshots и сохраняют возможность повторить command.
-    - Ошибка чтения публикует ровно одну typed failure в error channel и завершает stream; новая попытка создаёт новую подписку, а raw Drift/SQLite exception не пересекает seam.
-    - Диагностика содержит только разрешённый тип операции, duration, outcome и безопасный code, включая ошибки чтения и закрытую/повреждённую database.
+    - Ошибка страницы возвращает typed failure в `Result`, а ошибка `watchById` завершает stream одной typed failure; raw Drift/SQLite/FTS exception не пересекает seam.
+    - Диагностика страницы содержит только operation, duration, page size, outcome и safe code без фильтра, UUID, cursor или SQL parameters.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_failure_test.dart`.
     - Выполнить `flutter test test/shared/diagnostics`.
-  - **Зависимости:** 2.3, 4.2, 4.3, 4.5, 4.6.
+  - **Зависимости:** 2.3, 4.3, 4.4, 4.5, 4.7, 4.8.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/intention/data/storage_failure_mapper.dart`, `test/intention/data/drift_intention_repository_failure_test.dart`, `test/support/failing_query_executor.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 4.8 Проверить полный repository lifecycle и отсутствие регрессий хранилища
+- [ ] 4.10 Проверить полный repository lifecycle и отсутствие регрессий хранилища
   - **Критерии приёмки:**
-    - Создание, два порядка чтения, изменение, готовность, архивирование, восстановление и удаление проходят через одну seam на in-memory SQLite.
+    - Создание, три scope, четыре порядка, фильтр, cursor pages, exact count, изменение, готовность, архивирование, восстановление и удаление проходят через одну seam.
     - Ошибочные, отклонённые и no-op operations сохраняют подтверждённые данные и timestamps.
   - **Проверка:**
     - Выполнить `flutter test test/intention test/data/local test/shared/diagnostics`.
     - Выполнить `flutter analyze`.
-  - **Зависимости:** 4.4, 4.5, 4.6, 4.7.
+  - **Зависимости:** 4.6, 4.7, 4.8, 4.9.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
@@ -247,47 +287,58 @@
     - Loading, retryable failure, успешное восстановление после явного retry и non-retryable более новая schema наблюдаемо соответствуют сценариям `local-data-lifecycle`.
   - **Проверка:**
     - Выполнить `flutter test test/app/bootstrap` с отдельным `ProviderContainer` для loading, success, первого failure без автоматического повтора, явного retry и dispose.
-  - **Зависимости:** 1.2, 3.4, 4.8.
+  - **Зависимости:** 1.2, 3.6, 4.10.
   - **Вероятно затронутые файлы:** `lib/main.dart`, `lib/src/app/bootstrap/bootstrap_providers.dart`, `lib/src/app/bootstrap/bootstrap_view_model.dart`, `lib/src/app/app.dart`, `test/app/bootstrap/app_bootstrap_test.dart`.
   - **Оценка:** M (5 файлов).
 
 - [ ] 5.2 Настроить `MaterialApp.router` и generated типизированные AutoRoute-маршруты для внутренних переходов
   - **Критерии приёмки:**
-    - `AppRouter` через `@AutoRouterConfig` и страницы через `@RoutePage` генерируют `PageRouteInfo` для каталога, создания и подробного просмотра; маршрут подробного просмотра требует предметный `IntentionId`, а router получается из generated `keepAlive` provider.
+    - Generated routes для каталога, создания и подробного просмотра требуют предметный `IntentionId` там, где он применим, и возвращают необязательный typed `IntentionCommandSuccess` исходному каталогу.
     - Внутренние переходы используют только generated route objects; строковые `pushNamed`, `replaceNamed`, `navigateNamed`, route names и ручная сборка path отсутствуют в прикладном коде.
     - Внешняя схема URI, строковый path-параметр, deep-link adapter и platform-регистрация внешних маршрутов отсутствуют; маршрут подробного просмотра не принимает недоверенную строку и не требует routing-level parser идентификатора.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `flutter analyze`, чтобы проверить generated route types и обязательные аргументы.
-    - Выполнить `flutter test test/app/routing` для типизированных переходов из активного каталога и архива, обязательного `IntentionId` и возврата в исходный scope.
+    - Выполнить `flutter test test/app/routing` для переходов из трёх scopes, обязательного `IntentionId`, typed saved/deleted result и возврата в исходный query state.
     - Выполнить `rg -n --glob '!*.gr.dart' "pushNamed|replaceNamed|navigateNamed" lib` и убедиться, что строковая навигация отсутствует.
   - **Зависимости:** 5.1.
   - **Вероятно затронутые файлы:** `lib/src/app/app.dart`, `lib/src/app/routing/app_router.dart`, `lib/src/app/routing/app_router.gr.dart`, `test/app/routing/app_router_test.dart`, `test/support/app_harness.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.3 Реализовать активный каталог и архив с реактивными состояниями и переключением порядка
+- [ ] 5.3 Реализовать query state каталога с тремя scopes, фильтром, точным count и четырьмя порядками
   - **Критерии приёмки:**
-    - Generated class-based `@riverpod` Catalog ViewModel хранит порядок, а parameterized Stream provider представляет repository stream через `AsyncValue` и автоматически освобождается после ухода с экрана.
-    - View различает loading/data/empty/failure, явно разделяет активный каталог и архив, предоставляет целевую invalidation для retry и не показывает failure как пустой результат.
-    - Название, наличие описания, готовность и архивное состояние доступны текстом или semantics и не кодируются только цветом.
+    - Generated Catalog `AsyncNotifier` хранит active/archive/all, title filter, created/updated × ascending/descending, первую page, total count и query generation; defaults равны active и created descending.
+    - Debounce берётся из подменяемой `CatalogPagingPolicy`, поздний результат старого фильтра игнорируется, а смена scope сохраняет filter/order, но сбрасывает pages и scroll наверх.
+    - View различает initial loading/data/empty/no-matches/failure, показывает exact count и доступные summary/archived states без опоры только на цвет.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/catalog` через `ProviderContainer` для обоих scope, двух порядков, равных timestamps, loading/empty/failure/явного retry, automatic disposal и stream updates.
+    - Выполнить `flutter test test/intention/presentation/catalog/catalog_query_test.dart test/intention/presentation/catalog/catalog_view_test.dart` через `ProviderContainer` для трёх scopes, четырёх порядков, trim/case filter, debounce, stale results, count и initial states.
   - **Зависимости:** 5.2.
-  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/catalog_view_model.dart`, `lib/src/intention/presentation/catalog/catalog_state.dart`, `lib/src/intention/presentation/catalog/catalog_view.dart`, `test/intention/presentation/catalog/catalog_view_model_test.dart`, `test/intention/presentation/catalog/catalog_view_test.dart`.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/catalog_view_model.dart`, `lib/src/intention/presentation/catalog/catalog_state.dart`, `lib/src/intention/presentation/catalog/catalog_view.dart`, `test/intention/presentation/catalog/catalog_query_test.dart`, `test/intention/presentation/catalog/catalog_view_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.4 Проверить bootstrap, routing и каталоги как первый читаемый пользовательский срез
+- [ ] 5.4 Реализовать автоматическую подгрузку, сохранение прокрутки и локальную ошибку следующей порции
   - **Критерии приёмки:**
-    - Приложение проходит от bootstrap до активного каталога и архива при success, а retry восстанавливает работу после моделируемой ошибки.
+    - `CatalogPagingPolicy` задаёт production `pageSize = 100` и `prefetchRemaining = 30`, тесты подменяют значения, а `ScrollController` запускает не больше одной следующей страницы у threshold.
+    - Success дедуплицирует summaries по identity и добавляет page, конец прекращает запросы, а next-page failure сохраняет items и показывает inline retry внизу.
+    - `ListView.builder`, `PageStorageKey` и typed route result сохраняют accumulated state/offset при возврате и точечно отражают saved/deleted intention без перечитывания прежних pages.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/catalog/catalog_paging_test.dart test/intention/presentation/catalog/catalog_scroll_state_test.dart`.
+  - **Зависимости:** 5.3.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/catalog_view_model.dart`, `lib/src/intention/presentation/catalog/catalog_state.dart`, `lib/src/intention/presentation/catalog/catalog_view.dart`, `test/intention/presentation/catalog/catalog_paging_test.dart`, `test/intention/presentation/catalog/catalog_scroll_state_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 5.5 Проверить bootstrap, routing и каталог как первый читаемый пользовательский срез
+  - **Критерии приёмки:**
+    - Приложение проходит от bootstrap до трёх scopes каталога, фильтра, count и автоматической подгрузки, а retry восстанавливает initial или следующую page после моделируемой ошибки.
     - Более новая версия хранилища оставляет feature routes и repository недоступными, показывает локализованное требование обновить приложение без retry и не изменяет database.
-    - Внутренний переход к намерению из активного каталога или архива и возврат сохраняют исходный scope и корректное состояние навигации.
+    - Переход к намерению из любого scope и возврат сохраняют query, loaded pages, scroll и корректно применяют typed result.
   - **Проверка:**
     - Выполнить `flutter test test/app test/intention/presentation/catalog`.
     - Выполнить `flutter analyze`.
-  - **Зависимости:** 5.1, 5.2, 5.3.
+  - **Зависимости:** 5.1, 5.2, 5.3, 5.4.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 5.5 Реализовать общий presentation-модуль для эксклюзивного выполнения одной асинхронной операции
+- [ ] 5.6 Реализовать общий presentation-модуль для эксклюзивного выполнения одной асинхронной операции
   - **Критерии приёмки:**
     - `ExclusiveOperation` предоставляет одну синхронную операцию `start`: первый вызов резервирует экземпляр и возвращает принятое выполнение с его `Future`, а вызов занятого экземпляра возвращает отдельный outcome `alreadyRunning`, не вызывая и не ставя в очередь второе действие.
     - Gate освобождается после success, failure или неожиданной ошибки принятого действия; общий неизменяемый `OperationState<TResult>` предоставляет ViewModels статусы `idle`, `running`, `succeeded` и `failed`, но module не знает о предметных сущностях, repository, локализации или навигации.
@@ -298,84 +349,80 @@
   - **Вероятно затронутые файлы:** `lib/src/shared/presentation/exclusive_operation.dart`, `test/shared/presentation/exclusive_operation_test.dart`.
   - **Оценка:** S (2 файла).
 
-- [ ] 5.6 Реализовать пользовательский поток создания намерения без optimistic сохранения
+- [ ] 5.7 Реализовать пользовательский поток создания намерения без optimistic сохранения
   - **Критерии приёмки:**
     - Generated class-based `@riverpod` Editor ViewModel и форма используют общую предметную Unicode-валидацию, локализуют ошибки и не предлагают включить готовность при создании.
     - Отдельный для экземпляра формы `ExclusiveOperation` делает повторную отправку недоступной, защитно не запускает и не ставит её в очередь во время `running`, публикует одноразовый success event для навигации и сохраняет введённые данные для явного retry при failure.
-    - Созданное намерение появляется в активном каталоге через repository stream, а пользовательский текст отображается без перевода или преобразования.
+    - Typed `IntentionSaved` возвращается каталогу, который вставляет совпадающий summary, корректирует count и порядок без полного перечитывания; пользовательский текст не переводится и не преобразуется.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/editor/create_intention_test.dart` с пробелами, одинаковыми названиями, Unicode-границами, сохранением полей и повторной доступностью отправки после failure, а также double-submit без второго repository command.
-  - **Зависимости:** 4.2, 5.3, 5.5.
+  - **Зависимости:** 4.1, 5.4, 5.6.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_view.dart`, `lib/src/intention/presentation/editor/intention_form.dart`, `test/intention/presentation/editor/create_intention_test.dart`, `test/support/fake_intention_repository.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.7 Реализовать подробный просмотр и изменение названия и описания активного или архивированного намерения
+- [ ] 5.8 Реализовать подробный просмотр и изменение названия и описания активного или архивированного намерения
   - **Критерии приёмки:**
-    - Parameterized Stream provider представляет подробные данные через `AsyncValue`, а generated class-based `@riverpod` Details ViewModel переиспользует для каждого `IntentionId` единый `ExclusiveOperation` и общий `OperationState` с видом текущей операции, сохраняя последний подтверждённый snapshot при write failure.
-    - Пока mutation имеет статус `running`, ViewModel оставляет чтение активным, делает все изменяющие controls этого намерения недоступными и защитной проверкой не запускает и не ставит в очередь второй command; разные `IntentionId` не разделяют этот gate.
-    - Первый snapshot имеет отдельное loading-состояние, успешный `null` показывает локализованный not-found, а typed read failure показывает отличимое сообщение об ошибке и явный retry только для устранимого случая.
-    - Retry инвалидирует только provider текущего `IntentionId`, создаёт новую `watchById`-подписку и при успехе восстанавливает подробные данные; automatic disposal отменяет подписку после ухода последнего слушателя, а повторное открытие начинает новое чтение.
-    - Пользователь видит название, полное описание, готовность и явное архивное состояние и может изменить текст без предварительного восстановления.
-    - Success обновляет то же намерение с прежним идентификатором, а отмена, validation failure и storage failure сохраняют прежнее подтверждённое состояние.
+    - Parameterized `watchById` provider различает initial loading, data, not-found и typed failure; targeted retry создаёт новую подписку, а automatic disposal корректно завершает прежнюю.
+    - Details ViewModel использует один mutation gate на `IntentionId`, оставляет подтверждённый snapshot видимым и не допускает второй command того же намерения, не блокируя другое.
+    - Активное или архивированное намерение редактируется без восстановления; success возвращает typed saved result каталогу, а cancel/validation/storage failure сохраняют прежние данные.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/intention_details_read_states_test.dart test/intention/presentation/details/edit_intention_test.dart` для initial loading, data, not-found, read failure, targeted retry, recovery, disposal/re-entry, active/archive, no-op, validation и storage failure.
-  - **Зависимости:** 4.2, 5.2, 5.5, 5.6.
+  - **Зависимости:** 4.4, 5.2, 5.6, 5.7.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/intention_details_view.dart`, `lib/src/intention/presentation/editor/intention_editor_view.dart`, `test/intention/presentation/details/intention_details_read_states_test.dart`, `test/intention/presentation/details/edit_intention_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.8 Реализовать явное подтверждение включения и обратимое выключение готовности к действию
+- [ ] 5.9 Реализовать явное подтверждение включения и обратимое выключение готовности к действию
   - **Критерии приёмки:**
     - Перед включением локализованный dialog объясняет оба критерия: полную выполнимость за один день и операционную понятность; отмена не запускает command.
     - Выключение остаётся отдельным явным действием, а название или описание не запускают автоматическую классификацию.
     - Общий для `IntentionId` mutation `OperationState` указывает операцию готовности, предотвращает double-submit и любое другое изменение до результата, а затем публикует доступный одноразовый success/failure event, сохраняя последний подтверждённый snapshot.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/readiness_test.dart` для confirm/cancel, enable/disable, failure и semantics.
-  - **Зависимости:** 4.3, 5.7.
+  - **Зависимости:** 4.5, 5.8.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/readiness_dialog.dart`, `lib/src/intention/presentation/details/intention_details_view.dart`, `test/intention/presentation/details/readiness_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 5.9 Проверить создание, подробный просмотр, изменение и готовность как законченный редактируемый срез
+- [ ] 5.10 Проверить создание, подробный просмотр, изменение и готовность как законченный редактируемый срез
   - **Критерии приёмки:**
     - Пользователь может создать намерение, открыть его, изменить текст, включить и выключить готовность с согласованным обновлением каталога.
     - Отмены и моделируемые failures не показывают несохранённое состояние как подтверждённое.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/editor test/intention/presentation/details`.
-  - **Зависимости:** 5.6, 5.7, 5.8.
+  - **Зависимости:** 5.7, 5.8, 5.9.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 5.10 Реализовать архивирование активного намерения и восстановление архивированного намерения в UI
+- [ ] 5.11 Реализовать архивирование активного намерения и восстановление архивированного намерения в UI
   - **Критерии приёмки:**
     - Доступная операция зависит от текущего архивного состояния и не представляется как выполнение или удаление.
-    - Success реактивно перемещает намерение между каталогами без изменения текста и готовности; failure оставляет подробный snapshot и даёт повторить операцию, а общий mutation gate до результата исключает пересечение с edit, readiness и delete.
+    - Typed success обновляет принадлежность active/archive/all, count и summary без изменения текста и готовности; failure оставляет подробный snapshot и даёт повторить операцию.
     - Архивированное намерение остаётся доступным для просмотра и изменения.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/archive_restore_test.dart` для active/archive, success, failure и stream update.
-  - **Зависимости:** 4.5, 5.7.
+  - **Зависимости:** 4.7, 5.8.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/intention_details_view.dart`, `test/intention/presentation/details/archive_restore_test.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 5.11 Реализовать отдельное необратимое удаление активного или архивированного намерения с подтверждением
+- [ ] 5.12 Реализовать отдельное необратимое удаление активного или архивированного намерения с подтверждением
   - **Критерии приёмки:**
     - Delete недоступен как случайный побочный эффект архивирования и запускается только после локализованного явного подтверждения необратимости.
-    - Отмена не выполняет command; success закрывает подробный экран и удаляет запись из обоих каталогов; failure сохраняет запись и предоставляет retry, а во время delete общий mutation gate не допускает другого изменения и второго события результата.
+    - Отмена не выполняет command; typed success закрывает подробный экран и удаляет summary из всех scopes с обновлением count; failure сохраняет запись и предоставляет retry.
     - Dialog и результат операции имеют корректные semantics и не раскрывают пользовательский текст в diagnostics.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/delete_intention_test.dart` для active/archive, confirm/cancel, success/failure и double-submit.
-  - **Зависимости:** 4.6, 4.7, 5.7.
+  - **Зависимости:** 4.8, 4.9, 5.8.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/delete_confirmation_dialog.dart`, `lib/src/intention/presentation/details/intention_details_view.dart`, `test/intention/presentation/details/delete_intention_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 5.12 Проверить полный пользовательский жизненный цикл намерения через Riverpod overrides на fake repository
+- [ ] 5.13 Проверить полный пользовательский жизненный цикл намерения через Riverpod overrides на fake repository
   - **Критерии приёмки:**
-    - Widget tests покрывают создание, каталоги, подробности, изменение, готовность, архивирование, восстановление и удаление.
-    - Отдельный `ProviderContainer`/`ProviderScope` override подменяет только `IntentionRepository`; для каждой операции проверены running/success/failure, одноразовые events, automatic disposal и сохранение последнего подтверждённого snapshot.
-    - Parameterized tests для общего mutation gate доказывают, что любая выполняющаяся edit/readiness/archive/restore/delete operation блокирует запуск и постановку в очередь второй операции того же `IntentionId`; после success операции, сохраняющей существование намерения, или failure любой операции допустимые controls снова доступны, после delete success подробный просмотр завершается и controls удалённого намерения отсутствуют, а операция другого `IntentionId` остаётся независимой.
-    - Fake adapter соблюдает те же `IntentionSaved`/`IntentionDeleted` payloads и завершение watch stream после typed failure, что и production adapter; явный retry создаёт новую подписку.
+    - Widget tests покрывают каталог с paging/filter/count/sort, создание, подробности, изменение, готовность, архивирование, восстановление и удаление через override только `IntentionRepository`.
+    - Parameterized mutation tests покрывают running/success/failure, одноразовые events, общий gate одного `IntentionId`, независимость другого и отсутствие controls после delete.
+    - Fake adapter соблюдает page bounds/count/cursor, typed saved/deleted payloads, page failure через `Result` и завершение только `watchById` после typed stream failure.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation test/app`.
     - Выполнить `flutter analyze`.
-  - **Зависимости:** 5.9, 5.10, 5.11.
+  - **Зависимости:** 5.10, 5.11, 5.12.
   - **Вероятно затронутые файлы:** `test/intention/presentation/details/mutation_serialization_test.dart`.
   - **Оценка:** S (1 файл).
 
@@ -383,24 +430,24 @@
 
 - [ ] 6.1 Проверить локальную долговечность через повторное открытие file-backed SQLite
   - **Критерии приёмки:**
-    - Первый независимый `AppDatabase`/`IntentionRepository` object graph создаёт во временном SQLite-файле представительные активные и архивированные намерения, изменяет текст и готовность к действию и фиксирует ожидаемые идентификаторы, данные и timestamps.
-    - После отмены всех stream-подписок, закрытия первого `AppDatabase` и отбрасывания первого repository instance второй независимо созданный graph открывает тот же файл через новый file-backed `QueryExecutor` и восстанавливает точные идентификаторы, текст, готовность к действию, архивное состояние и timestamps только через публичную repository seam.
-    - Удаление после повторного открытия сохраняется после закрытия второго и открытия третьего graph; in-memory executor, `ProviderContainer`, UI и повторное использование прежних database/repository objects отсутствуют, а временный файл очищается только после финальных assertions.
+    - Первый независимый object graph создаёт активные и архивированные намерения, изменяет title/готовность и фиксирует expected identities, timestamps, scopes, filter results и count.
+    - Второй graph открывает тот же файл и восстанавливает данные, FTS-фильтр, cursor pages и exact count только через публичную seam; FTS consistency подтверждена.
+    - Удаление сохраняется после третьего открытия, а прежние database/repository objects, in-memory executor, UI и `ProviderContainer` не переиспользуются.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_persistence_test.dart`.
-  - **Зависимости:** 3.4, 4.8.
+  - **Зависимости:** 3.6, 4.10.
   - **Вероятно затронутые файлы:** `test/intention/data/drift_intention_repository_persistence_test.dart`, `test/support/repository_harness.dart`.
   - **Оценка:** S (2 файла).
 
 - [ ] 6.2 Закрыть русскую, английскую и fallback локализацию всех системных строк без изменения пользовательского текста
   - **Критерии приёмки:**
-    - Все loading/empty/failure, validation, commands, критерии действия, подтверждения и semantics имеют содержательные `en` и `ru` значения.
+    - Три scopes, filter/count/sort, initial/next-page states, validation, commands, критерии действия, подтверждения и semantics имеют содержательные `en` и `ru` значения.
     - Локали `ru` и `en` показывают соответствующие системные строки, любая другая локаль использует `en`.
     - Сохранённые названия и описания остаются посимвольно одинаковыми при смене локали и выводятся только как plain text.
   - **Проверка:**
     - Выполнить `flutter gen-l10n`.
     - Выполнить `flutter test test/app/localization test/intention/presentation/localization_test.dart`.
-  - **Зависимости:** 5.12.
+  - **Зависимости:** 5.13.
   - **Вероятно затронутые файлы:** `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb`, `test/app/localization/locale_resolution_test.dart`, `test/intention/presentation/localization_test.dart`.
   - **Оценка:** M (4 файла).
 
@@ -412,19 +459,20 @@
   - **Проверка:**
     - Выполнить `flutter test test/accessibility` с semantics assertions и text scale 200%.
     - Выполнить ручной TalkBack smoke test на Android и зафиксировать результат в проверке change.
-  - **Зависимости:** 5.12, 6.2.
+  - **Зависимости:** 5.13, 6.2.
   - **Вероятно затронутые файлы:** `test/accessibility/intention_semantics_test.dart`, `test/accessibility/intention_text_scale_test.dart`, `lib/src/shared/ui/accessible_operation_feedback.dart`.
   - **Оценка:** M (3 файла).
 
 - [ ] 6.4 Проверить Android privacy adapter в release mode и полноту безопасной диагностики
   - **Критерии приёмки:**
-    - Release-mode APK не запрашивает `INTERNET` или внешнее хранилище, а backup rules исключают database, WAL и временные файлы из cloud backup и device-to-device transfer согласно контракту одной установки.
-    - События bootstrap, migration, чтения и каждого command содержат outcome и duration; migration events также содержат только ожидаемую и обнаруженную версии схемы, а тесты с canary-данными не обнаруживают название, описание, UUID, SQL-параметр или полный exception.
-    - Проверка untrusted text/database inputs не выявляет обхода валидации, SQL interpolation, markup rendering или destructive recovery.
+    - Release-mode APK не запрашивает `INTERNET` или внешнее хранилище, production connection разрешается в `root/app_flutter/doable.sqlite`, а оба набора backup rules исключают весь `root/app_flutter/` вместе с SQLite WAL/SHM и соседними служебными файлами из cloud backup и device-to-device transfer.
+    - События bootstrap, migration, page/detail reads и commands содержат только разрешённые поля; canary-тесты не обнаруживают filter, title, description, UUID, cursor, SQL parameter или полный exception.
+    - Проверка untrusted text и FTS query syntax не выявляет обхода literal substring semantics, SQL/FTS injection, markup rendering или destructive recovery.
   - **Проверка:**
     - Выполнить `flutter build apk --release` и проверить permissions через `apkanalyzer manifest permissions build/app/outputs/flutter-apk/app-release.apk`.
+    - Выполнить `flutter test test/data/local/database_connection_test.dart test/android/backup_policy_test.dart`.
     - Выполнить `flutter test test/shared/diagnostics test/security`.
-  - **Зависимости:** 1.3, 4.7, 5.12, 6.1.
+  - **Зависимости:** 3.1, 4.9, 5.13, 6.1.
   - **Вероятно затронутые файлы:** `test/security/privacy_boundary_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** S (2 файла).
 
@@ -432,8 +480,7 @@
   - **Критерии приёмки:**
     - Workflow запускается для pull request и релевантного push из чистого checkout на Linux runner, устанавливает только явно зафиксированные версии используемых инструментов, разрешает зависимости без изменения `pubspec.lock`, а его статус настроен как обязательная проверка защищённой основной ветки.
     - Gate повторяет `flutter gen-l10n`, Riverpod/AutoRoute/Drift code generation и Drift schema/migration generation, после чего требует пустой `git status --porcelain`, включая отсутствие новых незакоммиченных generated files и schema snapshots.
-    - Gate выполняет `mise run check`, file-backed repository и migration tests, собирает release-mode APK, проверяет его manifest permissions и запускает `openspec validate --all --strict --no-interactive`.
-    - Android device/emulator job не создаётся: TalkBack остаётся отдельным ручным Android evidence из задачи 6.3, а CI-сборка и manifest check не объявляются проверкой platform bootstrap после завершения процесса.
+    - Gate выполняет `mise run check`, large-catalog/query-plan, file-backed и migration/FTS tests, release APK/manifest и OpenSpec; TalkBack остаётся отдельным ручным evidence без device/emulator job.
   - **Проверка:**
     - Выполнить workflow в GitHub Actions для чистого commit и подтвердить, что все перечисленные команды присутствуют в log, generated worktree остаётся чистым, а единый required status проходит до merge.
     - Подтвердить, что настройка required status блокирует merge того же pull request при непройденном или отсутствующем результате workflow.
@@ -445,8 +492,7 @@
   - **Критерии приёмки:**
     - Review проверяет корректность, читаемость, архитектуру, безопасность и производительность относительно proposal, spec, design и действующих ADR.
     - Устранены blocking замечания, отсутствуют unrelated refactors, dead code, debug output и дублирование предметных правил.
-    - Отдельно подтверждены storage-neutral seam и независимая идентичность для будущего adapter, отсутствие sync-specific interface/metadata и отсутствие преждевременной модели связей, тегов, поиска или дневного выбора.
-    - Предметный и прикладной modules, capability contracts и interfaces не зависят от Android SDK, путей, permissions или platform channels; Android-specific реализация локализована в host adapter и его evidence.
+    - Подтверждены bounded catalog/FTS/count/cursor, storage-neutral platform-independent seam, независимая identity и отсутствие преждевременных sync, tags, full-text/ranking, links или daily-choice contracts.
   - **Проверка:**
     - Применить `code-review-and-quality` к полному diff и повторить сфокусированные тесты затронутых замечаниями областей.
   - **Зависимости:** 6.5.
@@ -460,7 +506,7 @@
     - Change проходит строгую OpenSpec-валидацию и реализованное поведение не выходит за утверждённый scope.
   - **Проверка:**
     - Выполнить `flutter gen-l10n`, `dart run build_runner build --delete-conflicting-outputs` и убедиться в отсутствии дополнительного generated diff.
-    - Выполнить `flutter test test/data/local/migrations test/intention/data/drift_intention_repository_persistence_test.dart`, `mise run check` и `flutter build apk --release`.
+    - Выполнить `flutter test test/data/local/migrations test/intention/data/drift_intention_repository_large_catalog_test.dart test/intention/data/drift_intention_repository_persistence_test.dart`, `mise run check` и `flutter build apk --release`.
     - Выполнить `openspec validate manage-intentions --type change --strict`.
     - Подтвердить успешный required GitHub Actions status для текущего commit и наличие отдельного ручного TalkBack evidence.
   - **Зависимости:** 6.6.
