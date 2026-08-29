@@ -121,10 +121,11 @@
 
 - [ ] 3.3 Добавить FTS5 trigram-индекс названий, cursor indexes и транзакционную проверку согласованности
   - **Критерии приёмки:**
-    - Drift schema включает FTS5 external-content table с регистронезависимым trigram без удаления диакритики и timestamp/id indexes для обоих полей порядка.
+    - Drift schema включает FTS5 external-content table, связанную с hidden `rowid` таблицы `intentions`, с регистронезависимым trigram без удаления диакритики и timestamp/id indexes для обоих полей порядка; UUID `id` остаётся `TEXT PRIMARY KEY` и не заменяется storage rowid.
     - Корневой `build.yaml` настраивает анализатор `drift_dev` через `sql` → `dialect: sqlite` → `options` → `modules: [fts5]`; устаревшие или неподдерживаемые плоские ключи не используются, а build-time настройка не считается доказательством runtime-поддержки.
     - Insert/update/delete triggers атомарно поддерживают FTS rows вместе с основной таблицей, а пользовательский title не заменяется внутренним search key.
-    - Tests через тот же native executor, который лежит в основе production adapter, действительно создают FTS5 virtual table, выполняют `MATCH` и доказывают consistency основной таблицы и FTS после create/rename/delete, rollback и повторного открытия.
+    - Tests через тот же native executor, который лежит в основе production adapter, действительно создают FTS5 virtual table, выполняют `MATCH` и index-aware `integrity-check` с `rank = 1` после initial backfill, create/rename/delete, rollback и повторного открытия.
+    - Отрицательная fixture намеренно рассогласует FTS-индекс с `intentions` и доказывает, что обычное external-content чтение ошибку не обнаруживает, а `integrity-check` с `rank = 1` завершается ошибкой.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs`; команда должна прочитать корневой `build.yaml` без неизвестных options и сгенерировать FTS5 queries без ошибок анализа `CREATE VIRTUAL TABLE` или `MATCH`.
     - Выполнить `flutter test test/data/local/intention_search_schema_test.dart`.
@@ -145,8 +146,9 @@
 
 - [ ] 3.5 Реализовать атомарный migration orchestrator и доказать rollback при ошибке или прерывании
   - **Критерии приёмки:**
-    - Orchestrator выполняет generated DDL/DML/FTS steps и integrity checks в одной write transaction без `VACUUM` или destructive fallback.
-    - Fault injection откатывает таблицы, FTS, fixture-данные и marker версии, после чего повторное открытие начинает с прежней целостной версии.
+    - Orchestrator выполняет generated DDL/DML/FTS steps, `foreign_key_check` и для каждого затрагивающего FTS перехода `integrity-check` с `rank = 1` в одной write transaction до commit, без destructive fallback.
+    - Перестроение `intentions` внутри migration step либо явно сохраняет hidden rowids, либо атомарно пересоздаёт и заполняет FTS из окончательной основной таблицы; `VACUUM` и иные нетранзакционные rowid-rewriting paths отсутствуют в migration, production maintenance и diagnostics.
+    - Fault injection откатывает таблицы, FTS, fixture-данные и marker версии, после чего повторное открытие начинает с прежней целостной версии и проходит тот же index-aware FTS check.
     - File-backed interruption и более новая schema доказывают crash recovery и полный отказ от feature query, записи, downgrade или пересоздания.
   - **Проверка:**
     - Выполнить `flutter test test/data/local/migrations/atomic_migration_test.dart test/data/local/migrations/migration_interruption_test.dart test/data/local/migrations/newer_schema_test.dart`.
@@ -156,8 +158,8 @@
 
 - [ ] 3.6 Проверить версионируемую SQLite-основу и FTS consistency перед repository
   - **Критерии приёмки:**
-    - In-memory и файловая schema version 1 согласуют основную таблицу, FTS, indexes, triggers и включённые foreign keys.
-    - Snapshot, generated steps, rollback, crash recovery и incompatible-schema behavior проходят совместно.
+    - In-memory и файловая schema version 1 согласуют основную таблицу, FTS, indexes, triggers и включённые foreign keys; index-aware `integrity-check` с `rank = 1` проходит после создания, backfill и повторного открытия.
+    - Snapshot, generated steps, rollback, crash recovery и incompatible-schema behavior проходят совместно, а отрицательная FTS fixture подтверждает чувствительность проверки к реальному рассогласованию индекса.
   - **Проверка:**
     - Выполнить `flutter test test/data/local`.
     - Повторить Drift/code generation без дополнительного diff.
@@ -433,7 +435,7 @@
 - [ ] 6.1 Проверить локальную долговечность через повторное открытие file-backed SQLite
   - **Критерии приёмки:**
     - Первый независимый object graph создаёт активные и архивированные намерения, изменяет title/готовность и фиксирует expected identities, timestamps, scopes, filter results и count.
-    - Второй graph открывает тот же файл и восстанавливает данные, FTS-фильтр, cursor pages и exact count только через публичную seam; FTS consistency подтверждена.
+    - Второй graph открывает тот же файл и восстанавливает данные, FTS-фильтр, cursor pages и exact count только через публичную seam; storage-level harness после повторного открытия дополнительно подтверждает FTS consistency через `integrity-check` с `rank = 1`.
     - Удаление сохраняется после третьего открытия, а прежние database/repository objects, in-memory executor, UI и `ProviderContainer` не переиспользуются.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_persistence_test.dart`.
