@@ -59,7 +59,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention.dart`, `lib/src/intention/domain/intention_id.dart`, `lib/src/intention/domain/intention_text.dart`, `test/intention/domain/intention_text_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 2.2 Определить закрытые commands, typed `Result`/failures и небольшую seam `IntentionRepository`
+- [x] 2.2 Определить закрытые commands, typed `Result`/failures и небольшую seam `IntentionRepository`
   - **Критерии приёмки:**
     - Interface предоставляет только `watchCatalog`, `watchById` и `execute`, не раскрывая Drift или SQLite types.
     - Interface не раскрывает расположение данных, transport или состояние синхронизации; sync-specific методы, remote port, outbox, tombstones и revisions отсутствуют.
