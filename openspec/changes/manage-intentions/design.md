@@ -265,7 +265,22 @@ UI следует однонаправленному потоку: repository п
 
 Уникального индекса на `title` нет. `title_search_key` вычисляется repository из уже нормализованного названия единым Unicode-преобразованием регистра и никогда не показывается вместо исходного текста; `е`/`ё` и диакритика не сворачиваются. Идентификатор не переиспользуется после удаления. SQL-ограничения защищают обязательность и форму сохранённых значений, но не заменяют предметную валидацию расширенных графемных кластеров в repository: SQLite не является источником истины для пользовательски воспринимаемой длины Unicode-текста. Все запросы строятся типизированным API Drift или параметризованными variables; пользовательский текст не конкатенируется с SQL.
 
-Версия 1 также создаёт external-content virtual table `intention_titles_fts` через SQLite FTS5 с `tokenize = 'trigram case_sensitive 0 remove_diacritics 0'`, индексирующую `title_search_key` и связанную с hidden `rowid` таблицы `intentions`. Insert/update/delete triggers обновляют FTS-индекс в той же transaction, что и основную строку; миграционная проверка сравнивает количество и содержимое индексируемых записей с основной таблицей. FTS5 включается для Drift generated queries через `sqlite_module: [fts5]`; [Drift поддерживает FTS5 virtual tables](https://drift.simonbinder.eu/sql_api/extensions/), а [trigram tokenizer SQLite предназначен для substring matching](https://www.sqlite.org/fts5.html#the_trigram_tokenizer). Используемая `package:sqlite3` native build включает `SQLITE_ENABLE_FTS5` согласно её [официальным build options](https://pub.dev/documentation/sqlite3/latest/topics/hook-topic.html).
+Версия 1 также создаёт external-content virtual table `intention_titles_fts` через SQLite FTS5 с `tokenize = 'trigram case_sensitive 0 remove_diacritics 0'`, индексирующую `title_search_key` и связанную с hidden `rowid` таблицы `intentions`. Insert/update/delete triggers обновляют FTS-индекс в той же transaction, что и основную строку; миграционная проверка сравнивает количество и содержимое индексируемых записей с основной таблицей. Корневой `build.yaml` сообщает анализатору `drift_dev` 2.34.5 о FTS5 через поддерживаемую вложенную конфигурацию:
+
+```yaml
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          sql:
+            dialect: sqlite
+            options:
+              modules:
+                - fts5
+```
+
+Эта настройка разрешает статический анализ FTS5 virtual tables и оператора `MATCH`, но сама не включает extension в runtime SQLite, что явно оговорено в [официальных generation options Drift](https://drift.simonbinder.eu/generation_options/#available-extensions). Runtime-контракт проверяется отдельно через тот же native executor, который использует production adapter: schema test действительно создаёт FTS5 virtual table и выполняет `MATCH`. Используемая native-сборка `package:sqlite3` включает `SQLITE_ENABLE_FTS5` согласно [официальному описанию Drift Native](https://drift.simonbinder.eu/platforms/vm/#used-compile-options-on-android), а [trigram tokenizer SQLite предназначен для substring matching](https://www.sqlite.org/fts5.html#the_trigram_tokenizer).
 
 Допустимый непустой фильтр, чей готовый search key содержит не меньше трёх кодовых точек Unicode, преобразуется в безопасно экранированную единственную FTS phrase и передаётся параметром `MATCH`; это не позволяет пользовательскому тексту стать FTS operator. Поскольку trigram не индексирует подстроки короче трёх кодовых точек, допустимый search key из одной или двух кодовых точек использует параметризованный `instr(title_search_key, query_search_key)` по основной таблице. Фильтр длиннее 255 расширенных графемных кластеров отклоняется до построения search key и FTS phrase, открытия read transaction, `COUNT` или чтения строк. Обе ветви допустимого поиска дополнительно проверяются одинаковыми fixtures, чтобы наблюдаемая семантика буквальной подстроки не зависела от выбранного пути.
 

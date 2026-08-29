@@ -122,10 +122,11 @@
 - [ ] 3.3 Добавить FTS5 trigram-индекс названий, cursor indexes и транзакционную проверку согласованности
   - **Критерии приёмки:**
     - Drift schema включает FTS5 external-content table с регистронезависимым trigram без удаления диакритики и timestamp/id indexes для обоих полей порядка.
+    - Корневой `build.yaml` настраивает анализатор `drift_dev` через `sql` → `dialect: sqlite` → `options` → `modules: [fts5]`; устаревшие или неподдерживаемые плоские ключи не используются, а build-time настройка не считается доказательством runtime-поддержки.
     - Insert/update/delete triggers атомарно поддерживают FTS rows вместе с основной таблицей, а пользовательский title не заменяется внутренним search key.
-    - Tests доказывают consistency основной таблицы и FTS после create/rename/delete, rollback и повторного открытия.
+    - Tests через тот же native executor, который лежит в основе production adapter, действительно создают FTS5 virtual table, выполняют `MATCH` и доказывают consistency основной таблицы и FTS после create/rename/delete, rollback и повторного открытия.
   - **Проверка:**
-    - Выполнить `dart run build_runner build --delete-conflicting-outputs` с `sqlite_module: [fts5]`.
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`; команда должна прочитать корневой `build.yaml` без неизвестных options и сгенерировать FTS5 queries без ошибок анализа `CREATE VIRTUAL TABLE` или `MATCH`.
     - Выполнить `flutter test test/data/local/intention_search_schema_test.dart`.
   - **Зависимости:** 3.2.
   - **Вероятно затронутые файлы:** `build.yaml`, `lib/src/data/local/app_database.drift`, `lib/src/data/local/app_database.dart`, `test/data/local/intention_search_schema_test.dart`.
