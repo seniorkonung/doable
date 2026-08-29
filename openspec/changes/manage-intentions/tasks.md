@@ -23,7 +23,7 @@
   - **Вероятно затронутые файлы:** `l10n.yaml`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb`, `test/app/localization/locale_resolution_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 1.3 Реализовать политику одной установки в Android host adapter: исключить SQLite-файл и его служебные файлы из cloud backup и device-to-device transfer
+- [x] 1.3 Реализовать политику одной установки в Android host adapter: исключить SQLite-файл и его служебные файлы из cloud backup и device-to-device transfer
   - **Критерии приёмки:**
     - Android 12+ data extraction rules и Android 11- full backup rules исключают database, WAL и временные файлы внутреннего хранилища.
     - Application manifest ссылается на оба набора правил и не объявляет `INTERNET` или разрешения внешнего хранилища ради capability.
@@ -36,7 +36,7 @@
   - **Вероятно затронутые файлы:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/res/xml/data_extraction_rules.xml`, `android/app/src/main/res/xml/backup_rules.xml`.
   - **Оценка:** M (3 файла).
 
-- [ ] 1.4 Проверить сборочную основу до добавления предметного кода
+- [x] 1.4 Проверить сборочную основу до добавления предметного кода
   - **Критерии приёмки:**
     - Зависимости разрешаются, локализация генерируется, Android debug APK собирается.
     - Анализатор не сообщает ошибок в обновлённом каркасе.
