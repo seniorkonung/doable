@@ -62,10 +62,10 @@
 - [ ] 2.2 Определить закрытые commands, страничные типы каталога и storage-neutral seam `IntentionRepository`
   - **Критерии приёмки:**
     - В соответствии с ADR-0005 interface сохраняет границу глубокого модуля и предоставляет только ограниченный `getCatalogPage`, реактивный `watchById` и `execute`, не раскрывает Drift/SQLite, transport или sync-specific types и не имеет unbounded-варианта каталога из superseded ADR-0001.
-    - Query/page types выражают три scope, фильтр названия не длиннее 255 расширенных графемных кластеров, поле и направление порядка, page size от 1 до 100 включительно, облегчённые summaries, точный count и конец выдачи, а также единые storage-neutral правила membership и полного сравнения summaries для repository и локального согласования command results; opaque cursor связывает query с неизменяемой boundary, остаётся допустимым после command того же query без требования существования граничной строки и отбрасывается при изменении scope/filter/order.
+    - Query/page types выражают три scope, фильтр названия не длиннее 255 расширенных графемных кластеров, поле и направление порядка, page size от 1 до 100 включительно, облегчённые summaries и конец выдачи; sealed first-page variant обязательно несёт точный count, а continuation variant не допускает повторного count или nullable-представления его отсутствия. Единые storage-neutral правила membership и полного сравнения summaries служат repository и локальному согласованию command results; opaque cursor связывает query с неизменяемой boundary, остаётся допустимым после command того же query без требования существования граничной строки и отбрасывается при изменении scope/filter/order.
     - Commands и sealed results/failures исчерпывающе различают create/change/no-op/delete, validation/not-found/conflict/unavailable/corruption; только `watchById` использует typed error channel с новой подпиской для retry.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/application/intention_contract_test.dart` для page size 1/100 и validation failure 0/101, фильтра 255/256 расширенных графемных кластеров, query membership/order, cursor value-boundary semantics, success/failure variants, no-op/delete payloads и `watchById` failure lifecycle.
+    - Выполнить `flutter test test/intention/application/intention_contract_test.dart` для page size 1/100 и validation failure 0/101, фильтра 255/256 расширенных графемных кластеров, sealed first/continuation page variants, обязательного count только у первой страницы, query membership/order, cursor value-boundary semantics, success/failure variants, no-op/delete payloads и `watchById` failure lifecycle.
     - Выполнить `flutter analyze` и проверить исчерпывающую обработку sealed variants.
   - **Зависимости:** 2.1.
   - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_command.dart`, `lib/src/intention/application/intention_result.dart`, `test/intention/application/intention_contract_test.dart`.
@@ -179,7 +179,7 @@
 
 - [ ] 4.2 Реализовать ограниченные cursor-страницы для трёх scopes и четырёх порядков
   - **Критерии приёмки:**
-    - `getCatalogPage` возвращает не больше page size summaries, точный count и следующий cursor для active/archive/all без загрузки полного описания или offset.
+    - `getCatalogPage` возвращает не больше page size summaries и следующий cursor для active/archive/all без загрузки полного описания или offset; запрос без cursor возвращает sealed first-page variant с точным count, а запрос с cursor — continuation variant без count.
     - Created/updated × ascending/descending используют timestamp и `id ASC` как полный порядок и не дают пропусков или повторов при равных timestamps.
     - Структурно невалидный cursor, cursor другого scope/filter/order и page size вне диапазона 1–100 возвращают typed validation failure до storage query; изменение или отсутствие прежней граничной строки само по себе cursor не инвалидирует.
   - **Проверка:**
@@ -191,8 +191,8 @@
 - [ ] 4.3 Реализовать FTS5-фильтр названия, точный count и large-fixture проверку
   - **Критерии приёмки:**
     - Фильтр выполняет буквальное регистронезависимое substring-сопоставление с trim, внутренними пробелами и различием `е`/`ё` и диакритики; search key короче трёх кодовых точек Unicode использует согласованный fallback, значение длиной 255 расширенных графемных кластеров принимается, а 256 возвращает typed validation failure до построения search key/FTS phrase, `COUNT` или чтения строк.
-    - Count и строки страницы видят один read snapshot, а фильтр и scope применяются до count, порядка и cursor boundary.
-    - Fixture из 50 000 строк подтверждает FTS query plan для допустимых строк от трёх символов, timestamp/cursor indexes без фильтра, отсутствие SQL-операций для недопустимого фильтра и materialization не больше page size.
+    - Count и строки первой страницы видят один read snapshot, фильтр и scope применяются до count, порядка и cursor boundary, а страницы с cursor не выполняют `COUNT`.
+    - Fixture из 50 000 строк подтверждает FTS query plan для допустимых строк от трёх символов, timestamp/cursor indexes без фильтра, отсутствие SQL-операций для недопустимого фильтра, ровно один `COUNT` при последовательной загрузке всех порций одного query и materialization не больше page size для каждой operation.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_filter_test.dart test/intention/data/drift_intention_repository_large_catalog_test.dart`.
   - **Зависимости:** 4.2.
@@ -307,7 +307,7 @@
 
 - [ ] 5.3 Реализовать query state каталога с тремя scopes, фильтром, точным count и четырьмя порядками
   - **Критерии приёмки:**
-    - Generated Catalog `AsyncNotifier` хранит active/archive/all, title filter, created/updated × ascending/descending, первую page, total count и query generation; defaults равны active и created descending, а нормализованный фильтр длиннее 255 расширенных графемных кластеров получает локализованную validation error, сохраняется для исправления и не вызывает repository.
+    - Generated Catalog `AsyncNotifier` хранит active/archive/all, title filter, created/updated × ascending/descending, накопленные pages, total count первой страницы и query generation; defaults равны active и created descending, а нормализованный фильтр длиннее 255 расширенных графемных кластеров получает локализованную validation error, сохраняется для исправления и не вызывает repository.
     - Debounce берётся из подменяемой `CatalogPagingPolicy`, поздний результат старого фильтра игнорируется, а смена scope сохраняет filter/order, но сбрасывает pages и scroll наверх.
     - View различает initial loading/data/empty/no-matches/failure, показывает exact count и доступные summary/archived states без опоры только на цвет.
   - **Проверка:**
@@ -318,11 +318,11 @@
 
 - [ ] 5.4 Реализовать автоматическую подгрузку и согласование command results без потери позиции каталога
   - **Критерии приёмки:**
-    - `CatalogPagingPolicy` задаёт production `pageSize = 100` и `prefetchRemaining = 30`, принимает только `pageSize` 1–100 и `prefetchRemaining` от 0 до значения меньше `pageSize`, тесты подменяют их допустимыми малыми значениями, а `ScrollController` запускает не больше одной следующей страницы у threshold; success дедуплицирует summaries и добавляет page, конец прекращает запросы, а failure сохраняет items и показывает inline retry.
+    - `CatalogPagingPolicy` задаёт production `pageSize = 100` и `prefetchRemaining = 30`, принимает только `pageSize` 1–100 и `prefetchRemaining` от 0 до значения меньше `pageSize`, тесты подменяют их допустимыми малыми значениями, а `ScrollController` запускает не больше одной следующей страницы у threshold; success continuation дедуплицирует summaries, добавляет page и сохраняет count первой страницы, конец прекращает запросы, а failure сохраняет items и показывает inline retry.
     - При незавершённой выдаче typed saved result вставляется или перемещается только не позже сохранённой boundary, а summary после неё либо вне query не показывается до своей порции; при завершённой выдаче совпадающий summary размещается в любом правильном месте. Cursor сохраняется, count обновляется по membership transition, а deleted result удаляет summary.
     - `ListView.builder`, `PageStorageKey` и visual anchor по первому видимому `IntentionId` сохраняют accumulated state и позицию при вставке, перемещении или исключении summary без перечитывания прежних pages и без сброса к началу.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/catalog/catalog_paging_test.dart test/intention/presentation/catalog/catalog_scroll_state_test.dart` с параметризованной матрицей create/edit для `createdAt`/`updatedAt` × ascending/descending после нескольких порций, последующей подгрузкой, count, cursor, дедупликацией и visual anchor.
+    - Выполнить `flutter test test/intention/presentation/catalog/catalog_paging_test.dart test/intention/presentation/catalog/catalog_scroll_state_test.dart` с параметризованной матрицей create/edit для `createdAt`/`updatedAt` × ascending/descending после нескольких порций, сохранением count на continuation pages, его изменением только по membership transition, последующей подгрузкой, cursor, дедупликацией и visual anchor.
   - **Зависимости:** 5.3.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/catalog_view_model.dart`, `lib/src/intention/presentation/catalog/catalog_state.dart`, `lib/src/intention/presentation/catalog/catalog_view.dart`, `test/intention/presentation/catalog/catalog_paging_test.dart`, `test/intention/presentation/catalog/catalog_scroll_state_test.dart`.
   - **Оценка:** M (5 файлов).
@@ -419,7 +419,7 @@
   - **Критерии приёмки:**
     - Widget tests покрывают каталог с paging/filter/count/sort, boundary-согласование create/edit во всех четырёх порядках, последующую подгрузку, сохранение visual anchor, подробности, готовность, архивирование, восстановление и удаление через override только `IntentionRepository`.
     - Parameterized mutation tests покрывают running/success/failure, одноразовые events, общий gate одного `IntentionId`, независимость другого и отсутствие controls после delete.
-    - Fake adapter соблюдает page bounds/count/cursor, typed saved/deleted payloads, page failure через `Result` и завершение только `watchById` после typed stream failure.
+    - Fake adapter соблюдает page bounds/cursor, возвращает count только в sealed first-page variant и continuation без count, а также typed saved/deleted payloads, page failure через `Result` и завершение только `watchById` после typed stream failure.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation test/app`.
     - Выполнить `flutter analyze`.
