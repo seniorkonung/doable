@@ -287,20 +287,31 @@
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 5.5 Реализовать пользовательский поток создания намерения без optimistic сохранения
+- [ ] 5.5 Реализовать общий presentation-модуль для эксклюзивного выполнения одной асинхронной операции
+  - **Критерии приёмки:**
+    - `ExclusiveOperation` предоставляет одну синхронную операцию `start`: первый вызов резервирует экземпляр и возвращает принятое выполнение с его `Future`, а вызов занятого экземпляра возвращает отдельный outcome `alreadyRunning`, не вызывая и не ставя в очередь второе действие.
+    - Gate освобождается после success, failure или неожиданной ошибки принятого действия; общий неизменяемый `OperationState<TResult>` предоставляет ViewModels статусы `idle`, `running`, `succeeded` и `failed`, но module не знает о предметных сущностях, repository, локализации или навигации.
+    - Разные экземпляры выполняются независимо; scope экземпляра задаёт владеющая ViewModel, а experimental Riverpod Mutations и глобальный registry операций не используются.
+  - **Проверка:**
+    - Выполнить `flutter test test/shared/presentation/exclusive_operation_test.dart` для принятого и отклонённого outcomes, двух быстрых вызовов, отсутствия отложенного второго запуска, освобождения после success/failure/exception и независимых экземпляров.
+  - **Зависимости:** 1.1.
+  - **Вероятно затронутые файлы:** `lib/src/shared/presentation/exclusive_operation.dart`, `test/shared/presentation/exclusive_operation_test.dart`.
+  - **Оценка:** S (2 файла).
+
+- [ ] 5.6 Реализовать пользовательский поток создания намерения без optimistic сохранения
   - **Критерии приёмки:**
     - Generated class-based `@riverpod` Editor ViewModel и форма используют общую предметную Unicode-валидацию, локализуют ошибки и не предлагают включить готовность при создании.
-    - Неизменяемый create `OperationState` блокирует повторный запуск во время `running`, публикует одноразовый success event для навигации и сохраняет введённые данные для retry при failure.
+    - Отдельный для экземпляра формы `ExclusiveOperation` делает повторную отправку недоступной, защитно не запускает и не ставит её в очередь во время `running`, публикует одноразовый success event для навигации и сохраняет введённые данные для явного retry при failure.
     - Созданное намерение появляется в активном каталоге через repository stream, а пользовательский текст отображается без перевода или преобразования.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/editor/create_intention_test.dart` с пробелами, одинаковыми названиями, Unicode-границами, failure и double-submit.
-  - **Зависимости:** 4.2, 5.3.
+    - Выполнить `flutter test test/intention/presentation/editor/create_intention_test.dart` с пробелами, одинаковыми названиями, Unicode-границами, сохранением полей и повторной доступностью отправки после failure, а также double-submit без второго repository command.
+  - **Зависимости:** 4.2, 5.3, 5.5.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_view.dart`, `lib/src/intention/presentation/editor/intention_form.dart`, `test/intention/presentation/editor/create_intention_test.dart`, `test/support/fake_intention_repository.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.6 Реализовать подробный просмотр и изменение названия и описания активного или архивированного намерения
+- [ ] 5.7 Реализовать подробный просмотр и изменение названия и описания активного или архивированного намерения
   - **Критерии приёмки:**
-    - Parameterized Stream provider представляет подробные данные через `AsyncValue`, а generated class-based `@riverpod` Details ViewModel хранит для каждого `IntentionId` единый mutation `OperationState` с видом текущей операции и сохраняет последний подтверждённый snapshot при write failure.
+    - Parameterized Stream provider представляет подробные данные через `AsyncValue`, а generated class-based `@riverpod` Details ViewModel переиспользует для каждого `IntentionId` единый `ExclusiveOperation` и общий `OperationState` с видом текущей операции, сохраняя последний подтверждённый snapshot при write failure.
     - Пока mutation имеет статус `running`, ViewModel оставляет чтение активным, делает все изменяющие controls этого намерения недоступными и защитной проверкой не запускает и не ставит в очередь второй command; разные `IntentionId` не разделяют этот gate.
     - Первый snapshot имеет отдельное loading-состояние, успешный `null` показывает локализованный not-found, а typed read failure показывает отличимое сообщение об ошибке и явный retry только для устранимого случая.
     - Retry инвалидирует только provider текущего `IntentionId`, создаёт новую `watchById`-подписку и при успехе восстанавливает подробные данные; automatic disposal отменяет подписку после ухода последнего слушателя, а повторное открытие начинает новое чтение.
@@ -308,54 +319,54 @@
     - Success обновляет то же намерение с прежним идентификатором, а отмена, validation failure и storage failure сохраняют прежнее подтверждённое состояние.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/intention_details_read_states_test.dart test/intention/presentation/details/edit_intention_test.dart` для initial loading, data, not-found, read failure, targeted retry, recovery, disposal/re-entry, active/archive, no-op, validation и storage failure.
-  - **Зависимости:** 4.2, 5.2, 5.5.
+  - **Зависимости:** 4.2, 5.2, 5.5, 5.6.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/intention_details_view.dart`, `lib/src/intention/presentation/editor/intention_editor_view.dart`, `test/intention/presentation/details/intention_details_read_states_test.dart`, `test/intention/presentation/details/edit_intention_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.7 Реализовать явное подтверждение включения и обратимое выключение готовности к действию
+- [ ] 5.8 Реализовать явное подтверждение включения и обратимое выключение готовности к действию
   - **Критерии приёмки:**
     - Перед включением локализованный dialog объясняет оба критерия: полную выполнимость за один день и операционную понятность; отмена не запускает command.
     - Выключение остаётся отдельным явным действием, а название или описание не запускают автоматическую классификацию.
     - Общий для `IntentionId` mutation `OperationState` указывает операцию готовности, предотвращает double-submit и любое другое изменение до результата, а затем публикует доступный одноразовый success/failure event, сохраняя последний подтверждённый snapshot.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/readiness_test.dart` для confirm/cancel, enable/disable, failure и semantics.
-  - **Зависимости:** 4.3, 5.6.
+  - **Зависимости:** 4.3, 5.7.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/readiness_dialog.dart`, `lib/src/intention/presentation/details/intention_details_view.dart`, `test/intention/presentation/details/readiness_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 5.8 Проверить создание, подробный просмотр, изменение и готовность как законченный редактируемый срез
+- [ ] 5.9 Проверить создание, подробный просмотр, изменение и готовность как законченный редактируемый срез
   - **Критерии приёмки:**
     - Пользователь может создать намерение, открыть его, изменить текст, включить и выключить готовность с согласованным обновлением каталога.
     - Отмены и моделируемые failures не показывают несохранённое состояние как подтверждённое.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/editor test/intention/presentation/details`.
-  - **Зависимости:** 5.5, 5.6, 5.7.
+  - **Зависимости:** 5.6, 5.7, 5.8.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 5.9 Реализовать архивирование активного намерения и восстановление архивированного намерения в UI
+- [ ] 5.10 Реализовать архивирование активного намерения и восстановление архивированного намерения в UI
   - **Критерии приёмки:**
     - Доступная операция зависит от текущего архивного состояния и не представляется как выполнение или удаление.
     - Success реактивно перемещает намерение между каталогами без изменения текста и готовности; failure оставляет подробный snapshot и даёт повторить операцию, а общий mutation gate до результата исключает пересечение с edit, readiness и delete.
     - Архивированное намерение остаётся доступным для просмотра и изменения.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/archive_restore_test.dart` для active/archive, success, failure и stream update.
-  - **Зависимости:** 4.5, 5.6.
+  - **Зависимости:** 4.5, 5.7.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/intention_details_view.dart`, `test/intention/presentation/details/archive_restore_test.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 5.10 Реализовать отдельное необратимое удаление активного или архивированного намерения с подтверждением
+- [ ] 5.11 Реализовать отдельное необратимое удаление активного или архивированного намерения с подтверждением
   - **Критерии приёмки:**
     - Delete недоступен как случайный побочный эффект архивирования и запускается только после локализованного явного подтверждения необратимости.
     - Отмена не выполняет command; success закрывает подробный экран и удаляет запись из обоих каталогов; failure сохраняет запись и предоставляет retry, а во время delete общий mutation gate не допускает другого изменения и второго события результата.
     - Dialog и результат операции имеют корректные semantics и не раскрывают пользовательский текст в diagnostics.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/delete_intention_test.dart` для active/archive, confirm/cancel, success/failure и double-submit.
-  - **Зависимости:** 4.6, 4.7, 5.6.
+  - **Зависимости:** 4.6, 4.7, 5.7.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/delete_confirmation_dialog.dart`, `lib/src/intention/presentation/details/intention_details_view.dart`, `test/intention/presentation/details/delete_intention_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 5.11 Проверить полный пользовательский жизненный цикл намерения через Riverpod overrides на fake repository
+- [ ] 5.12 Проверить полный пользовательский жизненный цикл намерения через Riverpod overrides на fake repository
   - **Критерии приёмки:**
     - Widget tests покрывают создание, каталоги, подробности, изменение, готовность, архивирование, восстановление и удаление.
     - Отдельный `ProviderContainer`/`ProviderScope` override подменяет только `IntentionRepository`; для каждой операции проверены running/success/failure, одноразовые events, automatic disposal и сохранение последнего подтверждённого snapshot.
@@ -364,7 +375,7 @@
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation test/app`.
     - Выполнить `flutter analyze`.
-  - **Зависимости:** 5.8, 5.9, 5.10.
+  - **Зависимости:** 5.9, 5.10, 5.11.
   - **Вероятно затронутые файлы:** `test/intention/presentation/details/mutation_serialization_test.dart`.
   - **Оценка:** S (1 файл).
 
@@ -389,7 +400,7 @@
   - **Проверка:**
     - Выполнить `flutter gen-l10n`.
     - Выполнить `flutter test test/app/localization test/intention/presentation/localization_test.dart`.
-  - **Зависимости:** 5.11.
+  - **Зависимости:** 5.12.
   - **Вероятно затронутые файлы:** `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb`, `test/app/localization/locale_resolution_test.dart`, `test/intention/presentation/localization_test.dart`.
   - **Оценка:** M (4 файла).
 
@@ -401,7 +412,7 @@
   - **Проверка:**
     - Выполнить `flutter test test/accessibility` с semantics assertions и text scale 200%.
     - Выполнить ручной TalkBack smoke test на Android и зафиксировать результат в проверке change.
-  - **Зависимости:** 5.11, 6.2.
+  - **Зависимости:** 5.12, 6.2.
   - **Вероятно затронутые файлы:** `test/accessibility/intention_semantics_test.dart`, `test/accessibility/intention_text_scale_test.dart`, `lib/src/shared/ui/accessible_operation_feedback.dart`.
   - **Оценка:** M (3 файла).
 
@@ -413,7 +424,7 @@
   - **Проверка:**
     - Выполнить `flutter build apk --release` и проверить permissions через `apkanalyzer manifest permissions build/app/outputs/flutter-apk/app-release.apk`.
     - Выполнить `flutter test test/shared/diagnostics test/security`.
-  - **Зависимости:** 1.3, 4.7, 5.11, 6.1.
+  - **Зависимости:** 1.3, 4.7, 5.12, 6.1.
   - **Вероятно затронутые файлы:** `test/security/privacy_boundary_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** S (2 файла).
 
