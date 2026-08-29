@@ -251,14 +251,14 @@
   - **Вероятно затронутые файлы:** `lib/main.dart`, `lib/src/app/bootstrap/bootstrap_providers.dart`, `lib/src/app/bootstrap/bootstrap_view_model.dart`, `lib/src/app/app.dart`, `test/app/bootstrap/app_bootstrap_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.2 Настроить `MaterialApp.router` и generated типизированные AutoRoute-маршруты с безопасной границей `IntentionId`
+- [ ] 5.2 Настроить `MaterialApp.router` и generated типизированные AutoRoute-маршруты для внутренних переходов
   - **Критерии приёмки:**
-    - `AppRouter` через `@AutoRouterConfig` и страницы через `@RoutePage` генерируют `PageRouteInfo` для каталога, создания и подробного просмотра с обязательными типизированными аргументами; router получается из generated `keepAlive` provider.
+    - `AppRouter` через `@AutoRouterConfig` и страницы через `@RoutePage` генерируют `PageRouteInfo` для каталога, создания и подробного просмотра; маршрут подробного просмотра требует предметный `IntentionId`, а router получается из generated `keepAlive` provider.
     - Внутренние переходы используют только generated route objects; строковые `pushNamed`, `replaceNamed`, `navigateNamed`, route names и ручная сборка path отсутствуют в прикладном коде.
-    - Недоверенный строковый path-параметр подробного маршрута явно преобразуется в `IntentionId`, а некорректное значение и отсутствующая сущность дают безопасные локализованные состояния.
+    - Внешняя схема URI, строковый path-параметр, deep-link adapter и platform-регистрация внешних маршрутов отсутствуют; маршрут подробного просмотра не принимает недоверенную строку и не требует routing-level parser идентификатора.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `flutter analyze`, чтобы проверить generated route types и обязательные аргументы.
-    - Выполнить `flutter test test/app/routing` для typed transitions, прямых deep links, неверного UUID, отсутствующей сущности и локалей `ru`, `en`, `de`.
+    - Выполнить `flutter test test/app/routing` для типизированных переходов из активного каталога и архива, обязательного `IntentionId` и возврата в исходный scope.
     - Выполнить `rg -n --glob '!*.gr.dart' "pushNamed|replaceNamed|navigateNamed" lib` и убедиться, что строковая навигация отсутствует.
   - **Зависимости:** 5.1.
   - **Вероятно затронутые файлы:** `lib/src/app/app.dart`, `lib/src/app/routing/app_router.dart`, `lib/src/app/routing/app_router.gr.dart`, `test/app/routing/app_router_test.dart`, `test/support/app_harness.dart`.
@@ -279,7 +279,7 @@
   - **Критерии приёмки:**
     - Приложение проходит от bootstrap до активного каталога и архива при success, а retry восстанавливает работу после моделируемой ошибки.
     - Более новая версия хранилища оставляет feature routes и repository недоступными, показывает локализованное требование обновить приложение без retry и не изменяет database.
-    - Прямой маршрут к намерению и возврат в исходный scope сохраняют корректное состояние навигации.
+    - Внутренний переход к намерению из активного каталога или архива и возврат сохраняют исходный scope и корректное состояние навигации.
   - **Проверка:**
     - Выполнить `flutter test test/app test/intention/presentation/catalog`.
     - Выполнить `flutter analyze`.
@@ -370,7 +370,7 @@
   - **Критерии приёмки:**
     - Widget tests покрывают создание, каталоги, подробности, изменение, готовность, архивирование, восстановление и удаление.
     - Отдельный `ProviderContainer`/`ProviderScope` override подменяет только `IntentionRepository`; для каждой операции проверены running/success/failure, одноразовые events, automatic disposal и сохранение последнего подтверждённого snapshot.
-    - Parameterized tests для общего mutation gate доказывают, что любая выполняющаяся edit/readiness/archive/restore/delete operation блокирует запуск и постановку в очередь второй операции того же `IntentionId`, после success/failure допустимые controls снова доступны, а операция другого `IntentionId` остаётся независимой.
+    - Parameterized tests для общего mutation gate доказывают, что любая выполняющаяся edit/readiness/archive/restore/delete operation блокирует запуск и постановку в очередь второй операции того же `IntentionId`; после success операции, сохраняющей существование намерения, или failure любой операции допустимые controls снова доступны, после delete success подробный просмотр завершается и controls удалённого намерения отсутствуют, а операция другого `IntentionId` остаётся независимой.
     - Fake adapter соблюдает те же `IntentionSaved`/`IntentionDeleted` payloads и завершение watch stream после typed failure, что и production adapter; явный retry создаёт новую подписку.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation test/app`.
@@ -420,7 +420,7 @@
   - **Критерии приёмки:**
     - Release-mode APK не запрашивает `INTERNET` или внешнее хранилище, а backup rules исключают database, WAL и временные файлы из cloud backup и device-to-device transfer согласно контракту одной установки.
     - События bootstrap, migration, чтения и каждого command содержат outcome и duration; migration events также содержат только ожидаемую и обнаруженную версии схемы, а тесты с canary-данными не обнаруживают название, описание, UUID, SQL-параметр или полный exception.
-    - Проверка untrusted route/text/database inputs не выявляет обхода валидации, SQL interpolation, markup rendering или destructive recovery.
+    - Проверка untrusted text/database inputs не выявляет обхода валидации, SQL interpolation, markup rendering или destructive recovery.
   - **Проверка:**
     - Выполнить `flutter build apk --release` и проверить permissions через `apkanalyzer manifest permissions build/app/outputs/flutter-apk/app-release.apk`.
     - Выполнить `flutter test test/shared/diagnostics test/security`.
