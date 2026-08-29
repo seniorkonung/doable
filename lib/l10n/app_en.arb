@@ -1,0 +1,43 @@
+{
+  "@@locale": "en",
+  "appTitle": "Doable",
+  "@appTitle": {
+    "description": "Название приложения"
+  },
+  "navigationActiveIntentions": "Active intentions",
+  "@navigationActiveIntentions": {
+    "description": "Пункт навигации к каталогу активных намерений"
+  },
+  "navigationArchive": "Archive",
+  "@navigationArchive": {
+    "description": "Пункт навигации к архиву намерений"
+  },
+  "commonLoading": "Loading…",
+  "@commonLoading": {
+    "description": "Общее состояние загрузки"
+  },
+  "commonEmpty": "Nothing here yet",
+  "@commonEmpty": {
+    "description": "Общее состояние пустого результата"
+  },
+  "commonError": "Something went wrong",
+  "@commonError": {
+    "description": "Общее безопасное сообщение об ошибке"
+  },
+  "commonRetry": "Try again",
+  "@commonRetry": {
+    "description": "Действие явной повторной попытки"
+  },
+  "bootstrapLoading": "Preparing local data…",
+  "@bootstrapLoading": {
+    "description": "Состояние подготовки локального хранилища при запуске"
+  },
+  "bootstrapMigrationFailure": "Local data couldn’t be prepared. Your data wasn’t changed. Try again.",
+  "@bootstrapMigrationFailure": {
+    "description": "Безопасное сообщение об устранимой ошибке открытия или миграции"
+  },
+  "bootstrapIncompatibleSchema": "Install a compatible Doable update to continue.",
+  "@bootstrapIncompatibleSchema": {
+    "description": "Требование обновить приложение при более новой версии локального хранилища"
+  }
+}

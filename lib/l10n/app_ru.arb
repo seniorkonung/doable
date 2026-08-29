@@ -1,0 +1,13 @@
+{
+  "@@locale": "ru",
+  "appTitle": "Doable",
+  "navigationActiveIntentions": "Активные намерения",
+  "navigationArchive": "Архив",
+  "commonLoading": "Загрузка…",
+  "commonEmpty": "Пока здесь ничего нет",
+  "commonError": "Что-то пошло не так",
+  "commonRetry": "Повторить",
+  "bootstrapLoading": "Подготавливаем локальные данные…",
+  "bootstrapMigrationFailure": "Не удалось подготовить локальные данные. Данные не изменены. Повторите попытку.",
+  "bootstrapIncompatibleSchema": "Чтобы продолжить, установите совместимое обновление Doable."
+}
