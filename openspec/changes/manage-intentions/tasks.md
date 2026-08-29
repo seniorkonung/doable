@@ -61,11 +61,11 @@
 
 - [ ] 2.2 Определить закрытые commands, страничные типы каталога и storage-neutral seam `IntentionRepository`
   - **Критерии приёмки:**
-    - Interface предоставляет только ограниченный `getCatalogPage`, реактивный `watchById` и `execute`, не раскрывает Drift/SQLite, transport или sync-specific types и не имеет unbounded-варианта каталога.
-    - Query/page types выражают три scope, фильтр названия, поле и направление порядка, проверяемый конечный page size, opaque cursor, облегчённые summaries, точный count и конец выдачи.
+    - В соответствии с ADR-0005 interface сохраняет границу глубокого модуля и предоставляет только ограниченный `getCatalogPage`, реактивный `watchById` и `execute`, не раскрывает Drift/SQLite, transport или sync-specific types и не имеет unbounded-варианта каталога из superseded ADR-0001.
+    - Query/page types выражают три scope, фильтр названия, поле и направление порядка, проверяемый конечный page size, облегчённые summaries, точный count и конец выдачи, а также единые storage-neutral правила membership и полного сравнения summaries для repository и локального согласования command results; opaque cursor связывает query с неизменяемой boundary, остаётся допустимым после command того же query без требования существования граничной строки и отбрасывается при изменении scope/filter/order.
     - Commands и sealed results/failures исчерпывающе различают create/change/no-op/delete, validation/not-found/conflict/unavailable/corruption; только `watchById` использует typed error channel с новой подпиской для retry.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/application/intention_contract_test.dart` для page bounds, query variants, success/failure variants, no-op/delete payloads и `watchById` failure lifecycle.
+    - Выполнить `flutter test test/intention/application/intention_contract_test.dart` для page bounds, query membership/order, cursor value-boundary semantics, success/failure variants, no-op/delete payloads и `watchById` failure lifecycle.
     - Выполнить `flutter analyze` и проверить исчерпывающую обработку sealed variants.
   - **Зависимости:** 2.1.
   - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_command.dart`, `lib/src/intention/application/intention_result.dart`, `test/intention/application/intention_contract_test.dart`.
@@ -181,7 +181,7 @@
   - **Критерии приёмки:**
     - `getCatalogPage` возвращает не больше page size summaries, точный count и следующий cursor для active/archive/all без загрузки полного описания или offset.
     - Created/updated × ascending/descending используют timestamp и `id ASC` как полный порядок и не дают пропусков или повторов при равных timestamps.
-    - Невалидный, чужой или устаревший cursor и неограниченный page size возвращают typed validation failure без выполнения unbounded query.
+    - Структурно невалидный cursor, cursor другого scope/filter/order и неограниченный page size возвращают typed validation failure без выполнения unbounded query; изменение или отсутствие прежней граничной строки само по себе cursor не инвалидирует.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_catalog_page_test.dart`.
   - **Зависимости:** 4.1.
@@ -225,6 +225,7 @@
   - **Критерии приёмки:**
     - Все выполненные операции наблюдаемы через `IntentionRepository`, а тесты не обращаются к внутренним Drift rows для доказательства пользовательского поведения.
     - Три scope, четыре порядка, фильтр, exact count, pages и подробный stream показывают только подтверждённое состояние после каждого commit.
+    - Для `createdAt`/`updatedAt` × ascending/descending сохранённый cursor того же query продолжает выдачу после создания и изменения до либо после boundary без требования неизменной граничной строки, пропусков или повторов.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_create_read_test.dart test/intention/data/drift_intention_repository_catalog_page_test.dart test/intention/data/drift_intention_repository_filter_test.dart test/intention/data/drift_intention_repository_edit_test.dart test/intention/data/drift_intention_repository_readiness_test.dart`.
   - **Зависимости:** 4.1, 4.2, 4.3, 4.4, 4.5.
@@ -315,13 +316,13 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/catalog_view_model.dart`, `lib/src/intention/presentation/catalog/catalog_state.dart`, `lib/src/intention/presentation/catalog/catalog_view.dart`, `test/intention/presentation/catalog/catalog_query_test.dart`, `test/intention/presentation/catalog/catalog_view_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.4 Реализовать автоматическую подгрузку, сохранение прокрутки и локальную ошибку следующей порции
+- [ ] 5.4 Реализовать автоматическую подгрузку и согласование command results без потери позиции каталога
   - **Критерии приёмки:**
-    - `CatalogPagingPolicy` задаёт production `pageSize = 100` и `prefetchRemaining = 30`, тесты подменяют значения, а `ScrollController` запускает не больше одной следующей страницы у threshold.
-    - Success дедуплицирует summaries по identity и добавляет page, конец прекращает запросы, а next-page failure сохраняет items и показывает inline retry внизу.
-    - `ListView.builder`, `PageStorageKey` и typed route result сохраняют accumulated state/offset при возврате и точечно отражают saved/deleted intention без перечитывания прежних pages.
+    - `CatalogPagingPolicy` задаёт production `pageSize = 100` и `prefetchRemaining = 30`, тесты подменяют значения, а `ScrollController` запускает не больше одной следующей страницы у threshold; success дедуплицирует summaries и добавляет page, конец прекращает запросы, а failure сохраняет items и показывает inline retry.
+    - При незавершённой выдаче typed saved result вставляется или перемещается только не позже сохранённой boundary, а summary после неё либо вне query не показывается до своей порции; при завершённой выдаче совпадающий summary размещается в любом правильном месте. Cursor сохраняется, count обновляется по membership transition, а deleted result удаляет summary.
+    - `ListView.builder`, `PageStorageKey` и visual anchor по первому видимому `IntentionId` сохраняют accumulated state и позицию при вставке, перемещении или исключении summary без перечитывания прежних pages и без сброса к началу.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/catalog/catalog_paging_test.dart test/intention/presentation/catalog/catalog_scroll_state_test.dart`.
+    - Выполнить `flutter test test/intention/presentation/catalog/catalog_paging_test.dart test/intention/presentation/catalog/catalog_scroll_state_test.dart` с параметризованной матрицей create/edit для `createdAt`/`updatedAt` × ascending/descending после нескольких порций, последующей подгрузкой, count, cursor, дедупликацией и visual anchor.
   - **Зависимости:** 5.3.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/catalog_view_model.dart`, `lib/src/intention/presentation/catalog/catalog_state.dart`, `lib/src/intention/presentation/catalog/catalog_view.dart`, `test/intention/presentation/catalog/catalog_paging_test.dart`, `test/intention/presentation/catalog/catalog_scroll_state_test.dart`.
   - **Оценка:** M (5 файлов).
@@ -330,7 +331,7 @@
   - **Критерии приёмки:**
     - Приложение проходит от bootstrap до трёх scopes каталога, фильтра, count и автоматической подгрузки, а retry восстанавливает initial или следующую page после моделируемой ошибки.
     - Более новая версия хранилища оставляет feature routes и repository недоступными, показывает локализованное требование обновить приложение без retry и не изменяет database.
-    - Переход к намерению из любого scope и возврат сохраняют query, loaded pages, scroll и корректно применяют typed result.
+    - Переход к намерению из любого scope и возврат сохраняют query, loaded pages и visual anchor; typed result сохраняет непрерывный глобальный порядок и не показывает намерение раньше незагруженных предшественников.
   - **Проверка:**
     - Выполнить `flutter test test/app test/intention/presentation/catalog`.
     - Выполнить `flutter analyze`.
@@ -353,9 +354,9 @@
   - **Критерии приёмки:**
     - Generated class-based `@riverpod` Editor ViewModel и форма используют общую предметную Unicode-валидацию, локализуют ошибки и не предлагают включить готовность при создании.
     - Отдельный для экземпляра формы `ExclusiveOperation` делает повторную отправку недоступной, защитно не запускает и не ставит её в очередь во время `running`, публикует одноразовый success event для навигации и сохраняет введённые данные для явного retry при failure.
-    - Typed `IntentionSaved` возвращается каталогу, который вставляет совпадающий summary, корректирует count и порядок без полного перечитывания; пользовательский текст не переводится и не преобразуется.
+    - Typed `IntentionSaved` возвращается каталогу, который корректирует count и показывает summary сразу только внутри загруженной boundary либо после подтверждённого конца выдачи; при `createdAt ascending` новое намерение за незагруженными совпадениями остаётся вне префикса до своей порции. Пользовательский текст не переводится и не преобразуется.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/editor/create_intention_test.dart` с пробелами, одинаковыми названиями, Unicode-границами, сохранением полей и повторной доступностью отправки после failure, а также double-submit без второго repository command.
+    - Выполнить `flutter test test/intention/presentation/editor/create_intention_test.dart` с пробелами, одинаковыми названиями, Unicode-границами, сохранением полей, `createdAt` ascending/descending после нескольких порций, повторной доступностью отправки после failure и double-submit без второго repository command.
   - **Зависимости:** 4.1, 5.4, 5.6.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_view.dart`, `lib/src/intention/presentation/editor/intention_form.dart`, `test/intention/presentation/editor/create_intention_test.dart`, `test/support/fake_intention_repository.dart`.
   - **Оценка:** M (5 файлов).
@@ -395,7 +396,7 @@
 - [ ] 5.11 Реализовать архивирование активного намерения и восстановление архивированного намерения в UI
   - **Критерии приёмки:**
     - Доступная операция зависит от текущего архивного состояния и не представляется как выполнение или удаление.
-    - Typed success обновляет принадлежность active/archive/all, count и summary без изменения текста и готовности; failure оставляет подробный snapshot и даёт повторить операцию.
+    - Typed success согласует принадлежность active/archive/all, count и позицию summary с загруженной boundary без изменения текста и готовности; failure оставляет подробный snapshot и даёт повторить операцию.
     - Архивированное намерение остаётся доступным для просмотра и изменения.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/details/archive_restore_test.dart` для active/archive, success, failure и stream update.
@@ -416,7 +417,7 @@
 
 - [ ] 5.13 Проверить полный пользовательский жизненный цикл намерения через Riverpod overrides на fake repository
   - **Критерии приёмки:**
-    - Widget tests покрывают каталог с paging/filter/count/sort, создание, подробности, изменение, готовность, архивирование, восстановление и удаление через override только `IntentionRepository`.
+    - Widget tests покрывают каталог с paging/filter/count/sort, boundary-согласование create/edit во всех четырёх порядках, последующую подгрузку, сохранение visual anchor, подробности, готовность, архивирование, восстановление и удаление через override только `IntentionRepository`.
     - Parameterized mutation tests покрывают running/success/failure, одноразовые events, общий gate одного `IntentionId`, независимость другого и отсутствие controls после delete.
     - Fake adapter соблюдает page bounds/count/cursor, typed saved/deleted payloads, page failure через `Result` и завершение только `watchById` после typed stream failure.
   - **Проверка:**
