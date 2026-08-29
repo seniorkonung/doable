@@ -1,4 +1,4 @@
-## 1. Сборочная основа, локализация и граница Android
+## 1. Сборочная основа, локализация и Android host adapter
 
 - [ ] 1.1 Подключить совместимые зависимости управления состоянием, навигации, UUID, Unicode-графем, Drift и code generation с зафиксированным lockfile
   - **Критерии приёмки:**
@@ -11,11 +11,11 @@
   - **Вероятно затронутые файлы:** `pubspec.yaml`, `pubspec.lock`.
   - **Оценка:** S (2 файла).
 
-- [ ] 1.2 Настроить generated локализацию с русским, английским и явным английским fallback для остальных локалей Android
+- [ ] 1.2 Настроить platform-neutral generated локализацию с русским, английским и явным английским fallback
   - **Критерии приёмки:**
     - `gen_l10n` использует английский template и генерирует типизированные строки для `en` и `ru`.
     - Начальный каталог строк покрывает bootstrap, навигацию, общие состояния, retryable migration failure и требование установить совместимое обновление при более новой схеме; ручного переключателя языка нет.
-    - Правило разрешения локали выбирает `ru` для русского language code, `en` для английского и `en` для любого другого значения.
+    - Правило разрешения системной локали одинаково для любого platform host выбирает `ru` для русского language code, `en` для английского и `en` для любого другого значения.
   - **Проверка:**
     - Выполнить `flutter gen-l10n`.
     - Выполнить сфокусированные тесты разрешения локали через `flutter test test/app/localization`.
@@ -23,10 +23,12 @@
   - **Вероятно затронутые файлы:** `l10n.yaml`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb`, `test/app/localization/locale_resolution_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 1.3 Исключить SQLite-файл и его служебные файлы из Android backup и device-to-device transfer без добавления сетевых разрешений
+- [ ] 1.3 Реализовать политику одной установки в Android host adapter: исключить SQLite-файл и его служебные файлы из cloud backup и device-to-device transfer
   - **Критерии приёмки:**
     - Android 12+ data extraction rules и Android 11- full backup rules исключают database, WAL и временные файлы внутреннего хранилища.
     - Application manifest ссылается на оба набора правил и не объявляет `INTERNET` или разрешения внешнего хранилища ради capability.
+    - Конфигурация не добавляет backup agent, экспорт, перенос или синхронизацию и сохраняет данные только при перезапусках и совместимых обновлениях существующей установки.
+    - Android-specific пути, permissions и backup rules не входят в предметный или прикладной modules и не пересекают interfaces `IntentionRepository`/`AppDatabase`.
   - **Проверка:**
     - Выполнить `flutter build apk --debug`.
     - Проверить manifest и оба XML-файла командой `rg -n "allowBackup|dataExtractionRules|fullBackupContent|INTERNET|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE" android/app/src/main`.
@@ -60,6 +62,7 @@
 - [ ] 2.2 Определить закрытые commands, typed `Result`/failures и небольшую seam `IntentionRepository`
   - **Критерии приёмки:**
     - Interface предоставляет только `watchCatalog`, `watchById` и `execute`, не раскрывая Drift или SQLite types.
+    - Interface не раскрывает расположение данных, transport или состояние синхронизации; sync-specific методы, remote port, outbox, tombstones и revisions отсутствуют.
     - Commands различают создание, изменение данных, включение и выключение готовности, архивирование, восстановление и физическое удаление.
     - Закрытый success type различает `IntentionSaved` с подтверждённым намерением для create/change/no-op и `IntentionDeleted` с идентификатором только для подтверждённого удаления; отдельный `changed` flag отсутствует.
     - Scope, два порядка каталога и стабильные repository-level validation/not-found/conflict/unavailable/corruption failures выражены типами без bootstrap- или Drift-specific деталей.
@@ -85,7 +88,7 @@
 - [ ] 2.4 Проверить предметный контракт до реализации постоянного adapter
   - **Критерии приёмки:**
     - Граничные Unicode-инварианты, identity, все варианты command/result и завершение watch stream после typed failure проходят unit tests.
-    - Публичная seam не содержит storage- или Flutter-specific types.
+    - Публичная seam не содержит storage-, transport-, sync- или Flutter-specific types и допускает замену adapter без изменения callers.
   - **Проверка:**
     - Выполнить `flutter test test/intention/domain test/intention/application test/shared/diagnostics`.
     - Выполнить `flutter analyze`.
@@ -93,12 +96,12 @@
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-## 3. Версионируемое локальное хранилище
+## 3. Версионируемый lifecycle локальных данных
 
 - [ ] 3.1 Реализовать `AppDatabase` schema version 1, production/in-memory executors и защиту от более новой версии хранилища
   - **Критерии приёмки:**
     - Таблица хранит UUID `TEXT PRIMARY KEY`, нормализованное название, nullable описание, готовность, архивное состояние и UTC timestamps в микросекундах без unique index по названию.
-    - Production executor открывает один файл во внутреннем app-specific storage в background isolate, а тестовый executor использует in-memory SQLite.
+    - Production connection Android host открывает один файл во внутреннем app-specific storage в background isolate, а `AppDatabase`, migrations и тестовый in-memory executor не зависят от Android paths или permissions.
     - Отсутствующая или текущая версия открывается с `PRAGMA foreign_keys = ON`, а версия выше `AppDatabase.schemaVersion` возвращает typed `incompatibleSchema` до feature query и не изменяет, не удаляет и не пересоздаёт database.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
@@ -135,6 +138,7 @@
   - **Критерии приёмки:**
     - In-memory и файловое открытие используют schema version 1 и включённые foreign keys, а более новая версия даёт typed `incompatibleSchema` без изменения файла.
     - Schema snapshot, generated steps, marker версии, atomic rollback, crash recovery и migration tests согласованы.
+    - Проверки покрывают требования `local-data-lifecycle` к совместимому обновлению, пропуску опубликованных версий, прерыванию migration и отказу от более новой схемы.
   - **Проверка:**
     - Выполнить `flutter test test/data/local`.
     - Повторить `dart run drift_dev make-migrations` и `dart run build_runner build --delete-conflicting-outputs` без дополнительного diff.
@@ -240,6 +244,7 @@
     - Корневой `ProviderScope` предоставляет diagnostics, database, repository и router через generated `keepAlive` providers без service locator, глобальных mutable instances или database singleton.
     - До готовности database async bootstrap provider показывает loading; retryable opening/migration failure предоставляет явную invalidation для retry, а non-retryable `incompatibleSchema` не создаёт repository и сообщает о необходимости установить совместимое обновление без destructive recovery.
     - `ProviderScope` отключает automatic retry через `retry: (retryCount, error) => null`, а `ref.onDispose` закрывает database и подписки ровно один раз.
+    - Loading, retryable failure, успешное восстановление после явного retry и non-retryable более новая schema наблюдаемо соответствуют сценариям `local-data-lifecycle`.
   - **Проверка:**
     - Выполнить `flutter test test/app/bootstrap` с отдельным `ProviderContainer` для loading, success, первого failure без автоматического повтора, явного retry и dispose.
   - **Зависимости:** 1.2, 3.4, 4.8.
@@ -388,11 +393,11 @@
   - **Вероятно затронутые файлы:** `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb`, `test/app/localization/locale_resolution_test.dart`, `test/intention/presentation/localization_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 6.3 Доказать доступность основного жизненного цикла при TalkBack и Android text scale до 200%
+- [ ] 6.3 Доказать platform-neutral доступность основного жизненного цикла и проверить Android host через TalkBack
   - **Критерии приёмки:**
     - Интерактивные элементы имеют роли, labels, state, предсказуемый focus order и tap targets не менее 48×48; ошибки и результаты операций объявляются доступно.
     - Архивное состояние и готовность воспринимаются без опоры на цвет, а пользовательский текст не обрезает необходимые данные или commands при text scale 200%.
-    - Ручной TalkBack smoke test проходит создание, изменение, готовность, архивирование, восстановление и удаление.
+    - Flutter semantics и layout не зависят от конкретного screen reader, а ручной TalkBack smoke test текущего Android host проходит создание, изменение, готовность, архивирование, восстановление и удаление.
   - **Проверка:**
     - Выполнить `flutter test test/accessibility` с semantics assertions и text scale 200%.
     - Выполнить ручной TalkBack smoke test на Android и зафиксировать результат в проверке change.
@@ -400,9 +405,9 @@
   - **Вероятно затронутые файлы:** `test/accessibility/intention_semantics_test.dart`, `test/accessibility/intention_text_scale_test.dart`, `lib/src/shared/ui/accessible_operation_feedback.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 6.4 Проверить privacy boundary в release mode и полноту безопасной диагностики
+- [ ] 6.4 Проверить Android privacy adapter в release mode и полноту безопасной диагностики
   - **Критерии приёмки:**
-    - Release-mode APK не запрашивает `INTERNET` или внешнее хранилище, а backup rules исключают database, WAL и временные файлы.
+    - Release-mode APK не запрашивает `INTERNET` или внешнее хранилище, а backup rules исключают database, WAL и временные файлы из cloud backup и device-to-device transfer согласно контракту одной установки.
     - События bootstrap, migration, чтения и каждого command содержат outcome и duration; migration events также содержат только ожидаемую и обнаруженную версии схемы, а тесты с canary-данными не обнаруживают название, описание, UUID, SQL-параметр или полный exception.
     - Проверка untrusted route/text/database inputs не выявляет обхода валидации, SQL interpolation, markup rendering или destructive recovery.
   - **Проверка:**
@@ -429,7 +434,8 @@
   - **Критерии приёмки:**
     - Review проверяет корректность, читаемость, архитектуру, безопасность и производительность относительно proposal, spec, design и действующих ADR.
     - Устранены blocking замечания, отсутствуют unrelated refactors, dead code, debug output и дублирование предметных правил.
-    - Отдельно подтверждены обратная совместимость seam для следующих change и отсутствие преждевременной модели связей, тегов, поиска или дневного выбора.
+    - Отдельно подтверждены storage-neutral seam и независимая идентичность для будущего adapter, отсутствие sync-specific interface/metadata и отсутствие преждевременной модели связей, тегов, поиска или дневного выбора.
+    - Предметный и прикладной modules, capability contracts и interfaces не зависят от Android SDK, путей, permissions или platform channels; Android-specific реализация локализована в host adapter и его evidence.
   - **Проверка:**
     - Применить `code-review-and-quality` к полному diff и повторить сфокусированные тесты затронутых замечаниями областей.
   - **Зависимости:** 6.5.

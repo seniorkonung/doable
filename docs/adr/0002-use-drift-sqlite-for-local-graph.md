@@ -9,14 +9,14 @@
 
 ## Решение
 
-Постоянным локальным хранилищем Doable становится один версионируемый SQLite database во внутреннем хранилище Android, доступ к которому реализуется через Drift. `AppDatabase` принимает `QueryExecutor`; production использует файловый native executor в background isolate, тесты repository — in-memory SQLite.
+Постоянным локальным хранилищем Doable становится один версионируемый SQLite database во внутреннем app-specific storage текущего platform host, доступ к которому реализуется через Drift. `AppDatabase` и предметные interfaces не знают платформенных путей: `AppDatabase` принимает `QueryExecutor`, production connection текущего Android host использует файловый native executor в background isolate, а тесты repository — in-memory SQLite.
 
 Изменяющие предметные операции выполняются транзакционно. Для каждой версии схемы коммитятся schema snapshot и пошаговая migration, а переходы со всех поддерживаемых версий проверяются generated migration tests. При открытии включается `PRAGMA foreign_keys = ON`; ошибка открытия или migration никогда не приводит к автоматическому удалению и пересозданию пользовательской базы.
 
 ## Последствия
 
 - Следующие сущности графа используют ту же транзакционную и миграционную основу с нативными foreign keys.
+- Другой platform host сможет использовать ту же схему, миграции и `AppDatabase`, предоставив собственную production connection и platform evidence без изменения предметных interfaces.
 - Drift, SQLite schema и generated code становятся долговременной частью data layer; их замена потребует миграции всех пользовательских данных.
 - Code generation и schema snapshots увеличивают сложность сборки, поэтому lockfile, generated artifacts и отсутствие diff после генерации проверяются в CI.
 - Downgrade migrations не поддерживаются; после несовместимого изменения схемы применяется forward fix без destructive recovery.
-
