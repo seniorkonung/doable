@@ -62,10 +62,10 @@
 - [ ] 2.2 Определить закрытые commands, страничные типы каталога и storage-neutral seam `IntentionRepository`
   - **Критерии приёмки:**
     - В соответствии с ADR-0005 interface сохраняет границу глубокого модуля и предоставляет только ограниченный `getCatalogPage`, реактивный `watchById` и `execute`, не раскрывает Drift/SQLite, transport или sync-specific types и не имеет unbounded-варианта каталога из superseded ADR-0001.
-    - Query/page types выражают три scope, фильтр названия, поле и направление порядка, проверяемый конечный page size, облегчённые summaries, точный count и конец выдачи, а также единые storage-neutral правила membership и полного сравнения summaries для repository и локального согласования command results; opaque cursor связывает query с неизменяемой boundary, остаётся допустимым после command того же query без требования существования граничной строки и отбрасывается при изменении scope/filter/order.
+    - Query/page types выражают три scope, фильтр названия не длиннее 255 расширенных графемных кластеров, поле и направление порядка, page size от 1 до 100 включительно, облегчённые summaries, точный count и конец выдачи, а также единые storage-neutral правила membership и полного сравнения summaries для repository и локального согласования command results; opaque cursor связывает query с неизменяемой boundary, остаётся допустимым после command того же query без требования существования граничной строки и отбрасывается при изменении scope/filter/order.
     - Commands и sealed results/failures исчерпывающе различают create/change/no-op/delete, validation/not-found/conflict/unavailable/corruption; только `watchById` использует typed error channel с новой подпиской для retry.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/application/intention_contract_test.dart` для page bounds, query membership/order, cursor value-boundary semantics, success/failure variants, no-op/delete payloads и `watchById` failure lifecycle.
+    - Выполнить `flutter test test/intention/application/intention_contract_test.dart` для page size 1/100 и validation failure 0/101, фильтра 255/256 расширенных графемных кластеров, query membership/order, cursor value-boundary semantics, success/failure variants, no-op/delete payloads и `watchById` failure lifecycle.
     - Выполнить `flutter analyze` и проверить исчерпывающую обработку sealed variants.
   - **Зависимости:** 2.1.
   - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_command.dart`, `lib/src/intention/application/intention_result.dart`, `test/intention/application/intention_contract_test.dart`.
@@ -181,7 +181,7 @@
   - **Критерии приёмки:**
     - `getCatalogPage` возвращает не больше page size summaries, точный count и следующий cursor для active/archive/all без загрузки полного описания или offset.
     - Created/updated × ascending/descending используют timestamp и `id ASC` как полный порядок и не дают пропусков или повторов при равных timestamps.
-    - Структурно невалидный cursor, cursor другого scope/filter/order и неограниченный page size возвращают typed validation failure без выполнения unbounded query; изменение или отсутствие прежней граничной строки само по себе cursor не инвалидирует.
+    - Структурно невалидный cursor, cursor другого scope/filter/order и page size вне диапазона 1–100 возвращают typed validation failure до storage query; изменение или отсутствие прежней граничной строки само по себе cursor не инвалидирует.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_catalog_page_test.dart`.
   - **Зависимости:** 4.1.
@@ -190,9 +190,9 @@
 
 - [ ] 4.3 Реализовать FTS5-фильтр названия, точный count и large-fixture проверку
   - **Критерии приёмки:**
-    - Фильтр выполняет буквальное регистронезависимое substring-сопоставление с trim, внутренними пробелами и различием `е`/`ё` и диакритики; запросы короче трёх символов используют согласованный fallback.
+    - Фильтр выполняет буквальное регистронезависимое substring-сопоставление с trim, внутренними пробелами и различием `е`/`ё` и диакритики; search key короче трёх кодовых точек Unicode использует согласованный fallback, значение длиной 255 расширенных графемных кластеров принимается, а 256 возвращает typed validation failure до построения search key/FTS phrase, `COUNT` или чтения строк.
     - Count и строки страницы видят один read snapshot, а фильтр и scope применяются до count, порядка и cursor boundary.
-    - Fixture из 50 000 строк подтверждает FTS query plan для строк от трёх символов, timestamp/cursor indexes без фильтра и materialization не больше page size.
+    - Fixture из 50 000 строк подтверждает FTS query plan для допустимых строк от трёх символов, timestamp/cursor indexes без фильтра, отсутствие SQL-операций для недопустимого фильтра и materialization не больше page size.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_filter_test.dart test/intention/data/drift_intention_repository_large_catalog_test.dart`.
   - **Зависимости:** 4.2.
@@ -307,18 +307,18 @@
 
 - [ ] 5.3 Реализовать query state каталога с тремя scopes, фильтром, точным count и четырьмя порядками
   - **Критерии приёмки:**
-    - Generated Catalog `AsyncNotifier` хранит active/archive/all, title filter, created/updated × ascending/descending, первую page, total count и query generation; defaults равны active и created descending.
+    - Generated Catalog `AsyncNotifier` хранит active/archive/all, title filter, created/updated × ascending/descending, первую page, total count и query generation; defaults равны active и created descending, а нормализованный фильтр длиннее 255 расширенных графемных кластеров получает локализованную validation error, сохраняется для исправления и не вызывает repository.
     - Debounce берётся из подменяемой `CatalogPagingPolicy`, поздний результат старого фильтра игнорируется, а смена scope сохраняет filter/order, но сбрасывает pages и scroll наверх.
     - View различает initial loading/data/empty/no-matches/failure, показывает exact count и доступные summary/archived states без опоры только на цвет.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/catalog/catalog_query_test.dart test/intention/presentation/catalog/catalog_view_test.dart` через `ProviderContainer` для трёх scopes, четырёх порядков, trim/case filter, debounce, stale results, count и initial states.
+    - Выполнить `flutter test test/intention/presentation/catalog/catalog_query_test.dart test/intention/presentation/catalog/catalog_view_test.dart` через `ProviderContainer` для трёх scopes, четырёх порядков, trim/case filter, границ фильтра 255/256 с отсутствием repository call при превышении, debounce, stale results, count и initial states.
   - **Зависимости:** 5.2.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/catalog_view_model.dart`, `lib/src/intention/presentation/catalog/catalog_state.dart`, `lib/src/intention/presentation/catalog/catalog_view.dart`, `test/intention/presentation/catalog/catalog_query_test.dart`, `test/intention/presentation/catalog/catalog_view_test.dart`.
   - **Оценка:** M (5 файлов).
 
 - [ ] 5.4 Реализовать автоматическую подгрузку и согласование command results без потери позиции каталога
   - **Критерии приёмки:**
-    - `CatalogPagingPolicy` задаёт production `pageSize = 100` и `prefetchRemaining = 30`, тесты подменяют значения, а `ScrollController` запускает не больше одной следующей страницы у threshold; success дедуплицирует summaries и добавляет page, конец прекращает запросы, а failure сохраняет items и показывает inline retry.
+    - `CatalogPagingPolicy` задаёт production `pageSize = 100` и `prefetchRemaining = 30`, принимает только `pageSize` 1–100 и `prefetchRemaining` от 0 до значения меньше `pageSize`, тесты подменяют их допустимыми малыми значениями, а `ScrollController` запускает не больше одной следующей страницы у threshold; success дедуплицирует summaries и добавляет page, конец прекращает запросы, а failure сохраняет items и показывает inline retry.
     - При незавершённой выдаче typed saved result вставляется или перемещается только не позже сохранённой boundary, а summary после неё либо вне query не показывается до своей порции; при завершённой выдаче совпадающий summary размещается в любом правильном месте. Cursor сохраняется, count обновляется по membership transition, а deleted result удаляет summary.
     - `ListView.builder`, `PageStorageKey` и visual anchor по первому видимому `IntentionId` сохраняют accumulated state и позицию при вставке, перемещении или исключении summary без перечитывания прежних pages и без сброса к началу.
   - **Проверка:**
@@ -442,7 +442,7 @@
 
 - [ ] 6.2 Закрыть русскую, английскую и fallback локализацию всех системных строк без изменения пользовательского текста
   - **Критерии приёмки:**
-    - Три scopes, filter/count/sort, initial/next-page states, validation, commands, критерии действия, подтверждения и semantics имеют содержательные `en` и `ru` значения.
+    - Три scopes, filter/count/sort, initial/next-page states, включая ошибку превышения 255 расширенных графемных кластеров фильтра, validation, commands, критерии действия, подтверждения и semantics имеют содержательные `en` и `ru` значения.
     - Локали `ru` и `en` показывают соответствующие системные строки, любая другая локаль использует `en`.
     - Сохранённые названия и описания остаются посимвольно одинаковыми при смене локали и выводятся только как plain text.
   - **Проверка:**
@@ -468,7 +468,7 @@
   - **Критерии приёмки:**
     - Release-mode APK не запрашивает `INTERNET` или внешнее хранилище, production connection разрешается в `root/app_flutter/doable.sqlite`, а оба набора backup rules исключают весь `root/app_flutter/` вместе с SQLite WAL/SHM и соседними служебными файлами из cloud backup и device-to-device transfer.
     - События bootstrap, migration, page/detail reads и commands содержат только разрешённые поля; canary-тесты не обнаруживают filter, title, description, UUID, cursor, SQL parameter или полный exception.
-    - Проверка untrusted text и FTS query syntax не выявляет обхода literal substring semantics, SQL/FTS injection, markup rendering или destructive recovery.
+    - Проверка untrusted text и FTS query syntax не выявляет обхода лимита фильтра, literal substring semantics, SQL/FTS injection, markup rendering или destructive recovery; фильтр из 256 расширенных графемных кластеров отклоняется без SQLite/FTS/`COUNT`.
   - **Проверка:**
     - Выполнить `flutter build apk --release` и проверить permissions через `apkanalyzer manifest permissions build/app/outputs/flutter-apk/app-release.apk`.
     - Выполнить `flutter test test/data/local/database_connection_test.dart test/android/backup_policy_test.dart`.
