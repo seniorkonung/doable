@@ -35,33 +35,67 @@ void main() {
   );
 
   test(
-    'Android 12 и новее исключает database domain из cloud backup и transfer',
+    'Android 12 и новее исключает app_flutter из cloud backup и transfer',
     () {
       final rules = File(
         androidMain.resolve('res/xml/data_extraction_rules.xml').toFilePath(),
       ).readAsStringSync();
 
-      expect(
-        rules,
-        contains('''<cloud-backup>
-        <exclude domain="database" path="." />
-    </cloud-backup>'''),
-      );
-      expect(
-        rules,
-        contains('''<device-transfer>
-        <exclude domain="database" path="." />
-    </device-transfer>'''),
-      );
+      final cloudBackup = _elementBody(rules, 'cloud-backup');
+      final deviceTransfer = _elementBody(rules, 'device-transfer');
+
+      expect(_excludesAppFlutter(cloudBackup), isTrue);
+      expect(_excludesAppFlutter(deviceTransfer), isTrue);
+      expect(_excludesLegacyDatabaseDomain(cloudBackup), isFalse);
+      expect(_excludesLegacyDatabaseDomain(deviceTransfer), isFalse);
     },
   );
 
-  test('Android 11 и ниже исключает database domain из full backup', () {
+  test('Android 11 и ниже исключает app_flutter из full backup', () {
     final rules = File(
       androidMain.resolve('res/xml/backup_rules.xml').toFilePath(),
     ).readAsStringSync();
 
-    expect(rules, contains('<full-backup-content>'));
-    expect(rules, contains('<exclude domain="database" path="." />'));
+    final fullBackup = _elementBody(rules, 'full-backup-content');
+
+    expect(_excludesAppFlutter(fullBackup), isTrue);
+    expect(_excludesLegacyDatabaseDomain(fullBackup), isFalse);
+  });
+}
+
+String _elementBody(String xml, String elementName) {
+  final withoutComments = xml.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
+  final match = RegExp('<$elementName(?:\\s[^>]*)?>([\\s\\S]*?)</$elementName>')
+      .firstMatch(withoutComments);
+
+  if (match == null) {
+    throw StateError('Элемент <$elementName> отсутствует');
+  }
+  return match.group(1)!;
+}
+
+bool _excludesAppFlutter(String elementBody) =>
+    _hasExclusion(elementBody, domain: 'root', path: 'app_flutter/');
+
+bool _excludesLegacyDatabaseDomain(String elementBody) =>
+    _hasExclusion(elementBody, domain: 'database', path: '.');
+
+bool _hasExclusion(
+  String elementBody, {
+  required String domain,
+  required String path,
+}) {
+  final excludeElements = RegExp(r'<exclude\b([^>]*)/\s*>')
+      .allMatches(elementBody);
+
+  return excludeElements.any((element) {
+    final attributes = <String, String>{
+      for (final attribute in RegExp(
+        r'''([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')''',
+      ).allMatches(element.group(1)!))
+        attribute.group(1)!: attribute.group(2) ?? attribute.group(3)!,
+    };
+
+    return attributes['domain'] == domain && attributes['path'] == path;
   });
 }

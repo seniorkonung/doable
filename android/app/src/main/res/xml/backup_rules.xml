@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Android 11 и ниже используют full-backup-content. Исключение каталога
-  database покрывает SQLite-файл и его служебные файлы.
+  root/app_flutter покрывает SQLite-файл и его служебные файлы.
   Источник: https://developer.android.com/identity/data/autobackup
 -->
 <full-backup-content>
-    <exclude domain="database" path="." />
+    <exclude domain="root" path="app_flutter/" />
 </full-backup-content>
