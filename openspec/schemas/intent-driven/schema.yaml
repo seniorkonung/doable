@@ -2,7 +2,7 @@ name: intent-driven
 version: 3
 description: >-
   Intent-driven OpenSpec workflow - proposal -> Gherkin-style specs -> design ->
-  adr -> plan -> iterative tasks
+  adr -> plan -> phase-by-phase tasks
 artifacts:
   - id: proposal
     generates: proposal.md
@@ -346,76 +346,63 @@ artifacts:
     description: Phase-scoped implementation task packages
     template: tasks.md
     instruction: |
-      Create or update tasks.md by decomposing exactly one selected phase from
-      plan.md. Treat this instruction and the supplied template as authoritative
-      caller constraints. One invocation may create or update only one phase
-      package. Never generate packages for all future phases at once.
+      Create or update tasks.md by decomposing exactly one phase from plan.md.
+      Never create or update packages for multiple phases in one invocation.
 
-      Re-read before every write:
 
-      - the current plan.md;
-      - the current tasks.md, when it already exists; and
-      - every existing upstream dependency supplied for this artifact: proposal,
-        specs, design, and the ADR review manifest, including referenced durable
-        ADRs.
+      Before writing, re-read plan.md, existing tasks.md, and all supplied upstream
+      artifacts: proposal, specs, design, the ADR review manifest, and referenced
+      durable ADRs.
 
-      Validate the phase ledger before selecting work:
 
-      - Plan phases are the ordered `## Phase N: <title>` headings in plan.md.
-        Their numbers must be unique, sequential, and start at 1.
-      - Every represented phase in tasks.md is one package with the exact same
-        heading as plan.md. The heading is the package's phase reference and
-        must be the last content before that package's first checkbox.
-      - Represented packages must form a continuous prefix Phase 1 through
-        Phase K of the current plan, with no gaps, duplicates, or unknown phases.
-      - At most one package may contain unchecked tasks. If one does, it must be
-        the last represented package; every earlier package must be complete.
-      - Stop without modifying tasks.md when phase numbers, references, ordering,
-        completion state, or plan/tasks correspondence are missing, ambiguous,
-        or contradictory. Report the exact inconsistency that must be resolved.
+      Phase ledger:
 
-      Select exactly one phase package:
+      - Plan phases are unique, sequential `## Phase N: <title>` headings starting
+        at Phase 1.
 
-      - If tasks.md has no represented package, create only the Phase 1 package.
-      - If the last represented package has unchecked tasks, update only that
-        package and do not add another phase.
-      - If every represented package is complete and plan.md has unrepresented
-        phases, append only the first unrepresented phase, Phase K+1.
-      - If every plan phase already has a complete package, make no task changes
-        and report that no phase remains to plan.
+      - Each represented phase is one task package whose exact plan heading appears
+        immediately before its first checkbox.
 
-      Preserve history while updating:
+      - Represented packages form a continuous Phase 1 through Phase K prefix.
 
-      - Preserve every checked task block verbatim, including its checked state,
-        identifier, wording, nested metadata, order, and phase membership. Never
-        uncheck a completed task.
-      - Preserve completed phase headings verbatim. An unfinished package may
-        adopt the current title for the same unambiguous phase number without
-        moving any completed task to another phase.
-      - When changed requirements require corrective work, represent that work
-        as a new unchecked task in the selected unfinished or future phase. Do
-        not rewrite completed work or reopen an earlier completed package. If
-        the current plan has no suitable unfinished phase, stop and require a
-        plan update before changing tasks.md.
-      - Assign new tasks the next unused `N.X` identifier in their phase. Never
-        reuse an identifier belonging to preserved history.
+      - At most the last represented package may contain unchecked tasks. Stop
+        without modifying tasks.md if the ledger is missing, ambiguous, or
+        inconsistent with plan.md, and report the exact conflict.
 
-      Decompose only the selected phase's objective, outcome, boundaries, and
-      readiness gate. Use specs for required behaviour, design for the current
-      implementation approach, and durable ADRs for architectural constraints.
-      Do not pull work forward from later phases.
 
-      Give every task explicit acceptance criteria, verification, dependencies,
-      likely files, and an XS/S/M scope estimate. The selected
-      `## Phase N: <exact title>` heading is the only new level-two heading: put
-      primary `- [ ] N.X ...` tasks directly beneath it, without task-group
-      headings or other phase-like layers. Include a final tracked checkpoint
-      whose completion proves the selected phase's `Ready to advance` condition.
+      Phase selection:
 
-      OpenSpec tracks only primary checkbox lines. Do not use checkboxes for
-      nested acceptance criteria or metadata. If implementation changes
-      behaviour specs, include strict change validation in the relevant task or
-      phase checkpoint.
+      - If no package exists, create Phase 1 only.
+
+      - If the last package has unchecked tasks, update only that package.
+
+      - Otherwise, append only Phase K+1 when it exists. If every plan phase already
+        has a complete package, make no changes.
+
+
+      Rules:
+
+      - Preserve checked task blocks and completed phase headings verbatim. Never
+        uncheck, renumber, reword, reorder, or move completed work. An unfinished
+        package may adopt the current title of the same unambiguous phase.
+
+      - Add requirement-driven corrective work as a new unchecked task in the
+        selected unfinished or future phase, using its next unused `N.X` identifier.
+        Require a plan update when no suitable phase exists.
+
+      - Scope new tasks to the selected phase's objective, outcome, boundaries, and
+        readiness gate. Do not pull work forward from later phases.
+
+      - Follow the supplied template. Use the phase heading as the only new `##`
+        heading and checkboxes only for primary tasks. End the package with a tracked
+        checkpoint proving the phase's `Ready to advance` condition.
+
+      - Include strict change validation when implementation affects behaviour
+        specs.
+
+
+      Reference specs for required behaviour, design for the implementation
+      approach, and durable ADRs for architectural constraints.
     requires:
       - proposal
       - specs
@@ -428,34 +415,27 @@ apply:
     - tasks
   tracks: tasks.md
   instruction: |
-    Re-read every context file, especially the current plan.md and tasks.md,
-    before implementation. Treat tasks.md as a phase ledger, not an end-to-end
-    promise made when planning began.
+    Re-read all context files, especially plan.md and tasks.md.
 
-    Before changing code or task checkboxes, validate all of these invariants:
+    Before implementation, verify that:
 
-    - plan.md has unique sequential `## Phase N: <title>` headings starting at 1;
-    - each tasks.md package has the exact matching plan heading immediately
-      before its first checkbox;
-    - represented packages form a continuous prefix of plan.md;
-    - no more than one package has unchecked tasks, and it is the last package;
-    - completed packages precede the active package; and
-    - every pending task belongs unambiguously to that active package.
+    - plan phases are unique and sequential from Phase 1;
+    - every task package has the exact matching phase heading before its first
+      checkbox;
+    - packages form a continuous plan prefix;
+    - only the last package may contain unchecked tasks.
 
-    Stop without implementation if a phase reference is absent or ambiguous, or
-    if plan.md and tasks.md contradict one another. Report the exact inconsistency
-    and require the planning artifacts to be updated first.
+    Stop before implementation if phase references are missing, ambiguous, or
+    inconsistent. Work only on unchecked tasks in the last package, marking each
+    complete only after its full contract is satisfied.
 
-    Work only through pending tasks in the last represented package and mark each
-    checkbox complete only when its full task contract is satisfied. Do not begin
-    work from an unrepresented future phase.
+    When the package is complete, re-read plan.md and tasks.md:
 
-    After the package becomes complete, re-read plan.md and tasks.md. If plan.md
-    still has unrepresented phases, report completion of `Phase N`, explicitly
-    state that the change is not complete, stop, and propose updating tasks.md
-    with the openspec-update-change workflow to append the next single phase
-    package. Do not recommend archive yet.
+    - if phases remain unrepresented, report only `Phase N` complete, state that
+      the change is incomplete, stop, and propose using openspec-update-change to
+      append the next package;
+    - if every plan phase has a complete package, report the change complete and
+      recommend verification before archive.
 
-    Report the whole change complete only when every phase in plan.md is
-    represented by a complete package and all ledger invariants still hold. Then
-    recommend verification before archive. Pause on blockers or unclear tasks.
+    Do not implement unrepresented phases or recommend archive after an
+    intermediate package. Pause on blockers or unclear tasks.
