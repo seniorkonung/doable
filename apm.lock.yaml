@@ -1,5 +1,5 @@
 lockfile_version: '2'
-generated_at: '2026-08-29T08:40:07.908103+00:00'
+generated_at: '2026-08-30T20:05:22.005566+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: fission-ai/openspec
@@ -84,7 +84,7 @@ dependencies:
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: a026dce34a80ecc2d2023942f138d9fdae19b1b6
+  resolved_commit: b34ce1c5b238f65b391dd991f275863f0ed45c3f
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
@@ -109,6 +109,8 @@ dependencies:
   - .agents/skills/openspec-review-change/SKILL.md
   - .agents/skills/openspec-review-change/references/review-format.md
   - .agents/skills/openspec-review-change/references/review-lenses.md
+  - .agents/skills/phased-planning
+  - .agents/skills/phased-planning/SKILL.md
   - .agents/skills/planning-and-task-breakdown
   - .agents/skills/planning-and-task-breakdown/SKILL.md
   - .agents/skills/security-and-hardening
@@ -135,6 +137,7 @@ dependencies:
     .agents/skills/openspec-review-change/SKILL.md: sha256:d3aa7026125a4e019949f014bf6faf68b3200ffea60a959f1dabfbf2be637634
     .agents/skills/openspec-review-change/references/review-format.md: sha256:8fff9c014c0422603f982706b0b5b31adfceafec7ddd139e452c8017352fbfb7
     .agents/skills/openspec-review-change/references/review-lenses.md: sha256:68f289916a85cf64b0d675611bc6377af55c64fd8cad8b947bc23286bf34afb0
+    .agents/skills/phased-planning/SKILL.md: sha256:f6e9d5c94db8837f005182bcdc5e3d4f511bb88741cdd71829ce6aeaa0badd1c
     .agents/skills/planning-and-task-breakdown/SKILL.md: sha256:3a46c9031f2d70d5333bcd418ce835a866028e7d6abd8ed7cee621f20d6dfa72
     .agents/skills/security-and-hardening/SKILL.md: sha256:7dee4d2cc8b417b90790bf6016f74a3dcd1adcddde6e42f545a391f950778ebe
     .agents/skills/shipping-and-launch/SKILL.md: sha256:ca9216f73ac6dfd1b1104ccd7de570acc5a22e11b1bf0ad4bafde1009afc4512
@@ -142,7 +145,7 @@ dependencies:
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:84ecdae7035ecb602c1d06cf144415f2910237cd54922b980eccdaf2862bbf66
+  content_hash: sha256:f35c08d9b411169d4a2ec38c1f6d997b3e4a93a683a8fba248cb0adacb16b395
   skill_subset:
   - code-review-and-quality
   - discussion
@@ -150,6 +153,7 @@ dependencies:
   - incremental-implementation
   - observability-and-instrumentation
   - openspec-review-change
+  - phased-planning
   - planning-and-task-breakdown
   - security-and-hardening
   - shipping-and-launch
@@ -183,7 +187,7 @@ dependencies:
   - agent-skills
   constraint: 0.6.5
   resolved_tag: 0.6.5
-  resolved_at: '2026-08-29T08:39:55+00:00'
+  resolved_at: '2026-08-30T20:04:39+00:00'
 - repo_url: mattpocock/skills
   name: mattpocock-skills
   host: github.com
@@ -775,6 +779,24 @@ deployments:
   - fission-ai/openspec
   active_owner: fission-ai/openspec
   content_hash: sha256:02a810d3fb265df77ec22891cef25f0510fe0f07b608d837ba361debced81840
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/phased-planning
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/phased-planning/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:f6e9d5c94db8837f005182bcdc5e3d4f511bb88741cdd71829ce6aeaa0badd1c
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/planning-and-task-breakdown
