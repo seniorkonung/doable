@@ -14,8 +14,6 @@ check = [
     "flutter analyze",
     "flutter test"
 ]
-doc = [
-    "dart pub get",
-    "dart analyze",
-    "dart doc ."
+codegen = [
+    "flutter gen-l10n"
 ]
