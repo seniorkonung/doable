@@ -1,0 +1,389 @@
+import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('контракт каталога намерений', () {
+    test(
+      'нормализует фильтр, ограничивает порцию и применяет scope с фильтром',
+      () {
+        final query = IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: '  БЫТЬ ЗДОРОВЫМ  ',
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        );
+        final active = _summary(
+          id: '00000000-0000-4000-8000-000000000001',
+          title: 'Быть здоровым',
+        );
+        final archived = _summary(
+          id: '00000000-0000-4000-8000-000000000002',
+          title: 'Быть здоровым',
+          archiveState: IntentionArchiveState.archived,
+        );
+
+        expect(query.titleFilter, 'БЫТЬ ЗДОРОВЫМ');
+        expect(query.pageSize, 1);
+        expect(query.includes(active), isTrue);
+        expect(query.includes(archived), isFalse);
+        expect(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: '  \n\t ',
+            order: IntentionCatalogOrder.createdAtDescending,
+            pageSize: 100,
+          ).titleFilter,
+          isNull,
+        );
+      },
+    );
+
+    test('принимает границы page size и фильтра из 255 графем', () {
+      final titleFilter = List.filled(255, '👩🏽‍💻').join();
+
+      expect(
+        () => IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: titleFilter,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        ),
+        returnsNormally,
+      );
+      expect(
+        () => IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: titleFilter,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('отклоняет выходящие за границы размер порции и фильтр', () {
+      expect(
+        () => _query(pageSize: 0),
+        _throwsQueryFailure(
+          IntentionCatalogQueryValidationFailure.pageSizeOutOfRange,
+        ),
+      );
+      expect(
+        () => _query(pageSize: 101),
+        _throwsQueryFailure(
+          IntentionCatalogQueryValidationFailure.pageSizeOutOfRange,
+        ),
+      );
+      expect(
+        () => _query(titleFilter: List.filled(256, '👩🏽‍💻').join()),
+        _throwsQueryFailure(
+          IntentionCatalogQueryValidationFailure.titleFilterTooLong,
+        ),
+      );
+    });
+
+    test('сравнивает summaries полным порядком времени и идентификатора', () {
+      final query = _query();
+      final newer = _summary(
+        id: '00000000-0000-4000-8000-000000000002',
+        createdAt: DateTime.utc(2026, 8, 30, 13),
+      );
+      final older = _summary(
+        id: '00000000-0000-4000-8000-000000000001',
+        createdAt: DateTime.utc(2026, 8, 30, 12),
+      );
+      final sameTimeLaterId = _summary(
+        id: '00000000-0000-4000-8000-000000000003',
+        createdAt: DateTime.utc(2026, 8, 30, 13),
+      );
+
+      expect(query.compare(newer, older), isNegative);
+      expect(query.compare(newer, sameTimeLaterId), isNegative);
+      expect(query.compare(sameTimeLaterId, newer), isPositive);
+    });
+
+    test('выражает три scope и четыре сочетания поля с направлением', () {
+      final active = _summary(
+        id: '00000000-0000-4000-8000-000000000001',
+        createdAt: DateTime.utc(2026, 8, 30, 12),
+        updatedAt: DateTime.utc(2026, 8, 30, 14),
+      );
+      final archived = _summary(
+        id: '00000000-0000-4000-8000-000000000002',
+        archiveState: IntentionArchiveState.archived,
+        createdAt: DateTime.utc(2026, 8, 30, 13),
+        updatedAt: DateTime.utc(2026, 8, 30, 11),
+      );
+
+      expect(_queryForScope(IntentionScope.active).includes(active), isTrue);
+      expect(_queryForScope(IntentionScope.active).includes(archived), isFalse);
+      expect(_queryForScope(IntentionScope.archived).includes(active), isFalse);
+      expect(
+        _queryForScope(IntentionScope.archived).includes(archived),
+        isTrue,
+      );
+      expect(_queryForScope(IntentionScope.all).includes(active), isTrue);
+      expect(_queryForScope(IntentionScope.all).includes(archived), isTrue);
+
+      expect(
+        _order(
+          IntentionCatalogSortField.createdAt,
+          IntentionCatalogSortDirection.ascending,
+        ).compare(active, archived),
+        isNegative,
+      );
+      expect(
+        _order(
+          IntentionCatalogSortField.createdAt,
+          IntentionCatalogSortDirection.descending,
+        ).compare(active, archived),
+        isPositive,
+      );
+      expect(
+        _order(
+          IntentionCatalogSortField.updatedAt,
+          IntentionCatalogSortDirection.ascending,
+        ).compare(active, archived),
+        isPositive,
+      );
+      expect(
+        _order(
+          IntentionCatalogSortField.updatedAt,
+          IntentionCatalogSortDirection.descending,
+        ).compare(active, archived),
+        isNegative,
+      );
+    });
+
+    test('связывает cursor со scope, фильтром и порядком, но не с размером страницы', () {
+      final firstQuery = _query(pageSize: 10, titleFilter: ' здоровье ');
+      final boundary = _summary(
+        id: '00000000-0000-4000-8000-000000000002',
+        title: 'Здоровье',
+      );
+      final cursor = IntentionCatalogCursor.fromBoundary(firstQuery, boundary);
+
+      final continuation = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: 'здоровье',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+        cursor: cursor,
+      );
+
+      expect(cursor.isFor(continuation), isTrue);
+      expect(
+        () => IntentionCatalogQuery(
+          scope: IntentionScope.archived,
+          titleFilter: 'здоровье',
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 10,
+          cursor: cursor,
+        ),
+        _throwsQueryFailure(
+          IntentionCatalogQueryValidationFailure.cursorDoesNotMatchQuery,
+        ),
+      );
+    });
+
+    test(
+      'различает sealed первую и последующую страницы без nullable count',
+      () {
+        final query = _query();
+        final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
+        final cursor = IntentionCatalogCursor.fromBoundary(query, summary);
+        final pages = <IntentionCatalogPage>[
+          IntentionCatalogFirstPage(
+            items: [summary],
+            totalCount: 2,
+            nextCursor: cursor,
+          ),
+          IntentionCatalogContinuationPage(items: const [], nextCursor: null),
+        ];
+
+        expect(pages.map(_pageDescription), ['first:2', 'continuation']);
+      },
+    );
+  });
+
+  group('commands и результаты намерений', () {
+    test(
+      'закрытый набор commands несёт только необходимые предметные данные',
+      () {
+        final id = IntentionId('00000000-0000-4000-8000-000000000001');
+        final commands = <IntentionCommand>[
+          const CreateIntention(title: 'Здоровье', description: null),
+          UpdateIntention(
+            id: id,
+            title: 'Быть здоровым',
+            description: 'Каждый день',
+          ),
+          EnableIntentionReadiness(id),
+          DisableIntentionReadiness(id),
+          ArchiveIntention(id),
+          RestoreIntention(id),
+          DeleteIntention(id),
+        ];
+
+        expect(commands, hasLength(7));
+        expect(commands.first, isA<CreateIntention>());
+        expect(commands.last, isA<DeleteIntention>());
+      },
+    );
+
+    test('saved, deleted и failures имеют исчерпывающие типы', () {
+      final intention = _intention();
+      final results = <Result<IntentionCommandSuccess>>[
+        ResultSuccess(IntentionSaved(intention)),
+        ResultSuccess(IntentionDeleted(intention.id)),
+        const ResultFailure(IntentionValidationFailure()),
+        const ResultFailure(IntentionNotFoundFailure()),
+        const ResultFailure(IntentionConflictFailure()),
+        const ResultFailure(IntentionUnavailableFailure()),
+        const ResultFailure(IntentionCorruptionFailure()),
+      ];
+
+      expect(
+        results.whereType<ResultSuccess<IntentionCommandSuccess>>(),
+        hasLength(2),
+      );
+      expect(
+        results.whereType<ResultFailure<IntentionCommandSuccess>>(),
+        hasLength(5),
+      );
+      expect(_resultSuccessDescription(results[0]), 'saved');
+      expect(_resultSuccessDescription(results[1]), 'deleted');
+    });
+
+    test(
+      'watchById сигнализирует typed failure и повторяется новой подпиской',
+      () async {
+        final repository = _FailingRepository();
+        final id = IntentionId('00000000-0000-4000-8000-000000000001');
+
+        await expectLater(
+          repository.watchById(id),
+          emitsError(isA<IntentionRepositoryException>()),
+        );
+        await expectLater(
+          repository.watchById(id),
+          emitsError(isA<IntentionRepositoryException>()),
+        );
+
+        expect(repository.watchSubscriptions, 2);
+      },
+    );
+  });
+}
+
+IntentionCatalogQuery _query({int pageSize = 100, String? titleFilter}) =>
+    IntentionCatalogQuery(
+      scope: IntentionScope.active,
+      titleFilter: titleFilter,
+      order: IntentionCatalogOrder.createdAtDescending,
+      pageSize: pageSize,
+    );
+
+IntentionCatalogQuery _queryForScope(IntentionScope scope) =>
+    IntentionCatalogQuery(
+      scope: scope,
+      titleFilter: null,
+      order: IntentionCatalogOrder.createdAtDescending,
+      pageSize: 100,
+    );
+
+IntentionCatalogQuery _order(
+  IntentionCatalogSortField field,
+  IntentionCatalogSortDirection direction,
+) => IntentionCatalogQuery(
+  scope: IntentionScope.all,
+  titleFilter: null,
+  order: IntentionCatalogOrder(field: field, direction: direction),
+  pageSize: 100,
+);
+
+IntentionSummary _summary({
+  required String id,
+  String title = 'Здоровье',
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
+  DateTime? createdAt,
+  DateTime? updatedAt,
+}) {
+  final created = IntentionTimestamp(
+    createdAt ?? DateTime.utc(2026, 8, 30, 12),
+  );
+  return IntentionSummary(
+    id: IntentionId(id),
+    title: title,
+    hasDescription: false,
+    readiness: IntentionReadiness.notReady,
+    archiveState: archiveState,
+    createdAt: created,
+    updatedAt: IntentionTimestamp(updatedAt ?? created.value),
+  );
+}
+
+Intention _intention() {
+  final timestamp = IntentionTimestamp(DateTime.utc(2026, 8, 30, 12));
+  return Intention(
+    id: IntentionId('00000000-0000-4000-8000-000000000001'),
+    title: 'Здоровье',
+    description: null,
+    readiness: IntentionReadiness.notReady,
+    archiveState: IntentionArchiveState.active,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  );
+}
+
+String _pageDescription(IntentionCatalogPage page) => switch (page) {
+  IntentionCatalogFirstPage(:final totalCount) => 'first:$totalCount',
+  IntentionCatalogContinuationPage() => 'continuation',
+};
+
+String _successDescription(IntentionCommandSuccess success) =>
+    switch (success) {
+      IntentionSaved() => 'saved',
+      IntentionDeleted() => 'deleted',
+    };
+
+String _resultSuccessDescription(Result<IntentionCommandSuccess> result) =>
+    switch (result) {
+      ResultSuccess(:final value) => _successDescription(value),
+      ResultFailure() => throw StateError('Ожидался успешный результат.'),
+    };
+
+Matcher _throwsQueryFailure(IntentionCatalogQueryValidationFailure failure) =>
+    throwsA(
+      isA<IntentionCatalogQueryValidationException>().having(
+        (exception) => exception.failure,
+        'failure',
+        failure,
+      ),
+    );
+
+final class _FailingRepository implements IntentionRepository {
+  var watchSubscriptions = 0;
+
+  @override
+  Future<Result<IntentionCommandSuccess>> execute(
+    IntentionCommand command,
+  ) async => const ResultFailure(IntentionUnavailableFailure());
+
+  @override
+  Future<Result<IntentionCatalogPage>> getCatalogPage(
+    IntentionCatalogQuery query,
+  ) async => const ResultFailure(IntentionUnavailableFailure());
+
+  @override
+  Stream<Intention?> watchById(IntentionId id) {
+    watchSubscriptions++;
+    return Stream.error(
+      const IntentionRepositoryException(IntentionUnavailableFailure()),
+    );
+  }
+}

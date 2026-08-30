@@ -16,6 +16,8 @@ abstract final class IntentionText {
   static const int maxTitleLength = 255;
   static const int maxDescriptionLength = 4096;
 
+  static int countGraphemeClusters(String value) => value.characters.length;
+
   static String normalizeTitle(String value) {
     final normalized = value.trim();
     if (normalized.isEmpty) {
@@ -48,7 +50,7 @@ abstract final class IntentionText {
     int maximum,
     IntentionTextValidationFailure failure,
   ) {
-    if (value.characters.length > maximum) {
+    if (countGraphemeClusters(value) > maximum) {
       throw IntentionTextValidationException(failure);
     }
   }
