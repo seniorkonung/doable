@@ -9,6 +9,8 @@ rules:
     - Must use domain-modeling skill
   specs:
     - Must use gherkin-authoring skill
+  plan:
+    - Must use phased-planning skill
   tasks:
     - Must use planning-and-task-breakdown skill
 operations:
