@@ -21,15 +21,15 @@ void main() {
     test('отклоняет пустое, BOM и слишком длинное название', () {
       expect(
         () => IntentionText.normalizeTitle(' \n\t '),
-        throwsA(isA<IntentionTextValidationException>()),
+        _throwsTextFailure(IntentionTextValidationFailure.emptyTitle),
       );
       expect(
         () => IntentionText.normalizeTitle('\uFEFF'),
-        throwsA(isA<IntentionTextValidationException>()),
+        _throwsTextFailure(IntentionTextValidationFailure.emptyTitle),
       );
       expect(
         () => IntentionText.normalizeTitle(List.filled(256, '👩🏽‍💻').join()),
-        throwsA(isA<IntentionTextValidationException>()),
+        _throwsTextFailure(IntentionTextValidationFailure.titleTooLong),
       );
     });
 
@@ -52,8 +52,16 @@ void main() {
         () => IntentionText.normalizeDescription(
           List.filled(4097, '👩🏽‍💻').join(),
         ),
-        throwsA(isA<IntentionTextValidationException>()),
+        _throwsTextFailure(IntentionTextValidationFailure.descriptionTooLong),
       );
     });
   });
 }
+
+Matcher _throwsTextFailure(IntentionTextValidationFailure failure) => throwsA(
+  isA<IntentionTextValidationException>().having(
+    (exception) => exception.failure,
+    'failure',
+    failure,
+  ),
+);
