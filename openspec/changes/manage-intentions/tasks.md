@@ -106,3 +106,43 @@
   - **Зависимости:** 2.4.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
+
+## Phase 3: Идентичность намерения типобезопасна до появления постоянных данных
+
+- [ ] 3.1 Сделать `IntentionId` закрытым UUID-value object со сменной политикой генерации и типизированным декодированием
+  - **Критерии приёмки:**
+    - Публичный API не позволяет создать `IntentionId` из произвольной строки, не раскрывает `UuidValue` или сырой `.value` и предоставляет равенство, hashing, `Comparable<IntentionId>` и явную каноническую сериализацию для boundary adapters.
+    - Production `IntentionIdGenerator` создаёт UUID v7 через `Uuid().v7obj()`, а тестовый generator выдаёт детерминированную последовательность корректных `IntentionId` без обхода предметных инвариантов.
+    - Boundary-декодирование возвращает закрытый типизированный результат, принимает канонические lower-case записи ненулевых RFC 9562 UUID разных версий, включая v4 и v7, и отклоняет неверный формат, variant и nil UUID.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/domain/intention_id_test.dart` с корректным round trip UUID v4 и UUID v7, nil UUID, верхним регистром, записью без дефисов, неверным variant и несколькими генерациями в одну миллисекунду.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** Нет.
+  - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention_id.dart`, `lib/src/intention/application/intention_id_generator.dart`, `test/intention/domain/intention_id_test.dart`.
+  - **Оценка:** M (3 файла).
+
+- [ ] 3.2 Перевести существующий прикладной контракт на `IntentionId` без строковых обходов и зависимости от версии UUID
+  - **Критерии приёмки:**
+    - Catalog ordering использует `IntentionId.compareTo`, а commands, results, summaries и тестовые fixtures передают предметный тип без чтения сырой строки.
+    - Корректные UUID v4 fixtures сохраняются как проверка version-neutral decoding, а сценарии создания используют детерминированные UUID v7; гарантии равенства, стабильности identity, opaque cursor и исчерпывающих command/result variants не зависят от версии UUID.
+    - В `lib/src/intention` и `test/intention` отсутствуют вызовы публичного строкового конструктора `IntentionId(...)` и обращения к `IntentionId.value`.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/domain test/intention/application`.
+    - Выполнить `rg -n "IntentionId\\(|\.id\.value|IntentionId.*\.value" lib/src/intention test/intention` и убедиться, что совпадений обхода нового API нет.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 3.1.
+  - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `test/intention/domain/intention_test.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Оценка:** M (3 файла).
+
+- [ ] 3.3 Проверить типобезопасную идентичность до реализации постоянного adapter
+  - **Критерии приёмки:**
+    - Действующий ADR, design, предметный API и прикладные callers согласованно отделяют version-neutral `IntentionId` от production-генерации новых UUID v7 и не допускают произвольные строки или nil UUID.
+    - Domain/application/diagnostics tests подтверждают генерацию, декодирование, стабильность identity, отсутствие UUID в production diagnostics и сохранность прежнего repository contract.
+    - Статический анализ и строгая OpenSpec-валидация проходят, а Definition of Done для корректирующей фазы выполнен без появления постоянных пользовательских данных.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/domain test/intention/application test/shared/diagnostics`.
+    - Выполнить `flutter analyze`.
+    - Выполнить `openspec validate manage-intentions --type change --strict`.
+  - **Зависимости:** 3.1, 3.2.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
