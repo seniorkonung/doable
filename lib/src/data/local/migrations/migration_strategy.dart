@@ -20,6 +20,7 @@ MigrationStrategy localDataMigrationStrategy(GeneratedDatabase database) {
         migrate: () => generated.stepByStep()(migrator, from, to),
       );
     },
+    beforeOpen: (_) => database.customStatement('PRAGMA foreign_keys = ON'),
   );
 }
 

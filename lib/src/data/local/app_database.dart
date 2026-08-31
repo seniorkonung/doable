@@ -8,9 +8,18 @@ part 'app_database.g.dart';
 final class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
+  static const currentSchemaVersion = 1;
+
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => currentSchemaVersion;
 
   @override
   MigrationStrategy get migration => localDataMigrationStrategy(this);
+
+  Future<void> open() async {
+    final foreignKeys = await customSelect('PRAGMA foreign_keys').getSingle();
+    if (foreignKeys.read<int>('foreign_keys') != 1) {
+      throw StateError('Внешние ключи не включены после открытия базы данных.');
+    }
+  }
 }
