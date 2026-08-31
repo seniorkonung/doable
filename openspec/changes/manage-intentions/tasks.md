@@ -94,7 +94,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention.dart`, `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_result.dart`, `test/intention/domain/intention_test.dart`, `test/intention/application/intention_contract_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 2.5 Проверить предметный контракт до реализации постоянного adapter
+- [x] 2.5 Проверить предметный контракт до реализации постоянного adapter
   - **Критерии приёмки:**
     - Граничные Unicode-инварианты, identity, все варианты catalog query/page, command/result и завершение `watchById` после typed failure проходят unit tests.
     - Публичная seam не содержит storage-, transport-, sync- или Flutter-specific types и допускает замену adapter без изменения callers.
