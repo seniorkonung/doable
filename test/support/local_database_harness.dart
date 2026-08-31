@@ -8,25 +8,23 @@ import 'package:drift/native.dart';
 import 'in_memory_diagnostics_sink.dart';
 
 final class LocalDatabaseHarness {
-  LocalDatabaseHarness._({
-    required _LocalDatabaseStorage storage,
-    Directory? temporaryDirectory,
-    File? databaseFile,
-  }) : _storage = storage,
-       _temporaryDirectory = temporaryDirectory,
-       _databaseFile = databaseFile;
+  LocalDatabaseHarness._(
+    this._storage, [
+    this._temporaryDirectory,
+    this._databaseFile,
+  ]);
 
   factory LocalDatabaseHarness.inMemory() =>
-      LocalDatabaseHarness._(storage: _LocalDatabaseStorage.inMemory);
+      LocalDatabaseHarness._(_LocalDatabaseStorage.inMemory);
 
   static Future<LocalDatabaseHarness> fileBacked() async {
     final temporaryDirectory = await Directory.systemTemp.createTemp(
       'doable_local_database_',
     );
     return LocalDatabaseHarness._(
-      storage: _LocalDatabaseStorage.fileBacked,
-      temporaryDirectory: temporaryDirectory,
-      databaseFile: File('${temporaryDirectory.path}/doable.sqlite'),
+      _LocalDatabaseStorage.fileBacked,
+      temporaryDirectory,
+      File('${temporaryDirectory.path}/doable.sqlite'),
     );
   }
 
