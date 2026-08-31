@@ -146,3 +146,91 @@
   - **Зависимости:** 3.1, 3.2.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
+
+## Phase 4: Локальные данные имеют надёжный версионируемый lifecycle
+
+- [ ] 4.1 Подключить Android production connection через `QueryExecutor` и связать расположение SQLite-файла с действующей backup policy
+  - **Критерии приёмки:**
+    - `AppDatabase` принимает только `QueryExecutor` и не знает Android paths, backup domains или platform APIs, а production connection использует `driftDatabase(name: 'doable', ...)`, `getApplicationDocumentsDirectory` и background isolate.
+    - Production locator однозначно разрешается в `root/app_flutter/doable.sqlite`, включая соседние WAL/SHM, а contract test доказывает исключение всего `root/app_flutter/` из cloud backup и device-to-device transfer обоими наборами Android rules.
+    - Отрицательные fixtures с прежним `database` domain, неполным путём или другим именем connection не проходят contract; capability не получает `INTERNET`, разрешения внешнего хранилища, экспорт или синхронизацию.
+  - **Проверка:**
+    - Выполнить `flutter test test/android/backup_policy_test.dart test/data/local/database_connection_test.dart`.
+    - Выполнить `flutter build apk --debug`.
+  - **Зависимости:** 1.3, 3.3.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/database_connection.dart`, `test/data/local/database_connection_test.dart`, `test/android/backup_policy_test.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 4.2 Зафиксировать Drift schema version 1 для намерений и ограничивающие индексы будущих catalog queries
+  - **Критерии приёмки:**
+    - Таблица `intentions` хранит канонический UUID как `TEXT PRIMARY KEY`, исходное название, внутренний `title_search_key`, nullable-описание, обязательные состояния готовности и архива и UTC timestamps в микросекундах; уникального ограничения на название нет.
+    - SQL constraints защищают обязательность, начальные boolean-состояния и допустимое соотношение timestamps, не подменяя предметную Unicode-валидацию или типизированное декодирование `IntentionId`.
+    - Индексы поддерживают active, archived и all scopes и полный порядок по `created_at` либо `updated_at` с `id` как tie-breaker без offset pagination или неограниченного чтения.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
+    - Выполнить `flutter test test/data/local/app_database_schema_test.dart` с duplicate-title, nullable-description, timestamp и index fixtures.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 3.3.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/app_database.g.dart`, `test/data/local/app_database_schema_test.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 4.3 Добавить транзакционно согласованный external-content FTS5-индекс названий и index-aware проверку его целостности
+  - **Критерии приёмки:**
+    - `intention_titles_fts` индексирует `title_search_key` с `trigram case_sensitive 0 remove_diacritics 0`, связан с hidden `rowid` таблицы `intentions`, а insert/update/delete triggers изменяют индекс в той же transaction, что и основную строку.
+    - Native runtime действительно создаёт FTS5 virtual table и выполняет параметризованный буквальный `MATCH`; короткие search keys из одной или двух кодовых точек остаются возможны через параметризованный storage path без FTS operators из пользовательского текста.
+    - Канонический `integrity-check` с `rank = 1` проходит для согласованных данных и падает на намеренно рассогласованной fixture, тогда как обычное external-content чтение демонстративно не считается доказательством; production и migration paths не выполняют `VACUUM`.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
+    - Выполнить `flutter test test/data/local/fts_consistency_test.dart test/data/local/app_database_schema_test.dart`.
+  - **Зависимости:** 4.2.
+  - **Вероятно затронутые файлы:** `build.yaml`, `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/fts_integrity.dart`, `test/data/local/fts_consistency_test.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 4.4 Закрепить schema snapshot и атомарный migration harness без destructive fallback
+  - **Критерии приёмки:**
+    - Schema version 1 имеет committed snapshot и generated migration artifacts; дальнейшие пошаговые переходы выполняются от каждой опубликованной версии к текущей в одной write transaction с `foreign_keys = OFF` до её начала и `foreign_key_check` до commit.
+    - Migration step, перестраивающий `intentions`, обязан сохранить прежние hidden rowids либо атомарно пересоздать и заполнить FTS, после чего выполнить `integrity-check` с `rank = 1`; нет downgrade, автоматического удаления, пересоздания базы или нетранзакционного rowid-rewriting path.
+    - Fault-injection harness доказывает rollback схемы, данных и version marker при exception, закрытие неуспешного соединения и безопасный повтор из последней целостной версии; test-only переход не объявляется опубликованной production schema.
+  - **Проверка:**
+    - Выполнить `dart run drift_dev schema dump lib/src/data/local/app_database.dart drift_schemas/` и `dart run drift_dev schema steps drift_schemas/ lib/src/data/local/migrations/generated_schema.dart`.
+    - Выполнить `flutter test test/data/local/migrations` с generated validation, fault injection, `foreign_key_check` и FTS integrity fixtures.
+  - **Зависимости:** 4.2, 4.3.
+  - **Вероятно затронутые файлы:** `drift_schemas/`, `lib/src/data/local/migrations/migration_strategy.dart`, `lib/src/data/local/migrations/generated_schema.dart`, `test/data/local/migrations/migration_test.dart`, `test/data/local/migrations/fault_injection_test.dart`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 4.5 Реализовать типизированный bootstrap локального хранилища с безопасной проверкой совместимости и диагностикой
+  - **Критерии приёмки:**
+    - Bootstrap не предоставляет repository или feature operations до успешного открытия, проверки версии, необходимых миграций и включения `foreign_keys = ON`; результат исчерпывающе различает готовность, устранимую ошибку, corruption и non-retryable `incompatibleSchema`.
+    - Более новая версия хранилища обнаруживается до feature query или записи и остаётся побайтно неизменной без downgrade, удаления или пересоздания; версия ниже 1 и отсутствующая либо повреждённая metadata не угадываются и классифицируются как corruption.
+    - Устранимая ошибка закрывает неготовое соединение и допускает явную новую попытку, а bootstrap/migration diagnostics содержат только длительность, outcome, безопасный failure code и применимые версии схемы без пользовательского текста, UUID, SQL parameters или полного exception.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/bootstrap` с new/current/newer/corrupt schema fixtures, retry и проверкой отсутствия feature access до ready.
+    - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` с canary-значениями.
+  - **Зависимости:** 2.3, 4.1, 4.4.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap_result.dart`, `lib/src/data/local/app_database.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 4.6 Доказать in-memory и file-backed lifecycle схемы до подключения `IntentionRepository`
+  - **Критерии приёмки:**
+    - Общий storage-level harness работает с `NativeDatabase.memory()` и реальным временным SQLite-файлом, полностью закрывает первый persistence object graph и после повторного открытия подтверждает те же UUID разных версий, текст, состояния и UTC timestamps.
+    - Повторное открытие подтверждает `foreign_keys = ON`, согласованность основной таблицы и FTS через `integrity-check` с `rank = 1`, а также отсутствие частично подтверждённого состояния после fault-injected migration failure.
+    - File-backed fixture с более новой схемой остаётся неизменной после отказа bootstrap; тесты освобождают executor и временные ресурсы и не используют будущий `IntentionRepository` или presentation composition.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/file_backed_database_test.dart test/data/local/migrations/file_backed_migration_test.dart`.
+    - Повторить `flutter test test/android/backup_policy_test.dart test/data/local/database_connection_test.dart`.
+  - **Зависимости:** 4.1, 4.3, 4.4, 4.5.
+  - **Вероятно затронутые файлы:** `test/data/local/file_backed_database_test.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/support/local_database_harness.dart`.
+  - **Оценка:** M (3 файла).
+
+- [ ] 4.7 Проверить надёжный версионируемый lifecycle локальных данных перед реализацией repository adapter
+  - **Критерии приёмки:**
+    - In-memory и file-backed evidence подтверждает schema version 1, catalog indexes, runtime FTS5, `foreign_key_check`, index-aware FTS consistency, атомарный rollback/retry и безопасный отказ от более новой схемы.
+    - Android production locator, SQLite service files и оба набора backup/transfer rules образуют один проверяемый host contract, а `AppDatabase` и bootstrap остаются свободны от `IntentionRepository`, UI, transport и sync-specific interfaces.
+    - Повторная генерация не оставляет tracked или untracked diff, статический анализ, storage tests, Android debug build и строгая OpenSpec-валидация проходят на текущем состоянии change.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации.
+    - Выполнить `flutter test test/data/local test/android/backup_policy_test.dart test/shared/diagnostics` и `flutter analyze`.
+    - Выполнить `flutter build apk --debug` и `openspec validate manage-intentions --type change --strict`.
+  - **Зависимости:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
