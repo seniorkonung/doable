@@ -117,7 +117,7 @@ final class IntentionCatalogQuery {
     };
     return directionAdjusted != 0
         ? directionAdjusted
-        : left.id.value.compareTo(right.id.value);
+        : left.id.compareTo(right.id);
   }
 
   IntentionTimestamp _timestampOf(IntentionSummary summary) =>

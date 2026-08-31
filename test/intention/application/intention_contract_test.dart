@@ -228,7 +228,7 @@ void main() {
     test(
       'закрытый набор commands несёт только необходимые предметные данные',
       () {
-        final id = IntentionId('00000000-0000-4000-8000-000000000001');
+        final id = _intentionId('00000000-0000-4000-8000-000000000001');
         final commands = <IntentionCommand>[
           const CreateIntention(title: 'Здоровье', description: null),
           UpdateIntention(
@@ -290,7 +290,7 @@ void main() {
       'watchById сигнализирует typed failure и повторяется новой подпиской',
       () async {
         final repository = _FailingRepository();
-        final id = IntentionId('00000000-0000-4000-8000-000000000001');
+        final id = _intentionId('00000000-0000-4000-8000-000000000001');
 
         final expected = emitsInOrder(<Object?>[
           isA<ResultFailure<Intention?>>().having(
@@ -347,7 +347,7 @@ IntentionSummary _summary({
     createdAt ?? DateTime.utc(2026, 8, 30, 12),
   );
   return IntentionSummary(
-    id: IntentionId(id),
+    id: _intentionId(id),
     title: title,
     hasDescription: false,
     readiness: IntentionReadiness.notReady,
@@ -360,7 +360,7 @@ IntentionSummary _summary({
 Intention _intention() {
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 8, 30, 12));
   return Intention(
-    id: IntentionId('00000000-0000-4000-8000-000000000001'),
+    id: _intentionId('00000000-0000-4000-8000-000000000001'),
     title: 'Здоровье',
     description: null,
     readiness: IntentionReadiness.notReady,
@@ -419,6 +419,11 @@ Matcher _throwsQueryFailure(IntentionCatalogQueryValidationFailure failure) =>
         failure,
       ),
     );
+
+IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
+  IntentionIdDecodingSuccess(:final id) => id,
+  InvalidIntentionIdDecoding() => throw StateError('Ожидался корректный UUID.'),
+};
 
 final class _FailingRepository implements IntentionRepository {
   var watchSubscriptions = 0;
