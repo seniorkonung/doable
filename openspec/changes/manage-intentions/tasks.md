@@ -222,7 +222,7 @@
   - **Вероятно затронутые файлы:** `test/data/local/file_backed_database_test.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/support/local_database_harness.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 4.7 Проверить надёжный версионируемый lifecycle локальных данных перед реализацией repository adapter
+- [x] 4.7 Проверить надёжный версионируемый lifecycle локальных данных перед реализацией repository adapter
   - **Критерии приёмки:**
     - In-memory и file-backed evidence подтверждает schema version 1, catalog indexes, runtime FTS5, `foreign_key_check`, index-aware FTS consistency, атомарный rollback/retry и безопасный отказ от более новой схемы.
     - Android production locator, SQLite service files и оба набора backup/transfer rules образуют один проверяемый host contract, а `AppDatabase` и bootstrap остаются свободны от `IntentionRepository`, UI, transport и sync-specific interfaces.
