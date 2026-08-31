@@ -116,7 +116,7 @@ void main() {
         id: '00000000-0000-4000-8000-000000000002',
         archiveState: IntentionArchiveState.archived,
         createdAt: DateTime.utc(2026, 8, 30, 13),
-        updatedAt: DateTime.utc(2026, 8, 30, 11),
+        updatedAt: DateTime.utc(2026, 8, 30, 13),
       );
 
       expect(_queryForScope(IntentionScope.active).includes(active), isTrue);
@@ -159,13 +159,8 @@ void main() {
       );
     });
 
-    test('связывает cursor со scope, фильтром и порядком, но не с размером страницы', () {
-      final firstQuery = _query(pageSize: 10, titleFilter: ' здоровье ');
-      final boundary = _summary(
-        id: '00000000-0000-4000-8000-000000000002',
-        title: 'Здоровье',
-      );
-      final cursor = IntentionCatalogCursor.fromBoundary(firstQuery, boundary);
+    test('передаёт opaque cursor без раскрытия его реализации', () {
+      const cursor = _TestCatalogCursor();
 
       final continuation = IntentionCatalogQuery(
         scope: IntentionScope.active,
@@ -175,27 +170,14 @@ void main() {
         cursor: cursor,
       );
 
-      expect(cursor.isFor(continuation), isTrue);
-      expect(
-        () => IntentionCatalogQuery(
-          scope: IntentionScope.archived,
-          titleFilter: 'здоровье',
-          order: IntentionCatalogOrder.createdAtDescending,
-          pageSize: 10,
-          cursor: cursor,
-        ),
-        _throwsQueryFailure(
-          IntentionCatalogQueryValidationFailure.cursorDoesNotMatchQuery,
-        ),
-      );
+      expect(continuation.cursor, same(cursor));
     });
 
     test(
       'различает sealed первую и последующую страницы без nullable count',
       () {
-        final query = _query();
         final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
-        final cursor = IntentionCatalogCursor.fromBoundary(query, summary);
+        const cursor = _TestCatalogCursor();
         final pages = <IntentionCatalogPage>[
           IntentionCatalogFirstPage(
             items: [summary],
@@ -208,6 +190,38 @@ void main() {
         expect(pages.map(_pageDescription), ['first:2', 'continuation']);
       },
     );
+
+    test('первая страница отклоняет недопустимый total count в release', () {
+      final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
+
+      expect(
+        () => IntentionCatalogFirstPage(
+          items: [summary],
+          totalCount: 0,
+          nextCursor: null,
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+      expect(
+        () => IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: -1,
+          nextCursor: null,
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+    });
+
+    test('summary отклоняет изменение раньше создания', () {
+      expect(
+        () => _summary(
+          id: '00000000-0000-4000-8000-000000000001',
+          createdAt: DateTime.utc(2026, 8, 30, 12),
+          updatedAt: DateTime.utc(2026, 8, 30, 11),
+        ),
+        throwsA(isA<IntentionTimestampOrderException>()),
+      );
+    });
   });
 
   group('commands и результаты намерений', () {
@@ -229,9 +243,15 @@ void main() {
           DeleteIntention(id),
         ];
 
-        expect(commands, hasLength(7));
-        expect(commands.first, isA<CreateIntention>());
-        expect(commands.last, isA<DeleteIntention>());
+        expect(commands.map(_commandDescription), [
+          'create',
+          'update',
+          'enableReadiness',
+          'disableReadiness',
+          'archive',
+          'restore',
+          'delete',
+        ]);
       },
     );
 
@@ -257,6 +277,13 @@ void main() {
       );
       expect(_resultSuccessDescription(results[0]), 'saved');
       expect(_resultSuccessDescription(results[1]), 'deleted');
+      expect(results.skip(2).map(_resultFailureDescription), [
+        'validation',
+        'notFound',
+        'conflict',
+        'unavailable',
+        'corruption',
+      ]);
     });
 
     test(
@@ -265,14 +292,17 @@ void main() {
         final repository = _FailingRepository();
         final id = IntentionId('00000000-0000-4000-8000-000000000001');
 
-        await expectLater(
-          repository.watchById(id),
-          emitsError(isA<IntentionRepositoryException>()),
-        );
-        await expectLater(
-          repository.watchById(id),
-          emitsError(isA<IntentionRepositoryException>()),
-        );
+        final expected = emitsInOrder(<Object?>[
+          isA<ResultFailure<Intention?>>().having(
+            (result) => result.failure,
+            'failure',
+            isA<IntentionUnavailableFailure>(),
+          ),
+          emitsDone,
+        ]);
+
+        await expectLater(repository.watchById(id), expected);
+        await expectLater(repository.watchById(id), expected);
 
         expect(repository.watchSubscriptions, 2);
       },
@@ -351,10 +381,34 @@ String _successDescription(IntentionCommandSuccess success) =>
       IntentionDeleted() => 'deleted',
     };
 
+String _commandDescription(IntentionCommand command) => switch (command) {
+  CreateIntention() => 'create',
+  UpdateIntention() => 'update',
+  EnableIntentionReadiness() => 'enableReadiness',
+  DisableIntentionReadiness() => 'disableReadiness',
+  ArchiveIntention() => 'archive',
+  RestoreIntention() => 'restore',
+  DeleteIntention() => 'delete',
+};
+
+String _failureDescription(IntentionFailure failure) => switch (failure) {
+  IntentionValidationFailure() => 'validation',
+  IntentionNotFoundFailure() => 'notFound',
+  IntentionConflictFailure() => 'conflict',
+  IntentionUnavailableFailure() => 'unavailable',
+  IntentionCorruptionFailure() => 'corruption',
+};
+
 String _resultSuccessDescription(Result<IntentionCommandSuccess> result) =>
     switch (result) {
       ResultSuccess(:final value) => _successDescription(value),
       ResultFailure() => throw StateError('Ожидался успешный результат.'),
+    };
+
+String _resultFailureDescription(Result<IntentionCommandSuccess> result) =>
+    switch (result) {
+      ResultSuccess() => throw StateError('Ожидался неуспешный результат.'),
+      ResultFailure(:final failure) => _failureDescription(failure),
     };
 
 Matcher _throwsQueryFailure(IntentionCatalogQueryValidationFailure failure) =>
@@ -380,10 +434,12 @@ final class _FailingRepository implements IntentionRepository {
   ) async => const ResultFailure(IntentionUnavailableFailure());
 
   @override
-  Stream<Intention?> watchById(IntentionId id) {
+  Stream<Result<Intention?>> watchById(IntentionId id) {
     watchSubscriptions++;
-    return Stream.error(
-      const IntentionRepositoryException(IntentionUnavailableFailure()),
-    );
+    return Stream.value(const ResultFailure(IntentionUnavailableFailure()));
   }
+}
+
+final class _TestCatalogCursor implements IntentionCatalogCursor {
+  const _TestCatalogCursor();
 }

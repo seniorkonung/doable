@@ -49,4 +49,22 @@ void main() {
 
     expect(intention.description, isNull);
   });
+
+  test('фабрика отклоняет изменение раньше создания', () {
+    final createdAt = IntentionTimestamp(DateTime.utc(2026, 8, 29, 12));
+    final updatedAt = IntentionTimestamp(DateTime.utc(2026, 8, 29, 11));
+
+    expect(
+      () => Intention(
+        id: IntentionId('7c9e6679-7425-40de-944b-e07fc1f90ae7'),
+        title: 'Здоровье',
+        description: null,
+        readiness: IntentionReadiness.notReady,
+        archiveState: IntentionArchiveState.active,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      ),
+      throwsA(isA<IntentionTimestampOrderException>()),
+    );
+  });
 }

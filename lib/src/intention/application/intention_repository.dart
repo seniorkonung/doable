@@ -9,7 +9,7 @@ abstract interface class IntentionRepository {
     IntentionCatalogQuery query,
   );
 
-  Stream<Intention?> watchById(IntentionId id);
+  Stream<Result<Intention?>> watchById(IntentionId id);
 
   Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command);
 }
@@ -44,7 +44,6 @@ final class IntentionCatalogOrder {
 enum IntentionCatalogQueryValidationFailure {
   pageSizeOutOfRange,
   titleFilterTooLong,
-  cursorDoesNotMatchQuery,
 }
 
 final class IntentionCatalogQueryValidationException implements Exception {
@@ -68,12 +67,6 @@ final class IntentionCatalogQuery {
     }
 
     final normalizedFilter = _normalizeFilter(titleFilter);
-    if (cursor != null && !cursor._matches(scope, normalizedFilter, order)) {
-      throw const IntentionCatalogQueryValidationException(
-        IntentionCatalogQueryValidationFailure.cursorDoesNotMatchQuery,
-      );
-    }
-
     return IntentionCatalogQuery._(
       scope: scope,
       titleFilter: normalizedFilter,
@@ -151,47 +144,7 @@ final class IntentionCatalogQuery {
   }
 }
 
-final class IntentionCatalogCursor {
-  const IntentionCatalogCursor._({
-    required this.scope,
-    required this.titleFilter,
-    required this.order,
-    required this.boundaryTimestamp,
-    required this.boundaryId,
-  });
-
-  factory IntentionCatalogCursor.fromBoundary(
-    IntentionCatalogQuery query,
-    IntentionSummary boundary,
-  ) => IntentionCatalogCursor._(
-    scope: query.scope,
-    titleFilter: query.titleFilter,
-    order: query.order,
-    boundaryTimestamp: switch (query.order.field) {
-      IntentionCatalogSortField.createdAt => boundary.createdAt,
-      IntentionCatalogSortField.updatedAt => boundary.updatedAt,
-    },
-    boundaryId: boundary.id,
-  );
-
-  final IntentionScope scope;
-  final String? titleFilter;
-  final IntentionCatalogOrder order;
-  final IntentionTimestamp boundaryTimestamp;
-  final IntentionId boundaryId;
-
-  bool isFor(IntentionCatalogQuery query) =>
-      _matches(query.scope, query.titleFilter, query.order);
-
-  bool _matches(
-    IntentionScope candidateScope,
-    String? candidateFilter,
-    IntentionCatalogOrder candidateOrder,
-  ) =>
-      scope == candidateScope &&
-      titleFilter == candidateFilter &&
-      order == candidateOrder;
-}
+abstract interface class IntentionCatalogCursor {}
 
 final class IntentionSummary {
   IntentionSummary({
@@ -201,8 +154,12 @@ final class IntentionSummary {
     required this.readiness,
     required this.archiveState,
     required this.createdAt,
-    required this.updatedAt,
-  }) : title = IntentionText.normalizeTitle(title);
+    required IntentionTimestamp updatedAt,
+  }) : title = IntentionText.normalizeTitle(title),
+       updatedAt = IntentionTimestamp.requireValidUpdate(
+         createdAt: createdAt,
+         updatedAt: updatedAt,
+       );
 
   final IntentionId id;
   final String title;
@@ -226,11 +183,22 @@ sealed class IntentionCatalogPage {
 final class IntentionCatalogFirstPage extends IntentionCatalogPage {
   IntentionCatalogFirstPage({
     required super.items,
-    required this.totalCount,
+    required int totalCount,
     required super.nextCursor,
-  }) : assert(totalCount >= items.length);
+  }) : totalCount = _requireTotalCount(totalCount, items.length);
 
   final int totalCount;
+
+  static int _requireTotalCount(int totalCount, int itemCount) {
+    if (totalCount < itemCount) {
+      throw const IntentionCatalogPageValidationException();
+    }
+    return totalCount;
+  }
+}
+
+final class IntentionCatalogPageValidationException implements Exception {
+  const IntentionCatalogPageValidationException();
 }
 
 final class IntentionCatalogContinuationPage extends IntentionCatalogPage {

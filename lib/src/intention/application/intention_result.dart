@@ -81,9 +81,3 @@ final class IntentionCorruptionFailure extends IntentionFailure {
   @override
   IntentionFailureCode get code => IntentionFailureCode.corruption;
 }
-
-final class IntentionRepositoryException implements Exception {
-  const IntentionRepositoryException(this.failure);
-
-  final IntentionFailure failure;
-}
