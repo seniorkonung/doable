@@ -18,6 +18,7 @@ codegen = [
     "flutter gen-l10n"
 ]
 setup = [
+    "cp -R ~/projects/doable/apm_modules ./apm_modules/",
     "apm install --frozen",
     "flutter pub get"
 ]
