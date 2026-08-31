@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -44,10 +45,8 @@ void main() {
       final cloudBackup = _elementBody(rules, 'cloud-backup');
       final deviceTransfer = _elementBody(rules, 'device-transfer');
 
-      expect(_excludesAppFlutter(cloudBackup), isTrue);
-      expect(_excludesAppFlutter(deviceTransfer), isTrue);
-      expect(_excludesLegacyDatabaseDomain(cloudBackup), isFalse);
-      expect(_excludesLegacyDatabaseDomain(deviceTransfer), isFalse);
+      expect(_satisfiesProductionContract(cloudBackup), isTrue);
+      expect(_satisfiesProductionContract(deviceTransfer), isTrue);
     },
   );
 
@@ -58,8 +57,33 @@ void main() {
 
     final fullBackup = _elementBody(rules, 'full-backup-content');
 
-    expect(_excludesAppFlutter(fullBackup), isTrue);
-    expect(_excludesLegacyDatabaseDomain(fullBackup), isFalse);
+    expect(_satisfiesProductionContract(fullBackup), isTrue);
+  });
+
+  test('устаревший database domain не удовлетворяет production contract', () {
+    expect(
+      _satisfiesProductionContract('<exclude domain="database" path="." />'),
+      isFalse,
+    );
+  });
+
+  test('неполный путь не удовлетворяет production contract', () {
+    expect(
+      _satisfiesProductionContract(
+        '<exclude domain="root" path="app_flutter" />',
+      ),
+      isFalse,
+    );
+  });
+
+  test('другое имя connection не удовлетворяет production contract', () {
+    expect(
+      _satisfiesProductionContract(
+        '<exclude domain="root" path="app_flutter/" />',
+        connectionName: 'other',
+      ),
+      isFalse,
+    );
   });
 }
 
@@ -74,11 +98,12 @@ String _elementBody(String xml, String elementName) {
   return match.group(1)!;
 }
 
-bool _excludesAppFlutter(String elementBody) =>
+bool _satisfiesProductionContract(
+  String elementBody, {
+  String connectionName = AndroidProductionDatabaseConnection.databaseName,
+}) =>
+    connectionName == AndroidProductionDatabaseConnection.databaseName &&
     _hasExclusion(elementBody, domain: 'root', path: 'app_flutter/');
-
-bool _excludesLegacyDatabaseDomain(String elementBody) =>
-    _hasExclusion(elementBody, domain: 'database', path: '.');
 
 bool _hasExclusion(
   String elementBody, {

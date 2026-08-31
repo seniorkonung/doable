@@ -149,7 +149,7 @@
 
 ## Phase 4: Локальные данные имеют надёжный версионируемый lifecycle
 
-- [ ] 4.1 Подключить Android production connection через `QueryExecutor` и связать расположение SQLite-файла с действующей backup policy
+- [x] 4.1 Подключить Android production connection через `QueryExecutor` и связать расположение SQLite-файла с действующей backup policy
   - **Критерии приёмки:**
     - `AppDatabase` принимает только `QueryExecutor` и не знает Android paths, backup domains или platform APIs, а production connection использует `driftDatabase(name: 'doable', ...)`, `getApplicationDocumentsDirectory` и background isolate.
     - Production locator однозначно разрешается в `root/app_flutter/doable.sqlite`, включая соседние WAL/SHM, а contract test доказывает исключение всего `root/app_flutter/` из cloud backup и device-to-device transfer обоими наборами Android rules.
