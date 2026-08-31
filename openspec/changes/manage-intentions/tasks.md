@@ -210,7 +210,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap_result.dart`, `lib/src/data/local/app_database.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 4.6 Доказать in-memory и file-backed lifecycle схемы до подключения `IntentionRepository`
+- [x] 4.6 Доказать in-memory и file-backed lifecycle схемы до подключения `IntentionRepository`
   - **Критерии приёмки:**
     - Общий storage-level harness работает с `NativeDatabase.memory()` и реальным временным SQLite-файлом, полностью закрывает первый persistence object graph и после повторного открытия подтверждает те же UUID разных версий, текст, состояния и UTC timestamps.
     - Повторное открытие подтверждает `foreign_keys = ON`, согласованность основной таблицы и FTS через `integrity-check` с `rank = 1`, а также отсутствие частично подтверждённого состояния после fault-injected migration failure.
