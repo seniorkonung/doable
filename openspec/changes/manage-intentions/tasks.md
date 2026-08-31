@@ -174,7 +174,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/app_database.g.dart`, `test/data/local/app_database_schema_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 4.3 Добавить транзакционно согласованный external-content FTS5-индекс названий и index-aware проверку его целостности
+- [x] 4.3 Добавить транзакционно согласованный external-content FTS5-индекс названий и index-aware проверку его целостности
   - **Критерии приёмки:**
     - `intention_titles_fts` индексирует `title_search_key` с `trigram case_sensitive 0 remove_diacritics 0`, связан с hidden `rowid` таблицы `intentions`, а insert/update/delete triggers изменяют индекс в той же transaction, что и основную строку.
     - Native runtime действительно создаёт FTS5 virtual table и выполняет параметризованный буквальный `MATCH`; короткие search keys из одной или двух кодовых точек остаются возможны через параметризованный storage path без FTS operators из пользовательского текста.

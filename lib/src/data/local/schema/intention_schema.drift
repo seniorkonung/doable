@@ -12,6 +12,36 @@ CREATE TABLE intentions (
   CHECK (created_at <= updated_at)
 );
 
+CREATE VIRTUAL TABLE intention_titles_fts USING fts5(
+  title_search_key,
+  content = 'intentions',
+  content_rowid = 'rowid',
+  tokenize = 'trigram case_sensitive 0 remove_diacritics 0'
+);
+
+CREATE TRIGGER intentions_fts_after_insert
+AFTER INSERT ON intentions
+BEGIN
+  INSERT INTO intention_titles_fts(rowid, title_search_key)
+  VALUES (new.rowid, new.title_search_key);
+END;
+
+CREATE TRIGGER intentions_fts_after_update_title_search_key
+AFTER UPDATE OF title_search_key ON intentions
+BEGIN
+  INSERT INTO intention_titles_fts(intention_titles_fts, rowid, title_search_key)
+  VALUES ('delete', old.rowid, old.title_search_key);
+  INSERT INTO intention_titles_fts(rowid, title_search_key)
+  VALUES (new.rowid, new.title_search_key);
+END;
+
+CREATE TRIGGER intentions_fts_after_delete
+AFTER DELETE ON intentions
+BEGIN
+  INSERT INTO intention_titles_fts(intention_titles_fts, rowid, title_search_key)
+  VALUES ('delete', old.rowid, old.title_search_key);
+END;
+
 CREATE INDEX intentions_active_created_at_asc_id_asc
   ON intentions (created_at ASC, id ASC)
   WHERE is_archived = 0;
