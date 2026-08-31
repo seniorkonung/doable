@@ -186,7 +186,7 @@
   - **Вероятно затронутые файлы:** `build.yaml`, `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/fts_integrity.dart`, `test/data/local/fts_consistency_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 4.4 Закрепить schema snapshot и атомарный migration harness без destructive fallback
+- [x] 4.4 Закрепить schema snapshot и атомарный migration harness без destructive fallback
   - **Критерии приёмки:**
     - Schema version 1 имеет committed snapshot и generated migration artifacts; дальнейшие пошаговые переходы выполняются от каждой опубликованной версии к текущей в одной write transaction с `foreign_keys = OFF` до её начала и `foreign_key_check` до commit.
     - Migration step, перестраивающий `intentions`, обязан сохранить прежние hidden rowids либо атомарно пересоздать и заполнить FTS, после чего выполнить `integrity-check` с `rank = 1`; нет downgrade, автоматического удаления, пересоздания базы или нетранзакционного rowid-rewriting path.
