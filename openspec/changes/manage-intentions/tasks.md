@@ -82,7 +82,19 @@
   - **Вероятно затронутые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `test/support/in_memory_diagnostics_sink.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 2.4 Проверить предметный контракт до реализации постоянного adapter
+- [x] 2.4 Усилить типобезопасность предметного контракта до реализации постоянного adapter
+  - **Критерии приёмки:**
+    - `watchById` публикует `ResultSuccess<Intention?>` и `ResultFailure<Intention?>` как значения, завершает подписку после failure и не использует нетипизированный Dart error channel для ожидаемых repository failures.
+    - Публичный `IntentionCatalogCursor` не раскрывает поля или фабрику boundary, допускает adapter-owned implementation и оставляет будущему конкретному adapter проверку чужого, несовместимого или структурно недопустимого cursor через validation failure.
+    - `Intention` и `IntentionSummary` отклоняют `updatedAt` раньше `createdAt`, а первая страница в release mode не допускает отрицательный total count или count меньше числа items.
+    - Unit tests используют исчерпывающие `switch` для всех command/result/failure/page variants и доказывают завершение `watchById` после typed failure.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/domain test/intention/application` с отрицательными timestamp/page fixtures, opaque test cursor, исчерпывающими switch helpers и последовательностью typed failure → done.
+  - **Зависимости:** 2.1, 2.2, 2.3.
+  - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention.dart`, `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_result.dart`, `test/intention/domain/intention_test.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 2.5 Проверить предметный контракт до реализации постоянного adapter
   - **Критерии приёмки:**
     - Граничные Unicode-инварианты, identity, все варианты catalog query/page, command/result и завершение `watchById` после typed failure проходят unit tests.
     - Публичная seam не содержит storage-, transport-, sync- или Flutter-specific types и допускает замену adapter без изменения callers.
@@ -91,6 +103,6 @@
     - Выполнить `flutter test test/intention/domain test/intention/application test/shared/diagnostics`.
     - Выполнить `flutter analyze`.
     - Выполнить `openspec validate manage-intentions --type change --strict`.
-  - **Зависимости:** 2.1, 2.2, 2.3.
+  - **Зависимости:** 2.4.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
