@@ -1,0 +1,57 @@
+CREATE TABLE intentions (
+  id TEXT NOT NULL PRIMARY KEY,
+  title TEXT NOT NULL CHECK (title <> ''),
+  title_search_key TEXT NOT NULL CHECK (title_search_key <> ''),
+  description TEXT,
+  is_action_ready BOOLEAN NOT NULL DEFAULT FALSE
+    CHECK (is_action_ready IN (0, 1)),
+  is_archived BOOLEAN NOT NULL DEFAULT FALSE
+    CHECK (is_archived IN (0, 1)),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  CHECK (created_at <= updated_at)
+);
+
+CREATE INDEX intentions_active_created_at_asc_id_asc
+  ON intentions (created_at ASC, id ASC)
+  WHERE is_archived = 0;
+
+CREATE INDEX intentions_active_created_at_desc_id_asc
+  ON intentions (created_at DESC, id ASC)
+  WHERE is_archived = 0;
+
+CREATE INDEX intentions_active_updated_at_asc_id_asc
+  ON intentions (updated_at ASC, id ASC)
+  WHERE is_archived = 0;
+
+CREATE INDEX intentions_active_updated_at_desc_id_asc
+  ON intentions (updated_at DESC, id ASC)
+  WHERE is_archived = 0;
+
+CREATE INDEX intentions_archived_created_at_asc_id_asc
+  ON intentions (created_at ASC, id ASC)
+  WHERE is_archived = 1;
+
+CREATE INDEX intentions_archived_created_at_desc_id_asc
+  ON intentions (created_at DESC, id ASC)
+  WHERE is_archived = 1;
+
+CREATE INDEX intentions_archived_updated_at_asc_id_asc
+  ON intentions (updated_at ASC, id ASC)
+  WHERE is_archived = 1;
+
+CREATE INDEX intentions_archived_updated_at_desc_id_asc
+  ON intentions (updated_at DESC, id ASC)
+  WHERE is_archived = 1;
+
+CREATE INDEX intentions_all_created_at_asc_id_asc
+  ON intentions (created_at ASC, id ASC);
+
+CREATE INDEX intentions_all_created_at_desc_id_asc
+  ON intentions (created_at DESC, id ASC);
+
+CREATE INDEX intentions_all_updated_at_asc_id_asc
+  ON intentions (updated_at ASC, id ASC);
+
+CREATE INDEX intentions_all_updated_at_desc_id_asc
+  ON intentions (updated_at DESC, id ASC);

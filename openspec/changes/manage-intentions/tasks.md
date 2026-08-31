@@ -161,7 +161,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/database_connection.dart`, `test/data/local/database_connection_test.dart`, `test/android/backup_policy_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 4.2 Зафиксировать Drift schema version 1 для намерений и ограничивающие индексы будущих catalog queries
+- [x] 4.2 Зафиксировать Drift schema version 1 для намерений и ограничивающие индексы будущих catalog queries
   - **Критерии приёмки:**
     - Таблица `intentions` хранит канонический UUID как `TEXT PRIMARY KEY`, исходное название, внутренний `title_search_key`, nullable-описание, обязательные состояния готовности и архива и UTC timestamps в микросекундах; уникального ограничения на название нет.
     - SQL constraints защищают обязательность, начальные boolean-состояния и допустимое соотношение timestamps, не подменяя предметную Unicode-валидацию или типизированное декодирование `IntentionId`.
