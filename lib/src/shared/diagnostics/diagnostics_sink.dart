@@ -2,15 +2,32 @@ abstract interface class DiagnosticsSink {
   void record(DiagnosticsEvent event);
 }
 
-enum DiagnosticsOperation {
-  bootstrap,
-  migration,
-  catalogPageRead,
-  intentionDetailRead,
-  intentionCommand,
+sealed class DiagnosticsEvent {
+  const DiagnosticsEvent(this.status);
+
+  final DiagnosticsStatus status;
 }
 
-enum DiagnosticsOutcome { started, succeeded, failed }
+sealed class DiagnosticsStatus {
+  const DiagnosticsStatus();
+}
+
+final class DiagnosticsStarted extends DiagnosticsStatus {
+  const DiagnosticsStarted();
+}
+
+final class DiagnosticsSucceeded extends DiagnosticsStatus {
+  const DiagnosticsSucceeded(this.duration);
+
+  final Duration duration;
+}
+
+final class DiagnosticsFailed extends DiagnosticsStatus {
+  const DiagnosticsFailed({required this.duration, required this.code});
+
+  final Duration duration;
+  final DiagnosticsFailureCode code;
+}
 
 enum DiagnosticsFailureCode {
   validation,
@@ -32,144 +49,45 @@ enum IntentionCommandDiagnosticsType {
   delete,
 }
 
-final class DiagnosticsEvent {
-  DiagnosticsEvent.bootstrap({
-    required DiagnosticsOutcome outcome,
-    Duration? duration,
-    DiagnosticsFailureCode? failureCode,
-    int? schemaVersion,
-  }) : this._(
-         operation: DiagnosticsOperation.bootstrap,
-         outcome: outcome,
-         duration: duration,
-         failureCode: failureCode,
-         schemaVersion: schemaVersion,
-       );
-
-  DiagnosticsEvent.migration({
-    required DiagnosticsOutcome outcome,
-    Duration? duration,
-    DiagnosticsFailureCode? failureCode,
-    required int fromSchemaVersion,
-    required int toSchemaVersion,
-  }) : this._(
-         operation: DiagnosticsOperation.migration,
-         outcome: outcome,
-         duration: duration,
-         failureCode: failureCode,
-         fromSchemaVersion: fromSchemaVersion,
-         toSchemaVersion: toSchemaVersion,
-       );
-
-  DiagnosticsEvent.catalogPageRead({
-    required DiagnosticsOutcome outcome,
-    Duration? duration,
-    DiagnosticsFailureCode? failureCode,
-    required int pageSize,
-  }) : this._(
-         operation: DiagnosticsOperation.catalogPageRead,
-         outcome: outcome,
-         duration: duration,
-         failureCode: failureCode,
-         pageSize: pageSize,
-       );
-
-  DiagnosticsEvent.intentionDetailRead({
-    required DiagnosticsOutcome outcome,
-    Duration? duration,
-    DiagnosticsFailureCode? failureCode,
-  }) : this._(
-         operation: DiagnosticsOperation.intentionDetailRead,
-         outcome: outcome,
-         duration: duration,
-         failureCode: failureCode,
-       );
-
-  DiagnosticsEvent.intentionCommand({
-    required IntentionCommandDiagnosticsType commandType,
-    required DiagnosticsOutcome outcome,
-    Duration? duration,
-    DiagnosticsFailureCode? failureCode,
-  }) : this._(
-         operation: DiagnosticsOperation.intentionCommand,
-         outcome: outcome,
-         duration: duration,
-         failureCode: failureCode,
-         commandType: commandType,
-       );
-
-  DiagnosticsEvent._({
-    required this.operation,
-    required this.outcome,
-    this.duration,
-    this.failureCode,
-    this.pageSize,
-    this.commandType,
+final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
+  const BootstrapDiagnosticsEvent({
+    required DiagnosticsStatus status,
     this.schemaVersion,
-    this.fromSchemaVersion,
-    this.toSchemaVersion,
-  }) {
-    final validOutcomeData = outcome == DiagnosticsOutcome.started
-        ? duration == null && failureCode == null
-        : duration != null &&
-              (outcome == DiagnosticsOutcome.failed
-                  ? failureCode != null
-                  : failureCode == null);
-    if (!validOutcomeData || (duration?.isNegative ?? false)) {
-      throw ArgumentError(
-        'Недопустимое сочетание outcome, duration и failure.',
-      );
-    }
-    if (pageSize != null && (pageSize! < 1 || pageSize! > 100)) {
-      throw ArgumentError.value(pageSize, 'pageSize');
-    }
-    if (schemaVersion != null && schemaVersion! < 0) {
-      throw ArgumentError.value(schemaVersion, 'schemaVersion');
-    }
-    if (fromSchemaVersion != null && fromSchemaVersion! < 0) {
-      throw ArgumentError.value(fromSchemaVersion, 'fromSchemaVersion');
-    }
-    if (toSchemaVersion != null && toSchemaVersion! < 0) {
-      throw ArgumentError.value(toSchemaVersion, 'toSchemaVersion');
-    }
-  }
+  }) : super(status);
 
-  final DiagnosticsOperation operation;
-  final DiagnosticsOutcome outcome;
-  final Duration? duration;
-  final DiagnosticsFailureCode? failureCode;
-  final int? pageSize;
-  final IntentionCommandDiagnosticsType? commandType;
   final int? schemaVersion;
-  final int? fromSchemaVersion;
-  final int? toSchemaVersion;
+}
 
-  Map<String, Object> toStructuredData() {
-    final data = <String, Object>{
-      'operation': operation.name,
-      'outcome': outcome.name,
-    };
-    if (duration != null) {
-      data['durationMicros'] = duration!.inMicroseconds;
-    }
-    if (failureCode != null) {
-      data['failureCode'] = failureCode!.name;
-    }
-    if (pageSize != null) {
-      data['pageSize'] = pageSize!;
-    }
-    if (commandType != null) {
-      data['commandType'] = commandType!.name;
-    }
-    if (schemaVersion != null) {
-      data['schemaVersion'] = schemaVersion!;
-    }
-    if (fromSchemaVersion != null) {
-      data['fromSchemaVersion'] = fromSchemaVersion!;
-    }
-    if (toSchemaVersion != null) {
-      data['toSchemaVersion'] = toSchemaVersion!;
-    }
-    return Map.unmodifiable(data);
-  }
+final class MigrationDiagnosticsEvent extends DiagnosticsEvent {
+  const MigrationDiagnosticsEvent({
+    required this.fromSchemaVersion,
+    required this.toSchemaVersion,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int fromSchemaVersion;
+  final int toSchemaVersion;
+}
+
+final class CatalogPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const CatalogPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+}
+
+final class IntentionDetailReadDiagnosticsEvent extends DiagnosticsEvent {
+  const IntentionDetailReadDiagnosticsEvent({required DiagnosticsStatus status})
+    : super(status);
+}
+
+final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const IntentionCommandDiagnosticsEvent({
+    required this.commandType,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final IntentionCommandDiagnosticsType commandType;
 }

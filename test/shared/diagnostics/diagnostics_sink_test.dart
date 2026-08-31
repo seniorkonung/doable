@@ -8,66 +8,26 @@ import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
   group('DiagnosticsSink', () {
-    test('сохраняет проверяемые структурированные события без telemetry', () {
+    test('сохраняет закрытые типизированные события без telemetry', () {
       final sink = InMemoryDiagnosticsSink();
 
-      sink.record(
-        DiagnosticsEvent.bootstrap(
-          outcome: DiagnosticsOutcome.started,
-          schemaVersion: 1,
-        ),
-      );
-      sink.record(
-        DiagnosticsEvent.migration(
-          outcome: DiagnosticsOutcome.succeeded,
-          duration: Duration(milliseconds: 24),
-          fromSchemaVersion: 1,
-          toSchemaVersion: 2,
-        ),
-      );
-      sink.record(
-        DiagnosticsEvent.catalogPageRead(
-          outcome: DiagnosticsOutcome.succeeded,
-          duration: Duration(milliseconds: 8),
-          pageSize: 100,
-        ),
-      );
-      sink.record(
-        DiagnosticsEvent.intentionDetailRead(
-          outcome: DiagnosticsOutcome.failed,
-          duration: Duration(milliseconds: 3),
-          failureCode: DiagnosticsFailureCode.unavailable,
-        ),
-      );
-      sink.record(
-        DiagnosticsEvent.intentionCommand(
-          commandType: IntentionCommandDiagnosticsType.archive,
-          outcome: DiagnosticsOutcome.failed,
-          duration: Duration(milliseconds: 12),
-          failureCode: DiagnosticsFailureCode.conflict,
-        ),
-      );
+      for (final event in _events()) {
+        sink.record(event);
+      }
 
-      expect(sink.events.map((event) => event.operation), [
-        DiagnosticsOperation.bootstrap,
-        DiagnosticsOperation.migration,
-        DiagnosticsOperation.catalogPageRead,
-        DiagnosticsOperation.intentionDetailRead,
-        DiagnosticsOperation.intentionCommand,
+      expect(sink.events.map((event) => event.runtimeType), [
+        BootstrapDiagnosticsEvent,
+        MigrationDiagnosticsEvent,
+        CatalogPageReadDiagnosticsEvent,
+        IntentionDetailReadDiagnosticsEvent,
+        IntentionCommandDiagnosticsEvent,
       ]);
-      expect(sink.events[1].toStructuredData(), {
-        'operation': 'migration',
-        'outcome': 'succeeded',
-        'durationMicros': 24000,
-        'fromSchemaVersion': 1,
-        'toSchemaVersion': 2,
-      });
-      expect(sink.events[2].toStructuredData()['pageSize'], 100);
-      expect(sink.events[3].toStructuredData()['failureCode'], 'unavailable');
-      expect(sink.events[4].toStructuredData()['commandType'], 'archive');
+      expect(sink.events[0].status, isA<DiagnosticsStarted>());
+      expect(sink.events[1].status, isA<DiagnosticsSucceeded>());
+      expect(sink.events[3].status, isA<DiagnosticsFailed>());
     });
 
-    test('production adapter не записывает canary пользовательских данных', () {
+    test('production adapter записывает только allowlist полей', () {
       const titleCanary = 'CANARY-title-личное-намерение';
       const descriptionCanary = 'CANARY-description-секретный-текст';
       const idCanary = 'c0ffee00-cafe-4bad-8ace-0123456789ab';
@@ -77,23 +37,39 @@ void main() {
       final messages = <String>[];
       final sink = DeveloperDiagnosticsSink(messages.add);
 
-      sink.record(
-        DiagnosticsEvent.intentionCommand(
-          commandType: IntentionCommandDiagnosticsType.create,
-          outcome: DiagnosticsOutcome.failed,
-          duration: Duration(milliseconds: 7),
-          failureCode: DiagnosticsFailureCode.validation,
-        ),
-      );
+      for (final event in _events()) {
+        sink.record(event);
+      }
 
-      expect(messages, hasLength(1));
-      expect(jsonDecode(messages.single), {
-        'operation': 'intentionCommand',
-        'outcome': 'failed',
-        'durationMicros': 7000,
-        'failureCode': 'validation',
-        'commandType': 'create',
-      });
+      expect(messages.map(jsonDecode), [
+        {'operation': 'bootstrap', 'outcome': 'started', 'schemaVersion': 1},
+        {
+          'operation': 'migration',
+          'outcome': 'succeeded',
+          'durationMicros': 24000,
+          'fromSchemaVersion': 1,
+          'toSchemaVersion': 2,
+        },
+        {
+          'operation': 'catalogPageRead',
+          'outcome': 'succeeded',
+          'durationMicros': 8000,
+          'pageSize': 100,
+        },
+        {
+          'operation': 'intentionDetailRead',
+          'outcome': 'failed',
+          'durationMicros': 3000,
+          'failureCode': 'unavailable',
+        },
+        {
+          'operation': 'intentionCommand',
+          'outcome': 'failed',
+          'durationMicros': 12000,
+          'failureCode': 'conflict',
+          'commandType': 'archive',
+        },
+      ]);
       for (final canary in [
         titleCanary,
         descriptionCanary,
@@ -102,8 +78,37 @@ void main() {
         sqlCanary,
         exceptionCanary,
       ]) {
-        expect(messages.single, isNot(contains(canary)));
+        expect(messages.join(), isNot(contains(canary)));
       }
     });
   });
 }
+
+List<DiagnosticsEvent> _events() => [
+  const BootstrapDiagnosticsEvent(
+    schemaVersion: 1,
+    status: DiagnosticsStarted(),
+  ),
+  const MigrationDiagnosticsEvent(
+    fromSchemaVersion: 1,
+    toSchemaVersion: 2,
+    status: DiagnosticsSucceeded(Duration(milliseconds: 24)),
+  ),
+  const CatalogPageReadDiagnosticsEvent(
+    pageSize: 100,
+    status: DiagnosticsSucceeded(Duration(milliseconds: 8)),
+  ),
+  const IntentionDetailReadDiagnosticsEvent(
+    status: DiagnosticsFailed(
+      duration: Duration(milliseconds: 3),
+      code: DiagnosticsFailureCode.unavailable,
+    ),
+  ),
+  const IntentionCommandDiagnosticsEvent(
+    commandType: IntentionCommandDiagnosticsType.archive,
+    status: DiagnosticsFailed(
+      duration: Duration(milliseconds: 12),
+      code: DiagnosticsFailureCode.conflict,
+    ),
+  ),
+];
