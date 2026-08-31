@@ -1,0 +1,13 @@
+{
+  "worktree": {
+    "setup": "mise run setup"
+  },
+  "metadataGeneration": {
+    "branchName": {
+      "instructions": "Branch names must be:\n\n- written in English;\n- lowercase;\n- in kebab-case;\n- compact but meaningful;\n- specific to the actual purpose of the branch;\n- free of filler words, vague wording, and grammar mistakes;\n- formatted as \"<prefix>/<short-description>\".\n\nUse the most appropriate prefix:\n\n- \"feature/\" — new user-facing or product functionality\n- \"fix/\" — bug fixes\n- \"hotfix/\" — urgent production fixes\n- \"refactor/\" — internal code restructuring without behavior changes\n- \"chore/\" — maintenance, cleanup, configuration, tooling, dependencies\n- \"docs/\" — documentation changes\n- \"test/\" — adding or improving tests\n- \"perf/\" — performance improvements\n- \"ci/\" — CI/CD, workflows, automation\n- \"build/\" — build system, packaging, release tooling\n- \"style/\" — formatting or code style only\n- \"experiment/\" — temporary experimental work\n- \"spike/\" — research or investigation without a guaranteed production result\n\nPrefer short branch names with 2–6 words after the prefix.\n\nGood examples:\n\n- \"feature/add-room-search\"\n- \"feature/support-map-based-discovery\"\n- \"fix/handle-empty-user-profile\"\n- \"refactor/extract-auth-service\"\n- \"chore/update-flutter-version\"\n- \"docs/add-architecture-overview\"\n- \"test/add-auth-flow-tests\"\n- \"ci/add-release-workflow\"\n\nAvoid:\n\n- overly long names;\n- generic names like \"feature/update\", \"fix/bug\", \"chore/changes\";\n- mixed casing;\n- underscores;\n- spaces;\n- unnecessary articles like \"a\", \"an\", \"the\";\n- unnecessary verbs like \"make\", \"do\", \"change\", unless they clarify the meaning."
+    },
+    "commitMessage": {
+      "instructions": "When generating Git commit messages, use Conventional Commits.\n\nFormat:\n\n<type>(<scope>): <description>\n\nAllowed types:\n\n- feat\n- fix\n- refactor\n- test\n- docs\n- chore\n- build\n- ci\n- perf\n- style\n\nRules:\n\n- Write all commit messages in English.\n- Infer scope from changed files.\n- Keep subject under 72 characters.\n- Use the concise imperative mood.\n- Do not use vague messages like \"update files\" or \"misc changes\"."
+    }
+  }
+}

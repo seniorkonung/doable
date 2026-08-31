@@ -17,3 +17,7 @@ check = [
 codegen = [
     "flutter gen-l10n"
 ]
+setup = [
+    "apm install --frozen",
+    "flutter pub get"
+]
