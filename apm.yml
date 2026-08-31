@@ -38,6 +38,6 @@ dependencies:
       registry: false
       transport: stdio
       command: dart
-      args: ["mcp-server"]
+      args: ["mcp-server", "--force-roots-fallback"]
 includes: auto
 scripts: {}
