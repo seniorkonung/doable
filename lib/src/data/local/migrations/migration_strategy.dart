@@ -1,28 +1,160 @@
 import 'package:doable/src/data/local/fts_integrity.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
 
 import 'generated_schema.dart' as generated;
 
 typedef MigrationOperation = Future<void> Function();
 
-MigrationStrategy localDataMigrationStrategy(GeneratedDatabase database) {
-  return MigrationStrategy(
-    onUpgrade: (migrator, from, to) async {
-      if (from >= to) {
-        throw UnsupportedError(
-          'Понижение версии схемы локальных данных не поддерживается.',
-        );
-      }
+final class IncompatibleLocalDataSchemaException extends UnsupportedError {
+  IncompatibleLocalDataSchemaException({
+    required this.expectedSchemaVersion,
+    required this.detectedSchemaVersion,
+  }) : super('Схема локальных данных создана более новой версией приложения.');
 
-      await runAtomicMigration(
-        database,
-        targetSchemaVersion: to,
-        migrate: () => generated.stepByStep()(migrator, from, to),
-      );
+  final int expectedSchemaVersion;
+  final int detectedSchemaVersion;
+}
+
+final class CorruptLocalDataSchemaException implements Exception {
+  const CorruptLocalDataSchemaException();
+}
+
+MigrationStrategy localDataMigrationStrategy(
+  GeneratedDatabase database, {
+  DiagnosticsSink? diagnosticsSink,
+}) {
+  return MigrationStrategy(
+    onCreate: (migrator) => _recordMigration(
+      diagnosticsSink,
+      fromSchemaVersion: 0,
+      toSchemaVersion: database.schemaVersion,
+      migrate: () async {
+        await _verifyNewStorageHasNoSchema(database);
+        await migrator.createAll();
+      },
+    ),
+    onUpgrade: (migrator, from, to) => _recordMigration(
+      diagnosticsSink,
+      fromSchemaVersion: from,
+      toSchemaVersion: to,
+      migrate: () async {
+        if (from > to) {
+          throw IncompatibleLocalDataSchemaException(
+            expectedSchemaVersion: to,
+            detectedSchemaVersion: from,
+          );
+        }
+        if (from < 1) throw const CorruptLocalDataSchemaException();
+
+        await runAtomicMigration(
+          database,
+          targetSchemaVersion: to,
+          migrate: () => generated.stepByStep()(migrator, from, to),
+        );
+      },
+    ),
+    beforeOpen: (_) async {
+      await database.customStatement('PRAGMA foreign_keys = ON');
+      await _verifyStoredSchema(database);
     },
-    beforeOpen: (_) => database.customStatement('PRAGMA foreign_keys = ON'),
   );
 }
+
+Future<void> _recordMigration(
+  DiagnosticsSink? diagnosticsSink, {
+  required int fromSchemaVersion,
+  required int toSchemaVersion,
+  required MigrationOperation migrate,
+}) async {
+  final stopwatch = Stopwatch()..start();
+  diagnosticsSink?.record(
+    MigrationDiagnosticsEvent(
+      fromSchemaVersion: fromSchemaVersion,
+      toSchemaVersion: toSchemaVersion,
+      status: const DiagnosticsStarted(),
+    ),
+  );
+
+  try {
+    await migrate();
+    diagnosticsSink?.record(
+      MigrationDiagnosticsEvent(
+        fromSchemaVersion: fromSchemaVersion,
+        toSchemaVersion: toSchemaVersion,
+        status: DiagnosticsSucceeded(stopwatch.elapsed),
+      ),
+    );
+  } on Object catch (error) {
+    diagnosticsSink?.record(
+      MigrationDiagnosticsEvent(
+        fromSchemaVersion: fromSchemaVersion,
+        toSchemaVersion: toSchemaVersion,
+        status: DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: _migrationFailureCode(error),
+        ),
+      ),
+    );
+    rethrow;
+  }
+}
+
+DiagnosticsFailureCode _migrationFailureCode(Object error) => switch (error) {
+  IncompatibleLocalDataSchemaException() =>
+    DiagnosticsFailureCode.incompatibleSchema,
+  CorruptLocalDataSchemaException() => DiagnosticsFailureCode.corruption,
+  _ => DiagnosticsFailureCode.unexpected,
+};
+
+Future<void> _verifyNewStorageHasNoSchema(GeneratedDatabase database) async {
+  final schemaObjects = await database.customSelect('''
+        SELECT name FROM sqlite_schema
+        WHERE type IN ('table', 'index', 'trigger', 'view')
+          AND name NOT LIKE 'sqlite_%'
+      ''').get();
+
+  if (schemaObjects.isNotEmpty) throw const CorruptLocalDataSchemaException();
+}
+
+Future<void> _verifyStoredSchema(GeneratedDatabase database) async {
+  try {
+    final schemaObjects = await database.customSelect('''
+          SELECT name FROM sqlite_schema
+          WHERE type IN ('table', 'index', 'trigger')
+        ''').get();
+    final names = schemaObjects.map((row) => row.read<String>('name')).toSet();
+
+    if (!names.containsAll(_requiredSchemaObjects)) {
+      throw const CorruptLocalDataSchemaException();
+    }
+    await verifyIntentionTitlesFtsIntegrity(database);
+  } on CorruptLocalDataSchemaException {
+    rethrow;
+  } on Object {
+    throw const CorruptLocalDataSchemaException();
+  }
+}
+
+const _requiredSchemaObjects = {
+  'intentions',
+  'intention_titles_fts',
+  'intentions_fts_after_insert',
+  'intentions_fts_after_update_title_search_key',
+  'intentions_fts_after_delete',
+  'intentions_active_created_at_asc_id_asc',
+  'intentions_active_created_at_desc_id_asc',
+  'intentions_active_updated_at_asc_id_asc',
+  'intentions_active_updated_at_desc_id_asc',
+  'intentions_archived_created_at_asc_id_asc',
+  'intentions_archived_created_at_desc_id_asc',
+  'intentions_archived_updated_at_asc_id_asc',
+  'intentions_archived_updated_at_desc_id_asc',
+  'intentions_all_created_at_asc_id_asc',
+  'intentions_all_created_at_desc_id_asc',
+  'intentions_all_updated_at_asc_id_asc',
+  'intentions_all_updated_at_desc_id_asc',
+};
 
 Future<void> runAtomicMigration(
   GeneratedDatabase database, {

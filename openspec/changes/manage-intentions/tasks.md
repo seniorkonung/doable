@@ -198,7 +198,7 @@
   - **Вероятно затронутые файлы:** `drift_schemas/`, `lib/src/data/local/migrations/migration_strategy.dart`, `lib/src/data/local/migrations/generated_schema.dart`, `test/data/local/migrations/migration_test.dart`, `test/data/local/migrations/fault_injection_test.dart`.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 4.5 Реализовать типизированный bootstrap локального хранилища с безопасной проверкой совместимости и диагностикой
+- [x] 4.5 Реализовать типизированный bootstrap локального хранилища с безопасной проверкой совместимости и диагностикой
   - **Критерии приёмки:**
     - Bootstrap не предоставляет repository или feature operations до успешного открытия, проверки версии, необходимых миграций и включения `foreign_keys = ON`; результат исчерпывающе различает готовность, устранимую ошибку, corruption и non-retryable `incompatibleSchema`.
     - Более новая версия хранилища обнаруживается до feature query или записи и остаётся побайтно неизменной без downgrade, удаления или пересоздания; версия ниже 1 и отсутствующая либо повреждённая metadata не угадываются и классифицируются как corruption.

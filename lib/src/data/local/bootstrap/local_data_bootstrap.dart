@@ -1,4 +1,5 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
 
@@ -7,22 +8,37 @@ import 'local_data_bootstrap_result.dart';
 typedef LocalDataExecutorFactory = QueryExecutor Function();
 
 final class LocalDataBootstrap {
-  LocalDataBootstrap({
+  factory LocalDataBootstrap({
     required LocalDataExecutorFactory executorFactory,
     required DiagnosticsSink diagnosticsSink,
-  }) : _executorFactory = executorFactory,
-       _diagnosticsSink = diagnosticsSink;
+  }) => LocalDataBootstrap._(executorFactory, diagnosticsSink);
+
+  LocalDataBootstrap._(this._executorFactory, this._diagnosticsSink);
 
   final LocalDataExecutorFactory _executorFactory;
   final DiagnosticsSink _diagnosticsSink;
   AppDatabase? _database;
+  Future<LocalDataBootstrapResult>? _opening;
 
-  Future<LocalDataBootstrapResult> open() async {
+  Future<LocalDataBootstrapResult> open() {
     final existingDatabase = _database;
     if (existingDatabase != null) {
-      return LocalDataReady(existingDatabase);
+      return Future.value(LocalDataReady(existingDatabase));
+    }
+    final existingOpening = _opening;
+    if (existingOpening != null) {
+      return existingOpening;
     }
 
+    late final Future<LocalDataBootstrapResult> opening;
+    opening = _open().whenComplete(() {
+      if (identical(_opening, opening)) _opening = null;
+    });
+    _opening = opening;
+    return opening;
+  }
+
+  Future<LocalDataBootstrapResult> _open() async {
     final stopwatch = Stopwatch()..start();
     _diagnosticsSink.record(
       const BootstrapDiagnosticsEvent(
@@ -31,8 +47,12 @@ final class LocalDataBootstrap {
       ),
     );
 
-    final database = AppDatabase(_executorFactory());
+    AppDatabase? database;
     try {
+      database = AppDatabase(
+        _executorFactory(),
+        diagnosticsSink: _diagnosticsSink,
+      );
       await database.open();
       _database = database;
       _diagnosticsSink.record(
@@ -42,8 +62,35 @@ final class LocalDataBootstrap {
         ),
       );
       return LocalDataReady(database);
+    } on IncompatibleLocalDataSchemaException catch (error) {
+      await database?.close();
+      _diagnosticsSink.record(
+        BootstrapDiagnosticsEvent(
+          schemaVersion: AppDatabase.currentSchemaVersion,
+          status: DiagnosticsFailed(
+            duration: stopwatch.elapsed,
+            code: DiagnosticsFailureCode.incompatibleSchema,
+          ),
+        ),
+      );
+      return LocalDataIncompatibleSchema(
+        expectedSchemaVersion: error.expectedSchemaVersion,
+        detectedSchemaVersion: error.detectedSchemaVersion,
+      );
+    } on CorruptLocalDataSchemaException {
+      await database?.close();
+      _diagnosticsSink.record(
+        BootstrapDiagnosticsEvent(
+          schemaVersion: AppDatabase.currentSchemaVersion,
+          status: DiagnosticsFailed(
+            duration: stopwatch.elapsed,
+            code: DiagnosticsFailureCode.corruption,
+          ),
+        ),
+      );
+      return const LocalDataCorruption();
     } on Object {
-      await database.close();
+      await database?.close();
       _diagnosticsSink.record(
         BootstrapDiagnosticsEvent(
           schemaVersion: AppDatabase.currentSchemaVersion,
@@ -58,6 +105,8 @@ final class LocalDataBootstrap {
   }
 
   Future<void> close() async {
+    final opening = _opening;
+    if (opening != null) await opening;
     final database = _database;
     _database = null;
     await database?.close();
