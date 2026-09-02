@@ -2,11 +2,10 @@
 
 ## Assessment
 
-**Result:** Changes needed
+**Result:** No unresolved findings
 
-Typed Drift mapping стирает часть некорректных сохранённых значений до
-проверки предметных инвариантов. Задачу 6.2 пока нельзя считать полностью
-подтверждённой текущим инкрементом.
+Нерешённых findings для зафиксированного review target не осталось. Оставшаяся
+реализация корректирующих outcomes имеет конкретных владельцев в OpenSpec tasks.
 
 ## Review target
 
@@ -48,14 +47,7 @@ Typed Drift mapping стирает часть некорректных сохр�
 
 ## Findings
 
-### F2 · Medium — Typed mapping стирает некорректные сохранённые значения до rehydration
-
-- **Evidence:** `watchById` получает уже преобразованный `local.Intention` до вызова `_rehydrate` (`lib/src/intention/data/drift_intention_repository.dart:36-39`). Generated mapper читает readiness/archive как `bool`, а timestamps как `int` (`lib/src/data/local/app_database.g.dart:210-224`). В зафиксированном Drift 2.34.3 boolean mapping превращает любое ненулевое SQLite-значение в `true`, а integer mapping преобразует `double` через `toInt`; после этого `_rehydrate` доверяет boolean-значениям и строит timestamps (`lib/src/intention/data/drift_intention_repository.dart:82-100`). Тесты намеренно отключают `CHECK` для corrupt-row fixtures, но проверяют только нарушения текста и порядка времени, которые переживают typed mapping (`test/intention/data/drift_intention_repository_watch_test.dart:168-220`).
-- **Impact:** например, сохранённое boolean-значение `2` может выйти как успешная готовность/архивность, а дробное значение timestamp — как усечённое предметное время вместо terminal `IntentionCorruptionFailure`. Публичная seam тем самым может подтвердить искажённую модель.
-- **Required outcome:** граница чтения должна проверять сохранённые представления до потери некорректных состояний при coercion и завершать подписку typed corruption для каждого выявленного нарушения; regression evidence должно покрывать lossy boolean/timestamp cases.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** задача 6.2; безопасная rehydration в design; `DriftIntentionRepository.watchById`, persistent row mapping и corrupt-row tests
-- **Disposition:** Open
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 

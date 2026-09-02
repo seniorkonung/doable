@@ -483,15 +483,38 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/sqlite_failure_classifier.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 6.12 Подтвердить готовность Phase 6 после SQLite classification remediation
+- [ ] 6.12 Проверить точную SQLite-классификацию на всех затронутых boundaries
   - **Критерии приёмки:**
     - Сфокусированная failure matrix доказывает одинаковую классификацию на classifier, bootstrap и repository boundaries без retry для постоянных, повреждающих и неизвестных причин.
     - Specs, design, задачи и реализация согласованно различают unavailable, corruption и unexpected по точной машинной семантике без анализа текста exception или утечки storage-specific types.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/sqlite_failure_classifier_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/shared/diagnostics/diagnostics_sink_test.dart`.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 6.11.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 6.13 Исключить lossy typed coercion до rehydration подробных данных намерения
+  - **Критерии приёмки:**
+    - `watchById` получает исходные значения строки до generated Drift mapping и принимает только `String`/допустимый `null` для текстовых полей, целые `0` или `1` для readiness и archive state и целые микросекунды для обоих timestamps; storage-specific представление не пересекает публичную seam.
+    - `REAL`, `BLOB`, посторонний Dart-тип, `null` в обязательном поле, boolean-значение вне `0`/`1` или недопустимый timestamp завершают подписку одним `IntentionCorruptionFailure` без успешного либо частично построенного намерения, тогда как корректные UUID v4/v7, текст, состояния и UTC timestamps восстанавливаются без изменения.
+    - Реактивный detail query сохраняет initial/commit/delete/not-found semantics и безопасные diagnostics без UUID, текста, SQL, параметров или exception.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_watch_test.dart` с raw corrupt-row fixtures для boolean `2`/`-1`, дробных timestamps и посторонних storage classes, а также с прежней success/failure-then-done matrix.
+    - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` и `flutter analyze`.
+  - **Зависимости:** 6.2.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`.
+  - **Оценка:** S (2 файла).
+
+- [ ] 6.14 Подтвердить готовность Phase 6 после remediation SQLite classification и rehydration
+  - **Критерии приёмки:**
+    - Evidence задач 6.10, 6.12 и 6.13 совместно подтверждает полный repository lifecycle, точную SQLite-классификацию и lossless detail rehydration без storage обходов публичной seam.
+    - Corrupt-row matrix доказывает terminal corruption до typed coercion для недопустимых boolean/timestamp представлений, а failure matrix сохраняет утверждённое различие unavailable, corruption и unexpected на всех затронутых boundaries.
     - Повторная генерация не оставляет tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без storage обходов.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.10, 6.11.
+  - **Зависимости:** 6.10, 6.12, 6.13.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
