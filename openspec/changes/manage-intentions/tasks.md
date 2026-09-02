@@ -335,7 +335,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/support/local_database_harness.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.9 Подтвердить исправленный storage contract перед реализацией repository adapter
+- [x] 5.9 Подтвердить исправленный storage contract перед реализацией repository adapter
   - **Критерии приёмки:**
     - Storage suite подтверждает атомарный `onCreate` и безопасный retry через test-only fault injection на executor boundary без production callback, раздельные corruption/retryable/unexpected/incompatible outcomes на in-process и production-подобном background executor, полную семантическую совместимость schema objects в test/debug boundary и буквальный поиск через единую local search seam на file-backed executor.
     - Production-подобный bootstrap ограничен marker версии, необходимыми миграциями и `foreign_keys`, не зависит от `drift_dev`, не создаёт эталонную базу и не выполняет полную schema/FTS проверку при обычном повторном открытии текущей версии.
