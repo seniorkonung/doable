@@ -398,7 +398,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/support/intention_repository_harness.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 6.5 Провести создание и изменение данных намерения через `execute`
+- [x] 6.5 Провести создание и изменение данных намерения через `execute`
   - **Критерии приёмки:**
     - `CreateIntention` нормализует название и описание общей предметной функцией, получает новый `IntentionId` только от внедрённого UUIDv7-generator, записывает один UTC-момент в оба timestamp и принудительно создаёт active/not-ready намерение; одинаковые названия допустимы, а collision не перезаписывает существующую строку.
     - `UpdateIntention` одинаково работает для активного и архивированного намерения, сохраняет identity, `createdAt`, readiness и archive state, атомарно синхронизирует `title_search_key` и меняет `updatedAt` только вместе с фактическим изменением подтверждённых title либо description.

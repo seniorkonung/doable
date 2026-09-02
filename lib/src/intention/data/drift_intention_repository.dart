@@ -11,16 +11,19 @@ import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
 
 import 'package:drift/drift.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 final class DriftIntentionRepository implements IntentionRepository {
   DriftIntentionRepository(
     this._database,
-    IntentionIdGenerator idGenerator,
-    DateTime Function() now,
+    this._idGenerator,
+    this._now,
     this._diagnosticsSink,
   );
 
   final local.AppDatabase _database;
+  final IntentionIdGenerator _idGenerator;
+  final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
 
   @override
@@ -118,7 +121,112 @@ final class DriftIntentionRepository implements IntentionRepository {
   @override
   Future<Result<IntentionCommandSuccess>> execute(
     IntentionCommand command,
-  ) async => const ResultFailure(IntentionUnexpectedFailure());
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    final commandType = _commandDiagnosticsType(command);
+
+    try {
+      final success = await _database.transaction(
+        () => switch (command) {
+          CreateIntention() => _createIntention(command),
+          UpdateIntention() => _updateIntention(command),
+          _ => throw StateError('Неподдерживаемая команда намерения.'),
+        },
+      );
+      _diagnosticsSink.record(
+        IntentionCommandDiagnosticsEvent(
+          commandType: commandType,
+          status: DiagnosticsSucceeded(stopwatch.elapsed),
+        ),
+      );
+      return ResultSuccess(success);
+    } on Object catch (error) {
+      final failure = _classifyCommandFailure(error, command);
+      _diagnosticsSink.record(
+        IntentionCommandDiagnosticsEvent(
+          commandType: commandType,
+          status: DiagnosticsFailed(
+            duration: stopwatch.elapsed,
+            code: _diagnosticsFailureCode(failure),
+          ),
+        ),
+      );
+      return ResultFailure(failure);
+    }
+  }
+
+  Future<IntentionSaved> _createIntention(CreateIntention command) async {
+    final title = IntentionText.normalizeTitle(command.title);
+    final description = switch (command.description) {
+      null => null,
+      final value => IntentionText.normalizeDescription(value),
+    };
+    final createdAt = domain.IntentionTimestamp(_now());
+    final intention = domain.Intention(
+      id: _idGenerator.generate(),
+      title: title,
+      description: description,
+      readiness: domain.IntentionReadiness.notReady,
+      archiveState: domain.IntentionArchiveState.active,
+      createdAt: createdAt,
+      updatedAt: createdAt,
+    );
+
+    await _database
+        .into(_database.intentions)
+        .insert(
+          local.IntentionsCompanion.insert(
+            id: intention.id.toCanonicalString(),
+            title: intention.title,
+            titleSearchKey: intention.title.toLowerCase(),
+            description: Value(intention.description),
+            isActionReady: const Value(false),
+            isArchived: const Value(false),
+            createdAt: intention.createdAt.value.microsecondsSinceEpoch,
+            updatedAt: intention.updatedAt.value.microsecondsSinceEpoch,
+          ),
+        );
+    return IntentionSaved(intention);
+  }
+
+  Future<IntentionSaved> _updateIntention(UpdateIntention command) async {
+    final title = IntentionText.normalizeTitle(command.title);
+    final description = switch (command.description) {
+      null => null,
+      final value => IntentionText.normalizeDescription(value),
+    };
+    final row =
+        await (_database.select(_database.intentions)
+              ..where((row) => row.id.equals(command.id.toCanonicalString())))
+            .getSingleOrNull();
+    if (row == null) throw const _IntentionNotFound();
+
+    final existing = _rehydrate(row);
+    if (existing.title == title && existing.description == description) {
+      return IntentionSaved(existing);
+    }
+
+    final updated = domain.Intention(
+      id: existing.id,
+      title: title,
+      description: description,
+      readiness: existing.readiness,
+      archiveState: existing.archiveState,
+      createdAt: existing.createdAt,
+      updatedAt: domain.IntentionTimestamp(_now()),
+    );
+    await (_database.update(
+      _database.intentions,
+    )..where((row) => row.id.equals(command.id.toCanonicalString()))).write(
+      local.IntentionsCompanion(
+        title: Value(updated.title),
+        titleSearchKey: Value(updated.title.toLowerCase()),
+        description: Value(updated.description),
+        updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
+      ),
+    );
+    return IntentionSaved(updated);
+  }
 
   Future<IntentionCatalogFirstPage> _readFirstCatalogPage(
     IntentionCatalogQuery query,
@@ -410,6 +518,46 @@ IntentionFailure _classifyDetailReadFailure(Object error) {
 IntentionFailure _classifyCatalogReadFailure(Object error) =>
     _classifyDetailReadFailure(error);
 
+IntentionFailure _classifyCommandFailure(
+  Object error,
+  IntentionCommand command,
+) {
+  if (error is IntentionTextValidationException) {
+    return const IntentionValidationFailure();
+  }
+  if (error is _IntentionNotFound) {
+    return const IntentionNotFoundFailure();
+  }
+  if (error is _StoredIntentionCorruption) {
+    return const IntentionCorruptionFailure();
+  }
+
+  return switch (classifySqliteFailure(error)) {
+    SqliteConstraintFailure(:final extendedResultCode)
+        when command is CreateIntention &&
+            extendedResultCode ==
+                SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY =>
+      const IntentionConflictFailure(),
+    SqliteCorruptionFailure() => const IntentionCorruptionFailure(),
+    SqliteUnavailableFailure() => const IntentionUnavailableFailure(),
+    SqliteConstraintFailure() ||
+    SqliteUnexpectedFailure() => const IntentionUnexpectedFailure(),
+  };
+}
+
+IntentionCommandDiagnosticsType _commandDiagnosticsType(
+  IntentionCommand command,
+) => switch (command) {
+  CreateIntention() => IntentionCommandDiagnosticsType.create,
+  UpdateIntention() => IntentionCommandDiagnosticsType.update,
+  EnableIntentionReadiness() => IntentionCommandDiagnosticsType.enableReadiness,
+  DisableIntentionReadiness() =>
+    IntentionCommandDiagnosticsType.disableReadiness,
+  ArchiveIntention() => IntentionCommandDiagnosticsType.archive,
+  RestoreIntention() => IntentionCommandDiagnosticsType.restore,
+  DeleteIntention() => IntentionCommandDiagnosticsType.delete,
+};
+
 DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
     switch (failure) {
       IntentionValidationFailure() => DiagnosticsFailureCode.validation,
@@ -422,4 +570,8 @@ DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
 
 final class _StoredIntentionCorruption implements Exception {
   const _StoredIntentionCorruption();
+}
+
+final class _IntentionNotFound implements Exception {
+  const _IntentionNotFound();
 }
