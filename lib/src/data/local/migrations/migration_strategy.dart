@@ -65,9 +65,12 @@ MigrationStrategy localDataMigrationStrategy(
         );
       },
     ),
-    beforeOpen: (_) async {
+    beforeOpen: (details) async {
+      await _verifyStoredSchema(
+        database,
+        expectedSchemaVersion: details.versionNow,
+      );
       await database.customStatement('PRAGMA foreign_keys = ON');
-      await _verifyStoredSchema(database);
     },
   );
 }
@@ -128,8 +131,18 @@ Future<void> _verifyNewStorageHasNoSchema(GeneratedDatabase database) async {
   if (schemaObjects.isNotEmpty) throw const CorruptLocalDataSchemaException();
 }
 
-Future<void> _verifyStoredSchema(GeneratedDatabase database) async {
+Future<void> _verifyStoredSchema(
+  GeneratedDatabase database, {
+  required int expectedSchemaVersion,
+}) async {
   try {
+    final schemaVersion = await database
+        .customSelect('PRAGMA user_version')
+        .getSingle();
+    if (schemaVersion.read<int>('user_version') != expectedSchemaVersion) {
+      throw const CorruptLocalDataSchemaException();
+    }
+
     final schemaObjects = await database.customSelect('''
           SELECT name FROM sqlite_schema
           WHERE type IN ('table', 'index', 'trigger')
@@ -139,7 +152,6 @@ Future<void> _verifyStoredSchema(GeneratedDatabase database) async {
     if (!names.containsAll(_requiredSchemaObjects)) {
       throw const CorruptLocalDataSchemaException();
     }
-    await verifyIntentionTitlesFtsIntegrity(database);
   } on CorruptLocalDataSchemaException {
     rethrow;
   } on Object {

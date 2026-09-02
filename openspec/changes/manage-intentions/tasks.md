@@ -261,7 +261,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 5.3 Отделить ограниченную проверку обычного открытия от полного FTS audit
+- [x] 5.3 Отделить ограниченную проверку обычного открытия от полного FTS audit
   - **Критерии приёмки:**
     - `beforeOpen` текущей схемы проверяет только marker и конечный набор обязательных schema objects, включает `foreign_keys` и не вызывает FTS `integrity-check` либо другую операцию, сканирующую пользовательские строки или весь индекс.
     - Полный index-aware audit остаётся единым helper и обязательно выполняется до commit атомарного первичного создания и каждой миграции, затрагивающей FTS; будущий recovery/maintenance caller сможет выбрать его явно.

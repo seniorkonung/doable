@@ -1,8 +1,11 @@
+import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:drift/drift.dart' hide isNull;
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
@@ -110,6 +113,45 @@ void main() {
       },
     );
 
+    test('обычный повторный bootstrap не выполняет полный FTS audit', () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+
+      final firstDatabase = await harness.openReadyDatabase();
+      await _insertIntention(
+        firstDatabase,
+        id: '018f0b5d-6b2e-7c80-8000-000000000303',
+        title: 'Первое намерение для проверки открытия',
+        titleSearchKey: 'первое намерение для проверки открытия',
+        createdAt: 1704412800000000,
+        updatedAt: 1704412800000000,
+      );
+      await _insertIntention(
+        firstDatabase,
+        id: '018f0b5d-6b2e-7c80-8000-000000000304',
+        title: 'Второе намерение для проверки открытия',
+        titleSearchKey: 'второе намерение для проверки открытия',
+        createdAt: 1704499200000000,
+        updatedAt: 1704499200000000,
+      );
+      await harness.closePersistenceObjectGraph();
+
+      final sqlTrace = _SqlTrace();
+      final bootstrap = LocalDataBootstrap(
+        executorFactory: () =>
+            NativeDatabase(harness.databaseFile).interceptWith(sqlTrace),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(bootstrap.close);
+
+      expect(await bootstrap.open(), isA<LocalDataReady>());
+      final trace = sqlTrace.statements.join('\n').toLowerCase();
+      expect(trace, contains('pragma user_version'));
+      expect(trace, contains('sqlite_schema'));
+      expect(trace, contains('pragma foreign_keys = on'));
+      expect(trace, isNot(contains('integrity-check')));
+    });
+
     test(
       'dispose закрывает file-backed graph и удаляет его временные ресурсы',
       () async {
@@ -170,4 +212,55 @@ Future<void> _insertIntention(
       updatedAt,
     ],
   );
+}
+
+final class _SqlTrace extends QueryInterceptor {
+  final statements = <String>[];
+
+  @override
+  Future<bool> ensureOpen(QueryExecutor executor, QueryExecutorUser user) =>
+      executor.ensureOpen(_TracingQueryExecutorUser(user, this));
+
+  @override
+  Future<void> runBatched(
+    QueryExecutor executor,
+    BatchedStatements statements,
+  ) {
+    this.statements.addAll(statements.statements);
+    return super.runBatched(executor, statements);
+  }
+
+  @override
+  Future<void> runCustom(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    statements.add(statement);
+    return super.runCustom(executor, statement, args);
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    statements.add(statement);
+    return super.runSelect(executor, statement, args);
+  }
+}
+
+final class _TracingQueryExecutorUser implements QueryExecutorUser {
+  const _TracingQueryExecutorUser(this._delegate, this._sqlTrace);
+
+  final QueryExecutorUser _delegate;
+  final _SqlTrace _sqlTrace;
+
+  @override
+  int get schemaVersion => _delegate.schemaVersion;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) =>
+      _delegate.beforeOpen(executor.interceptWith(_sqlTrace), details);
 }
