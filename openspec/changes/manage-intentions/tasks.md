@@ -374,7 +374,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 6.3 Реализовать ограниченную первую страницу каталога для всех scope, фильтров и порядков
+- [x] 6.3 Реализовать ограниченную первую страницу каталога для всех scope, фильтров и порядков
   - **Критерии приёмки:**
     - Запрос без cursor возвращает только `IntentionCatalogFirstPage`: точный `COUNT` и строки первой порции читаются внутри одной read transaction из одного SQLite snapshot и используют одно составное условие scope и допустимого `IntentionTitleFilter` до упорядочивания.
     - Три scope и четыре сочетания поля с направлением применяют `IntentionId` как автоматический tie-breaker, короткая и FTS-ветви переиспользуют только `LocalIntentionTitleSearch`, а `IntentionSummary` не материализует полный description.
