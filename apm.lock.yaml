@@ -1,6 +1,6 @@
 lockfile_version: '2'
-generated_at: '2026-08-31T15:29:01.487677+00:00'
-apm_version: 0.29.0
+generated_at: '2026-09-02T06:51:58.817723+00:00'
+apm_version: 0.28.0
 dependencies:
 - repo_url: fission-ai/openspec
   name: openspec
@@ -84,7 +84,7 @@ dependencies:
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: b34ce1c5b238f65b391dd991f275863f0ed45c3f
+  resolved_commit: abb437ecd61e2a3645d133ddf08d8b78590f99bb
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
@@ -101,14 +101,25 @@ dependencies:
   - .agents/skills/idea-refine/frameworks.md
   - .agents/skills/idea-refine/refinement-criteria.md
   - .agents/skills/idea-refine/scripts/idea-refine.sh
+  - .agents/skills/implementation-decision-review
+  - .agents/skills/implementation-decision-review/SKILL.md
   - .agents/skills/incremental-implementation
   - .agents/skills/incremental-implementation/SKILL.md
   - .agents/skills/observability-and-instrumentation
   - .agents/skills/observability-and-instrumentation/SKILL.md
   - .agents/skills/openspec-review-change
   - .agents/skills/openspec-review-change/SKILL.md
+  - .agents/skills/openspec-review-change/references/evaluation-cases.md
   - .agents/skills/openspec-review-change/references/review-format.md
   - .agents/skills/openspec-review-change/references/review-lenses.md
+  - .agents/skills/openspec-review-implementation
+  - .agents/skills/openspec-review-implementation/SKILL.md
+  - .agents/skills/openspec-review-implementation/references/evaluation-cases.md
+  - .agents/skills/openspec-review-implementation/references/remediation.md
+  - .agents/skills/openspec-review-implementation/references/review-format.md
+  - .agents/skills/openspec-review-implementation/references/review-target.md
+  - .agents/skills/openspec-review-implementation/scripts/discover-review-target.mjs
+  - .agents/skills/openspec-review-implementation/tests/discover-review-target.test.mjs
   - .agents/skills/phased-planning
   - .agents/skills/phased-planning/SKILL.md
   - .agents/skills/planning-and-task-breakdown
@@ -132,11 +143,20 @@ dependencies:
     .agents/skills/idea-refine/frameworks.md: sha256:161ebc18fdf2d996bc62a87a2d747cf1bf53548354f8925de25c732c27f00309
     .agents/skills/idea-refine/refinement-criteria.md: sha256:1ca2973a4d01b5cb37ab7ddb2eff77fa4e792634a33d0ce44961c068fc88d51a
     .agents/skills/idea-refine/scripts/idea-refine.sh: sha256:f02a52408a4218047c032d221483abfbb48d11f090bb4915965c7419bf2e0e47
+    .agents/skills/implementation-decision-review/SKILL.md: sha256:ffc04efe010575750a2b20258d0ff7afabe08db8c144ce17b6608beb7c2833eb
     .agents/skills/incremental-implementation/SKILL.md: sha256:9fc3b1931a1aa6da02e51d030f872cb52771843830b375fc91e43885a73fa853
     .agents/skills/observability-and-instrumentation/SKILL.md: sha256:e4e75a3b486967db22b1446ab694b82116800cb19cc6b9387ac79a604da83bca
-    .agents/skills/openspec-review-change/SKILL.md: sha256:d3aa7026125a4e019949f014bf6faf68b3200ffea60a959f1dabfbf2be637634
-    .agents/skills/openspec-review-change/references/review-format.md: sha256:8fff9c014c0422603f982706b0b5b31adfceafec7ddd139e452c8017352fbfb7
-    .agents/skills/openspec-review-change/references/review-lenses.md: sha256:68f289916a85cf64b0d675611bc6377af55c64fd8cad8b947bc23286bf34afb0
+    .agents/skills/openspec-review-change/SKILL.md: sha256:5abe1ec06e4056cc1ea6148c6be2e441c0c9ae68e8e89768592b525c4d81d4af
+    .agents/skills/openspec-review-change/references/evaluation-cases.md: sha256:dedf26193693b433002f8ed6cbecdbdd63d98806c0a6e54b7eaa89bc29c78bb0
+    .agents/skills/openspec-review-change/references/review-format.md: sha256:f41258b6cb084ec13c033705a3305c7c92841e0aefe6e55f15d84d4a8c41f817
+    .agents/skills/openspec-review-change/references/review-lenses.md: sha256:bdb0d6ce2e407770f2c66119eeb8fe40ae56aa5cc3a6da11a93fed697790ddf7
+    .agents/skills/openspec-review-implementation/SKILL.md: sha256:c071a0cbfb12a22742e557219cbc3ea73f82fdb8fba3755d6b724402726402f1
+    .agents/skills/openspec-review-implementation/references/evaluation-cases.md: sha256:e5419252083e530e2e720b3c7435793d9c636f25cf506f560ca007fb77fb99f8
+    .agents/skills/openspec-review-implementation/references/remediation.md: sha256:e42bcd99f144ae7b116d21bdf805de9050f653244458c9c1fbfdb863de930e17
+    .agents/skills/openspec-review-implementation/references/review-format.md: sha256:54bb9bdf24666088f6b6515b9967fa5575e0574793908db3755073717b6c2bb8
+    .agents/skills/openspec-review-implementation/references/review-target.md: sha256:78b121390f8192ed41105b780658d0e538e36d089b1b99556b74b797d64fd45f
+    .agents/skills/openspec-review-implementation/scripts/discover-review-target.mjs: sha256:0c7ac71c54444c139978b9b7e63b93f245adf247c9c9bb845a90b3d9d121e3d6
+    .agents/skills/openspec-review-implementation/tests/discover-review-target.test.mjs: sha256:0516c7f03964d27eab85d4b33411ccf91bd3d539035dfcc074456e8ed18ed818
     .agents/skills/phased-planning/SKILL.md: sha256:f6e9d5c94db8837f005182bcdc5e3d4f511bb88741cdd71829ce6aeaa0badd1c
     .agents/skills/planning-and-task-breakdown/SKILL.md: sha256:3a46c9031f2d70d5333bcd418ce835a866028e7d6abd8ed7cee621f20d6dfa72
     .agents/skills/security-and-hardening/SKILL.md: sha256:7dee4d2cc8b417b90790bf6016f74a3dcd1adcddde6e42f545a391f950778ebe
@@ -145,14 +165,16 @@ dependencies:
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:f35c08d9b411169d4a2ec38c1f6d997b3e4a93a683a8fba248cb0adacb16b395
+  content_hash: sha256:3fecc330855502bda987661c2e6c9af75127d75b5c0f065f5f8b5245e45927ca
   skill_subset:
   - code-review-and-quality
   - discussion
   - idea-refine
+  - implementation-decision-review
   - incremental-implementation
   - observability-and-instrumentation
   - openspec-review-change
+  - openspec-review-implementation
   - phased-planning
   - planning-and-task-breakdown
   - security-and-hardening
@@ -167,6 +189,17 @@ dependencies:
   depth: 2
   resolved_by: seniorkonung/agent-skills
   package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/code-simplification
+  - .agents/skills/code-simplification/SKILL.md
+  - .agents/skills/debugging-and-error-recovery
+  - .agents/skills/debugging-and-error-recovery/SKILL.md
+  - .agents/skills/source-driven-development
+  - .agents/skills/source-driven-development/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/code-simplification/SKILL.md: sha256:f0c5ed754057eb0c1e027e2587f59de816651feb5e837242296c43ea21cf621d
+    .agents/skills/debugging-and-error-recovery/SKILL.md: sha256:927ad6917fa2891827351cfa3470cd715423faaa5c5f27fe74534d9324c35eea
+    .agents/skills/source-driven-development/SKILL.md: sha256:b979e7531ea601ed14a090f32a5b135db517c48ab9821c5e8b09efd80f4ff4d8
   content_hash: sha256:5b91544f925d04ef97f08ad0d20586c29b3c8394535eb6e8585b4d04ba7eb53b
   skill_subset:
   - code-simplification
@@ -176,7 +209,7 @@ dependencies:
   - agent-skills
   constraint: 0.6.5
   resolved_tag: 0.6.5
-  resolved_at: '2026-08-30T20:04:39+00:00'
+  resolved_at: '2026-09-02T06:51:44+00:00'
 - repo_url: mattpocock/skills
   name: mattpocock-skills
   host: github.com
@@ -186,6 +219,28 @@ dependencies:
   depth: 2
   resolved_by: seniorkonung/agent-skills
   package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/codebase-design
+  - .agents/skills/codebase-design/DEEPENING.md
+  - .agents/skills/codebase-design/DESIGN-IT-TWICE.md
+  - .agents/skills/codebase-design/SKILL.md
+  - .agents/skills/domain-modeling
+  - .agents/skills/domain-modeling/ADR-FORMAT.md
+  - .agents/skills/domain-modeling/CONTEXT-FORMAT.md
+  - .agents/skills/domain-modeling/SKILL.md
+  - .agents/skills/grill-with-docs
+  - .agents/skills/grill-with-docs/SKILL.md
+  - .agents/skills/grilling
+  - .agents/skills/grilling/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/codebase-design/DEEPENING.md: sha256:125e6b77413ad2bc7cf7a772bc74336d580a50f9e797db2178ed133d62333d06
+    .agents/skills/codebase-design/DESIGN-IT-TWICE.md: sha256:21c3264953bd30ee87b181a3ccaf0e70649f461e5ffd7dc654acee4ba1788b31
+    .agents/skills/codebase-design/SKILL.md: sha256:a8d50abac5a4018f60e1d911d4b6f4e36454ca14d6c390c0695a578c7de65dad
+    .agents/skills/domain-modeling/ADR-FORMAT.md: sha256:f1f36cd3f8d3b6474ddd5855da4e233bfc4ae1a1c5024909ccf11871819a41b2
+    .agents/skills/domain-modeling/CONTEXT-FORMAT.md: sha256:b8cc318f2a4285b530e908b6bc43901c3c5cd11100362636bbc4216639bef597
+    .agents/skills/domain-modeling/SKILL.md: sha256:152e2c97239affb12a60c5f4a7e74ab546a49ae169688c81f4e2ccc42dafa579
+    .agents/skills/grill-with-docs/SKILL.md: sha256:610d091047bcfb9db0f75c057d15538481a721111579fc5ec7f83ad9131a2165
+    .agents/skills/grilling/SKILL.md: sha256:5a35925d03a391bcfa46940868b649b72dba89ec9c19525e785bbb6bd3a7f478
   content_hash: sha256:3a26aa108d8b0b740315c7e62921597f2cc2c99412e63c1f8b3d4c403a5e30b8
   skill_subset:
   - codebase-design
@@ -203,6 +258,11 @@ dependencies:
   depth: 2
   resolved_by: seniorkonung/agent-skills
   package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/verification-before-completion
+  - .agents/skills/verification-before-completion/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/verification-before-completion/SKILL.md: sha256:2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3
   content_hash: sha256:f4ba2a0b0275955535927e8635806758416f20b7dd7ff598c051cf5cdd08051d
   skill_subset:
   - verification-before-completion
@@ -257,6 +317,78 @@ deployments:
   content_hash: sha256:0ff65150158adfd41844534948cbe4271e6a7a3aa463700a8d99caf550e38223
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/code-simplification
+  runtime: null
+  scope: project
+  owners:
+  - addyosmani/agent-skills
+  active_owner: addyosmani/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/code-simplification/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - addyosmani/agent-skills
+  active_owner: addyosmani/agent-skills
+  content_hash: sha256:f0c5ed754057eb0c1e027e2587f59de816651feb5e837242296c43ea21cf621d
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/codebase-design
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/codebase-design/DEEPENING.md
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: sha256:125e6b77413ad2bc7cf7a772bc74336d580a50f9e797db2178ed133d62333d06
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/codebase-design/DESIGN-IT-TWICE.md
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: sha256:21c3264953bd30ee87b181a3ccaf0e70649f461e5ffd7dc654acee4ba1788b31
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/codebase-design/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: sha256:a8d50abac5a4018f60e1d911d4b6f4e36454ca14d6c390c0695a578c7de65dad
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/debugging-and-error-recovery
+  runtime: null
+  scope: project
+  owners:
+  - addyosmani/agent-skills
+  active_owner: addyosmani/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/debugging-and-error-recovery/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - addyosmani/agent-skills
+  active_owner: addyosmani/agent-skills
+  content_hash: sha256:927ad6917fa2891827351cfa3470cd715423faaa5c5f27fe74534d9324c35eea
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/discussion
   runtime: null
   scope: project
@@ -293,6 +425,42 @@ deployments:
   content_hash: sha256:e0a056cc213de20ee0e311c1404a21bfdda9e70d2d2cc2b73748de1b53359a6c
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/domain-modeling
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/domain-modeling/ADR-FORMAT.md
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: sha256:f1f36cd3f8d3b6474ddd5855da4e233bfc4ae1a1c5024909ccf11871819a41b2
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/domain-modeling/CONTEXT-FORMAT.md
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: sha256:b8cc318f2a4285b530e908b6bc43901c3c5cd11100362636bbc4216639bef597
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/domain-modeling/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: sha256:152e2c97239affb12a60c5f4a7e74ab546a49ae169688c81f4e2ccc42dafa579
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/gherkin-authoring
   runtime: null
   scope: project
@@ -309,6 +477,42 @@ deployments:
   - intent-driven-dev/intent-driven-template/.agents/skills/gherkin-authoring
   active_owner: intent-driven-dev/intent-driven-template/.agents/skills/gherkin-authoring
   content_hash: sha256:6be226f25e2968f6175e59067f05915508c60eddf4717a46f21f332a403943ac
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/grill-with-docs
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/grill-with-docs/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: sha256:610d091047bcfb9db0f75c057d15538481a721111579fc5ec7f83ad9131a2165
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/grilling
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/grilling/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - mattpocock/skills
+  active_owner: mattpocock/skills
+  content_hash: sha256:5a35925d03a391bcfa46940868b649b72dba89ec9c19525e785bbb6bd3a7f478
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/idea-refine
@@ -363,6 +567,24 @@ deployments:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
   content_hash: sha256:f02a52408a4218047c032d221483abfbb48d11f090bb4915965c7419bf2e0e47
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/implementation-decision-review
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/implementation-decision-review/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:ffc04efe010575750a2b20258d0ff7afabe08db8c144ce17b6608beb7c2833eb
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/incremental-implementation
@@ -524,7 +746,16 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:d3aa7026125a4e019949f014bf6faf68b3200ffea60a959f1dabfbf2be637634
+  content_hash: sha256:5abe1ec06e4056cc1ea6148c6be2e441c0c9ae68e8e89768592b525c4d81d4af
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-change/references/evaluation-cases.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:dedf26193693b433002f8ed6cbecdbdd63d98806c0a6e54b7eaa89bc29c78bb0
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-change/references/review-format.md
@@ -533,7 +764,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:8fff9c014c0422603f982706b0b5b31adfceafec7ddd139e452c8017352fbfb7
+  content_hash: sha256:f41258b6cb084ec13c033705a3305c7c92841e0aefe6e55f15d84d4a8c41f817
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-change/references/review-lenses.md
@@ -542,7 +773,79 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:68f289916a85cf64b0d675611bc6377af55c64fd8cad8b947bc23286bf34afb0
+  content_hash: sha256:bdb0d6ce2e407770f2c66119eeb8fe40ae56aa5cc3a6da11a93fed697790ddf7
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-implementation
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-implementation/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:c071a0cbfb12a22742e557219cbc3ea73f82fdb8fba3755d6b724402726402f1
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-implementation/references/evaluation-cases.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:e5419252083e530e2e720b3c7435793d9c636f25cf506f560ca007fb77fb99f8
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-implementation/references/remediation.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:e42bcd99f144ae7b116d21bdf805de9050f653244458c9c1fbfdb863de930e17
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-implementation/references/review-format.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:54bb9bdf24666088f6b6515b9967fa5575e0574793908db3755073717b6c2bb8
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-implementation/references/review-target.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:78b121390f8192ed41105b780658d0e538e36d089b1b99556b74b797d64fd45f
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-implementation/scripts/discover-review-target.mjs
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:0c7ac71c54444c139978b9b7e63b93f245adf247c9c9bb845a90b3d9d121e3d6
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-review-implementation/tests/discover-review-target.test.mjs
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:0516c7f03964d27eab85d4b33411ccf91bd3d539035dfcc074456e8ed18ed818
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-sync-specs
@@ -671,6 +974,24 @@ deployments:
   content_hash: sha256:ca9216f73ac6dfd1b1104ccd7de570acc5a22e11b1bf0ad4bafde1009afc4512
 - kind: project-relative
   target: agent-skills
+  value: .agents/skills/source-driven-development
+  runtime: null
+  scope: project
+  owners:
+  - addyosmani/agent-skills
+  active_owner: addyosmani/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/source-driven-development/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - addyosmani/agent-skills
+  active_owner: addyosmani/agent-skills
+  content_hash: sha256:b979e7531ea601ed14a090f32a5b135db517c48ab9821c5e8b09efd80f4ff4d8
+- kind: project-relative
+  target: agent-skills
   value: .agents/skills/test-driven-development
   runtime: null
   scope: project
@@ -687,6 +1008,24 @@ deployments:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
   content_hash: sha256:0b3eadb3e71a64d015933f8fd41d6bff678b2ee174d638b0bbe79d8f54513860
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/verification-before-completion
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/verification-before-completion/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3
 - kind: project-relative
   target: codex
   value: .codex/agents/code-reviewer.toml
@@ -731,6 +1070,7 @@ mcp_configs:
     transport: stdio
     args:
     - mcp-server
+    - --force-roots-fallback
     registry: false
     command: dart
 mcp_target_servers:
