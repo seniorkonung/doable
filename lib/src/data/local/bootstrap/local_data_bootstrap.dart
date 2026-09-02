@@ -11,12 +11,22 @@ final class LocalDataBootstrap {
   factory LocalDataBootstrap({
     required LocalDataExecutorFactory executorFactory,
     required DiagnosticsSink diagnosticsSink,
-  }) => LocalDataBootstrap._(executorFactory, diagnosticsSink);
+    InitialSchemaObjectCreated? onInitialSchemaObjectCreated,
+  }) => LocalDataBootstrap._(
+    executorFactory,
+    diagnosticsSink,
+    onInitialSchemaObjectCreated,
+  );
 
-  LocalDataBootstrap._(this._executorFactory, this._diagnosticsSink);
+  LocalDataBootstrap._(
+    this._executorFactory,
+    this._diagnosticsSink,
+    this._onInitialSchemaObjectCreated,
+  );
 
   final LocalDataExecutorFactory _executorFactory;
   final DiagnosticsSink _diagnosticsSink;
+  final InitialSchemaObjectCreated? _onInitialSchemaObjectCreated;
   AppDatabase? _database;
   Future<LocalDataBootstrapResult>? _opening;
 
@@ -52,6 +62,7 @@ final class LocalDataBootstrap {
       database = AppDatabase(
         _executorFactory(),
         diagnosticsSink: _diagnosticsSink,
+        onInitialSchemaObjectCreated: _onInitialSchemaObjectCreated,
       );
       await database.open();
       _database = database;

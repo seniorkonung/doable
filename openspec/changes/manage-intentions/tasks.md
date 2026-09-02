@@ -237,7 +237,7 @@
 
 ## Phase 5: Локальное хранилище выдерживает прерывание, повреждение и недоверенный поиск
 
-- [ ] 5.1 Сделать первичное создание schema version 1 атомарным и безопасно повторяемым после прерывания
+- [x] 5.1 Сделать первичное создание schema version 1 атомарным и безопасно повторяемым после прерывания
   - **Критерии приёмки:**
     - Проверка пустого storage выполняется до write transaction, а создание всех schema objects, `foreign_key_check`, FTS `integrity-check` с `rank = 1` и запись `user_version = 1` завершаются внутри одной transaction.
     - Fault injection после промежуточной DDL-операции оставляет file-backed storage без пользовательских schema objects и подтверждённого marker версии, а неготовый persistence object graph полностью закрывается.

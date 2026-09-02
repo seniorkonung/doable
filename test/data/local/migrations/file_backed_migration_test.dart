@@ -1,11 +1,51 @@
+import 'dart:io';
+
+import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/local_database_harness.dart';
 
 void main() {
+  test('прерванное первичное создание не оставляет schema objects и допускает повтор', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    var createdSchemaObjects = 0;
+
+    final failedResult = await harness.open(
+      onInitialSchemaObjectCreated: () async {
+        createdSchemaObjects += 1;
+        if (createdSchemaObjects == 1) {
+          throw const _InjectedInitialCreationFailure();
+        }
+      },
+    );
+
+    expect(failedResult, isA<LocalDataRetryableFailure>());
+    expect(createdSchemaObjects, 1);
+
+    await harness.closePersistenceObjectGraph();
+    await _expectStorageWithoutUserSchema(harness.databaseFile);
+
+    final reopenedDatabase = await harness.openReadyDatabase();
+    final version = await reopenedDatabase
+        .customSelect('PRAGMA user_version')
+        .getSingle();
+    final foreignKeys = await reopenedDatabase
+        .customSelect('PRAGMA foreign_keys')
+        .getSingle();
+
+    expect(version.read<int>('user_version'), 1);
+    expect(foreignKeys.read<int>('foreign_keys'), 1);
+    await expectLater(
+      verifyIntentionTitlesFtsIntegrity(reopenedDatabase),
+      completes,
+    );
+  });
+
   test('file-backed fault-injected migration оставляет целостную схему после повторного открытия', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
@@ -71,6 +111,22 @@ void main() {
   });
 }
 
+Future<void> _expectStorageWithoutUserSchema(File databaseFile) async {
+  final executor = NativeDatabase(databaseFile);
+  addTearDown(executor.close);
+  await executor.ensureOpen(const _SchemaInspectionExecutorUser());
+
+  final schemaObjects = await executor.runSelect('''
+      SELECT name FROM sqlite_schema
+      WHERE type IN ('table', 'index', 'trigger', 'view')
+        AND name NOT LIKE 'sqlite_%'
+    ''', const []);
+  final version = await executor.runSelect('PRAGMA user_version', const []);
+
+  expect(schemaObjects, isEmpty);
+  expect(version.single['user_version'], 0);
+}
+
 Future<void> _insertIntention(GeneratedDatabase database) {
   return database.customStatement(
     '''
@@ -90,4 +146,21 @@ Future<void> _insertIntention(GeneratedDatabase database) {
 
 final class _InjectedMigrationFailure implements Exception {
   const _InjectedMigrationFailure();
+}
+
+final class _InjectedInitialCreationFailure implements Exception {
+  const _InjectedInitialCreationFailure();
+}
+
+final class _SchemaInspectionExecutorUser implements QueryExecutorUser {
+  const _SchemaInspectionExecutorUser();
+
+  @override
+  int get schemaVersion => 0;
+
+  @override
+  Future<void> beforeOpen(
+    QueryExecutor executor,
+    OpeningDetails details,
+  ) async {}
 }

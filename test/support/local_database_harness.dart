@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
+import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:drift/native.dart';
 
 import 'in_memory_diagnostics_sink.dart';
@@ -42,7 +43,10 @@ final class LocalDatabaseHarness {
       _temporaryDirectory ??
       (throw StateError('In-memory harness не имеет временного каталога.'));
 
-  Future<LocalDataBootstrapResult> open({DatabaseSetup? setup}) {
+  Future<LocalDataBootstrapResult> open({
+    DatabaseSetup? setup,
+    InitialSchemaObjectCreated? onInitialSchemaObjectCreated,
+  }) {
     if (_isDisposed) {
       throw StateError('Нельзя открыть уже освобождённый database harness.');
     }
@@ -51,14 +55,18 @@ final class LocalDatabaseHarness {
     }
 
     final bootstrap = LocalDataBootstrap(
-      executorFactory: () => switch (_storage) {
-        _LocalDatabaseStorage.inMemory => NativeDatabase.memory(setup: setup),
-        _LocalDatabaseStorage.fileBacked => NativeDatabase(
-          databaseFile,
-          setup: setup,
-        ),
+      executorFactory: () {
+        final executor = switch (_storage) {
+          _LocalDatabaseStorage.inMemory => NativeDatabase.memory(setup: setup),
+          _LocalDatabaseStorage.fileBacked => NativeDatabase(
+            databaseFile,
+            setup: setup,
+          ),
+        };
+        return executor;
       },
       diagnosticsSink: InMemoryDiagnosticsSink(),
+      onInitialSchemaObjectCreated: onInitialSchemaObjectCreated,
     );
     _bootstrap = bootstrap;
     return bootstrap.open();
