@@ -347,3 +347,126 @@
   - **Зависимости:** 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
+
+## Phase 6: Жизненный цикл намерения полностью доступен через публичную seam
+
+- [ ] 6.1 Создать production `DriftIntentionRepository` с общей безопасной классификацией storage failures
+  - **Критерии приёмки:**
+    - Concrete adapter получает `AppDatabase`, `IntentionIdGenerator`, внедряемую функцию текущего UTC-времени и `DiagnosticsSink`, реализует только `IntentionRepository` и не раскрывает Drift, SQLite, platform path, transport или sync-specific types через публичную seam.
+    - Единый внутренний классификатор последовательно раскрывает известные `DriftRemoteException`, использует первичные SQLite-коды без анализа текста и различает corruption, allowlisted временную недоступность, constraint conflict и unexpected; bootstrap переиспользует ту же машинную классификацию без изменения уже доказанных outcomes.
+    - Repository преобразует инфраструктурный отказ только в существующий типизированный failure, записывает точный безопасный diagnostics code и никогда не передаёт caller либо diagnostics пользовательский текст, UUID, cursor, SQL, параметры или полный exception.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/sqlite_failure_classifier_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart` с primary/extended SQLite-кодами, вложенными remote wrappers, constraint и unknown fixtures.
+    - Выполнить `flutter analyze` и проверить, что concrete adapter не меняет публичный storage-neutral контракт `IntentionRepository`.
+  - **Зависимости:** 5.9.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/sqlite_failure_classifier.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 6.2 Реализовать `watchById` с безопасной rehydration подтверждённых данных
+  - **Критерии приёмки:**
+    - Существующая строка восстанавливается как `ResultSuccess<Intention>` с теми же UUID v4 либо v7, исходным пользовательским текстом, состояниями и UTC timestamps, а подтверждённое отсутствие идентификатора публикуется как `ResultSuccess(null)` без storage-specific представления.
+    - Неканонический или nil UUID, недопустимый текст, `updatedAt` раньше `createdAt` либо иное нарушение сохранённых предметных инвариантов возвращает `IntentionCorruptionFailure` без частично построенной модели; storage failures проходят классификацию из 6.1.
+    - Подписка публикует только committed snapshots, после одного typed failure завершается, а явный retry создаёт новую подписку; detail diagnostics соблюдает утверждённый lifecycle и не содержит UUID, текста, SQL или exception.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_watch_test.dart` с initial value, commit, delete, not-found, UUID v4/v7, corrupt-row и failure-then-done fixtures.
+    - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` с canary-значениями пользовательского текста и UUID.
+  - **Зависимости:** 6.1.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 6.3 Реализовать ограниченную первую страницу каталога для всех scope, фильтров и порядков
+  - **Критерии приёмки:**
+    - Запрос без cursor возвращает только `IntentionCatalogFirstPage`: точный `COUNT` и строки первой порции читаются внутри одной read transaction из одного SQLite snapshot и используют одно составное условие scope и допустимого `IntentionTitleFilter` до упорядочивания.
+    - Три scope и четыре сочетания поля с направлением применяют `IntentionId` как автоматический tie-breaker, короткая и FTS-ветви переиспользуют только `LocalIntentionTitleSearch`, а `IntentionSummary` не материализует полный description.
+    - SQL запрашивает не больше `pageSize + 1` строк для определения конца, наружу публикует не больше `pageSize` summaries, не использует offset и записывает безопасные page-read diagnostics с фактическим page size и outcome.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart` с матрицей scope × field × direction, count больше порции, duplicate timestamps и границами page size 1/100.
+    - Выполнить `flutter test test/data/local/fts_consistency_test.dart` с короткой и FTS-ветвями, adversarial фильтрами, SQL trace и `EXPLAIN QUERY PLAN`.
+  - **Зависимости:** 6.2.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/fts_query.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/support/intention_repository_harness.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 6.4 Завершить opaque keyset cursor и ограниченные продолжения каталога
+  - **Критерии приёмки:**
+    - Adapter-owned cursor остаётся без публичных полей и фабрик, связывает нормализованные scope, filter и order с value boundary из выбранного UTC timestamp и `IntentionId` и не зависит от дальнейшего существования граничной строки.
+    - Допустимый cursor строит keyset predicate для обоих полей и направлений и возвращает только `IntentionCatalogContinuationPage` без повторного `COUNT`; последовательные порции неизменного результата образуют полный порядок без пропусков и повторов.
+    - Cursor другого adapter, другой комбинации scope/filter/order либо структурно недопустимое значение возвращает validation failure до storage query, а создание, изменение или удаление прежней boundary row не превращает continuation в offset pagination или невалидный cursor.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart` с матрицей cursor/order, foreign и mismatched cursors, удалённой boundary row и mutations до/после boundary.
+    - Проверить SQL trace теста и убедиться в отсутствии `OFFSET` и повторного `COUNT` у continuation pages.
+  - **Зависимости:** 6.3.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/support/intention_repository_harness.dart`.
+  - **Оценка:** M (3 файла).
+
+- [ ] 6.5 Провести создание и изменение данных намерения через `execute`
+  - **Критерии приёмки:**
+    - `CreateIntention` нормализует название и описание общей предметной функцией, получает новый `IntentionId` только от внедрённого UUIDv7-generator, записывает один UTC-момент в оба timestamp и принудительно создаёт active/not-ready намерение; одинаковые названия допустимы, а collision не перезаписывает существующую строку.
+    - `UpdateIntention` одинаково работает для активного и архивированного намерения, сохраняет identity, `createdAt`, readiness и archive state, атомарно синхронизирует `title_search_key` и меняет `updatedAt` только вместе с фактическим изменением подтверждённых title либо description.
+    - Validation failure не создаёт подтверждённого состояния, отсутствие ID возвращает not-found, collision — conflict, а no-op не выполняет запись и возвращает прежний `IntentionSaved`; любой success и command diagnostics появляются только после commit.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart` с Unicode-границами, duplicate title, deterministic clock/generator, active/archived update, no-op и ID collision.
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_watch_test.dart test/data/local/fts_consistency_test.dart` и подтвердить согласованные snapshots и search key только после commit.
+  - **Зависимости:** 6.2.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 6.6 Реализовать readiness, архивирование и восстановление как транзакционные state transitions
+  - **Критерии приёмки:**
+    - `EnableIntentionReadiness`, `DisableIntentionReadiness`, `ArchiveIntention` и `RestoreIntention` изменяют только принадлежащее command состояние, сохраняют identity, title, description и остальные flags и одинаково поддерживают допустимые изменения активных и архивированных намерений.
+    - Фактический переход атомарно обновляет `updatedAt`, повтор уже достигнутого состояния возвращает текущий `IntentionSaved` без записи и изменения timestamps, а отсутствующий ID возвращает not-found.
+    - Конкурентные вызовы не создают частично смешанного состояния: операции разных намерений не влияют друг на друга, а результат для одного намерения всегда соответствует целиком подтверждённой transaction и доступен `watchById` только после commit.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart` с полной transition/no-op matrix для active/archived и ready/not-ready состояний.
+    - Выполнить focused concurrent tests для одного и разных идентификаторов и проверить неизменность непредназначенных command полей.
+  - **Зависимости:** 6.5.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 6.7 Реализовать физическое удаление и доказать атомарность всех command paths
+  - **Критерии приёмки:**
+    - `DeleteIntention` физически удаляет существующее активное или архивированное намерение без предварительного архивирования, возвращает `IntentionDeleted` только после commit, после чего `watchById` публикует успешное отсутствие и ни один scope каталога не содержит ID.
+    - Отсутствующий ID возвращает not-found, а блокирующее SQLite-ограничение возвращает conflict и оставляет намерение полностью неизменным; repository не моделирует будущие связи и полагается только на фактические транзакционные constraints текущего storage.
+    - Fault injection после DML для create, update, state transition и delete откатывает основную строку, FTS trigger effects и timestamps; unknown failure не представляется как success, conflict или corruption и записывает только безопасный unexpected diagnostics code.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_fault_test.dart` с active/archived delete, not-found, test-only blocking foreign key и fault matrix.
+    - Выполнить `flutter test test/data/local/fts_consistency_test.dart test/shared/diagnostics/diagnostics_sink_test.dart` и подтвердить целостность индекса и отсутствие чувствительных diagnostics после rollback.
+  - **Зависимости:** 6.5, 6.6.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 6.8 Доказать полный repository lifecycle через публичную seam после повторного открытия SQLite-файла
+  - **Критерии приёмки:**
+    - File-backed harness полностью закрывает первый `AppDatabase` и `DriftIntentionRepository`, создаёт новый persistence object graph на том же файле и через публичную seam восстанавливает те же UUID, исходный текст, readiness, archive state, `createdAt` и `updatedAt`.
+    - После повторного открытия `watchById` и `getCatalogPage` подтверждают три scope, буквальный фильтр, порядок, точный count и сохранение физического удаления; корректные сохранённые UUID v4 и UUID v7 восстанавливаются одинаково.
+    - Fixture с некорректным либо nil UUID возвращает corruption без частичной модели, неуспешные graph и executor закрываются, а storage-level harness отдельно подтверждает FTS `integrity-check` без добавления полного audit в обычный bootstrap.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/file_backed_drift_intention_repository_test.dart` с полным create/update/readiness/archive/restore/delete/reopen lifecycle и corrupt-row fixtures.
+    - Повторить `flutter test test/data/local/file_backed_database_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart` для общей storage boundary.
+  - **Зависимости:** 6.4, 6.7.
+  - **Вероятно затронутые файлы:** `test/intention/data/file_backed_drift_intention_repository_test.dart`, `test/support/intention_repository_harness.dart`, `test/support/local_database_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 6.9 Доказать ограниченную стоимость каталога на большой file-backed fixture
+  - **Критерии приёмки:**
+    - Fixture содержит не меньше 50 000 коротких активных и архивированных намерений с равными и различающимися timestamps, а все repository operations возвращают не больше настроенного `pageSize` предметных summaries независимо от точного общего count.
+    - `EXPLAIN QUERY PLAN` подтверждает использование FTS virtual table для допустимого фильтра от трёх Unicode-кодовых точек и timestamp/cursor indexes для неотфильтрованных scope/order queries; SQL не содержит `OFFSET` и не материализует description.
+    - Последовательная загрузка всех порций одной query выполняет ровно один точный `COUNT`, не повторяет или пропускает ID и не публикует служебную `pageSize + 1` sentinel row через публичную seam.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_large_fixture_test.dart` с SQL trace, query-plan assertions и полным проходом ограниченных страниц.
+    - Выполнить `flutter analyze` и проверить отсутствие unbounded catalog API или предварительной материализации множества совпавших ID в Dart.
+  - **Зависимости:** 6.4.
+  - **Вероятно затронутые файлы:** `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/support/intention_repository_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart`.
+  - **Оценка:** M (3 файла).
+
+- [ ] 6.10 Подтвердить готовность полного постоянного lifecycle через публичную seam
+  - **Критерии приёмки:**
+    - Repository suite через один и тот же `IntentionRepository` contract подтверждает создание, bounded catalog, фильтр, точный count, четыре порядка, opaque continuations, подробное чтение, изменение, readiness, архивирование, восстановление, удаление, file-backed reopen, concurrent и failure paths.
+    - Публичные interface и failures не содержат Drift, SQLite, platform, transport или sync-specific types, пользовательские данные не попадают в diagnostics, а large-fixture evidence подтверждает ограниченную стоимость каждой catalog operation.
+    - Повторная генерация не оставляет tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без storage обходов.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
+    - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
