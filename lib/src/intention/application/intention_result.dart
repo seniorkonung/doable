@@ -39,6 +39,7 @@ enum IntentionFailureCode {
   conflict,
   unavailable,
   corruption,
+  unexpected,
 }
 
 sealed class IntentionFailure {
@@ -80,4 +81,11 @@ final class IntentionCorruptionFailure extends IntentionFailure {
 
   @override
   IntentionFailureCode get code => IntentionFailureCode.corruption;
+}
+
+final class IntentionUnexpectedFailure extends IntentionFailure {
+  const IntentionUnexpectedFailure();
+
+  @override
+  IntentionFailureCode get code => IntentionFailureCode.unexpected;
 }

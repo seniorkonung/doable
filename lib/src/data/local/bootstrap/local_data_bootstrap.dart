@@ -2,10 +2,9 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
-import 'package:drift/isolate.dart';
-import 'package:sqlite3/sqlite3.dart';
 
 import 'local_data_bootstrap_result.dart';
+import '../sqlite_failure_classifier.dart';
 
 typedef LocalDataExecutorFactory = QueryExecutor Function();
 
@@ -91,7 +90,7 @@ final class LocalDataBootstrap {
   }
 
   static LocalDataBootstrapResult _classifyOpeningFailure(Object error) {
-    final cause = _unwrapDriftRemoteException(error);
+    final cause = unwrapDriftRemoteException(error);
     return switch (cause) {
       IncompatibleLocalDataSchemaException(
         :final expectedSchemaVersion,
@@ -102,27 +101,13 @@ final class LocalDataBootstrap {
           detectedSchemaVersion: detectedSchemaVersion,
         ),
       CorruptLocalDataSchemaException() => const LocalDataCorruption(),
-      SqliteException(
-        resultCode: SqlError.SQLITE_CORRUPT || SqlError.SQLITE_NOTADB,
-      ) =>
-        const LocalDataCorruption(),
-      SqliteException(
-        resultCode: SqlError.SQLITE_BUSY ||
-            SqlError.SQLITE_LOCKED ||
-            SqlError.SQLITE_CANTOPEN ||
-            SqlError.SQLITE_IOERR,
-      ) =>
-        const LocalDataRetryableFailure(),
-      _ => const LocalDataUnexpectedFailure(),
+      _ => switch (classifySqliteFailure(cause)) {
+        SqliteCorruptionFailure() => const LocalDataCorruption(),
+        SqliteUnavailableFailure() => const LocalDataRetryableFailure(),
+        SqliteConstraintFailure() ||
+        SqliteUnexpectedFailure() => const LocalDataUnexpectedFailure(),
+      },
     };
-  }
-
-  static Object _unwrapDriftRemoteException(Object error) {
-    var cause = error;
-    while (cause is DriftRemoteException) {
-      cause = cause.remoteCause;
-    }
-    return cause;
   }
 
   Future<void> close() async {

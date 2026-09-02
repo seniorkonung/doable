@@ -350,7 +350,7 @@
 
 ## Phase 6: Жизненный цикл намерения полностью доступен через публичную seam
 
-- [ ] 6.1 Завершить публичный failure contract и общий безопасный классификатор SQLite
+- [x] 6.1 Завершить публичный failure contract и общий безопасный классификатор SQLite
   - **Критерии приёмки:**
     - Закрытый публичный набор `IntentionFailure` получает отдельный `IntentionUnexpectedFailure`/`unexpected`, который является non-retryable, не утверждает о corruption и не смешивается с `IntentionUnavailableFailure`; `unavailable` остаётся только для доказанно временных причин.
     - Единый внутренний классификатор последовательно раскрывает известные `DriftRemoteException`, использует машинные primary/extended SQLite-коды без анализа текста и различает corruption, allowlisted временную недоступность, constraint с сохранённым extended code и unexpected; он не превращает constraint в предметный conflict без контекста command.

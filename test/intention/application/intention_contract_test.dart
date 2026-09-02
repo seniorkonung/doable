@@ -266,6 +266,7 @@ void main() {
         const ResultFailure(IntentionConflictFailure()),
         const ResultFailure(IntentionUnavailableFailure()),
         const ResultFailure(IntentionCorruptionFailure()),
+        const ResultFailure(IntentionUnexpectedFailure()),
       ];
 
       expect(
@@ -274,7 +275,7 @@ void main() {
       );
       expect(
         results.whereType<ResultFailure<IntentionCommandSuccess>>(),
-        hasLength(5),
+        hasLength(6),
       );
       expect(_resultSuccessDescription(results[0]), 'saved');
       expect(_resultSuccessDescription(results[1]), 'deleted');
@@ -284,7 +285,12 @@ void main() {
         'conflict',
         'unavailable',
         'corruption',
+        'unexpected',
       ]);
+      expect(
+        const IntentionUnexpectedFailure().code,
+        IntentionFailureCode.unexpected,
+      );
     });
 
     test(
@@ -398,6 +404,7 @@ String _failureDescription(IntentionFailure failure) => switch (failure) {
   IntentionConflictFailure() => 'conflict',
   IntentionUnavailableFailure() => 'unavailable',
   IntentionCorruptionFailure() => 'corruption',
+  IntentionUnexpectedFailure() => 'unexpected',
 };
 
 String _resultSuccessDescription(Result<IntentionCommandSuccess> result) =>
