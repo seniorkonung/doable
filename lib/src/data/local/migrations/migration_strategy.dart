@@ -1,6 +1,7 @@
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
+import 'package:drift_dev/api/migrations_native.dart';
 
 import 'generated_schema.dart' as generated;
 
@@ -66,10 +67,17 @@ MigrationStrategy localDataMigrationStrategy(
       },
     ),
     beforeOpen: (details) async {
-      await _verifyStoredSchema(
+      await _verifyStoredSchemaVersion(
         database,
         expectedSchemaVersion: details.versionNow,
       );
+      try {
+        await database.validateDatabaseSchema(
+          options: const ValidationOptions(validateDropped: true),
+        );
+      } on SchemaMismatch {
+        throw const CorruptLocalDataSchemaException();
+      }
       await database.customStatement('PRAGMA foreign_keys = ON');
     },
   );
@@ -131,7 +139,7 @@ Future<void> _verifyNewStorageHasNoSchema(GeneratedDatabase database) async {
   if (schemaObjects.isNotEmpty) throw const CorruptLocalDataSchemaException();
 }
 
-Future<void> _verifyStoredSchema(
+Future<void> _verifyStoredSchemaVersion(
   GeneratedDatabase database, {
   required int expectedSchemaVersion,
 }) async {
@@ -141,37 +149,7 @@ Future<void> _verifyStoredSchema(
   if (schemaVersion.read<int>('user_version') != expectedSchemaVersion) {
     throw const CorruptLocalDataSchemaException();
   }
-
-  final schemaObjects = await database.customSelect('''
-          SELECT name FROM sqlite_schema
-          WHERE type IN ('table', 'index', 'trigger')
-        ''').get();
-  final names = schemaObjects.map((row) => row.read<String>('name')).toSet();
-
-  if (!names.containsAll(_requiredSchemaObjects)) {
-    throw const CorruptLocalDataSchemaException();
-  }
 }
-
-const _requiredSchemaObjects = {
-  'intentions',
-  'intention_titles_fts',
-  'intentions_fts_after_insert',
-  'intentions_fts_after_update_title_search_key',
-  'intentions_fts_after_delete',
-  'intentions_active_created_at_asc_id_asc',
-  'intentions_active_created_at_desc_id_asc',
-  'intentions_active_updated_at_asc_id_asc',
-  'intentions_active_updated_at_desc_id_asc',
-  'intentions_archived_created_at_asc_id_asc',
-  'intentions_archived_created_at_desc_id_asc',
-  'intentions_archived_updated_at_asc_id_asc',
-  'intentions_archived_updated_at_desc_id_asc',
-  'intentions_all_created_at_asc_id_asc',
-  'intentions_all_created_at_desc_id_asc',
-  'intentions_all_updated_at_asc_id_asc',
-  'intentions_all_updated_at_desc_id_asc',
-};
 
 Future<void> runAtomicMigration(
   GeneratedDatabase database, {

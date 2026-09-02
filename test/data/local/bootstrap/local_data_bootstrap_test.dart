@@ -562,7 +562,8 @@ final class _BoundedVerificationFailureInterceptor extends QueryInterceptor {
         r'^PRAGMA USER_VERSION;?$',
       ).hasMatch(normalizedStatement),
       _BoundedVerificationQuery.schemaMetadata =>
-        normalizedStatement.contains('FROM SQLITE_SCHEMA') &&
+        (normalizedStatement.contains('FROM SQLITE_SCHEMA') ||
+                normalizedStatement.contains('FROM SQLITE_MASTER')) &&
             !normalizedStatement.contains('NOT LIKE'),
     };
   }

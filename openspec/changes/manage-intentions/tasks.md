@@ -297,7 +297,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/bootstrap/local_data_bootstrap_result.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.6 Проверять полную структуру текущей схемы при каждом production bootstrap
+- [x] 5.6 Проверять полную структуру текущей схемы при каждом production bootstrap
   - **Критерии приёмки:**
     - Production `beforeOpen` вызывает `validateDatabaseSchema` с `ValidationOptions(validateDropped: true)` и включённой по умолчанию проверкой column constraints; только `SchemaMismatch` преобразуется в `CorruptLocalDataSchemaException`, а ошибки чтения schema metadata или создания эталонной in-memory database сохраняют типизированную причину для политики 5.5.
     - File-backed fixtures с текущим `user_version` и ожидаемыми именами по отдельности изменяют колонку или constraint, FTS5-конфигурацию, тело trigger, поле либо predicate index и добавляют лишний schema object; каждый несовместимый вариант возвращает `LocalDataCorruption`, закрывает executor и не изменяет файл.
