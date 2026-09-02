@@ -458,15 +458,40 @@
   - **Вероятно затронутые файлы:** `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/support/intention_repository_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 6.10 Подтвердить готовность полного постоянного lifecycle через публичную seam
+- [ ] 6.10 Проверить полный постоянный lifecycle через публичную seam
   - **Критерии приёмки:**
     - Repository suite через один и тот же `IntentionRepository` contract подтверждает создание, bounded catalog, фильтр, точный count, четыре порядка, opaque continuations, подробное чтение, изменение, readiness, архивирование, восстановление, удаление, file-backed reopen, concurrent и failure paths.
     - Публичные interface и failures не содержат Drift, SQLite, platform, transport, sync-specific или lifecycle types, закрытый набор исчерпывающе различает retryable `unavailable` и non-retryable `unexpected`, пользовательские данные не попадают в diagnostics, а large-fixture evidence подтверждает ограниченную materialization каждой catalog operation и утверждённый short-filter regression budget.
-    - Повторная генерация не оставляет tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без storage обходов.
+    - Повторная генерация не оставляет tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят на состоянии полного repository lifecycle и создают change-wide regression baseline для финального readiness checkpoint.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
   - **Зависимости:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 6.11 Заменить широкую SQLite-классификацию из 5.2, 5.5 и 6.1 точным extended-code contract
+  - **Критерии приёмки:**
+    - Единый classifier использует полный `extendedResultCode`: семейства `CORRUPT`/`NOTADB` и точный `IOERR_DATA` возвращают corruption, а unavailable ограничен точными `BUSY`, `BUSY_RECOVERY`, `BUSY_SNAPSHOT`, `BUSY_TIMEOUT`, `LOCKED`, `LOCKED_SHAREDCACHE` и `LOCKED_VTAB`.
+    - Первичные `CANTOPEN`/`IOERR`, их невнесённые в allowlist extended variants, включая `CANTOPEN_ISDIR` и `IOERR_CORRUPTFS`, и любой новый неизвестный extended code возвращают unexpected; bootstrap и repository boundaries одинаково сохраняют retryability, terminal detail-stream semantics и allowlisted diagnostics без exception, SQL, UUID и пользовательского текста.
+    - Regression matrix охватывает каждый allowlisted код, `CANTOPEN_ISDIR`, primary `CANTOPEN`/`IOERR`, `IOERR_DATA`, `IOERR_CORRUPTFS`, неизвестный extended code знакомого семейства, nested `DriftRemoteException`, bootstrap mapping и `watchById` failure-then-done без ложного retry.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/sqlite_failure_classifier_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/shared/diagnostics/diagnostics_sink_test.dart`.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 6.1, 6.2.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/sqlite_failure_classifier.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 6.12 Подтвердить готовность Phase 6 после SQLite classification remediation
+  - **Критерии приёмки:**
+    - Сфокусированная failure matrix доказывает одинаковую классификацию на classifier, bootstrap и repository boundaries без retry для постоянных, повреждающих и неизвестных причин.
+    - Specs, design, задачи и реализация согласованно различают unavailable, corruption и unexpected по точной машинной семантике без анализа текста exception или утечки storage-specific types.
+    - Повторная генерация не оставляет tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без storage обходов.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
+    - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.10, 6.11.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.

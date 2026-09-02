@@ -4,20 +4,20 @@
 
 **Result:** Changes needed
 
-Классификация SQLite делает некоторые постоянные и повреждающие причины
-retryable, а typed Drift mapping стирает часть некорректных сохранённых значений
-до проверки предметных инвариантов. Задачи 6.1 и 6.2 пока нельзя считать
-полностью подтверждёнными текущим инкрементом.
+Typed Drift mapping стирает часть некорректных сохранённых значений до
+проверки предметных инвариантов. Задачу 6.2 пока нельзя считать полностью
+подтверждённой текущим инкрементом.
 
 ## Review target
 
 - **Baseline:** configured `origin/main` @ `6b0e641c76fe0d4718514dc83b5b1f57f08f0c87`
-- **Reviewed head:** `850184990e0864a1ca3ca52554b4e9f08494719b`
-- **Target commits:** 3
+- **Reviewed head:** `54bdf89de714ac5e4a4d040a6c7339db37cc60d4`
+- **Target commits:** 4
 - **Reviewable paths:** 11; excludes `implementation-review.md`
 - **OpenSpec change:** `manage-intentions` (`intent-driven`)
 - **Target scope:** Complete pre-push range
 - **Baseline freshness:** Local tracking state; no fetch performed
+- **Excluded worktree state:** planning remediation в `design.md` и `tasks.md` исключена из immutable target
 
 ## Reviewed increment
 
@@ -42,20 +42,11 @@ retryable, а typed Drift mapping стирает часть некорректн
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | свежий изолированный reviewer проверил оба пересекающихся unit одним объединённым target из семи delivery/test paths и неизменяемым диапазоном `6b0e641c…850184990e` |
+| Independent decision review | Complete | свежий изолированный reviewer проверил оба пересекающихся unit одним объединённым target из семи delivery/test paths в `6b0e641c…850184990e`; последующий `85018499…54bdf89d` изменяет только исключённый `implementation-review.md` и не меняет reviewed delivery bytes |
 | OpenSpec conformance | Complete | полный граф артефактов и задачи 6.1–6.2 сопоставлены с кодом и тестами в обе стороны; JSON- и строгая OpenSpec-валидация успешны |
 | Code quality | Complete | семь delivery/test paths и неизменённые caller, schema, generated mapping, diagnostics и dependency boundaries проверены по correctness, readability, architecture, security и performance; сфокусированные тесты и анализ успешны |
 
 ## Findings
-
-### F1 · High — Широкие primary-коды ошибочно считаются доказанно временными
-
-- **Evidence:** `lib/src/data/local/sqlite_failure_classifier.dart:29-39` классифицирует целые primary-семейства `SQLITE_CANTOPEN` и `SQLITE_IOERR` как `SqliteUnavailableFailure`, не учитывая уже доступный `extendedResultCode`. `test/data/local/sqlite_failure_classifier_test.dart:31-50` явно закрепляет `SQLITE_CANTOPEN_ISDIR` как retryable, хотя этот extended-код означает попытку открыть каталог как файл. В тех же primary-семействах находятся `SQLITE_IOERR_DATA` с неверной checksum страницы и `SQLITE_IOERR_CORRUPTFS` с признаком повреждённой файловой системы; их машинная семантика описана в официальном [справочнике SQLite](https://www.sqlite.org/rescode.html). Bootstrap и detail read затем отображают такой результат в retryable `unavailable` (`lib/src/data/local/bootstrap/local_data_bootstrap.dart:104-108`, `lib/src/intention/data/drift_intention_repository.dart:117-121`).
-- **Impact:** постоянная ошибка пути или признак повреждения может получить ложный совет обычного retry и неверный diagnostics outcome; состояние данных представляется менее серьёзным и более устранимым, чем подтверждает машинный код.
-- **Required outcome:** `unavailable` должен охватывать только машинные коды с доказанно временной семантикой; постоянные, повреждающие и неизвестные extended-причины должны сохранять корректное отличие от retryable недоступности на bootstrap и repository boundaries.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** задачи 6.1 и 6.2; requirements `Безопасный bootstrap локального хранилища` и `Безопасное представление неизвестного отказа операции с намерением`; общий classifier, bootstrap mapping, detail-read mapping и их tests
-- **Disposition:** Open
 
 ### F2 · Medium — Typed mapping стирает некорректные сохранённые значения до rehydration
 
