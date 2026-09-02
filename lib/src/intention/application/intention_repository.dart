@@ -89,7 +89,7 @@ final class IntentionCatalogQuery {
   static const maxTitleFilterLength = 255;
 
   final IntentionScope scope;
-  final String? titleFilter;
+  final IntentionTitleFilter? titleFilter;
   final IntentionCatalogOrder order;
   final int pageSize;
   final IntentionCatalogCursor? cursor;
@@ -105,7 +105,7 @@ final class IntentionCatalogQuery {
     if (!matchesScope || titleFilter == null) {
       return matchesScope;
     }
-    return summary.title.toLowerCase().contains(titleFilter!.toLowerCase());
+    return titleFilter!.matchesTitle(summary.title);
   }
 
   int compare(IntentionSummary left, IntentionSummary right) {
@@ -126,7 +126,7 @@ final class IntentionCatalogQuery {
         IntentionCatalogSortField.updatedAt => summary.updatedAt,
       };
 
-  static String? _normalizeFilter(String? value) {
+  static IntentionTitleFilter? _normalizeFilter(String? value) {
     if (value == null) {
       return null;
     }
@@ -140,8 +140,20 @@ final class IntentionCatalogQuery {
         IntentionCatalogQueryValidationFailure.titleFilterTooLong,
       );
     }
-    return normalized;
+    return IntentionTitleFilter._(normalized);
   }
+}
+
+final class IntentionTitleFilter {
+  const IntentionTitleFilter._(this._normalizedValue);
+
+  final String _normalizedValue;
+
+  bool matchesTitle(String title) =>
+      title.toLowerCase().contains(_normalizedValue.toLowerCase());
+
+  T map<T>(T Function(String normalizedValue) transform) =>
+      transform(_normalizedValue);
 }
 
 abstract interface class IntentionCatalogCursor {}

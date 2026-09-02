@@ -310,7 +310,7 @@
   - **Вероятно затронутые файлы:** `pubspec.yaml`, `pubspec.lock`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/migrations/migration_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 5.7 Закрыть выбор локального поиска за единой типобезопасной seam буквальной подстроки
+- [x] 5.7 Закрыть выбор локального поиска за единой типобезопасной seam буквальной подстроки
   - **Критерии приёмки:**
     - Factory `IntentionCatalogQuery` по-прежнему принимает nullable пользовательскую строку, но хранит допустимый непустой фильтр как `IntentionTitleFilter` с закрытым конструктором; только `null` представляет отсутствие фильтра, прежняя Unicode-валидация сохраняется, а прикладной тип не раскрывает Drift, SQLite или FTS.
     - Единая concrete interface в `data/local` принимает только `IntentionTitleFilter`, сама строит search key и выбирает параметризованный `instr` для одной-двух Unicode-кодовых точек либо экранированный параметризованный trigram `MATCH` для трёх и более; raw `String`, FTS phrase, route flag, SQL fragment, branch-specific helper и открытые варианты стратегии caller недоступны.

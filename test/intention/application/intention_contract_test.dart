@@ -26,7 +26,8 @@ void main() {
           archiveState: IntentionArchiveState.archived,
         );
 
-        expect(query.titleFilter, 'БЫТЬ ЗДОРОВЫМ');
+        expect(query.titleFilter, isA<IntentionTitleFilter>());
+        expect(query.titleFilter!.matchesTitle('Быть здоровым'), isTrue);
         expect(query.pageSize, 1);
         expect(query.includes(active), isTrue);
         expect(query.includes(archived), isFalse);

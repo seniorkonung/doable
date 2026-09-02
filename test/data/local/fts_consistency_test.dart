@@ -1,15 +1,20 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/fts_query.dart';
+import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late AppDatabase database;
+  late _SqlTrace sqlTrace;
 
-  setUp(() {
-    database = AppDatabase(NativeDatabase.memory());
+  setUp(() async {
+    sqlTrace = _SqlTrace();
+    database = AppDatabase(NativeDatabase.memory().interceptWith(sqlTrace));
+    await database.open();
+    sqlTrace.clear();
   });
 
   tearDown(() => database.close());
@@ -27,37 +32,61 @@ void main() {
           titleSearchKey: 'купить молоко',
         );
 
-        expect(await _findByLiteralFtsPhrase(database, 'молоко'), [id]);
+        expect(await _findByTitleFilter(database, 'молоко'), [id]);
 
         await database.customStatement(
           'UPDATE intentions SET title_search_key = ? WHERE id = ?',
           ['купить хлеб', id],
         );
 
-        expect(await _findByLiteralFtsPhrase(database, 'молоко'), isEmpty);
-        expect(await _findByLiteralFtsPhrase(database, 'хлеб'), [id]);
+        expect(await _findByTitleFilter(database, 'молоко'), isEmpty);
+        expect(await _findByTitleFilter(database, 'хлеб'), [id]);
 
         await database.customStatement('DELETE FROM intentions WHERE id = ?', [
           id,
         ]);
 
-        expect(await _findByLiteralFtsPhrase(database, 'хлеб'), isEmpty);
+        expect(await _findByTitleFilter(database, 'хлеб'), isEmpty);
       },
     );
 
-    test('выполняет параметризованный буквальный MATCH и хранит короткие ключи через параметризованный путь', () async {
-      const id = '018f0b5d-6b2e-7c80-8000-000000000102';
-      await _insertIntention(
-        database,
-        id: id,
-        title: 'Купить молоко',
-        titleSearchKey: 'купить молоко',
-      );
+    test(
+      'выбирает параметризованный путь по числу Unicode-кодовых точек',
+      () async {
+        const id = '018f0b5d-6b2e-7c80-8000-000000000102';
+        await _insertIntention(
+          database,
+          id: id,
+          title: '😀😀😀 купить молоко',
+          titleSearchKey: '😀😀😀 купить молоко',
+        );
 
-      expect(await _findByLiteralFtsPhrase(database, 'молоко'), [id]);
-      expect(await _findByShortSearchKey(database, 'к'), [id]);
-      expect(await _findByShortSearchKey(database, 'ко'), [id]);
-    });
+        expect(await _findByTitleFilter(database, '😀'), [id]);
+        expect(_lastSelectStatement, contains('instr('));
+        expect(_lastSelectArguments, ['😀']);
+
+        sqlTrace.clear();
+        expect(await _findByTitleFilter(database, '😀😀'), [id]);
+        expect(_lastSelectStatement, contains('instr('));
+        expect(_lastSelectArguments, ['😀😀']);
+
+        sqlTrace.clear();
+        expect(await _findByTitleFilter(database, '😀😀😀'), [id]);
+        expect(_lastSelectStatement, contains('intention_titles_fts MATCH ?'));
+        expect(_lastSelectArguments, ['"😀😀😀"']);
+
+        final queryPlan = await database
+            .customSelect(
+              'EXPLAIN QUERY PLAN $_lastSelectStatement',
+              variables: _lastSelectArguments.map(Variable.withString).toList(),
+            )
+            .get();
+        expect(
+          queryPlan.map((row) => row.read<String>('detail')).join('\n'),
+          contains('intention_titles_fts'),
+        );
+      },
+    );
 
     test('сохраняет буквальную семантику для синтаксических FTS-символов и Unicode', () async {
       const fixtures = [
@@ -137,7 +166,7 @@ void main() {
           titleSearchKey: fixture.interpretedSearchKey,
         );
 
-        expect(await _findByLiteralFtsPhrase(database, fixture.searchKey), [
+        expect(await _findByTitleFilter(database, fixture.searchKey), [
           fixture.literalId,
         ], reason: fixture.searchKey);
       }
@@ -208,41 +237,56 @@ Future<void> _insertIntention(
   [id, title, titleSearchKey, 1000000, 1000000],
 );
 
-Future<List<String>> _findByLiteralFtsPhrase(
+Future<List<String>> _findByTitleFilter(
   AppDatabase database,
-  String searchKey,
+  String userFilter,
 ) async {
-  final rows = await database
-      .customSelect(
-        '''
-      SELECT intentions.id
-      FROM intention_titles_fts
-      INNER JOIN intentions ON intentions.rowid = intention_titles_fts.rowid
-      WHERE intention_titles_fts MATCH ?
-      ORDER BY intentions.id ASC
-    ''',
-        variables: [literalFtsPhraseParameter(searchKey)],
-      )
-      .get();
+  final titleFilter = IntentionCatalogQuery(
+    scope: IntentionScope.all,
+    titleFilter: userFilter,
+    order: IntentionCatalogOrder.createdAtDescending,
+    pageSize: 1,
+  ).titleFilter!;
+  final search = LocalIntentionTitleSearch(titleFilter);
+  final query = database.select(database.intentions)
+    ..where((_) => search.conditionFor(database.intentions))
+    ..orderBy([(intentions) => OrderingTerm.asc(intentions.id)]);
 
-  return rows.map((row) => row.read<String>('id')).toList();
+  final rows = await query.get();
+  return rows.map((row) => row.id).toList();
 }
 
-Future<List<String>> _findByShortSearchKey(
-  AppDatabase database,
-  String searchKey,
-) async {
-  final rows = await database
-      .customSelect(
-        '''
-      SELECT id
-      FROM intentions
-      WHERE instr(title_search_key, ?) > 0
-      ORDER BY id ASC
-    ''',
-        variables: [Variable.withString(searchKey)],
-      )
-      .get();
+String get _lastSelectStatement => _currentSqlTrace.lastSelect.statement;
 
-  return rows.map((row) => row.read<String>('id')).toList();
+List<String> get _lastSelectArguments =>
+    _currentSqlTrace.lastSelect.arguments.cast<String>();
+
+late _SqlTrace _currentSqlTrace;
+
+final class _SqlTrace extends QueryInterceptor {
+  final selects = <_SelectStatement>[];
+
+  _SelectStatement get lastSelect => selects.last;
+
+  void clear() {
+    selects.clear();
+    _currentSqlTrace = this;
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    selects.add(_SelectStatement(statement, List.unmodifiable(args)));
+    return super.runSelect(executor, statement, args);
+  }
+}
+
+final class _SelectStatement {
+  const _SelectStatement(this.statement, this.arguments);
+
+  final String statement;
+  final List<Object?> arguments;
 }
