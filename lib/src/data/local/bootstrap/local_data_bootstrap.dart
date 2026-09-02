@@ -2,6 +2,7 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 import 'local_data_bootstrap_result.dart';
 
@@ -100,19 +101,34 @@ final class LocalDataBootstrap {
         ),
       );
       return const LocalDataCorruption();
-    } on Object {
+    } on Object catch (error) {
       await database?.close();
+      final result = _classifyOpeningFailure(error);
+      final diagnosticsFailureCode = switch (result) {
+        LocalDataCorruption() => DiagnosticsFailureCode.corruption,
+        LocalDataRetryableFailure() => DiagnosticsFailureCode.unavailable,
+        _ => throw StateError('Неожиданный результат классификации bootstrap.'),
+      };
       _diagnosticsSink.record(
         BootstrapDiagnosticsEvent(
           schemaVersion: AppDatabase.currentSchemaVersion,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
-            code: DiagnosticsFailureCode.unavailable,
+            code: diagnosticsFailureCode,
           ),
         ),
       );
-      return const LocalDataRetryableFailure();
+      return result;
     }
+  }
+
+  static LocalDataBootstrapResult _classifyOpeningFailure(Object error) {
+    if (error case SqliteException(
+      resultCode: SqlError.SQLITE_CORRUPT || SqlError.SQLITE_NOTADB,
+    )) {
+      return const LocalDataCorruption();
+    }
+    return const LocalDataRetryableFailure();
   }
 
   Future<void> close() async {

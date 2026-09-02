@@ -6,6 +6,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 import '../../../support/in_memory_diagnostics_sink.dart';
 
@@ -172,6 +173,128 @@ void main() {
       },
     );
 
+    test('классифицирует произвольный non-database файл как non-retryable corruption', () async {
+      final databaseFile = await _temporaryDatabaseFile();
+      await databaseFile.writeAsString('это не SQLite database');
+      final diagnosticsSink = InMemoryDiagnosticsSink();
+      _CloseTrackingExecutor? failedExecutor;
+      final bootstrap = LocalDataBootstrap(
+        executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+          NativeDatabase(databaseFile),
+        ),
+        diagnosticsSink: diagnosticsSink,
+      );
+      addTearDown(bootstrap.close);
+
+      final result = await bootstrap.open();
+
+      expect(result, isA<LocalDataCorruption>());
+      expect(failedExecutor!.closeCalls, 1);
+      _expectBootstrapFailureCode(
+        diagnosticsSink,
+        DiagnosticsFailureCode.corruption,
+      );
+    });
+
+    test(
+      'классифицирует повреждённую страницу sqlite_schema как corruption',
+      () async {
+        final databaseFile = await _temporaryDatabaseFile();
+        final firstBootstrap = _bootstrapFor(databaseFile);
+        expect(await firstBootstrap.open(), isA<LocalDataReady>());
+        await firstBootstrap.close();
+
+        final bytes = await databaseFile.readAsBytes();
+        bytes[100] = 0xff;
+        await databaseFile.writeAsBytes(bytes, flush: true);
+
+        final diagnosticsSink = InMemoryDiagnosticsSink();
+        _CloseTrackingExecutor? failedExecutor;
+        final bootstrap = LocalDataBootstrap(
+          executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+            NativeDatabase(databaseFile),
+          ),
+          diagnosticsSink: diagnosticsSink,
+        );
+        addTearDown(bootstrap.close);
+
+        expect(await bootstrap.open(), isA<LocalDataCorruption>());
+        expect(failedExecutor!.closeCalls, 1);
+        _expectBootstrapFailureCode(
+          diagnosticsSink,
+          DiagnosticsFailureCode.corruption,
+        );
+      },
+    );
+
+    test('классифицирует primary и extended коды CORRUPT и NOTADB без текста ошибки', () async {
+      for (final exception in [
+        SqliteException(
+          extendedResultCode: SqlError.SQLITE_NOTADB,
+          message: 'временная недоступность',
+        ),
+        SqliteException(
+          extendedResultCode: SqlExtendedError.SQLITE_CORRUPT_VTAB,
+          message: 'можно повторить попытку',
+        ),
+      ]) {
+        final diagnosticsSink = InMemoryDiagnosticsSink();
+        _CloseTrackingExecutor? failedExecutor;
+        final bootstrap = LocalDataBootstrap(
+          executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+            NativeDatabase.memory(setup: (_) => throw exception),
+          ),
+          diagnosticsSink: diagnosticsSink,
+        );
+        addTearDown(bootstrap.close);
+
+        expect(await bootstrap.open(), isA<LocalDataCorruption>());
+        expect(failedExecutor!.closeCalls, 1);
+        _expectBootstrapFailureCode(
+          diagnosticsSink,
+          DiagnosticsFailureCode.corruption,
+        );
+      }
+    });
+
+    test('оставляет временные SQLite-ошибки retryable', () async {
+      for (final exception in [
+        SqliteException(
+          extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
+          message: 'SQLite-файл повреждён',
+        ),
+        SqliteException(
+          extendedResultCode: SqlError.SQLITE_LOCKED,
+          message: 'SQLite-файл повреждён',
+        ),
+        SqliteException(
+          extendedResultCode: SqlError.SQLITE_CANTOPEN,
+          message: 'SQLite-файл повреждён',
+        ),
+        SqliteException(
+          extendedResultCode: SqlExtendedError.SQLITE_IOERR_READ,
+          message: 'SQLite-файл повреждён',
+        ),
+      ]) {
+        final diagnosticsSink = InMemoryDiagnosticsSink();
+        _CloseTrackingExecutor? failedExecutor;
+        final bootstrap = LocalDataBootstrap(
+          executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+            NativeDatabase.memory(setup: (_) => throw exception),
+          ),
+          diagnosticsSink: diagnosticsSink,
+        );
+        addTearDown(bootstrap.close);
+
+        expect(await bootstrap.open(), isA<LocalDataRetryableFailure>());
+        expect(failedExecutor!.closeCalls, 1);
+        _expectBootstrapFailureCode(
+          diagnosticsSink,
+          DiagnosticsFailureCode.unavailable,
+        );
+      }
+    });
+
     test('записывает безопасные события bootstrap и миграции', () async {
       final diagnosticsSink = InMemoryDiagnosticsSink();
       final bootstrap = LocalDataBootstrap(
@@ -257,4 +380,70 @@ final class _NoopQueryExecutorUser implements QueryExecutorUser {
     QueryExecutor executor,
     OpeningDetails details,
   ) async {}
+}
+
+void _expectBootstrapFailureCode(
+  InMemoryDiagnosticsSink diagnosticsSink,
+  DiagnosticsFailureCode expectedCode,
+) {
+  final event = diagnosticsSink.events.last as BootstrapDiagnosticsEvent;
+  expect(
+    event.status,
+    isA<DiagnosticsFailed>().having(
+      (status) => status.code,
+      'безопасный код',
+      expectedCode,
+    ),
+  );
+}
+
+final class _CloseTrackingExecutor implements QueryExecutor {
+  _CloseTrackingExecutor(this._delegate);
+
+  final QueryExecutor _delegate;
+  var closeCalls = 0;
+
+  @override
+  SqlDialect get dialect => _delegate.dialect;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutorUser user) => _delegate.ensureOpen(user);
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    String statement,
+    List<Object?> args,
+  ) => _delegate.runSelect(statement, args);
+
+  @override
+  Future<int> runInsert(String statement, List<Object?> args) =>
+      _delegate.runInsert(statement, args);
+
+  @override
+  Future<int> runUpdate(String statement, List<Object?> args) =>
+      _delegate.runUpdate(statement, args);
+
+  @override
+  Future<int> runDelete(String statement, List<Object?> args) =>
+      _delegate.runDelete(statement, args);
+
+  @override
+  Future<void> runCustom(String statement, [List<Object?>? args]) =>
+      _delegate.runCustom(statement, args);
+
+  @override
+  Future<void> runBatched(BatchedStatements statements) =>
+      _delegate.runBatched(statements);
+
+  @override
+  TransactionExecutor beginTransaction() => _delegate.beginTransaction();
+
+  @override
+  QueryExecutor beginExclusive() => _delegate.beginExclusive();
+
+  @override
+  Future<void> close() {
+    closeCalls += 1;
+    return _delegate.close();
+  }
 }

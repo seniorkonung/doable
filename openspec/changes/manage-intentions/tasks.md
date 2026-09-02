@@ -249,7 +249,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/migrations/fault_injection_test.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/support/local_database_harness.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 5.2 Классифицировать SQLite `CORRUPT` и `NOTADB` как non-retryable повреждение на bootstrap boundary
+- [x] 5.2 Классифицировать SQLite `CORRUPT` и `NOTADB` как non-retryable повреждение на bootstrap boundary
   - **Критерии приёмки:**
     - `SqliteException` классифицируется по первичному `resultCode`: `SQLITE_CORRUPT` и `SQLITE_NOTADB`, включая extended variants, возвращают `LocalDataCorruption` без анализа текста исключения.
     - `BUSY`, `LOCKED`, `CANTOPEN`, `IOERR` и прочие opening failures остаются `LocalDataRetryableFailure`; оба failure path закрывают неготовый executor и записывают только allowlisted diagnostics code.
