@@ -386,7 +386,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/fts_query.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/support/intention_repository_harness.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 6.4 Завершить opaque keyset cursor и ограниченные продолжения каталога
+- [x] 6.4 Завершить opaque keyset cursor и ограниченные продолжения каталога
   - **Критерии приёмки:**
     - Adapter-owned cursor остаётся без публичных полей и фабрик, связывает нормализованные scope, filter и order с value boundary из выбранного UTC timestamp и `IntentionId` и не зависит от дальнейшего существования граничной строки.
     - Допустимый cursor строит keyset predicate для обоих полей и направлений и возвращает только `IntentionCatalogContinuationPage` без повторного `COUNT`; последовательные порции неизменного результата образуют полный порядок без пропусков и повторов.

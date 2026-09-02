@@ -329,6 +329,290 @@ void main() {
     },
   );
 
+  test(
+    'продолжает каталог keyset-порциями для всех порядков без повторного COUNT',
+    () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000041',
+        title: 'Первое',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+        updatedAt: DateTime.utc(2026, 9, 2, 12),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000042',
+        title: 'Второе',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+        updatedAt: DateTime.utc(2026, 9, 2, 12),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000043',
+        title: 'Третье',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+        updatedAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000044',
+        title: 'Четвёртое',
+        createdAt: DateTime.utc(2026, 9, 2, 9),
+        updatedAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000045',
+        title: 'Пятое',
+        createdAt: DateTime.utc(2026, 9, 2, 12),
+        updatedAt: DateTime.utc(2026, 9, 2, 13),
+      );
+
+      final cases = <(IntentionCatalogOrder, List<String>)>[
+        (
+          const IntentionCatalogOrder(
+            field: IntentionCatalogSortField.createdAt,
+            direction: IntentionCatalogSortDirection.ascending,
+          ),
+          [
+            '018f0b5d-6b2e-7c80-8000-000000000044',
+            '018f0b5d-6b2e-7c80-8000-000000000041',
+            '018f0b5d-6b2e-7c80-8000-000000000042',
+            '018f0b5d-6b2e-7c80-8000-000000000043',
+            '018f0b5d-6b2e-7c80-8000-000000000045',
+          ],
+        ),
+        (
+          IntentionCatalogOrder.createdAtDescending,
+          [
+            '018f0b5d-6b2e-7c80-8000-000000000045',
+            '018f0b5d-6b2e-7c80-8000-000000000041',
+            '018f0b5d-6b2e-7c80-8000-000000000042',
+            '018f0b5d-6b2e-7c80-8000-000000000043',
+            '018f0b5d-6b2e-7c80-8000-000000000044',
+          ],
+        ),
+        (
+          const IntentionCatalogOrder(
+            field: IntentionCatalogSortField.updatedAt,
+            direction: IntentionCatalogSortDirection.ascending,
+          ),
+          [
+            '018f0b5d-6b2e-7c80-8000-000000000044',
+            '018f0b5d-6b2e-7c80-8000-000000000043',
+            '018f0b5d-6b2e-7c80-8000-000000000041',
+            '018f0b5d-6b2e-7c80-8000-000000000042',
+            '018f0b5d-6b2e-7c80-8000-000000000045',
+          ],
+        ),
+        (
+          const IntentionCatalogOrder(
+            field: IntentionCatalogSortField.updatedAt,
+            direction: IntentionCatalogSortDirection.descending,
+          ),
+          [
+            '018f0b5d-6b2e-7c80-8000-000000000045',
+            '018f0b5d-6b2e-7c80-8000-000000000041',
+            '018f0b5d-6b2e-7c80-8000-000000000042',
+            '018f0b5d-6b2e-7c80-8000-000000000043',
+            '018f0b5d-6b2e-7c80-8000-000000000044',
+          ],
+        ),
+      ];
+
+      for (final (order, expectedIds) in cases) {
+        final query = IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: null,
+          order: order,
+          pageSize: 2,
+        );
+        final firstPage = _firstPage(await repository.getCatalogPage(query));
+        trace.statements.clear();
+
+        final actualIds = [
+          ...firstPage.items.map((summary) => summary.id.toCanonicalString()),
+        ];
+        var cursor = firstPage.nextCursor;
+        while (cursor != null) {
+          final continuation = _continuationPage(
+            await repository.getCatalogPage(
+              IntentionCatalogQuery(
+                scope: query.scope,
+                titleFilter: null,
+                order: query.order,
+                pageSize: query.pageSize,
+                cursor: cursor,
+              ),
+            ),
+          );
+          actualIds.addAll(
+            continuation.items.map((summary) => summary.id.toCanonicalString()),
+          );
+          cursor = continuation.nextCursor;
+        }
+
+        expect(actualIds, expectedIds);
+        expect(
+          trace.statements.where((statement) => statement.contains('COUNT(')),
+          isEmpty,
+        );
+        expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
+      }
+    },
+  );
+
+  test(
+    'отклоняет cursor другого адаптера и cursor с другими параметрами до SQL',
+    () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000051',
+        title: 'Первое',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000052',
+        title: 'Первое дополнение',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: 'Первое',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+      );
+      final cursor = _firstPage(await repository.getCatalogPage(query))
+          .nextCursor!;
+      final invalidQueries = [
+        IntentionCatalogQuery(
+          scope: query.scope,
+          titleFilter: 'Другое',
+          order: query.order,
+          pageSize: query.pageSize,
+          cursor: cursor,
+        ),
+        IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: 'Первое',
+          order: query.order,
+          pageSize: query.pageSize,
+          cursor: cursor,
+        ),
+        IntentionCatalogQuery(
+          scope: query.scope,
+          titleFilter: 'Первое',
+          order: const IntentionCatalogOrder(
+            field: IntentionCatalogSortField.updatedAt,
+            direction: IntentionCatalogSortDirection.descending,
+          ),
+          pageSize: query.pageSize,
+          cursor: cursor,
+        ),
+        IntentionCatalogQuery(
+          scope: query.scope,
+          titleFilter: 'Первое',
+          order: query.order,
+          pageSize: query.pageSize,
+          cursor: const _ForeignCatalogCursor(),
+        ),
+      ];
+
+      for (final invalidQuery in invalidQueries) {
+        trace.statements.clear();
+
+        final result = await repository.getCatalogPage(invalidQuery);
+
+        expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+        expect(
+          (result as ResultFailure<IntentionCatalogPage>).failure,
+          isA<IntentionValidationFailure>(),
+        );
+        expect(trace.statements, isEmpty);
+      }
+    },
+  );
+
+  test(
+    'использует value boundary после удаления и вставок вокруг cursor',
+    () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000061',
+        title: 'Первое',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000062',
+        title: 'Второе',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000064',
+        title: 'Четвёртое',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000065',
+        title: 'Пятое',
+        createdAt: DateTime.utc(2026, 9, 2, 12),
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: const IntentionCatalogOrder(
+          field: IntentionCatalogSortField.createdAt,
+          direction: IntentionCatalogSortDirection.ascending,
+        ),
+        pageSize: 2,
+      );
+      final cursor = _firstPage(await repository.getCatalogPage(query))
+          .nextCursor!;
+      await (database.delete(database.intentions)..where(
+            (row) => row.id.equals('018f0b5d-6b2e-7c80-8000-000000000062'),
+          ))
+          .go();
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000060',
+        title: 'До границы',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000063',
+        title: 'После границы',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+
+      final continuation = _continuationPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: query.scope,
+            titleFilter: null,
+            order: query.order,
+            pageSize: query.pageSize,
+            cursor: cursor,
+          ),
+        ),
+      );
+
+      expect(
+        continuation.items.map((summary) => summary.id.toCanonicalString()),
+        [
+          '018f0b5d-6b2e-7c80-8000-000000000063',
+          '018f0b5d-6b2e-7c80-8000-000000000064',
+        ],
+      );
+      expect(continuation.nextCursor, isNotNull);
+      expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
+    },
+  );
+
   test('диагностирует typed failure чтения первой страницы без пользовательских данных', () async {
     trace.failure = SqliteException(
       extendedResultCode: SqlError.SQLITE_BUSY,
@@ -410,6 +694,19 @@ IntentionCatalogFirstPage _firstPage(Result<IntentionCatalogPage> result) {
   final page = (result as ResultSuccess<IntentionCatalogPage>).value;
   expect(page, isA<IntentionCatalogFirstPage>());
   return page as IntentionCatalogFirstPage;
+}
+
+IntentionCatalogContinuationPage _continuationPage(
+  Result<IntentionCatalogPage> result,
+) {
+  expect(result, isA<ResultSuccess<IntentionCatalogPage>>());
+  final page = (result as ResultSuccess<IntentionCatalogPage>).value;
+  expect(page, isA<IntentionCatalogContinuationPage>());
+  return page as IntentionCatalogContinuationPage;
+}
+
+final class _ForeignCatalogCursor implements IntentionCatalogCursor {
+  const _ForeignCatalogCursor();
 }
 
 final class _SelectTrace extends QueryInterceptor {

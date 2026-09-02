@@ -35,7 +35,9 @@ final class DriftIntentionRepository implements IntentionRepository {
       ),
     );
 
-    if (query.cursor != null) {
+    final cursor = query.cursor;
+    if (cursor != null &&
+        (cursor is! _DriftIntentionCatalogCursor || !cursor.matches(query))) {
       const failure = IntentionValidationFailure();
       _diagnosticsSink.record(
         CatalogPageReadDiagnosticsEvent(
@@ -50,9 +52,14 @@ final class DriftIntentionRepository implements IntentionRepository {
     }
 
     try {
-      final page = await _database.transaction(
-        () => _readFirstCatalogPage(query),
-      );
+      final page = switch (cursor) {
+        null => await _database.transaction(() => _readFirstCatalogPage(query)),
+        _DriftIntentionCatalogCursor() => await _readCatalogContinuationPage(
+          query,
+          cursor,
+        ),
+        _ => throw StateError('Недопустимый cursor каталога.'),
+      };
       _diagnosticsSink.record(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
@@ -163,6 +170,49 @@ final class DriftIntentionRepository implements IntentionRepository {
     );
   }
 
+  Future<IntentionCatalogContinuationPage> _readCatalogContinuationPage(
+    IntentionCatalogQuery query,
+    _DriftIntentionCatalogCursor cursor,
+  ) async {
+    final intentions = _database.intentions;
+    final hasDescriptionExpression = intentions.description.isNotNull();
+    final rowsQuery = _database.selectOnly(intentions)
+      ..addColumns([hasDescriptionExpression])
+      ..addColumns([
+        intentions.id,
+        intentions.title,
+        intentions.isActionReady,
+        intentions.isArchived,
+        intentions.createdAt,
+        intentions.updatedAt,
+      ])
+      ..where(_catalogCondition(query) & _keysetCondition(query, cursor))
+      ..orderBy([
+        _primaryOrderingTerm(intentions, query.order),
+        OrderingTerm.asc(intentions.id),
+      ])
+      ..limit(query.pageSize + 1);
+    final rows = await rowsQuery.get();
+    final items = [
+      for (final row in rows.take(query.pageSize))
+        _rehydrateSummary(
+          id: row.read(intentions.id)!,
+          title: row.read(intentions.title)!,
+          hasDescription: row.read(hasDescriptionExpression)!,
+          isActionReady: row.read(intentions.isActionReady)!,
+          isArchived: row.read(intentions.isArchived)!,
+          createdAt: row.read(intentions.createdAt)!,
+          updatedAt: row.read(intentions.updatedAt)!,
+        ),
+    ];
+    final hasNextPage = rows.length > query.pageSize;
+
+    return IntentionCatalogContinuationPage(
+      items: items,
+      nextCursor: hasNextPage ? _cursorAt(query, items.last) : null,
+    );
+  }
+
   Expression<bool> _catalogCondition(IntentionCatalogQuery query) {
     final intentions = _database.intentions;
     final scopeCondition = switch (query.scope) {
@@ -180,14 +230,42 @@ final class DriftIntentionRepository implements IntentionRepository {
     local.Intentions intentions,
     IntentionCatalogOrder order,
   ) {
-    final timestamp = switch (order.field) {
-      IntentionCatalogSortField.createdAt => intentions.createdAt,
-      IntentionCatalogSortField.updatedAt => intentions.updatedAt,
-    };
+    final timestamp = _primaryOrderingColumn(intentions, order);
     return switch (order.direction) {
       IntentionCatalogSortDirection.ascending => OrderingTerm.asc(timestamp),
       IntentionCatalogSortDirection.descending => OrderingTerm.desc(timestamp),
     };
+  }
+
+  GeneratedColumn<int> _primaryOrderingColumn(
+    local.Intentions intentions,
+    IntentionCatalogOrder order,
+  ) => switch (order.field) {
+    IntentionCatalogSortField.createdAt => intentions.createdAt,
+    IntentionCatalogSortField.updatedAt => intentions.updatedAt,
+  };
+
+  Expression<bool> _keysetCondition(
+    IntentionCatalogQuery query,
+    _DriftIntentionCatalogCursor cursor,
+  ) {
+    final intentions = _database.intentions;
+    final timestamp = _primaryOrderingColumn(intentions, query.order);
+    final boundaryTimestamp =
+        cursor.boundaryTimestamp.value.microsecondsSinceEpoch;
+    final afterTimestamp = switch (query.order.direction) {
+      IntentionCatalogSortDirection.ascending => timestamp.isBiggerThanValue(
+        boundaryTimestamp,
+      ),
+      IntentionCatalogSortDirection.descending => timestamp.isSmallerThanValue(
+        boundaryTimestamp,
+      ),
+    };
+    return afterTimestamp |
+        (timestamp.equals(boundaryTimestamp) &
+            intentions.id.isBiggerThanValue(
+              cursor.boundaryId.toCanonicalString(),
+            ));
   }
 
   IntentionSummary _rehydrateSummary({
@@ -240,7 +318,7 @@ final class DriftIntentionRepository implements IntentionRepository {
     IntentionSummary boundary,
   ) => _DriftIntentionCatalogCursor(
     scope: query.scope,
-    titleFilter: query.titleFilter,
+    normalizedTitleFilter: query.titleFilter?.map((value) => value),
     order: query.order,
     boundaryTimestamp: switch (query.order.field) {
       IntentionCatalogSortField.createdAt => boundary.createdAt,
@@ -299,17 +377,22 @@ final class DriftIntentionRepository implements IntentionRepository {
 final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   const _DriftIntentionCatalogCursor({
     required this.scope,
-    required this.titleFilter,
+    required this.normalizedTitleFilter,
     required this.order,
     required this.boundaryTimestamp,
     required this.boundaryId,
   });
 
   final IntentionScope scope;
-  final IntentionTitleFilter? titleFilter;
+  final String? normalizedTitleFilter;
   final IntentionCatalogOrder order;
   final domain.IntentionTimestamp boundaryTimestamp;
   final IntentionId boundaryId;
+
+  bool matches(IntentionCatalogQuery query) =>
+      scope == query.scope &&
+      normalizedTitleFilter == query.titleFilter?.map((value) => value) &&
+      order == query.order;
 }
 
 IntentionFailure _classifyDetailReadFailure(Object error) {
