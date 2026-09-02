@@ -252,8 +252,8 @@
 - [x] 5.2 Классифицировать SQLite `CORRUPT` и `NOTADB` как non-retryable повреждение на bootstrap boundary
   - **Критерии приёмки:**
     - `SqliteException` классифицируется по первичному `resultCode`: `SQLITE_CORRUPT` и `SQLITE_NOTADB`, включая extended variants, возвращают `LocalDataCorruption` без анализа текста исключения.
-    - `BUSY`, `LOCKED`, `CANTOPEN`, `IOERR` и прочие opening failures остаются `LocalDataRetryableFailure`; оба failure path закрывают неготовый executor и записывают только allowlisted diagnostics code.
-    - File-backed fixtures произвольного non-database файла и повреждённой header/schema metadata подтверждают corruption, отсутствие ложного retry outcome и освобождение файла для последующего доступа.
+    - `BUSY`, `LOCKED`, `CANTOPEN` и `IOERR` остаются `LocalDataRetryableFailure`, а неизвестные opening failures получают отдельный outcome из 5.5; каждый non-ready path закрывает неготовый executor и записывает только allowlisted diagnostics code.
+    - File-backed fixture произвольного non-database файла и fault fixtures primary/extended кодов `CORRUPT`/`NOTADB` подтверждают corruption, отсутствие ложного retry outcome и освобождение файла для последующего доступа.
   - **Проверка:**
     - Выполнить `flutter test test/data/local/bootstrap/local_data_bootstrap_test.dart` с fixtures `NOTADB`, `CORRUPT` и временной недоступности.
     - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart`.
@@ -263,7 +263,7 @@
 
 - [x] 5.3 Отделить ограниченную проверку обычного открытия от полного FTS audit
   - **Критерии приёмки:**
-    - `beforeOpen` текущей схемы проверяет только marker и конечный набор обязательных schema objects, включает `foreign_keys` и не вызывает FTS `integrity-check` либо другую операцию, сканирующую пользовательские строки или весь индекс.
+    - `beforeOpen` текущей схемы проверяет marker версии, включает `foreign_keys` и не проверяет список либо определения schema objects, не вызывает FTS `integrity-check` или другую операцию, сканирующую пользовательские строки либо весь индекс.
     - Полный index-aware audit остаётся единым helper и обязательно выполняется до commit атомарного первичного создания и каждой миграции, затрагивающей FTS; будущий recovery/maintenance caller сможет выбрать его явно.
     - Instrumented file-backed test с представительным набором намерений доказывает отсутствие команды `integrity-check` при обычном повторном bootstrap, а отдельный явный вызов audit по-прежнему обнаруживает рассогласованный индекс.
   - **Проверка:**
@@ -287,7 +287,7 @@
 
 - [x] 5.5 Сохранить типизированную причину SQLite-отказа через bounded verification и production background executor
   - **Критерии приёмки:**
-    - Ограниченная проверка marker и schema metadata создаёт corruption только из доказанного несовместимого состояния и сохраняет типизированную причину ошибки выполнения verification query до bootstrap boundary.
+    - Ограниченная проверка marker версии создаёт corruption только из доказанного несовместимого состояния и сохраняет типизированную причину ошибки выполнения marker query до bootstrap boundary.
     - Bootstrap раскрывает `DriftRemoteException.remoteCause`, классифицирует `CORRUPT`/`NOTADB` как `LocalDataCorruption`, allowlisted `BUSY`/`LOCKED`/`CANTOPEN`/`IOERR` как `LocalDataRetryableFailure`, а любую неизвестную причину как отдельный non-retryable `LocalDataUnexpectedFailure` без анализа текста exception.
     - In-process и production-подобный background executor подтверждают одинаковые outcomes непосредственно во время bounded verification; каждый non-ready path закрывает executor, не изменяет хранилище и записывает только соответствующий allowlisted diagnostics code.
   - **Проверка:**
@@ -297,18 +297,18 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/bootstrap/local_data_bootstrap_result.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [x] 5.6 Проверять полную структуру текущей схемы при каждом production bootstrap
+- [x] 5.6 Вынести полную Drift-проверку схемы из production bootstrap в test/debug boundary
   - **Критерии приёмки:**
-    - Production `beforeOpen` вызывает `validateDatabaseSchema` с `ValidationOptions(validateDropped: true)` и включённой по умолчанию проверкой column constraints; только `SchemaMismatch` преобразуется в `CorruptLocalDataSchemaException`, а ошибки чтения schema metadata или создания эталонной in-memory database сохраняют типизированную причину для политики 5.5.
-    - File-backed fixtures с текущим `user_version` и ожидаемыми именами по отдельности изменяют колонку или constraint, FTS5-конфигурацию, тело trigger, поле либо predicate index и добавляют лишний schema object; каждый несовместимый вариант возвращает `LocalDataCorruption`, закрывает executor и не изменяет файл.
-    - Instrumented fixture доказывает, что обычная проверка читает schema metadata, но не пользовательские строки и не полный FTS-индекс; повторяемые измерения на одном toolchain фиксируют длительность bootstrap пустой и представительной базы, а сопоставимые release APK builds — абсолютное и относительное изменение размера после включения verifier.
+    - Production `beforeOpen` ограничивает bounded verification `PRAGMA user_version`, необходимыми миграциями и включением `foreign_keys`: он не проверяет список либо определения schema objects, не создаёт эталонную базу и не импортирует или вызывает `drift_dev`; `drift_dev` находится только в dev dependencies.
+    - Полная проверка `validateDatabaseSchema` с `ValidationOptions(validateDropped: true)` остаётся в явно запускаемом test/debug boundary: file-backed fixtures с текущим `user_version` по отдельности изменяют column constraint, FTS5-конфигурацию, тело trigger, поле либо predicate index и добавляют лишний schema object, а каждый несовместимый вариант завершается `SchemaMismatch` и блокирует готовность production artifact до поставки.
+    - Bootstrap сохраняет типизированную классификацию SQLite-ошибок на marker query через in-process и production-подобный background executor; instrumented повторное открытие текущей схемы подтверждает `foreign_keys = ON` и отсутствие чтения определений schema objects, эталонной базы, пользовательских reads и полного FTS audit.
   - **Проверка:**
-    - Выполнить `flutter test test/data/local/migrations/migration_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/data/local/file_backed_database_test.dart` с матрицей несовместимых определений и SQL trace.
-    - На одном toolchain выполнить bootstrap-измерения пустой и представительной file-backed базы до и после изменения, затем для обеих ревизий выполнить `flutter build apk --release --target-platform android-arm64 --analyze-size` и зафиксировать длительности, размеры и их абсолютные и относительные дельты в Apply handoff.
+    - Выполнить `flutter test test/data/local/migrations/migration_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/data/local/file_backed_database_test.dart` с test-only матрицей несовместимых определений, marker-query failures и production SQL trace.
+    - Выполнить `rg -n "package:drift_dev|validateDatabaseSchema|ValidationOptions|SchemaMismatch" lib pubspec.yaml test` и убедиться, что tooling API отсутствует в `lib/`, а `drift_dev` объявлен только в dev dependencies.
     - Выполнить `flutter analyze`.
   - **Зависимости:** 5.3, 5.5.
-  - **Вероятно затронутые файлы:** `pubspec.yaml`, `pubspec.lock`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
-  - **Оценка:** M (5 файлов).
+  - **Вероятно затронутые файлы:** `pubspec.yaml`, `pubspec.lock`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/migrations/migration_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
 
 - [ ] 5.7 Закрыть выбор локального поиска за единой типобезопасной seam буквальной подстроки
   - **Критерии приёмки:**
@@ -323,6 +323,7 @@
   - **Оценка:** M (4 файла).
 
 - [ ] 5.8 Убрать тестовую точку отказа из production boundary первичного создания схемы
+  - **Исходное состояние:** Полный `flutter test` имеет один ожидающий исправления сценарий `прерванное первичное создание не оставляет schema objects и допускает повтор`: legacy-ожидание `LocalDataRetryableFailure` уже расходится с корректной runtime-классификацией `LocalDataUnexpectedFailure`. Этот известный отказ относится к 5.8, а не к завершённой 5.6.
   - **Критерии приёмки:**
     - `LocalDataBootstrap`, `AppDatabase` и production migration strategy не принимают и не вызывают `InitialSchemaObjectCreated`, `onInitialSchemaObjectCreated` либо другую тестовую callback-точку между DDL-операциями атомарного `onCreate`.
     - File-backed harness оборачивает настоящий `QueryExecutor` test-only `QueryInterceptor`, который внутри migration transaction пропускает первую schema `CREATE` в SQLite и сразу после её успешного выполнения однократно выбрасывает тестовую ошибку, не добавляя test seam в `lib/`.
@@ -336,9 +337,9 @@
 
 - [ ] 5.9 Подтвердить исправленный storage contract перед реализацией repository adapter
   - **Критерии приёмки:**
-    - Storage suite подтверждает атомарный `onCreate` и безопасный retry через test-only fault injection на executor boundary без production callback, раздельные corruption/retryable/unexpected/incompatible outcomes на in-process и production-подобном background executor, полную семантическую совместимость schema objects без data-dependent scan и буквальный поиск через единую local search seam на file-backed executor.
-    - Полная текущая test suite и статический анализ проходят без регрессий, а генерация не оставляет tracked или untracked artifacts.
-    - Измерения bootstrap пустой и представительной базы и дельта release APK зафиксированы, Android debug build и строгая OpenSpec-валидация проходят на тех же артефактах, после чего Phase 6 может использовать storage foundation без обходных механизмов.
+    - Storage suite подтверждает атомарный `onCreate` и безопасный retry через test-only fault injection на executor boundary без production callback, раздельные corruption/retryable/unexpected/incompatible outcomes на in-process и production-подобном background executor, полную семантическую совместимость schema objects в test/debug boundary и буквальный поиск через единую local search seam на file-backed executor.
+    - Production-подобный bootstrap ограничен marker версии, необходимыми миграциями и `foreign_keys`, не зависит от `drift_dev`, не создаёт эталонную базу и не выполняет полную schema/FTS проверку при обычном повторном открытии текущей версии.
+    - Полная текущая test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят без регрессий, а генерация не оставляет tracked или untracked artifacts, после чего Phase 6 может использовать storage foundation без обходных механизмов.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
