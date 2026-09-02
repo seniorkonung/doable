@@ -4,18 +4,11 @@
 
 **Результат:** Требуются изменения.
 
-Phase 6 сохраняет правильную границу: production Drift adapter должен провести полный постоянный lifecycle намерения через storage-neutral `IntentionRepository`, не забирая Riverpod, navigation и пользовательские состояния из Phase 7. Задачи 6.1–6.10 в целом трассируют catalog reads, commands, file-backed persistence, атомарность, диагностику и representative-volume evidence, однако в четырёх местах implementer всё ещё должен самостоятельно выбрать наблюдаемый либо архитектурный контракт.
+Phase 6 сохраняет правильную границу: production Drift adapter должен провести полный постоянный lifecycle намерения через storage-neutral `IntentionRepository`, не забирая Riverpod, navigation и пользовательские состояния из Phase 7. Задачи 6.1–6.10 в целом трассируют catalog reads, commands, file-backed persistence, атомарность, диагностику и representative-volume evidence, однако в трёх местах implementer всё ещё должен самостоятельно выбрать наблюдаемый либо архитектурный контракт.
 
 **Валидация:** `openspec validate manage-intentions --type change --strict --no-interactive` успешна. Это подтверждает структуру change, но не разрешает перечисленные семантические пробелы. Аудит не проверяет ещё не существующую реализацию Phase 6 и не является разрешением на Apply.
 
 ## Замечания
-
-### F1 · Medium — Repository failure contract не определяет unknown outcome и контекст constraint
-
-- **Доказательства:** `design.md:403` перечисляет публичные repository failures `validation`, `not-found`, `conflict`, `unavailable` и `corruption`, а неожиданные exceptions обещает преобразовать только в неопределённый «общий безопасный failure». Реализованный sealed contract в `lib/src/intention/application/intention_result.dart:36-82` также не имеет `unexpected`. При этом `tasks.md:356-357` требует различать `constraint conflict` и `unexpected`, но возвращать только существующий failure, а `tasks.md:429` фиксирует лишь diagnostics code для unknown. Спецификация в `specs/intention-management/spec.md:471-472` разрешает предлагать retry только там, где он способен восстановить работу.
-- **Влияние:** implementer должен сам решить, выдавать ли unknown как retryable `unavailable`, скрывать ли programming/constraint defects за `conflict` и какие extended `SQLITE_CONSTRAINT_*` действительно являются предметным конфликтом. Phase 7 вследствие этого не сможет однозначно выбрать retry/non-retryable состояние, а разные read/command paths могут классифицировать одинаковую причину по-разному.
-- **Требуемое изменение:** зафиксировать исчерпывающую публичную семантику unknown failure и контекстную матрицу constraint-кодов. Отдельно определить outcomes как минимум для UUID primary-key collision, blocking foreign key, `CHECK`/`NOT NULL`, allowlisted временных кодов и неизвестного SQLite либо non-SQLite exception; тесты 6.1 и 6.7 должны проверять Result, retryability и diagnostics, а не только внутреннюю категорию.
-- **Требуется решение:** должен ли repository получить отдельный non-retryable `IntentionUnexpectedFailure`, либо существующая seam будет представлять unknown иначе, не смешивая его с retryable `unavailable`?
 
 ### F2 · Medium — `updatedAt` не определён при равном или откатившемся UTC-clock
 

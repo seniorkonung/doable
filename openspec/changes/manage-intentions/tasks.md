@@ -350,25 +350,25 @@
 
 ## Phase 6: Жизненный цикл намерения полностью доступен через публичную seam
 
-- [ ] 6.1 Создать production `DriftIntentionRepository` с общей безопасной классификацией storage failures
+- [ ] 6.1 Завершить публичный failure contract и общий безопасный классификатор SQLite
   - **Критерии приёмки:**
-    - Concrete adapter получает `AppDatabase`, `IntentionIdGenerator`, внедряемую функцию текущего UTC-времени и `DiagnosticsSink`, реализует только `IntentionRepository` и не раскрывает Drift, SQLite, platform path, transport или sync-specific types через публичную seam.
-    - Единый внутренний классификатор последовательно раскрывает известные `DriftRemoteException`, использует первичные SQLite-коды без анализа текста и различает corruption, allowlisted временную недоступность, constraint conflict и unexpected; bootstrap переиспользует ту же машинную классификацию без изменения уже доказанных outcomes.
-    - Repository преобразует инфраструктурный отказ только в существующий типизированный failure, записывает точный безопасный diagnostics code и никогда не передаёт caller либо diagnostics пользовательский текст, UUID, cursor, SQL, параметры или полный exception.
+    - Закрытый публичный набор `IntentionFailure` получает отдельный `IntentionUnexpectedFailure`/`unexpected`, который является non-retryable, не утверждает о corruption и не смешивается с `IntentionUnavailableFailure`; `unavailable` остаётся только для доказанно временных причин.
+    - Единый внутренний классификатор последовательно раскрывает известные `DriftRemoteException`, использует машинные primary/extended SQLite-коды без анализа текста и различает corruption, allowlisted временную недоступность, constraint с сохранённым extended code и unexpected; он не превращает constraint в предметный conflict без контекста command.
+    - Bootstrap переиспользует классификатор, отображает любую constraint-категорию в прежний `LocalDataUnexpectedFailure`, сохраняет остальные уже доказанные outcomes и записывает только точный безопасный diagnostics code без пользовательского текста, UUID, cursor, SQL, параметров или полного exception.
   - **Проверка:**
-    - Выполнить `flutter test test/data/local/sqlite_failure_classifier_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart` с primary/extended SQLite-кодами, вложенными remote wrappers, constraint и unknown fixtures.
-    - Выполнить `flutter analyze` и проверить, что concrete adapter не меняет публичный storage-neutral контракт `IntentionRepository`.
+    - Выполнить `flutter test test/intention/application/intention_contract_test.dart test/data/local/sqlite_failure_classifier_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart` с исчерпывающим `unexpected`, primary/extended SQLite-кодами, вложенными remote wrappers, всеми известными constraint-видами и unknown fixtures.
+    - Выполнить `flutter analyze` и проверить исчерпывающую обработку нового sealed-варианта и отсутствие SQLite-типа за публичной storage-neutral seam.
   - **Зависимости:** 5.9.
-  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/sqlite_failure_classifier.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`.
-  - **Оценка:** M (5 файлов).
+  - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_result.dart`, `lib/src/data/local/sqlite_failure_classifier.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `test/intention/application/intention_contract_test.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.2 Реализовать `watchById` с безопасной rehydration подтверждённых данных
+- [ ] 6.2 Создать production `DriftIntentionRepository` и реализовать `watchById` с безопасной rehydration
   - **Критерии приёмки:**
-    - Существующая строка восстанавливается как `ResultSuccess<Intention>` с теми же UUID v4 либо v7, исходным пользовательским текстом, состояниями и UTC timestamps, а подтверждённое отсутствие идентификатора публикуется как `ResultSuccess(null)` без storage-specific представления.
-    - Неканонический или nil UUID, недопустимый текст, `updatedAt` раньше `createdAt` либо иное нарушение сохранённых предметных инвариантов возвращает `IntentionCorruptionFailure` без частично построенной модели; storage failures проходят классификацию из 6.1.
-    - Подписка публикует только committed snapshots, после одного typed failure завершается, а явный retry создаёт новую подписку; detail diagnostics соблюдает утверждённый lifecycle и не содержит UUID, текста, SQL или exception.
+    - Concrete adapter получает `AppDatabase`, `IntentionIdGenerator`, внедряемую функцию текущего UTC-времени и `DiagnosticsSink`, реализует только `IntentionRepository` без storage-specific публичных типов и восстанавливает существующую строку как `ResultSuccess<Intention>` с теми же UUID v4 либо v7, исходным пользовательским текстом, состояниями и UTC timestamps; подтверждённое отсутствие идентификатора публикуется как `ResultSuccess(null)`.
+    - Неканонический или nil UUID, недопустимый текст, `updatedAt` раньше `createdAt` либо иное нарушение сохранённых предметных инвариантов возвращает `IntentionCorruptionFailure` без частично построенной модели; storage failures проходят классификацию из 6.1, а constraint или неизвестная причина на read-path возвращает `IntentionUnexpectedFailure`.
+    - Подписка публикует только committed snapshots и после одного typed failure завершается; при `IntentionUnavailableFailure` явный retry создаёт новую подписку, а `IntentionUnexpectedFailure` не предлагает обычный retry. Detail diagnostics соблюдает утверждённый lifecycle и не содержит UUID, текста, SQL или exception.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/data/drift_intention_repository_watch_test.dart` с initial value, commit, delete, not-found, UUID v4/v7, corrupt-row и failure-then-done fixtures.
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_watch_test.dart` с initial value, commit, delete, not-found, UUID v4/v7, corrupt-row, retryable unavailable и non-retryable constraint/unknown failure-then-done fixtures.
     - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` с canary-значениями пользовательского текста и UUID.
   - **Зависимости:** 6.1.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
@@ -402,7 +402,7 @@
   - **Критерии приёмки:**
     - `CreateIntention` нормализует название и описание общей предметной функцией, получает новый `IntentionId` только от внедрённого UUIDv7-generator, записывает один UTC-момент в оба timestamp и принудительно создаёт active/not-ready намерение; одинаковые названия допустимы, а collision не перезаписывает существующую строку.
     - `UpdateIntention` одинаково работает для активного и архивированного намерения, сохраняет identity, `createdAt`, readiness и archive state, атомарно синхронизирует `title_search_key` и меняет `updatedAt` только вместе с фактическим изменением подтверждённых title либо description.
-    - Validation failure не создаёт подтверждённого состояния, отсутствие ID возвращает not-found, collision — conflict, а no-op не выполняет запись и возвращает прежний `IntentionSaved`; любой success и command diagnostics появляются только после commit.
+    - Validation failure не создаёт подтверждённого состояния, отсутствие ID возвращает not-found, только `SQLITE_CONSTRAINT_PRIMARYKEY` при вставке нового `IntentionId` представляет collision как conflict, а no-op не выполняет запись и возвращает прежний `IntentionSaved`; любой success и command diagnostics появляются только после commit.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart` с Unicode-границами, duplicate title, deterministic clock/generator, active/archived update, no-op и ID collision.
     - Выполнить `flutter test test/intention/data/drift_intention_repository_watch_test.dart test/data/local/fts_consistency_test.dart` и подтвердить согласованные snapshots и search key только после commit.
@@ -425,10 +425,10 @@
 - [ ] 6.7 Реализовать физическое удаление и доказать атомарность всех command paths
   - **Критерии приёмки:**
     - `DeleteIntention` физически удаляет существующее активное или архивированное намерение без предварительного архивирования, возвращает `IntentionDeleted` только после commit, после чего `watchById` публикует успешное отсутствие и ни один scope каталога не содержит ID.
-    - Отсутствующий ID возвращает not-found, а блокирующее SQLite-ограничение возвращает conflict и оставляет намерение полностью неизменным; repository не моделирует будущие связи и полагается только на фактические транзакционные constraints текущего storage.
-    - Fault injection после DML для create, update, state transition и delete откатывает основную строку, FTS trigger effects и timestamps; unknown failure не представляется как success, conflict или corruption и записывает только безопасный unexpected diagnostics code.
+    - Отсутствующий ID возвращает not-found, а только `SQLITE_CONSTRAINT_FOREIGNKEY` при `DeleteIntention` представляет блокирующую связь как conflict и оставляет намерение полностью неизменным; repository не моделирует будущие связи и полагается только на фактические транзакционные constraints текущего storage.
+    - Fault injection после DML для create, update, state transition и delete откатывает основную строку, FTS trigger effects и timestamps; `CHECK`, `NOT NULL`, `UNIQUE`, `ROWID`, `TRIGGER`, общий либо неизвестный constraint и `PRIMARYKEY`/`FOREIGNKEY` вне утверждённых command contexts возвращают `IntentionUnexpectedFailure`, как и неизвестный SQLite либо non-SQLite exception, и записывают только безопасный unexpected diagnostics code.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_fault_test.dart` с active/archived delete, not-found, test-only blocking foreign key и fault matrix.
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_fault_test.dart` с active/archived delete, not-found, test-only blocking foreign key и полной контекстной constraint/unknown fault matrix, проверяющей публичный `Result`, retryability и diagnostics.
     - Выполнить `flutter test test/data/local/fts_consistency_test.dart test/shared/diagnostics/diagnostics_sink_test.dart` и подтвердить целостность индекса и отсутствие чувствительных diagnostics после rollback.
   - **Зависимости:** 6.5, 6.6.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
@@ -461,7 +461,7 @@
 - [ ] 6.10 Подтвердить готовность полного постоянного lifecycle через публичную seam
   - **Критерии приёмки:**
     - Repository suite через один и тот же `IntentionRepository` contract подтверждает создание, bounded catalog, фильтр, точный count, четыре порядка, opaque continuations, подробное чтение, изменение, readiness, архивирование, восстановление, удаление, file-backed reopen, concurrent и failure paths.
-    - Публичные interface и failures не содержат Drift, SQLite, platform, transport или sync-specific types, пользовательские данные не попадают в diagnostics, а large-fixture evidence подтверждает ограниченную стоимость каждой catalog operation.
+    - Публичные interface и failures не содержат Drift, SQLite, platform, transport или sync-specific types, закрытый набор исчерпывающе различает retryable `unavailable` и non-retryable `unexpected`, пользовательские данные не попадают в diagnostics, а large-fixture evidence подтверждает ограниченную стоимость каждой catalog operation.
     - Повторная генерация не оставляет tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без storage обходов.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
