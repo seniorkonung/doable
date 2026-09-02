@@ -310,15 +310,27 @@
   - **Вероятно затронутые файлы:** `pubspec.yaml`, `pubspec.lock`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 5.7 Подтвердить исправленный storage contract перед реализацией repository adapter
+- [ ] 5.7 Закрыть выбор локального поиска за единой типобезопасной seam буквальной подстроки
   - **Критерии приёмки:**
-    - Storage suite подтверждает атомарный `onCreate` и безопасный retry, раздельные corruption/retryable/unexpected/incompatible outcomes на in-process и production-подобном background executor, полную семантическую совместимость schema objects без data-dependent scan и буквальный поиск на file-backed executor.
+    - Factory `IntentionCatalogQuery` по-прежнему принимает nullable пользовательскую строку, но хранит допустимый непустой фильтр как `IntentionTitleFilter` с закрытым конструктором; только `null` представляет отсутствие фильтра, прежняя Unicode-валидация сохраняется, а прикладной тип не раскрывает Drift, SQLite или FTS.
+    - Единая concrete interface в `data/local` принимает только `IntentionTitleFilter`, сама строит search key и выбирает параметризованный `instr` для одной-двух Unicode-кодовых точек либо экранированный параметризованный trigram `MATCH` для трёх и более; raw `String`, FTS phrase, route flag, SQL fragment, branch-specific helper и открытые варианты стратегии caller недоступны.
+    - Составное условие одной interface пригодно для будущих `COUNT` и ограниченного чтения страниц без предварительной материализации идентификаторов в Dart; единый test surface доказывает одинаковую буквальную семантику, выбранный SQL path и использование FTS virtual table длинной ветвью.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/application/intention_contract_test.dart test/data/local/fts_consistency_test.dart` с границами 1/2/3 кодовых точек, символами вне BMP, различием диакритики, adversarial FTS-синтаксисом, SQL trace и `EXPLAIN QUERY PLAN`.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 5.4.
+  - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/data/local/fts_query.dart`, `test/intention/application/intention_contract_test.dart`, `test/data/local/fts_consistency_test.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 5.8 Подтвердить исправленный storage contract перед реализацией repository adapter
+  - **Критерии приёмки:**
+    - Storage suite подтверждает атомарный `onCreate` и безопасный retry, раздельные corruption/retryable/unexpected/incompatible outcomes на in-process и production-подобном background executor, полную семантическую совместимость schema objects без data-dependent scan и буквальный поиск через единую local search seam на file-backed executor.
     - Полная текущая test suite и статический анализ проходят без регрессий, а генерация не оставляет tracked или untracked artifacts.
     - Измерения bootstrap пустой и представительной базы и дельта release APK зафиксированы, Android debug build и строгая OpenSpec-валидация проходят на тех же артефактах, после чего Phase 6 может использовать storage foundation без обходных механизмов.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 5.1, 5.2, 5.3, 5.4, 5.5, 5.6.
+  - **Зависимости:** 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.

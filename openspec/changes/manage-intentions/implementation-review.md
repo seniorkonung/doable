@@ -4,10 +4,7 @@
 
 **Result:** Changes needed
 
-Наиболее существенное нерешённое замечание относится к публичной границе
-FTS-helper: она допускает короткий валидный фильтр, для которого trigram `MATCH`
-молча возвращает пустой результат вместо параметризованного `instr`-пути.
-Также остаются два low-severity замечания о production test hook и границе
+Остаются два low-severity замечания о production test hook и границе
 несопоставленного изменения агентской политики.
 
 ## Review target
@@ -64,8 +61,8 @@ FTS-helper: она допускает короткий валидный филь
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | свежие изолированные reviewers проверили девять delivery paths U1–U3 и два delivery paths U4 на соответствующих неизменяемых границах; для U4 установлен F5 |
-| OpenSpec conformance | Complete | полный граф артефактов и задачи 5.1–5.4 сопоставлены с обоими инкрементами в обе стороны; строгая валидация вершины U1–U3 и JSON-валидация вершины U4 успешны; выявленное несоответствие U4 отражено в F5 |
+| Independent decision review | Complete | свежие изолированные reviewers проверили девять delivery paths U1–U3 и два delivery paths U4 на соответствующих неизменяемых границах |
+| OpenSpec conformance | Complete | полный граф артефактов и задачи 5.1–5.4 сопоставлены с обоими инкрементами в обе стороны; строгая валидация вершины U1–U3 и JSON-валидация вершины U4 успешны |
 | Code quality | Complete | одиннадцать delivery paths и затронутые runtime, dependency, schema и caller boundaries проверены по correctness, readability, architecture, security и performance; verification evidence для обоих инкрементов раскрыт в Review coverage |
 
 ## Findings
@@ -86,15 +83,6 @@ FTS-helper: она допускает короткий валидный филь
 - **Required outcome:** изменение агентской политики должно получить отдельную прослеживаемую границу ревью либо явный отдельный источник намерения, не смешанный с implementation increment `manage-intentions`.
 - **Earliest source of truth:** separate change
 - **Affected artifacts:** `.apm/instructions/dart-mcp.instructions.md`; `AGENTS.md`
-- **Disposition:** Open
-
-### F5 · Medium — Применимость trigram FTS не закреплена в публичной границе
-
-- **Evidence:** `lib/src/data/local/fts_query.dart:4` принимает любой `String` и только экранирует кавычки перед созданием `Variable<String>`. Trigram FTS5 не возвращает совпадений для полнотекстового запроса короче трёх Unicode-кодовых точек, что прямо оговорено в [официальной документации SQLite](https://www.sqlite.org/fts5.html#the_trigram_tokenizer). `test/data/local/fts_consistency_test.dart:57`–`59` проверяет `к` и `ко` через отдельный приватный `_findByShortSearchKey`, а не через общую границу, выбирающую его вместо FTS-helper; все новые FTS-fixtures имеют не меньше трёх кодовых точек.
-- **Impact:** будущий repository caller может передать в экспортируемый helper валидный короткий фильтр. SQL останется безопасным, но `MATCH` молча вернёт пустую выдачу вместо буквального подстрочного совпадения; компилятор и API не обнаружат неверный выбор пути.
-- **Required outcome:** локальная поисковая граница или её типы должны гарантировать буквальную подстрочную семантику для каждого валидного фильтра, включая значения короче трёх Unicode-кодовых точек, и не позволять направить их в trigram `MATCH` только по дисциплине caller.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** задача 5.4; раздел design о буквальной FTS phrase и коротком `instr`-пути; `fts_query.dart`; `fts_consistency_test.dart`
 - **Disposition:** Open
 
 ## Review coverage
