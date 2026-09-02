@@ -1,5 +1,5 @@
 lockfile_version: '2'
-generated_at: '2026-09-02T10:26:06.484876+00:00'
+generated_at: '2026-09-02T15:55:00.068219+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: fission-ai/openspec
@@ -84,11 +84,14 @@ dependencies:
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: db649015dabfe6a422a373c19f14dcace158b3f2
+  resolved_commit: 9fc0a9a21980ca54b162da394216a1953e7b443b
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
   deployed_files:
+  - .agents/skills/change-summary
+  - .agents/skills/change-summary/SKILL.md
+  - .agents/skills/change-summary/agents/openai.yaml
   - .agents/skills/code-review-and-quality
   - .agents/skills/code-review-and-quality/SKILL.md
   - .agents/skills/discussion
@@ -134,6 +137,8 @@ dependencies:
   - .codex/agents/security-auditor.toml
   - .codex/agents/test-engineer.toml
   deployed_file_hashes:
+    .agents/skills/change-summary/SKILL.md: sha256:4ae34cafbb85451d19dc2cddeb135584fc9bfb15de33534620c2d745e1f750c1
+    .agents/skills/change-summary/agents/openai.yaml: sha256:a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94
     .agents/skills/code-review-and-quality/SKILL.md: sha256:0ff65150158adfd41844534948cbe4271e6a7a3aa463700a8d99caf550e38223
     .agents/skills/discussion/SKILL.md: sha256:e9c3423b73b4d572af3d95c8820142e18bb44e226adc92f1c297905e9835ca9a
     .agents/skills/discussion/references/document-format.md: sha256:9012f228e7a7759f14176e38b1b39946a3d810693a4a96319934b93ad71e80ac
@@ -165,8 +170,9 @@ dependencies:
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:71675b65f8d5a240d24976df62a5c3c4067b0ccfbdd1b5713b5ef26e96583f5b
+  content_hash: sha256:cece806a305948fafafee209871327ae7d44c446b62fc919bf60a80d2470ada6
   skill_subset:
+  - change-summary
   - code-review-and-quality
   - discussion
   - idea-refine
@@ -209,7 +215,7 @@ dependencies:
   - agent-skills
   constraint: 0.6.5
   resolved_tag: 0.6.5
-  resolved_at: '2026-09-02T10:25:58+00:00'
+  resolved_at: '2026-09-02T15:54:48+00:00'
 - repo_url: mattpocock/skills
   name: mattpocock-skills
   host: github.com
@@ -297,6 +303,33 @@ deployments:
   - intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams
   active_owner: intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams
   content_hash: sha256:0eaae951dd4781538f50661f0cb2fea9b5d41ffe8256809fadb19ce3adc0fc10
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/change-summary
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/change-summary/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:4ae34cafbb85451d19dc2cddeb135584fc9bfb15de33534620c2d745e1f750c1
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/change-summary/agents/openai.yaml
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/code-review-and-quality

@@ -21,6 +21,7 @@ dependencies:
         - phased-planning
         - implementation-decision-review
         - openspec-review-implementation
+        - change-summary
     - git: fission-ai/openspec
       ref: v1.10.0
       skills:
