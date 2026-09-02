@@ -1,5 +1,6 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
+import 'package:doable/src/data/local/fts_query.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,6 +57,90 @@ void main() {
       expect(await _findByLiteralFtsPhrase(database, 'молоко'), [id]);
       expect(await _findByShortSearchKey(database, 'к'), [id]);
       expect(await _findByShortSearchKey(database, 'ко'), [id]);
+    });
+
+    test('сохраняет буквальную семантику для синтаксических FTS-символов и Unicode', () async {
+      const fixtures = [
+        (
+          searchKey: 'скажи "да"',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000201',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000202',
+          interpretedSearchKey: 'скажи да',
+        ),
+        (
+          searchKey: 'чай OR кофе',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000203',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000204',
+          interpretedSearchKey: 'кофе',
+        ),
+        (
+          searchKey: 'дело AND срочно',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000205',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000206',
+          interpretedSearchKey: 'срочно дело',
+        ),
+        (
+          searchKey: 'дело NOT срочно',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000207',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000208',
+          interpretedSearchKey: 'дело важно',
+        ),
+        (
+          searchKey: 'NEAR(дело срочно)',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000209',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000210',
+          interpretedSearchKey: 'дело очень срочно',
+        ),
+        (
+          searchKey: '(дело OR срочно)',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000211',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000212',
+          interpretedSearchKey: 'срочно',
+        ),
+        (
+          searchKey: 'купить*',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000213',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000214',
+          interpretedSearchKey: 'купить молоко',
+        ),
+        (
+          searchKey: 'self-care',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000215',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000216',
+          interpretedSearchKey: 'self care',
+        ),
+        (
+          searchKey: 'сделать  дело',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000217',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000218',
+          interpretedSearchKey: 'сделать дело',
+        ),
+        (
+          searchKey: 'ёжик café',
+          literalId: '018f0b5d-6b2e-7c80-8000-000000000219',
+          interpretedId: '018f0b5d-6b2e-7c80-8000-000000000220',
+          interpretedSearchKey: 'café ёжик',
+        ),
+      ];
+
+      for (final fixture in fixtures) {
+        await _insertIntention(
+          database,
+          id: fixture.literalId,
+          title: fixture.searchKey,
+          titleSearchKey: fixture.searchKey,
+        );
+        await _insertIntention(
+          database,
+          id: fixture.interpretedId,
+          title: fixture.interpretedSearchKey,
+          titleSearchKey: fixture.interpretedSearchKey,
+        );
+
+        expect(await _findByLiteralFtsPhrase(database, fixture.searchKey), [
+          fixture.literalId,
+        ], reason: fixture.searchKey);
+      }
     });
 
     test(
@@ -136,7 +221,7 @@ Future<List<String>> _findByLiteralFtsPhrase(
       WHERE intention_titles_fts MATCH ?
       ORDER BY intentions.id ASC
     ''',
-        variables: [Variable.withString('"$searchKey"')],
+        variables: [literalFtsPhraseParameter(searchKey)],
       )
       .get();
 

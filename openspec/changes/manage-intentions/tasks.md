@@ -273,7 +273,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/migrations/migration_strategy.dart`, `lib/src/data/local/fts_integrity.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 5.4 Ввести единый helper буквальной FTS phrase для всех допустимых фильтров
+- [x] 5.4 Ввести единый helper буквальной FTS phrase для всех допустимых фильтров
   - **Критерии приёмки:**
     - Helper принимает уже проверенный search key, удваивает каждую двойную кавычку, заключает весь результат в одну FTS phrase и передаёт её только как SQL parameter; самостоятельное построение `MATCH`-выражений для пользовательского фильтра отсутствует.
     - Одинаковая буквальная substring-семантика без syntax error доказана для кавычек, `OR`/`AND`/`NOT`/`NEAR`, скобок, `*`, дефисов, внутренних пробелов и Unicode; ни один оператор не расширяет множество результатов.
