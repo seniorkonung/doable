@@ -362,7 +362,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_result.dart`, `lib/src/data/local/sqlite_failure_classifier.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `test/intention/application/intention_contract_test.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.2 Создать production `DriftIntentionRepository` и реализовать `watchById` с безопасной rehydration
+- [x] 6.2 Создать production `DriftIntentionRepository` и реализовать `watchById` с безопасной rehydration
   - **Критерии приёмки:**
     - Concrete adapter получает `AppDatabase`, `IntentionIdGenerator`, внедряемую функцию текущего UTC-времени и `DiagnosticsSink`, реализует только `IntentionRepository` без storage-specific публичных типов и восстанавливает существующую строку как `ResultSuccess<Intention>` с теми же UUID v4 либо v7, исходным пользовательским текстом, состояниями и UTC timestamps; подтверждённое отсутствие идентификатора публикуется как `ResultSuccess(null)`.
     - Неканонический или nil UUID, недопустимый текст, `updatedAt` раньше `createdAt` либо иное нарушение сохранённых предметных инвариантов возвращает `IntentionCorruptionFailure` без частично построенной модели; storage failures проходят классификацию из 6.1, а constraint или неизвестная причина на read-path возвращает `IntentionUnexpectedFailure`.
