@@ -235,7 +235,7 @@ void main() {
     );
 
     test(
-      'раскрывает SQLite BUSY чтения schema metadata из background executor',
+      'раскрывает SQLite BUSY чтения версии схемы из background executor',
       () async {
         final isolate = await DriftIsolate.spawn(
           _openBackgroundExecutorWithBusyVerificationFailure,
@@ -308,37 +308,6 @@ void main() {
         DiagnosticsFailureCode.corruption,
       );
     });
-
-    test(
-      'классифицирует повреждённую страницу sqlite_schema как corruption',
-      () async {
-        final databaseFile = await _temporaryDatabaseFile();
-        final firstBootstrap = _bootstrapFor(databaseFile);
-        expect(await firstBootstrap.open(), isA<LocalDataReady>());
-        await firstBootstrap.close();
-
-        final bytes = await databaseFile.readAsBytes();
-        bytes[100] = 0xff;
-        await databaseFile.writeAsBytes(bytes, flush: true);
-
-        final diagnosticsSink = InMemoryDiagnosticsSink();
-        _CloseTrackingExecutor? failedExecutor;
-        final bootstrap = LocalDataBootstrap(
-          executorFactory: () => failedExecutor = _CloseTrackingExecutor(
-            NativeDatabase(databaseFile),
-          ),
-          diagnosticsSink: diagnosticsSink,
-        );
-        addTearDown(bootstrap.close);
-
-        expect(await bootstrap.open(), isA<LocalDataCorruption>());
-        expect(failedExecutor!.closeCalls, 1);
-        _expectBootstrapFailureCode(
-          diagnosticsSink,
-          DiagnosticsFailureCode.corruption,
-        );
-      },
-    );
 
     test('классифицирует primary и extended коды CORRUPT и NOTADB без текста ошибки', () async {
       for (final exception in [
@@ -502,7 +471,6 @@ QueryExecutor _openBackgroundExecutorWithBusyVerificationFailure() {
         extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
         message: 'SQLite-файл повреждён',
       ),
-      query: _BoundedVerificationQuery.schemaMetadata,
     ),
   );
 }
@@ -513,16 +481,10 @@ QueryExecutor _openBackgroundExecutorWithUnexpectedVerificationFailure() {
   );
 }
 
-enum _BoundedVerificationQuery { marker, schemaMetadata }
-
 final class _BoundedVerificationFailureInterceptor extends QueryInterceptor {
-  _BoundedVerificationFailureInterceptor(
-    this._failure, {
-    this.query = _BoundedVerificationQuery.marker,
-  });
+  _BoundedVerificationFailureInterceptor(this._failure);
 
   final Object _failure;
-  final _BoundedVerificationQuery query;
 
   @override
   Future<bool> ensureOpen(QueryExecutor executor, QueryExecutorUser user) {
@@ -557,15 +519,7 @@ final class _BoundedVerificationFailureInterceptor extends QueryInterceptor {
 
   bool _isBoundedVerificationQuery(String statement) {
     final normalizedStatement = statement.trim().toUpperCase();
-    return switch (query) {
-      _BoundedVerificationQuery.marker => RegExp(
-        r'^PRAGMA USER_VERSION;?$',
-      ).hasMatch(normalizedStatement),
-      _BoundedVerificationQuery.schemaMetadata =>
-        (normalizedStatement.contains('FROM SQLITE_SCHEMA') ||
-                normalizedStatement.contains('FROM SQLITE_MASTER')) &&
-            !normalizedStatement.contains('NOT LIKE'),
-    };
+    return RegExp(r'^PRAGMA USER_VERSION;?$').hasMatch(normalizedStatement);
   }
 }
 

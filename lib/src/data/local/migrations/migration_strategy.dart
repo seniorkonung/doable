@@ -1,7 +1,6 @@
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
-import 'package:drift_dev/api/migrations_native.dart';
 
 import 'generated_schema.dart' as generated;
 
@@ -71,13 +70,6 @@ MigrationStrategy localDataMigrationStrategy(
         database,
         expectedSchemaVersion: details.versionNow,
       );
-      try {
-        await database.validateDatabaseSchema(
-          options: const ValidationOptions(validateDropped: true),
-        );
-      } on SchemaMismatch {
-        throw const CorruptLocalDataSchemaException();
-      }
       await database.customStatement('PRAGMA foreign_keys = ON');
     },
   );

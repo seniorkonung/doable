@@ -1,8 +1,10 @@
+import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
+import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -148,31 +150,77 @@ void main() {
       expect(await bootstrap.open(), isA<LocalDataReady>());
       final trace = sqlTrace.statements.join('\n').toLowerCase();
       expect(trace, contains('pragma user_version'));
-      expect(trace, contains('sqlite_master'));
       expect(trace, contains('pragma foreign_keys = on'));
+      expect(trace, isNot(contains('sqlite_schema')));
+      expect(trace, isNot(contains('sqlite_master')));
       expect(trace, isNot(contains('from intentions')));
       expect(trace, isNot(contains('from intention_titles_fts')));
       expect(trace, isNot(contains('integrity-check')));
     });
 
-    for (final scenario in _incompatibleSchemaScenarios) {
-      test('отклоняет текущую схему с ${scenario.description}', () async {
+    test(
+      'полный тестовый verifier выявляет повреждённую страницу sqlite_schema',
+      () async {
         final harness = await LocalDatabaseHarness.fileBacked();
         addTearDown(harness.dispose);
         await harness.openReadyDatabase();
         await harness.closePersistenceObjectGraph();
 
-        final rawDatabase = sqlite.sqlite3.open(harness.databaseFile.path);
-        try {
-          scenario.mutate(rawDatabase);
-        } finally {
-          rawDatabase.close();
-        }
+        final bytes = await harness.databaseFile.readAsBytes();
+        bytes[100] = 0xff;
+        await harness.databaseFile.writeAsBytes(bytes, flush: true);
         final preservedBytes = await harness.databaseFile.readAsBytes();
 
-        expect(await harness.open(), isA<LocalDataCorruption>());
+        final verifierDatabase = AppDatabase(
+          NativeDatabase(harness.databaseFile),
+        );
+        try {
+          await expectLater(
+            verifierDatabase.validateDatabaseSchema(
+              options: const ValidationOptions(validateDropped: true),
+            ),
+            throwsA(isA<sqlite.SqliteException>()),
+          );
+        } finally {
+          await verifierDatabase.close();
+        }
         expect(await harness.databaseFile.readAsBytes(), preservedBytes);
-      });
+      },
+    );
+
+    for (final scenario in _incompatibleSchemaScenarios) {
+      test(
+        'полный тестовый verifier выявляет текущую схему с ${scenario.description}',
+        () async {
+          final harness = await LocalDatabaseHarness.fileBacked();
+          addTearDown(harness.dispose);
+          await harness.openReadyDatabase();
+          await harness.closePersistenceObjectGraph();
+
+          final rawDatabase = sqlite.sqlite3.open(harness.databaseFile.path);
+          try {
+            scenario.mutate(rawDatabase);
+          } finally {
+            rawDatabase.close();
+          }
+          final preservedBytes = await harness.databaseFile.readAsBytes();
+
+          final verifierDatabase = AppDatabase(
+            NativeDatabase(harness.databaseFile),
+          );
+          try {
+            await expectLater(
+              verifierDatabase.validateDatabaseSchema(
+                options: const ValidationOptions(validateDropped: true),
+              ),
+              throwsA(isA<SchemaMismatch>()),
+            );
+          } finally {
+            await verifierDatabase.close();
+          }
+          expect(await harness.databaseFile.readAsBytes(), preservedBytes);
+        },
+      );
     }
 
     test(
