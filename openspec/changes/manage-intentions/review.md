@@ -1,17 +1,19 @@
-# OpenSpec Change Review: manage-intentions
+# Проверка OpenSpec change: manage-intentions
 
 ## Оценка
 
-**Результат:** Существенных замечаний нет
+**Результат:** Существенных замечаний нет.
 
-Текущие артефакты задают связную модель полного жизненного цикла намерения и ограниченного каталога: три охвата, буквальный фильтр по названию, точное количество совпадений, четыре временных порядка, keyset pagination и автоматическую подгрузку. Ресурсные границы прослеживаются от specs до repository и widget verification. External-content FTS теперь имеет явный hidden-rowid contract: `VACUUM` и иные нетранзакционные rowid-rewriting paths запрещены, table rebuild сохраняет rowids либо атомарно перестраивает индекс, а его реальная согласованность доказывается `integrity-check` с `rank = 1` и отрицательной fixture, а не делегируемым content-чтением.
+Артефакты теперь согласованно закрепляют четыре обязательные границы локального хранилища: атомарное первичное создание с безопасным повтором, non-retryable классификацию `CORRUPT`/`NOTADB`, буквальную семантику допустимого фильтра за FTS-границей и отсутствие полного index-aware audit при каждом обычном bootstrap. Поскольку прежняя Phase 4 уже завершена, корректирующая работа выделена в следующую Phase 5 до реализации repository adapter; checked-пакеты фаз 1–4 сохранены без изменений.
 
-**Валидация:** `openspec validate manage-intentions --type change --strict --no-interactive` прошла; OpenSpec видит все 5 из 5 schema-артефактов, 26 требований и 120 сценариев в двух delta specs. Структурная валидация не запускает будущие Drift generation/runtime, migration, negative FTS, file-backed и repository tests, не проверяет выполнение sealed page/count и Android host contracts в коде. Эти обязательства однозначно зафиксированы в design и pending-задачах, но соответствующая реализация ещё не написана и этим review не проверялась.
+Текущая реализация всё ещё должна выполнить незавершённые задачи Phase 5. Эта оценка подтверждает согласованность планирования, но не подтверждает соответствие кода и не заменяет последующую проверку реализации.
+
+**Валидация:** `openspec validate manage-intentions --type change --strict --no-interactive` успешно. В рамках этой проверки код не изменялся и implementation tests не запускались; их обязательный набор зафиксирован в Phase 5.
 
 ## Замечания
 
-Существенных замечаний в проверенных артефактах change и релевантном контексте репозитория не найдено.
+Существенных замечаний в проверенных артефактах изменения и относящемся к ним контексте репозитория не найдено.
 
-## Покрытие ревью
+## Охват проверки
 
-Проверены полный граф артефактов `proposal → specs/design → adr → tasks`, обе delta specs, schema `intent-driven`, предметный язык и пять repository-level ADR с supersession ADR-0001 → ADR-0005. Повторно прослежены capability boundaries, lifecycle точного count, sealed page contract, application/storage boundary, Drift build-time и runtime FTS5 contracts, hidden-rowid lifecycle, index-aware negative verification, migration rollback и file-backed reopening. Также проверены architecture/public interface, data/migrations, reliability/concurrency, security, performance, observability, UX и delivery применительно к change. Apply, implementation code и состояние checklist не изменялись.
+Проверены фактический граф `proposal → specs → design → adr → plan → tasks`, обе новые capability и размещение их требований, действующие ADR-0002–ADR-0005, завершённый task ledger фаз 1–4 и затронутые Dart/SQLite implementation и tests. Помимо пяти основных вопросов углублённо проверены архитектурная граница repository, данные и миграции, надёжность и failure classification, недоверенный FTS input, стоимость bootstrap, безопасная диагностика, rollback и проверяемость. Канонических specs для новых capability ещё нет; delta specs образуют их первичный поведенческий контракт.

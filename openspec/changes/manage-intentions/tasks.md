@@ -234,3 +234,66 @@
   - **Зависимости:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
+
+## Phase 5: Локальное хранилище выдерживает прерывание, повреждение и недоверенный поиск
+
+- [ ] 5.1 Сделать первичное создание schema version 1 атомарным и безопасно повторяемым после прерывания
+  - **Критерии приёмки:**
+    - Проверка пустого storage выполняется до write transaction, а создание всех schema objects, `foreign_key_check`, FTS `integrity-check` с `rank = 1` и запись `user_version = 1` завершаются внутри одной transaction.
+    - Fault injection после промежуточной DDL-операции оставляет file-backed storage без пользовательских schema objects и подтверждённого marker версии, а неготовый persistence object graph полностью закрывается.
+    - Повторный bootstrap того же файла без ручной очистки успешно создаёт целостную schema version 1 и включает `foreign_keys`.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/migrations/fault_injection_test.dart test/data/local/migrations/file_backed_migration_test.dart` с новым сценарием прерванного `onCreate` и повторного открытия.
+    - Выполнить `flutter test test/data/local/bootstrap/local_data_bootstrap_test.dart`.
+  - **Зависимости:** 4.7.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/migrations/fault_injection_test.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/support/local_database_harness.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 5.2 Классифицировать SQLite `CORRUPT` и `NOTADB` как non-retryable повреждение на bootstrap boundary
+  - **Критерии приёмки:**
+    - `SqliteException` классифицируется по первичному `resultCode`: `SQLITE_CORRUPT` и `SQLITE_NOTADB`, включая extended variants, возвращают `LocalDataCorruption` без анализа текста исключения.
+    - `BUSY`, `LOCKED`, `CANTOPEN`, `IOERR` и прочие opening failures остаются `LocalDataRetryableFailure`; оба failure path закрывают неготовый executor и записывают только allowlisted diagnostics code.
+    - File-backed fixtures произвольного non-database файла и повреждённой header/schema metadata подтверждают corruption, отсутствие ложного retry outcome и освобождение файла для последующего доступа.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/bootstrap/local_data_bootstrap_test.dart` с fixtures `NOTADB`, `CORRUPT` и временной недоступности.
+    - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Зависимости:** 4.7.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Оценка:** M (3 файла).
+
+- [ ] 5.3 Отделить ограниченную проверку обычного открытия от полного FTS audit
+  - **Критерии приёмки:**
+    - `beforeOpen` текущей схемы проверяет только marker и конечный набор обязательных schema objects, включает `foreign_keys` и не вызывает FTS `integrity-check` либо другую операцию, сканирующую пользовательские строки или весь индекс.
+    - Полный index-aware audit остаётся единым helper и обязательно выполняется до commit атомарного первичного создания и каждой миграции, затрагивающей FTS; будущий recovery/maintenance caller сможет выбрать его явно.
+    - Instrumented file-backed test с представительным набором намерений доказывает отсутствие команды `integrity-check` при обычном повторном bootstrap, а отдельный явный вызов audit по-прежнему обнаруживает рассогласованный индекс.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/bootstrap/local_data_bootstrap_test.dart test/data/local/file_backed_database_test.dart test/data/local/fts_consistency_test.dart`.
+    - Проверить SQL trace теста и убедиться, что обычное повторное открытие не содержит `integrity-check`.
+  - **Зависимости:** 5.1.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/migrations/migration_strategy.dart`, `lib/src/data/local/fts_integrity.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
+  - **Оценка:** M (4 файла).
+
+- [ ] 5.4 Ввести единый helper буквальной FTS phrase для всех допустимых фильтров
+  - **Критерии приёмки:**
+    - Helper принимает уже проверенный search key, удваивает каждую двойную кавычку, заключает весь результат в одну FTS phrase и передаёт её только как SQL parameter; самостоятельное построение `MATCH`-выражений для пользовательского фильтра отсутствует.
+    - Одинаковая буквальная substring-семантика без syntax error доказана для кавычек, `OR`/`AND`/`NOT`/`NEAR`, скобок, `*`, дефисов, внутренних пробелов и Unicode; ни один оператор не расширяет множество результатов.
+    - Ветка `instr` для search key короче трёх кодовых точек остаётся параметризованной, а будущий production repository обязан переиспользовать тот же FTS helper.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/fts_consistency_test.dart` с adversarial matrix и отдельными строками, которые совпали бы при интерпретации операторов.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 4.7.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/fts_query.dart`, `test/data/local/fts_consistency_test.dart`.
+  - **Оценка:** S (2 файла).
+
+- [ ] 5.5 Подтвердить исправленный storage contract перед реализацией repository adapter
+  - **Критерии приёмки:**
+    - Storage suite подтверждает атомарный `onCreate` и безопасный retry, раздельные corruption/retryable outcomes, ограниченный обычный bootstrap и буквальный поиск на file-backed executor.
+    - Полная текущая test suite и статический анализ проходят без регрессий, а генерация не оставляет tracked или untracked artifacts.
+    - Android debug build и строгая OpenSpec-валидация проходят на тех же артефактах, после чего Phase 6 может использовать storage foundation без обходных механизмов.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
+    - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 5.1, 5.2, 5.3, 5.4.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
