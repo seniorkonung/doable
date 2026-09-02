@@ -2,86 +2,83 @@
 
 ## Assessment
 
-**Result:** No unresolved findings
+**Result:** Changes needed
 
-Нерешённых замечаний в текущем implementation review не осталось.
+Классификация SQLite делает некоторые постоянные и повреждающие причины
+retryable, а typed Drift mapping стирает часть некорректных сохранённых значений
+до проверки предметных инвариантов. Задачи 6.1 и 6.2 пока нельзя считать
+полностью подтверждёнными текущим инкрементом.
 
 ## Review target
 
-- **Baseline:** recorded `origin/main` @ `186b8815c4d35760da05476914220ff6c09404f1`
-- **Reviewed head:** `9eb803822545536e937bae8c160afbbf2724a95d`
-- **Target commits:** 7
-- **Reviewable paths:** 14; excludes `implementation-review.md`
+- **Baseline:** configured `origin/main` @ `6b0e641c76fe0d4718514dc83b5b1f57f08f0c87`
+- **Reviewed head:** `850184990e0864a1ca3ca52554b4e9f08494719b`
+- **Target commits:** 3
+- **Reviewable paths:** 11; excludes `implementation-review.md`
 - **OpenSpec change:** `manage-intentions` (`intent-driven`)
-- **Target scope:** User-requested bounded range
-- **Baseline freshness:** Recorded local tracking state; no fetch performed
+- **Target scope:** Complete pre-push range
+- **Baseline freshness:** Local tracking state; no fetch performed
 
 ## Reviewed increment
 
-### U1 · Атомарное первичное создание локальной схемы
+### U1 · Безопасный публичный failure contract и классификация SQLite
 
-- **Work items:** 5.1
-- **Requirements and scenarios:** `Создание и версионирование локального хранилища` · `Прерывание создания нового локального хранилища`
-- **Affected boundary:** bootstrap и первичное создание постоянного локального хранилища
-- **Implementation target:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/support/local_database_harness.dart`
-- **Applicable constraints and non-goals:** подтверждение структуры, проверок целостности и marker версии должно быть атомарным; автоматическое удаление или пересоздание данных запрещено; repository, UI и синхронизация не входят в инкремент
-- **Excluded change scope:** задачи 5.4 и последующие фазы не входят в этот инкремент
+- **Work items:** 6.1
+- **Requirements and scenarios:** `Безопасное представление неизвестного отказа операции с намерением` · `Неизвестная причина отказа получения данных`, `Неизвестная причина отказа изменения`; `Безопасный bootstrap локального хранилища` · `Устранимая ошибка bootstrap`, `Неизвестная причина отказа bootstrap`, `Повреждённый SQLite-файл при bootstrap`
+- **Affected boundary:** публичный результат операций с намерениями и внутренняя классификация причин отказа локального хранилища
+- **Implementation target:** `lib/src/intention/application/intention_result.dart`, `lib/src/data/local/sqlite_failure_classifier.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `test/intention/application/intention_contract_test.dart`, `test/data/local/sqlite_failure_classifier_test.dart`
+- **Applicable constraints and non-goals:** `unexpected` должен оставаться отдельным non-retryable outcome; retry допустим только для доказанно временных причин; классификация опирается на машинные коды, а diagnostics не содержит текста, UUID, SQL, параметров или полного exception; command-specific conflict, каталог, UI и синхронизация не входят в unit
 
-### U2 · Разделение corruption и временной недоступности
+### U2 · Реактивное подробное чтение намерения из подтверждённого состояния
 
-- **Work items:** 5.2
-- **Requirements and scenarios:** `Безопасный bootstrap локального хранилища` · `Устранимая ошибка bootstrap`, `Повреждённый SQLite-файл при bootstrap`
-- **Affected boundary:** результат bootstrap, владение неготовым executor и безопасная диагностика
-- **Implementation target:** `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `pubspec.yaml`, `pubspec.lock`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`
-- **Applicable constraints and non-goals:** классификация опирается на машинный код, а не текст; диагностика не раскрывает пользовательские данные или полный exception; автоматическое destructive recovery запрещено
-
-### U3 · Ограниченная стоимость обычного bootstrap
-
-- **Work items:** 5.3
-- **Requirements and scenarios:** `Безопасный bootstrap локального хранилища` · `Обычное открытие текущей схемы не выполняет полный аудит данных`
-- **Affected boundary:** готовность текущей схемы и целостность поискового индекса
-- **Implementation target:** `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/file_backed_database_test.dart`
-- **Applicable constraints and non-goals:** обычное открытие не сканирует все записи или индекс; полный audit остаётся обязательным до commit первичного создания и затрагивающих FTS миграций; search semantics и repository не входят в инкремент
-
-### U4 · Буквальная граница FTS5 phrase для фильтра названия
-
-- **Work items:** 5.4; `openspec/changes/manage-intentions/tasks.md` отмечает задачу выполненной
-- **Requirements and scenarios:** `Фильтрация каталога по названию`; буквальная регистронезависимая подстрока, сохранение внутренних пробелов и различие Unicode-букв и диакритики
-- **Affected boundary:** внутренний ввод фильтра названия из будущего локального repository adapter в SQLite search
-- **Implementation target:** `lib/src/data/local/fts_query.dart`, `test/data/local/fts_consistency_test.dart`
-- **Applicable constraints and non-goals:** пользовательский фильтр не изменяет SQL или FTS-грамматику; ключи короче трёх Unicode-кодовых точек используют параметризованный `instr`; production repository, каталог и UI не входят в инкремент
-- **Excluded change scope:** задачи 5.5–5.7 и последующие repository/UI-фазы не проверялись
-
-## Unmapped range
-
-- **Separately scoped target paths:** `.apm/instructions/dart-mcp.instructions.md` и `AGENTS.md` изменяют инструкции агентам и не относятся к результатам U1–U4; изменение имеет отдельную прослеживаемую границу в commit `2823efefce73a2f4e4af1cfb67d0702208936975` и merge commit `3bd75a8d11037ac49c19b67e0058593b8dc96ab2`
+- **Work items:** 6.2
+- **Requirements and scenarios:** `Каталог намерений и его охват` · `Просмотр активного намерения подробно`, `Просмотр архивированного намерения подробно`; `Состояния получения данных` · `Загрузка подробных данных`, `Намерение с корректным идентификатором отсутствует`, `Ошибка получения подробных данных`, `Восстановление подробных данных после повторной попытки`; `Безопасное представление неизвестного отказа операции с намерением` · `Неизвестная причина отказа получения данных`
+- **Affected boundary:** `IntentionRepository.watchById` между постоянным состоянием намерения и доверенной предметной моделью
+- **Implementation target:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`; совместно проверенные изменённые зависимости — `lib/src/intention/application/intention_result.dart`, `lib/src/data/local/sqlite_failure_classifier.dart`, `test/intention/application/intention_contract_test.dart`, `test/data/local/sqlite_failure_classifier_test.dart`
+- **Applicable constraints and non-goals:** stream публикует только подтверждённый snapshot либо успешное отсутствие, после одного typed failure завершается, а retry создаёт новую подписку; storage-типы и пользовательские данные не пересекают публичную seam или diagnostics; каталог, commands, UI, синхронизация и владение заимствованной базой не входят в unit
+- **Excluded change scope:** задачи 6.3–6.10 остаются будущей частью Phase 6 и не являются обязательствами этого инкремента
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | свежие изолированные reviewers проверили девять delivery paths U1–U3 и два delivery paths U4 на соответствующих неизменяемых границах |
-| OpenSpec conformance | Complete | полный граф артефактов и задачи 5.1–5.4 сопоставлены с обоими инкрементами в обе стороны; строгая валидация вершины U1–U3 и JSON-валидация вершины U4 успешны |
-| Code quality | Complete | одиннадцать delivery paths и затронутые runtime, dependency, schema и caller boundaries проверены по correctness, readability, architecture, security и performance; verification evidence для обоих инкрементов раскрыт в Review coverage |
+| Independent decision review | Complete | свежий изолированный reviewer проверил оба пересекающихся unit одним объединённым target из семи delivery/test paths и неизменяемым диапазоном `6b0e641c…850184990e` |
+| OpenSpec conformance | Complete | полный граф артефактов и задачи 6.1–6.2 сопоставлены с кодом и тестами в обе стороны; JSON- и строгая OpenSpec-валидация успешны |
+| Code quality | Complete | семь delivery/test paths и неизменённые caller, schema, generated mapping, diagnostics и dependency boundaries проверены по correctness, readability, architecture, security и performance; сфокусированные тесты и анализ успешны |
 
 ## Findings
 
-Нерешённых замечаний в implementation review нет.
+### F1 · High — Широкие primary-коды ошибочно считаются доказанно временными
+
+- **Evidence:** `lib/src/data/local/sqlite_failure_classifier.dart:29-39` классифицирует целые primary-семейства `SQLITE_CANTOPEN` и `SQLITE_IOERR` как `SqliteUnavailableFailure`, не учитывая уже доступный `extendedResultCode`. `test/data/local/sqlite_failure_classifier_test.dart:31-50` явно закрепляет `SQLITE_CANTOPEN_ISDIR` как retryable, хотя этот extended-код означает попытку открыть каталог как файл. В тех же primary-семействах находятся `SQLITE_IOERR_DATA` с неверной checksum страницы и `SQLITE_IOERR_CORRUPTFS` с признаком повреждённой файловой системы; их машинная семантика описана в официальном [справочнике SQLite](https://www.sqlite.org/rescode.html). Bootstrap и detail read затем отображают такой результат в retryable `unavailable` (`lib/src/data/local/bootstrap/local_data_bootstrap.dart:104-108`, `lib/src/intention/data/drift_intention_repository.dart:117-121`).
+- **Impact:** постоянная ошибка пути или признак повреждения может получить ложный совет обычного retry и неверный diagnostics outcome; состояние данных представляется менее серьёзным и более устранимым, чем подтверждает машинный код.
+- **Required outcome:** `unavailable` должен охватывать только машинные коды с доказанно временной семантикой; постоянные, повреждающие и неизвестные extended-причины должны сохранять корректное отличие от retryable недоступности на bootstrap и repository boundaries.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** задачи 6.1 и 6.2; requirements `Безопасный bootstrap локального хранилища` и `Безопасное представление неизвестного отказа операции с намерением`; общий classifier, bootstrap mapping, detail-read mapping и их tests
+- **Disposition:** Open
+
+### F2 · Medium — Typed mapping стирает некорректные сохранённые значения до rehydration
+
+- **Evidence:** `watchById` получает уже преобразованный `local.Intention` до вызова `_rehydrate` (`lib/src/intention/data/drift_intention_repository.dart:36-39`). Generated mapper читает readiness/archive как `bool`, а timestamps как `int` (`lib/src/data/local/app_database.g.dart:210-224`). В зафиксированном Drift 2.34.3 boolean mapping превращает любое ненулевое SQLite-значение в `true`, а integer mapping преобразует `double` через `toInt`; после этого `_rehydrate` доверяет boolean-значениям и строит timestamps (`lib/src/intention/data/drift_intention_repository.dart:82-100`). Тесты намеренно отключают `CHECK` для corrupt-row fixtures, но проверяют только нарушения текста и порядка времени, которые переживают typed mapping (`test/intention/data/drift_intention_repository_watch_test.dart:168-220`).
+- **Impact:** например, сохранённое boolean-значение `2` может выйти как успешная готовность/архивность, а дробное значение timestamp — как усечённое предметное время вместо terminal `IntentionCorruptionFailure`. Публичная seam тем самым может подтвердить искажённую модель.
+- **Required outcome:** граница чтения должна проверять сохранённые представления до потери некорректных состояний при coercion и завершать подписку typed corruption для каждого выявленного нарушения; regression evidence должно покрывать lossy boolean/timestamp cases.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** задача 6.2; безопасная rehydration в design; `DriftIntentionRepository.watchById`, persistent row mapping и corrupt-row tests
+- **Disposition:** Open
 
 ## Review coverage
 
-Проверены все 14 reviewable paths объединённого диапазона: одиннадцать delivery
-paths входят в U1–U4, `tasks.md` служит planning evidence, а два agent-policy
-path раскрыты как отдельно ограниченное governance-изменение. Покрыты production paths bootstrap/migration,
-file-backed и in-memory evidence, атомарность DDL, SQLite primary/extended
-codes, Android background-isolate executor, lifecycle ресурсов, безопасная
-диагностика, FTS5 phrase escaping, SQL parameterization, trigram substring
-semantics, короткий fallback и граница будущего repository caller.
+Проверены все 11 reviewable paths диапазона: семь delivery/test paths входят в
+U1–U2, а `design.md`, `plan.md`, `review.md` и `tasks.md` классифицированы как
+planning evidence. Материальных несопоставленных путей нет. Дополнительно как
+неизменённый контекст проверены публичный `IntentionRepository`, предметные
+инварианты текста, identity и timestamps, schema/generated mapping,
+`DiagnosticsSink`, primary-key query semantics и зафиксированное поведение
+Drift/sqlite3.
 
-На вершине U1–U3 `flutter test` прошёл 79 тестов; `flutter analyze`, строгая
-OpenSpec-валидация и `git diff --check` также были успешны. На вершине U4
-целевой Flutter-тест прошёл 5 сценариев; `flutter analyze`, целевой Dart-анализ,
-`git diff --check` и OpenSpec JSON-валидация завершились без замечаний. Активного
-Flutter/DTD-приложения не обнаружено, поэтому hot reload не выполнялся. Полный
-test suite и build после U4 не запускались, поскольку они относятся к отдельной
-задаче 5.7 и выходят за запрошенный review.
+Сфокусированный запуск пяти test files прошёл 41 тест; targeted Dart analysis и
+полный `flutter analyze` завершились без ошибок. `openspec validate
+manage-intentions --json`, строгая OpenSpec-валидация и `git diff --check` также
+успешны. Полный test suite и Android build не запускались: критерии задач 6.1 и
+6.2 требуют сфокусированные тесты и анализ, а change-wide build gate относится к
+будущей задаче 6.10.
