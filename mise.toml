@@ -15,7 +15,8 @@ check = [
     "flutter test"
 ]
 codegen = [
-    "flutter gen-l10n"
+    "flutter gen-l10n",
+    "dart run build_runner build"
 ]
 setup = [
     "cp -R ~/projects/doable/apm_modules ./apm_modules/",
