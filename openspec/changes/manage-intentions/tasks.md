@@ -436,9 +436,9 @@
 
 - [ ] 6.8 Доказать полный repository lifecycle через публичную seam после повторного открытия SQLite-файла
   - **Критерии приёмки:**
-    - File-backed harness полностью закрывает первый `AppDatabase` и `DriftIntentionRepository`, создаёт новый persistence object graph на том же файле и через публичную seam восстанавливает те же UUID, исходный текст, readiness, archive state, `createdAt` и `updatedAt`.
+    - `LocalDataBootstrap` является единственным владельцем созданных им `AppDatabase` и `QueryExecutor`; `DriftIntentionRepository` заимствует `AppDatabase`, не получает `close()` и не закрывает storage. File-backed harness отменяет активные stream subscriptions, вызывает `close()` у первого bootstrap, отбрасывает первый repository adapter и создаёт новый bootstrap и repository на том же файле.
     - После повторного открытия `watchById` и `getCatalogPage` подтверждают три scope, буквальный фильтр, порядок, точный count и сохранение физического удаления; корректные сохранённые UUID v4 и UUID v7 восстанавливаются одинаково.
-    - Fixture с некорректным либо nil UUID возвращает corruption без частичной модели, неуспешные graph и executor закрываются, а storage-level harness отдельно подтверждает FTS `integrity-check` без добавления полного audit в обычный bootstrap.
+    - Новый object graph через публичную seam восстанавливает те же UUID, исходный текст, readiness, archive state, `createdAt` и `updatedAt`; fixture с некорректным либо nil UUID возвращает corruption без частичной модели. Каждый готовый graph закрывается ровно один раз через владеющий bootstrap, а частично созданный `AppDatabase` при неуспешном открытии закрывается самим bootstrap без передачи наружу; storage-level harness отдельно подтверждает FTS `integrity-check` без добавления полного audit в обычный bootstrap.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/file_backed_drift_intention_repository_test.dart` с полным create/update/readiness/archive/restore/delete/reopen lifecycle и corrupt-row fixtures.
     - Повторить `flutter test test/data/local/file_backed_database_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart` для общей storage boundary.
@@ -449,10 +449,10 @@
 - [ ] 6.9 Доказать ограниченную стоимость каталога на большой file-backed fixture
   - **Критерии приёмки:**
     - Fixture содержит не меньше 50 000 коротких активных и архивированных намерений с равными и различающимися timestamps, а все repository operations возвращают не больше настроенного `pageSize` предметных summaries независимо от точного общего count.
-    - `EXPLAIN QUERY PLAN` подтверждает использование FTS virtual table для допустимого фильтра от трёх Unicode-кодовых точек и timestamp/cursor indexes для неотфильтрованных scope/order queries; SQL не содержит `OFFSET` и не материализует description.
-    - Последовательная загрузка всех порций одной query выполняет ровно один точный `COUNT`, не повторяет или пропускает ID и не публикует служебную `pageSize + 1` sentinel row через публичную seam.
+    - `EXPLAIN QUERY PLAN` подтверждает использование FTS virtual table для допустимого фильтра от трёх Unicode-кодовых точек, намеренный `instr` scan для фильтров из одной и двух кодовых точек и timestamp/cursor indexes для неотфильтрованных scope/order queries; short-filter fixtures покрывают частое и отсутствующее совпадение, SQL не содержит `OFFSET` и не материализует description либо множество совпавших ID в Dart.
+    - После пяти прогревочных вызовов 30 последовательных первых страниц с `pageSize = 100` для каждого short-filter case измеряются отдельно от SQL trace; полный repository path с точным `COUNT` имеет 95-й процентиль не больше 100 мс в авторитетном GitHub Actions Linux CI-профиле. Каждая первая страница выполняет ровно один `COUNT` и один ограниченный `pageSize + 1` read, а последовательная загрузка всех порций одной query не повторяет `COUNT`, не пропускает и не повторяет ID и не публикует sentinel row через публичную seam.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/data/drift_intention_repository_large_fixture_test.dart` с SQL trace, query-plan assertions и полным проходом ограниченных страниц.
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_large_fixture_test.dart` с отдельными SQL trace и query-plan assertions для 1/2/3-code-point filters, warmed latency assertions для 1/2-code-point filters и полным проходом ограниченных страниц.
     - Выполнить `flutter analyze` и проверить отсутствие unbounded catalog API или предварительной материализации множества совпавших ID в Dart.
   - **Зависимости:** 6.4.
   - **Вероятно затронутые файлы:** `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/support/intention_repository_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart`.
@@ -461,7 +461,7 @@
 - [ ] 6.10 Подтвердить готовность полного постоянного lifecycle через публичную seam
   - **Критерии приёмки:**
     - Repository suite через один и тот же `IntentionRepository` contract подтверждает создание, bounded catalog, фильтр, точный count, четыре порядка, opaque continuations, подробное чтение, изменение, readiness, архивирование, восстановление, удаление, file-backed reopen, concurrent и failure paths.
-    - Публичные interface и failures не содержат Drift, SQLite, platform, transport или sync-specific types, закрытый набор исчерпывающе различает retryable `unavailable` и non-retryable `unexpected`, пользовательские данные не попадают в diagnostics, а large-fixture evidence подтверждает ограниченную стоимость каждой catalog operation.
+    - Публичные interface и failures не содержат Drift, SQLite, platform, transport, sync-specific или lifecycle types, закрытый набор исчерпывающе различает retryable `unavailable` и non-retryable `unexpected`, пользовательские данные не попадают в diagnostics, а large-fixture evidence подтверждает ограниченную materialization каждой catalog operation и утверждённый short-filter regression budget.
     - Повторная генерация не оставляет tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без storage обходов.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.

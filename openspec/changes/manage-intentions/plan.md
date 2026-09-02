@@ -90,7 +90,7 @@ File-backed migration evidence выявляет семантические ра�
 Фаза реализует и проверяет Drift adapter, mapping, cursor semantics, согласованность поиска, классификацию ошибок и безопасные диагностические события. Flutter navigation, экранное состояние и Views остаются следующей пользовательской границей.
 
 **Ready to advance:**
-Публичная seam доказывает полный постоянный lifecycle, ограниченную стоимость catalog operations, корректность concurrent и failure paths и отсутствие утечки Drift/SQLite деталей вызывающим сторонам.
+Публичная seam доказывает полный постоянный lifecycle, ограниченную materialization catalog operations, утверждённый regression budget короткого фильтра на репрезентативном объёме, корректность concurrent и failure paths и отсутствие утечки Drift/SQLite либо lifecycle деталей вызывающим сторонам.
 
 ## Phase 7: Пользователь управляет намерениями в доступном локализованном интерфейсе
 
