@@ -322,15 +322,27 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/data/local/fts_query.dart`, `test/intention/application/intention_contract_test.dart`, `test/data/local/fts_consistency_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 5.8 Подтвердить исправленный storage contract перед реализацией repository adapter
+- [ ] 5.8 Убрать тестовую точку отказа из production boundary первичного создания схемы
   - **Критерии приёмки:**
-    - Storage suite подтверждает атомарный `onCreate` и безопасный retry, раздельные corruption/retryable/unexpected/incompatible outcomes на in-process и production-подобном background executor, полную семантическую совместимость schema objects без data-dependent scan и буквальный поиск через единую local search seam на file-backed executor.
+    - `LocalDataBootstrap`, `AppDatabase` и production migration strategy не принимают и не вызывают `InitialSchemaObjectCreated`, `onInitialSchemaObjectCreated` либо другую тестовую callback-точку между DDL-операциями атомарного `onCreate`.
+    - File-backed harness оборачивает настоящий `QueryExecutor` test-only `QueryInterceptor`, который внутри migration transaction пропускает первую schema `CREATE` в SQLite и сразу после её успешного выполнения однократно выбрасывает тестовую ошибку, не добавляя test seam в `lib/`.
+    - Bootstrap преобразует эту неизвестную non-SQLite причину в `LocalDataUnexpectedFailure`, полностью закрывает неготовый persistence object graph и оставляет файл без пользовательских schema objects и с `user_version = 0`; повтор без interceptor создаёт целостную schema version 1, включает `foreign_keys` и проходит FTS `integrity-check`.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/migrations/file_backed_migration_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart`.
+    - Выполнить `rg -n "InitialSchemaObjectCreated|onInitialSchemaObjectCreated" lib test` и убедиться, что production test hook полностью удалён, затем выполнить `flutter analyze`.
+  - **Зависимости:** 5.1, 5.5.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/support/local_database_harness.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 5.9 Подтвердить исправленный storage contract перед реализацией repository adapter
+  - **Критерии приёмки:**
+    - Storage suite подтверждает атомарный `onCreate` и безопасный retry через test-only fault injection на executor boundary без production callback, раздельные corruption/retryable/unexpected/incompatible outcomes на in-process и production-подобном background executor, полную семантическую совместимость schema objects без data-dependent scan и буквальный поиск через единую local search seam на file-backed executor.
     - Полная текущая test suite и статический анализ проходят без регрессий, а генерация не оставляет tracked или untracked artifacts.
     - Измерения bootstrap пустой и представительной базы и дельта release APK зафиксированы, Android debug build и строгая OpenSpec-валидация проходят на тех же артефактах, после чего Phase 6 может использовать storage foundation без обходных механизмов.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7.
+  - **Зависимости:** 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.

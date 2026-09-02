@@ -2,10 +2,9 @@
 
 ## Assessment
 
-**Result:** Changes needed
+**Result:** No unresolved findings
 
-Остаются два low-severity замечания о production test hook и границе
-несопоставленного изменения агентской политики.
+Нерешённых замечаний в текущем implementation review не осталось.
 
 ## Review target
 
@@ -55,7 +54,7 @@
 
 ## Unmapped range
 
-- **Unmatched target paths:** `.apm/instructions/dart-mcp.instructions.md` и `AGENTS.md` изменяют инструкции агентам и не относятся к результатам U1–U4
+- **Separately scoped target paths:** `.apm/instructions/dart-mcp.instructions.md` и `AGENTS.md` изменяют инструкции агентам и не относятся к результатам U1–U4; изменение имеет отдельную прослеживаемую границу в commit `2823efefce73a2f4e4af1cfb67d0702208936975` и merge commit `3bd75a8d11037ac49c19b67e0058593b8dc96ab2`
 
 ## Pass coverage
 
@@ -67,29 +66,13 @@
 
 ## Findings
 
-### F3 · Low — Тестовая точка отказа стала частью production API и транзакции
-
-- **Evidence:** `InitialSchemaObjectCreated` проведён через конструкторы `LocalDataBootstrap` (`local_data_bootstrap.dart:11`–`30`) и `AppDatabase` (`app_database.dart:10`–`28`), а `migration_strategy.dart:40`–`43` вызывает произвольный async callback после каждого schema object внутри атомарной транзакции. В исходящем диапазоне callback используется только для `_InjectedInitialCreationFailure` в `test/data/local/migrations/file_backed_migration_test.dart:13`–`25`.
-- **Impact:** production boundary зависит от внутренней гранулярности Drift-схемы и допускает callback, способный задержать или сорвать инициализацию и выполнить внешние побочные эффекты, которые SQLite rollback не отменяет и следующая попытка повторит. Это расширение не нужно результату bootstrap и усложняет его контракт ради одного теста.
-- **Required outcome:** fault injection должна доказывать атомарность, не расширяя production bootstrap contract тестовой детализированной точкой и не допуская внешних побочных эффектов внутри migration transaction.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** задача 5.1; `app_database.dart`; `local_data_bootstrap.dart`; `migration_strategy.dart`; migration tests
-- **Disposition:** Open
-
-### F4 · Low — В диапазон включено несопоставленное изменение агентской политики
-
-- **Evidence:** `.apm/instructions/dart-mcp.instructions.md` меняет обязательный порядок инициализации Dart MCP roots, а сгенерированный `AGENTS.md` распространяет эту политику на весь репозиторий. Эти пути не реализуют и не проверяют результаты U1–U3 и не имеют соответствующего work item или requirement в `manage-intentions`.
-- **Impact:** одно исходящее изменение связывает storage remediation с независимой политикой инженерной автоматизации. Её корректность и откат нельзя обосновать артефактами выбранного OpenSpec change, а повторное ревью storage-range вынуждено нести несвязанную governance-конфигурацию.
-- **Required outcome:** изменение агентской политики должно получить отдельную прослеживаемую границу ревью либо явный отдельный источник намерения, не смешанный с implementation increment `manage-intentions`.
-- **Earliest source of truth:** separate change
-- **Affected artifacts:** `.apm/instructions/dart-mcp.instructions.md`; `AGENTS.md`
-- **Disposition:** Open
+Нерешённых замечаний в implementation review нет.
 
 ## Review coverage
 
 Проверены все 14 reviewable paths объединённого диапазона: одиннадцать delivery
 paths входят в U1–U4, `tasks.md` служит planning evidence, а два agent-policy
-path раскрыты как unmatched. Покрыты production paths bootstrap/migration,
+path раскрыты как отдельно ограниченное governance-изменение. Покрыты production paths bootstrap/migration,
 file-backed и in-memory evidence, атомарность DDL, SQLite primary/extended
 codes, Android background-isolate executor, lifecycle ресурсов, безопасная
 диагностика, FTS5 phrase escaping, SQL parameterization, trigram substring
