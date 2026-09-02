@@ -1,5 +1,5 @@
 lockfile_version: '2'
-generated_at: '2026-09-02T09:22:18.662128+00:00'
+generated_at: '2026-09-02T10:26:06.484876+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: fission-ai/openspec
@@ -84,7 +84,7 @@ dependencies:
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: 2d1c17e630bf7b88d34f6857137b95fb1cb596c2
+  resolved_commit: db649015dabfe6a422a373c19f14dcace158b3f2
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
@@ -146,15 +146,15 @@ dependencies:
     .agents/skills/implementation-decision-review/SKILL.md: sha256:ffc04efe010575750a2b20258d0ff7afabe08db8c144ce17b6608beb7c2833eb
     .agents/skills/incremental-implementation/SKILL.md: sha256:9fc3b1931a1aa6da02e51d030f872cb52771843830b375fc91e43885a73fa853
     .agents/skills/observability-and-instrumentation/SKILL.md: sha256:e4e75a3b486967db22b1446ab694b82116800cb19cc6b9387ac79a604da83bca
-    .agents/skills/openspec-review-change/SKILL.md: sha256:66cc50ab313171d75fc3793299de18f697338098dadbc5a203468945e754d200
-    .agents/skills/openspec-review-change/references/evaluation-cases.md: sha256:d052862efd8ca6894bb02cfc695b0d4fea03199ce8ca0e0b1105ab8916c3c0f3
-    .agents/skills/openspec-review-change/references/review-format.md: sha256:da84976723b0c74cff031e9bd69f4b83cc7af5018bb18d795ed42161ecf72307
+    .agents/skills/openspec-review-change/SKILL.md: sha256:9ed6737ef43b4d80f80448041a41a6a50346b58fb036a98733079c06aecd0261
+    .agents/skills/openspec-review-change/references/evaluation-cases.md: sha256:b03e6242255bde83ebfc82ea8b69a9d1c6110779f95cac87ade2b9233fc65482
+    .agents/skills/openspec-review-change/references/review-format.md: sha256:8e5fb869e8c9430f9c7be21b8a82b37aebcb313f50608bee2a88b775dd695e1d
     .agents/skills/openspec-review-change/references/review-lenses.md: sha256:bdb0d6ce2e407770f2c66119eeb8fe40ae56aa5cc3a6da11a93fed697790ddf7
-    .agents/skills/openspec-review-implementation/SKILL.md: sha256:c071a0cbfb12a22742e557219cbc3ea73f82fdb8fba3755d6b724402726402f1
-    .agents/skills/openspec-review-implementation/references/evaluation-cases.md: sha256:e5419252083e530e2e720b3c7435793d9c636f25cf506f560ca007fb77fb99f8
-    .agents/skills/openspec-review-implementation/references/remediation.md: sha256:e42bcd99f144ae7b116d21bdf805de9050f653244458c9c1fbfdb863de930e17
-    .agents/skills/openspec-review-implementation/references/review-format.md: sha256:54bb9bdf24666088f6b6515b9967fa5575e0574793908db3755073717b6c2bb8
-    .agents/skills/openspec-review-implementation/references/review-target.md: sha256:78b121390f8192ed41105b780658d0e538e36d089b1b99556b74b797d64fd45f
+    .agents/skills/openspec-review-implementation/SKILL.md: sha256:c7cb8cf31e55a20cace0b63adbfd8c051ba78bc731c056c963d6158e7a03c152
+    .agents/skills/openspec-review-implementation/references/evaluation-cases.md: sha256:dce85a59e9b9fef73880c71b6c570870cf903637dfc1e511040deb59f5e27719
+    .agents/skills/openspec-review-implementation/references/remediation.md: sha256:db87d1df507a24a909cbce1d2c01df221893a0d8fc373014c3914f8d081a0b0c
+    .agents/skills/openspec-review-implementation/references/review-format.md: sha256:5d3a2db7ce40cb8ff04f8e92df406a7701b4d8a3ba36286bac99b875384e7268
+    .agents/skills/openspec-review-implementation/references/review-target.md: sha256:b61b032186e82530f7d942f2c6bbe23356e85a4b2f133851509236921a0b9b28
     .agents/skills/openspec-review-implementation/scripts/discover-review-target.mjs: sha256:0c7ac71c54444c139978b9b7e63b93f245adf247c9c9bb845a90b3d9d121e3d6
     .agents/skills/openspec-review-implementation/tests/discover-review-target.test.mjs: sha256:0516c7f03964d27eab85d4b33411ccf91bd3d539035dfcc074456e8ed18ed818
     .agents/skills/phased-planning/SKILL.md: sha256:f6e9d5c94db8837f005182bcdc5e3d4f511bb88741cdd71829ce6aeaa0badd1c
@@ -165,7 +165,7 @@ dependencies:
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:8407577766d81276b9daf28907b6e910f472ca8deb19c5f27eb13a9b587f89e5
+  content_hash: sha256:71675b65f8d5a240d24976df62a5c3c4067b0ccfbdd1b5713b5ef26e96583f5b
   skill_subset:
   - code-review-and-quality
   - discussion
@@ -209,7 +209,7 @@ dependencies:
   - agent-skills
   constraint: 0.6.5
   resolved_tag: 0.6.5
-  resolved_at: '2026-09-02T09:22:07+00:00'
+  resolved_at: '2026-09-02T10:25:58+00:00'
 - repo_url: mattpocock/skills
   name: mattpocock-skills
   host: github.com
@@ -746,7 +746,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:66cc50ab313171d75fc3793299de18f697338098dadbc5a203468945e754d200
+  content_hash: sha256:9ed6737ef43b4d80f80448041a41a6a50346b58fb036a98733079c06aecd0261
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-change/references/evaluation-cases.md
@@ -755,7 +755,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:d052862efd8ca6894bb02cfc695b0d4fea03199ce8ca0e0b1105ab8916c3c0f3
+  content_hash: sha256:b03e6242255bde83ebfc82ea8b69a9d1c6110779f95cac87ade2b9233fc65482
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-change/references/review-format.md
@@ -764,7 +764,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:da84976723b0c74cff031e9bd69f4b83cc7af5018bb18d795ed42161ecf72307
+  content_hash: sha256:8e5fb869e8c9430f9c7be21b8a82b37aebcb313f50608bee2a88b775dd695e1d
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-change/references/review-lenses.md
@@ -791,7 +791,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:c071a0cbfb12a22742e557219cbc3ea73f82fdb8fba3755d6b724402726402f1
+  content_hash: sha256:c7cb8cf31e55a20cace0b63adbfd8c051ba78bc731c056c963d6158e7a03c152
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/references/evaluation-cases.md
@@ -800,7 +800,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:e5419252083e530e2e720b3c7435793d9c636f25cf506f560ca007fb77fb99f8
+  content_hash: sha256:dce85a59e9b9fef73880c71b6c570870cf903637dfc1e511040deb59f5e27719
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/references/remediation.md
@@ -809,7 +809,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:e42bcd99f144ae7b116d21bdf805de9050f653244458c9c1fbfdb863de930e17
+  content_hash: sha256:db87d1df507a24a909cbce1d2c01df221893a0d8fc373014c3914f8d081a0b0c
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/references/review-format.md
@@ -818,7 +818,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:54bb9bdf24666088f6b6515b9967fa5575e0574793908db3755073717b6c2bb8
+  content_hash: sha256:5d3a2db7ce40cb8ff04f8e92df406a7701b4d8a3ba36286bac99b875384e7268
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/references/review-target.md
@@ -827,7 +827,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:78b121390f8192ed41105b780658d0e538e36d089b1b99556b74b797d64fd45f
+  content_hash: sha256:b61b032186e82530f7d942f2c6bbe23356e85a4b2f133851509236921a0b9b28
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/scripts/discover-review-target.mjs
