@@ -4,18 +4,11 @@
 
 **Результат:** Требуются изменения.
 
-Phase 6 сохраняет правильную границу: production Drift adapter должен провести полный постоянный lifecycle намерения через storage-neutral `IntentionRepository`, не забирая Riverpod, navigation и пользовательские состояния из Phase 7. Задачи 6.1–6.10 в целом трассируют catalog reads, commands, file-backed persistence, атомарность, диагностику и representative-volume evidence, однако в трёх местах implementer всё ещё должен самостоятельно выбрать наблюдаемый либо архитектурный контракт.
+Phase 6 сохраняет правильную границу: production Drift adapter должен провести полный постоянный lifecycle намерения через storage-neutral `IntentionRepository`, не забирая Riverpod, navigation и пользовательские состояния из Phase 7. Задачи 6.1–6.10 в целом трассируют catalog reads, commands, file-backed persistence, атомарность, диагностику и representative-volume evidence, однако в двух местах implementer всё ещё должен самостоятельно выбрать наблюдаемый либо архитектурный контракт.
 
 **Валидация:** `openspec validate manage-intentions --type change --strict --no-interactive` успешна. Это подтверждает структуру change, но не разрешает перечисленные семантические пробелы. Аудит не проверяет ещё не существующую реализацию Phase 6 и не является разрешением на Apply.
 
 ## Замечания
-
-### F2 · Medium — `updatedAt` не определён при равном или откатившемся UTC-clock
-
-- **Доказательства:** спецификация требует сохранять «момент последнего успешного изменения» и после фактического изменения записывать новый момент (`specs/intention-management/spec.md:230-245`); этот момент является пользовательским ключом упорядочивания (`:257-283`). Design внедряет функцию текущего UTC-времени (`design.md:185-186`), но не задаёт поведение при `now <= previous.updatedAt`. Текущий `IntentionTimestamp` проверяет только `updatedAt >= createdAt` (`lib/src/intention/domain/intention.dart:17-24`), а задачи 6.5–6.6 не содержат fixtures для равного времени или отката часов.
-- **Влияние:** два фактических изменения могут получить одинаковый `updatedAt`, а после коррекции системных часов timestamp может уменьшиться. Тогда каталог «по последнему изменению» перестаёт отражать последовательность подтверждённых операций, намерение неожиданно перемещается через cursor boundary, а test author вынужден сам выбрать допустимый результат.
-- **Требуемое изменение:** определить invariant обновления времени при `now == previous.updatedAt` и `now < previous.updatedAt`, провести его через spec/design/tasks и добавить deterministic clock fixtures к 6.5, 6.6 и cursor evidence 6.4.
-- **Требуется решение:** обязан ли `updatedAt` быть строго монотонным для одного намерения; если да, какая утверждённая политика формирует следующий момент при неувеличившемся wall clock?
 
 ### F3 · Medium — Checkpoint Phase 6 не доказывает стоимость допустимого фильтра длиной 1–2 символа
 
