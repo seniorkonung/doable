@@ -5,7 +5,6 @@ import 'package:drift/drift.dart';
 import 'generated_schema.dart' as generated;
 
 typedef MigrationOperation = Future<void> Function();
-typedef InitialSchemaObjectCreated = Future<void> Function();
 
 final class IncompatibleLocalDataSchemaException extends UnsupportedError {
   IncompatibleLocalDataSchemaException({
@@ -24,7 +23,6 @@ final class CorruptLocalDataSchemaException implements Exception {
 MigrationStrategy localDataMigrationStrategy(
   GeneratedDatabase database, {
   DiagnosticsSink? diagnosticsSink,
-  InitialSchemaObjectCreated? onInitialSchemaObjectCreated,
 }) {
   return MigrationStrategy(
     onCreate: (migrator) => _recordMigration(
@@ -39,7 +37,6 @@ MigrationStrategy localDataMigrationStrategy(
           migrate: () async {
             for (final schemaObject in database.allSchemaEntities) {
               await migrator.create(schemaObject);
-              await onInitialSchemaObjectCreated?.call();
             }
           },
         );

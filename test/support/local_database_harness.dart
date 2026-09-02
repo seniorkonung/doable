@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
-import 'package:doable/src/data/local/migrations/migration_strategy.dart';
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
 import 'in_memory_diagnostics_sink.dart';
@@ -45,7 +45,7 @@ final class LocalDatabaseHarness {
 
   Future<LocalDataBootstrapResult> open({
     DatabaseSetup? setup,
-    InitialSchemaObjectCreated? onInitialSchemaObjectCreated,
+    QueryInterceptor? queryInterceptor,
   }) {
     if (_isDisposed) {
       throw StateError('Нельзя открыть уже освобождённый database harness.');
@@ -63,10 +63,12 @@ final class LocalDatabaseHarness {
             setup: setup,
           ),
         };
-        return executor;
+        return switch (queryInterceptor) {
+          null => executor,
+          final interceptor => executor.interceptWith(interceptor),
+        };
       },
       diagnosticsSink: InMemoryDiagnosticsSink(),
-      onInitialSchemaObjectCreated: onInitialSchemaObjectCreated,
     );
     _bootstrap = bootstrap;
     return bootstrap.open();

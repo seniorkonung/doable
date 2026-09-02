@@ -322,7 +322,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/data/local/fts_query.dart`, `test/intention/application/intention_contract_test.dart`, `test/data/local/fts_consistency_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 5.8 Убрать тестовую точку отказа из production boundary первичного создания схемы
+- [x] 5.8 Убрать тестовую точку отказа из production boundary первичного создания схемы
   - **Исходное состояние:** Полный `flutter test` имеет один ожидающий исправления сценарий `прерванное первичное создание не оставляет schema objects и допускает повтор`: legacy-ожидание `LocalDataRetryableFailure` уже расходится с корректной runtime-классификацией `LocalDataUnexpectedFailure`. Этот известный отказ относится к 5.8, а не к завершённой 5.6.
   - **Критерии приёмки:**
     - `LocalDataBootstrap`, `AppDatabase` и production migration strategy не принимают и не вызывают `InitialSchemaObjectCreated`, `onInitialSchemaObjectCreated` либо другую тестовую callback-точку между DDL-операциями атомарного `onCreate`.

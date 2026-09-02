@@ -13,19 +13,15 @@ void main() {
   test('прерванное первичное создание не оставляет schema objects и допускает повтор', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
-    var createdSchemaObjects = 0;
+    final failureInterceptor = _InitialSchemaCreationFailureInterceptor();
 
     final failedResult = await harness.open(
-      onInitialSchemaObjectCreated: () async {
-        createdSchemaObjects += 1;
-        if (createdSchemaObjects == 1) {
-          throw const _InjectedInitialCreationFailure();
-        }
-      },
+      queryInterceptor: failureInterceptor,
     );
 
-    expect(failedResult, isA<LocalDataRetryableFailure>());
-    expect(createdSchemaObjects, 1);
+    expect(failedResult, isA<LocalDataUnexpectedFailure>());
+    expect(failureInterceptor.didInjectFailure, isTrue);
+    expect(failureInterceptor.didCloseExecutor, isTrue);
 
     await harness.closePersistenceObjectGraph();
     await _expectStorageWithoutUserSchema(harness.databaseFile);
@@ -150,6 +146,57 @@ final class _InjectedMigrationFailure implements Exception {
 
 final class _InjectedInitialCreationFailure implements Exception {
   const _InjectedInitialCreationFailure();
+}
+
+final class _InitialSchemaCreationFailureInterceptor extends QueryInterceptor {
+  var didInjectFailure = false;
+  var didCloseExecutor = false;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutor executor, QueryExecutorUser user) {
+    return executor.ensureOpen(_InterceptedQueryExecutorUser(user, this));
+  }
+
+  @override
+  Future<void> runCustom(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) async {
+    await executor.runCustom(statement, args);
+    if (!didInjectFailure && _isSchemaCreate(statement)) {
+      didInjectFailure = true;
+      throw const _InjectedInitialCreationFailure();
+    }
+  }
+
+  @override
+  Future<void> close(QueryExecutor inner) async {
+    didCloseExecutor = true;
+    await inner.close();
+  }
+
+  bool _isSchemaCreate(String statement) {
+    return RegExp(
+      r'^CREATE (?:TABLE|VIRTUAL TABLE|INDEX|TRIGGER|VIEW)\b',
+      caseSensitive: false,
+    ).hasMatch(statement.trimLeft());
+  }
+}
+
+final class _InterceptedQueryExecutorUser implements QueryExecutorUser {
+  const _InterceptedQueryExecutorUser(this._delegate, this._interceptor);
+
+  final QueryExecutorUser _delegate;
+  final QueryInterceptor _interceptor;
+
+  @override
+  int get schemaVersion => _delegate.schemaVersion;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) {
+    return _delegate.beforeOpen(executor.interceptWith(_interceptor), details);
+  }
 }
 
 final class _SchemaInspectionExecutorUser implements QueryExecutorUser {
