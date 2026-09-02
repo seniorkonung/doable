@@ -1,9 +1,9 @@
 ### Dart and Flutter MCP
 
-Dart and Flutter MCP tools are registered for this repository. They are exposed
-as deferred `mcp__dart__*` tools through `ALL_TOOLS`, rather than the initial
-tool list. Before working on Dart or Flutter code, discover the applicable
-tools.
+When Dart and Flutter MCP is available, inspect the tools exposed by the client.
+Before the first `lsp` or other root-dependent call, use an exposed fallback
+`roots` tool (`command: add`) with the workspace's absolute `file://` URI;
+clients that supply MCP Roots automatically need no fallback.
 
 Use Dart MCP first for targeted code investigation:
 
