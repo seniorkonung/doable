@@ -506,15 +506,65 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`.
   - **Оценка:** S (2 файла).
 
-- [ ] 6.14 Подтвердить готовность Phase 6 после remediation SQLite classification и rehydration
+- [ ] 6.14 Проверить remediation SQLite classification и lossless detail rehydration
   - **Критерии приёмки:**
     - Evidence задач 6.10, 6.12 и 6.13 совместно подтверждает полный repository lifecycle, точную SQLite-классификацию и lossless detail rehydration без storage обходов публичной seam.
     - Corrupt-row matrix доказывает terminal corruption до typed coercion для недопустимых boolean/timestamp представлений, а failure matrix сохраняет утверждённое различие unavailable, corruption и unexpected на всех затронутых boundaries.
+    - Specs, design, задачи и реализация согласованно описывают эти failure и rehydration boundaries, а результаты готовы войти в финальную проверку Phase 6 без преждевременного перехода к Phase 7.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/sqlite_failure_classifier_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/intention/data/file_backed_drift_intention_repository_test.dart test/shared/diagnostics/diagnostics_sink_test.dart`.
+    - Выполнить `flutter analyze`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.10, 6.12, 6.13.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 6.15 Исключить успешный catalog snapshot при несогласованных производных storage-полях
+  - **Критерии приёмки:**
+    - Первая и последующие страницы успешно возвращают только намерения с каноническим названием и каноническим nullable-представлением описания; расхождение `title_search_key` с каноническим search key либо непустого storage-description с результатом `IntentionText.normalizeDescription` предотвращается storage-инвариантом или возвращает `IntentionCorruptionFailure` без частичной страницы, успешного count или summaries.
+    - Принадлежность текущим scope/filter и точный `totalCount` опираются на представление, согласованное с показываемым названием, поэтому повреждённый search key не создаёт ложное совпадение и не скрывает корректное, а `IntentionSummary.hasDescription` точно отражает наличие канонического описания.
+    - Проверка целостности сохраняет один SQLite snapshot первой страницы, keyset semantics продолжений, чтение не больше `pageSize + 1` строк, отсутствие `OFFSET`, полного description в summary projection и неограниченной materialization в Dart.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart test/data/local/fts_consistency_test.dart` с adversarial storage fixtures для ложноположительного и ложноотрицательного `title_search_key`, пустого и полностью пробельного ненулевого description, включая повреждённую строку за границей первой порции; каждый случай должен быть отклонён storage-инвариантом либо вернуть typed corruption до публикации страницы.
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_large_fixture_test.dart` и `flutter analyze`, подтвердив прежние ограничения SQL, materialization и regression budget после усиления integrity boundary.
+  - **Зависимости:** 6.3, 6.4.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/fts_query.dart`, `lib/src/data/local/schema/intention_schema.drift`, generated Drift/schema artifacts, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/data/local/fts_consistency_test.dart`, migration/schema tests.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 6.16 Проверить семантическую целостность catalog snapshots после remediation
+  - **Критерии приёмки:**
+    - Evidence задач 6.10, 6.14 и 6.15 совместно подтверждает точную SQLite-классификацию, lossless detail rehydration и семантически согласованные ограниченные catalog snapshots через публичную seam.
+    - Corrupt-row matrix доказывает terminal corruption до typed coercion подробных данных и отсутствие успешной страницы либо ложного count при несогласованных производных storage-полях каталога.
+    - Large-fixture evidence сохраняет утверждённые границы SQL, materialization и стоимости, а результаты готовы войти в финальную проверку Phase 6 вместе с отдельным доказательством cursor ownership.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_large_fixture_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/data/local/fts_consistency_test.dart`.
+    - Выполнить `flutter analyze`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.14, 6.15.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 6.17 Связать opaque cursor с выдавшим экземпляром `DriftIntentionRepository`
+  - **Критерии приёмки:**
+    - Каждый экземпляр adapter владеет отдельным приватным process-local owner token и включает его во все свои cursors; до storage query продолжение требует идентичности этого token и совпадения нормализованных scope/filter/order, поэтому cursor любого другого экземпляра возвращает `IntentionValidationFailure` как при общей, так и при разных `AppDatabase`.
+    - `cursor: null` всегда начинает независимую первую страницу и создаёт новый cursor текущего owner; несколько цепочек одного repository можно продолжать вперемешку, каждое продолжение переносит value boundary к последней опубликованной строке, а создание, изменение или удаление прежней boundary row сохраняет утверждённую keyset semantics.
+    - Owner token не сериализуется, не сохраняется в SQLite, не раскрывается через публичную `IntentionRepository` seam, не удерживает ссылку на database и не попадает в diagnostics; cursor другого runtime-типа, несовпадающих параметров или прежнего пересозданного repository отклоняется до SQL.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart` с двумя repository над общей и разными `AppDatabase`, cursor прежнего пересозданного repository, SQL trace отсутствия storage access при rejection, повторным `cursor: null` и чередующимися продолжениями нескольких цепочек одного owner.
+    - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` и `flutter analyze`, подтвердив неизменность публичной seam и отсутствие owner token в диагностических данных.
+  - **Зависимости:** 6.4.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Оценка:** S (3 файла).
+
+- [ ] 6.18 Подтвердить готовность Phase 6 после всех repository remediation
+  - **Критерии приёмки:**
+    - Evidence задач 6.10, 6.14, 6.16 и 6.17 совместно подтверждает полный постоянный lifecycle, точную SQLite-классификацию, lossless detail rehydration, семантически согласованные ограниченные catalog snapshots и instance-owned cursors через публичную seam.
+    - Corrupt-row matrix исключает успешную подробную модель, страницу или ложный count при несогласованных storage-представлениях, cursor matrix отклоняет provenance/parameter mismatch до SQL и сохраняет независимые цепочки одного repository, а large-fixture evidence подтверждает утверждённые границы materialization и стоимости.
     - Повторная генерация не оставляет tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без storage обходов.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.10, 6.12, 6.13.
+  - **Зависимости:** 6.16, 6.17.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
