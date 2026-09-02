@@ -285,7 +285,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/fts_query.dart`, `test/data/local/fts_consistency_test.dart`.
   - **Оценка:** S (2 файла).
 
-- [ ] 5.5 Сохранить типизированную причину SQLite-отказа через bounded verification и production background executor
+- [x] 5.5 Сохранить типизированную причину SQLite-отказа через bounded verification и production background executor
   - **Критерии приёмки:**
     - Ограниченная проверка marker и schema metadata создаёт corruption только из доказанного несовместимого состояния и сохраняет типизированную причину ошибки выполнения verification query до bootstrap boundary.
     - Bootstrap раскрывает `DriftRemoteException.remoteCause`, классифицирует `CORRUPT`/`NOTADB` как `LocalDataCorruption`, allowlisted `BUSY`/`LOCKED`/`CANTOPEN`/`IOERR` как `LocalDataRetryableFailure`, а любую неизвестную причину как отдельный non-retryable `LocalDataUnexpectedFailure` без анализа текста exception.

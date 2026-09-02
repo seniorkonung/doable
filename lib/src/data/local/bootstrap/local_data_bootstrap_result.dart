@@ -18,6 +18,10 @@ final class LocalDataCorruption extends LocalDataBootstrapResult {
   const LocalDataCorruption();
 }
 
+final class LocalDataUnexpectedFailure extends LocalDataBootstrapResult {
+  const LocalDataUnexpectedFailure();
+}
+
 final class LocalDataIncompatibleSchema extends LocalDataBootstrapResult {
   const LocalDataIncompatibleSchema({
     required this.expectedSchemaVersion,

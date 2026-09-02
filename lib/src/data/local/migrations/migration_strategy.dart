@@ -135,26 +135,20 @@ Future<void> _verifyStoredSchema(
   GeneratedDatabase database, {
   required int expectedSchemaVersion,
 }) async {
-  try {
-    final schemaVersion = await database
-        .customSelect('PRAGMA user_version')
-        .getSingle();
-    if (schemaVersion.read<int>('user_version') != expectedSchemaVersion) {
-      throw const CorruptLocalDataSchemaException();
-    }
+  final schemaVersion = await database
+      .customSelect('PRAGMA user_version')
+      .getSingle();
+  if (schemaVersion.read<int>('user_version') != expectedSchemaVersion) {
+    throw const CorruptLocalDataSchemaException();
+  }
 
-    final schemaObjects = await database.customSelect('''
+  final schemaObjects = await database.customSelect('''
           SELECT name FROM sqlite_schema
           WHERE type IN ('table', 'index', 'trigger')
         ''').get();
-    final names = schemaObjects.map((row) => row.read<String>('name')).toSet();
+  final names = schemaObjects.map((row) => row.read<String>('name')).toSet();
 
-    if (!names.containsAll(_requiredSchemaObjects)) {
-      throw const CorruptLocalDataSchemaException();
-    }
-  } on CorruptLocalDataSchemaException {
-    rethrow;
-  } on Object {
+  if (!names.containsAll(_requiredSchemaObjects)) {
     throw const CorruptLocalDataSchemaException();
   }
 }

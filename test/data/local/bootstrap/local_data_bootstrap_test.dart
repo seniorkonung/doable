@@ -4,6 +4,7 @@ import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
+import 'package:drift/isolate.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -145,31 +146,143 @@ void main() {
     );
 
     test(
-      'закрывает неготовый executor и допускает явную повторную попытку',
+      'классифицирует неизвестную причину открытия как unexpected',
       () async {
         QueryExecutor? failedExecutor;
-        var attempts = 0;
+        final diagnosticsSink = InMemoryDiagnosticsSink();
         final bootstrap = LocalDataBootstrap(
           executorFactory: () {
-            attempts += 1;
-            if (attempts == 1) {
-              return failedExecutor = NativeDatabase.memory(
-                setup: (_) => throw StateError('Недоступное хранилище'),
-              );
-            }
-            return NativeDatabase.memory();
+            return failedExecutor = NativeDatabase.memory(
+              setup: (_) => throw StateError('Недоступное хранилище'),
+            );
           },
-          diagnosticsSink: InMemoryDiagnosticsSink(),
+          diagnosticsSink: diagnosticsSink,
         );
         addTearDown(bootstrap.close);
 
-        expect(await bootstrap.open(), isA<LocalDataRetryableFailure>());
+        expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
         await expectLater(
           failedExecutor!.ensureOpen(_NoopQueryExecutorUser()),
           throwsStateError,
         );
+        _expectBootstrapFailureCode(
+          diagnosticsSink,
+          DiagnosticsFailureCode.unexpected,
+        );
+      },
+    );
 
-        expect(await bootstrap.open(), isA<LocalDataReady>());
+    test(
+      'сохраняет типизированную причину отказа bounded verification',
+      () async {
+        final scenarios = [
+          (
+            failure: SqliteException(
+              extendedResultCode: SqlError.SQLITE_NOTADB,
+              message: 'временная недоступность',
+            ),
+            expectedResult: isA<LocalDataCorruption>(),
+            expectedCode: DiagnosticsFailureCode.corruption,
+          ),
+          (
+            failure: SqliteException(
+              extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
+              message: 'SQLite-файл повреждён',
+            ),
+            expectedResult: isA<LocalDataRetryableFailure>(),
+            expectedCode: DiagnosticsFailureCode.unavailable,
+          ),
+          (
+            failure: SqliteException(
+              extendedResultCode: SqlError.SQLITE_CONSTRAINT,
+              message: 'можно повторить попытку',
+            ),
+            expectedResult: isA<LocalDataUnexpectedFailure>(),
+            expectedCode: DiagnosticsFailureCode.unexpected,
+          ),
+          (
+            failure: StateError('Неизвестная причина'),
+            expectedResult: isA<LocalDataUnexpectedFailure>(),
+            expectedCode: DiagnosticsFailureCode.unexpected,
+          ),
+        ];
+
+        for (final scenario in scenarios) {
+          final databaseFile = await _temporaryDatabaseFile();
+          final initialBootstrap = _bootstrapFor(databaseFile);
+          expect(await initialBootstrap.open(), isA<LocalDataReady>());
+          await initialBootstrap.close();
+          final preservedBytes = await databaseFile.readAsBytes();
+
+          final diagnosticsSink = InMemoryDiagnosticsSink();
+          _CloseTrackingExecutor? failedExecutor;
+          final bootstrap = LocalDataBootstrap(
+            executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+              NativeDatabase(databaseFile).interceptWith(
+                _BoundedVerificationFailureInterceptor(scenario.failure),
+              ),
+            ),
+            diagnosticsSink: diagnosticsSink,
+          );
+          addTearDown(bootstrap.close);
+
+          expect(await bootstrap.open(), scenario.expectedResult);
+          expect(await databaseFile.readAsBytes(), preservedBytes);
+          expect(failedExecutor!.closeCalls, 1);
+          _expectBootstrapFailureCode(diagnosticsSink, scenario.expectedCode);
+        }
+      },
+    );
+
+    test(
+      'раскрывает SQLite BUSY чтения schema metadata из background executor',
+      () async {
+        final isolate = await DriftIsolate.spawn(
+          _openBackgroundExecutorWithBusyVerificationFailure,
+        );
+        addTearDown(isolate.shutdownAll);
+        final connection = await isolate.connect();
+        final diagnosticsSink = InMemoryDiagnosticsSink();
+        _CloseTrackingExecutor? failedExecutor;
+        final bootstrap = LocalDataBootstrap(
+          executorFactory: () =>
+              failedExecutor = _CloseTrackingExecutor(connection.executor),
+          diagnosticsSink: diagnosticsSink,
+        );
+        addTearDown(bootstrap.close);
+
+        expect(await bootstrap.open(), isA<LocalDataRetryableFailure>());
+        expect(failedExecutor!.closeCalls, 1);
+        _expectBootstrapFailureCode(
+          diagnosticsSink,
+          DiagnosticsFailureCode.unavailable,
+        );
+      },
+    );
+
+    test(
+      'классифицирует неизвестную причину background executor как unexpected',
+      () async {
+        final isolate = await DriftIsolate.spawn(
+          _openBackgroundExecutorWithUnexpectedVerificationFailure,
+        );
+        addTearDown(isolate.shutdownAll);
+        final connection = await isolate.connect();
+        final diagnosticsSink = InMemoryDiagnosticsSink();
+        _CloseTrackingExecutor? failedExecutor;
+        final bootstrap = LocalDataBootstrap(
+          executorFactory: () =>
+              failedExecutor = _CloseTrackingExecutor(connection.executor),
+          diagnosticsSink: diagnosticsSink,
+        );
+        addTearDown(bootstrap.close);
+
+        expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
+        expect(failedExecutor!.closeCalls, 1);
+        _expectBootstrapFailureCode(
+          diagnosticsSink,
+          DiagnosticsFailureCode.unexpected,
+        );
       },
     );
 
@@ -380,6 +493,98 @@ final class _NoopQueryExecutorUser implements QueryExecutorUser {
     QueryExecutor executor,
     OpeningDetails details,
   ) async {}
+}
+
+QueryExecutor _openBackgroundExecutorWithBusyVerificationFailure() {
+  return NativeDatabase.memory().interceptWith(
+    _BoundedVerificationFailureInterceptor(
+      SqliteException(
+        extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
+        message: 'SQLite-файл повреждён',
+      ),
+      query: _BoundedVerificationQuery.schemaMetadata,
+    ),
+  );
+}
+
+QueryExecutor _openBackgroundExecutorWithUnexpectedVerificationFailure() {
+  return NativeDatabase.memory().interceptWith(
+    _BoundedVerificationFailureInterceptor(StateError('Неизвестная причина')),
+  );
+}
+
+enum _BoundedVerificationQuery { marker, schemaMetadata }
+
+final class _BoundedVerificationFailureInterceptor extends QueryInterceptor {
+  _BoundedVerificationFailureInterceptor(
+    this._failure, {
+    this.query = _BoundedVerificationQuery.marker,
+  });
+
+  final Object _failure;
+  final _BoundedVerificationQuery query;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutor executor, QueryExecutorUser user) {
+    return executor.ensureOpen(
+      _BoundedVerificationFailureQueryExecutorUser(user, this),
+    );
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    if (_isBoundedVerificationQuery(statement)) {
+      return Future.error(_failure);
+    }
+    return super.runSelect(executor, statement, args);
+  }
+
+  @override
+  Future<void> runCustom(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    if (_isBoundedVerificationQuery(statement)) {
+      return Future.error(_failure);
+    }
+    return super.runCustom(executor, statement, args);
+  }
+
+  bool _isBoundedVerificationQuery(String statement) {
+    final normalizedStatement = statement.trim().toUpperCase();
+    return switch (query) {
+      _BoundedVerificationQuery.marker => RegExp(
+        r'^PRAGMA USER_VERSION;?$',
+      ).hasMatch(normalizedStatement),
+      _BoundedVerificationQuery.schemaMetadata =>
+        normalizedStatement.contains('FROM SQLITE_SCHEMA') &&
+            !normalizedStatement.contains('NOT LIKE'),
+    };
+  }
+}
+
+final class _BoundedVerificationFailureQueryExecutorUser
+    implements QueryExecutorUser {
+  const _BoundedVerificationFailureQueryExecutorUser(
+    this._delegate,
+    this._interceptor,
+  );
+
+  final QueryExecutorUser _delegate;
+  final QueryInterceptor _interceptor;
+
+  @override
+  int get schemaVersion => _delegate.schemaVersion;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) {
+    return _delegate.beforeOpen(executor.interceptWith(_interceptor), details);
+  }
 }
 
 void _expectBootstrapFailureCode(
