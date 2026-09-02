@@ -285,15 +285,40 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/fts_query.dart`, `test/data/local/fts_consistency_test.dart`.
   - **Оценка:** S (2 файла).
 
-- [ ] 5.5 Подтвердить исправленный storage contract перед реализацией repository adapter
+- [ ] 5.5 Сохранить типизированную причину SQLite-отказа через bounded verification и production background executor
   - **Критерии приёмки:**
-    - Storage suite подтверждает атомарный `onCreate` и безопасный retry, раздельные corruption/retryable outcomes, ограниченный обычный bootstrap и буквальный поиск на file-backed executor.
+    - Ограниченная проверка marker и schema metadata создаёт corruption только из доказанного несовместимого состояния и сохраняет типизированную причину ошибки выполнения verification query до bootstrap boundary.
+    - Bootstrap раскрывает `DriftRemoteException.remoteCause`, классифицирует `CORRUPT`/`NOTADB` как `LocalDataCorruption`, allowlisted `BUSY`/`LOCKED`/`CANTOPEN`/`IOERR` как `LocalDataRetryableFailure`, а любую неизвестную причину как отдельный non-retryable `LocalDataUnexpectedFailure` без анализа текста exception.
+    - In-process и production-подобный background executor подтверждают одинаковые outcomes непосредственно во время bounded verification; каждый non-ready path закрывает executor, не изменяет хранилище и записывает только соответствующий allowlisted diagnostics code.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/bootstrap/local_data_bootstrap_test.dart test/data/local/file_backed_database_test.dart test/shared/diagnostics/diagnostics_sink_test.dart` с отказами на verification-query и background-isolate paths.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 5.2, 5.3.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/bootstrap/local_data_bootstrap_result.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 5.6 Проверять полную структуру текущей схемы при каждом production bootstrap
+  - **Критерии приёмки:**
+    - Production `beforeOpen` вызывает `validateDatabaseSchema` с `ValidationOptions(validateDropped: true)` и включённой по умолчанию проверкой column constraints; только `SchemaMismatch` преобразуется в `CorruptLocalDataSchemaException`, а ошибки чтения schema metadata или создания эталонной in-memory database сохраняют типизированную причину для политики 5.5.
+    - File-backed fixtures с текущим `user_version` и ожидаемыми именами по отдельности изменяют колонку или constraint, FTS5-конфигурацию, тело trigger, поле либо predicate index и добавляют лишний schema object; каждый несовместимый вариант возвращает `LocalDataCorruption`, закрывает executor и не изменяет файл.
+    - Instrumented fixture доказывает, что обычная проверка читает schema metadata, но не пользовательские строки и не полный FTS-индекс; повторяемые измерения на одном toolchain фиксируют длительность bootstrap пустой и представительной базы, а сопоставимые release APK builds — абсолютное и относительное изменение размера после включения verifier.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/migrations/migration_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/data/local/file_backed_database_test.dart` с матрицей несовместимых определений и SQL trace.
+    - На одном toolchain выполнить bootstrap-измерения пустой и представительной file-backed базы до и после изменения, затем для обеих ревизий выполнить `flutter build apk --release --target-platform android-arm64 --analyze-size` и зафиксировать длительности, размеры и их абсолютные и относительные дельты в Apply handoff.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 5.3, 5.5.
+  - **Вероятно затронутые файлы:** `pubspec.yaml`, `pubspec.lock`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/data/local/file_backed_database_test.dart`.
+  - **Оценка:** M (5 файлов).
+
+- [ ] 5.7 Подтвердить исправленный storage contract перед реализацией repository adapter
+  - **Критерии приёмки:**
+    - Storage suite подтверждает атомарный `onCreate` и безопасный retry, раздельные corruption/retryable/unexpected/incompatible outcomes на in-process и production-подобном background executor, полную семантическую совместимость schema objects без data-dependent scan и буквальный поиск на file-backed executor.
     - Полная текущая test suite и статический анализ проходят без регрессий, а генерация не оставляет tracked или untracked artifacts.
-    - Android debug build и строгая OpenSpec-валидация проходят на тех же артефактах, после чего Phase 6 может использовать storage foundation без обходных механизмов.
+    - Измерения bootstrap пустой и представительной базы и дельта release APK зафиксированы, Android debug build и строгая OpenSpec-валидация проходят на тех же артефактах, после чего Phase 6 может использовать storage foundation без обходных механизмов.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 5.1, 5.2, 5.3, 5.4.
+  - **Зависимости:** 5.1, 5.2, 5.3, 5.4, 5.5, 5.6.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.

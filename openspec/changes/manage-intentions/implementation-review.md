@@ -4,11 +4,11 @@
 
 **Result:** Changes needed
 
-Bootstrap не сохраняет надёжную типизированную причину отказа сквозь реальные
-executor paths и допускает хранилище по совпадению одних имён schema objects.
-Кроме того, публичная граница FTS-helper допускает короткий валидный фильтр, для
-которого trigram `MATCH` молча возвращает пустой результат вместо выбора
-параметризованного `instr`-пути.
+Наиболее существенное нерешённое замечание относится к публичной границе
+FTS-helper: она допускает короткий валидный фильтр, для которого trigram `MATCH`
+молча возвращает пустой результат вместо параметризованного `instr`-пути.
+Также остаются два low-severity замечания о production test hook и границе
+несопоставленного изменения агентской политики.
 
 ## Review target
 
@@ -54,7 +54,7 @@ executor paths и допускает хранилище по совпадени�
 - **Affected boundary:** внутренний ввод фильтра названия из будущего локального repository adapter в SQLite search
 - **Implementation target:** `lib/src/data/local/fts_query.dart`, `test/data/local/fts_consistency_test.dart`
 - **Applicable constraints and non-goals:** пользовательский фильтр не изменяет SQL или FTS-грамматику; ключи короче трёх Unicode-кодовых точек используют параметризованный `instr`; production repository, каталог и UI не входят в инкремент
-- **Excluded change scope:** задача 5.5 и последующие repository/UI-фазы не проверялись
+- **Excluded change scope:** задачи 5.5–5.7 и последующие repository/UI-фазы не проверялись
 
 ## Unmapped range
 
@@ -65,29 +65,10 @@ executor paths и допускает хранилище по совпадени�
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Complete | свежие изолированные reviewers проверили девять delivery paths U1–U3 и два delivery paths U4 на соответствующих неизменяемых границах; для U4 установлен F5 |
-| OpenSpec conformance | Complete | полный граф артефактов и задачи 5.1–5.4 сопоставлены с обоими инкрементами в обе стороны; строгая валидация вершины U1–U3 и JSON-валидация вершины U4 успешны; проблемы отражены в F1–F2 |
+| OpenSpec conformance | Complete | полный граф артефактов и задачи 5.1–5.4 сопоставлены с обоими инкрементами в обе стороны; строгая валидация вершины U1–U3 и JSON-валидация вершины U4 успешны; выявленное несоответствие U4 отражено в F5 |
 | Code quality | Complete | одиннадцать delivery paths и затронутые runtime, dependency, schema и caller boundaries проверены по correctness, readability, architecture, security и performance; verification evidence для обоих инкрементов раскрыт в Review coverage |
 
 ## Findings
-
-### F1 · High — Классификация SQLite-ошибок не работает сквозь реальные bootstrap paths
-
-- **Evidence:** в immutable head `lib/src/data/local/migrations/migration_strategy.dart:134`–`159` `_verifyStoredSchema` выполняет `PRAGMA user_version` и чтение `sqlite_schema`, после чего преобразует любой `Object`, кроме уже типизированного corruption, в `CorruptLocalDataSchemaException`. `lib/src/data/local/bootstrap/local_data_bootstrap.dart:92`–`103` перехватывает этот тип раньше общего классификатора строк `125`–`131`, поэтому исходный `SqliteException` с `BUSY`, `LOCKED` или `IOERR` до классификатора не доходит. В обратном направлении неизменённый production context `lib/src/data/local/database_connection.dart:23`–`24` использует `driftDatabase`; зафиксированный `drift_flutter` 0.3.1 создаёт background `DatabaseConnection`, а Drift 2.34.3 возвращает ошибку удалённого executor как `DriftRemoteException` с `remoteCause`. Классификатор строк `125`–`131` проверяет только непосредственный `SqliteException` и не распознаёт этот production wrapper. Тесты строк `176`–`296` используют in-process `NativeDatabase`, а retryable matrix выбрасывает исключение из `setup` до `_verifyStoredSchema`, поэтому ни verification-query path, ни production background-isolate path не покрыты.
-- **Impact:** временная блокировка или ошибка ввода-вывода при чтении marker/структуры может быть показана как повреждение без повторной попытки, а реальный `CORRUPT`/`NOTADB` из Android production executor — как временная недоступность с ложным retry. В обоих случаях caller получает противоположную recovery policy и не может надёжно защитить доступ к сохранённым данным.
-- **Required outcome:** типизированная причина должна сохраняться и единообразно классифицироваться на всём in-process и production background-isolate bootstrap path: `CORRUPT`/`NOTADB` дают corruption, доказанно временные opening/verification failures остаются retryable, а неизвестная причина получает явно определённую безопасную policy. Проверки должны воспроизводить ошибки непосредственно во время bounded schema verification и через executor того же isolate-типа, который использует production connection.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** задача 5.2; requirement `Безопасный bootstrap локального хранилища`; `local_data_bootstrap.dart`; `migration_strategy.dart`; bootstrap tests
-- **Decision needed:** определить caller-visible policy для неизвестного детерминированного отказа: отдельный non-retryable/unexpected outcome либо осознанно сохранённый catch-all retry с явным обоснованием остаточного риска
-- **Disposition:** Open
-
-### F2 · High — Проверка совместимости подтверждает имена, но не структуру схемы
-
-- **Evidence:** `lib/src/data/local/migrations/migration_strategy.dart:134`–`154` сравнивает `user_version`, затем выбирает из `sqlite_schema` только `name` для строк с типом `table`, `index` или `trigger` и применяет `containsAll`. Тип конкретного имени, SQL-определение, обязательные колонки и constraints таблицы, FTS5-конфигурация, тела triggers и поля/предикаты indexes не проверяются. Поэтому файл с marker версии 1 и теми же именами, но несовместимыми определениями проходит `beforeOpen`; `AppDatabase.open` строк `30`–`35` проверяет после этого только `foreign_keys`.
-- **Impact:** bootstrap может вернуть ready для структурно несовместимого хранилища. Последующие feature queries способны завершаться ошибками или работать против неверных constraints/triggers/indexes; в частности, повреждённая FTS-конфигурация может молча перестать поддерживать согласованность поискового индекса.
-- **Required outcome:** обычное открытие должно за время, ограниченное размером схемы, подтверждать все compatibility-critical свойства таблиц, virtual tables, triggers и indexes, не просматривая пользовательские строки и полный поисковый индекс.
-- **Earliest source of truth:** design/ADR
-- **Affected artifacts:** задача 5.3; requirement `Безопасный bootstrap локального хранилища`; `migration_strategy.dart`; file-backed bootstrap tests
-- **Disposition:** Open
 
 ### F3 · Low — Тестовая точка отказа стала частью production API и транзакции
 
@@ -132,4 +113,4 @@ OpenSpec-валидация и `git diff --check` также были успеш
 `git diff --check` и OpenSpec JSON-валидация завершились без замечаний. Активного
 Flutter/DTD-приложения не обнаружено, поэтому hot reload не выполнялся. Полный
 test suite и build после U4 не запускались, поскольку они относятся к отдельной
-задаче 5.5 и выходят за запрошенный review.
+задаче 5.7 и выходят за запрошенный review.
