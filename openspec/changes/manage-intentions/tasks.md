@@ -410,6 +410,19 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** M (5 файлов).
 
+- [ ] 6.5a Изолировать отказ diagnostics от результата command
+  - **Критерии приёмки:**
+    - `DiagnosticsSink` является best-effort/no-throw interface: production adapter перехватывает любую собственную ошибку кодирования или writer, не предпринимает рекурсивную диагностическую запись и не выпускает исключение caller.
+    - После commit `CreateIntention`, `UpdateIntention` и no-op возвращают исходный `ResultSuccess<IntentionCommandSuccess>` даже при отказе diagnostics writer; сохранённая строка, FTS-представление и следующий snapshot `watchById` соответствуют этому success без повторной command или переклассификации в failure.
+    - При storage failure отказ diagnostics writer не заменяет исходный typed `ResultFailure`, не выходит через нетипизированный Dart error channel и не изменяет последнее подтверждённое состояние.
+  - **Проверка:**
+    - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` с бросающим writer для каждого вида события и доказать no-throw поведение и отсутствие рекурсивной записи.
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/data/local/fts_consistency_test.dart` с отказом diagnostics после успешного commit и на failure path, проверяя исходный typed result и подтверждённое SQLite-состояние через публичную seam.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** 6.5.
+  - **Вероятно затронутые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
 - [ ] 6.6 Реализовать readiness, архивирование и восстановление как транзакционные state transitions
   - **Критерии приёмки:**
     - `EnableIntentionReadiness`, `DisableIntentionReadiness`, `ArchiveIntention` и `RestoreIntention` изменяют только принадлежащее command состояние, сохраняют identity, title, description и остальные flags и одинаково поддерживают допустимые изменения активных и архивированных намерений.
@@ -418,7 +431,7 @@
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart` с полной transition/no-op matrix для active/archived и ready/not-ready состояний.
     - Выполнить focused concurrent tests для одного и разных идентификаторов и проверить неизменность непредназначенных command полей.
-  - **Зависимости:** 6.5.
+  - **Зависимости:** 6.5a.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`.
   - **Оценка:** M (4 файла).
 

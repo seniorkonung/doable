@@ -2,67 +2,95 @@
 
 ## Assessment
 
-**Result:** No unresolved findings
+**Result:** Changes needed
 
-В пределах зафиксированного review target unresolved findings не остаются.
+Создание и изменение данных проведены через транзакционную repository seam. В
+текущем unresolved state остаётся принятый остаточный риск регрессии `updatedAt`
+при коррекции системных часов.
 
 ## Review target
 
-- **Baseline:** configured `origin/main` @ `db00120577a2ed96f1adc808cc5964f762cd4141`
-- **Reviewed head:** `44f77d2289bea8e869fb90fa0669801b1911342b`
-- **Target commits:** 3
+- **Baseline:** configured `origin/main` @ `b291af3ff73298416c65b50d9d2823658c2771a4`
+- **Reviewed head:** `6770f259f89973017a77cb67e91481aa8f2072b7`
+- **Target commits:** 1
 - **Reviewable paths:** 3; excludes `implementation-review.md`
 - **OpenSpec change:** `manage-intentions` (`intent-driven`)
 - **Target scope:** Complete pre-push range
 - **Baseline freshness:** Local tracking state; no fetch performed
-- **Excluded worktree state:** неподтверждённая delivery-реализация отсутствует;
-  planning remediation в `design.md` и `tasks.md` исключена из committed target
+- **Excluded worktree state:** при discovery рабочее дерево было чистым; текущая
+  planning remediation в `design.md` и `tasks.md`, а также правка этого отчёта
+  исключены из review target
 
 ## Reviewed increment
 
-### U1 · Ограниченная первая страница каталога
+### U1 · Создание и изменение данных намерения
 
-- **Work items:** 6.3
-- **Requirements and scenarios:** `Каталог намерений и его охват` · `Сводные данные намерения в каталоге`; `Фильтрация каталога по названию` · все допустимые варианты фильтра; `Ограниченная выдача и автоматическая подгрузка каталога` · `Ограниченная первая порция`; `Точное количество совпадений каталога` · `Количество больше загруженной порции`, `Количество после изменения фильтра`; `Упорядочивание каталогов намерений` · четыре порядка и детерминированный tie-breaker
-- **Affected boundary:** вызывающая сторона каталога и постоянный `IntentionRepository`
-- **Implementation target:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`
-- **Applicable constraints and non-goals:** первая порция и точный count должны принадлежать одному SQLite snapshot; чтение ограничено `pageSize + 1`, не использует offset и не материализует полный description; фильтр остаётся буквальным и параметризованным через `LocalIntentionTitleSearch`; UI, command paths, large-fixture performance budget и синхронизация не входят в unit
-
-### U2 · Opaque keyset-продолжения каталога
-
-- **Work items:** 6.4
-- **Requirements and scenarios:** `Ограниченная выдача и автоматическая подгрузка каталога` · `Последовательность порций`, `Конец выдачи`; `Упорядочивание каталогов намерений` · `Детерминированный порядок при одинаковом времени между порциями`
-- **Affected boundary:** вызывающая сторона каталога, opaque continuation state и постоянный `IntentionRepository`
-- **Implementation target:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`
-- **Applicable constraints and non-goals:** cursor связывает один логический каталог, нормализованные scope/filter/order и value boundary из выбранного UTC timestamp и `IntentionId`; continuation не повторяет count, не зависит от существования boundary row и отклоняет чужой или несовместимый cursor до storage query; UI-prefetch, согласование command results, command paths и performance qualification не входят в unit
-- **Excluded change scope:** задачи 6.5–6.18 остаются будущей частью Phase 6 и не являются обязательствами этого инкремента
+- **Work items:** 6.5
+- **Requirements and scenarios:** `Создание намерения` · минимальные данные,
+  одинаковые названия и независимая идентичность; `Название намерения` и
+  `Описание намерения` · нормализация, сохранение исходного непустого описания и
+  Unicode-границы; `Время создания и обновления намерения` · равные timestamps
+  при создании, фактическое изменение, no-op и неуспешная операция; `Изменение
+  намерения` · active и archived; применимые сценарии `Целостности при ошибках
+  записи` и безопасного typed failure
+- **Affected boundary:** прикладной caller `IntentionRepository.execute`,
+  подтверждённое локальное SQLite-состояние и наблюдающие его readers
+- **Implementation target:** `lib/src/intention/data/drift_intention_repository.dart`,
+  `test/intention/data/drift_intention_repository_command_test.dart`
+- **Applicable constraints and non-goals:** публичная seam остаётся storage-neutral;
+  command применяется целиком либо не применяется, success соответствует commit,
+  пользовательский текст и UUID не попадают в diagnostics; readiness-переходы,
+  архивирование/восстановление, удаление, file-backed reopen, UI и синхронизация
+  не входят в unit
+- **Excluded change scope:** задачи 6.6–6.18 остаются будущей частью Phase 6 и не
+  являются обязательствами этого инкремента
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | свежий изолированный reviewer проверил U1 и U2 одним overlap-target из двух delivery/test paths в диапазоне `db001205…4853c223`; следующий commit `44f77d2` изменяет только исключённый review report и не добавляет reviewable content; planning-артефакты и прежний отчёт reviewer не раскрывались |
-| OpenSpec conformance | Complete | полный граф артефактов и задачи 6.3–6.4 сопоставлены с delivery-кодом и тестами в обе стороны; targeted и полная test suite, Dart analysis и JSON-валидация OpenSpec успешны |
-| Code quality | Complete | полный delivery-path subset и неизменённые repository contract, domain identity/order, schema, FTS, diagnostics и SQLite boundaries проверены по correctness, readability, architecture, security, performance и evidence |
+| Independent decision review | Complete | свежий изолированный reviewer проверил точный delivery/test target `b291af3…6770f25`; planning-артефакты, commit history и прежний отчёт ему не раскрывались |
+| OpenSpec conformance | Complete | полный граф proposal/specs/design/ADR/plan/tasks сопоставлен с задачей 6.5 и immutable diff; `openspec validate manage-intentions --json` и strict-валидация успешны |
+| Code quality | Complete | delivery-path subset и неизменённые contract, domain timestamp/text, schema, FTS, diagnostics и SQLite failure boundaries проверены по correctness, readability, architecture, security, performance и evidence |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F2 · Medium — Изменённые данные могут получить равный или меньший `updatedAt`
+
+- **Evidence:** при фактическом изменении `_updateIntention` присваивает
+  `updatedAt` непосредственно из `_now()`
+  (`lib/src/intention/data/drift_intention_repository.dart:204-227`). Domain
+  проверяет только `updatedAt >= createdAt`, но не сравнивает новое значение с
+  прежним `updatedAt` (`lib/src/intention/domain/intention.dart:17-25,53-56`).
+  Поэтому равное прежнему время допускает изменение данных без изменения marker,
+  а wall-clock между `createdAt` и прежним `updatedAt` регрессирует marker. Design
+  явно фиксирует это как принятый остаточный риск.
+- **Impact:** каталог по времени изменения может переместить только что изменённое
+  намерение назад или не различить новое состояние по времени; значение раньше
+  `createdAt` превращает допустимое изменение в unexpected failure.
+- **Required outcome:** семантика времени последнего изменения должна оставаться
+  согласованной между requirements, design, implementation и catalog ordering;
+  фактическое изменение должно иметь однозначно определённое поведение при равном
+  или откатившемся wall-clock.
+- **Earliest source of truth:** requirement/proposal
+- **Affected artifacts:** requirement `Время создания и обновления намерения`,
+  design § 2 и его residual-risk section, задача 6.5, domain timestamp и command
+  implementation/tests
+- **Disposition:** Accepted risk
 
 ## Review coverage
 
-Все три reviewable path классифицированы: два delivery/test path образуют
-пересекающиеся U1–U2, а `openspec/changes/manage-intentions/tasks.md` является
-planning evidence; материальных несопоставленных путей нет. Проверены первая read
-transaction, общий predicate count/rows, три scope, четыре порядка, компактная
-summary projection, короткая и FTS-ветви, SQL limits, keyset predicates,
-cursor provenance/mismatch, удалённая boundary row, typed failures и безопасные
+Все reviewable paths классифицированы: repository и command test образуют U1,
+`openspec/changes/manage-intentions/tasks.md` является planning evidence;
+материальных несопоставленных путей нет. Проверены validation до генерации и
+записи, duplicate title и primary-key collision, active/archived update, no-op,
+UTC conversion, сохранение непричастных полей, синхронизация search key,
+transaction/observer boundary, typed failure classification и безопасные поля
 diagnostics.
 
-`flutter test test/intention/data/drift_intention_catalog_test.dart
-test/data/local/fts_consistency_test.dart` прошёл 12 тестов; полный `flutter test`
-прошёл 107 тестов. Targeted Dart analysis и полный `flutter analyze` завершились
-без ошибок. `openspec validate manage-intentions --json` и `git diff --check`
-успешны. Android build не запускался: задачи 6.3–6.4 не меняют platform delivery
-и требуют repository/FTS tests, а change-wide build gate относится к будущей
-проверочной задаче.
+Целевой запуск command/watch/FTS прошёл 21 тест, полный `flutter test` — 116
+тестов. Targeted Dart MCP analysis и полный `flutter analyze` завершились без
+ошибок; обычная JSON- и strict OpenSpec-валидация успешны, `git diff --check`
+для immutable range чист. Android build не запускался: задача 6.5 не меняет
+platform delivery и предписывает repository/FTS verification; change-wide build
+gate относится к будущей проверочной задаче.
