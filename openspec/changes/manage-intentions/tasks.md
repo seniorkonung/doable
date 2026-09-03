@@ -531,7 +531,20 @@
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 6.13 Исключить lossy typed coercion до rehydration подробных данных намерения
+- [ ] 6.13 Сделать timestamps намерения устойчивыми к переводу системных часов без синтетической монотонности
+  - **Критерии приёмки:**
+    - Действующий контракт отменяет только исторические timestamp-order критерии выполненных задач 2.4, 4.2 и 6.2: `Intention`, `IntentionSummary` и schema version 1 принимают каждую представимую пару UTC timestamps без ограничения `updatedAt >= createdAt`, а обратный порядок корректно представимых значений сам по себе не классифицируется как corruption.
+    - Создание сохраняет одно показание системных часов в `createdAt` и `updatedAt`, а фактическое изменение данных, готовности к действию или архивного состояния атомарно сохраняет точное текущее показание в `updatedAt` и завершается успешно даже при равном или более раннем значении; no-op не вызывает clock, не пишет данные и сохраняет оба timestamp.
+    - Каталог и opaque cursor упорядочивают намерения по сохранённому timestamp с `IntentionId` как tie-breaker без логического счётчика, искусственного продвижения или нормализации времени; исходная и generated schema, snapshot, domain/repository contracts и тесты остаются взаимно согласованными.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/domain/intention_test.dart test/intention/application/intention_contract_test.dart test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/intention/data/drift_intention_catalog_test.dart` с равным прежнему `updatedAt`, откатом раньше прежнего `updatedAt` и раньше `createdAt`, а также no-op cases.
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`, затем `flutter test test/data/local/app_database_schema_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart` и подтвердить согласованность schema version 1 и snapshot без timestamp-order `CHECK`.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.10, 6.12.
+  - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention.dart`, `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/schema/intention_schema.drift`, generated Drift/schema artifacts, domain/application/repository/schema/migration tests.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 6.14 Исключить lossy typed coercion до rehydration подробных данных намерения
   - **Критерии приёмки:**
     - `watchById` получает исходные значения строки до generated Drift mapping и принимает только `String`/допустимый `null` для текстовых полей, целые `0` или `1` для readiness и archive state и целые микросекунды для обоих timestamps; storage-specific представление не пересекает публичную seam.
     - `REAL`, `BLOB`, посторонний Dart-тип, `null` в обязательном поле, boolean-значение вне `0`/`1` или timestamp вне поддерживаемого диапазона `DateTime` завершают подписку одним `IntentionCorruptionFailure` без успешного либо частично построенного намерения, тогда как корректные UUID v4/v7, текст, состояния и представимые UTC timestamps восстанавливаются без изменения независимо от взаимного порядка `createdAt` и `updatedAt`.
@@ -539,24 +552,24 @@
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_repository_watch_test.dart` с raw corrupt-row fixtures для boolean `2`/`-1`, дробных timestamps, значений вне диапазона `DateTime` и посторонних storage classes, а также с корректной строкой `updatedAt < createdAt` и прежней success/failure-then-done matrix.
     - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` и `flutter analyze`.
-  - **Зависимости:** 6.2.
+  - **Зависимости:** 6.13.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`.
   - **Оценка:** S (2 файла).
 
-- [ ] 6.14 Проверить remediation SQLite classification и lossless detail rehydration
+- [ ] 6.15 Проверить SQLite classification, timestamp contract и lossless detail rehydration
   - **Критерии приёмки:**
-    - Evidence задач 6.10, 6.12 и 6.13 совместно подтверждает полный repository lifecycle, точную SQLite-классификацию и lossless detail rehydration без storage обходов публичной seam.
-    - Corrupt-row matrix доказывает terminal corruption до typed coercion для недопустимых boolean/timestamp представлений, а failure matrix сохраняет утверждённое различие unavailable, corruption и unexpected на всех затронутых boundaries.
-    - Specs, design, задачи и реализация согласованно описывают эти failure и rehydration boundaries, а результаты готовы войти в финальную проверку Phase 6 без преждевременного перехода к Phase 7.
+    - Evidence задач 6.10, 6.12, 6.13 и 6.14 совместно подтверждает полный repository lifecycle, точную SQLite-классификацию, устойчивый к переводу системных часов timestamp contract и lossless detail rehydration без storage обходов публичной seam.
+    - Corrupt-row matrix доказывает terminal corruption до typed coercion для недопустимых boolean/timestamp представлений и отличает их от допустимого обратного порядка timestamps, а failure matrix сохраняет утверждённое различие unavailable, corruption и unexpected на всех затронутых boundaries.
+    - Specs, design, задачи и реализация согласованно описывают timestamp, failure и rehydration boundaries, а результаты готовы войти в следующие repository remediation без преждевременного перехода к Phase 7.
   - **Проверка:**
-    - Выполнить `flutter test test/data/local/sqlite_failure_classifier_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/intention/data/file_backed_drift_intention_repository_test.dart test/shared/diagnostics/diagnostics_sink_test.dart`.
+    - Выполнить `flutter test test/intention/domain/intention_test.dart test/intention/application/intention_contract_test.dart test/data/local/app_database_schema_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart test/data/local/sqlite_failure_classifier_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/intention/data/file_backed_drift_intention_repository_test.dart test/shared/diagnostics/diagnostics_sink_test.dart`.
     - Выполнить `flutter analyze`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.10, 6.12, 6.13.
+  - **Зависимости:** 6.10, 6.12, 6.13, 6.14.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 6.15 Исключить успешный catalog snapshot при несогласованных производных storage-полях
+- [ ] 6.16 Исключить успешный catalog snapshot при несогласованных производных storage-полях
   - **Критерии приёмки:**
     - Первая и последующие страницы успешно возвращают только намерения с каноническим названием и каноническим nullable-представлением описания; расхождение `title_search_key` с каноническим search key либо непустого storage-description с результатом `IntentionText.normalizeDescription` предотвращается storage-инвариантом или возвращает `IntentionCorruptionFailure` без частичной страницы, успешного count или summaries.
     - Принадлежность текущим scope/filter и точный `totalCount` опираются на представление, согласованное с показываемым названием, поэтому повреждённый search key не создаёт ложное совпадение и не скрывает корректное, а `IntentionSummary.hasDescription` точно отражает наличие канонического описания.
@@ -564,24 +577,24 @@
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart test/data/local/fts_consistency_test.dart` с adversarial storage fixtures для ложноположительного и ложноотрицательного `title_search_key`, пустого и полностью пробельного ненулевого description, включая повреждённую строку за границей первой порции; каждый случай должен быть отклонён storage-инвариантом либо вернуть typed corruption до публикации страницы.
     - Выполнить `flutter test test/intention/data/drift_intention_repository_large_fixture_test.dart` и `flutter analyze`, подтвердив прежние ограничения SQL, materialization и regression budget после усиления integrity boundary.
-  - **Зависимости:** 6.3, 6.4.
+  - **Зависимости:** 6.3, 6.4, 6.15.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/fts_query.dart`, `lib/src/data/local/schema/intention_schema.drift`, generated Drift/schema artifacts, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/data/local/fts_consistency_test.dart`, migration/schema tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.16 Проверить семантическую целостность catalog snapshots после remediation
+- [ ] 6.17 Проверить семантическую целостность catalog snapshots после remediation
   - **Критерии приёмки:**
-    - Evidence задач 6.10, 6.14 и 6.15 совместно подтверждает точную SQLite-классификацию, lossless detail rehydration и семантически согласованные ограниченные catalog snapshots через публичную seam.
+    - Evidence задач 6.10, 6.15 и 6.16 совместно подтверждает точную SQLite-классификацию, timestamp contract, lossless detail rehydration и семантически согласованные ограниченные catalog snapshots через публичную seam.
     - Corrupt-row matrix доказывает terminal corruption до typed coercion подробных данных и отсутствие успешной страницы либо ложного count при несогласованных производных storage-полях каталога.
     - Large-fixture evidence сохраняет утверждённые границы SQL, materialization и стоимости, а результаты готовы войти в финальную проверку Phase 6 вместе с отдельным доказательством cursor ownership.
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_large_fixture_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/data/local/fts_consistency_test.dart`.
     - Выполнить `flutter analyze`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.14, 6.15.
+  - **Зависимости:** 6.15, 6.16.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 6.17 Связать opaque cursor с выдавшим экземпляром `DriftIntentionRepository`
+- [ ] 6.18 Связать opaque cursor с выдавшим экземпляром `DriftIntentionRepository`
   - **Критерии приёмки:**
     - Каждый экземпляр adapter владеет отдельным приватным process-local owner token и включает его во все свои cursors; до storage query продолжение требует идентичности этого token и совпадения нормализованных scope/filter/order, поэтому cursor любого другого экземпляра возвращает `IntentionValidationFailure` как при общей, так и при разных `AppDatabase`.
     - `cursor: null` всегда начинает независимую первую страницу и создаёт новый cursor текущего owner; несколько цепочек одного repository можно продолжать вперемешку, каждое продолжение переносит value boundary к последней опубликованной строке, а создание, изменение или удаление прежней boundary row сохраняет утверждённую keyset semantics.
@@ -589,38 +602,25 @@
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart` с двумя repository над общей и разными `AppDatabase`, cursor прежнего пересозданного repository, SQL trace отсутствия storage access при rejection, повторным `cursor: null` и чередующимися продолжениями нескольких цепочек одного owner.
     - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` и `flutter analyze`, подтвердив неизменность публичной seam и отсутствие owner token в диагностических данных.
-  - **Зависимости:** 6.4.
+  - **Зависимости:** 6.4, 6.17.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** S (3 файла).
 
-- [ ] 6.18 Проверить остальные repository remediation перед реализацией нового timestamp contract
+- [ ] 6.19 Проверить все repository remediation перед финальным checkpoint Phase 6
   - **Критерии приёмки:**
-    - Evidence задач 6.10, 6.14, 6.16 и 6.17 совместно подтверждает полный постоянный lifecycle, точную SQLite-классификацию, lossless detail rehydration, семантически согласованные ограниченные catalog snapshots и instance-owned cursors через публичную seam.
-    - Corrupt-row matrix исключает успешную подробную модель, страницу или ложный count при несогласованных storage-представлениях, cursor matrix отклоняет provenance/parameter mismatch до SQL и сохраняет независимые цепочки одного repository, а large-fixture evidence подтверждает утверждённые границы materialization и стоимости.
-    - Сфокусированные repository tests, статический анализ и строгая OpenSpec-валидация проходят до реализации нового timestamp contract, чтобы последующая corrective-задача имела явную regression baseline.
+    - Evidence задач 6.10, 6.15, 6.17 и 6.18 совместно подтверждает полный постоянный lifecycle, точную SQLite-классификацию, устойчивый timestamp contract, lossless detail rehydration, семантически согласованные ограниченные catalog snapshots и instance-owned cursors через публичную seam.
+    - Corrupt-row matrix отличает недопустимые storage-представления от допустимого обратного порядка timestamps, catalog matrix исключает успешную страницу и ложный count при несогласованных производных полях, а cursor matrix отклоняет provenance/parameter mismatch до SQL и сохраняет независимые цепочки одного repository.
+    - Сфокусированные domain, application, repository и storage tests, статический анализ и строгая OpenSpec-валидация проходят, а large-fixture evidence сохраняет утверждённые границы materialization и стоимости.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/data test/data/local test/shared/diagnostics` и `flutter analyze`.
+    - Выполнить `flutter test test/intention/domain test/intention/application test/intention/data test/data/local test/shared/diagnostics` и `flutter analyze`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.16, 6.17.
+  - **Зависимости:** 6.15, 6.17, 6.18.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 6.19 Сделать timestamps намерения устойчивыми к переводу системных часов без синтетической монотонности
-  - **Критерии приёмки:**
-    - Действующий контракт отменяет только исторические timestamp-order критерии выполненных задач 2.4, 4.2 и 6.2: `Intention`, `IntentionSummary` и schema version 1 принимают каждую представимую пару UTC timestamps без ограничения `updatedAt >= createdAt`; rehydration продолжает отклонять недопустимые storage-типы и значения вне диапазона `DateTime`, но не классифицирует обратный порядок времени как corruption.
-    - Создание сохраняет одно показание системных часов в `createdAt` и `updatedAt`, а фактическое изменение данных, готовности к действию или архивного состояния атомарно сохраняет точное текущее показание в `updatedAt` и завершается успешно даже при равном или более раннем значении; no-op не вызывает clock, не пишет данные и сохраняет оба timestamp.
-    - Каталог и opaque cursor упорядочивают намерения по сохранённому timestamp с `IntentionId` как tie-breaker без логического счётчика, искусственного продвижения или нормализации времени; исходная и generated schema, snapshot, domain/repository contracts и тесты остаются взаимно согласованными.
-  - **Проверка:**
-    - Выполнить `flutter test test/intention/domain/intention_test.dart test/intention/application/intention_contract_test.dart test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/intention/data/drift_intention_catalog_test.dart` с равным прежнему `updatedAt`, откатом раньше прежнего `updatedAt` и раньше `createdAt`, а также no-op cases.
-    - Выполнить `dart run build_runner build --delete-conflicting-outputs`, затем `flutter test test/data/local/app_database_schema_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart` и подтвердить согласованность schema version 1 и snapshot без timestamp-order `CHECK`.
-    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.18.
-  - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention.dart`, `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/schema/intention_schema.drift`, generated Drift/schema artifacts, domain/application/repository/schema/migration tests.
-  - **Оценка:** M (до 5 файлов или групп артефактов).
-
 - [ ] 6.20 Подтвердить готовность Phase 6 после всех repository remediation
   - **Критерии приёмки:**
-    - Evidence задач 6.18 и 6.19 совместно подтверждает полный постоянный lifecycle, точную SQLite-классификацию, lossless rehydration, семантически согласованные ограниченные catalog snapshots, instance-owned cursors и успешные изменения при равных или убывающих показаниях системных часов через публичную seam.
+    - Evidence задачи 6.19 подтверждает полный постоянный lifecycle, точную SQLite-классификацию, lossless rehydration, семантически согласованные ограниченные catalog snapshots, instance-owned cursors и успешные изменения при равных или убывающих показаниях системных часов через публичную seam.
     - Corrupt-row matrix отличает недопустимое storage-представление timestamp от допустимого обратного порядка времени, clock matrix сохраняет атомарность фактических изменений и отсутствие записи для no-op, а catalog evidence подтверждает порядок по сохранённым значениям с `IntentionId` как tie-breaker.
     - Повторная генерация не оставляет незапланированных tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без storage обходов.
   - **Проверка:**
