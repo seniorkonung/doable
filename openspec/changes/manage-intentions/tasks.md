@@ -495,7 +495,7 @@
   - **Вероятно затронутые файлы:** `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `dart_test.yaml`, `mise.toml`.
   - **Оценка:** XS (3 файла).
 
-- [ ] 6.10 Проверить полный постоянный lifecycle через публичную seam
+- [x] 6.10 Проверить полный постоянный lifecycle через публичную seam
   - **Критерии приёмки:**
     - Repository suite через один и тот же `IntentionRepository` contract подтверждает создание, bounded catalog, фильтр, точный count, четыре порядка, opaque continuations, подробное чтение, изменение, readiness, архивирование, восстановление, удаление, file-backed reopen, concurrent и failure paths.
     - Публичные interface и failures не содержат Drift, SQLite, platform, transport, sync-specific или lifecycle types, закрытый набор исчерпывающе различает retryable `unavailable` и non-retryable `unexpected`, пользовательские данные не попадают в diagnostics, а large-fixture evidence подтверждает ограниченную materialization каждой catalog operation и утверждённый short-filter regression budget.
