@@ -189,6 +189,15 @@ void main() {
             createdAt: DateTime.utc(2026, 9, 2, 10),
             updatedAt: DateTime.utc(2026, 9, 2, 12),
           ),
+          (
+            id: _id('018f0b5d-6b2e-7c80-8000-000000000305'),
+            title: 'Показание после перевода часов',
+            description: null,
+            readiness: IntentionReadiness.notReady,
+            archiveState: IntentionArchiveState.active,
+            createdAt: DateTime.utc(2026, 9, 2, 12),
+            updatedAt: DateTime.utc(2026, 9, 2, 11),
+          ),
         ];
 
         for (final fixture in fixtures) {
@@ -242,13 +251,6 @@ void main() {
             title: List.filled(256, 'a').join(),
             description: null,
             createdAt: DateTime.utc(2026, 9, 2, 10),
-            updatedAt: DateTime.utc(2026, 9, 2, 10),
-          ),
-          (
-            id: _id('018f0b5d-6b2e-7c80-8000-000000000304'),
-            title: 'Нарушенный порядок времени',
-            description: null,
-            createdAt: DateTime.utc(2026, 9, 2, 11),
             updatedAt: DateTime.utc(2026, 9, 2, 10),
           ),
         ];

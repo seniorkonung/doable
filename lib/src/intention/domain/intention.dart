@@ -5,24 +5,10 @@ enum IntentionReadiness { notReady, ready }
 
 enum IntentionArchiveState { active, archived }
 
-final class IntentionTimestampOrderException implements Exception {
-  const IntentionTimestampOrderException();
-}
-
 final class IntentionTimestamp {
   IntentionTimestamp(DateTime value) : value = value.toUtc();
 
   final DateTime value;
-
-  static IntentionTimestamp requireValidUpdate({
-    required IntentionTimestamp createdAt,
-    required IntentionTimestamp updatedAt,
-  }) {
-    if (updatedAt.value.isBefore(createdAt.value)) {
-      throw const IntentionTimestampOrderException();
-    }
-    return updatedAt;
-  }
 
   @override
   bool operator ==(Object other) =>
@@ -50,10 +36,7 @@ final class Intention {
     readiness: readiness,
     archiveState: archiveState,
     createdAt: createdAt,
-    updatedAt: IntentionTimestamp.requireValidUpdate(
-      createdAt: createdAt,
-      updatedAt: updatedAt,
-    ),
+    updatedAt: updatedAt,
   );
 
   const Intention._({

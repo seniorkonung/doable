@@ -57,19 +57,28 @@ void main() {
       expect(rows[1].read<int>('updated_at'), 3000000);
     });
 
-    test('отклоняет неполную строку, недопустимые boolean и обратный порядок времени', () async {
-      await expectLater(
-        _insertIntention(
-          database,
-          id: '018f0b5d-6b2e-7c80-8000-000000000003',
-          title: 'Пустое описание не равно пустому названию',
-          titleSearchKey: 'пустое описание не равно пустому названию',
-          description: null,
-          createdAt: 1000000,
-          updatedAt: 999999,
-        ),
-        throwsA(isA<Exception>()),
+    test('принимает обратный порядок корректных timestamps', () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000003',
+        title: 'Показание после перевода часов',
+        titleSearchKey: 'показание после перевода часов',
+        description: null,
+        createdAt: 1000000,
+        updatedAt: 999999,
       );
+
+      final row =
+          await (database.select(database.intentions)..where(
+                (row) => row.id.equals('018f0b5d-6b2e-7c80-8000-000000000003'),
+              ))
+              .getSingle();
+
+      expect(row.createdAt, 1000000);
+      expect(row.updatedAt, 999999);
+    });
+
+    test('отклоняет неполную строку и недопустимые boolean', () async {
       await expectLater(
         database.customStatement(
           '''

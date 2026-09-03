@@ -273,6 +273,58 @@ void main() {
   });
 
   test(
+    'упорядочивает сохранённые убывающие timestamps с tie-breaker по ID',
+    () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000121',
+        title: 'Первое',
+        createdAt: DateTime.utc(2026, 9, 3, 12),
+        updatedAt: DateTime.utc(2026, 9, 3, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000122',
+        title: 'Второе',
+        createdAt: DateTime.utc(2026, 9, 3, 11),
+        updatedAt: DateTime.utc(2026, 9, 3, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000123',
+        title: 'Третье',
+        createdAt: DateTime.utc(2026, 9, 3, 10),
+        updatedAt: DateTime.utc(2026, 9, 3, 9),
+      );
+
+      final page = _firstPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: const IntentionCatalogOrder(
+              field: IntentionCatalogSortField.updatedAt,
+              direction: IntentionCatalogSortDirection.descending,
+            ),
+            pageSize: 3,
+          ),
+        ),
+      );
+
+      expect(page.items.map((item) => item.id.toCanonicalString()), [
+        '018f0b5d-6b2e-7c80-8000-000000000121',
+        '018f0b5d-6b2e-7c80-8000-000000000122',
+        '018f0b5d-6b2e-7c80-8000-000000000123',
+      ]);
+      expect(page.items.map((item) => item.updatedAt.value), [
+        DateTime.utc(2026, 9, 3, 10),
+        DateTime.utc(2026, 9, 3, 10),
+        DateTime.utc(2026, 9, 3, 9),
+      ]);
+    },
+  );
+
+  test(
     'применяет FTS-фильтр к count и ограниченному чтению без OFFSET',
     () async {
       await _insertIntention(

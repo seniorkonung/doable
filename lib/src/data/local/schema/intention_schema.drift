@@ -8,8 +8,7 @@ CREATE TABLE intentions (
   is_archived BOOLEAN NOT NULL DEFAULT FALSE
     CHECK (is_archived IN (0, 1)),
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  CHECK (created_at <= updated_at)
+  updated_at INTEGER NOT NULL
 );
 
 CREATE VIRTUAL TABLE intention_titles_fts USING fts5(

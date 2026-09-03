@@ -232,10 +232,6 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
   }
 
   @override
-  List<String> get customConstraints => const [
-    'CHECK(created_at <= updated_at)',
-  ];
-  @override
   bool get dontWriteConstraints => true;
 }
 

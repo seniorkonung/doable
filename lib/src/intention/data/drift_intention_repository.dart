@@ -502,7 +502,6 @@ final class DriftIntentionRepository implements IntentionRepository {
       );
     } on Object catch (error) {
       if (error is IntentionTextValidationException ||
-          error is domain.IntentionTimestampOrderException ||
           error is ArgumentError ||
           error is RangeError) {
         throw const _StoredIntentionCorruption();
@@ -562,7 +561,6 @@ final class DriftIntentionRepository implements IntentionRepository {
       );
     } on Object catch (error) {
       if (error is IntentionTextValidationException ||
-          error is domain.IntentionTimestampOrderException ||
           error is ArgumentError ||
           error is RangeError) {
         throw const _StoredIntentionCorruption();

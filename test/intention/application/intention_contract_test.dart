@@ -213,16 +213,19 @@ void main() {
       );
     });
 
-    test('summary отклоняет изменение раньше создания', () {
-      expect(
-        () => _summary(
+    test(
+      'summary сохраняет показание изменения после перевода часов назад',
+      () {
+        final summary = _summary(
           id: '00000000-0000-4000-8000-000000000001',
           createdAt: DateTime.utc(2026, 8, 30, 12),
           updatedAt: DateTime.utc(2026, 8, 30, 11),
-        ),
-        throwsA(isA<IntentionTimestampOrderException>()),
-      );
-    });
+        );
+
+        expect(summary.createdAt.value, DateTime.utc(2026, 8, 30, 12));
+        expect(summary.updatedAt.value, DateTime.utc(2026, 8, 30, 11));
+      },
+    );
   });
 
   group('commands и результаты намерений', () {

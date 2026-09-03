@@ -166,12 +166,8 @@ final class IntentionSummary {
     required this.readiness,
     required this.archiveState,
     required this.createdAt,
-    required IntentionTimestamp updatedAt,
-  }) : title = IntentionText.normalizeTitle(title),
-       updatedAt = IntentionTimestamp.requireValidUpdate(
-         createdAt: createdAt,
-         updatedAt: updatedAt,
-       );
+    required this.updatedAt,
+  }) : title = IntentionText.normalizeTitle(title);
 
   final IntentionId id;
   final String title;

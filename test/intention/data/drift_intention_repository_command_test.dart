@@ -280,6 +280,64 @@ void main() {
       },
     );
 
+    test(
+      'сохраняет равные и убывающие показания часов для фактических изменений',
+      () async {
+        final id = _id(_firstUuid);
+        final createdAt = DateTime.utc(2026, 9, 3, 12);
+        final previouslyUpdatedAt = DateTime.utc(2026, 9, 3, 13);
+        await _insertIntention(
+          database,
+          id: id.toCanonicalString(),
+          title: 'Исходное название',
+          createdAt: createdAt,
+          updatedAt: previouslyUpdatedAt,
+        );
+        clock = _DeterministicClock([
+          previouslyUpdatedAt,
+          createdAt,
+          DateTime.utc(2026, 9, 3, 11),
+        ]);
+        repository = DriftIntentionRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
+        writeTrace.updateStatements.clear();
+
+        final titleUpdated = _saved(
+          await repository.execute(
+            UpdateIntention(
+              id: id,
+              title: 'Обновлённое название',
+              description: null,
+            ),
+          ),
+        );
+        final readinessUpdated = _saved(
+          await repository.execute(EnableIntentionReadiness(id)),
+        );
+        final archiveUpdated = _saved(
+          await repository.execute(ArchiveIntention(id)),
+        );
+
+        expect(titleUpdated.updatedAt.value, previouslyUpdatedAt);
+        expect(readinessUpdated.updatedAt.value, createdAt);
+        expect(archiveUpdated.updatedAt.value, DateTime.utc(2026, 9, 3, 11));
+        expect(archiveUpdated.createdAt.value, createdAt);
+        expect(clock.calls, 3);
+        expect(writeTrace.updateStatements, hasLength(3));
+        final stored = await (database.select(
+          database.intentions,
+        )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+        expect(
+          stored.updatedAt,
+          DateTime.utc(2026, 9, 3, 11).microsecondsSinceEpoch,
+        );
+      },
+    );
+
     test('оставляет прежнее намерение при недопустимом изменении', () async {
       final id = _id(_firstUuid);
       final createdAt = DateTime.utc(2026, 9, 2, 10);
@@ -896,6 +954,7 @@ Future<void> _insertIntention(
   bool isActionReady = false,
   bool isArchived = false,
   required DateTime createdAt,
+  DateTime? updatedAt,
 }) => database
     .into(database.intentions)
     .insert(
@@ -907,7 +966,7 @@ Future<void> _insertIntention(
         isActionReady: Value(isActionReady),
         isArchived: Value(isArchived),
         createdAt: createdAt.microsecondsSinceEpoch,
-        updatedAt: createdAt.microsecondsSinceEpoch,
+        updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
       ),
     );
 
