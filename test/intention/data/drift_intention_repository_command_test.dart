@@ -1,6 +1,7 @@
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -322,6 +323,72 @@ void main() {
         expect(diagnostics.events, [
           _failedCommand(
             IntentionCommandDiagnosticsType.update,
+            DiagnosticsFailureCode.notFound,
+          ),
+        ]);
+      },
+    );
+
+    test(
+      'физически удаляет active и archived намерения из всех публичных чтений',
+      () async {
+        final fixtures = [
+          (id: _id(_firstUuid), isArchived: false),
+          (id: _id(_secondUuid), isArchived: true),
+        ];
+        for (final fixture in fixtures) {
+          await _insertIntention(
+            database,
+            id: fixture.id.toCanonicalString(),
+            title: 'Удаляемое намерение ${fixture.id.toCanonicalString()}',
+            isArchived: fixture.isArchived,
+            createdAt: DateTime.utc(2026, 9, 2, 10),
+          );
+
+          final result = await repository.execute(DeleteIntention(fixture.id));
+
+          expect(result, _deleted(fixture.id));
+          expect(
+            _watched(await repository.watchById(fixture.id).first),
+            isNull,
+          );
+          for (final scope in IntentionScope.values) {
+            final page = await repository.getCatalogPage(
+              IntentionCatalogQuery(
+                scope: scope,
+                titleFilter: null,
+                order: IntentionCatalogOrder.createdAtDescending,
+                pageSize: 100,
+              ),
+            );
+            expect(
+              _catalogItems(page).map((summary) => summary.id),
+              isNot(contains(fixture.id)),
+            );
+          }
+        }
+
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+          [
+            _successfulCommand(IntentionCommandDiagnosticsType.delete),
+            _successfulCommand(IntentionCommandDiagnosticsType.delete),
+          ],
+        );
+      },
+    );
+
+    test(
+      'возвращает not-found при удалении отсутствующего намерения',
+      () async {
+        final result = await repository.execute(
+          DeleteIntention(_id(_firstUuid)),
+        );
+
+        expect(result, _failure<IntentionNotFoundFailure>());
+        expect(diagnostics.events, [
+          _failedCommand(
+            IntentionCommandDiagnosticsType.delete,
             DiagnosticsFailureCode.notFound,
           ),
         ]);
@@ -807,6 +874,18 @@ IntentionId _idForSequence(int value) =>
 Intention? _watched(Result<Intention?> result) {
   expect(result, isA<ResultSuccess<Intention?>>());
   return (result as ResultSuccess<Intention?>).value;
+}
+
+Matcher _deleted(IntentionId id) =>
+    isA<ResultSuccess<IntentionCommandSuccess>>().having(
+      (result) => result.value,
+      'value',
+      isA<IntentionDeleted>().having((success) => success.id, 'id', id),
+    );
+
+List<IntentionSummary> _catalogItems(Result<IntentionCatalogPage> result) {
+  expect(result, isA<ResultSuccess<IntentionCatalogPage>>());
+  return (result as ResultSuccess<IntentionCatalogPage>).value.items;
 }
 
 Future<void> _insertIntention(

@@ -146,6 +146,7 @@ final class DriftIntentionRepository implements IntentionRepository {
             command.id,
             domain.IntentionArchiveState.active,
           ),
+          DeleteIntention() => _deleteIntention(command.id),
           _ => throw StateError('Неподдерживаемая команда намерения.'),
         },
       );
@@ -308,6 +309,14 @@ final class DriftIntentionRepository implements IntentionRepository {
       ),
     );
     return IntentionSaved(updated);
+  }
+
+  Future<IntentionDeleted> _deleteIntention(IntentionId id) async {
+    final deletedRows = await (_database.delete(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).go();
+    if (deletedRows == 0) throw const _IntentionNotFound();
+    return IntentionDeleted(id);
   }
 
   Future<IntentionCatalogFirstPage> _readFirstCatalogPage(
@@ -619,6 +628,11 @@ IntentionFailure _classifyCommandFailure(
         when command is CreateIntention &&
             extendedResultCode ==
                 SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY =>
+      const IntentionConflictFailure(),
+    SqliteConstraintFailure(:final extendedResultCode)
+        when command is DeleteIntention &&
+            extendedResultCode ==
+                SqlExtendedError.SQLITE_CONSTRAINT_FOREIGNKEY =>
       const IntentionConflictFailure(),
     SqliteCorruptionFailure() => const IntentionCorruptionFailure(),
     SqliteUnavailableFailure() => const IntentionUnavailableFailure(),
