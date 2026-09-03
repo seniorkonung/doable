@@ -459,6 +459,18 @@
   - **Вероятно затронутые файлы:** `test/intention/data/file_backed_drift_intention_repository_test.dart`, `test/support/intention_repository_harness.dart`, `test/support/local_database_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart`.
   - **Оценка:** M (4 файла).
 
+- [ ] 6.8a Доказать file-backed recovery после отказавших command и сохранённого повреждения
+  - **Критерии приёмки:**
+    - File-backed fault injection после DML для create, update, state transition и delete возвращает исходный typed failure; затем первый persistence object graph полностью закрывается, его repository отбрасывается, а новый bootstrap и repository открывают тот же SQLite-файл.
+    - Через публичные `watchById` и `getCatalogPage` новый object graph подтверждает последнее согласованное состояние: отказавшийся create не существует, а отказавшиеся update, state transition и delete сохраняют прежние identity, пользовательский текст, состояния, timestamps, принадлежность каталогам и буквальному фильтру; FTS остаётся согласованным с основной строкой.
+    - Fixture с сохранённым некорректным либо nil UUID полностью закрывается до чтения, после чего новый object graph над тем же файлом возвращает `IntentionCorruptionFailure` без успешной или частичной страницы. Активные подписки отменяются до закрытия, а каждый готовый graph закрывается ровно один раз через владеющий `LocalDataBootstrap`.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_fault_test.dart test/intention/data/file_backed_drift_intention_repository_test.dart` с file-backed post-DML failure/reopen matrix и corrupt-row close/reopen fixtures.
+    - Выполнить `flutter test test/data/local/file_backed_database_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart` и `flutter analyze`, подтвердив прежнюю storage ownership boundary и отсутствие регрессий.
+  - **Зависимости:** 6.7, 6.8.
+  - **Вероятно затронутые файлы:** `test/intention/data/file_backed_drift_intention_repository_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `test/support/intention_repository_harness.dart`, `test/support/local_database_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart` только если новое evidence выявит дефект реализации.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
 - [ ] 6.9 Доказать ограниченную стоимость каталога на большой file-backed fixture
   - **Критерии приёмки:**
     - Fixture содержит не меньше 50 000 коротких активных и архивированных намерений с равными и различающимися timestamps, а все repository operations возвращают не больше настроенного `pageSize` предметных summaries независимо от точного общего count.
@@ -480,7 +492,7 @@
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9.
+  - **Зависимости:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.8a, 6.9.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 

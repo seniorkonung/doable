@@ -4,60 +4,78 @@
 
 **Result:** No unresolved findings
 
-Неточность фактической хронологии при одинаковых или откатившихся системных
-часах принята как ограниченный остаточный риск `AR1`. Отказ реальной операции
-из-за `updatedAt < createdAt` в этот риск не входит: обновлённый контракт и
-задача 6.19 владеют необходимым изменением модели, schema и repository. До
-выполнения задачи текущий код сохраняет этот failure path; planning handoff
-фиксирует владельца последующей реализации, а не утверждает, что код уже исправлен.
+Активных findings не осталось. Ранее принятый ограниченный риск неточной
+хронологии системных часов (`AR1`) остаётся применимым.
 
 ## Review target
 
-- **Baseline:** configured `origin/main` @ `f29b7dcc1a515c357b6e93fa9a18cec43fc4a0cd`
-- **Reviewed head:** `f27fddefc3e7998ac254e699860420f7811d9126`
-- **Target commits:** 1
-- **Reviewable paths:** 4; excludes `implementation-review.md`
+- **Baseline:** configured `origin/main` @ `bdd76790e5b8f89b864b8f88bca38a6e37c2e3b7`
+- **Reviewed head:** `52efc3c1a43a5f998336490a4e034ce473ba3d7d`
+- **Target commits:** 4
+- **Reviewable paths:** 5; excludes `implementation-review.md`
 - **OpenSpec change:** `manage-intentions` (`intent-driven`)
 - **Target scope:** Complete pre-push range
 - **Baseline freshness:** Local tracking state; no fetch performed
-- **Excluded worktree state:** локальные правки `apm.lock.yaml`, planning-
-  артефактов и этого отчёта не входят в immutable review target
+- **Excluded worktree state:** локальные remediation-правки `tasks.md` и этого
+  отчёта не входят в immutable target
 
 ## Reviewed increment
 
-### U1 · Готовность к действию, архивирование и восстановление намерения
+### U1 · Физическое удаление и атомарность command-paths
 
-- **Work items:** 6.6
-- **Requirements and scenarios:** `Явная классификация действия` · подтверждение
-  и обратимое выключение готовности; `Архивирование намерения` · активное
-  намерение и действие; `Восстановление намерения из архива`; `Время создания и
-  обновления намерения` · фактическое изменение и no-op; применимые сценарии
-  `Изменения намерения`, `Целостности при ошибках записи` и подтверждённого
-  наблюдения состояния
+- **Work items:** 6.7
+- **Requirements and scenarios:** `Физическое удаление намерения` · удаление
+  active/archived намерения и отсутствие после успеха; `Целостность при ошибках
+  записи` · ошибка физического удаления и сохранение подтверждённого состояния;
+  `Безопасное представление неизвестного отказа операции с намерением`;
+  применимые сценарии `Сохранения результата операций с намерениями`
 - **Affected boundary:** прикладной caller `IntentionRepository.execute`,
-  подтверждённое локальное SQLite-состояние и `watchById`
+  подтверждённое локальное SQLite-состояние, FTS-представление и публичные read
+  operations
 - **Implementation target:** `lib/src/intention/data/drift_intention_repository.dart`,
   `test/intention/data/drift_intention_repository_command_test.dart`,
-  `test/intention/data/drift_intention_repository_watch_test.dart`
-- **Applicable constraints and non-goals:** подтверждённое SQLite-состояние
-  остаётся единственным источником истины; transition применяется целиком либо
-  не применяется, success соответствует commit, no-op не пишет данные,
-  публичная seam и diagnostics не раскрывают storage details или пользовательские
-  данные; физическое удаление, связи, UI и синхронизация не входят в unit
-- **Excluded change scope:** задачи 6.7–6.20 и последующие фазы остаются будущей
+  `test/intention/data/drift_intention_repository_fault_test.dart`,
+  `test/intention/data/file_backed_drift_intention_repository_test.dart`
+- **Applicable constraints and non-goals:** success соответствует завершённой
+  transaction; failure сохраняет последнее подтверждённое состояние и не
+  раскрывает SQLite через публичную seam; связи моделировать не требуется,
+  UI-подтверждение удаления и platform-specific process orchestration не входят
+  в unit
+- **Excluded change scope:** задачи 6.8a–6.20 и последующие фазы остаются будущей
+  частью change и не являются обязательствами этого инкремента
+
+### U2 · Полный repository lifecycle после повторного открытия SQLite-файла
+
+- **Work items:** 6.8
+- **Requirements and scenarios:** `Сохранение результата операций с
+  намерениями` · сохранение данных и физического удаления после перезапуска;
+  `Локальная долговечность данных приложения` · сохранение после полного
+  перезапуска; применимые сценарии каталога, подробного чтения и corruption
+  boundary
+- **Affected boundary:** публичная `IntentionRepository` seam между полным
+  закрытием владельца локального persistence graph и новым object graph над тем
+  же файлом одной установки
+- **Implementation target:** `lib/src/intention/data/drift_intention_repository.dart`,
+  `test/intention/data/file_backed_drift_intention_repository_test.dart`
+- **Applicable constraints and non-goals:** repository заимствует database и не
+  владеет её lifecycle; подтверждённые identity, пользовательский текст,
+  readiness, archive state, timestamps, каталог и удаление должны переживать
+  reopen; large-fixture performance, UI composition, синхронизация и другие
+  platform hosts не входят в unit
+- **Excluded change scope:** задачи 6.8a–6.20 и последующие фазы остаются будущей
   частью change и не являются обязательствами этого инкремента
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | свежий изолированный reviewer проверил точный delivery/test target `f29b7dc…f27fdde`; planning-артефакты, commit history и прежний отчёт ему не раскрывались |
-| OpenSpec conformance | Complete | полный граф proposal/specs/design/ADR/plan/tasks сопоставлен с задачей 6.6 и immutable diff; сфокусированные и полные тесты и анализ исходного инкремента успешны, а remediation-артефакты проходят строгую OpenSpec-валидацию |
-| Code quality | Complete | delivery-path subset и неизменённые command, domain timestamp, schema, transaction, diagnostics и observer boundaries проверены по correctness, readability, architecture, security, performance и evidence |
+| Independent decision review | Complete | свежий zero-history reviewer проверил объединённый delivery target двух path-overlapping units на точном `bdd7679…52efc3c`; planning-артефакты, commit history, прежний отчёт и accepted risks ему не раскрывались |
+| OpenSpec conformance | Complete | полный граф proposal/specs/design/ADR/plan/tasks сопоставлен с 6.7–6.8 и immutable diff; каждый reviewable path классифицирован, будущие задачи исключены, task-prescribed tests и структурная валидация выполнены |
+| Code quality | Complete | production/test delivery subset и неизменённые schema/FTS, classifier, bootstrap/ownership, diagnostics и observer boundaries проверены по correctness, readability, architecture, security, performance и evidence |
 
 ## Findings
 
-В implementation review не осталось нерешённых замечаний.
+В implementation review не осталось незакрытых findings.
 
 ## Accepted risks
 
@@ -76,8 +94,8 @@
 - **Acceptance rationale:** монотонное логическое время, искусственное
   продвижение либо дополнительная revision-модель усложнили бы контракт и могли
   бы исказить показываемое wall-clock время. Эти компромиссы не оправданы для
-  вспомогательной сортировки, когда при обычной работе системных часов сохранённые
-  значения дают ожидаемый порядок.
+  вспомогательной сортировки, когда при обычной работе системных часов
+  сохранённые значения дают ожидаемый порядок.
 - **Scope and assumptions:** решение относится только к локальным UTC wall-clock
   timestamps одной установки и сортировке по их сохранённым значениям;
   timestamps не используются как revision, causal clock, средство разрешения
@@ -90,30 +108,32 @@
   поведения; пользователи наблюдают существенный ущерб от неверного порядка;
   либо поддерживаемая платформа демонстрирует систематические скачки часов.
 - **Acceptance authority:** явное решение пользователя от 2026-09-03 в рамках
-  remediation F1.
+  remediation F1
 - **Originating finding:** F1
 - **Decision record:** `proposal.md` · сортировка по сохранённым показаниям;
   `specs/intention-management/spec.md` · требования `Время создания и обновления
   намерения` и `Упорядочивание каталогов намерений`; `design.md` · wall-clock
   contract и запись в `Риски / компромиссы`
+- **Current target relation:** Carried forward; not re-reviewed
 
 ## Review coverage
 
-Все reviewable paths классифицированы: repository и два тестовых файла образуют
-U1, `openspec/changes/manage-intentions/tasks.md` является planning evidence;
-материальных несопоставленных путей нет. Проверены полная transition/no-op
-матрица active/archived и ready/not-ready, сохранение identity, пользовательского
-текста и непричастного флага, not-found, атомарная transaction, публикация через
-`watchById` после commit, конкурентные вызовы одного и разных намерений,
-типизированная failure-классификация, diagnostics, primary-key доступ и отсутствие
-дополнительной materialization.
+Все пять reviewable paths классифицированы: production repository и три тестовых
+файла образуют U1/U2, `openspec/changes/manage-intentions/tasks.md` является
+planning evidence; материальных несопоставленных путей нет. Проверены
+исчерпывающий command dispatcher, delete по типизированному ID, not-found,
+контекстный foreign-key conflict, transaction rollback после insert/update/state
+transition/delete, FTS consistency, safe diagnostics, active/archived/all reads,
+UUID v4/v7, точный пользовательский текст и timestamps после file-backed reopen.
 
-Сфокусированный запуск прошёл 22 теста, полный `flutter test` — 123 теста.
-Targeted Dart MCP analysis и полный `flutter analyze` завершились без ошибок;
-`openspec validate manage-intentions --json` успешен, `git diff --check` для
-immutable range чист. Android build не запускался: задача 6.6 не меняет platform
-delivery, а её собственная verification boundary состоит из repository command,
-concurrency и observer tests. В remediation-run код и тесты не изменялись и
-повторный implementation audit не выполнялся; planning handoff проходит
-`openspec validate manage-intentions --type change --strict --no-interactive`,
-а оставшаяся реализация принадлежит задаче 6.19.
+`flutter test test/intention/data` прошёл 42 теста. Отдельный объединённый запуск
+task-prescribed repository, FTS, diagnostics, file-backed и bootstrap tests прошёл
+60 тестов. Targeted Dart MCP analysis и полный `flutter analyze` завершились без
+ошибок; `openspec validate manage-intentions --json` успешен, `git diff --check`
+для immutable range чист. Android build не запускался: target не меняет host
+delivery, а проверки 6.7–6.8 ограничены repository, FTS, file-backed и bootstrap
+boundaries.
+
+В remediation-run код и тесты не изменялись, повторный implementation audit не
+выполнялся. Новая задача 6.8a владеет file-backed adverse-path evidence для
+последующего Apply; строгая OpenSpec-валидация planning handoff успешна.
