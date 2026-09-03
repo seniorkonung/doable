@@ -447,7 +447,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 6.8 Доказать полный repository lifecycle через публичную seam после повторного открытия SQLite-файла
+- [x] 6.8 Доказать полный repository lifecycle через публичную seam после повторного открытия SQLite-файла
   - **Критерии приёмки:**
     - `LocalDataBootstrap` является единственным владельцем созданных им `AppDatabase` и `QueryExecutor`; `DriftIntentionRepository` заимствует `AppDatabase`, не получает `close()` и не закрывает storage. File-backed harness отменяет активные stream subscriptions, вызывает `close()` у первого bootstrap, отбрасывает первый repository adapter и создаёт новый bootstrap и repository на том же файле.
     - После повторного открытия `watchById` и `getCatalogPage` подтверждают три scope, буквальный фильтр, порядок, точный count и сохранение физического удаления; корректные сохранённые UUID v4 и UUID v7 восстанавливаются одинаково.
