@@ -435,7 +435,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 6.7 Реализовать физическое удаление и доказать атомарность всех command paths
+- [x] 6.7 Реализовать физическое удаление и доказать атомарность всех command paths
   - **Критерии приёмки:**
     - `DeleteIntention` физически удаляет существующее активное или архивированное намерение без предварительного архивирования, возвращает `IntentionDeleted` только после commit, после чего `watchById` публикует успешное отсутствие и ни один scope каталога не содержит ID.
     - Отсутствующий ID возвращает not-found, а только `SQLITE_CONSTRAINT_FOREIGNKEY` при `DeleteIntention` представляет блокирующую связь как conflict и оставляет намерение полностью неизменным; repository не моделирует будущие связи и полагается только на фактические транзакционные constraints текущего storage.
