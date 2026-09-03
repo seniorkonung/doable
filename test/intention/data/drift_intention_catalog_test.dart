@@ -381,6 +381,210 @@ void main() {
     },
   );
 
+  test('отклоняет snapshot каталога, когда search key скрывает совпадающее название', () async {
+    const id = '018f0b5d-6b2e-7c80-8000-000000000024';
+    await _insertIntention(
+      database,
+      id: id,
+      title: 'Купить молоко',
+      createdAt: DateTime.utc(2026, 9, 2, 10),
+    );
+    await database.customStatement(
+      'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+      ['посторонний ключ', id],
+    );
+
+    final result = await repository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: 'молоко',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+      ),
+    );
+
+    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+    expect(
+      (result as ResultFailure<IntentionCatalogPage>).failure,
+      isA<IntentionCorruptionFailure>(),
+    );
+  });
+
+  test(
+    'отклоняет snapshot короткого фильтра, когда search key скрывает название',
+    () async {
+      const id = '018f0b5d-6b2e-7c80-8000-000000000029';
+      await _insertIntention(
+        database,
+        id: id,
+        title: 'Купить молоко',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await database.customStatement(
+        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+        ['посторонний ключ', id],
+      );
+
+      final result = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: 'ку',
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        ),
+      );
+
+      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+      expect(
+        (result as ResultFailure<IntentionCatalogPage>).failure,
+        isA<IntentionCorruptionFailure>(),
+      );
+    },
+  );
+
+  test(
+    'отклоняет snapshot каталога, когда search key создаёт ложное совпадение',
+    () async {
+      const id = '018f0b5d-6b2e-7c80-8000-000000000025';
+      await _insertIntention(
+        database,
+        id: id,
+        title: 'Купить молоко',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await database.customStatement(
+        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+        ['посторонний ключ', id],
+      );
+
+      final result = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: 'посторонний',
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        ),
+      );
+
+      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+      expect(
+        (result as ResultFailure<IntentionCatalogPage>).failure,
+        isA<IntentionCorruptionFailure>(),
+      );
+    },
+  );
+
+  test(
+    'отклоняет первую страницу при повреждённой строке за её границей',
+    () async {
+      const visibleId = '018f0b5d-6b2e-7c80-8000-000000000026';
+      const lookaheadId = '018f0b5d-6b2e-7c80-8000-000000000027';
+      await _insertIntention(
+        database,
+        id: visibleId,
+        title: 'Видимое намерение',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      await _insertIntention(
+        database,
+        id: lookaheadId,
+        title: 'Намерение за границей',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await database.customStatement(
+        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+        ['повреждённый ключ', lookaheadId],
+      );
+
+      final result = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        ),
+      );
+
+      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+      expect(
+        (result as ResultFailure<IntentionCatalogPage>).failure,
+        isA<IntentionCorruptionFailure>(),
+      );
+    },
+  );
+
+  test('отклоняет continuation page с повреждённой строкой', () async {
+    const firstId = '018f0b5d-6b2e-7c80-8000-000000000030';
+    const corruptedId = '018f0b5d-6b2e-7c80-8000-000000000031';
+    await _insertIntention(
+      database,
+      id: firstId,
+      title: 'Первая строка',
+      createdAt: DateTime.utc(2026, 9, 2, 10),
+    );
+    await _insertIntention(
+      database,
+      id: corruptedId,
+      title: 'Строка продолжения',
+      createdAt: DateTime.utc(2026, 9, 2, 11),
+    );
+    final firstQuery = IntentionCatalogQuery(
+      scope: IntentionScope.active,
+      titleFilter: null,
+      order: const IntentionCatalogOrder(
+        field: IntentionCatalogSortField.createdAt,
+        direction: IntentionCatalogSortDirection.ascending,
+      ),
+      pageSize: 1,
+    );
+    final cursor = _firstPage(await repository.getCatalogPage(firstQuery))
+        .nextCursor!;
+    await database.customStatement(
+      'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+      ['повреждённый ключ', corruptedId],
+    );
+
+    final result = await repository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: firstQuery.scope,
+        titleFilter: null,
+        order: firstQuery.order,
+        pageSize: firstQuery.pageSize,
+        cursor: cursor,
+      ),
+    );
+
+    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+    expect(
+      (result as ResultFailure<IntentionCatalogPage>).failure,
+      isA<IntentionCorruptionFailure>(),
+    );
+  });
+
+  test(
+    'хранилище не допускает пустое или полностью пробельное описание',
+    () async {
+      const id = '018f0b5d-6b2e-7c80-8000-000000000028';
+      await _insertIntention(
+        database,
+        id: id,
+        title: 'Намерение с описанием',
+        description: 'Исходное описание',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+
+      for (final description in const ['', ' \t\r\n ']) {
+        await expectLater(
+          database.customStatement(
+            'UPDATE intentions SET description = ? WHERE id = ?',
+            [description, id],
+          ),
+          throwsA(isA<SqliteException>()),
+        );
+      }
+    },
+  );
+
   test(
     'продолжает каталог keyset-порциями для всех порядков без повторного COUNT',
     () async {

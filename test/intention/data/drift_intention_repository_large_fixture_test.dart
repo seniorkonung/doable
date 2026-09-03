@@ -86,7 +86,7 @@ Future<void> _expectQueryPlans(AppDatabase database) async {
         EXPLAIN QUERY PLAN
         SELECT id FROM intentions
         WHERE is_archived = 0
-          AND instr(title_search_key, '$filter') > 0
+          AND instr(title, '$filter') > 0
         ORDER BY created_at DESC, id ASC
         LIMIT ${_pageSize + 1}
       ''');

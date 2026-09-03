@@ -2,7 +2,10 @@ CREATE TABLE intentions (
   id TEXT NOT NULL PRIMARY KEY,
   title TEXT NOT NULL CHECK (title <> ''),
   title_search_key TEXT NOT NULL CHECK (title_search_key <> ''),
-  description TEXT,
+  description TEXT CHECK (
+    description IS NULL OR
+    length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0
+  ),
   is_action_ready BOOLEAN NOT NULL DEFAULT FALSE
     CHECK (is_action_ready IN (0, 1)),
   is_archived BOOLEAN NOT NULL DEFAULT FALSE
@@ -12,6 +15,7 @@ CREATE TABLE intentions (
 );
 
 CREATE VIRTUAL TABLE intention_titles_fts USING fts5(
+  title,
   title_search_key,
   content = 'intentions',
   content_rowid = 'rowid',
@@ -21,24 +25,26 @@ CREATE VIRTUAL TABLE intention_titles_fts USING fts5(
 CREATE TRIGGER intentions_fts_after_insert
 AFTER INSERT ON intentions
 BEGIN
-  INSERT INTO intention_titles_fts(rowid, title_search_key)
-  VALUES (new.rowid, new.title_search_key);
+  INSERT INTO intention_titles_fts(rowid, title, title_search_key)
+  VALUES (new.rowid, new.title, new.title_search_key);
 END;
 
-CREATE TRIGGER intentions_fts_after_update_title_search_key
-AFTER UPDATE OF title_search_key ON intentions
+CREATE TRIGGER intentions_fts_after_update_search_content
+AFTER UPDATE OF title, title_search_key ON intentions
 BEGIN
-  INSERT INTO intention_titles_fts(intention_titles_fts, rowid, title_search_key)
-  VALUES ('delete', old.rowid, old.title_search_key);
-  INSERT INTO intention_titles_fts(rowid, title_search_key)
-  VALUES (new.rowid, new.title_search_key);
+  INSERT INTO intention_titles_fts(
+    intention_titles_fts, rowid, title, title_search_key
+  ) VALUES ('delete', old.rowid, old.title, old.title_search_key);
+  INSERT INTO intention_titles_fts(rowid, title, title_search_key)
+  VALUES (new.rowid, new.title, new.title_search_key);
 END;
 
 CREATE TRIGGER intentions_fts_after_delete
 AFTER DELETE ON intentions
 BEGIN
-  INSERT INTO intention_titles_fts(intention_titles_fts, rowid, title_search_key)
-  VALUES ('delete', old.rowid, old.title_search_key);
+  INSERT INTO intention_titles_fts(
+    intention_titles_fts, rowid, title, title_search_key
+  ) VALUES ('delete', old.rowid, old.title, old.title_search_key);
 END;
 
 CREATE INDEX intentions_active_created_at_asc_id_asc

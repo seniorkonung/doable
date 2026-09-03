@@ -35,8 +35,8 @@ void main() {
         expect(await _findByTitleFilter(database, 'молоко'), [id]);
 
         await database.customStatement(
-          'UPDATE intentions SET title_search_key = ? WHERE id = ?',
-          ['купить хлеб', id],
+          'UPDATE intentions SET title = ?, title_search_key = ? WHERE id = ?',
+          ['Купить хлеб', 'купить хлеб', id],
         );
 
         expect(await _findByTitleFilter(database, 'молоко'), isEmpty);
@@ -63,12 +63,12 @@ void main() {
 
         expect(await _findByTitleFilter(database, '😀'), [id]);
         expect(_lastSelectStatement, contains('instr('));
-        expect(_lastSelectArguments, ['😀']);
+        expect(_lastSelectArguments, ['😀', '😀']);
 
         sqlTrace.clear();
         expect(await _findByTitleFilter(database, '😀😀'), [id]);
         expect(_lastSelectStatement, contains('instr('));
-        expect(_lastSelectArguments, ['😀😀']);
+        expect(_lastSelectArguments, ['😀😀', '😀😀']);
 
         sqlTrace.clear();
         expect(await _findByTitleFilter(database, '😀😀😀'), [id]);

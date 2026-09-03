@@ -28,16 +28,26 @@ sealed class _TitleSearchCondition {
 }
 
 final class _ShortTitleSearchCondition extends _TitleSearchCondition {
-  const _ShortTitleSearchCondition(this._searchKey);
+  _ShortTitleSearchCondition(String searchKey)
+    : _searchKey = Variable.withString(searchKey),
+      _titleVariants = [
+        for (final variant in _caseVariants(searchKey))
+          Variable.withString(variant),
+      ];
 
-  final String _searchKey;
+  final Variable<String> _searchKey;
+  final List<Variable<String>> _titleVariants;
 
   @override
-  Expression<bool> conditionFor(Intentions intentions) =>
-      _InstrTitleSearchExpression(
-        intentions.titleSearchKey,
-        Variable.withString(_searchKey),
-      );
+  Expression<bool> conditionFor(Intentions intentions) {
+    final titleCondition = _titleVariants
+        .map<Expression<bool>>(
+          (variant) => _InstrTitleSearchExpression(intentions.title, variant),
+        )
+        .reduce((left, right) => left | right);
+    return _InstrTitleSearchExpression(intentions.titleSearchKey, _searchKey) |
+        titleCondition;
+  }
 }
 
 final class _FtsTitleSearchCondition extends _TitleSearchCondition {
@@ -53,16 +63,32 @@ final class _FtsTitleSearchCondition extends _TitleSearchCondition {
       );
 }
 
-final class _InstrTitleSearchExpression extends Expression<bool> {
-  const _InstrTitleSearchExpression(this._titleSearchKey, this._searchKey);
+Iterable<String> _caseVariants(String value) sync* {
+  final symbols = [for (final rune in value.runes) String.fromCharCode(rune)];
+  final variants = <String>{};
+  for (var mask = 0; mask < 1 << symbols.length; mask++) {
+    variants.add(
+      [
+        for (var index = 0; index < symbols.length; index++)
+          (mask & (1 << index)) == 0
+              ? symbols[index].toLowerCase()
+              : symbols[index].toUpperCase(),
+      ].join(),
+    );
+  }
+  yield* variants;
+}
 
-  final GeneratedColumn<String> _titleSearchKey;
+final class _InstrTitleSearchExpression extends Expression<bool> {
+  const _InstrTitleSearchExpression(this._title, this._searchKey);
+
+  final GeneratedColumn<String> _title;
   final Variable<String> _searchKey;
 
   @override
   void writeInto(GenerationContext context) {
     context.buffer.write('instr(');
-    _titleSearchKey.writeInto(context);
+    _title.writeInto(context);
     context.buffer.write(', ');
     _searchKey.writeInto(context);
     context.buffer.write(') > 0');

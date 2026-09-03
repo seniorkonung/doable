@@ -350,6 +350,7 @@ final class DriftIntentionRepository implements IntentionRepository {
       ..addColumns([
         intentions.id,
         intentions.title,
+        intentions.titleSearchKey,
         intentions.isActionReady,
         intentions.isArchived,
         intentions.createdAt,
@@ -362,11 +363,12 @@ final class DriftIntentionRepository implements IntentionRepository {
       ])
       ..limit(query.pageSize + 1);
     final rows = await rowsQuery.get();
-    final items = [
-      for (final row in rows.take(query.pageSize))
+    final summaries = [
+      for (final row in rows)
         _rehydrateSummary(
           id: row.read(intentions.id)!,
           title: row.read(intentions.title)!,
+          titleSearchKey: row.read(intentions.titleSearchKey)!,
           hasDescription: row.read(hasDescriptionExpression)!,
           isActionReady: row.read(intentions.isActionReady)!,
           isArchived: row.read(intentions.isArchived)!,
@@ -374,6 +376,7 @@ final class DriftIntentionRepository implements IntentionRepository {
           updatedAt: row.read(intentions.updatedAt)!,
         ),
     ];
+    final items = summaries.take(query.pageSize).toList(growable: false);
     final hasNextPage = rows.length > query.pageSize;
 
     return IntentionCatalogFirstPage(
@@ -394,6 +397,7 @@ final class DriftIntentionRepository implements IntentionRepository {
       ..addColumns([
         intentions.id,
         intentions.title,
+        intentions.titleSearchKey,
         intentions.isActionReady,
         intentions.isArchived,
         intentions.createdAt,
@@ -406,11 +410,12 @@ final class DriftIntentionRepository implements IntentionRepository {
       ])
       ..limit(query.pageSize + 1);
     final rows = await rowsQuery.get();
-    final items = [
-      for (final row in rows.take(query.pageSize))
+    final summaries = [
+      for (final row in rows)
         _rehydrateSummary(
           id: row.read(intentions.id)!,
           title: row.read(intentions.title)!,
+          titleSearchKey: row.read(intentions.titleSearchKey)!,
           hasDescription: row.read(hasDescriptionExpression)!,
           isActionReady: row.read(intentions.isActionReady)!,
           isArchived: row.read(intentions.isArchived)!,
@@ -418,6 +423,7 @@ final class DriftIntentionRepository implements IntentionRepository {
           updatedAt: row.read(intentions.updatedAt)!,
         ),
     ];
+    final items = summaries.take(query.pageSize).toList(growable: false);
     final hasNextPage = rows.length > query.pageSize;
 
     return IntentionCatalogContinuationPage(
@@ -484,6 +490,7 @@ final class DriftIntentionRepository implements IntentionRepository {
   IntentionSummary _rehydrateSummary({
     required String id,
     required String title,
+    required String titleSearchKey,
     required bool hasDescription,
     required bool isActionReady,
     required bool isArchived,
@@ -497,7 +504,10 @@ final class DriftIntentionRepository implements IntentionRepository {
 
     try {
       final normalizedTitle = IntentionText.normalizeTitle(title);
-      if (normalizedTitle != title) throw const _StoredIntentionCorruption();
+      if (normalizedTitle != title ||
+          titleSearchKey != normalizedTitle.toLowerCase()) {
+        throw const _StoredIntentionCorruption();
+      }
       return IntentionSummary(
         id: intentionId,
         title: title,

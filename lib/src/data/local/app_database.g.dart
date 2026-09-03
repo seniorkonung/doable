@@ -46,7 +46,7 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    $customConstraints: '',
+    $customConstraints: 'CHECK (description IS NULL OR length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0)',
   );
   static const VerificationMeta _isActionReadyMeta = const VerificationMeta(
     'isActionReady',
@@ -538,6 +538,15 @@ class IntentionTitlesFts extends Table
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   IntentionTitlesFts(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: '',
+  );
   static const VerificationMeta _titleSearchKeyMeta = const VerificationMeta(
     'titleSearchKey',
   );
@@ -550,7 +559,7 @@ class IntentionTitlesFts extends Table
     $customConstraints: '',
   );
   @override
-  List<GeneratedColumn> get $columns => [titleSearchKey];
+  List<GeneratedColumn> get $columns => [title, titleSearchKey];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -563,6 +572,14 @@ class IntentionTitlesFts extends Table
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
     if (data.containsKey('title_search_key')) {
       context.handle(
         _titleSearchKeyMeta,
@@ -583,6 +600,10 @@ class IntentionTitlesFts extends Table
   IntentionTitlesFt map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return IntentionTitlesFt(
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
       titleSearchKey: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}title_search_key'],
@@ -599,22 +620,27 @@ class IntentionTitlesFts extends Table
   bool get dontWriteConstraints => true;
   @override
   String get moduleAndArgs =>
-      'fts5(title_search_key, content = \'intentions\', content_rowid = \'rowid\', tokenize = \'trigram case_sensitive 0 remove_diacritics 0\')';
+      'fts5(title, title_search_key, content = \'intentions\', content_rowid = \'rowid\', tokenize = \'trigram case_sensitive 0 remove_diacritics 0\')';
 }
 
 class IntentionTitlesFt extends DataClass
     implements Insertable<IntentionTitlesFt> {
+  final String title;
   final String titleSearchKey;
-  const IntentionTitlesFt({required this.titleSearchKey});
+  const IntentionTitlesFt({required this.title, required this.titleSearchKey});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['title'] = Variable<String>(title);
     map['title_search_key'] = Variable<String>(titleSearchKey);
     return map;
   }
 
   IntentionTitlesFtsCompanion toCompanion(bool nullToAbsent) {
-    return IntentionTitlesFtsCompanion(titleSearchKey: Value(titleSearchKey));
+    return IntentionTitlesFtsCompanion(
+      title: Value(title),
+      titleSearchKey: Value(titleSearchKey),
+    );
   }
 
   factory IntentionTitlesFt.fromJson(
@@ -623,6 +649,7 @@ class IntentionTitlesFt extends DataClass
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return IntentionTitlesFt(
+      title: serializer.fromJson<String>(json['title']),
       titleSearchKey: serializer.fromJson<String>(json['title_search_key']),
     );
   }
@@ -630,14 +657,19 @@ class IntentionTitlesFt extends DataClass
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'title': serializer.toJson<String>(title),
       'title_search_key': serializer.toJson<String>(titleSearchKey),
     };
   }
 
-  IntentionTitlesFt copyWith({String? titleSearchKey}) =>
-      IntentionTitlesFt(titleSearchKey: titleSearchKey ?? this.titleSearchKey);
+  IntentionTitlesFt copyWith({String? title, String? titleSearchKey}) =>
+      IntentionTitlesFt(
+        title: title ?? this.title,
+        titleSearchKey: titleSearchKey ?? this.titleSearchKey,
+      );
   IntentionTitlesFt copyWithCompanion(IntentionTitlesFtsCompanion data) {
     return IntentionTitlesFt(
+      title: data.title.present ? data.title.value : this.title,
       titleSearchKey: data.titleSearchKey.present
           ? data.titleSearchKey.value
           : this.titleSearchKey,
@@ -647,46 +679,56 @@ class IntentionTitlesFt extends DataClass
   @override
   String toString() {
     return (StringBuffer('IntentionTitlesFt(')
+          ..write('title: $title, ')
           ..write('titleSearchKey: $titleSearchKey')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => titleSearchKey.hashCode;
+  int get hashCode => Object.hash(title, titleSearchKey);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is IntentionTitlesFt &&
+          other.title == this.title &&
           other.titleSearchKey == this.titleSearchKey);
 }
 
 class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
+  final Value<String> title;
   final Value<String> titleSearchKey;
   final Value<int> rowid;
   const IntentionTitlesFtsCompanion({
+    this.title = const Value.absent(),
     this.titleSearchKey = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   IntentionTitlesFtsCompanion.insert({
+    required String title,
     required String titleSearchKey,
     this.rowid = const Value.absent(),
-  }) : titleSearchKey = Value(titleSearchKey);
+  }) : title = Value(title),
+       titleSearchKey = Value(titleSearchKey);
   static Insertable<IntentionTitlesFt> custom({
+    Expression<String>? title,
     Expression<String>? titleSearchKey,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (title != null) 'title': title,
       if (titleSearchKey != null) 'title_search_key': titleSearchKey,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   IntentionTitlesFtsCompanion copyWith({
+    Value<String>? title,
     Value<String>? titleSearchKey,
     Value<int>? rowid,
   }) {
     return IntentionTitlesFtsCompanion(
+      title: title ?? this.title,
       titleSearchKey: titleSearchKey ?? this.titleSearchKey,
       rowid: rowid ?? this.rowid,
     );
@@ -695,6 +737,9 @@ class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
     if (titleSearchKey.present) {
       map['title_search_key'] = Variable<String>(titleSearchKey.value);
     }
@@ -707,6 +752,7 @@ class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
   @override
   String toString() {
     return (StringBuffer('IntentionTitlesFtsCompanion(')
+          ..write('title: $title, ')
           ..write('titleSearchKey: $titleSearchKey, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -720,15 +766,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Intentions intentions = Intentions(this);
   late final IntentionTitlesFts intentionTitlesFts = IntentionTitlesFts(this);
   late final Trigger intentionsFtsAfterInsert = Trigger(
-    'CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
+    'CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts ("rowid", title, title_search_key) VALUES (new."rowid", new.title, new.title_search_key);END',
     'intentions_fts_after_insert',
   );
-  late final Trigger intentionsFtsAfterUpdateTitleSearchKey = Trigger(
-    'CREATE TRIGGER intentions_fts_after_update_title_search_key AFTER UPDATE OF title_search_key ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
-    'intentions_fts_after_update_title_search_key',
+  late final Trigger intentionsFtsAfterUpdateSearchContent = Trigger(
+    'CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE OF title, title_search_key ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title, title_search_key) VALUES (\'delete\', old."rowid", old.title, old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title, title_search_key) VALUES (new."rowid", new.title, new.title_search_key);END',
+    'intentions_fts_after_update_search_content',
   );
   late final Trigger intentionsFtsAfterDelete = Trigger(
-    'CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);END',
+    'CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title, title_search_key) VALUES (\'delete\', old."rowid", old.title, old.title_search_key);END',
     'intentions_fts_after_delete',
   );
   late final Index intentionsActiveCreatedAtAscIdAsc = Index(
@@ -787,7 +833,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     intentions,
     intentionTitlesFts,
     intentionsFtsAfterInsert,
-    intentionsFtsAfterUpdateTitleSearchKey,
+    intentionsFtsAfterUpdateSearchContent,
     intentionsFtsAfterDelete,
     intentionsActiveCreatedAtAscIdAsc,
     intentionsActiveCreatedAtDescIdAsc,
@@ -1085,11 +1131,13 @@ typedef $IntentionsProcessedTableManager =
     >;
 typedef $IntentionTitlesFtsCreateCompanionBuilder =
     IntentionTitlesFtsCompanion Function({
+      required String title,
       required String titleSearchKey,
       Value<int> rowid,
     });
 typedef $IntentionTitlesFtsUpdateCompanionBuilder =
     IntentionTitlesFtsCompanion Function({
+      Value<String> title,
       Value<String> titleSearchKey,
       Value<int> rowid,
     });
@@ -1103,6 +1151,11 @@ class $IntentionTitlesFtsFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get titleSearchKey => $composableBuilder(
     column: $table.titleSearchKey,
     builder: (column) => ColumnFilters(column),
@@ -1118,6 +1171,11 @@ class $IntentionTitlesFtsOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get titleSearchKey => $composableBuilder(
     column: $table.titleSearchKey,
     builder: (column) => ColumnOrderings(column),
@@ -1133,6 +1191,9 @@ class $IntentionTitlesFtsAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
   GeneratedColumn<String> get titleSearchKey => $composableBuilder(
     column: $table.titleSearchKey,
     builder: (column) => column,
@@ -1174,17 +1235,21 @@ class $IntentionTitlesFtsTableManager
               $IntentionTitlesFtsAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<String> title = const Value.absent(),
                 Value<String> titleSearchKey = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => IntentionTitlesFtsCompanion(
+                title: title,
                 titleSearchKey: titleSearchKey,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
+                required String title,
                 required String titleSearchKey,
                 Value<int> rowid = const Value.absent(),
               }) => IntentionTitlesFtsCompanion.insert(
+                title: title,
                 titleSearchKey: titleSearchKey,
                 rowid: rowid,
               ),
