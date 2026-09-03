@@ -581,7 +581,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/fts_query.dart`, `lib/src/data/local/schema/intention_schema.drift`, generated Drift/schema artifacts, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/data/local/fts_consistency_test.dart`, migration/schema tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.17 Проверить семантическую целостность catalog snapshots после remediation
+- [x] 6.17 Проверить семантическую целостность catalog snapshots после remediation
   - **Критерии приёмки:**
     - Evidence задач 6.10, 6.15 и 6.16 совместно подтверждает точную SQLite-классификацию, timestamp contract, lossless detail rehydration и семантически согласованные ограниченные catalog snapshots через публичную seam.
     - Corrupt-row matrix доказывает terminal corruption до typed coercion подробных данных и отсутствие успешной страницы либо ложного count при несогласованных производных storage-полях каталога.
