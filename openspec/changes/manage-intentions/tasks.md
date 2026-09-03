@@ -520,7 +520,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/sqlite_failure_classifier.dart`, `test/data/local/sqlite_failure_classifier_test.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 6.12 Проверить точную SQLite-классификацию на всех затронутых boundaries
+- [x] 6.12 Проверить точную SQLite-классификацию на всех затронутых boundaries
   - **Критерии приёмки:**
     - Сфокусированная failure matrix доказывает одинаковую классификацию на classifier, bootstrap и repository boundaries без retry для постоянных, повреждающих и неизвестных причин.
     - Specs, design, задачи и реализация согласованно различают unavailable, corruption и unexpected по точной машинной семантике без анализа текста exception или утечки storage-specific types.
