@@ -508,7 +508,7 @@
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 6.11 Заменить широкую SQLite-классификацию из 5.2, 5.5 и 6.1 точным extended-code contract
+- [x] 6.11 Заменить широкую SQLite-классификацию из 5.2, 5.5 и 6.1 точным extended-code contract
   - **Критерии приёмки:**
     - Единый classifier использует полный `extendedResultCode`: семейства `CORRUPT`/`NOTADB` и точный `IOERR_DATA` возвращают corruption, а unavailable ограничен точными `BUSY`, `BUSY_RECOVERY`, `BUSY_SNAPSHOT`, `BUSY_TIMEOUT`, `LOCKED`, `LOCKED_SHAREDCACHE` и `LOCKED_VTAB`.
     - Первичные `CANTOPEN`/`IOERR`, их невнесённые в allowlist extended variants, включая `CANTOPEN_ISDIR` и `IOERR_CORRUPTFS`, и любой новый неизвестный extended code возвращают unexpected; bootstrap и repository boundaries одинаково сохраняют retryability, terminal detail-stream semantics и allowlisted diagnostics без exception, SQL, UUID и пользовательского текста.

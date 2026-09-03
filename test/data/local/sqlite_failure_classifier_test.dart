@@ -28,16 +28,15 @@ void main() {
       },
     );
 
-    test('разрешает retry только для временной SQLite allowlist', () {
+    test('разрешает retry только для точной временной SQLite allowlist', () {
       for (final code in [
         SqlError.SQLITE_BUSY,
         SqlExtendedError.SQLITE_BUSY_RECOVERY,
+        SqlExtendedError.SQLITE_BUSY_SNAPSHOT,
+        SqlExtendedError.SQLITE_BUSY_TIMEOUT,
         SqlError.SQLITE_LOCKED,
         SqlExtendedError.SQLITE_LOCKED_SHAREDCACHE,
-        SqlError.SQLITE_CANTOPEN,
-        SqlExtendedError.SQLITE_CANTOPEN_ISDIR,
-        SqlError.SQLITE_IOERR,
-        SqlExtendedError.SQLITE_IOERR_READ,
+        SqlExtendedError.SQLITE_LOCKED_VTAB,
       ]) {
         expect(
           classifySqliteFailure(
@@ -51,19 +50,52 @@ void main() {
       }
     });
 
+    test('классифицирует IOERR_DATA как повреждение', () {
+      expect(
+        classifySqliteFailure(
+          SqliteException(
+            extendedResultCode: SqlExtendedError.SQLITE_IOERR_DATA,
+            message: 'CANARY-личные-данные',
+          ),
+        ),
+        isA<SqliteCorruptionFailure>(),
+      );
+    });
+
+    test('оставляет первичные и неизвестные extended коды unexpected', () {
+      for (final code in [
+        SqlError.SQLITE_CANTOPEN,
+        SqlExtendedError.SQLITE_CANTOPEN_ISDIR,
+        SqlError.SQLITE_IOERR,
+        _sqliteIoerrCorruptFs,
+        SqlError.SQLITE_BUSY | (999 << 8),
+        SqlError.SQLITE_CONSTRAINT | (999 << 8),
+      ]) {
+        expect(
+          classifySqliteFailure(
+            SqliteException(
+              extendedResultCode: code,
+              message: 'CANARY-личные-данные',
+            ),
+          ),
+          isA<SqliteUnexpectedFailure>(),
+        );
+      }
+    });
+
     test('раскрывает вложенные DriftRemoteException до SQLite причины', () {
       final failure = classifySqliteFailure(
         _NestedDriftRemoteException(
           _NestedDriftRemoteException(
             SqliteException(
-              extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
+              extendedResultCode: SqlExtendedError.SQLITE_IOERR_DATA,
               message: 'CANARY-личные-данные',
             ),
           ),
         ),
       );
 
-      expect(failure, isA<SqliteUnavailableFailure>());
+      expect(failure, isA<SqliteCorruptionFailure>());
     });
 
     test('сохраняет extended код всех известных constraint без предметного conflict', () {
@@ -126,3 +158,5 @@ final class _NestedDriftRemoteException implements DriftRemoteException {
   @override
   StackTrace? get remoteStackTrace => null;
 }
+
+const _sqliteIoerrCorruptFs = 8458;

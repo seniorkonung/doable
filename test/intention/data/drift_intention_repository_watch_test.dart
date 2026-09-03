@@ -300,6 +300,28 @@ void main() {
       );
     });
 
+    test(
+      'превращает IOERR_DATA в corruption failure и завершает подписку',
+      () async {
+        final interceptor = _SelectFailureInterceptor();
+        await database.close();
+        database = AppDatabase(
+          NativeDatabase.memory().interceptWith(interceptor),
+        );
+        await database.open();
+        repository = _repository(database, diagnostics);
+        interceptor.failure = SqliteException(
+          extendedResultCode: SqlExtendedError.SQLITE_IOERR_DATA,
+          message: 'CANARY-exception-личные-данные',
+        );
+
+        await expectLater(
+          repository.watchById(_id(_uuidV7)),
+          emitsInOrder([_isFailure<IntentionCorruptionFailure>(), emitsDone]),
+        );
+      },
+    );
+
     test('превращает constraint и неизвестную ошибку чтения в unexpected и завершает подписку', () async {
       final interceptor = _SelectFailureInterceptor();
       await database.close();
@@ -312,6 +334,18 @@ void main() {
       for (final failure in <Object>[
         SqliteException(
           extendedResultCode: SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
+          message: 'CANARY-exception-личные-данные',
+        ),
+        SqliteException(
+          extendedResultCode: SqlError.SQLITE_CANTOPEN,
+          message: 'CANARY-exception-личные-данные',
+        ),
+        SqliteException(
+          extendedResultCode: _sqliteIoerrCorruptFs,
+          message: 'CANARY-exception-личные-данные',
+        ),
+        SqliteException(
+          extendedResultCode: SqlError.SQLITE_BUSY | (999 << 8),
           message: 'CANARY-exception-личные-данные',
         ),
         StateError('CANARY-exception-личные-данные'),
@@ -328,6 +362,7 @@ void main() {
 
 const _uuidV4 = '550e8400-e29b-41d4-a716-446655440000';
 const _uuidV7 = '018f0b5d-6b2e-7c80-8000-000000000300';
+const _sqliteIoerrCorruptFs = 8458;
 
 DriftIntentionRepository _repository(
   AppDatabase database,

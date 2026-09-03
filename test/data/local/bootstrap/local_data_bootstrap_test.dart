@@ -11,6 +11,8 @@ import 'package:sqlite3/sqlite3.dart';
 
 import '../../../support/in_memory_diagnostics_sink.dart';
 
+const _sqliteIoerrCorruptFs = 8458;
+
 void main() {
   group('LocalDataBootstrap', () {
     test(
@@ -342,7 +344,19 @@ void main() {
     test('оставляет временные SQLite-ошибки retryable', () async {
       for (final exception in [
         SqliteException(
+          extendedResultCode: SqlError.SQLITE_BUSY,
+          message: 'SQLite-файл повреждён',
+        ),
+        SqliteException(
           extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
+          message: 'SQLite-файл повреждён',
+        ),
+        SqliteException(
+          extendedResultCode: SqlExtendedError.SQLITE_BUSY_SNAPSHOT,
+          message: 'SQLite-файл повреждён',
+        ),
+        SqliteException(
+          extendedResultCode: SqlExtendedError.SQLITE_BUSY_TIMEOUT,
           message: 'SQLite-файл повреждён',
         ),
         SqliteException(
@@ -350,11 +364,11 @@ void main() {
           message: 'SQLite-файл повреждён',
         ),
         SqliteException(
-          extendedResultCode: SqlError.SQLITE_CANTOPEN,
+          extendedResultCode: SqlExtendedError.SQLITE_LOCKED_SHAREDCACHE,
           message: 'SQLite-файл повреждён',
         ),
         SqliteException(
-          extendedResultCode: SqlExtendedError.SQLITE_IOERR_READ,
+          extendedResultCode: SqlExtendedError.SQLITE_LOCKED_VTAB,
           message: 'SQLite-файл повреждён',
         ),
       ]) {
@@ -375,6 +389,75 @@ void main() {
           DiagnosticsFailureCode.unavailable,
         );
       }
+    });
+
+    test(
+      'не предлагает retry для CANTOPEN, неразрешённых IOERR и unknown',
+      () async {
+        for (final exception in [
+          SqliteException(
+            extendedResultCode: SqlError.SQLITE_CANTOPEN,
+            message: 'CANARY-личные-данные',
+          ),
+          SqliteException(
+            extendedResultCode: SqlExtendedError.SQLITE_CANTOPEN_ISDIR,
+            message: 'CANARY-личные-данные',
+          ),
+          SqliteException(
+            extendedResultCode: SqlError.SQLITE_IOERR,
+            message: 'CANARY-личные-данные',
+          ),
+          SqliteException(
+            extendedResultCode: _sqliteIoerrCorruptFs,
+            message: 'CANARY-личные-данные',
+          ),
+          SqliteException(
+            extendedResultCode: SqlError.SQLITE_BUSY | (999 << 8),
+            message: 'CANARY-личные-данные',
+          ),
+        ]) {
+          final diagnosticsSink = InMemoryDiagnosticsSink();
+          _CloseTrackingExecutor? failedExecutor;
+          final bootstrap = LocalDataBootstrap(
+            executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+              NativeDatabase.memory(setup: (_) => throw exception),
+            ),
+            diagnosticsSink: diagnosticsSink,
+          );
+          addTearDown(bootstrap.close);
+
+          expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
+          expect(failedExecutor!.closeCalls, 1);
+          _expectBootstrapFailureCode(
+            diagnosticsSink,
+            DiagnosticsFailureCode.unexpected,
+          );
+        }
+      },
+    );
+
+    test('классифицирует IOERR_DATA как non-retryable corruption', () async {
+      final diagnosticsSink = InMemoryDiagnosticsSink();
+      _CloseTrackingExecutor? failedExecutor;
+      final bootstrap = LocalDataBootstrap(
+        executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+          NativeDatabase.memory(
+            setup: (_) => throw SqliteException(
+              extendedResultCode: SqlExtendedError.SQLITE_IOERR_DATA,
+              message: 'CANARY-личные-данные',
+            ),
+          ),
+        ),
+        diagnosticsSink: diagnosticsSink,
+      );
+      addTearDown(bootstrap.close);
+
+      expect(await bootstrap.open(), isA<LocalDataCorruption>());
+      expect(failedExecutor!.closeCalls, 1);
+      _expectBootstrapFailureCode(
+        diagnosticsSink,
+        DiagnosticsFailureCode.corruption,
+      );
     });
 
     test('записывает безопасные события bootstrap и миграции', () async {

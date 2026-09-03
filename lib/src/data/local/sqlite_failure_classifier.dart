@@ -26,22 +26,52 @@ final class SqliteUnexpectedFailure extends SqliteFailure {
 SqliteFailure classifySqliteFailure(Object error) {
   final cause = unwrapDriftRemoteException(error);
   return switch (cause) {
-    SqliteException(:final resultCode, :final extendedResultCode) =>
-      switch (resultCode) {
-        SqlError.SQLITE_CORRUPT ||
-        SqlError.SQLITE_NOTADB => const SqliteCorruptionFailure(),
-        SqlError.SQLITE_BUSY ||
-        SqlError.SQLITE_LOCKED ||
-        SqlError.SQLITE_CANTOPEN ||
-        SqlError.SQLITE_IOERR => const SqliteUnavailableFailure(),
-        SqlError.SQLITE_CONSTRAINT => SqliteConstraintFailure(
-          extendedResultCode,
-        ),
-        _ => const SqliteUnexpectedFailure(),
-      },
+    SqliteException(:final extendedResultCode) => switch (extendedResultCode) {
+      SqlExtendedError.SQLITE_IOERR_DATA => const SqliteCorruptionFailure(),
+      _ when _isCorruptionFamily(extendedResultCode) =>
+        const SqliteCorruptionFailure(),
+      _ when _unavailableExtendedResultCodes.contains(extendedResultCode) =>
+        const SqliteUnavailableFailure(),
+      _ when _constraintExtendedResultCodes.contains(extendedResultCode) =>
+        SqliteConstraintFailure(extendedResultCode),
+      _ => const SqliteUnexpectedFailure(),
+    },
     _ => const SqliteUnexpectedFailure(),
   };
 }
+
+const _unavailableExtendedResultCodes = <int>{
+  SqlError.SQLITE_BUSY,
+  SqlExtendedError.SQLITE_BUSY_RECOVERY,
+  SqlExtendedError.SQLITE_BUSY_SNAPSHOT,
+  SqlExtendedError.SQLITE_BUSY_TIMEOUT,
+  SqlError.SQLITE_LOCKED,
+  SqlExtendedError.SQLITE_LOCKED_SHAREDCACHE,
+  SqlExtendedError.SQLITE_LOCKED_VTAB,
+};
+
+const _constraintExtendedResultCodes = <int>{
+  SqlError.SQLITE_CONSTRAINT,
+  SqlExtendedError.SQLITE_CONSTRAINT_CHECK,
+  SqlExtendedError.SQLITE_CONSTRAINT_COMMITHOOK,
+  SqlExtendedError.SQLITE_CONSTRAINT_FOREIGNKEY,
+  SqlExtendedError.SQLITE_CONSTRAINT_FUNCTION,
+  SqlExtendedError.SQLITE_CONSTRAINT_NOTNULL,
+  SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY,
+  SqlExtendedError.SQLITE_CONSTRAINT_TRIGGER,
+  SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
+  SqlExtendedError.SQLITE_CONSTRAINT_VTAB,
+  SqlExtendedError.SQLITE_CONSTRAINT_ROWID,
+  SqlExtendedError.SQLITE_CONSTRAINT_PINNED,
+};
+
+bool _isCorruptionFamily(int extendedResultCode) {
+  final primaryResultCode = _primaryResultCode(extendedResultCode);
+  return primaryResultCode == SqlError.SQLITE_CORRUPT ||
+      primaryResultCode == SqlError.SQLITE_NOTADB;
+}
+
+int _primaryResultCode(int extendedResultCode) => extendedResultCode & 0xff;
 
 Object unwrapDriftRemoteException(Object error) {
   var cause = error;
