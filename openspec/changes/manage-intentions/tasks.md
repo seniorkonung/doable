@@ -483,6 +483,18 @@
   - **Вероятно затронутые файлы:** `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/support/intention_repository_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart`.
   - **Оценка:** M (3 файла).
 
+- [ ] 6.9a Разделить быстрый и полный check без потери large-fixture evidence
+  - **Критерии приёмки:**
+    - Large-fixture suite получает file-level tag `slow`, объявленный в package-level test configuration; тег классифицирует только длительность запуска и не представляет suite как benchmark.
+    - Новый `mise run check-fast` выполняет форматирование, статический анализ и тесты с исключённым `slow`, а существующий `mise run check` сохраняет прежнюю полную семантику и запускает все тесты без фильтрации.
+    - Быстрый локальный цикл не ослабляет полный regression gate: `check` продолжает включать large-fixture evidence в финальные проверки Phase 6, а отдельных `test-*` команд не вводится.
+  - **Проверка:**
+    - Выполнить `mise run check-fast` и `mise run check`, подтвердив соответственно исключение и включение large-fixture suite вместе с форматированием и статическим анализом.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.9.
+  - **Вероятно затронутые файлы:** `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `dart_test.yaml`, `mise.toml`.
+  - **Оценка:** XS (3 файла).
+
 - [ ] 6.10 Проверить полный постоянный lifecycle через публичную seam
   - **Критерии приёмки:**
     - Repository suite через один и тот же `IntentionRepository` contract подтверждает создание, bounded catalog, фильтр, точный count, четыре порядка, opaque continuations, подробное чтение, изменение, readiness, архивирование, восстановление, удаление, file-backed reopen, concurrent и failure paths.
@@ -492,7 +504,7 @@
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.8a, 6.9.
+  - **Зависимости:** 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.8a, 6.9, 6.9a.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
