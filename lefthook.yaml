@@ -1,6 +1,6 @@
 pre-push:
   jobs:
-    - run: mise run check
+    - run: mise run check-fast
 
 pre-commit:
   jobs:
