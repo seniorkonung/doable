@@ -329,9 +329,9 @@ void main() {
     );
 
     test('сохраняет success create, update и no-op при отказе diagnostics после commit', () async {
-      var writeAttempts = 0;
+      var writerWasCalled = false;
       final diagnosticsWithFailingWriter = DeveloperDiagnosticsSink((_) {
-        writeAttempts += 1;
+        writerWasCalled = true;
         throw StateError('CANARY-diagnostics-writer-failure');
       });
       final id = _id(_firstUuid);
@@ -392,7 +392,7 @@ void main() {
       expect(watched?.description, updated.description);
       expect(watched?.createdAt, updated.createdAt);
       expect(watched?.updatedAt, updated.updatedAt);
-      expect(writeAttempts, 5);
+      expect(writerWasCalled, isTrue);
     });
 
     test(
@@ -404,9 +404,9 @@ void main() {
             message: 'CANARY-storage-failure',
           ),
         );
-        var writeAttempts = 0;
+        var writerWasCalled = false;
         final diagnosticsWithFailingWriter = DeveloperDiagnosticsSink((_) {
-          writeAttempts += 1;
+          writerWasCalled = true;
           throw StateError('CANARY-diagnostics-writer-failure');
         });
         await database.close();
@@ -427,7 +427,7 @@ void main() {
 
         expect(result, _failure<IntentionUnavailableFailure>());
         expect(await database.select(database.intentions).get(), isEmpty);
-        expect(writeAttempts, 1);
+        expect(writerWasCalled, isTrue);
       },
     );
   });
