@@ -2,11 +2,10 @@
 
 ## Assessment
 
-**Result:** Changes needed
+**Result:** No unresolved findings
 
-Создание и изменение данных проведены через транзакционную repository seam. В
-текущем unresolved state остаётся принятый остаточный риск регрессии `updatedAt`
-при коррекции системных часов.
+Создание и изменение данных проведены через транзакционную repository seam;
+нерешённых замечаний по проверенному инкременту не осталось.
 
 ## Review target
 
@@ -18,8 +17,7 @@
 - **Target scope:** Complete pre-push range
 - **Baseline freshness:** Local tracking state; no fetch performed
 - **Excluded worktree state:** при discovery рабочее дерево было чистым; текущая
-  planning remediation в `design.md` и `tasks.md`, а также правка этого отчёта
-  исключены из review target
+  правка `design.md` и этого отчёта исключена из review target
 
 ## Reviewed increment
 
@@ -55,28 +53,7 @@
 
 ## Findings
 
-### F2 · Medium — Изменённые данные могут получить равный или меньший `updatedAt`
-
-- **Evidence:** при фактическом изменении `_updateIntention` присваивает
-  `updatedAt` непосредственно из `_now()`
-  (`lib/src/intention/data/drift_intention_repository.dart:204-227`). Domain
-  проверяет только `updatedAt >= createdAt`, но не сравнивает новое значение с
-  прежним `updatedAt` (`lib/src/intention/domain/intention.dart:17-25,53-56`).
-  Поэтому равное прежнему время допускает изменение данных без изменения marker,
-  а wall-clock между `createdAt` и прежним `updatedAt` регрессирует marker. Design
-  явно фиксирует это как принятый остаточный риск.
-- **Impact:** каталог по времени изменения может переместить только что изменённое
-  намерение назад или не различить новое состояние по времени; значение раньше
-  `createdAt` превращает допустимое изменение в unexpected failure.
-- **Required outcome:** семантика времени последнего изменения должна оставаться
-  согласованной между requirements, design, implementation и catalog ordering;
-  фактическое изменение должно иметь однозначно определённое поведение при равном
-  или откатившемся wall-clock.
-- **Earliest source of truth:** requirement/proposal
-- **Affected artifacts:** requirement `Время создания и обновления намерения`,
-  design § 2 и его residual-risk section, задача 6.5, domain timestamp и command
-  implementation/tests
-- **Disposition:** Accepted risk
+В implementation review не осталось нерешённых замечаний.
 
 ## Review coverage
 
