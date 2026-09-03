@@ -81,6 +81,20 @@ void main() {
         expect(messages.join(), isNot(contains(canary)));
       }
     });
+
+    test('production adapter подавляет ошибки writer для каждого события без повторной записи', () {
+      var writeAttempts = 0;
+      final sink = DeveloperDiagnosticsSink((_) {
+        writeAttempts += 1;
+        throw StateError('CANARY-diagnostics-writer-failure');
+      });
+
+      for (final event in _events()) {
+        expect(() => sink.record(event), returnsNormally);
+      }
+
+      expect(writeAttempts, _events().length);
+    });
   });
 }
 

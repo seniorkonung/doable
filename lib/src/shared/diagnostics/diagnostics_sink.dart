@@ -1,4 +1,5 @@
 abstract interface class DiagnosticsSink {
+  /// Выполняет best-effort запись и не выпускает ошибки в вызывающий код.
   void record(DiagnosticsEvent event);
 }
 

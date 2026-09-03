@@ -410,7 +410,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** M (5 файлов).
 
-- [ ] 6.5a Изолировать отказ diagnostics от результата command
+- [x] 6.5a Изолировать отказ diagnostics от результата command
   - **Критерии приёмки:**
     - `DiagnosticsSink` является best-effort/no-throw interface: production adapter перехватывает любую собственную ошибку кодирования или writer, не предпринимает рекурсивную диагностическую запись и не выпускает исключение caller.
     - После commit `CreateIntention`, `UpdateIntention` и no-op возвращают исходный `ResultSuccess<IntentionCommandSuccess>` даже при отказе diagnostics writer; сохранённая строка, FTS-представление и следующий snapshot `watchById` соответствуют этому success без повторной command или переклассификации в failure.

@@ -13,7 +13,11 @@ final class DeveloperDiagnosticsSink implements DiagnosticsSink {
 
   @override
   void record(DiagnosticsEvent event) {
-    _write(jsonEncode(_encode(event)));
+    try {
+      _write(jsonEncode(_encode(event)));
+    } on Object {
+      // Diagnostics остаётся best-effort: повторная запись здесь недопустима.
+    }
   }
 
   static void _writeToDeveloperLog(String message) {

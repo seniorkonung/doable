@@ -5,10 +5,12 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
 
@@ -325,6 +327,109 @@ void main() {
         ]);
       },
     );
+
+    test('сохраняет success create, update и no-op при отказе diagnostics после commit', () async {
+      var writeAttempts = 0;
+      final diagnosticsWithFailingWriter = DeveloperDiagnosticsSink((_) {
+        writeAttempts += 1;
+        throw StateError('CANARY-diagnostics-writer-failure');
+      });
+      final id = _id(_firstUuid);
+      clock = _DeterministicClock([
+        DateTime.utc(2026, 9, 3, 12),
+        DateTime.utc(2026, 9, 3, 13),
+      ]);
+      repository = DriftIntentionRepository(
+        database,
+        idGenerator,
+        clock.call,
+        diagnosticsWithFailingWriter,
+      );
+
+      final created = _saved(
+        await repository.execute(
+          const CreateIntention(
+            title: 'Исходное название',
+            description: 'Исходное описание',
+          ),
+        ),
+      );
+      final updated = _saved(
+        await repository.execute(
+          UpdateIntention(
+            id: id,
+            title: 'Обновлённое название',
+            description: 'Обновлённое описание',
+          ),
+        ),
+      );
+      final noOp = _saved(
+        await repository.execute(
+          UpdateIntention(
+            id: id,
+            title: 'Обновлённое название',
+            description: 'Обновлённое описание',
+          ),
+        ),
+      );
+
+      expect(created.id, id);
+      expect(updated.title, 'Обновлённое название');
+      expect(noOp.id, updated.id);
+      expect(noOp.title, updated.title);
+      expect(noOp.description, updated.description);
+      expect(noOp.createdAt, updated.createdAt);
+      expect(noOp.updatedAt, updated.updatedAt);
+      final row = await (database.select(
+        database.intentions,
+      )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+      expect(row.titleSearchKey, 'обновлённое название');
+      final snapshot = await repository.watchById(id).first;
+      expect(snapshot, isA<ResultSuccess<Intention?>>());
+      final watched = (snapshot as ResultSuccess<Intention?>).value;
+      expect(watched?.id, id);
+      expect(watched?.title, updated.title);
+      expect(watched?.description, updated.description);
+      expect(watched?.createdAt, updated.createdAt);
+      expect(watched?.updatedAt, updated.updatedAt);
+      expect(writeAttempts, 5);
+    });
+
+    test(
+      'сохраняет typed storage failure при отказе diagnostics writer',
+      () async {
+        final storageFailure = _InsertFailureInterceptor(
+          SqliteException(
+            extendedResultCode: SqlError.SQLITE_BUSY,
+            message: 'CANARY-storage-failure',
+          ),
+        );
+        var writeAttempts = 0;
+        final diagnosticsWithFailingWriter = DeveloperDiagnosticsSink((_) {
+          writeAttempts += 1;
+          throw StateError('CANARY-diagnostics-writer-failure');
+        });
+        await database.close();
+        database = AppDatabase(
+          NativeDatabase.memory().interceptWith(storageFailure),
+        );
+        await database.open();
+        repository = DriftIntentionRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnosticsWithFailingWriter,
+        );
+
+        final result = await repository.execute(
+          const CreateIntention(title: 'Намерение', description: null),
+        );
+
+        expect(result, _failure<IntentionUnavailableFailure>());
+        expect(await database.select(database.intentions).get(), isEmpty);
+        expect(writeAttempts, 1);
+      },
+    );
   });
 }
 
@@ -438,4 +543,17 @@ final class _WriteTrace extends QueryInterceptor {
     updateStatements.add(statement);
     return super.runUpdate(executor, statement, args);
   }
+}
+
+final class _InsertFailureInterceptor extends QueryInterceptor {
+  _InsertFailureInterceptor(this.failure);
+
+  final Object failure;
+
+  @override
+  Future<int> runInsert(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) => Future<int>.error(failure);
 }
