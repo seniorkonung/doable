@@ -277,6 +277,115 @@ void main() {
       },
     );
 
+    test(
+      'отклоняет недопустимые raw storage-значения до typed Drift mapping',
+      () async {
+        final fixtures = [
+          (
+            id: _id('018f0b5d-6b2e-7c80-8000-000000000306'),
+            isActionReady: 2 as Object,
+            isArchived: 0 as Object,
+            createdAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            updatedAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            description: null as Object?,
+          ),
+          (
+            id: _id('018f0b5d-6b2e-7c80-8000-000000000307'),
+            isActionReady: -1 as Object,
+            isArchived: 0 as Object,
+            createdAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            updatedAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            description: null as Object?,
+          ),
+          (
+            id: _id('018f0b5d-6b2e-7c80-8000-000000000308'),
+            isActionReady: 1.5 as Object,
+            isArchived: 0 as Object,
+            createdAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            updatedAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            description: null as Object?,
+          ),
+          (
+            id: _id('018f0b5d-6b2e-7c80-8000-000000000309'),
+            isActionReady: 0 as Object,
+            isArchived: 0 as Object,
+            createdAt: 1.5 as Object,
+            updatedAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            description: null as Object?,
+          ),
+          (
+            id: _id('018f0b5d-6b2e-7c80-8000-000000000310'),
+            isActionReady: 0 as Object,
+            isArchived: 0 as Object,
+            createdAt: 9223372036854775807 as Object,
+            updatedAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            description: null as Object?,
+          ),
+          (
+            id: _id('018f0b5d-6b2e-7c80-8000-000000000311'),
+            isActionReady: Uint8List.fromList([1]) as Object,
+            isArchived: 0 as Object,
+            createdAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            updatedAt:
+                DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
+            description: Uint8List.fromList([1]) as Object,
+          ),
+        ];
+
+        await database.customStatement('PRAGMA ignore_check_constraints = ON');
+        for (final fixture in fixtures) {
+          await _insertRawIntention(
+            database,
+            id: fixture.id.toCanonicalString(),
+            description: fixture.description,
+            isActionReady: fixture.isActionReady,
+            isArchived: fixture.isArchived,
+            createdAt: fixture.createdAt,
+            updatedAt: fixture.updatedAt,
+          );
+        }
+        await database.customStatement('PRAGMA ignore_check_constraints = OFF');
+
+        for (final fixture in fixtures) {
+          await expectLater(
+            repository.watchById(fixture.id),
+            emitsInOrder([_isFailure<IntentionCorruptionFailure>(), emitsDone]),
+          );
+        }
+      },
+    );
+
+    test('отклоняет null в обязательном raw storage-поле', () async {
+      final interceptor = _RawRowValueInterceptor();
+      await database.close();
+      database = AppDatabase(
+        NativeDatabase.memory().interceptWith(interceptor),
+      );
+      await database.open();
+      repository = _repository(database, diagnostics);
+      final id = _id(_uuidV7);
+      await _insertIntention(
+        database,
+        id: id.toCanonicalString(),
+        title: 'Корректное название',
+      );
+      interceptor.overrides = const {'title': null};
+
+      await expectLater(
+        repository.watchById(id),
+        emitsInOrder([_isFailure<IntentionCorruptionFailure>(), emitsDone]),
+      );
+    });
+
     test('превращает временную SQLite-недоступность в failure и завершает подписку', () async {
       final interceptor = _SelectFailureInterceptor();
       await database.close();
@@ -404,6 +513,39 @@ Future<void> _insertIntention(
       );
 }
 
+Future<void> _insertRawIntention(
+  AppDatabase database, {
+  required String id,
+  required Object isActionReady,
+  required Object isArchived,
+  required Object createdAt,
+  required Object updatedAt,
+  Object? description,
+}) => database.customStatement(
+  '''
+    INSERT INTO intentions (
+      id,
+      title,
+      title_search_key,
+      description,
+      is_action_ready,
+      is_archived,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  ''',
+  [
+    id,
+    'Корректное название',
+    'корректное название',
+    description,
+    isActionReady,
+    isArchived,
+    createdAt,
+    updatedAt,
+  ],
+);
+
 IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw ArgumentError.value(value, 'value'),
@@ -465,5 +607,24 @@ final class _SelectFailureInterceptor extends QueryInterceptor {
     return failure == null
         ? super.runSelect(executor, statement, args)
         : Future.error(failure);
+  }
+}
+
+final class _RawRowValueInterceptor extends QueryInterceptor {
+  Map<String, Object?>? overrides;
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) async {
+    final rows = await super.runSelect(executor, statement, args);
+    final overrides = this.overrides;
+    return overrides == null
+        ? rows
+        : [
+            for (final row in rows) {...row, ...overrides},
+          ];
   }
 }

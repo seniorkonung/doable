@@ -544,7 +544,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention.dart`, `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/data/local/schema/intention_schema.drift`, generated Drift/schema artifacts, domain/application/repository/schema/migration tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.14 Исключить lossy typed coercion до rehydration подробных данных намерения
+- [x] 6.14 Исключить lossy typed coercion до rehydration подробных данных намерения
   - **Критерии приёмки:**
     - `watchById` получает исходные значения строки до generated Drift mapping и принимает только `String`/допустимый `null` для текстовых полей, целые `0` или `1` для readiness и archive state и целые микросекунды для обоих timestamps; storage-specific представление не пересекает публичную seam.
     - `REAL`, `BLOB`, посторонний Dart-тип, `null` в обязательном поле, boolean-значение вне `0`/`1` или timestamp вне поддерживаемого диапазона `DateTime` завершают подписку одним `IntentionCorruptionFailure` без успешного либо частично построенного намерения, тогда как корректные UUID v4/v7, текст, состояния и представимые UTC timestamps восстанавливаются без изменения независимо от взаимного порядка `createdAt` и `updatedAt`.

@@ -93,10 +93,25 @@ final class DriftIntentionRepository implements IntentionRepository {
     );
 
     try {
-      final query = _database.select(_database.intentions)
-        ..where((row) => row.id.equals(id.toCanonicalString()));
+      final query = _database.customSelect(
+        '''
+          SELECT
+            id,
+            title,
+            title_search_key,
+            description,
+            is_action_ready,
+            is_archived,
+            created_at,
+            updated_at
+          FROM intentions
+          WHERE id = ?
+        ''',
+        variables: [Variable<String>(id.toCanonicalString())],
+        readsFrom: {_database.intentions},
+      );
       await for (final row in query.watchSingleOrNull()) {
-        final intention = row == null ? null : _rehydrate(row);
+        final intention = row == null ? null : _rehydrateDetailRow(row);
         _diagnosticsSink.record(
           IntentionDetailReadDiagnosticsEvent(
             status: DiagnosticsSucceeded(stopwatch.elapsed),
@@ -525,37 +540,75 @@ final class DriftIntentionRepository implements IntentionRepository {
   );
 
   domain.Intention _rehydrate(local.Intention row) {
-    final id = switch (IntentionId.decode(row.id)) {
-      IntentionIdDecodingSuccess(:final id) => id,
-      InvalidIntentionIdDecoding() => throw const _StoredIntentionCorruption(),
-    };
-
     try {
-      final title = IntentionText.normalizeTitle(row.title);
-      final description = row.description == null
-          ? null
-          : IntentionText.normalizeDescription(row.description!);
-      if (title != row.title ||
-          description != row.description ||
-          row.titleSearchKey != title.toLowerCase()) {
-        throw const _StoredIntentionCorruption();
-      }
-      final createdAt = domain.IntentionTimestamp(
-        DateTime.fromMicrosecondsSinceEpoch(row.createdAt, isUtc: true),
-      );
-      final updatedAt = domain.IntentionTimestamp(
-        DateTime.fromMicrosecondsSinceEpoch(row.updatedAt, isUtc: true),
-      );
-      return domain.Intention(
-        id: id,
-        title: title,
-        description: description,
+      return _rehydrateValues(
+        id: row.id,
+        title: row.title,
+        titleSearchKey: row.titleSearchKey,
+        description: row.description,
         readiness: row.isActionReady
             ? domain.IntentionReadiness.ready
             : domain.IntentionReadiness.notReady,
         archiveState: row.isArchived
             ? domain.IntentionArchiveState.archived
             : domain.IntentionArchiveState.active,
+        createdAt: domain.IntentionTimestamp(
+          DateTime.fromMicrosecondsSinceEpoch(row.createdAt, isUtc: true),
+        ),
+        updatedAt: domain.IntentionTimestamp(
+          DateTime.fromMicrosecondsSinceEpoch(row.updatedAt, isUtc: true),
+        ),
+      );
+    } on ArgumentError catch (_) {
+      throw const _StoredIntentionCorruption();
+    }
+  }
+
+  domain.Intention _rehydrateDetailRow(QueryRow row) {
+    final stored = _StoredIntentionDetail.fromRawRow(row);
+    return _rehydrateValues(
+      id: stored.id,
+      title: stored.title,
+      titleSearchKey: stored.titleSearchKey,
+      description: stored.description,
+      readiness: stored.readiness,
+      archiveState: stored.archiveState,
+      createdAt: stored.createdAt,
+      updatedAt: stored.updatedAt,
+    );
+  }
+
+  domain.Intention _rehydrateValues({
+    required String id,
+    required String title,
+    required String titleSearchKey,
+    required String? description,
+    required domain.IntentionReadiness readiness,
+    required domain.IntentionArchiveState archiveState,
+    required domain.IntentionTimestamp createdAt,
+    required domain.IntentionTimestamp updatedAt,
+  }) {
+    final decodedId = switch (IntentionId.decode(id)) {
+      IntentionIdDecodingSuccess(:final id) => id,
+      InvalidIntentionIdDecoding() => throw const _StoredIntentionCorruption(),
+    };
+
+    try {
+      final normalizedTitle = IntentionText.normalizeTitle(title);
+      final normalizedDescription = description == null
+          ? null
+          : IntentionText.normalizeDescription(description);
+      if (normalizedTitle != title ||
+          normalizedDescription != description ||
+          titleSearchKey != normalizedTitle.toLowerCase()) {
+        throw const _StoredIntentionCorruption();
+      }
+      return domain.Intention(
+        id: decodedId,
+        title: normalizedTitle,
+        description: normalizedDescription,
+        readiness: readiness,
+        archiveState: archiveState,
         createdAt: createdAt,
         updatedAt: updatedAt,
       );
@@ -567,6 +620,92 @@ final class DriftIntentionRepository implements IntentionRepository {
       }
       rethrow;
     }
+  }
+}
+
+final class _StoredIntentionDetail {
+  const _StoredIntentionDetail({
+    required this.id,
+    required this.title,
+    required this.titleSearchKey,
+    required this.description,
+    required this.readiness,
+    required this.archiveState,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory _StoredIntentionDetail.fromRawRow(QueryRow row) {
+    final data = row.data;
+    return _StoredIntentionDetail(
+      id: _requiredString(data, 'id'),
+      title: _requiredString(data, 'title'),
+      titleSearchKey: _requiredString(data, 'title_search_key'),
+      description: _nullableString(data, 'description'),
+      readiness: _readiness(data, 'is_action_ready'),
+      archiveState: _archiveState(data, 'is_archived'),
+      createdAt: _timestamp(data, 'created_at'),
+      updatedAt: _timestamp(data, 'updated_at'),
+    );
+  }
+
+  final String id;
+  final String title;
+  final String titleSearchKey;
+  final String? description;
+  final domain.IntentionReadiness readiness;
+  final domain.IntentionArchiveState archiveState;
+  final domain.IntentionTimestamp createdAt;
+  final domain.IntentionTimestamp updatedAt;
+
+  static String _requiredString(Map<String, dynamic> data, String column) {
+    final value = data[column];
+    if (value is String) return value;
+    throw const _StoredIntentionCorruption();
+  }
+
+  static String? _nullableString(Map<String, dynamic> data, String column) {
+    final value = data[column];
+    if (value == null || value is String) return value;
+    throw const _StoredIntentionCorruption();
+  }
+
+  static domain.IntentionReadiness _readiness(
+    Map<String, dynamic> data,
+    String column,
+  ) => switch (_integer(data, column)) {
+    0 => domain.IntentionReadiness.notReady,
+    1 => domain.IntentionReadiness.ready,
+    _ => throw const _StoredIntentionCorruption(),
+  };
+
+  static domain.IntentionArchiveState _archiveState(
+    Map<String, dynamic> data,
+    String column,
+  ) => switch (_integer(data, column)) {
+    0 => domain.IntentionArchiveState.active,
+    1 => domain.IntentionArchiveState.archived,
+    _ => throw const _StoredIntentionCorruption(),
+  };
+
+  static domain.IntentionTimestamp _timestamp(
+    Map<String, dynamic> data,
+    String column,
+  ) {
+    final microseconds = _integer(data, column);
+    try {
+      return domain.IntentionTimestamp(
+        DateTime.fromMicrosecondsSinceEpoch(microseconds, isUtc: true),
+      );
+    } on ArgumentError catch (_) {
+      throw const _StoredIntentionCorruption();
+    }
+  }
+
+  static int _integer(Map<String, dynamic> data, String column) {
+    final value = data[column];
+    if (value is int) return value;
+    throw const _StoredIntentionCorruption();
   }
 }
 
