@@ -1,5 +1,5 @@
 lockfile_version: '2'
-generated_at: '2026-09-02T15:55:00.068219+00:00'
+generated_at: '2026-09-03T07:07:11.069282+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: fission-ai/openspec
@@ -84,7 +84,7 @@ dependencies:
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: 9fc0a9a21980ca54b162da394216a1953e7b443b
+  resolved_commit: 59bc9966f0417f50402e70c97c004e95ef72ec05
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
@@ -137,7 +137,7 @@ dependencies:
   - .codex/agents/security-auditor.toml
   - .codex/agents/test-engineer.toml
   deployed_file_hashes:
-    .agents/skills/change-summary/SKILL.md: sha256:4ae34cafbb85451d19dc2cddeb135584fc9bfb15de33534620c2d745e1f750c1
+    .agents/skills/change-summary/SKILL.md: sha256:cf4f96ab7bca9e995deeb88a8bff0a8e8d9cadf4fe775a451731f359445a7276
     .agents/skills/change-summary/agents/openai.yaml: sha256:a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94
     .agents/skills/code-review-and-quality/SKILL.md: sha256:0ff65150158adfd41844534948cbe4271e6a7a3aa463700a8d99caf550e38223
     .agents/skills/discussion/SKILL.md: sha256:e9c3423b73b4d572af3d95c8820142e18bb44e226adc92f1c297905e9835ca9a
@@ -170,7 +170,7 @@ dependencies:
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:cece806a305948fafafee209871327ae7d44c446b62fc919bf60a80d2470ada6
+  content_hash: sha256:a358cdccb1fc66e37414b1a398928ccb7c63530ac63de9bbcf4dd4cd6bb13e0c
   skill_subset:
   - change-summary
   - code-review-and-quality
@@ -215,7 +215,7 @@ dependencies:
   - agent-skills
   constraint: 0.6.5
   resolved_tag: 0.6.5
-  resolved_at: '2026-09-02T15:54:48+00:00'
+  resolved_at: '2026-09-03T07:06:59+00:00'
 - repo_url: mattpocock/skills
   name: mattpocock-skills
   host: github.com
@@ -320,7 +320,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:4ae34cafbb85451d19dc2cddeb135584fc9bfb15de33534620c2d745e1f750c1
+  content_hash: sha256:cf4f96ab7bca9e995deeb88a8bff0a8e8d9cadf4fe775a451731f359445a7276
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/change-summary/agents/openai.yaml
