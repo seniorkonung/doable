@@ -130,6 +130,22 @@ final class DriftIntentionRepository implements IntentionRepository {
         () => switch (command) {
           CreateIntention() => _createIntention(command),
           UpdateIntention() => _updateIntention(command),
+          EnableIntentionReadiness() => _changeReadiness(
+            command.id,
+            domain.IntentionReadiness.ready,
+          ),
+          DisableIntentionReadiness() => _changeReadiness(
+            command.id,
+            domain.IntentionReadiness.notReady,
+          ),
+          ArchiveIntention() => _changeArchiveState(
+            command.id,
+            domain.IntentionArchiveState.archived,
+          ),
+          RestoreIntention() => _changeArchiveState(
+            command.id,
+            domain.IntentionArchiveState.active,
+          ),
           _ => throw StateError('Неподдерживаемая команда намерения.'),
         },
       );
@@ -222,6 +238,72 @@ final class DriftIntentionRepository implements IntentionRepository {
         title: Value(updated.title),
         titleSearchKey: Value(updated.title.toLowerCase()),
         description: Value(updated.description),
+        updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
+      ),
+    );
+    return IntentionSaved(updated);
+  }
+
+  Future<IntentionSaved> _changeReadiness(
+    IntentionId id,
+    domain.IntentionReadiness readiness,
+  ) async {
+    final row = await (_database.select(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingleOrNull();
+    if (row == null) throw const _IntentionNotFound();
+
+    final existing = _rehydrate(row);
+    if (existing.readiness == readiness) return IntentionSaved(existing);
+
+    final updated = domain.Intention(
+      id: existing.id,
+      title: existing.title,
+      description: existing.description,
+      readiness: readiness,
+      archiveState: existing.archiveState,
+      createdAt: existing.createdAt,
+      updatedAt: domain.IntentionTimestamp(_now()),
+    );
+    await (_database.update(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).write(
+      local.IntentionsCompanion(
+        isActionReady: Value(readiness == domain.IntentionReadiness.ready),
+        updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
+      ),
+    );
+    return IntentionSaved(updated);
+  }
+
+  Future<IntentionSaved> _changeArchiveState(
+    IntentionId id,
+    domain.IntentionArchiveState archiveState,
+  ) async {
+    final row = await (_database.select(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingleOrNull();
+    if (row == null) throw const _IntentionNotFound();
+
+    final existing = _rehydrate(row);
+    if (existing.archiveState == archiveState) return IntentionSaved(existing);
+
+    final updated = domain.Intention(
+      id: existing.id,
+      title: existing.title,
+      description: existing.description,
+      readiness: existing.readiness,
+      archiveState: archiveState,
+      createdAt: existing.createdAt,
+      updatedAt: domain.IntentionTimestamp(_now()),
+    );
+    await (_database.update(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).write(
+      local.IntentionsCompanion(
+        isArchived: Value(
+          archiveState == domain.IntentionArchiveState.archived,
+        ),
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
     );

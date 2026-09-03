@@ -328,6 +328,332 @@ void main() {
       },
     );
 
+    test('выполняет матрицу переходов readiness и архива без изменения несвязанных данных', () async {
+      final transitions =
+          <
+            ({
+              IntentionCommand Function(IntentionId) command,
+              IntentionCommandDiagnosticsType commandType,
+              IntentionReadiness? readiness,
+              IntentionArchiveState? archiveState,
+              List<
+                ({
+                  IntentionReadiness readiness,
+                  IntentionArchiveState archiveState,
+                })
+              >
+              fixtures,
+            })
+          >[
+            (
+              command: (IntentionId id) => EnableIntentionReadiness(id),
+              commandType: IntentionCommandDiagnosticsType.enableReadiness,
+              readiness: IntentionReadiness.ready,
+              archiveState: null,
+              fixtures: [
+                (
+                  readiness: IntentionReadiness.notReady,
+                  archiveState: IntentionArchiveState.active,
+                ),
+                (
+                  readiness: IntentionReadiness.notReady,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+                (
+                  readiness: IntentionReadiness.ready,
+                  archiveState: IntentionArchiveState.active,
+                ),
+                (
+                  readiness: IntentionReadiness.ready,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+              ],
+            ),
+            (
+              command: (IntentionId id) => DisableIntentionReadiness(id),
+              commandType: IntentionCommandDiagnosticsType.disableReadiness,
+              readiness: IntentionReadiness.notReady,
+              archiveState: null,
+              fixtures: [
+                (
+                  readiness: IntentionReadiness.ready,
+                  archiveState: IntentionArchiveState.active,
+                ),
+                (
+                  readiness: IntentionReadiness.ready,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+                (
+                  readiness: IntentionReadiness.notReady,
+                  archiveState: IntentionArchiveState.active,
+                ),
+                (
+                  readiness: IntentionReadiness.notReady,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+              ],
+            ),
+            (
+              command: (IntentionId id) => ArchiveIntention(id),
+              commandType: IntentionCommandDiagnosticsType.archive,
+              readiness: null,
+              archiveState: IntentionArchiveState.archived,
+              fixtures: [
+                (
+                  readiness: IntentionReadiness.notReady,
+                  archiveState: IntentionArchiveState.active,
+                ),
+                (
+                  readiness: IntentionReadiness.ready,
+                  archiveState: IntentionArchiveState.active,
+                ),
+                (
+                  readiness: IntentionReadiness.notReady,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+                (
+                  readiness: IntentionReadiness.ready,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+              ],
+            ),
+            (
+              command: (IntentionId id) => RestoreIntention(id),
+              commandType: IntentionCommandDiagnosticsType.restore,
+              readiness: null,
+              archiveState: IntentionArchiveState.active,
+              fixtures: [
+                (
+                  readiness: IntentionReadiness.notReady,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+                (
+                  readiness: IntentionReadiness.ready,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+                (
+                  readiness: IntentionReadiness.notReady,
+                  archiveState: IntentionArchiveState.active,
+                ),
+                (
+                  readiness: IntentionReadiness.ready,
+                  archiveState: IntentionArchiveState.active,
+                ),
+              ],
+            ),
+          ];
+      final transitionTimes = [
+        for (var hour = 10; hour < 18; hour++) DateTime.utc(2026, 9, 3, hour),
+      ];
+      clock = _DeterministicClock(transitionTimes);
+      repository = DriftIntentionRepository(
+        database,
+        idGenerator,
+        clock.call,
+        diagnostics,
+      );
+
+      var sequence = 1;
+      var transitionCount = 0;
+      for (final transition in transitions) {
+        for (final fixture in transition.fixtures) {
+          final id = _idForSequence(sequence++);
+          final title = 'Название $sequence';
+          final description = 'Описание $sequence';
+          final createdAt = DateTime.utc(2026, 9, 2, 10, sequence);
+          await _insertIntention(
+            database,
+            id: id.toCanonicalString(),
+            title: title,
+            description: description,
+            isActionReady: fixture.readiness == IntentionReadiness.ready,
+            isArchived: fixture.archiveState == IntentionArchiveState.archived,
+            createdAt: createdAt,
+          );
+          final expectedReadiness = transition.readiness ?? fixture.readiness;
+          final expectedArchiveState =
+              transition.archiveState ?? fixture.archiveState;
+          final changesState =
+              expectedReadiness != fixture.readiness ||
+              expectedArchiveState != fixture.archiveState;
+          final updatesBefore = writeTrace.updateStatements.length;
+
+          final saved = _saved(
+            await repository.execute(transition.command(id)),
+          );
+
+          expect(saved.id, id);
+          expect(saved.title, title);
+          expect(saved.description, description);
+          expect(saved.createdAt.value, createdAt);
+          expect(saved.readiness, expectedReadiness);
+          expect(saved.archiveState, expectedArchiveState);
+          if (changesState) {
+            expect(saved.updatedAt.value, transitionTimes[transitionCount++]);
+            expect(writeTrace.updateStatements, hasLength(updatesBefore + 1));
+          } else {
+            expect(saved.updatedAt.value, createdAt);
+            expect(writeTrace.updateStatements, hasLength(updatesBefore));
+          }
+
+          final row = await (database.select(
+            database.intentions,
+          )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+          expect(row.title, title);
+          expect(row.description, description);
+          expect(
+            row.isActionReady,
+            expectedReadiness == IntentionReadiness.ready,
+          );
+          expect(
+            row.isArchived,
+            expectedArchiveState == IntentionArchiveState.archived,
+          );
+          expect(row.createdAt, createdAt.microsecondsSinceEpoch);
+          expect(row.updatedAt, saved.updatedAt.value.microsecondsSinceEpoch);
+        }
+      }
+
+      expect(transitionCount, transitionTimes.length);
+      expect(clock.calls, transitionTimes.length);
+      expect(
+        diagnostics.events,
+        everyElement(
+          isA<IntentionCommandDiagnosticsEvent>().having(
+            (event) => event.status,
+            'status',
+            isA<DiagnosticsSucceeded>(),
+          ),
+        ),
+      );
+      expect(
+        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().map(
+          (event) => event.commandType,
+        ),
+        [
+          for (final transition in transitions)
+            for (final _ in transition.fixtures) transition.commandType,
+        ],
+      );
+    });
+
+    test(
+      'возвращает not-found для каждого отсутствующего state transition',
+      () async {
+        final id = _id(_firstUuid);
+        final transitions =
+            <
+              ({
+                IntentionCommand Function(IntentionId) command,
+                IntentionCommandDiagnosticsType commandType,
+              })
+            >[
+              (
+                command: (IntentionId id) => EnableIntentionReadiness(id),
+                commandType: IntentionCommandDiagnosticsType.enableReadiness,
+              ),
+              (
+                command: (IntentionId id) => DisableIntentionReadiness(id),
+                commandType: IntentionCommandDiagnosticsType.disableReadiness,
+              ),
+              (
+                command: (IntentionId id) => ArchiveIntention(id),
+                commandType: IntentionCommandDiagnosticsType.archive,
+              ),
+              (
+                command: (IntentionId id) => RestoreIntention(id),
+                commandType: IntentionCommandDiagnosticsType.restore,
+              ),
+            ];
+
+        for (final transition in transitions) {
+          expect(
+            await repository.execute(transition.command(id)),
+            _failure<IntentionNotFoundFailure>(),
+          );
+        }
+
+        expect(clock.calls, 0);
+        expect(writeTrace.updateStatements, isEmpty);
+        expect(diagnostics.events, [
+          for (final transition in transitions)
+            _failedCommand(
+              transition.commandType,
+              DiagnosticsFailureCode.notFound,
+            ),
+        ]);
+      },
+    );
+
+    test(
+      'изолирует параллельные state transitions одного и разных намерений',
+      () async {
+        final firstId = _id(_firstUuid);
+        final secondId = _id(_secondUuid);
+        final createdAt = DateTime.utc(2026, 9, 2, 10);
+        await _insertIntention(
+          database,
+          id: firstId.toCanonicalString(),
+          title: 'Первое намерение',
+          description: 'Первое описание',
+          createdAt: createdAt,
+        );
+        await _insertIntention(
+          database,
+          id: secondId.toCanonicalString(),
+          title: 'Второе намерение',
+          description: 'Второе описание',
+          isActionReady: true,
+          isArchived: true,
+          createdAt: createdAt,
+        );
+        clock = _DeterministicClock([
+          DateTime.utc(2026, 9, 3, 10),
+          DateTime.utc(2026, 9, 3, 11),
+          DateTime.utc(2026, 9, 3, 12),
+          DateTime.utc(2026, 9, 3, 13),
+        ]);
+        repository = DriftIntentionRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
+
+        final results = await Future.wait([
+          repository.execute(EnableIntentionReadiness(firstId)),
+          repository.execute(ArchiveIntention(firstId)),
+          repository.execute(DisableIntentionReadiness(secondId)),
+          repository.execute(RestoreIntention(secondId)),
+        ]);
+
+        final firstReadiness = _saved(results[0]);
+        final firstArchive = _saved(results[1]);
+        final secondReadiness = _saved(results[2]);
+        final secondRestore = _saved(results[3]);
+        expect(firstReadiness.id, firstId);
+        expect(firstReadiness.readiness, IntentionReadiness.ready);
+        expect(firstArchive.id, firstId);
+        expect(firstArchive.archiveState, IntentionArchiveState.archived);
+        expect(secondReadiness.id, secondId);
+        expect(secondReadiness.readiness, IntentionReadiness.notReady);
+        expect(secondRestore.id, secondId);
+        expect(secondRestore.archiveState, IntentionArchiveState.active);
+
+        final first = _watched(await repository.watchById(firstId).first);
+        final second = _watched(await repository.watchById(secondId).first);
+        expect(first?.title, 'Первое намерение');
+        expect(first?.description, 'Первое описание');
+        expect(first?.readiness, IntentionReadiness.ready);
+        expect(first?.archiveState, IntentionArchiveState.archived);
+        expect(second?.title, 'Второе намерение');
+        expect(second?.description, 'Второе описание');
+        expect(second?.readiness, IntentionReadiness.notReady);
+        expect(second?.archiveState, IntentionArchiveState.active);
+        expect(clock.calls, 4);
+      },
+    );
+
     test('сохраняет success create, update и no-op при отказе diagnostics после commit', () async {
       var writerWasCalled = false;
       final diagnosticsWithFailingWriter = DeveloperDiagnosticsSink((_) {
@@ -474,6 +800,14 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw ArgumentError.value(value, 'value'),
 };
+
+IntentionId _idForSequence(int value) =>
+    _id('018f0b5d-6b2e-7c80-8000-${value.toRadixString(16).padLeft(12, '0')}');
+
+Intention? _watched(Result<Intention?> result) {
+  expect(result, isA<ResultSuccess<Intention?>>());
+  return (result as ResultSuccess<Intention?>).value;
+}
 
 Future<void> _insertIntention(
   AppDatabase database, {

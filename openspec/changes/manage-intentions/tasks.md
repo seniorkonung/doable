@@ -423,7 +423,7 @@
   - **Вероятно затронутые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`, `test/support/intention_repository_harness.dart`.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.6 Реализовать readiness, архивирование и восстановление как транзакционные state transitions
+- [x] 6.6 Реализовать readiness, архивирование и восстановление как транзакционные state transitions
   - **Критерии приёмки:**
     - `EnableIntentionReadiness`, `DisableIntentionReadiness`, `ArchiveIntention` и `RestoreIntention` изменяют только принадлежащее command состояние, сохраняют identity, title, description и остальные flags и одинаково поддерживают допустимые изменения активных и архивированных намерений.
     - Фактический переход атомарно обновляет `updatedAt`, повтор уже достигнутого состояния возвращает текущий `IntentionSaved` без записи и изменения timestamps, а отсутствующий ID возвращает not-found.

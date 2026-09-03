@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
@@ -82,6 +83,59 @@ void main() {
             archiveState: IntentionArchiveState.archived,
             createdAt: DateTime.utc(2026, 9, 2, 10),
             updatedAt: DateTime.utc(2026, 9, 2, 11),
+          ),
+        );
+      },
+    );
+
+    test(
+      'публикует state transition только после подтверждённого commit',
+      () async {
+        final id = _id(_uuidV7);
+        final createdAt = DateTime.utc(2026, 9, 2, 10);
+        await _insertIntention(
+          database,
+          id: id.toCanonicalString(),
+          title: 'Прочитать книгу',
+          description: 'До выходных',
+          isActionReady: true,
+          createdAt: createdAt,
+        );
+        repository = DriftIntentionRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026, 9, 3, 12),
+          diagnostics,
+        );
+        final events = StreamIterator(repository.watchById(id));
+        addTearDown(events.cancel);
+
+        expect(await events.moveNext(), isTrue);
+        expect(
+          events.current,
+          _isSuccessfulIntention(
+            id: id,
+            title: 'Прочитать книгу',
+            description: 'До выходных',
+            readiness: IntentionReadiness.ready,
+            createdAt: createdAt,
+          ),
+        );
+
+        final result = await repository.execute(ArchiveIntention(id));
+
+        expect(result, isA<ResultSuccess<IntentionCommandSuccess>>());
+        expect(await events.moveNext(), isTrue);
+        expect(
+          events.current,
+          _isSuccessfulIntention(
+            id: id,
+            title: 'Прочитать книгу',
+            description: 'До выходных',
+            readiness: IntentionReadiness.ready,
+            archiveState: IntentionArchiveState.archived,
+            createdAt: createdAt,
+            updatedAt: DateTime.utc(2026, 9, 3, 12),
           ),
         );
       },
