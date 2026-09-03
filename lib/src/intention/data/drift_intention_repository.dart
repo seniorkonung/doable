@@ -147,7 +147,6 @@ final class DriftIntentionRepository implements IntentionRepository {
             domain.IntentionArchiveState.active,
           ),
           DeleteIntention() => _deleteIntention(command.id),
-          _ => throw StateError('Неподдерживаемая команда намерения.'),
         },
       );
       _diagnosticsSink.record(
