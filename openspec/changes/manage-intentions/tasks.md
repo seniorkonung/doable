@@ -483,7 +483,7 @@
   - **Вероятно затронутые файлы:** `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/support/intention_repository_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart`.
   - **Оценка:** M (3 файла).
 
-- [ ] 6.9a Разделить быстрый и полный check без потери large-fixture evidence
+- [x] 6.9a Разделить быстрый и полный check без потери large-fixture evidence
   - **Критерии приёмки:**
     - Large-fixture suite получает file-level tag `slow`, объявленный в package-level test configuration; тег классифицирует только длительность запуска и не представляет suite как benchmark.
     - Новый `mise run check-fast` выполняет форматирование, статический анализ и тесты с исключённым `slow`, а существующий `mise run check` сохраняет прежнюю полную семантику и запускает все тесты без фильтрации.
