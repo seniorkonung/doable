@@ -471,7 +471,7 @@
   - **Вероятно затронутые файлы:** `test/intention/data/file_backed_drift_intention_repository_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `test/support/intention_repository_harness.dart`, `test/support/local_database_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart` только если новое evidence выявит дефект реализации.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.9 Доказать ограниченную стоимость каталога на большой file-backed fixture
+- [x] 6.9 Доказать ограниченную стоимость каталога на большой file-backed fixture
   - **Критерии приёмки:**
     - Fixture содержит не меньше 50 000 коротких активных и архивированных намерений с равными и различающимися timestamps, а все repository operations возвращают не больше настроенного `pageSize` предметных summaries независимо от точного общего count.
     - `EXPLAIN QUERY PLAN` подтверждает использование FTS virtual table для допустимого фильтра от трёх Unicode-кодовых точек, намеренный `instr` scan для фильтров из одной и двух кодовых точек и timestamp/cursor indexes для неотфильтрованных scope/order queries; short-filter fixtures покрывают частое и отсутствующее совпадение, SQL не содержит `OFFSET` и не материализует description либо множество совпавших ID в Dart.
