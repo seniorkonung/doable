@@ -556,7 +556,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_watch_test.dart`.
   - **Оценка:** S (2 файла).
 
-- [ ] 6.15 Проверить SQLite classification, timestamp contract и lossless detail rehydration
+- [x] 6.15 Проверить SQLite classification, timestamp contract и lossless detail rehydration
   - **Критерии приёмки:**
     - Evidence задач 6.10, 6.12, 6.13 и 6.14 совместно подтверждает полный repository lifecycle, точную SQLite-классификацию, устойчивый к переводу системных часов timestamp contract и lossless detail rehydration без storage обходов публичной seam.
     - Corrupt-row matrix доказывает terminal corruption до typed coercion для недопустимых boolean/timestamp представлений и отличает их от допустимого обратного порядка timestamps, а failure matrix сохраняет утверждённое различие unavailable, corruption и unexpected на всех затронутых boundaries.
