@@ -8,6 +8,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -15,6 +16,208 @@ import '../../support/local_database_harness.dart';
 
 void main() {
   group('file-backed DriftIntentionRepository', () {
+    test('после отказавшего создания открывает тот же файл без созданного намерения', () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      final id = _id('018f0b5d-6b2e-7c80-8000-000000000811');
+      final interceptor = _FailAfterDmlInterceptor(_DmlOperation.insert);
+      final firstDatabase = await harness.openReadyDatabase(
+        queryInterceptor: interceptor,
+      );
+      final IntentionRepository firstRepository = DriftIntentionRepository(
+        firstDatabase,
+        _SequenceIntentionIdGenerator([id]),
+        () => DateTime.utc(2026, 9, 3, 10),
+        InMemoryDiagnosticsSink(),
+      );
+
+      interceptor.arm();
+      final result = await firstRepository.execute(
+        const CreateIntention(
+          title: 'Несохранённое создание',
+          description: 'Не должно остаться в файле',
+        ),
+      );
+
+      expect(result, _unexpectedCommandFailure());
+      final firstSnapshot = Completer<Result<Intention?>>();
+      final subscription = firstRepository
+          .watchById(id)
+          .listen(firstSnapshot.complete);
+      expect(_watched(await firstSnapshot.future), isNull);
+      await subscription.cancel();
+      await harness.closePersistenceObjectGraph();
+
+      final reopenedDatabase = await harness.openReadyDatabase();
+      final IntentionRepository reopenedRepository = DriftIntentionRepository(
+        reopenedDatabase,
+        _SequenceIntentionIdGenerator(const []),
+        () => DateTime.utc(2026, 9, 3, 11),
+        InMemoryDiagnosticsSink(),
+      );
+
+      expect(_watched(await reopenedRepository.watchById(id).first), isNull);
+      final page = _firstPage(
+        await reopenedRepository.getCatalogPage(
+          _catalogQuery(
+            IntentionScope.all,
+            titleFilter: 'несохранённое создание',
+          ),
+        ),
+      );
+      expect(page.totalCount, 0);
+      expect(page.items, isEmpty);
+      await verifyIntentionTitlesFtsIntegrity(reopenedDatabase);
+      await harness.closePersistenceObjectGraph();
+    });
+
+    for (final scenario in [
+      _PostDmlFailureReopenScenario(
+        description: 'изменения',
+        operation: _DmlOperation.update,
+        id: _id('018f0b5d-6b2e-7c80-8000-000000000812'),
+        initialTitle: 'Исходное обновление',
+        initialDescription: 'Исходное описание',
+        failedCommand: (id) => UpdateIntention(
+          id: id,
+          title: 'Несохранённое обновление',
+          description: 'Несохранённое описание',
+        ),
+        readiness: IntentionReadiness.notReady,
+        archiveState: IntentionArchiveState.active,
+        updatedAt: DateTime.utc(2026, 9, 3, 10),
+        scope: IntentionScope.active,
+        titleFilter: 'исходное обновление',
+      ),
+      _PostDmlFailureReopenScenario(
+        description: 'изменения готовности к действию',
+        operation: _DmlOperation.update,
+        id: _id('018f0b5d-6b2e-7c80-8000-000000000813'),
+        initialTitle: 'Намерение для готовности',
+        initialDescription: 'Сохраняемая готовность',
+        failedCommand: EnableIntentionReadiness.new,
+        readiness: IntentionReadiness.notReady,
+        archiveState: IntentionArchiveState.active,
+        updatedAt: DateTime.utc(2026, 9, 3, 10),
+        scope: IntentionScope.active,
+        titleFilter: 'намерение для готовности',
+      ),
+      _PostDmlFailureReopenScenario(
+        description: 'физического удаления',
+        operation: _DmlOperation.delete,
+        id: _id('018f0b5d-6b2e-7c80-8000-000000000814'),
+        initialTitle: 'Архивируемое намерение',
+        initialDescription: null,
+        preparationCommands: [
+          EnableIntentionReadiness.new,
+          ArchiveIntention.new,
+        ],
+        failedCommand: DeleteIntention.new,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+        updatedAt: DateTime.utc(2026, 9, 3, 12),
+        scope: IntentionScope.archived,
+        titleFilter: 'архивируемое намерение',
+      ),
+    ]) {
+      test(
+        'после отказавшего ${scenario.description} сохраняет согласованное намерение после повторного открытия',
+        () async {
+          final harness = await LocalDatabaseHarness.fileBacked();
+          addTearDown(harness.dispose);
+          final interceptor = _FailAfterDmlInterceptor(scenario.operation);
+          final firstDatabase = await harness.openReadyDatabase(
+            queryInterceptor: interceptor,
+          );
+          final IntentionRepository firstRepository = DriftIntentionRepository(
+            firstDatabase,
+            _SequenceIntentionIdGenerator([scenario.id]),
+            _SequenceClock([
+              DateTime.utc(2026, 9, 3, 10),
+              DateTime.utc(2026, 9, 3, 11),
+              DateTime.utc(2026, 9, 3, 12),
+              DateTime.utc(2026, 9, 3, 13),
+            ]).call,
+            InMemoryDiagnosticsSink(),
+          );
+
+          _saved(
+            await firstRepository.execute(
+              CreateIntention(
+                title: scenario.initialTitle,
+                description: scenario.initialDescription,
+              ),
+            ),
+          );
+          for (final command in scenario.preparationCommands) {
+            _saved(await firstRepository.execute(command(scenario.id)));
+          }
+
+          interceptor.arm();
+          expect(
+            await firstRepository.execute(scenario.failedCommand(scenario.id)),
+            _unexpectedCommandFailure(),
+          );
+          final firstSnapshot = Completer<Result<Intention?>>();
+          final subscription = firstRepository
+              .watchById(scenario.id)
+              .listen(firstSnapshot.complete);
+          _expectIntention(_watched(await firstSnapshot.future), scenario);
+          await subscription.cancel();
+          await harness.closePersistenceObjectGraph();
+
+          final reopenedDatabase = await harness.openReadyDatabase();
+          final IntentionRepository reopenedRepository =
+              DriftIntentionRepository(
+                reopenedDatabase,
+                _SequenceIntentionIdGenerator(const []),
+                () => DateTime.utc(2026, 9, 3, 14),
+                InMemoryDiagnosticsSink(),
+              );
+
+          _expectIntention(
+            _watched(await reopenedRepository.watchById(scenario.id).first),
+            scenario,
+          );
+          final scopePage = _firstPage(
+            await reopenedRepository.getCatalogPage(
+              _catalogQuery(scenario.scope),
+            ),
+          );
+          expect(scopePage.totalCount, 1);
+          expect(scopePage.items.map((item) => item.id), [scenario.id]);
+
+          final excludedScope = switch (scenario.scope) {
+            IntentionScope.active => IntentionScope.archived,
+            IntentionScope.archived => IntentionScope.active,
+            IntentionScope.all => throw StateError(
+              'Охват all не может быть исключающим.',
+            ),
+          };
+          final excludedPage = _firstPage(
+            await reopenedRepository.getCatalogPage(
+              _catalogQuery(excludedScope),
+            ),
+          );
+          expect(excludedPage.totalCount, 0);
+          expect(excludedPage.items, isEmpty);
+
+          final filteredPage = _firstPage(
+            await reopenedRepository.getCatalogPage(
+              _catalogQuery(
+                IntentionScope.all,
+                titleFilter: scenario.titleFilter,
+              ),
+            ),
+          );
+          expect(filteredPage.totalCount, 1);
+          expect(filteredPage.items.map((item) => item.id), [scenario.id]);
+          await verifyIntentionTitlesFtsIntegrity(reopenedDatabase);
+          await harness.closePersistenceObjectGraph();
+        },
+      );
+    }
+
     test('сохраняет полный lifecycle через публичную seam после повторного открытия', () async {
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
@@ -93,7 +296,7 @@ void main() {
       (description: 'nil UUID', id: '00000000-0000-0000-0000-000000000000'),
     ]) {
       test(
-        'возвращает corruption без частичной страницы для строки с ${fixture.description} идентификатором',
+        'возвращает corruption без частичной страницы после повторного открытия строки с ${fixture.description} идентификатором',
         () async {
           final harness = await LocalDatabaseHarness.fileBacked();
           addTearDown(harness.dispose);
@@ -122,8 +325,11 @@ void main() {
               DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
             ],
           );
+          await harness.closePersistenceObjectGraph();
+
+          final reopenedDatabase = await harness.openReadyDatabase();
           final IntentionRepository repository = DriftIntentionRepository(
-            database,
+            reopenedDatabase,
             _SequenceIntentionIdGenerator(const []),
             () => DateTime.utc(2026, 9, 3, 11),
             InMemoryDiagnosticsSink(),
@@ -141,6 +347,7 @@ void main() {
               isA<IntentionCorruptionFailure>(),
             ),
           );
+          await harness.closePersistenceObjectGraph();
         },
       );
     }
@@ -254,10 +461,111 @@ Matcher _deleted(IntentionId id) =>
       isA<IntentionDeleted>().having((success) => success.id, 'id', id),
     );
 
+Matcher _unexpectedCommandFailure() =>
+    isA<ResultFailure<IntentionCommandSuccess>>().having(
+      (result) => result.failure,
+      'failure',
+      isA<IntentionUnexpectedFailure>(),
+    );
+
+void _expectIntention(
+  Intention? intention,
+  _PostDmlFailureReopenScenario scenario,
+) {
+  expect(intention, isNotNull);
+  expect(intention!.id, scenario.id);
+  expect(intention.title, scenario.initialTitle);
+  expect(intention.description, scenario.initialDescription);
+  expect(intention.readiness, scenario.readiness);
+  expect(intention.archiveState, scenario.archiveState);
+  expect(intention.createdAt.value, DateTime.utc(2026, 9, 3, 10));
+  expect(intention.updatedAt.value, scenario.updatedAt);
+}
+
 IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw ArgumentError.value(value, 'value'),
 };
+
+enum _DmlOperation { insert, update, delete }
+
+typedef _IntentionCommandFactory = IntentionCommand Function(IntentionId id);
+
+final class _PostDmlFailureReopenScenario {
+  _PostDmlFailureReopenScenario({
+    required this.description,
+    required this.operation,
+    required this.id,
+    required this.initialTitle,
+    required this.initialDescription,
+    required this.failedCommand,
+    required this.readiness,
+    required this.archiveState,
+    required this.updatedAt,
+    required this.scope,
+    required this.titleFilter,
+    this.preparationCommands = const [],
+  });
+
+  final String description;
+  final _DmlOperation operation;
+  final IntentionId id;
+  final String initialTitle;
+  final String? initialDescription;
+  final List<_IntentionCommandFactory> preparationCommands;
+  final _IntentionCommandFactory failedCommand;
+  final IntentionReadiness readiness;
+  final IntentionArchiveState archiveState;
+  final DateTime updatedAt;
+  final IntentionScope scope;
+  final String titleFilter;
+}
+
+final class _FailAfterDmlInterceptor extends QueryInterceptor {
+  _FailAfterDmlInterceptor(this._operation);
+
+  final _DmlOperation _operation;
+  var _armed = false;
+  var _hasFailed = false;
+
+  void arm() => _armed = true;
+
+  Future<int> _afterDml(Future<int> Function() operation) async {
+    final rows = await operation();
+    if (_armed && !_hasFailed) {
+      _hasFailed = true;
+      throw StateError('CANARY-after-dml-failure');
+    }
+    return rows;
+  }
+
+  @override
+  Future<int> runInsert(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) => _operation == _DmlOperation.insert
+      ? _afterDml(() => super.runInsert(executor, statement, args))
+      : super.runInsert(executor, statement, args);
+
+  @override
+  Future<int> runUpdate(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) => _operation == _DmlOperation.update
+      ? _afterDml(() => super.runUpdate(executor, statement, args))
+      : super.runUpdate(executor, statement, args);
+
+  @override
+  Future<int> runDelete(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) => _operation == _DmlOperation.delete
+      ? _afterDml(() => super.runDelete(executor, statement, args))
+      : super.runDelete(executor, statement, args);
+}
 
 final class _SequenceIntentionIdGenerator implements IntentionIdGenerator {
   _SequenceIntentionIdGenerator(this._ids);

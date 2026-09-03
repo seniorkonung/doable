@@ -459,7 +459,7 @@
   - **Вероятно затронутые файлы:** `test/intention/data/file_backed_drift_intention_repository_test.dart`, `test/support/intention_repository_harness.dart`, `test/support/local_database_harness.dart`, `lib/src/intention/data/drift_intention_repository.dart`.
   - **Оценка:** M (4 файла).
 
-- [ ] 6.8a Доказать file-backed recovery после отказавших command и сохранённого повреждения
+- [x] 6.8a Доказать file-backed recovery после отказавших command и сохранённого повреждения
   - **Критерии приёмки:**
     - File-backed fault injection после DML для create, update, state transition и delete возвращает исходный typed failure; затем первый persistence object graph полностью закрывается, его repository отбрасывается, а новый bootstrap и repository открывают тот же SQLite-файл.
     - Через публичные `watchById` и `getCatalogPage` новый object graph подтверждает последнее согласованное состояние: отказавшийся create не существует, а отказавшиеся update, state transition и delete сохраняют прежние identity, пользовательский текст, состояния, timestamps, принадлежность каталогам и буквальному фильтру; FTS остаётся согласованным с основной строкой.

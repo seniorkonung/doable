@@ -74,8 +74,11 @@ final class LocalDatabaseHarness {
     return bootstrap.open();
   }
 
-  Future<AppDatabase> openReadyDatabase({DatabaseSetup? setup}) async {
-    final result = await open(setup: setup);
+  Future<AppDatabase> openReadyDatabase({
+    DatabaseSetup? setup,
+    QueryInterceptor? queryInterceptor,
+  }) async {
+    final result = await open(setup: setup, queryInterceptor: queryInterceptor);
     if (result is LocalDataReady) return result.database;
     throw StateError('Bootstrap не предоставил готовое локальное хранилище.');
   }
