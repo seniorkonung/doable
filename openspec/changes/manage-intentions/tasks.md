@@ -606,7 +606,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** S (3 файла).
 
-- [ ] 6.19 Проверить cursor ownership и предшествующие repository remediation
+- [x] 6.19 Проверить cursor ownership и предшествующие repository remediation
   - **Критерии приёмки:**
     - Evidence задач 6.10, 6.15 и 6.18 совместно подтверждает полный постоянный lifecycle, точную SQLite-классификацию, устойчивый timestamp contract, lossless detail rehydration и instance-owned cursors через публичную seam.
     - Corrupt-row matrix отличает недопустимые storage-представления от допустимого обратного порядка timestamps, а cursor matrix отклоняет provenance/parameter mismatch до SQL и сохраняет независимые цепочки одного repository; завершение remediation поисковой проекции этим checkpoint не заявляется и принадлежит задачам 6.20–6.22.
