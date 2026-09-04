@@ -622,7 +622,7 @@
   - **Критерии приёмки:**
     - Одна чистая storage-neutral Dart-операция `titleSearchKey` задаёт для названия и нормализованного фильтра полный Default Case Folding по Unicode-данным текущей сборки не старше Unicode 17.0.0 без Turkic tailoring и дополнительной Unicode-нормализации, включая многосимвольные mappings; `IntentionTitleFilter.matchesTitle`, ключ SQL-фильтра и SQLite-функция `doable_title_search_key` используют эту операцию как единственного владельца каждого вновь вычисляемого отношения совпадения независимо от системной локали и языка интерфейса.
     - Unicode implementation/data фиксируются воспроизводимыми версиями toolchain и зависимостей соответствующей сборки, но не образуют неизменяемую межрелизную версию поисковой семантики: совместимое обновление MAY продвинуть их без schema version bump, обязательного table rebuild или отдельного имени функции. Этот критерий supersedes search-key части выполненных задач 6.16 и 6.17, которые считали любое расхождение с ключом текущей сборки corruption.
-    - Единый native connection setup регистрирует `doable_title_search_key(TEXT)` до работы со схемой на production background connection, in-memory/file-backed harness и schema-verification connection с `deterministic: true` и необходимым `directOnly: false`; callback принимает только один `TEXT`, не выполняет I/O, не читает внешнее состояние и не пишет пользовательские данные в diagnostics.
+    - Согласно ADR-0008 единый native connection setup регистрирует долговечную сигнатуру `doable_title_search_key(TEXT)` до работы со схемой на production background connection, in-memory/file-backed harness и schema-verification connection с `deterministic: true` и необходимым `directOnly: false`; callback принимает только один `TEXT`, не выполняет I/O, не читает внешнее состояние и не пишет пользовательские данные в diagnostics.
     - `build.yaml` объявляет точную `known_functions`-сигнатуру для Drift analysis, а contract tests доказывают одинаковый результат direct Dart call и SQL call в пределах одной сборки на production-подобном background executor и test executors без расширения публичной repository seam.
   - **Проверка:**
     - Выполнить `flutter test test/intention/application/intention_contract_test.dart test/data/local/database_connection_test.dart test/data/local/app_database_schema_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart` с ASCII, кириллицей, символами вне BMP, `Straße`/`STRASSE`, `Istanbul`/`ı` и production-подобным background connection, подтвердив одинаковое application- и SQL-поведение.
@@ -658,15 +658,52 @@
   - **Вероятно затронутые файлы:** local database/FTS/migration test infrastructure, repository catalog/command/watch tests, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, generated Drift/schema artifacts.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.23 Подтвердить готовность Phase 6 после cursor и search-projection remediation
+- [ ] 6.23 Проверить cursor и search-projection remediation до общей текстовой границы
   - **Критерии приёмки:**
-    - Evidence задач 6.10, 6.15, 6.18 и 6.22 подтверждает полный постоянный lifecycle, точную SQLite-классификацию, lossless rehydration, instance-owned cursors, один записываемый источник названия и согласованные с фактически сохранённой поисковой проекцией ограниченные catalog snapshots через публичную seam.
-    - Corrupt-row, clock, cursor, Unicode, mapping-drift, generated-column, FTS и catalog matrices сохраняют утверждённые failure, timestamp, ordering, exact-count, keyset, integrity и bounded-materialization contracts без storage обходов и не классифицируют допустимую историческую Unicode-проекцию как corruption.
-    - Повторная генерация не оставляет незапланированных tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без отдельной записи поискового ключа.
+    - Evidence задач 6.10, 6.15, 6.18 и 6.22 подтверждает точную SQLite-классификацию, lossless detail rehydration, instance-owned cursors, один записываемый источник названия и согласованные с фактически сохранённой поисковой проекцией ограниченные catalog snapshots через публичную seam.
+    - Corrupt-row, clock, cursor, Unicode mapping-drift, generated-column, FTS и catalog matrices сохраняют утверждённые failure, timestamp, ordering, exact-count, keyset, integrity и bounded-materialization contracts без storage обходов и не классифицируют допустимую историческую Unicode-проекцию как corruption.
+    - Повторная генерация, сфокусированные tests, статический анализ и строгая OpenSpec-валидация проходят; checkpoint не заявляет готовность Phase 6 до corrective work общей Unicode-границы и полного description contract в задачах 6.24–6.25.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
+    - Выполнить `flutter test test/intention/application test/intention/data test/data/local` и `flutter analyze`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.22.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 6.24 Провести общий контракт корректного Unicode без NUL через domain и application boundaries намерения
+  - **Критерии приёмки:**
+    - Одна чистая storage-neutral проверка до `trim()`, `characters`, case folding и UTF-8-кодирования обходит исходные UTF-16 code units, принимает только корректные пары surrogates, отклоняет непарные high/low surrogates и `U+0000` и не удаляет, не заменяет и не нормализует остальные корректные скалярные значения Unicode согласно ADR-0007.
+    - Название, ненулевое описание и строка фильтра проходят общую проверку до собственных правил; стабильная типизированная validation failure различает поле и недопустимый Unicode-repertoire, а invalid command или query сохраняет прежнее подтверждённое состояние и завершается до storage write, read transaction, `COUNT`, search-key либо FTS helper.
+    - Общий adversarial corpus покрывает `U+0000` в каждом поле, одиночные high/low surrogates, корректную supplementary pair, составной emoji с `U+200D`, tab/newline и канонически эквивалентные, но не нормализуемые строки; diagnostics не содержат входной пользовательский текст.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/domain/intention_text_test.dart test/intention/application/intention_contract_test.dart test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_catalog_test.dart test/shared/diagnostics/diagnostics_sink_test.dart` с общим corpus и SQL trace отсутствия запросов для недопустимого фильтра.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.23.
+  - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention_text.dart`, `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_result.dart`, `lib/src/intention/data/drift_intention_repository.dart`, соответствующие domain/application/repository/diagnostics tests.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 6.25 Обеспечить NUL-защиту схемы и полную проверку описания в ограниченном каталоге
+  - **Критерии приёмки:**
+    - Неопубликованная schema version 1 и её generated/snapshot artifacts запрещают нулевой UTF-8 byte в `title`, присутствующем `description` и generated `title_search_key` через BLOB-safe `CHECK`, не используют SQLite `length()` как меру графем и атомарно отклоняют raw `INSERT`/`UPDATE` канонического текста либо результат тестовой search-key function с NUL без изменения прежней строки или FTS.
+    - Catalog query получает исходное nullable-описание только для не более чем `pageSize + 1` выбранных строк, проверяет общий Unicode-repertoire, семантику отсутствия и предел 4096 графем той же domain operation и отбрасывает текст до построения `IntentionSummary`; `COUNT` не читает описание, а недопустимая строка возвращает `IntentionCorruptionFailure` без успешной страницы, ложного `hasDescription` или публикации count. Этот критерий supersedes description-части выполненных задач 6.16 и 6.17.
+    - Schema, raw-write и catalog fixtures покрывают NUL, пустую строку, ASCII whitespace, NBSP, BOM, 4097 графем, допустимые 4096 графем и корректное многострочное описание; large-file evidence подтверждает прежние предел `pageSize + 1`, один `COUNT`, отсутствие `OFFSET` и regression budget.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`, затем `flutter test test/data/local/app_database_schema_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_watch_test.dart`.
+    - Выполнить `flutter test test/intention/data/drift_intention_repository_large_fixture_test.dart`, `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.24.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/schema/intention_schema.drift`, `lib/src/intention/data/drift_intention_repository.dart`, generated Drift/schema snapshot artifacts, schema/migration tests, catalog/detail/large-fixture repository tests.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 6.26 Подтвердить готовность Phase 6 после cursor, search-projection и text-integrity remediation
+  - **Критерии приёмки:**
+    - Evidence задач 6.10, 6.15, 6.18, 6.22, 6.24 и 6.25 подтверждает полный постоянный lifecycle, точную SQLite-классификацию, lossless rehydration, instance-owned cursors, единственный записываемый источник названия, согласованные ограниченные catalog snapshots и общий контракт корректного Unicode без NUL через публичную seam.
+    - Domain, application, raw-schema, corrupt-row, clock, cursor, Unicode, malformed UTF-16, mapping-drift, generated-column, FTS, description и catalog matrices подтверждают утверждённые validation, corruption, timestamp, ordering, exact-count, keyset, integrity и bounded-materialization contracts без тихого преобразования текста или storage обходов.
+    - Повторная генерация не оставляет незапланированных tracked или untracked artifacts, полный test suite, статический анализ, Android debug build, многоосевой review и строгая OpenSpec-валидация проходят, после чего Phase 7 получает стабильные field-specific причины для локализованного исправления ввода.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
     - Выполнить `flutter test`, `flutter analyze` и `flutter build apk --debug`.
-    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.22.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive` и повторный review изменённого implementation range.
+  - **Зависимости:** 6.23, 6.25.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
