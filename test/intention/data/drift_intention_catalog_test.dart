@@ -791,6 +791,171 @@ void main() {
   );
 
   test(
+    'отклоняет cursor другого экземпляра repository до обращения к SQLite',
+    () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000056',
+        title: 'Первое',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000057',
+        title: 'Второе',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+      );
+      final cursor = _firstPage(await repository.getCatalogPage(query))
+          .nextCursor!;
+      final sharedDatabaseRepository = DriftIntentionRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 2),
+        diagnostics,
+      );
+      final recreatedRepository = DriftIntentionRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 2),
+        diagnostics,
+      );
+      final foreignTrace = _SelectTrace();
+      final previousMultipleDatabaseWarning =
+          driftRuntimeOptions.dontWarnAboutMultipleDatabases;
+      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+      addTearDown(
+        () => driftRuntimeOptions.dontWarnAboutMultipleDatabases =
+            previousMultipleDatabaseWarning,
+      );
+      final foreignDatabase = AppDatabase(
+        NativeDatabase.memory().interceptWith(foreignTrace),
+      );
+      await foreignDatabase.open();
+      addTearDown(foreignDatabase.close);
+      final foreignDatabaseRepository = DriftIntentionRepository(
+        foreignDatabase,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 2),
+        diagnostics,
+      );
+      final continuationQuery = IntentionCatalogQuery(
+        scope: query.scope,
+        titleFilter: null,
+        order: query.order,
+        pageSize: query.pageSize,
+        cursor: cursor,
+      );
+
+      for (final foreignRepository in [
+        sharedDatabaseRepository,
+        recreatedRepository,
+        foreignDatabaseRepository,
+      ]) {
+        trace.statements.clear();
+        foreignTrace.statements.clear();
+
+        final result = await foreignRepository.getCatalogPage(
+          continuationQuery,
+        );
+
+        expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+        expect(
+          (result as ResultFailure<IntentionCatalogPage>).failure,
+          isA<IntentionValidationFailure>(),
+        );
+        expect(trace.statements, isEmpty);
+        expect(foreignTrace.statements, isEmpty);
+      }
+    },
+  );
+
+  test('продолжает независимые цепочки одного repository вперемешку', () async {
+    for (final (id, title, createdAt) in [
+      (
+        '018f0b5d-6b2e-7c80-8000-000000000058',
+        'Первое',
+        DateTime.utc(2026, 9, 2, 10),
+      ),
+      (
+        '018f0b5d-6b2e-7c80-8000-000000000059',
+        'Второе',
+        DateTime.utc(2026, 9, 2, 11),
+      ),
+      (
+        '018f0b5d-6b2e-7c80-8000-00000000005a',
+        'Третье',
+        DateTime.utc(2026, 9, 2, 12),
+      ),
+    ]) {
+      await _insertIntention(
+        database,
+        id: id,
+        title: title,
+        createdAt: createdAt,
+      );
+    }
+    final ascendingQuery = IntentionCatalogQuery(
+      scope: IntentionScope.active,
+      titleFilter: null,
+      order: const IntentionCatalogOrder(
+        field: IntentionCatalogSortField.createdAt,
+        direction: IntentionCatalogSortDirection.ascending,
+      ),
+      pageSize: 1,
+    );
+    final descendingQuery = IntentionCatalogQuery(
+      scope: ascendingQuery.scope,
+      titleFilter: null,
+      order: IntentionCatalogOrder.createdAtDescending,
+      pageSize: ascendingQuery.pageSize,
+    );
+    final ascendingCursor = _firstPage(
+      await repository.getCatalogPage(ascendingQuery),
+    ).nextCursor!;
+    final descendingCursor = _firstPage(
+      await repository.getCatalogPage(descendingQuery),
+    ).nextCursor!;
+
+    final ascendingContinuation = _continuationPage(
+      await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: ascendingQuery.scope,
+          titleFilter: null,
+          order: ascendingQuery.order,
+          pageSize: ascendingQuery.pageSize,
+          cursor: ascendingCursor,
+        ),
+      ),
+    );
+    final descendingContinuation = _continuationPage(
+      await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: descendingQuery.scope,
+          titleFilter: null,
+          order: descendingQuery.order,
+          pageSize: descendingQuery.pageSize,
+          cursor: descendingCursor,
+        ),
+      ),
+    );
+
+    expect(
+      ascendingContinuation.items.single.id,
+      _id('018f0b5d-6b2e-7c80-8000-000000000059'),
+    );
+    expect(
+      descendingContinuation.items.single.id,
+      _id('018f0b5d-6b2e-7c80-8000-000000000059'),
+    );
+  });
+
+  test(
     'использует value boundary после удаления и вставок вокруг cursor',
     () async {
       await _insertIntention(

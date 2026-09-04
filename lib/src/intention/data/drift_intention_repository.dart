@@ -25,6 +25,7 @@ final class DriftIntentionRepository implements IntentionRepository {
   final IntentionIdGenerator _idGenerator;
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
+  final _CatalogCursorOwner _cursorOwner = _CatalogCursorOwner();
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -40,7 +41,9 @@ final class DriftIntentionRepository implements IntentionRepository {
 
     final cursor = query.cursor;
     if (cursor != null &&
-        (cursor is! _DriftIntentionCatalogCursor || !cursor.matches(query))) {
+        (cursor is! _DriftIntentionCatalogCursor ||
+            !cursor.isOwnedBy(_cursorOwner) ||
+            !cursor.matches(query))) {
       const failure = IntentionValidationFailure();
       _diagnosticsSink.record(
         CatalogPageReadDiagnosticsEvent(
@@ -539,6 +542,7 @@ final class DriftIntentionRepository implements IntentionRepository {
     IntentionCatalogQuery query,
     IntentionSummary boundary,
   ) => _DriftIntentionCatalogCursor(
+    owner: _cursorOwner,
     scope: query.scope,
     normalizedTitleFilter: query.titleFilter?.map((value) => value),
     order: query.order,
@@ -719,8 +723,11 @@ final class _StoredIntentionDetail {
   }
 }
 
+final class _CatalogCursorOwner {}
+
 final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   const _DriftIntentionCatalogCursor({
+    required this.owner,
     required this.scope,
     required this.normalizedTitleFilter,
     required this.order,
@@ -728,11 +735,14 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
     required this.boundaryId,
   });
 
+  final _CatalogCursorOwner owner;
   final IntentionScope scope;
   final String? normalizedTitleFilter;
   final IntentionCatalogOrder order;
   final domain.IntentionTimestamp boundaryTimestamp;
   final IntentionId boundaryId;
+
+  bool isOwnedBy(_CatalogCursorOwner candidate) => identical(owner, candidate);
 
   bool matches(IntentionCatalogQuery query) =>
       scope == query.scope &&
