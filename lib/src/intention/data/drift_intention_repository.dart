@@ -6,6 +6,7 @@ import '../application/intention_command.dart';
 import '../application/intention_id_generator.dart';
 import '../application/intention_repository.dart';
 import '../application/intention_result.dart';
+import '../application/title_search_key.dart' as search;
 import '../domain/intention.dart' as domain;
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
@@ -212,7 +213,7 @@ final class DriftIntentionRepository implements IntentionRepository {
           local.IntentionsCompanion.insert(
             id: intention.id.toCanonicalString(),
             title: intention.title,
-            titleSearchKey: intention.title.toLowerCase(),
+            titleSearchKey: search.titleSearchKey(intention.title),
             description: Value(intention.description),
             isActionReady: const Value(false),
             isArchived: const Value(false),
@@ -254,7 +255,7 @@ final class DriftIntentionRepository implements IntentionRepository {
     )..where((row) => row.id.equals(command.id.toCanonicalString()))).write(
       local.IntentionsCompanion(
         title: Value(updated.title),
-        titleSearchKey: Value(updated.title.toLowerCase()),
+        titleSearchKey: Value(search.titleSearchKey(updated.title)),
         description: Value(updated.description),
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
@@ -508,7 +509,7 @@ final class DriftIntentionRepository implements IntentionRepository {
     try {
       final normalizedTitle = IntentionText.normalizeTitle(title);
       if (normalizedTitle != title ||
-          titleSearchKey != normalizedTitle.toLowerCase()) {
+          titleSearchKey != search.titleSearchKey(normalizedTitle)) {
         throw const _StoredIntentionCorruption();
       }
       return IntentionSummary(
@@ -614,7 +615,7 @@ final class DriftIntentionRepository implements IntentionRepository {
           : IntentionText.normalizeDescription(description);
       if (normalizedTitle != title ||
           normalizedDescription != description ||
-          titleSearchKey != normalizedTitle.toLowerCase()) {
+          titleSearchKey != search.titleSearchKey(normalizedTitle)) {
         throw const _StoredIntentionCorruption();
       }
       return domain.Intention(

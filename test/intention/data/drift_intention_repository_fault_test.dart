@@ -4,6 +4,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -398,7 +399,7 @@ Future<void> _insertIntention(
       IntentionsCompanion.insert(
         id: id.toCanonicalString(),
         title: title,
-        titleSearchKey: title.toLowerCase(),
+        titleSearchKey: titleSearchKey(title),
         description: Value(description),
         isActionReady: Value(isActionReady),
         isArchived: Value(isArchived),
@@ -420,7 +421,7 @@ Future<void> _expectStoredIntention(
     database.intentions,
   )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
   expect(row.title, title);
-  expect(row.titleSearchKey, title.toLowerCase());
+  expect(row.titleSearchKey, titleSearchKey(title));
   expect(row.description, description);
   expect(row.isActionReady, isActionReady);
   expect(row.isArchived, isArchived);

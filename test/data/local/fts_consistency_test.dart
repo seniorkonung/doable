@@ -2,6 +2,7 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/fts_query.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,12 +64,12 @@ void main() {
 
         expect(await _findByTitleFilter(database, '😀'), [id]);
         expect(_lastSelectStatement, contains('instr('));
-        expect(_lastSelectArguments, ['😀', '😀']);
+        expect(_lastSelectArguments, ['😀']);
 
         sqlTrace.clear();
         expect(await _findByTitleFilter(database, '😀😀'), [id]);
         expect(_lastSelectStatement, contains('instr('));
-        expect(_lastSelectArguments, ['😀😀', '😀😀']);
+        expect(_lastSelectArguments, ['😀😀']);
 
         sqlTrace.clear();
         expect(await _findByTitleFilter(database, '😀😀😀'), [id]);
@@ -85,6 +86,24 @@ void main() {
           queryPlan.map((row) => row.read<String>('detail')).join('\n'),
           contains('intention_titles_fts'),
         );
+      },
+    );
+
+    test(
+      'готовит короткий фильтр только через единый поисковый ключ',
+      () async {
+        const id = '018f0b5d-6b2e-7c80-8000-000000000105';
+        await _insertIntention(
+          database,
+          id: id,
+          title: 'ꭰ',
+          titleSearchKey: titleSearchKey('ꭰ'),
+        );
+
+        expect(await _findByTitleFilter(database, 'ꭰ'), [id]);
+        expect(_lastSelectStatement, contains('instr("title_search_key", ?)'));
+        expect(_lastSelectStatement, isNot(contains(' OR instr(')));
+        expect(_lastSelectArguments, ['Ꭰ']);
       },
     );
 

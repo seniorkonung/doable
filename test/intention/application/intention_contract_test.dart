@@ -1,11 +1,88 @@
+import 'dart:io';
+
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('поисковый ключ названия намерения', () {
+    test('использует полный Unicode Default Case Folding 17.0.0', () {
+      expect(unicodeDefaultCaseFoldingVersion, '17.0.0');
+      expect(titleSearchKey('КУПИТЬ МОЛОКО'), 'купить молоко');
+      expect(titleSearchKey('Straße'), 'strasse');
+      expect(titleSearchKey('K'), 'k');
+      expect(titleSearchKey('Σςσ'), 'σσσ');
+      expect(titleSearchKey('ꭰᎠ'), 'ᎠᎠ');
+      expect(titleSearchKey('𐐀'), '𐐨');
+      expect(titleSearchKey('İ'), 'i̇');
+      expect(titleSearchKey('Istanbul'), 'istanbul');
+      expect(titleSearchKey('ışık'), 'ışık');
+      expect(titleSearchKey('еé'), 'еé');
+    });
+
+    test('сопоставляет фильтр с названием через единый поисковый ключ', () {
+      final filter = IntentionCatalogQuery(
+        scope: IntentionScope.all,
+        titleFilter: 'STRASSE',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+      ).titleFilter!;
+
+      expect(filter.matchesTitle('Прогуляться по Straße'), isTrue);
+      expect(filter.matchesTitle('Istanbul'), isFalse);
+      expect(
+        IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: 'ı',
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        ).titleFilter!.matchesTitle('ışık'),
+        isTrue,
+      );
+    });
+
+    test(
+      'повторяет весь закреплённый corpus Unicode Default Case Folding',
+      () async {
+        final lines = await File('test/fixtures/unicode/CaseFolding-17.0.0.txt')
+            .readAsLines();
+        var mappingCount = 0;
+
+        for (final line in lines) {
+          if (line.isEmpty || line.startsWith('#')) {
+            continue;
+          }
+          final fields = line.split(';');
+          final status = fields[1].trim();
+          if (status != 'C' && status != 'F') {
+            continue;
+          }
+
+          final input = int.parse(fields[0].trim(), radix: 16);
+          final expected = String.fromCharCodes(
+            fields[2]
+                .trim()
+                .split(RegExp(r'\s+'))
+                .map((codePoint) => int.parse(codePoint, radix: 16)),
+          );
+
+          expect(
+            titleSearchKey(String.fromCharCode(input)),
+            expected,
+            reason: 'U+${input.toRadixString(16).toUpperCase()}',
+          );
+          mappingCount++;
+        }
+
+        expect(mappingCount, 1585);
+      },
+    );
+  });
+
   group('контракт каталога намерений', () {
     test(
       'нормализует фильтр, ограничивает порцию и применяет scope с фильтром',

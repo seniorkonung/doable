@@ -3,6 +3,7 @@ import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
 import 'intention_command.dart';
 import 'intention_result.dart';
+import 'title_search_key.dart';
 
 abstract interface class IntentionRepository {
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -150,7 +151,7 @@ final class IntentionTitleFilter {
   final String _normalizedValue;
 
   bool matchesTitle(String title) =>
-      title.toLowerCase().contains(_normalizedValue.toLowerCase());
+      titleSearchKey(title).contains(titleSearchKey(_normalizedValue));
 
   T map<T>(T Function(String normalizedValue) transform) =>
       transform(_normalizedValue);

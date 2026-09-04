@@ -2,6 +2,7 @@ import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -381,6 +382,29 @@ void main() {
     },
   );
 
+  test('применяет полный Default Case Folding к фильтру названия', () async {
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000028',
+      title: 'Прогуляться по Straße',
+      createdAt: DateTime.utc(2026, 9, 2, 12),
+    );
+
+    final page = _firstPage(
+      await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: 'STRASSE',
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        ),
+      ),
+    );
+
+    expect(page.totalCount, 1);
+    expect(page.items.single.title, 'Прогуляться по Straße');
+  });
+
   test('отклоняет snapshot каталога, когда search key скрывает совпадающее название', () async {
     const id = '018f0b5d-6b2e-7c80-8000-000000000024';
     await _insertIntention(
@@ -409,38 +433,6 @@ void main() {
       isA<IntentionCorruptionFailure>(),
     );
   });
-
-  test(
-    'отклоняет snapshot короткого фильтра, когда search key скрывает название',
-    () async {
-      const id = '018f0b5d-6b2e-7c80-8000-000000000029';
-      await _insertIntention(
-        database,
-        id: id,
-        title: 'Купить молоко',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await database.customStatement(
-        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
-        ['посторонний ключ', id],
-      );
-
-      final result = await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: IntentionScope.active,
-          titleFilter: 'ку',
-          order: IntentionCatalogOrder.createdAtDescending,
-          pageSize: 1,
-        ),
-      );
-
-      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-      expect(
-        (result as ResultFailure<IntentionCatalogPage>).failure,
-        isA<IntentionCorruptionFailure>(),
-      );
-    },
-  );
 
   test(
     'отклоняет snapshot каталога, когда search key создаёт ложное совпадение',
@@ -1097,7 +1089,7 @@ Future<void> _insertIntention(
       IntentionsCompanion.insert(
         id: id,
         title: title,
-        titleSearchKey: title.toLowerCase(),
+        titleSearchKey: titleSearchKey(title),
         description: Value(description),
         isArchived: Value(isArchived),
         createdAt: createdAt.microsecondsSinceEpoch,

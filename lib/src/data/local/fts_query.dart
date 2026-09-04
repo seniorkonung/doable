@@ -1,11 +1,12 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart';
 
 /// Формирует составное условие буквального поиска названия намерения.
 final class LocalIntentionTitleSearch {
   factory LocalIntentionTitleSearch(IntentionTitleFilter filter) {
-    final searchKey = filter.map((value) => value.toLowerCase());
+    final searchKey = filter.map(titleSearchKey);
     final condition = switch (searchKey.runes.length) {
       1 || 2 => _ShortTitleSearchCondition(searchKey),
       _ => _FtsTitleSearchCondition(searchKey),
@@ -29,25 +30,13 @@ sealed class _TitleSearchCondition {
 
 final class _ShortTitleSearchCondition extends _TitleSearchCondition {
   _ShortTitleSearchCondition(String searchKey)
-    : _searchKey = Variable.withString(searchKey),
-      _titleVariants = [
-        for (final variant in _caseVariants(searchKey))
-          Variable.withString(variant),
-      ];
+    : _searchKey = Variable.withString(searchKey);
 
   final Variable<String> _searchKey;
-  final List<Variable<String>> _titleVariants;
 
   @override
-  Expression<bool> conditionFor(Intentions intentions) {
-    final titleCondition = _titleVariants
-        .map<Expression<bool>>(
-          (variant) => _InstrTitleSearchExpression(intentions.title, variant),
-        )
-        .reduce((left, right) => left | right);
-    return _InstrTitleSearchExpression(intentions.titleSearchKey, _searchKey) |
-        titleCondition;
-  }
+  Expression<bool> conditionFor(Intentions intentions) =>
+      _InstrTitleSearchExpression(intentions.titleSearchKey, _searchKey);
 }
 
 final class _FtsTitleSearchCondition extends _TitleSearchCondition {
@@ -61,22 +50,6 @@ final class _FtsTitleSearchCondition extends _TitleSearchCondition {
         intentions.titleSearchKey,
         _literalFtsPhraseParameter(_searchKey),
       );
-}
-
-Iterable<String> _caseVariants(String value) sync* {
-  final symbols = [for (final rune in value.runes) String.fromCharCode(rune)];
-  final variants = <String>{};
-  for (var mask = 0; mask < 1 << symbols.length; mask++) {
-    variants.add(
-      [
-        for (var index = 0; index < symbols.length; index++)
-          (mask & (1 << index)) == 0
-              ? symbols[index].toLowerCase()
-              : symbols[index].toUpperCase(),
-      ].join(),
-    );
-  }
-  yield* variants;
 }
 
 final class _InstrTitleSearchExpression extends Expression<bool> {
