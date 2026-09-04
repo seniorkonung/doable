@@ -602,7 +602,7 @@
   - **Проверка:**
     - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart` с двумя repository над общей и разными `AppDatabase`, cursor прежнего пересозданного repository, SQL trace отсутствия storage access при rejection, повторным `cursor: null` и чередующимися продолжениями нескольких цепочек одного owner.
     - Выполнить `flutter test test/shared/diagnostics/diagnostics_sink_test.dart` и `flutter analyze`, подтвердив неизменность публичной seam и отсутствие owner token в диагностических данных.
-  - **Зависимости:** 6.4, 6.17.
+  - **Зависимости:** 6.4, 6.15.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка:** S (3 файла).
 
@@ -618,23 +618,24 @@
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 6.20 Ввести versioned Unicode search-key function на всех SQLite connection paths
+- [ ] 6.20 Ввести единую Unicode search-key function на всех SQLite connection paths
   - **Критерии приёмки:**
-    - Одна чистая storage-neutral Dart-операция `titleSearchKeyV1` задаёт для названия и нормализованного фильтра полный Default Case Folding из Unicode 17.0.0 без Turkic tailoring и дополнительной Unicode-нормализации, включая многосимвольные mappings; `IntentionTitleFilter.matchesTitle`, ключ SQL-фильтра и SQLite-функция `doable_title_search_key_v1` используют эту операцию как единственного владельца отношения совпадения независимо от системной локали и языка интерфейса.
-    - Единый native connection setup регистрирует `doable_title_search_key_v1(TEXT)` до работы со схемой на production background connection, in-memory/file-backed harness и schema-verification connection с `deterministic: true` и необходимым `directOnly: false`; callback принимает только один `TEXT`, не выполняет I/O, не читает внешнее состояние и не пишет пользовательские данные в diagnostics.
-    - `build.yaml` объявляет точную `known_functions`-сигнатуру для Drift analysis, а contract tests доказывают одинаковый результат direct Dart call и SQL call на production-подобном background executor и test executors без расширения публичной repository seam.
+    - Одна чистая storage-neutral Dart-операция `titleSearchKey` задаёт для названия и нормализованного фильтра полный Default Case Folding по Unicode-данным текущей сборки не старше Unicode 17.0.0 без Turkic tailoring и дополнительной Unicode-нормализации, включая многосимвольные mappings; `IntentionTitleFilter.matchesTitle`, ключ SQL-фильтра и SQLite-функция `doable_title_search_key` используют эту операцию как единственного владельца каждого вновь вычисляемого отношения совпадения независимо от системной локали и языка интерфейса.
+    - Unicode implementation/data фиксируются воспроизводимыми версиями toolchain и зависимостей соответствующей сборки, но не образуют неизменяемую межрелизную версию поисковой семантики: совместимое обновление MAY продвинуть их без schema version bump, обязательного table rebuild или отдельного имени функции. Этот критерий supersedes search-key части выполненных задач 6.16 и 6.17, которые считали любое расхождение с ключом текущей сборки corruption.
+    - Единый native connection setup регистрирует `doable_title_search_key(TEXT)` до работы со схемой на production background connection, in-memory/file-backed harness и schema-verification connection с `deterministic: true` и необходимым `directOnly: false`; callback принимает только один `TEXT`, не выполняет I/O, не читает внешнее состояние и не пишет пользовательские данные в diagnostics.
+    - `build.yaml` объявляет точную `known_functions`-сигнатуру для Drift analysis, а contract tests доказывают одинаковый результат direct Dart call и SQL call в пределах одной сборки на production-подобном background executor и test executors без расширения публичной repository seam.
   - **Проверка:**
     - Выполнить `flutter test test/intention/application/intention_contract_test.dart test/data/local/database_connection_test.dart test/data/local/app_database_schema_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart` с ASCII, кириллицей, символами вне BMP, `Straße`/`STRASSE`, `Istanbul`/`ı` и production-подобным background connection, подтвердив одинаковое application- и SQL-поведение.
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `flutter analyze`, подтвердив распознавание custom function анализатором Drift.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
   - **Зависимости:** 6.19.
-  - **Вероятно затронутые файлы:** `build.yaml`, `lib/src/intention/application/intention_repository.dart`, storage-neutral versioned search-key module в `lib/src/intention/application/`, `lib/src/data/local/database_connection.dart`, `test/support/local_database_harness.dart`, application/connection/bootstrap/schema contract tests.
+  - **Вероятно затронутые файлы:** `build.yaml`, `lib/src/intention/application/intention_repository.dart`, storage-neutral search-key module в `lib/src/intention/application/`, `lib/src/data/local/database_connection.dart`, `test/support/local_database_harness.dart`, application/connection/bootstrap/schema contract tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
 - [ ] 6.21 Сделать `title` единственным записываемым источником поисковой проекции и count
   - **Критерии приёмки:**
-    - Schema version 1 объявляет `title_search_key` как `NOT NULL STORED GENERATED ALWAYS AS (doable_title_search_key_v1(title))`; generated Drift companion, repository create/update и raw supported write paths не принимают отдельное значение ключа, а изменение `title` атомарно пересчитывает проекцию.
-    - `intention_titles_fts` индексирует только generated `title_search_key`; insert/update/delete triggers используют его вычисленные `old`/`new` значения, короткая ветвь применяет только параметризованный `instr(title_search_key, query_search_key)`, а длинная — column-qualified trigram `title_search_key MATCH` без резервной колонки `title` и case-variant predicate.
+    - Schema version 1 объявляет `title_search_key` как `NOT NULL STORED GENERATED ALWAYS AS (doable_title_search_key(title))`; generated Drift companion, repository create/update и raw supported write paths не принимают отдельное значение ключа, а создание и любая последующая запись строки позволяют SQLite пересчитать эту восстанавливаемую проекцию без изменения канонического `title`. Этот критерий supersedes выполненную задачу 6.5 в части прикладной записи и синхронизации отдельного `title_search_key`.
+    - `intention_titles_fts` индексирует только generated `title_search_key`; insert/delete triggers и срабатывающий на любой `UPDATE` строки trigger используют его вычисленные `old`/`new` значения, чтобы возможный пересчёт ключа после обновления Unicode-данных не оставил FTS рассогласованным с основной таблицей. Короткая ветвь применяет только параметризованный `instr(title_search_key, query_search_key)`, а длинная — column-qualified trigram `title_search_key MATCH` без резервной колонки `title` и case-variant predicate.
     - Первая страница считает и читает кандидатов по одному и тому же условию одной проекции внутри прежнего SQLite snapshot, продолжения сохраняют keyset semantics и предел `pageSize + 1`, а detail/catalog rehydration не трактует generated key как независимо сохранённое предметное поле.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs`, затем `flutter test test/data/local/app_database_schema_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart test/data/local/fts_consistency_test.dart`.
@@ -646,11 +647,12 @@
 
 - [ ] 6.22 Доказать целостность generated search key, FTS и ограниченных catalog snapshots
   - **Критерии приёмки:**
-    - Schema tests доказывают, что прямые `INSERT`/`UPDATE` значения `title_search_key` отклоняются, изменение только `title` пересчитывает ключ, а отсутствие обязательного connection setup не может привести к успешному созданию или изменению строки; Unicode corpus подтверждает равенство Dart operation, generated value и ключа фильтра.
-    - FTS tests подтверждают единственную индексируемую колонку, транзакционное обновление после изменения `title`, index-aware `integrity-check`, восстановление через `rebuild` и буквальную parameterized семантику обеих ветвей без резервного поиска по исходному `title`.
-    - Catalog matrix с несколькими строками до и после page boundary подтверждает точный count по отображаемым названиям без полной rehydration, а large-file fixture сохраняет один `COUNT`, предел `pageSize + 1`, отсутствие `OFFSET`, ограниченную materialization и утверждённый regression budget короткого фильтра.
+    - Schema tests доказывают, что прямые `INSERT`/`UPDATE` значения `title_search_key` отклоняются, запись только `title` пересчитывает ключ, а отсутствие обязательного connection setup не может привести к успешному созданию или изменению строки; репрезентативный Unicode corpus подтверждает равенство Dart operation, generated value и ключа фильтра в пределах одной сборки, не заявляя неизменность всех mappings между обновлениями.
+    - File-backed fixture с двумя тестовыми реализациями `doable_title_search_key` последовательно открывает одну schema version, подтверждает неизменность исходного `title` и отсутствие обязательного массового rebuild, а после любой записи затронутой строки доказывает атомарный пересчёт generated key и соответствующей FTS-записи. Исторический ключ, корректно вычисленный прежней сборкой, не классифицируется как corruption только из-за отличия от функции текущей сборки; этот критерий supersedes противоположные search-key claims задач 6.16 и 6.17.
+    - FTS tests подтверждают единственную индексируемую колонку, транзакционное обновление после изменения `title` и после записи другого поля строки, index-aware `integrity-check`, восстановление через `rebuild` и буквальную parameterized семантику обеих ветвей без резервного поиска по исходному `title`.
+    - Catalog matrix с несколькими строками до и после page boundary подтверждает точный count по фактически применённой сохранённой поисковой проекции без полной rehydration, а large-file fixture сохраняет один `COUNT`, предел `pageSize + 1`, отсутствие `OFFSET`, ограниченную materialization и утверждённый regression budget короткого фильтра.
   - **Проверка:**
-    - Выполнить `flutter test test/data/local/app_database_schema_test.dart test/data/local/fts_consistency_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart test/intention/data/drift_intention_catalog_test.dart` с direct-write, missing-setup, Unicode и multi-page fixtures.
+    - Выполнить `flutter test test/data/local/app_database_schema_test.dart test/data/local/fts_consistency_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart test/intention/data/drift_intention_catalog_test.dart` с direct-write, missing-setup, Unicode, mapping-drift и multi-page fixtures.
     - Выполнить `flutter test test/intention/data/drift_intention_repository_large_fixture_test.dart`, `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
   - **Зависимости:** 6.21.
   - **Вероятно затронутые файлы:** local database/FTS/migration test infrastructure, repository catalog/command/watch tests, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, generated Drift/schema artifacts.
@@ -658,8 +660,8 @@
 
 - [ ] 6.23 Подтвердить готовность Phase 6 после cursor и search-projection remediation
   - **Критерии приёмки:**
-    - Evidence задач 6.10, 6.15, 6.18 и 6.22 подтверждает полный постоянный lifecycle, точную SQLite-классификацию, lossless rehydration, instance-owned cursors, один записываемый источник названия и семантически согласованные ограниченные catalog snapshots через публичную seam.
-    - Corrupt-row, clock, cursor, Unicode, generated-column, FTS и catalog matrices сохраняют утверждённые failure, timestamp, ordering, exact-count, keyset, integrity и bounded-materialization contracts без storage обходов.
+    - Evidence задач 6.10, 6.15, 6.18 и 6.22 подтверждает полный постоянный lifecycle, точную SQLite-классификацию, lossless rehydration, instance-owned cursors, один записываемый источник названия и согласованные с фактически сохранённой поисковой проекцией ограниченные catalog snapshots через публичную seam.
+    - Corrupt-row, clock, cursor, Unicode, mapping-drift, generated-column, FTS и catalog matrices сохраняют утверждённые failure, timestamp, ordering, exact-count, keyset, integrity и bounded-materialization contracts без storage обходов и не классифицируют допустимую историческую Unicode-проекцию как corruption.
     - Повторная генерация не оставляет незапланированных tracked или untracked artifacts, полный test suite, статический анализ, Android debug build и строгая OpenSpec-валидация проходят, после чего Phase 7 может использовать repository без отдельной записи поискового ключа.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие результата генерации помимо запланированных исходных изменений.
