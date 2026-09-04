@@ -1,10 +1,10 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/fts_query.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -13,7 +13,7 @@ void main() {
 
   setUp(() async {
     sqlTrace = _SqlTrace();
-    database = AppDatabase(NativeDatabase.memory().interceptWith(sqlTrace));
+    database = AppDatabase(openInMemoryLocalDatabase().interceptWith(sqlTrace));
     await database.open();
     sqlTrace.clear();
   });

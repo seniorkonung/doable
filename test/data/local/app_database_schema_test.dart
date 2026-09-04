@@ -1,12 +1,12 @@
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:drift/native.dart';
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late AppDatabase database;
 
   setUp(() {
-    database = AppDatabase(NativeDatabase.memory());
+    database = AppDatabase(openInMemoryLocalDatabase());
   });
 
   tearDown(() => database.close());

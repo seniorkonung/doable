@@ -8,3 +8,5 @@ targets:
             options:
               modules:
                 - fts5
+              known_functions:
+                doable_title_search_key: "TEXT (TEXT)"

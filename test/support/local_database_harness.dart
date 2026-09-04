@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
@@ -57,8 +58,10 @@ final class LocalDatabaseHarness {
     final bootstrap = LocalDataBootstrap(
       executorFactory: () {
         final executor = switch (_storage) {
-          _LocalDatabaseStorage.inMemory => NativeDatabase.memory(setup: setup),
-          _LocalDatabaseStorage.fileBacked => NativeDatabase(
+          _LocalDatabaseStorage.inMemory => openInMemoryLocalDatabase(
+            setup: setup,
+          ),
+          _LocalDatabaseStorage.fileBacked => openFileBackedLocalDatabase(
             databaseFile,
             setup: setup,
           ),

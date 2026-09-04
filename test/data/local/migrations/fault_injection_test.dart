@@ -1,13 +1,13 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
     'атомарная миграция откатывает схему, данные и маркер версии после ошибки',
     () async {
-      final database = AppDatabase(NativeDatabase.memory());
+      final database = AppDatabase(openInMemoryLocalDatabase());
       addTearDown(database.close);
 
       await _insertIntention(database);
@@ -104,7 +104,7 @@ final class _InjectedMigrationFailure implements Exception {
 
 final class _FailedMigrationConnectionHarness {
   _FailedMigrationConnectionHarness()
-    : database = AppDatabase(NativeDatabase.memory());
+    : database = AppDatabase(openInMemoryLocalDatabase());
 
   final AppDatabase database;
   var isClosed = false;

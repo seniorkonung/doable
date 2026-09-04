@@ -2,10 +2,11 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/database_connection.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -78,10 +79,61 @@ void main() {
   test(
     'AppDatabase принимает QueryExecutor без platform-specific параметров',
     () async {
-      final database = AppDatabase(NativeDatabase.memory());
+      final database = AppDatabase(openInMemoryLocalDatabase());
 
       await database.close();
     },
+  );
+
+  test('регистрирует search-key function на production, in-memory и file-backed соединениях', () async {
+    final executors = <QueryExecutor Function()>[
+      openAndroidProductionDatabaseConnection,
+      openInMemoryLocalDatabase,
+      () => openFileBackedLocalDatabase(
+        File.fromUri(temporaryDirectory.uri.resolve('file-backed.sqlite')),
+      ),
+    ];
+
+    for (final executor in executors) {
+      final database = AppDatabase(executor());
+      try {
+        final row = await database
+            .customSelect(
+              'SELECT doable_title_search_key(?) AS search_key',
+              variables: [Variable.withString('Straße')],
+            )
+            .getSingle();
+
+        expect(row.read<String>('search_key'), titleSearchKey('Straße'));
+      } finally {
+        await database.close();
+      }
+    }
+  });
+
+  test('объединяет search-key setup с fixture setup', () async {
+    final database = AppDatabase(
+      openInMemoryLocalDatabase(setup: _registerFixtureFunction),
+    );
+    addTearDown(database.close);
+
+    final fixture = await database
+        .customSelect('SELECT fixture_marker() AS value')
+        .getSingle();
+    final searchKey = await database
+        .customSelect("SELECT doable_title_search_key('Straße') AS search_key")
+        .getSingle();
+
+    expect(fixture.read<String>('value'), 'готово');
+    expect(searchKey.read<String>('search_key'), 'strasse');
+  });
+}
+
+void _registerFixtureFunction(sqlite.Database database) {
+  database.createFunction(
+    functionName: 'fixture_marker',
+    argumentCount: const sqlite.AllowedArgumentCount(0),
+    function: (_) => 'готово',
   );
 }
 

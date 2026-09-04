@@ -1,9 +1,9 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:drift/drift.dart' hide isNull;
-import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -142,7 +142,8 @@ void main() {
       final sqlTrace = _SqlTrace();
       final bootstrap = LocalDataBootstrap(
         executorFactory: () =>
-            NativeDatabase(harness.databaseFile).interceptWith(sqlTrace),
+            openFileBackedLocalDatabase(harness.databaseFile)
+                .interceptWith(sqlTrace),
         diagnosticsSink: InMemoryDiagnosticsSink(),
       );
       addTearDown(bootstrap.close);
@@ -172,12 +173,13 @@ void main() {
         final preservedBytes = await harness.databaseFile.readAsBytes();
 
         final verifierDatabase = AppDatabase(
-          NativeDatabase(harness.databaseFile),
+          openFileBackedLocalDatabase(harness.databaseFile),
         );
         try {
           await expectLater(
             verifierDatabase.validateDatabaseSchema(
               options: const ValidationOptions(validateDropped: true),
+              setup: configureDoableSqliteConnection,
             ),
             throwsA(isA<sqlite.SqliteException>()),
           );
@@ -206,12 +208,13 @@ void main() {
           final preservedBytes = await harness.databaseFile.readAsBytes();
 
           final verifierDatabase = AppDatabase(
-            NativeDatabase(harness.databaseFile),
+            openFileBackedLocalDatabase(harness.databaseFile),
           );
           try {
             await expectLater(
               verifierDatabase.validateDatabaseSchema(
                 options: const ValidationOptions(validateDropped: true),
+                setup: configureDoableSqliteConnection,
               ),
               throwsA(isA<SchemaMismatch>()),
             );

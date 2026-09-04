@@ -2,6 +2,15 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:drift/native.dart';
+
+import 'sqlite_connection_setup.dart';
+
+export 'sqlite_connection_setup.dart'
+    show
+        composeDoableSqliteConnectionSetup,
+        configureDoableSqliteConnection,
+        doableTitleSearchKeyFunctionName;
 
 abstract final class AndroidProductionDatabaseConnection {
   static const databaseName = 'doable';
@@ -20,5 +29,18 @@ abstract final class AndroidProductionDatabaseConnection {
   }
 }
 
-QueryExecutor openAndroidProductionDatabaseConnection() =>
-    driftDatabase(name: AndroidProductionDatabaseConnection.databaseName);
+QueryExecutor openAndroidProductionDatabaseConnection() => driftDatabase(
+  name: AndroidProductionDatabaseConnection.databaseName,
+  native: const DriftNativeOptions(setup: configureDoableSqliteConnection),
+);
+
+QueryExecutor openInMemoryLocalDatabase({DatabaseSetup? setup}) =>
+    NativeDatabase.memory(setup: composeDoableSqliteConnectionSetup(setup));
+
+QueryExecutor openFileBackedLocalDatabase(
+  File databaseFile, {
+  DatabaseSetup? setup,
+}) => NativeDatabase(
+  databaseFile,
+  setup: composeDoableSqliteConnectionSetup(setup),
+);

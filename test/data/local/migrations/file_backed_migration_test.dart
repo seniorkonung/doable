@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/local_database_harness.dart';
@@ -108,7 +108,7 @@ void main() {
 }
 
 Future<void> _expectStorageWithoutUserSchema(File databaseFile) async {
-  final executor = NativeDatabase(databaseFile);
+  final executor = openFileBackedLocalDatabase(databaseFile);
   addTearDown(executor.close);
   await executor.ensureOpen(const _SchemaInspectionExecutorUser());
 

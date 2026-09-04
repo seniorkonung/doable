@@ -1,8 +1,8 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,7 +10,7 @@ void main() {
   late AppDatabase database;
 
   setUp(() {
-    database = AppDatabase(NativeDatabase.memory());
+    database = AppDatabase(openInMemoryLocalDatabase());
   });
 
   tearDown(() => database.close());
@@ -18,6 +18,7 @@ void main() {
   test('схема версии 1 проходит сгенерированную валидацию', () async {
     await database.validateDatabaseSchema(
       options: const ValidationOptions(validateDropped: true),
+      setup: configureDoableSqliteConnection,
     );
   });
 

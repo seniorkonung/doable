@@ -631,7 +631,7 @@
   - **Вероятно затронутые файлы:** dependency manifests, storage-neutral search-key module в `lib/src/intention/application/`, `lib/src/intention/application/intention_repository.dart`, Unicode data/generation artifacts при необходимости, application contract tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.20a Зарегистрировать единую search-key function на всех SQLite connection paths
+- [x] 6.20a Зарегистрировать единую search-key function на всех SQLite connection paths
   - **Критерии приёмки:**
     - Согласно ADR-0008 единый sendable native connection setup регистрирует долговечную сигнатуру `doable_title_search_key(TEXT)` до разбора или использования схемы на production background connection, in-memory/file-backed harness, migration connections и обеих сторонах schema verification с `deterministic: true` и необходимым `directOnly: false`; callback делегирует только `titleSearchKey`, принимает один `TEXT`, не выполняет I/O и не читает изменяемое внешнее состояние.
     - Все поддерживаемые способы создания `AppDatabase` и test executors используют общий setup либо доказанно объединяют его с целевым fixture setup вместо замены; отсутствие обязательной регистрации приводит к контролируемому отказу до успешного создания схемы или записи, а публичная `IntentionRepository` seam и diagnostics не раскрывают функцию, Unicode-данные или пользовательский текст.

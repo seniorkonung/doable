@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
+import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/isolate.dart';
@@ -19,7 +20,7 @@ void main() {
       'открывает новую базу и предоставляет её только в результате ready',
       () async {
         final bootstrap = LocalDataBootstrap(
-          executorFactory: NativeDatabase.memory,
+          executorFactory: openInMemoryLocalDatabase,
           diagnosticsSink: InMemoryDiagnosticsSink(),
         );
         addTearDown(bootstrap.close);
@@ -55,7 +56,7 @@ void main() {
       final bootstrap = LocalDataBootstrap(
         executorFactory: () {
           createdExecutors += 1;
-          return NativeDatabase.memory();
+          return openInMemoryLocalDatabase();
         },
         diagnosticsSink: InMemoryDiagnosticsSink(),
       );
@@ -154,7 +155,7 @@ void main() {
         final diagnosticsSink = InMemoryDiagnosticsSink();
         final bootstrap = LocalDataBootstrap(
           executorFactory: () {
-            return failedExecutor = NativeDatabase.memory(
+            return failedExecutor = openInMemoryLocalDatabase(
               setup: (_) => throw StateError('Недоступное хранилище'),
             );
           },
@@ -220,7 +221,7 @@ void main() {
           _CloseTrackingExecutor? failedExecutor;
           final bootstrap = LocalDataBootstrap(
             executorFactory: () => failedExecutor = _CloseTrackingExecutor(
-              NativeDatabase(databaseFile).interceptWith(
+              openFileBackedLocalDatabase(databaseFile).interceptWith(
                 _BoundedVerificationFailureInterceptor(scenario.failure),
               ),
             ),
@@ -295,7 +296,7 @@ void main() {
       _CloseTrackingExecutor? failedExecutor;
       final bootstrap = LocalDataBootstrap(
         executorFactory: () => failedExecutor = _CloseTrackingExecutor(
-          NativeDatabase(databaseFile),
+          openFileBackedLocalDatabase(databaseFile),
         ),
         diagnosticsSink: diagnosticsSink,
       );
@@ -326,7 +327,7 @@ void main() {
         _CloseTrackingExecutor? failedExecutor;
         final bootstrap = LocalDataBootstrap(
           executorFactory: () => failedExecutor = _CloseTrackingExecutor(
-            NativeDatabase.memory(setup: (_) => throw exception),
+            openInMemoryLocalDatabase(setup: (_) => throw exception),
           ),
           diagnosticsSink: diagnosticsSink,
         );
@@ -376,7 +377,7 @@ void main() {
         _CloseTrackingExecutor? failedExecutor;
         final bootstrap = LocalDataBootstrap(
           executorFactory: () => failedExecutor = _CloseTrackingExecutor(
-            NativeDatabase.memory(setup: (_) => throw exception),
+            openInMemoryLocalDatabase(setup: (_) => throw exception),
           ),
           diagnosticsSink: diagnosticsSink,
         );
@@ -420,7 +421,7 @@ void main() {
           _CloseTrackingExecutor? failedExecutor;
           final bootstrap = LocalDataBootstrap(
             executorFactory: () => failedExecutor = _CloseTrackingExecutor(
-              NativeDatabase.memory(setup: (_) => throw exception),
+              openInMemoryLocalDatabase(setup: (_) => throw exception),
             ),
             diagnosticsSink: diagnosticsSink,
           );
@@ -441,7 +442,7 @@ void main() {
       _CloseTrackingExecutor? failedExecutor;
       final bootstrap = LocalDataBootstrap(
         executorFactory: () => failedExecutor = _CloseTrackingExecutor(
-          NativeDatabase.memory(
+          openInMemoryLocalDatabase(
             setup: (_) => throw SqliteException(
               extendedResultCode: SqlExtendedError.SQLITE_IOERR_DATA,
               message: 'CANARY-личные-данные',
@@ -463,7 +464,7 @@ void main() {
     test('записывает безопасные события bootstrap и миграции', () async {
       final diagnosticsSink = InMemoryDiagnosticsSink();
       final bootstrap = LocalDataBootstrap(
-        executorFactory: NativeDatabase.memory,
+        executorFactory: openInMemoryLocalDatabase,
         diagnosticsSink: diagnosticsSink,
       );
       addTearDown(bootstrap.close);
@@ -489,7 +490,7 @@ void main() {
       final databaseFile = await _temporaryDatabaseFile();
       final diagnosticsSink = InMemoryDiagnosticsSink();
       final bootstrap = LocalDataBootstrap(
-        executorFactory: () => NativeDatabase(
+        executorFactory: () => openFileBackedLocalDatabase(
           databaseFile,
           setup: (database) => database.execute('PRAGMA user_version = 2'),
         ),
@@ -525,7 +526,8 @@ void main() {
 
 LocalDataBootstrap _bootstrapFor(File databaseFile, {DatabaseSetup? setup}) {
   return LocalDataBootstrap(
-    executorFactory: () => NativeDatabase(databaseFile, setup: setup),
+    executorFactory: () =>
+        openFileBackedLocalDatabase(databaseFile, setup: setup),
     diagnosticsSink: InMemoryDiagnosticsSink(),
   );
 }
@@ -548,7 +550,7 @@ final class _NoopQueryExecutorUser implements QueryExecutorUser {
 }
 
 QueryExecutor _openBackgroundExecutorWithBusyVerificationFailure() {
-  return NativeDatabase.memory().interceptWith(
+  return openInMemoryLocalDatabase().interceptWith(
     _BoundedVerificationFailureInterceptor(
       SqliteException(
         extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
@@ -559,7 +561,7 @@ QueryExecutor _openBackgroundExecutorWithBusyVerificationFailure() {
 }
 
 QueryExecutor _openBackgroundExecutorWithUnexpectedVerificationFailure() {
-  return NativeDatabase.memory().interceptWith(
+  return openInMemoryLocalDatabase().interceptWith(
     _BoundedVerificationFailureInterceptor(StateError('Неизвестная причина')),
   );
 }
