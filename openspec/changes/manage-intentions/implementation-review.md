@@ -2,13 +2,14 @@
 
 ## Assessment
 
-**Result:** Changes needed
+**Result:** No unresolved findings
 
-В immutable инкременте остаются три активных finding: short-filter recovery
-неполон для Unicode-регистра, storage constraint описания уже предметной
-нормализации, а реализация ещё не соответствует согласованной схеме поисковой
-проекции. Отметка 6.17 как завершённой поэтому не подтверждена. Ранее принятый
-риск `AR1` остаётся применимым и не считается активным finding.
+Активных findings не осталось. Remediation поисковой проекции передана
+согласованной последовательности задач 6.20–6.23: отдельно зафиксированы
+воспроизводимая Unicode-операция, обязательная регистрация schema-function,
+перевод схемы и repository на generated projection и интеграционный checkpoint.
+Это planning handoff, а не утверждение, что текущая реализация уже исправлена.
+Ранее принятый риск `AR1` остаётся применимым и не считается активным finding.
 
 ## Review target
 
@@ -21,7 +22,7 @@
 - **Target scope:** Complete pre-push range
 - **Baseline freshness:** Local tracking state; no fetch performed
 - **Excluded worktree state:** неподтверждённые коммитом remediation-изменения
-  `design.md`, `tasks.md` и этого отчёта не входят в immutable review target
+  `tasks.md` и этого отчёта не входят в immutable review target
 
 ## Reviewed increment
 
@@ -62,77 +63,7 @@
 
 ## Findings
 
-### F3 · Medium — Short-filter recovery не является полным обратным Unicode lowercasing
-
-- **Evidence:** публичное правило сравнивает
-  `title.toLowerCase().contains(filter.toLowerCase())` в
-  `lib/src/intention/application/intention_repository.dart:152`. Для фильтра из
-  одной-двух кодовых точек новый код строит варианты только через lower/upper
-  каждой кодовой точки самого фильтра
-  (`lib/src/data/local/fts_query.dart:66`–`:79`). В используемом Dart 3.13
-  `K`.toLowerCase() равно `k`, но варианты фильтра `k` равны только `k` и `K`.
-  Поэтому название `Kettle` с повреждённым посторонним `title_search_key` не
-  попадает ни в одну ветвь candidate predicate, хотя публичная seam считает его
-  совпадением. Добавленный short-filter test покрывает только обычную кириллицу
-  (`test/intention/data/drift_intention_catalog_test.dart:413`).
-- **Impact:** для допустимого Unicode-названия каталог может успешно вернуть
-  ложное отсутствие и count `0`, не обнаружив одновременно повреждённый search
-  key.
-- **Required outcome:** short-filter candidate selection должна включать каждое
-  название, совпадающее по каноническому repository-правилу Unicode lowercasing,
-  и при этом выводить релевантное рассогласованное storage-представление на
-  corruption boundary.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** задачи 6.16 и 6.17; `LocalIntentionTitleSearch`;
-  application matching contract; short-filter adversarial tests
-
-### F4 · Medium — Storage constraint описания уже предметной семантики
-
-- **Evidence:** schema отклоняет только значения, состоящие из кодовых точек
-  9–13 и 32 (`lib/src/data/local/schema/intention_schema.drift:5`), тогда как
-  предметная граница считает отсутствующим любое значение с пустым Dart
-  `String.trim()` и ограничивает присутствующее описание 4096 графемами
-  (`lib/src/intention/domain/intention_text.dart:36`). Каталог проецирует только
-  `description IS NOT NULL` и не проверяет само значение
-  (`lib/src/intention/data/drift_intention_repository.dart:346`). В Dart 3.13
-  строки только из NBSP (`U+00A0`) или BOM (`U+FEFF`) обрезаются до пустых, но
-  проходят новый SQL constraint; описание из 4097 графем также проходит его.
-  Добавленный тест проверяет лишь пустую строку и ASCII whitespace
-  (`test/intention/data/drift_intention_catalog_test.dart:564`).
-- **Impact:** свежая schema допускает предметно отсутствующее или недопустимое
-  описание, после чего каталог публикует успешный summary с
-  `hasDescription = true` вместо typed corruption.
-- **Required outcome:** каждое ненулевое сохранённое описание, влияющее на
-  успешный summary, должно удовлетворять полному предметному контракту
-  представления без материализации полного текста в `IntentionSummary`.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** задачи 6.16 и 6.17; исходная/generated/snapshot schema;
-  catalog projection и adversarial description tests
-
-### F5 · Low — Реализация ещё не соответствует согласованной схеме поисковой проекции
-
-- **Evidence:** актуальный `design.md:266` и `:273` определяет
-  `title_search_key` как `STORED GENERATED ALWAYS` от единственного
-  записываемого `title`; `design.md:292` оставляет в FTS только generated key,
-  а `design.md:313`–`:315` запрещает резервную ветвь по исходному `title`.
-  Текущий committed target по-прежнему хранит обычный записываемый
-  `title_search_key`, индексирует в FTS и `title`, и `title_search_key`
-  (`lib/src/data/local/schema/intention_schema.drift:17`), а short-filter
-  predicate дополнительно ищет case variants в `title`
-  (`lib/src/data/local/fts_query.dart:41`). Новые задачи 6.20–6.22 владеют
-  реализацией этого решения, но находятся вне immutable target.
-- **Impact:** пока задачи remediation не реализованы, generated/schema
-  artifacts, runtime connection setup, trigger content и candidate semantics
-  противоречат техническому источнику истины; следующий change не может
-  безопасно полагаться на инвариант единственного записываемого названия.
-- **Required outcome:** реализация, generated artifacts, schema snapshot и тесты
-  должны подтвердить versioned SQLite-функцию, generated search key,
-  одно-колоночный FTS и единое условие count/page; финальный checkpoint 6.23
-  должен повторно доказать согласованность Phase 6.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** задачи 6.20–6.23; `build.yaml`; connection setup;
-  исходная/generated/snapshot schema; `LocalIntentionTitleSearch`; repository
-  write/read paths; schema, FTS, migration и catalog tests
+No unresolved findings remain in the implementation review.
 
 ## Accepted risks
 
