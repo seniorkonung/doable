@@ -244,7 +244,10 @@ final _incompatibleSchemaScenarios = [
             SET sql = replace(sql, ?, ?)
             WHERE type = 'table' AND name = 'intentions'
           ''',
-          ["CHECK (title <> '')", 'CHECK (length(title) > 1)'],
+          [
+            "CHECK (title <> '' AND instr(CAST(title AS BLOB), X'00') = 0)",
+            'CHECK (length(title) > 1)',
+          ],
         );
       } finally {
         database.execute('PRAGMA writable_schema = OFF');
