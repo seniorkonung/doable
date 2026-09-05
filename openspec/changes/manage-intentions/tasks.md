@@ -733,7 +733,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/schema/intention_schema.drift`, `lib/src/intention/data/drift_intention_repository.dart`, generated Drift/schema snapshot artifacts, schema/migration tests, catalog/detail/large-fixture repository tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.26 Подтвердить готовность Phase 6 после cursor, search-projection и text-integrity remediation
+- [x] 6.26 Подтвердить готовность Phase 6 после cursor, search-projection и text-integrity remediation
   - **Критерии приёмки:**
     - Evidence задач 6.10, 6.15, 6.18, 6.20b, 6.20c, 6.22, 6.24 и 6.25 подтверждает полный постоянный lifecycle, типизированную границу всех Doable-owned connections, отдельную `drift_dev` verifier boundary, точную SQLite-классификацию, lossless rehydration, instance-owned cursors, единственный записываемый источник названия, согласованные ограниченные catalog snapshots и общий контракт корректного Unicode без NUL через публичную seam.
     - Domain, application, connection, verifier, missing-setup, reserved-name-collision, raw-schema, corrupt-row, clock, cursor, Unicode, malformed UTF-16, mapping-drift, generated-column, FTS, description и catalog matrices подтверждают утверждённые setup, validation, corruption, timestamp, ordering, exact-count, keyset, integrity и bounded-materialization contracts без тихого преобразования текста или storage обходов.
