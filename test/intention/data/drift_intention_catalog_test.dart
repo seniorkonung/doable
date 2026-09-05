@@ -2,7 +2,6 @@ import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -409,7 +408,7 @@ void main() {
     expect(page.items.single.title, 'Прогуляться по Straße');
   });
 
-  test('отклоняет snapshot каталога, когда search key скрывает совпадающее название', () async {
+  test('сохраняет согласованный snapshot, когда запись отдельного search key отклонена', () async {
     const id = '018f0b5d-6b2e-7c80-8000-000000000024';
     await _insertIntention(
       database,
@@ -417,9 +416,12 @@ void main() {
       title: 'Купить молоко',
       createdAt: DateTime.utc(2026, 9, 2, 10),
     );
-    await database.customStatement(
-      'UPDATE intentions SET title_search_key = ? WHERE id = ?',
-      ['посторонний ключ', id],
+    await expectLater(
+      database.customStatement(
+        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+        ['посторонний ключ', id],
+      ),
+      throwsA(isA<Exception>()),
     );
 
     final result = await repository.getCatalogPage(
@@ -431,131 +433,121 @@ void main() {
       ),
     );
 
-    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-    expect(
-      (result as ResultFailure<IntentionCatalogPage>).failure,
-      isA<IntentionCorruptionFailure>(),
-    );
+    expect(_firstPage(result).items.single.id, _id(id));
   });
 
-  test(
-    'отклоняет snapshot каталога, когда search key создаёт ложное совпадение',
-    () async {
-      const id = '018f0b5d-6b2e-7c80-8000-000000000025';
-      await _insertIntention(
-        database,
-        id: id,
-        title: 'Купить молоко',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await database.customStatement(
-        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
-        ['посторонний ключ', id],
-      );
-
-      final result = await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: IntentionScope.active,
-          titleFilter: 'посторонний',
-          order: IntentionCatalogOrder.createdAtDescending,
-          pageSize: 1,
-        ),
-      );
-
-      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-      expect(
-        (result as ResultFailure<IntentionCatalogPage>).failure,
-        isA<IntentionCorruptionFailure>(),
-      );
-    },
-  );
-
-  test(
-    'отклоняет первую страницу при повреждённой строке за её границей',
-    () async {
-      const visibleId = '018f0b5d-6b2e-7c80-8000-000000000026';
-      const lookaheadId = '018f0b5d-6b2e-7c80-8000-000000000027';
-      await _insertIntention(
-        database,
-        id: visibleId,
-        title: 'Видимое намерение',
-        createdAt: DateTime.utc(2026, 9, 2, 11),
-      );
-      await _insertIntention(
-        database,
-        id: lookaheadId,
-        title: 'Намерение за границей',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      await database.customStatement(
-        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
-        ['повреждённый ключ', lookaheadId],
-      );
-
-      final result = await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: IntentionScope.active,
-          titleFilter: null,
-          order: IntentionCatalogOrder.createdAtDescending,
-          pageSize: 1,
-        ),
-      );
-
-      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-      expect(
-        (result as ResultFailure<IntentionCatalogPage>).failure,
-        isA<IntentionCorruptionFailure>(),
-      );
-    },
-  );
-
-  test('отклоняет continuation page с повреждённой строкой', () async {
-    const firstId = '018f0b5d-6b2e-7c80-8000-000000000030';
-    const corruptedId = '018f0b5d-6b2e-7c80-8000-000000000031';
+  test('не создаёт ложное совпадение, когда запись отдельного search key отклонена', () async {
+    const id = '018f0b5d-6b2e-7c80-8000-000000000025';
     await _insertIntention(
       database,
-      id: firstId,
-      title: 'Первая строка',
+      id: id,
+      title: 'Купить молоко',
       createdAt: DateTime.utc(2026, 9, 2, 10),
     );
-    await _insertIntention(
-      database,
-      id: corruptedId,
-      title: 'Строка продолжения',
-      createdAt: DateTime.utc(2026, 9, 2, 11),
-    );
-    final firstQuery = IntentionCatalogQuery(
-      scope: IntentionScope.active,
-      titleFilter: null,
-      order: const IntentionCatalogOrder(
-        field: IntentionCatalogSortField.createdAt,
-        direction: IntentionCatalogSortDirection.ascending,
+    await expectLater(
+      database.customStatement(
+        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+        ['посторонний ключ', id],
       ),
-      pageSize: 1,
-    );
-    final cursor = _firstPage(await repository.getCatalogPage(firstQuery))
-        .nextCursor!;
-    await database.customStatement(
-      'UPDATE intentions SET title_search_key = ? WHERE id = ?',
-      ['повреждённый ключ', corruptedId],
+      throwsA(isA<Exception>()),
     );
 
     final result = await repository.getCatalogPage(
       IntentionCatalogQuery(
-        scope: firstQuery.scope,
-        titleFilter: null,
-        order: firstQuery.order,
-        pageSize: firstQuery.pageSize,
-        cursor: cursor,
+        scope: IntentionScope.active,
+        titleFilter: 'посторонний',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
       ),
     );
 
-    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
-    expect(
-      (result as ResultFailure<IntentionCatalogPage>).failure,
-      isA<IntentionCorruptionFailure>(),
-    );
+    expect(_firstPage(result).items, isEmpty);
   });
+
+  test('сохраняет первую страницу при отклонённой записи отдельного search key за её границей', () async {
+    const visibleId = '018f0b5d-6b2e-7c80-8000-000000000026';
+    const lookaheadId = '018f0b5d-6b2e-7c80-8000-000000000027';
+    await _insertIntention(
+      database,
+      id: visibleId,
+      title: 'Видимое намерение',
+      createdAt: DateTime.utc(2026, 9, 2, 11),
+    );
+    await _insertIntention(
+      database,
+      id: lookaheadId,
+      title: 'Намерение за границей',
+      createdAt: DateTime.utc(2026, 9, 2, 10),
+    );
+    await expectLater(
+      database.customStatement(
+        'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+        ['повреждённый ключ', lookaheadId],
+      ),
+      throwsA(isA<Exception>()),
+    );
+
+    final result = await repository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+      ),
+    );
+
+    expect(_firstPage(result).items.single.id, _id(visibleId));
+  });
+
+  test(
+    'сохраняет continuation page при отклонённой записи отдельного search key',
+    () async {
+      const firstId = '018f0b5d-6b2e-7c80-8000-000000000030';
+      const corruptedId = '018f0b5d-6b2e-7c80-8000-000000000031';
+      await _insertIntention(
+        database,
+        id: firstId,
+        title: 'Первая строка',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: corruptedId,
+        title: 'Строка продолжения',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      final firstQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: const IntentionCatalogOrder(
+          field: IntentionCatalogSortField.createdAt,
+          direction: IntentionCatalogSortDirection.ascending,
+        ),
+        pageSize: 1,
+      );
+      final cursor = _firstPage(await repository.getCatalogPage(firstQuery))
+          .nextCursor!;
+      await expectLater(
+        database.customStatement(
+          'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+          ['повреждённый ключ', corruptedId],
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      final result = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: firstQuery.scope,
+          titleFilter: null,
+          order: firstQuery.order,
+          pageSize: firstQuery.pageSize,
+          cursor: cursor,
+        ),
+      );
+
+      expect(_continuationPage(result).items.single.id, _id(corruptedId));
+    },
+  );
 
   test(
     'хранилище не допускает пустое или полностью пробельное описание',
@@ -1096,7 +1088,6 @@ Future<void> _insertIntention(
       IntentionsCompanion.insert(
         id: id,
         title: title,
-        titleSearchKey: titleSearchKey(title),
         description: Value(description),
         isArchived: Value(isArchived),
         createdAt: createdAt.microsecondsSinceEpoch,

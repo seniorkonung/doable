@@ -33,9 +33,13 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
     'title_search_key',
     aliasedName,
     false,
+    generatedAs: GeneratedAs(
+      const CustomExpression('doable_title_search_key(title)'),
+      true,
+    ),
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (title_search_key <> \'\')',
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> \'\')',
   );
   static const VerificationMeta _descriptionMeta = const VerificationMeta(
     'description',
@@ -139,8 +143,6 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
           _titleSearchKeyMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_titleSearchKeyMeta);
     }
     if (data.containsKey('description')) {
       context.handle(
@@ -259,7 +261,6 @@ class Intention extends DataClass implements Insertable<Intention> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
-    map['title_search_key'] = Variable<String>(titleSearchKey);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
@@ -274,7 +275,6 @@ class Intention extends DataClass implements Insertable<Intention> {
     return IntentionsCompanion(
       id: Value(id),
       title: Value(title),
-      titleSearchKey: Value(titleSearchKey),
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
@@ -335,27 +335,6 @@ class Intention extends DataClass implements Insertable<Intention> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
-  Intention copyWithCompanion(IntentionsCompanion data) {
-    return Intention(
-      id: data.id.present ? data.id.value : this.id,
-      title: data.title.present ? data.title.value : this.title,
-      titleSearchKey: data.titleSearchKey.present
-          ? data.titleSearchKey.value
-          : this.titleSearchKey,
-      description: data.description.present
-          ? data.description.value
-          : this.description,
-      isActionReady: data.isActionReady.present
-          ? data.isActionReady.value
-          : this.isActionReady,
-      isArchived: data.isArchived.present
-          ? data.isArchived.value
-          : this.isArchived,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-    );
-  }
-
   @override
   String toString() {
     return (StringBuffer('Intention(')
@@ -399,7 +378,6 @@ class Intention extends DataClass implements Insertable<Intention> {
 class IntentionsCompanion extends UpdateCompanion<Intention> {
   final Value<String> id;
   final Value<String> title;
-  final Value<String> titleSearchKey;
   final Value<String?> description;
   final Value<bool> isActionReady;
   final Value<bool> isArchived;
@@ -409,7 +387,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
   const IntentionsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
-    this.titleSearchKey = const Value.absent(),
     this.description = const Value.absent(),
     this.isActionReady = const Value.absent(),
     this.isArchived = const Value.absent(),
@@ -420,7 +397,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
   IntentionsCompanion.insert({
     required String id,
     required String title,
-    required String titleSearchKey,
     this.description = const Value.absent(),
     this.isActionReady = const Value.absent(),
     this.isArchived = const Value.absent(),
@@ -429,13 +405,11 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
-       titleSearchKey = Value(titleSearchKey),
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<Intention> custom({
     Expression<String>? id,
     Expression<String>? title,
-    Expression<String>? titleSearchKey,
     Expression<String>? description,
     Expression<bool>? isActionReady,
     Expression<bool>? isArchived,
@@ -446,7 +420,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (title != null) 'title': title,
-      if (titleSearchKey != null) 'title_search_key': titleSearchKey,
       if (description != null) 'description': description,
       if (isActionReady != null) 'is_action_ready': isActionReady,
       if (isArchived != null) 'is_archived': isArchived,
@@ -459,7 +432,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
   IntentionsCompanion copyWith({
     Value<String>? id,
     Value<String>? title,
-    Value<String>? titleSearchKey,
     Value<String?>? description,
     Value<bool>? isActionReady,
     Value<bool>? isArchived,
@@ -470,7 +442,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     return IntentionsCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
-      titleSearchKey: titleSearchKey ?? this.titleSearchKey,
       description: description ?? this.description,
       isActionReady: isActionReady ?? this.isActionReady,
       isArchived: isArchived ?? this.isArchived,
@@ -488,9 +459,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
-    }
-    if (titleSearchKey.present) {
-      map['title_search_key'] = Variable<String>(titleSearchKey.value);
     }
     if (description.present) {
       map['description'] = Variable<String>(description.value);
@@ -518,7 +486,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     return (StringBuffer('IntentionsCompanion(')
           ..write('id: $id, ')
           ..write('title: $title, ')
-          ..write('titleSearchKey: $titleSearchKey, ')
           ..write('description: $description, ')
           ..write('isActionReady: $isActionReady, ')
           ..write('isArchived: $isArchived, ')
@@ -538,15 +505,6 @@ class IntentionTitlesFts extends Table
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   IntentionTitlesFts(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _titleMeta = const VerificationMeta('title');
-  late final GeneratedColumn<String> title = GeneratedColumn<String>(
-    'title',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: '',
-  );
   static const VerificationMeta _titleSearchKeyMeta = const VerificationMeta(
     'titleSearchKey',
   );
@@ -559,7 +517,7 @@ class IntentionTitlesFts extends Table
     $customConstraints: '',
   );
   @override
-  List<GeneratedColumn> get $columns => [title, titleSearchKey];
+  List<GeneratedColumn> get $columns => [titleSearchKey];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -572,14 +530,6 @@ class IntentionTitlesFts extends Table
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
-    if (data.containsKey('title')) {
-      context.handle(
-        _titleMeta,
-        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_titleMeta);
-    }
     if (data.containsKey('title_search_key')) {
       context.handle(
         _titleSearchKeyMeta,
@@ -600,10 +550,6 @@ class IntentionTitlesFts extends Table
   IntentionTitlesFt map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return IntentionTitlesFt(
-      title: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}title'],
-      )!,
       titleSearchKey: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}title_search_key'],
@@ -620,27 +566,22 @@ class IntentionTitlesFts extends Table
   bool get dontWriteConstraints => true;
   @override
   String get moduleAndArgs =>
-      'fts5(title, title_search_key, content = \'intentions\', content_rowid = \'rowid\', tokenize = \'trigram case_sensitive 0 remove_diacritics 0\')';
+      'fts5(title_search_key, content = \'intentions\', content_rowid = \'rowid\', tokenize = \'trigram case_sensitive 0 remove_diacritics 0\')';
 }
 
 class IntentionTitlesFt extends DataClass
     implements Insertable<IntentionTitlesFt> {
-  final String title;
   final String titleSearchKey;
-  const IntentionTitlesFt({required this.title, required this.titleSearchKey});
+  const IntentionTitlesFt({required this.titleSearchKey});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['title'] = Variable<String>(title);
     map['title_search_key'] = Variable<String>(titleSearchKey);
     return map;
   }
 
   IntentionTitlesFtsCompanion toCompanion(bool nullToAbsent) {
-    return IntentionTitlesFtsCompanion(
-      title: Value(title),
-      titleSearchKey: Value(titleSearchKey),
-    );
+    return IntentionTitlesFtsCompanion(titleSearchKey: Value(titleSearchKey));
   }
 
   factory IntentionTitlesFt.fromJson(
@@ -649,7 +590,6 @@ class IntentionTitlesFt extends DataClass
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return IntentionTitlesFt(
-      title: serializer.fromJson<String>(json['title']),
       titleSearchKey: serializer.fromJson<String>(json['title_search_key']),
     );
   }
@@ -657,19 +597,14 @@ class IntentionTitlesFt extends DataClass
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'title': serializer.toJson<String>(title),
       'title_search_key': serializer.toJson<String>(titleSearchKey),
     };
   }
 
-  IntentionTitlesFt copyWith({String? title, String? titleSearchKey}) =>
-      IntentionTitlesFt(
-        title: title ?? this.title,
-        titleSearchKey: titleSearchKey ?? this.titleSearchKey,
-      );
+  IntentionTitlesFt copyWith({String? titleSearchKey}) =>
+      IntentionTitlesFt(titleSearchKey: titleSearchKey ?? this.titleSearchKey);
   IntentionTitlesFt copyWithCompanion(IntentionTitlesFtsCompanion data) {
     return IntentionTitlesFt(
-      title: data.title.present ? data.title.value : this.title,
       titleSearchKey: data.titleSearchKey.present
           ? data.titleSearchKey.value
           : this.titleSearchKey,
@@ -679,56 +614,46 @@ class IntentionTitlesFt extends DataClass
   @override
   String toString() {
     return (StringBuffer('IntentionTitlesFt(')
-          ..write('title: $title, ')
           ..write('titleSearchKey: $titleSearchKey')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(title, titleSearchKey);
+  int get hashCode => titleSearchKey.hashCode;
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is IntentionTitlesFt &&
-          other.title == this.title &&
           other.titleSearchKey == this.titleSearchKey);
 }
 
 class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
-  final Value<String> title;
   final Value<String> titleSearchKey;
   final Value<int> rowid;
   const IntentionTitlesFtsCompanion({
-    this.title = const Value.absent(),
     this.titleSearchKey = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   IntentionTitlesFtsCompanion.insert({
-    required String title,
     required String titleSearchKey,
     this.rowid = const Value.absent(),
-  }) : title = Value(title),
-       titleSearchKey = Value(titleSearchKey);
+  }) : titleSearchKey = Value(titleSearchKey);
   static Insertable<IntentionTitlesFt> custom({
-    Expression<String>? title,
     Expression<String>? titleSearchKey,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
-      if (title != null) 'title': title,
       if (titleSearchKey != null) 'title_search_key': titleSearchKey,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   IntentionTitlesFtsCompanion copyWith({
-    Value<String>? title,
     Value<String>? titleSearchKey,
     Value<int>? rowid,
   }) {
     return IntentionTitlesFtsCompanion(
-      title: title ?? this.title,
       titleSearchKey: titleSearchKey ?? this.titleSearchKey,
       rowid: rowid ?? this.rowid,
     );
@@ -737,9 +662,6 @@ class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    if (title.present) {
-      map['title'] = Variable<String>(title.value);
-    }
     if (titleSearchKey.present) {
       map['title_search_key'] = Variable<String>(titleSearchKey.value);
     }
@@ -752,7 +674,6 @@ class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
   @override
   String toString() {
     return (StringBuffer('IntentionTitlesFtsCompanion(')
-          ..write('title: $title, ')
           ..write('titleSearchKey: $titleSearchKey, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -766,15 +687,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Intentions intentions = Intentions(this);
   late final IntentionTitlesFts intentionTitlesFts = IntentionTitlesFts(this);
   late final Trigger intentionsFtsAfterInsert = Trigger(
-    'CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts ("rowid", title, title_search_key) VALUES (new."rowid", new.title, new.title_search_key);END',
+    'CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
     'intentions_fts_after_insert',
   );
   late final Trigger intentionsFtsAfterUpdateSearchContent = Trigger(
-    'CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE OF title, title_search_key ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title, title_search_key) VALUES (\'delete\', old."rowid", old.title, old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title, title_search_key) VALUES (new."rowid", new.title, new.title_search_key);END',
+    'CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
     'intentions_fts_after_update_search_content',
   );
   late final Trigger intentionsFtsAfterDelete = Trigger(
-    'CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title, title_search_key) VALUES (\'delete\', old."rowid", old.title, old.title_search_key);END',
+    'CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);END',
     'intentions_fts_after_delete',
   );
   late final Index intentionsActiveCreatedAtAscIdAsc = Index(
@@ -877,7 +798,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $IntentionsCreateCompanionBuilder = IntentionsCompanion Function({
   required String id,
   required String title,
-  required String titleSearchKey,
   Value<String?> description,
   Value<bool> isActionReady,
   Value<bool> isArchived,
@@ -888,7 +808,6 @@ typedef $IntentionsCreateCompanionBuilder = IntentionsCompanion Function({
 typedef $IntentionsUpdateCompanionBuilder = IntentionsCompanion Function({
   Value<String> id,
   Value<String> title,
-  Value<String> titleSearchKey,
   Value<String?> description,
   Value<bool> isActionReady,
   Value<bool> isArchived,
@@ -1067,7 +986,6 @@ class $IntentionsTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
-                Value<String> titleSearchKey = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<bool> isActionReady = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
@@ -1077,7 +995,6 @@ class $IntentionsTableManager
               }) => IntentionsCompanion(
                 id: id,
                 title: title,
-                titleSearchKey: titleSearchKey,
                 description: description,
                 isActionReady: isActionReady,
                 isArchived: isArchived,
@@ -1089,7 +1006,6 @@ class $IntentionsTableManager
               ({
                 required String id,
                 required String title,
-                required String titleSearchKey,
                 Value<String?> description = const Value.absent(),
                 Value<bool> isActionReady = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
@@ -1099,7 +1015,6 @@ class $IntentionsTableManager
               }) => IntentionsCompanion.insert(
                 id: id,
                 title: title,
-                titleSearchKey: titleSearchKey,
                 description: description,
                 isActionReady: isActionReady,
                 isArchived: isArchived,
@@ -1131,13 +1046,11 @@ typedef $IntentionsProcessedTableManager =
     >;
 typedef $IntentionTitlesFtsCreateCompanionBuilder =
     IntentionTitlesFtsCompanion Function({
-      required String title,
       required String titleSearchKey,
       Value<int> rowid,
     });
 typedef $IntentionTitlesFtsUpdateCompanionBuilder =
     IntentionTitlesFtsCompanion Function({
-      Value<String> title,
       Value<String> titleSearchKey,
       Value<int> rowid,
     });
@@ -1151,11 +1064,6 @@ class $IntentionTitlesFtsFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<String> get title => $composableBuilder(
-    column: $table.title,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<String> get titleSearchKey => $composableBuilder(
     column: $table.titleSearchKey,
     builder: (column) => ColumnFilters(column),
@@ -1171,11 +1079,6 @@ class $IntentionTitlesFtsOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<String> get title => $composableBuilder(
-    column: $table.title,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get titleSearchKey => $composableBuilder(
     column: $table.titleSearchKey,
     builder: (column) => ColumnOrderings(column),
@@ -1191,9 +1094,6 @@ class $IntentionTitlesFtsAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<String> get title =>
-      $composableBuilder(column: $table.title, builder: (column) => column);
-
   GeneratedColumn<String> get titleSearchKey => $composableBuilder(
     column: $table.titleSearchKey,
     builder: (column) => column,
@@ -1235,21 +1135,17 @@ class $IntentionTitlesFtsTableManager
               $IntentionTitlesFtsAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<String> title = const Value.absent(),
                 Value<String> titleSearchKey = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => IntentionTitlesFtsCompanion(
-                title: title,
                 titleSearchKey: titleSearchKey,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                required String title,
                 required String titleSearchKey,
                 Value<int> rowid = const Value.absent(),
               }) => IntentionTitlesFtsCompanion.insert(
-                title: title,
                 titleSearchKey: titleSearchKey,
                 rowid: rowid,
               ),

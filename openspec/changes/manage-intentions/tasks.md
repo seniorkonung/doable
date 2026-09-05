@@ -671,7 +671,7 @@
   - **Вероятно затронутые файлы:** отдельный Doable schema-verifier helper в `test/support`, connection/schema-verification tests, migration tests, test-only raw SQLite fixtures.
   - **Оценка:** M (до 4 групп артефактов).
 
-- [ ] 6.21 Сделать `title` единственным записываемым источником поисковой проекции и count
+- [x] 6.21 Сделать `title` единственным записываемым источником поисковой проекции и count
   - **Критерии приёмки:**
     - Schema version 1 объявляет `title_search_key` как `NOT NULL STORED GENERATED ALWAYS AS (doable_title_search_key(title))`; generated Drift companion, repository create/update и raw supported write paths не принимают отдельное значение ключа, а создание и любая последующая запись строки позволяют SQLite пересчитать эту восстанавливаемую проекцию без изменения канонического `title`. Этот критерий supersedes выполненную задачу 6.5 в части прикладной записи и синхронизации отдельного `title_search_key`.
     - `intention_titles_fts` индексирует только generated `title_search_key`; insert/delete triggers и срабатывающий на любой `UPDATE` строки trigger используют его вычисленные `old`/`new` значения, чтобы возможный пересчёт ключа после обновления Unicode-данных не оставил FTS рассогласованным с основной таблицей. Короткая ветвь применяет только параметризованный `instr(title_search_key, query_search_key)`, а длинная — column-qualified trigram `title_search_key MATCH` без резервной колонки `title` и case-variant predicate.

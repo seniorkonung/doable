@@ -306,18 +306,16 @@ void main() {
               INSERT INTO intentions (
                 id,
                 title,
-                title_search_key,
                 description,
                 is_action_ready,
                 is_archived,
                 created_at,
                 updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ''',
             [
               fixture.id,
               'Повреждённое намерение',
-              'повреждённое намерение',
               null,
               0,
               0,

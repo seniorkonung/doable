@@ -6,7 +6,6 @@ import '../application/intention_command.dart';
 import '../application/intention_id_generator.dart';
 import '../application/intention_repository.dart';
 import '../application/intention_result.dart';
-import '../application/title_search_key.dart' as search;
 import '../domain/intention.dart' as domain;
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
@@ -102,7 +101,6 @@ final class DriftIntentionRepository implements IntentionRepository {
           SELECT
             id,
             title,
-            title_search_key,
             description,
             is_action_ready,
             is_archived,
@@ -213,7 +211,6 @@ final class DriftIntentionRepository implements IntentionRepository {
           local.IntentionsCompanion.insert(
             id: intention.id.toCanonicalString(),
             title: intention.title,
-            titleSearchKey: search.titleSearchKey(intention.title),
             description: Value(intention.description),
             isActionReady: const Value(false),
             isArchived: const Value(false),
@@ -255,7 +252,6 @@ final class DriftIntentionRepository implements IntentionRepository {
     )..where((row) => row.id.equals(command.id.toCanonicalString()))).write(
       local.IntentionsCompanion(
         title: Value(updated.title),
-        titleSearchKey: Value(search.titleSearchKey(updated.title)),
         description: Value(updated.description),
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
@@ -354,7 +350,6 @@ final class DriftIntentionRepository implements IntentionRepository {
       ..addColumns([
         intentions.id,
         intentions.title,
-        intentions.titleSearchKey,
         intentions.isActionReady,
         intentions.isArchived,
         intentions.createdAt,
@@ -372,7 +367,6 @@ final class DriftIntentionRepository implements IntentionRepository {
         _rehydrateSummary(
           id: row.read(intentions.id)!,
           title: row.read(intentions.title)!,
-          titleSearchKey: row.read(intentions.titleSearchKey)!,
           hasDescription: row.read(hasDescriptionExpression)!,
           isActionReady: row.read(intentions.isActionReady)!,
           isArchived: row.read(intentions.isArchived)!,
@@ -401,7 +395,6 @@ final class DriftIntentionRepository implements IntentionRepository {
       ..addColumns([
         intentions.id,
         intentions.title,
-        intentions.titleSearchKey,
         intentions.isActionReady,
         intentions.isArchived,
         intentions.createdAt,
@@ -419,7 +412,6 @@ final class DriftIntentionRepository implements IntentionRepository {
         _rehydrateSummary(
           id: row.read(intentions.id)!,
           title: row.read(intentions.title)!,
-          titleSearchKey: row.read(intentions.titleSearchKey)!,
           hasDescription: row.read(hasDescriptionExpression)!,
           isActionReady: row.read(intentions.isActionReady)!,
           isArchived: row.read(intentions.isArchived)!,
@@ -494,7 +486,6 @@ final class DriftIntentionRepository implements IntentionRepository {
   IntentionSummary _rehydrateSummary({
     required String id,
     required String title,
-    required String titleSearchKey,
     required bool hasDescription,
     required bool isActionReady,
     required bool isArchived,
@@ -508,8 +499,7 @@ final class DriftIntentionRepository implements IntentionRepository {
 
     try {
       final normalizedTitle = IntentionText.normalizeTitle(title);
-      if (normalizedTitle != title ||
-          titleSearchKey != search.titleSearchKey(normalizedTitle)) {
+      if (normalizedTitle != title) {
         throw const _StoredIntentionCorruption();
       }
       return IntentionSummary(
@@ -559,7 +549,6 @@ final class DriftIntentionRepository implements IntentionRepository {
       return _rehydrateValues(
         id: row.id,
         title: row.title,
-        titleSearchKey: row.titleSearchKey,
         description: row.description,
         readiness: row.isActionReady
             ? domain.IntentionReadiness.ready
@@ -584,7 +573,6 @@ final class DriftIntentionRepository implements IntentionRepository {
     return _rehydrateValues(
       id: stored.id,
       title: stored.title,
-      titleSearchKey: stored.titleSearchKey,
       description: stored.description,
       readiness: stored.readiness,
       archiveState: stored.archiveState,
@@ -596,7 +584,6 @@ final class DriftIntentionRepository implements IntentionRepository {
   domain.Intention _rehydrateValues({
     required String id,
     required String title,
-    required String titleSearchKey,
     required String? description,
     required domain.IntentionReadiness readiness,
     required domain.IntentionArchiveState archiveState,
@@ -613,9 +600,7 @@ final class DriftIntentionRepository implements IntentionRepository {
       final normalizedDescription = description == null
           ? null
           : IntentionText.normalizeDescription(description);
-      if (normalizedTitle != title ||
-          normalizedDescription != description ||
-          titleSearchKey != search.titleSearchKey(normalizedTitle)) {
+      if (normalizedTitle != title || normalizedDescription != description) {
         throw const _StoredIntentionCorruption();
       }
       return domain.Intention(
@@ -642,7 +627,6 @@ final class _StoredIntentionDetail {
   const _StoredIntentionDetail({
     required this.id,
     required this.title,
-    required this.titleSearchKey,
     required this.description,
     required this.readiness,
     required this.archiveState,
@@ -655,7 +639,6 @@ final class _StoredIntentionDetail {
     return _StoredIntentionDetail(
       id: _requiredString(data, 'id'),
       title: _requiredString(data, 'title'),
-      titleSearchKey: _requiredString(data, 'title_search_key'),
       description: _nullableString(data, 'description'),
       readiness: _readiness(data, 'is_action_ready'),
       archiveState: _archiveState(data, 'is_archived'),
@@ -666,7 +649,6 @@ final class _StoredIntentionDetail {
 
   final String id;
   final String title;
-  final String titleSearchKey;
   final String? description;
   final domain.IntentionReadiness readiness;
   final domain.IntentionArchiveState archiveState;

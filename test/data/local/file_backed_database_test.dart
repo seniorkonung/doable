@@ -22,7 +22,6 @@ void main() {
         database,
         id: '018f0b5d-6b2e-7c80-8000-000000000301',
         title: 'Проверить память',
-        titleSearchKey: 'проверить память',
         createdAt: 1704067200000000,
         updatedAt: 1704067200000000,
       );
@@ -39,7 +38,6 @@ void main() {
         firstDatabase,
         id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
         title: 'Сохранить текст',
-        titleSearchKey: 'сохранить текст',
         description: '  Точный текст\nбез нормализации  ',
         isActionReady: true,
         createdAt: 1704067200000000,
@@ -49,7 +47,6 @@ void main() {
         firstDatabase,
         id: '018f0b5d-6b2e-7c80-8000-000000000302',
         title: 'Архивное намерение',
-        titleSearchKey: 'архивное намерение',
         isArchived: true,
         createdAt: 1704240000000000,
         updatedAt: 1704326400000000,
@@ -125,7 +122,6 @@ void main() {
         firstDatabase,
         id: '018f0b5d-6b2e-7c80-8000-000000000303',
         title: 'Первое намерение для проверки открытия',
-        titleSearchKey: 'первое намерение для проверки открытия',
         createdAt: 1704412800000000,
         updatedAt: 1704412800000000,
       );
@@ -133,7 +129,6 @@ void main() {
         firstDatabase,
         id: '018f0b5d-6b2e-7c80-8000-000000000304',
         title: 'Второе намерение для проверки открытия',
-        titleSearchKey: 'второе намерение для проверки открытия',
         createdAt: 1704499200000000,
         updatedAt: 1704499200000000,
       );
@@ -321,7 +316,6 @@ Future<void> _insertIntention(
   GeneratedDatabase database, {
   required String id,
   required String title,
-  required String titleSearchKey,
   String? description,
   bool isActionReady = false,
   bool isArchived = false,
@@ -333,18 +327,16 @@ Future<void> _insertIntention(
       INSERT INTO intentions (
         id,
         title,
-        title_search_key,
         description,
         is_action_ready,
         is_archived,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ''',
     [
       id,
       title,
-      titleSearchKey,
       description,
       isActionReady ? 1 : 0,
       isArchived ? 1 : 0,

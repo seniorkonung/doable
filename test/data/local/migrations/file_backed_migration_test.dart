@@ -130,13 +130,12 @@ Future<void> _insertIntention(GeneratedDatabase database) {
   return database.customStatement(
     '''
       INSERT INTO intentions (
-        id, title, title_search_key, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?)
+        id, title, created_at, updated_at
+      ) VALUES (?, ?, ?, ?)
     ''',
     [
       '018f0b5d-6b2e-7c80-8000-000000000303',
       'Сохранённое намерение',
-      'сохранённое намерение',
       1704067200000000,
       1704067200000000,
     ],

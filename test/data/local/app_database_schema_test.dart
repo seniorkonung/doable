@@ -1,4 +1,5 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -11,12 +12,56 @@ void main() {
   tearDown(() => database.close());
 
   group('схема локальных намерений', () {
+    test(
+      'вычисляет поисковую проекцию только из записываемого title',
+      () async {
+        await database.customStatement(
+          '''
+            INSERT INTO intentions (id, title, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+          ''',
+          ['018f0b5d-6b2e-7c80-8000-000000000000', 'Straße', 1000000, 1000000],
+        );
+
+        final stored = await database
+            .customSelect(
+              '''
+            SELECT title, title_search_key
+            FROM intentions
+            WHERE id = ?
+          ''',
+              variables: [
+                Variable.withString('018f0b5d-6b2e-7c80-8000-000000000000'),
+              ],
+            )
+            .getSingle();
+        final ftsColumns = await database
+            .customSelect('PRAGMA table_info(intention_titles_fts)')
+            .get();
+        final updateTrigger = await database.customSelect('''
+            SELECT sql
+            FROM sqlite_schema
+            WHERE type = 'trigger'
+              AND name = 'intentions_fts_after_update_search_content'
+          ''').getSingle();
+
+        expect(stored.read<String>('title'), 'Straße');
+        expect(stored.read<String>('title_search_key'), 'strasse');
+        expect(ftsColumns.map((column) => column.read<String>('name')), [
+          'title_search_key',
+        ]);
+        expect(
+          updateTrigger.read<String>('sql'),
+          contains('AFTER UPDATE ON intentions'),
+        );
+      },
+    );
+
     test('сохраняет одноимённые намерения с допускающим отсутствие описанием и исходными состояниями', () async {
       await _insertIntention(
         database,
         id: '018f0b5d-6b2e-7c80-8000-000000000001',
         title: 'Быть здоровым',
-        titleSearchKey: 'быть здоровым',
         description: null,
         createdAt: 1000000,
         updatedAt: 1000000,
@@ -25,7 +70,6 @@ void main() {
         database,
         id: '018f0b5d-6b2e-7c80-8000-000000000002',
         title: 'Быть здоровым',
-        titleSearchKey: 'быть здоровым',
         description: 'Сон и прогулки',
         createdAt: 2000000,
         updatedAt: 3000000,
@@ -61,7 +105,6 @@ void main() {
         database,
         id: '018f0b5d-6b2e-7c80-8000-000000000003',
         title: 'Показание после перевода часов',
-        titleSearchKey: 'показание после перевода часов',
         description: null,
         createdAt: 1000000,
         updatedAt: 999999,
@@ -82,14 +125,12 @@ void main() {
         database.customStatement(
           '''
           INSERT INTO intentions (
-            id, title, title_search_key, is_action_ready, is_archived,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            id, title, is_action_ready, is_archived, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?)
         ''',
           [
             '018f0b5d-6b2e-7c80-8000-000000000004',
             'Некорректное состояние',
-            'некорректное состояние',
             2,
             0,
             1000000,
@@ -102,15 +143,10 @@ void main() {
         database.customStatement(
           '''
           INSERT INTO intentions (
-            id, title, title_search_key, created_at, updated_at
-          ) VALUES (?, NULL, ?, ?, ?)
+            id, title, created_at, updated_at
+          ) VALUES (?, NULL, ?, ?)
         ''',
-          [
-            '018f0b5d-6b2e-7c80-8000-000000000005',
-            'некорректное название',
-            1000000,
-            1000000,
-          ],
+          ['018f0b5d-6b2e-7c80-8000-000000000005', 1000000, 1000000],
         ),
         throwsA(isA<Exception>()),
       );
@@ -118,16 +154,10 @@ void main() {
         database.customStatement(
           '''
           INSERT INTO intentions (
-            id, title, title_search_key, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?)
+            id, title, created_at, updated_at
+          ) VALUES (?, ?, ?, ?)
         ''',
-          [
-            '018f0b5d-6b2e-7c80-8000-000000000006',
-            '',
-            'пустое название',
-            1000000,
-            1000000,
-          ],
+          ['018f0b5d-6b2e-7c80-8000-000000000006', '', 1000000, 1000000],
         ),
         throwsA(isA<Exception>()),
       );
@@ -166,17 +196,16 @@ Future<void> _insertIntention(
   AppDatabase database, {
   required String id,
   required String title,
-  required String titleSearchKey,
   required String? description,
   required int createdAt,
   required int updatedAt,
 }) => database.customStatement(
   '''
       INSERT INTO intentions (
-        id, title, title_search_key, description, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
+        id, title, description, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?)
     ''',
-  [id, title, titleSearchKey, description, createdAt, updatedAt],
+  [id, title, description, createdAt, updatedAt],
 );
 
 enum _CatalogIndexScope {

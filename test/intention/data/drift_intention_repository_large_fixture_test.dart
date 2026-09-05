@@ -58,7 +58,6 @@ Future<void> _populateFixture(AppDatabase database) => database.batch((batch) {
       IntentionsCompanion.insert(
         id: _fixtureId(index),
         title: title,
-        titleSearchKey: title,
         isArchived: Value(index.isOdd),
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -74,7 +73,7 @@ Future<void> _expectQueryPlans(AppDatabase database) async {
       WHERE is_archived = 0
         AND rowid IN (
           SELECT rowid FROM intention_titles_fts
-          WHERE intention_titles_fts MATCH '"ааа"'
+          WHERE title_search_key MATCH '"ааа"'
         )
       ORDER BY created_at DESC, id ASC
       LIMIT ${_pageSize + 1}
@@ -86,7 +85,7 @@ Future<void> _expectQueryPlans(AppDatabase database) async {
         EXPLAIN QUERY PLAN
         SELECT id FROM intentions
         WHERE is_archived = 0
-          AND instr(title, '$filter') > 0
+          AND instr(title_search_key, '$filter') > 0
         ORDER BY created_at DESC, id ASC
         LIMIT ${_pageSize + 1}
       ''');

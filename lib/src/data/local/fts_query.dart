@@ -79,7 +79,7 @@ final class _FtsTitleSearchExpression extends Expression<bool> {
     context.buffer.write(
       '${_titleSearchKey.tableName}.rowid IN ('
       'SELECT rowid FROM intention_titles_fts '
-      'WHERE intention_titles_fts MATCH ',
+      'WHERE title_search_key MATCH ',
     );
     _phrase.writeInto(context);
     context.buffer.write(')');

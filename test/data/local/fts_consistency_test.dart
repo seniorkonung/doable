@@ -2,7 +2,6 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/fts_query.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
-import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,18 +29,13 @@ void main() {
       () async {
         const id = '018f0b5d-6b2e-7c80-8000-000000000101';
 
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'Купить молоко',
-          titleSearchKey: 'купить молоко',
-        );
+        await _insertIntention(database, id: id, title: 'Купить молоко');
 
         expect(await _findByTitleFilter(database, 'молоко'), [id]);
 
         await database.customStatement(
-          'UPDATE intentions SET title = ?, title_search_key = ? WHERE id = ?',
-          ['Купить хлеб', 'купить хлеб', id],
+          'UPDATE intentions SET title = ? WHERE id = ?',
+          ['Купить хлеб', id],
         );
 
         expect(await _findByTitleFilter(database, 'молоко'), isEmpty);
@@ -59,12 +53,7 @@ void main() {
       'выбирает параметризованный путь по числу Unicode-кодовых точек',
       () async {
         const id = '018f0b5d-6b2e-7c80-8000-000000000102';
-        await _insertIntention(
-          database,
-          id: id,
-          title: '😀😀😀 купить молоко',
-          titleSearchKey: '😀😀😀 купить молоко',
-        );
+        await _insertIntention(database, id: id, title: '😀😀😀 купить молоко');
 
         expect(await _findByTitleFilter(database, '😀'), [id]);
         expect(_lastSelectStatement, contains('instr('));
@@ -77,7 +66,7 @@ void main() {
 
         sqlTrace.clear();
         expect(await _findByTitleFilter(database, '😀😀😀'), [id]);
-        expect(_lastSelectStatement, contains('intention_titles_fts MATCH ?'));
+        expect(_lastSelectStatement, contains('title_search_key MATCH ?'));
         expect(_lastSelectArguments, ['"😀😀😀"']);
 
         final queryPlan = await database
@@ -97,12 +86,7 @@ void main() {
       'готовит короткий фильтр только через единый поисковый ключ',
       () async {
         const id = '018f0b5d-6b2e-7c80-8000-000000000105';
-        await _insertIntention(
-          database,
-          id: id,
-          title: 'ꭰ',
-          titleSearchKey: titleSearchKey('ꭰ'),
-        );
+        await _insertIntention(database, id: id, title: 'ꭰ');
 
         expect(await _findByTitleFilter(database, 'ꭰ'), [id]);
         expect(_lastSelectStatement, contains('instr("title_search_key", ?)'));
@@ -180,13 +164,11 @@ void main() {
           database,
           id: fixture.literalId,
           title: fixture.searchKey,
-          titleSearchKey: fixture.searchKey,
         );
         await _insertIntention(
           database,
           id: fixture.interpretedId,
           title: fixture.interpretedSearchKey,
-          titleSearchKey: fixture.interpretedSearchKey,
         );
 
         expect(await _findByTitleFilter(database, fixture.searchKey), [
@@ -202,7 +184,6 @@ void main() {
           database,
           id: '018f0b5d-6b2e-7c80-8000-000000000103',
           title: 'Заняться спортом',
-          titleSearchKey: 'заняться спортом',
         );
 
         await expectLater(
@@ -215,12 +196,7 @@ void main() {
     test('index-aware integrity-check обнаруживает рассогласованный индекс, который не видно content-чтению', () async {
       const id = '018f0b5d-6b2e-7c80-8000-000000000104';
       const searchKey = 'прочитать книгу';
-      await _insertIntention(
-        database,
-        id: id,
-        title: 'Прочитать книгу',
-        titleSearchKey: searchKey,
-      );
+      await _insertIntention(database, id: id, title: 'Прочитать книгу');
       await database.customStatement(
         '''
           INSERT INTO intention_titles_fts(
@@ -250,14 +226,13 @@ Future<void> _insertIntention(
   AppDatabase database, {
   required String id,
   required String title,
-  required String titleSearchKey,
 }) => database.customStatement(
   '''
       INSERT INTO intentions (
-        id, title, title_search_key, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?)
+        id, title, created_at, updated_at
+      ) VALUES (?, ?, ?, ?)
     ''',
-  [id, title, titleSearchKey, 1000000, 1000000],
+  [id, title, 1000000, 1000000],
 );
 
 Future<List<String>> _findByTitleFilter(

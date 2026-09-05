@@ -42,10 +42,26 @@
             "getter_name": "titleSearchKey",
             "moor_type": "string",
             "nullable": false,
-            "customConstraints": "NOT NULL CHECK (title_search_key <> '')",
+            "customConstraints": "NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> '')",
             "default_dart": null,
             "default_client_dart": null,
-            "dsl_features": []
+            "dsl_features": [
+              {
+                "generated_as": {
+                  "dart_expression": {
+                    "elements": [
+                      "const ",
+                      {
+                        "lexeme": "CustomExpression",
+                        "import_uri": "package:drift/drift.dart"
+                      },
+                      "('doable_title_search_key(title)')"
+                    ]
+                  },
+                  "stored": true
+                }
+              }
+            ]
           },
           {
             "name": "description",
@@ -112,16 +128,6 @@
         "was_declared_in_moor": true,
         "columns": [
           {
-            "name": "title",
-            "getter_name": "title",
-            "moor_type": "string",
-            "nullable": false,
-            "customConstraints": "",
-            "default_dart": null,
-            "default_client_dart": null,
-            "dsl_features": []
-          },
-          {
             "name": "title_search_key",
             "getter_name": "titleSearchKey",
             "moor_type": "string",
@@ -133,7 +139,7 @@
           }
         ],
         "is_virtual": true,
-        "create_virtual_stmt": "CREATE VIRTUAL TABLE \"intention_titles_fts\" USING fts5(title, title_search_key, content = 'intentions', content_rowid = 'rowid', tokenize = 'trigram case_sensitive 0 remove_diacritics 0')",
+        "create_virtual_stmt": "CREATE VIRTUAL TABLE \"intention_titles_fts\" USING fts5(title_search_key, content = 'intentions', content_rowid = 'rowid', tokenize = 'trigram case_sensitive 0 remove_diacritics 0')",
         "without_rowid": false,
         "constraints": []
       }
@@ -152,7 +158,7 @@
           1
         ],
         "name": "intentions_fts_after_insert",
-        "sql": "CREATE TRIGGER intentions_fts_after_insert\nAFTER INSERT ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(rowid, title, title_search_key)\n  VALUES (new.rowid, new.title, new.title_search_key);\nEND;"
+        "sql": "CREATE TRIGGER intentions_fts_after_insert\nAFTER INSERT ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
@@ -169,7 +175,7 @@
           1
         ],
         "name": "intentions_fts_after_update_search_content",
-        "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE OF title, title_search_key ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title, title_search_key\n  ) VALUES ('delete', old.rowid, old.title, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title, title_search_key)\n  VALUES (new.rowid, new.title, new.title_search_key);\nEND;"
+        "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
@@ -186,7 +192,7 @@
           1
         ],
         "name": "intentions_fts_after_delete",
-        "sql": "CREATE TRIGGER intentions_fts_after_delete\nAFTER DELETE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title, title_search_key\n  ) VALUES ('delete', old.rowid, old.title, old.title_search_key);\nEND;"
+        "sql": "CREATE TRIGGER intentions_fts_after_delete\nAFTER DELETE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\nEND;"
       }
     },
     {
@@ -364,7 +370,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"intentions\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"title\" TEXT NOT NULL CHECK (title <> ''), \"title_search_key\" TEXT NOT NULL CHECK (title_search_key <> ''), \"description\" TEXT CHECK (description IS NULL OR length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0), \"is_action_ready\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_action_ready IN (0, 1)), \"is_archived\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_archived IN (0, 1)), \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"intentions\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"title\" TEXT NOT NULL CHECK (title <> ''), \"title_search_key\" TEXT NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> ''), \"description\" TEXT CHECK (description IS NULL OR length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0), \"is_action_ready\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_action_ready IN (0, 1)), \"is_archived\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_archived IN (0, 1)), \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL);"
         }
       ]
     },
@@ -373,7 +379,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE VIRTUAL TABLE IF NOT EXISTS \"intention_titles_fts\" USING fts5(title, title_search_key, content = 'intentions', content_rowid = 'rowid', tokenize = 'trigram case_sensitive 0 remove_diacritics 0');"
+          "sql": "CREATE VIRTUAL TABLE IF NOT EXISTS \"intention_titles_fts\" USING fts5(title_search_key, content = 'intentions', content_rowid = 'rowid', tokenize = 'trigram case_sensitive 0 remove_diacritics 0');"
         }
       ]
     },
@@ -382,7 +388,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts (\"rowid\", title, title_search_key) VALUES (new.\"rowid\", new.title, new.title_search_key);END"
+          "sql": "CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts (\"rowid\", title_search_key) VALUES (new.\"rowid\", new.title_search_key);END"
         }
       ]
     },
@@ -391,7 +397,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE OF title, title_search_key ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, \"rowid\", title, title_search_key) VALUES ('delete', old.\"rowid\", old.title, old.title_search_key);INSERT INTO intention_titles_fts (\"rowid\", title, title_search_key) VALUES (new.\"rowid\", new.title, new.title_search_key);END"
+          "sql": "CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, \"rowid\", title_search_key) VALUES ('delete', old.\"rowid\", old.title_search_key);INSERT INTO intention_titles_fts (\"rowid\", title_search_key) VALUES (new.\"rowid\", new.title_search_key);END"
         }
       ]
     },
@@ -400,7 +406,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, \"rowid\", title, title_search_key) VALUES ('delete', old.\"rowid\", old.title, old.title_search_key);END"
+          "sql": "CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, \"rowid\", title_search_key) VALUES ('delete', old.\"rowid\", old.title_search_key);END"
         }
       ]
     },

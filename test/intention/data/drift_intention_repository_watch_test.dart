@@ -4,7 +4,6 @@ import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -515,7 +514,6 @@ Future<void> _insertIntention(
         IntentionsCompanion.insert(
           id: id,
           title: title,
-          titleSearchKey: titleSearchKey(title),
           description: Value(description),
           isActionReady: Value(isActionReady),
           isArchived: Value(isArchived),
@@ -538,18 +536,16 @@ Future<void> _insertRawIntention(
     INSERT INTO intentions (
       id,
       title,
-      title_search_key,
       description,
       is_action_ready,
       is_archived,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
   ''',
   [
     id,
     'Корректное название',
-    'корректное название',
     description,
     isActionReady,
     isArchived,

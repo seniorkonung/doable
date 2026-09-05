@@ -401,7 +401,6 @@ Future<void> _insertIntention(
       IntentionsCompanion.insert(
         id: id.toCanonicalString(),
         title: title,
-        titleSearchKey: titleSearchKey(title),
         description: Value(description),
         isActionReady: Value(isActionReady),
         isArchived: Value(isArchived),
