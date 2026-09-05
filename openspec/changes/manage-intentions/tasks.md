@@ -696,7 +696,7 @@
   - **Вероятно затронутые файлы:** local database/FTS/migration test infrastructure, repository catalog/command/watch tests, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, generated Drift/schema artifacts.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.23 Проверить cursor и search-projection remediation до общей текстовой границы
+- [x] 6.23 Проверить cursor и search-projection remediation до общей текстовой границы
   - **Критерии приёмки:**
     - Evidence задач 6.10, 6.15, 6.18 и 6.22 подтверждает точную SQLite-классификацию, lossless detail rehydration, instance-owned cursors, один записываемый источник названия и согласованные с фактически сохранённой поисковой проекцией ограниченные catalog snapshots через публичную seam.
     - Corrupt-row, clock, cursor, Unicode mapping-drift, generated-column, FTS и catalog matrices сохраняют утверждённые failure, timestamp, ordering, exact-count, keyset, integrity и bounded-materialization contracts без storage обходов и не классифицируют допустимую историческую Unicode-проекцию как corruption.
