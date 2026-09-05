@@ -6,6 +6,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -124,6 +125,94 @@ void main() {
         ]);
       },
     );
+
+    test('отклоняет недопустимый текст до SQL-чтения и записи', () async {
+      final invalidValues = [
+        '\u0000',
+        String.fromCharCode(0xd800),
+        String.fromCharCode(0xdc00),
+      ];
+      final invalidCommands = [
+        for (final invalidValue in invalidValues) ...[
+          (
+            CreateIntention(title: 'Название$invalidValue', description: null),
+            IntentionTextField.title,
+          ),
+          (
+            CreateIntention(
+              title: 'Название',
+              description: 'Описание$invalidValue',
+            ),
+            IntentionTextField.description,
+          ),
+        ],
+      ];
+
+      for (final (command, field) in invalidCommands) {
+        writeTrace.operations.clear();
+
+        final result = await repository.execute(command);
+
+        expect(
+          result,
+          _textValidationFailure(
+            field: field,
+            reason: IntentionTextValidationReason.invalidUnicodeRepertoire,
+          ),
+        );
+        expect(writeTrace.operations, isEmpty);
+        expect(idGenerator.generated, isEmpty);
+        expect(clock.calls, 0);
+      }
+
+      expect(await database.select(database.intentions).get(), isEmpty);
+      expect(
+        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+        everyElement(
+          _failedCommand(
+            IntentionCommandDiagnosticsType.create,
+            DiagnosticsFailureCode.validation,
+          ),
+        ),
+      );
+    });
+
+    test('не изменяет подтверждённое намерение при NUL в title', () async {
+      final id = _id(_firstUuid);
+      final createdAt = DateTime.utc(2026, 9, 2, 10);
+      await _insertIntention(
+        database,
+        id: id.toCanonicalString(),
+        title: 'Исходное название',
+        description: 'Исходное описание',
+        createdAt: createdAt,
+      );
+      writeTrace.operations.clear();
+
+      final result = await repository.execute(
+        UpdateIntention(
+          id: id,
+          title: 'Недопустимое\u0000название',
+          description: 'Изменённое описание',
+        ),
+      );
+
+      expect(
+        result,
+        _textValidationFailure(
+          field: IntentionTextField.title,
+          reason: IntentionTextValidationReason.invalidUnicodeRepertoire,
+        ),
+      );
+      expect(writeTrace.operations, isEmpty);
+      expect(clock.calls, 0);
+      final row = await (database.select(
+        database.intentions,
+      )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+      expect(row.title, 'Исходное название');
+      expect(row.description, 'Исходное описание');
+      expect(row.updatedAt, createdAt.microsecondsSinceEpoch);
+    });
 
     test('принимает title из 255 Unicode-графем', () async {
       final title = List.filled(255, '👩🏽‍💻').join();
@@ -908,6 +997,17 @@ Matcher _failure<TFailure extends IntentionFailure>() =>
       isA<TFailure>(),
     );
 
+Matcher _textValidationFailure({
+  required IntentionTextField field,
+  required IntentionTextValidationReason reason,
+}) => isA<ResultFailure<IntentionCommandSuccess>>().having(
+  (result) => result.failure,
+  'failure',
+  isA<IntentionTextInputValidationFailure>()
+      .having((failure) => failure.textFailure.field, 'field', field)
+      .having((failure) => failure.textFailure.reason, 'reason', reason),
+);
+
 Matcher _successfulCommand(IntentionCommandDiagnosticsType commandType) =>
     isA<IntentionCommandDiagnosticsEvent>()
         .having((event) => event.commandType, 'commandType', commandType)
@@ -1010,10 +1110,12 @@ final class _DeterministicClock {
 }
 
 final class _WriteTrace extends LocalDatabaseConnectionObserver {
+  final List<LocalDatabaseSqlOperation> operations = [];
   final List<String> updateStatements = [];
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
+    operations.add(statement.operation);
     if (statement.operation == LocalDatabaseSqlOperation.update) {
       updateStatements.add(statement.statements.single);
     }

@@ -45,12 +45,17 @@ final class IntentionCatalogOrder {
 enum IntentionCatalogQueryValidationFailure {
   pageSizeOutOfRange,
   titleFilterTooLong,
+  invalidUnicodeRepertoire,
 }
 
 final class IntentionCatalogQueryValidationException implements Exception {
-  const IntentionCatalogQueryValidationException(this.failure);
+  const IntentionCatalogQueryValidationException(
+    this.failure, {
+    this.textFailure,
+  });
 
   final IntentionCatalogQueryValidationFailure failure;
+  final IntentionTextValidationFailure? textFailure;
 }
 
 final class IntentionCatalogQuery {
@@ -131,6 +136,17 @@ final class IntentionCatalogQuery {
     if (value == null) {
       return null;
     }
+    try {
+      IntentionText.ensureValidUnicodeRepertoire(
+        value,
+        field: IntentionTextField.titleFilter,
+      );
+    } on IntentionTextValidationException catch (error) {
+      throw IntentionCatalogQueryValidationException(
+        IntentionCatalogQueryValidationFailure.invalidUnicodeRepertoire,
+        textFailure: error.failure,
+      );
+    }
     final normalized = value.trim();
     if (normalized.isEmpty) {
       return null;
@@ -150,8 +166,13 @@ final class IntentionTitleFilter {
 
   final String _normalizedValue;
 
-  bool matchesTitle(String title) =>
-      titleSearchKey(title).contains(titleSearchKey(_normalizedValue));
+  bool matchesTitle(String title) {
+    IntentionText.ensureValidUnicodeRepertoire(
+      title,
+      field: IntentionTextField.title,
+    );
+    return titleSearchKey(title).contains(titleSearchKey(_normalizedValue));
+  }
 
   T map<T>(T Function(String normalizedValue) transform) =>
       transform(_normalizedValue);

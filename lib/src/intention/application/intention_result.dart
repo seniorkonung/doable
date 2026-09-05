@@ -1,5 +1,6 @@
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
+import '../domain/intention_text.dart';
 
 sealed class Result<T> {
   const Result();
@@ -48,11 +49,23 @@ sealed class IntentionFailure {
   IntentionFailureCode get code;
 }
 
-final class IntentionValidationFailure extends IntentionFailure {
+sealed class IntentionValidationFailure extends IntentionFailure {
   const IntentionValidationFailure();
 
   @override
   IntentionFailureCode get code => IntentionFailureCode.validation;
+}
+
+final class IntentionGenericValidationFailure
+    extends IntentionValidationFailure {
+  const IntentionGenericValidationFailure();
+}
+
+final class IntentionTextInputValidationFailure
+    extends IntentionValidationFailure {
+  const IntentionTextInputValidationFailure(this.textFailure);
+
+  final IntentionTextValidationFailure textFailure;
 }
 
 final class IntentionNotFoundFailure extends IntentionFailure {

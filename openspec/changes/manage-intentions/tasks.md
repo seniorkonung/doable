@@ -709,7 +709,7 @@
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
 
-- [ ] 6.24 Провести общий контракт корректного Unicode без NUL через domain и application boundaries намерения
+- [x] 6.24 Провести общий контракт корректного Unicode без NUL через domain и application boundaries намерения
   - **Критерии приёмки:**
     - Одна чистая storage-neutral проверка до `trim()`, `characters`, case folding и UTF-8-кодирования обходит исходные UTF-16 code units, принимает только корректные пары surrogates, отклоняет непарные high/low surrogates и `U+0000` и не удаляет, не заменяет и не нормализует остальные корректные скалярные значения Unicode согласно ADR-0007.
     - Название, ненулевое описание и строка фильтра проходят общую проверку до собственных правил; стабильная типизированная validation failure различает поле и недопустимый Unicode-repertoire, а invalid command или query сохраняет прежнее подтверждённое состояние и завершается до storage write, read transaction, `COUNT`, search-key либо FTS helper.

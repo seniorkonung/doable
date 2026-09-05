@@ -6,6 +6,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -162,6 +163,49 @@ void main() {
           IntentionCatalogQueryValidationFailure.titleFilterTooLong,
         ),
       );
+    });
+
+    test('отклоняет некорректный Unicode фильтра до поиска', () {
+      final invalidValues = [
+        '\u0000',
+        String.fromCharCode(0xd800),
+        String.fromCharCode(0xdc00),
+      ];
+
+      for (final invalidValue in invalidValues) {
+        expect(
+          () => _query(titleFilter: 'до$invalidValueпосле'),
+          _throwsInvalidUnicodeFilter(),
+        );
+      }
+    });
+
+    test('отклоняет некорректное название до case folding', () {
+      final filter = _query(titleFilter: 'здоровье').titleFilter!;
+
+      expect(
+        () => filter.matchesTitle('Здоровье\u0000'),
+        throwsA(
+          isA<IntentionTextValidationException>()
+              .having(
+                (exception) => exception.failure.field,
+                'field',
+                IntentionTextField.title,
+              )
+              .having(
+                (exception) => exception.failure.reason,
+                'reason',
+                IntentionTextValidationReason.invalidUnicodeRepertoire,
+              ),
+        ),
+      );
+    });
+
+    test('сохраняет корректный Unicode фильтра без нормализации', () {
+      const filter = 'е\u0301\t👩🏽‍💻\nтекст';
+      final query = _query(titleFilter: filter);
+
+      expect(query.titleFilter!.map((value) => value), filter);
     });
 
     test('сравнивает summaries полным порядком времени и идентификатора', () {
@@ -341,7 +385,7 @@ void main() {
       final results = <Result<IntentionCommandSuccess>>[
         ResultSuccess(IntentionSaved(intention)),
         ResultSuccess(IntentionDeleted(intention.id)),
-        const ResultFailure(IntentionValidationFailure()),
+        const ResultFailure(IntentionGenericValidationFailure()),
         const ResultFailure(IntentionNotFoundFailure()),
         const ResultFailure(IntentionConflictFailure()),
         const ResultFailure(IntentionUnavailableFailure()),
@@ -507,6 +551,25 @@ Matcher _throwsQueryFailure(IntentionCatalogQueryValidationFailure failure) =>
         failure,
       ),
     );
+
+Matcher _throwsInvalidUnicodeFilter() => throwsA(
+  isA<IntentionCatalogQueryValidationException>()
+      .having(
+        (exception) => exception.failure,
+        'failure',
+        IntentionCatalogQueryValidationFailure.invalidUnicodeRepertoire,
+      )
+      .having(
+        (exception) => exception.textFailure?.field,
+        'field',
+        IntentionTextField.titleFilter,
+      )
+      .having(
+        (exception) => exception.textFailure?.reason,
+        'reason',
+        IntentionTextValidationReason.invalidUnicodeRepertoire,
+      ),
+);
 
 IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,

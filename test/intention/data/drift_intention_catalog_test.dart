@@ -4,6 +4,7 @@ import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +38,38 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  test('не запрашивает SQLite для недопустимого Unicode фильтра', () {
+    expect(
+      () => IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: 'молоко\u0000',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+      ),
+      throwsA(
+        isA<IntentionCatalogQueryValidationException>()
+            .having(
+              (exception) => exception.failure,
+              'failure',
+              IntentionCatalogQueryValidationFailure.invalidUnicodeRepertoire,
+            )
+            .having(
+              (exception) => exception.textFailure?.field,
+              'field',
+              IntentionTextField.titleFilter,
+            )
+            .having(
+              (exception) => exception.textFailure?.reason,
+              'reason',
+              IntentionTextValidationReason.invalidUnicodeRepertoire,
+            ),
+      ),
+    );
+
+    expect(trace.statements, isEmpty);
+    expect(diagnostics.events, isEmpty);
+  });
 
   test('возвращает ограниченную первую страницу и точное количество', () async {
     await _insertIntention(

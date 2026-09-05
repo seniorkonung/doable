@@ -44,7 +44,7 @@ final class DriftIntentionRepository implements IntentionRepository {
         (cursor is! _DriftIntentionCatalogCursor ||
             !cursor.isOwnedBy(_cursorOwner) ||
             !cursor.matches(query))) {
-      const failure = IntentionValidationFailure();
+      const failure = IntentionGenericValidationFailure();
       _diagnosticsSink.record(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
@@ -143,6 +143,7 @@ final class DriftIntentionRepository implements IntentionRepository {
     final commandType = _commandDiagnosticsType(command);
 
     try {
+      _validateCommandText(command);
       final success = await _database.transaction(
         () => switch (command) {
           CreateIntention() => _createIntention(command),
@@ -753,7 +754,7 @@ IntentionFailure _classifyCommandFailure(
   IntentionCommand command,
 ) {
   if (error is IntentionTextValidationException) {
-    return const IntentionValidationFailure();
+    return IntentionTextInputValidationFailure(error.failure);
   }
   if (error is _IntentionNotFound) {
     return const IntentionNotFoundFailure();
@@ -778,6 +779,23 @@ IntentionFailure _classifyCommandFailure(
     SqliteConstraintFailure() ||
     SqliteUnexpectedFailure() => const IntentionUnexpectedFailure(),
   };
+}
+
+void _validateCommandText(IntentionCommand command) {
+  switch (command) {
+    case CreateIntention(:final title, :final description):
+    case UpdateIntention(:final title, :final description):
+      IntentionText.normalizeTitle(title);
+      if (description != null) {
+        IntentionText.normalizeDescription(description);
+      }
+    case EnableIntentionReadiness() ||
+        DisableIntentionReadiness() ||
+        ArchiveIntention() ||
+        RestoreIntention() ||
+        DeleteIntention():
+      return;
+  }
 }
 
 IntentionCommandDiagnosticsType _commandDiagnosticsType(

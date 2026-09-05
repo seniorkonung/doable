@@ -21,15 +21,24 @@ void main() {
     test('отклоняет пустое, BOM и слишком длинное название', () {
       expect(
         () => IntentionText.normalizeTitle(' \n\t '),
-        _throwsTextFailure(IntentionTextValidationFailure.emptyTitle),
+        _throwsTextFailure(
+          field: IntentionTextField.title,
+          reason: IntentionTextValidationReason.empty,
+        ),
       );
       expect(
         () => IntentionText.normalizeTitle('\uFEFF'),
-        _throwsTextFailure(IntentionTextValidationFailure.emptyTitle),
+        _throwsTextFailure(
+          field: IntentionTextField.title,
+          reason: IntentionTextValidationReason.empty,
+        ),
       );
       expect(
         () => IntentionText.normalizeTitle(List.filled(256, '👩🏽‍💻').join()),
-        _throwsTextFailure(IntentionTextValidationFailure.titleTooLong),
+        _throwsTextFailure(
+          field: IntentionTextField.title,
+          reason: IntentionTextValidationReason.tooLong,
+        ),
       );
     });
 
@@ -52,16 +61,53 @@ void main() {
         () => IntentionText.normalizeDescription(
           List.filled(4097, '👩🏽‍💻').join(),
         ),
-        _throwsTextFailure(IntentionTextValidationFailure.descriptionTooLong),
+        _throwsTextFailure(
+          field: IntentionTextField.description,
+          reason: IntentionTextValidationReason.tooLong,
+        ),
       );
+    });
+
+    test('отклоняет NUL и непарные UTF-16 surrogate до нормализации', () {
+      final invalidValues = [
+        '\u0000',
+        String.fromCharCode(0xd800),
+        String.fromCharCode(0xdc00),
+      ];
+
+      for (final invalidValue in invalidValues) {
+        expect(
+          () => IntentionText.normalizeTitle('до$invalidValueпосле'),
+          _throwsTextFailure(
+            field: IntentionTextField.title,
+            reason: IntentionTextValidationReason.invalidUnicodeRepertoire,
+          ),
+        );
+        expect(
+          () => IntentionText.normalizeDescription('до$invalidValueпосле'),
+          _throwsTextFailure(
+            field: IntentionTextField.description,
+            reason: IntentionTextValidationReason.invalidUnicodeRepertoire,
+          ),
+        );
+      }
+    });
+
+    test('сохраняет корректные scalar values без Unicode-нормализации', () {
+      const title = 'Название\tс\n👩🏽‍💻 и e\u0301';
+      const description = '  Строка\nс\t👩🏽‍💻 и é  ';
+
+      expect(IntentionText.normalizeTitle(title), title);
+      expect(IntentionText.normalizeDescription(description), description);
     });
   });
 }
 
-Matcher _throwsTextFailure(IntentionTextValidationFailure failure) => throwsA(
-  isA<IntentionTextValidationException>().having(
-    (exception) => exception.failure,
-    'failure',
-    failure,
-  ),
+Matcher _throwsTextFailure({
+  required IntentionTextField field,
+  required IntentionTextValidationReason reason,
+}) => throwsA(
+  isA<IntentionTextValidationException>()
+      .having((exception) => exception.failure.field, 'field', field)
+      .having((exception) => exception.failure.reason, 'reason', reason),
 );
