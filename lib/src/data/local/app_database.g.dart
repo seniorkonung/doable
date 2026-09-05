@@ -24,7 +24,7 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (title <> \'\')',
+    $customConstraints: 'NOT NULL CHECK (title <> \'\' AND instr(CAST(title AS BLOB), X\'00\') = 0)',
   );
   static const VerificationMeta _titleSearchKeyMeta = const VerificationMeta(
     'titleSearchKey',
@@ -39,7 +39,7 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
     ),
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    $customConstraints: 'NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> \'\')',
+    $customConstraints: 'NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> \'\' AND instr(CAST(title_search_key AS BLOB), X\'00\') = 0)',
   );
   static const VerificationMeta _descriptionMeta = const VerificationMeta(
     'description',
@@ -50,7 +50,7 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    $customConstraints: 'CHECK (description IS NULL OR length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0)',
+    $customConstraints: 'CHECK (description IS NULL OR(instr(CAST(description AS BLOB), X\'00\') = 0 AND length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0))',
   );
   static const VerificationMeta _isActionReadyMeta = const VerificationMeta(
     'isActionReady',

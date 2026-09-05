@@ -32,7 +32,7 @@
             "getter_name": "title",
             "moor_type": "string",
             "nullable": false,
-            "customConstraints": "NOT NULL CHECK (title <> '')",
+            "customConstraints": "NOT NULL CHECK (title <> '' AND instr(CAST(title AS BLOB), X'00') = 0)",
             "default_dart": null,
             "default_client_dart": null,
             "dsl_features": []
@@ -42,7 +42,7 @@
             "getter_name": "titleSearchKey",
             "moor_type": "string",
             "nullable": false,
-            "customConstraints": "NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> '')",
+            "customConstraints": "NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> '' AND instr(CAST(title_search_key AS BLOB), X'00') = 0)",
             "default_dart": null,
             "default_client_dart": null,
             "dsl_features": [
@@ -68,7 +68,7 @@
             "getter_name": "description",
             "moor_type": "string",
             "nullable": true,
-            "customConstraints": "CHECK (description IS NULL OR length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0)",
+            "customConstraints": "CHECK (description IS NULL OR(instr(CAST(description AS BLOB), X'00') = 0 AND length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0))",
             "default_dart": null,
             "default_client_dart": null,
             "dsl_features": []
@@ -370,7 +370,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"intentions\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"title\" TEXT NOT NULL CHECK (title <> ''), \"title_search_key\" TEXT NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> ''), \"description\" TEXT CHECK (description IS NULL OR length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0), \"is_action_ready\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_action_ready IN (0, 1)), \"is_archived\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_archived IN (0, 1)), \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"intentions\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"title\" TEXT NOT NULL CHECK (title <> '' AND instr(CAST(title AS BLOB), X'00') = 0), \"title_search_key\" TEXT NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> '' AND instr(CAST(title_search_key AS BLOB), X'00') = 0), \"description\" TEXT CHECK (description IS NULL OR(instr(CAST(description AS BLOB), X'00') = 0 AND length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0)), \"is_action_ready\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_action_ready IN (0, 1)), \"is_archived\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_archived IN (0, 1)), \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL);"
         }
       ]
     },

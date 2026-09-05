@@ -1,8 +1,10 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 void main() {
   late AppDatabase database;
@@ -202,6 +204,96 @@ void main() {
       expect(rows[1].read<int>('created_at'), 2000000);
       expect(rows[1].read<int>('updated_at'), 3000000);
     });
+
+    test(
+      'атомарно отклоняет NUL в каноническом тексте и сохраняет FTS',
+      () async {
+        const id = '018f0b5d-6b2e-7c80-8000-000000000012';
+        await _insertIntention(
+          database,
+          id: id,
+          title: 'Сохранённое намерение',
+          description: 'Сохранённое описание',
+          createdAt: 1000000,
+          updatedAt: 1000000,
+        );
+
+        await expectLater(
+          database.customStatement(
+            '''
+              INSERT INTO intentions (id, title, created_at, updated_at)
+              VALUES (?, ?, ?, ?)
+            ''',
+            [
+              '018f0b5d-6b2e-7c80-8000-000000000013',
+              'Недопустимый\u0000заголовок',
+              1000000,
+              1000000,
+            ],
+          ),
+          throwsA(isA<sqlite.SqliteException>()),
+        );
+
+        for (final statement in [
+          (
+            sql: 'UPDATE intentions SET title = ? WHERE id = ?',
+            arguments: ['Недопустимый\u0000заголовок', id],
+          ),
+          (
+            sql: 'UPDATE intentions SET description = ? WHERE id = ?',
+            arguments: ['Недопустимое\u0000описание', id],
+          ),
+        ]) {
+          await expectLater(
+            database.customStatement(statement.sql, statement.arguments),
+            throwsA(isA<sqlite.SqliteException>()),
+          );
+        }
+
+        final row = await database
+            .customSelect(
+              'SELECT title, description FROM intentions WHERE id = ?',
+              variables: [Variable.withString(id)],
+            )
+            .getSingle();
+
+        expect(row.read<String>('title'), 'Сохранённое намерение');
+        expect(row.read<String>('description'), 'Сохранённое описание');
+        await expectLater(
+          verifyIntentionTitlesFtsIntegrity(database),
+          completes,
+        );
+      },
+    );
+
+    test(
+      'отклоняет NUL, возвращённый search-key function, в generated схеме',
+      () async {
+        final schema = await database.customSelect('''
+          SELECT sql
+          FROM sqlite_schema
+          WHERE type = 'table' AND name = 'intentions'
+        ''').getSingle();
+        final rawDatabase = sqlite.sqlite3.openInMemory();
+        addTearDown(rawDatabase.close);
+        rawDatabase.createFunction(
+          functionName: 'doable_title_search_key',
+          argumentCount: const sqlite.AllowedArgumentCount(1),
+          deterministic: true,
+          directOnly: false,
+          function: (_) => '\u0000',
+        );
+        rawDatabase.execute(schema.read<String>('sql'));
+
+        expect(
+          () => rawDatabase.execute('''
+            INSERT INTO intentions (id, title, created_at, updated_at)
+            VALUES ('018f0b5d-6b2e-7c80-8000-000000000014', 'Допустимый заголовок', 1000000, 1000000)
+          '''),
+          throwsA(isA<sqlite.SqliteException>()),
+        );
+      },
+    );
 
     test('принимает обратный порядок корректных timestamps', () async {
       await _insertIntention(

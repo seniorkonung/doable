@@ -1,12 +1,21 @@
 CREATE TABLE intentions (
   id TEXT NOT NULL PRIMARY KEY,
-  title TEXT NOT NULL CHECK (title <> ''),
+  title TEXT NOT NULL CHECK (
+    title <> '' AND
+    instr(CAST(title AS BLOB), x'00') = 0
+  ),
   title_search_key TEXT NOT NULL
     GENERATED ALWAYS AS (doable_title_search_key(title)) STORED
-    CHECK (title_search_key <> ''),
+    CHECK (
+      title_search_key <> '' AND
+      instr(CAST(title_search_key AS BLOB), x'00') = 0
+    ),
   description TEXT CHECK (
     description IS NULL OR
-    length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0
+    (
+      instr(CAST(description AS BLOB), x'00') = 0 AND
+      length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0
+    )
   ),
   is_action_ready BOOLEAN NOT NULL DEFAULT FALSE
     CHECK (is_action_ready IN (0, 1)),
