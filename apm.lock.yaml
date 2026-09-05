@@ -1,5 +1,5 @@
 lockfile_version: '2'
-generated_at: '2026-09-04T22:30:52.191935+00:00'
+generated_at: '2026-09-05T15:44:21.079072+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: fission-ai/openspec
@@ -49,46 +49,17 @@ dependencies:
   - openspec-sync-specs
   - openspec-update-change
   - openspec-verify-change
-- repo_url: intent-driven-dev/intent-driven-template
-  name: c4-diagrams
-  host: github.com
-  resolved_commit: 0d2b903c231f8aaf7caa94fc1538d847681fa4bf
-  resolved_ref: 0d2b903c231f8aaf7caa94fc1538d847681fa4bf
-  version: unknown
-  virtual_path: .agents/skills/c4-diagrams
-  is_virtual: true
-  package_type: claude_skill
-  deployed_files:
-  - .agents/skills/c4-diagrams
-  - .agents/skills/c4-diagrams/SKILL.md
-  - .agents/skills/c4-diagrams/templates.md
-  deployed_file_hashes:
-    .agents/skills/c4-diagrams/SKILL.md: sha256:5ba43fe1b6e7c763beab75aaa897f314a6b259ed42285ca4db6c00cdf59510c5
-    .agents/skills/c4-diagrams/templates.md: sha256:0eaae951dd4781538f50661f0cb2fea9b5d41ffe8256809fadb19ce3adc0fc10
-  content_hash: sha256:6c432ca7c9f5dec38ec9309b0f874025b668c53fad8f13125ef049db7a571b12
-- repo_url: intent-driven-dev/intent-driven-template
-  name: gherkin-authoring
-  host: github.com
-  resolved_commit: 0d2b903c231f8aaf7caa94fc1538d847681fa4bf
-  resolved_ref: 0d2b903c231f8aaf7caa94fc1538d847681fa4bf
-  version: unknown
-  virtual_path: .agents/skills/gherkin-authoring
-  is_virtual: true
-  package_type: claude_skill
-  deployed_files:
-  - .agents/skills/gherkin-authoring
-  - .agents/skills/gherkin-authoring/SKILL.md
-  deployed_file_hashes:
-    .agents/skills/gherkin-authoring/SKILL.md: sha256:6be226f25e2968f6175e59067f05915508c60eddf4717a46f21f332a403943ac
-  content_hash: sha256:c9e0f9b6eddc4dffb9da6e359353e4cf01a6bad73bcc4613f0528695ceff5d1d
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: 465d6b1c43ac64b0e721e02c1f1855dddd4ac91b
+  resolved_commit: 899f471a16fb6bb4e1f3d54b148cddf521e0042e
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
   deployed_files:
+  - .agents/skills/c4-diagrams
+  - .agents/skills/c4-diagrams/SKILL.md
+  - .agents/skills/c4-diagrams/templates.md
   - .agents/skills/change-summary
   - .agents/skills/change-summary/SKILL.md
   - .agents/skills/change-summary/agents/openai.yaml
@@ -98,6 +69,10 @@ dependencies:
   - .agents/skills/discussion/SKILL.md
   - .agents/skills/discussion/references/document-format.md
   - .agents/skills/discussion/references/examples.md
+  - .agents/skills/domain-modeling
+  - .agents/skills/domain-modeling/ADR-FORMAT.md
+  - .agents/skills/domain-modeling/CONTEXT-FORMAT.md
+  - .agents/skills/domain-modeling/SKILL.md
   - .agents/skills/idea-refine
   - .agents/skills/idea-refine/SKILL.md
   - .agents/skills/idea-refine/examples.md
@@ -111,6 +86,8 @@ dependencies:
   - .agents/skills/incremental-implementation/SKILL.md
   - .agents/skills/observability-and-instrumentation
   - .agents/skills/observability-and-instrumentation/SKILL.md
+  - .agents/skills/openspec-gherkin-authoring
+  - .agents/skills/openspec-gherkin-authoring/SKILL.md
   - .agents/skills/openspec-review-change
   - .agents/skills/openspec-review-change/SKILL.md
   - .agents/skills/openspec-review-change/references/evaluation-cases.md
@@ -142,12 +119,17 @@ dependencies:
   - .codex/agents/security-auditor.toml
   - .codex/agents/test-engineer.toml
   deployed_file_hashes:
+    .agents/skills/c4-diagrams/SKILL.md: sha256:1e7d597f24a015fc44cb9052fc0f8b665d136bd5c2f3a60a242adfedd98d17b4
+    .agents/skills/c4-diagrams/templates.md: sha256:d5f6096cccd57d0d6b36adabd7d027c41b71961304db825dba8ea53ddbebc5a0
     .agents/skills/change-summary/SKILL.md: sha256:cf4f96ab7bca9e995deeb88a8bff0a8e8d9cadf4fe775a451731f359445a7276
     .agents/skills/change-summary/agents/openai.yaml: sha256:a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94
     .agents/skills/code-review-and-quality/SKILL.md: sha256:0ff65150158adfd41844534948cbe4271e6a7a3aa463700a8d99caf550e38223
     .agents/skills/discussion/SKILL.md: sha256:e9c3423b73b4d572af3d95c8820142e18bb44e226adc92f1c297905e9835ca9a
     .agents/skills/discussion/references/document-format.md: sha256:9012f228e7a7759f14176e38b1b39946a3d810693a4a96319934b93ad71e80ac
     .agents/skills/discussion/references/examples.md: sha256:e0a056cc213de20ee0e311c1404a21bfdda9e70d2d2cc2b73748de1b53359a6c
+    .agents/skills/domain-modeling/ADR-FORMAT.md: sha256:987ffed2f666ddae4135cff5b049d03379a53141bdbe82af50852cfcfdee493e
+    .agents/skills/domain-modeling/CONTEXT-FORMAT.md: sha256:709fb2ce20067248fe4e1a23fe18007de12cd1d97d7f7f772c6d634a76f380cd
+    .agents/skills/domain-modeling/SKILL.md: sha256:601e8ac96664064793acc470e7eb454bc78dddb06ea4e380834210183130a071
     .agents/skills/idea-refine/SKILL.md: sha256:ab5240e4593b9b0250952986ce3b9aba4a7629c4bf8f6335d13584cff6ba7300
     .agents/skills/idea-refine/examples.md: sha256:326c8e64083f29b3ea8b99e757198efafcf30a68c227156b521e1cddff5ed4ad
     .agents/skills/idea-refine/frameworks.md: sha256:161ebc18fdf2d996bc62a87a2d747cf1bf53548354f8925de25c732c27f00309
@@ -157,6 +139,7 @@ dependencies:
     .agents/skills/implementation-decision-review/references/evaluation-cases.md: sha256:0b79bccb469001f18652b49709037e81a5d0841e426bf550da6d6c3b59c674ae
     .agents/skills/incremental-implementation/SKILL.md: sha256:9fc3b1931a1aa6da02e51d030f872cb52771843830b375fc91e43885a73fa853
     .agents/skills/observability-and-instrumentation/SKILL.md: sha256:e4e75a3b486967db22b1446ab694b82116800cb19cc6b9387ac79a604da83bca
+    .agents/skills/openspec-gherkin-authoring/SKILL.md: sha256:d6520b4823eaee953b39c6c9354516a71b8a76c816ffbfc56690353e34732a2e
     .agents/skills/openspec-review-change/SKILL.md: sha256:fbb0d5dcc3be8642b94dec1b227bdf877278d6dac08a7f9c2fd3bd49932b8004
     .agents/skills/openspec-review-change/references/evaluation-cases.md: sha256:aa218248d2852afdb863cede16374dfb82003828e1bc2b46f631ce164a210de2
     .agents/skills/openspec-review-change/references/review-format.md: sha256:8d6a8c1e37e595779009948d1e357599eb2edb95950347fa9a83f451a010a3da
@@ -179,15 +162,18 @@ dependencies:
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:4886adaea639744c8d01e5fcaa10b38a5d586c132307ac97df042470bdbb8e70
+  content_hash: sha256:ecb21762c34e594d4b913ce014ad59047d1b0033028f10b83f9b21b7d6a30e09
   skill_subset:
+  - c4-diagrams
   - change-summary
   - code-review-and-quality
   - discussion
+  - domain-modeling
   - idea-refine
   - implementation-decision-review
   - incremental-implementation
   - observability-and-instrumentation
+  - openspec-gherkin-authoring
   - openspec-review-change
   - openspec-review-implementation
   - openspec-task-deliberation
@@ -225,7 +211,7 @@ dependencies:
   - agent-skills
   constraint: 0.6.5
   resolved_tag: 0.6.5
-  resolved_at: '2026-09-04T22:30:40+00:00'
+  resolved_at: '2026-09-05T15:44:11+00:00'
 - repo_url: mattpocock/skills
   name: mattpocock-skills
   host: github.com
@@ -240,10 +226,6 @@ dependencies:
   - .agents/skills/codebase-design/DEEPENING.md
   - .agents/skills/codebase-design/DESIGN-IT-TWICE.md
   - .agents/skills/codebase-design/SKILL.md
-  - .agents/skills/domain-modeling
-  - .agents/skills/domain-modeling/ADR-FORMAT.md
-  - .agents/skills/domain-modeling/CONTEXT-FORMAT.md
-  - .agents/skills/domain-modeling/SKILL.md
   - .agents/skills/grill-with-docs
   - .agents/skills/grill-with-docs/SKILL.md
   - .agents/skills/grilling
@@ -252,15 +234,11 @@ dependencies:
     .agents/skills/codebase-design/DEEPENING.md: sha256:125e6b77413ad2bc7cf7a772bc74336d580a50f9e797db2178ed133d62333d06
     .agents/skills/codebase-design/DESIGN-IT-TWICE.md: sha256:21c3264953bd30ee87b181a3ccaf0e70649f461e5ffd7dc654acee4ba1788b31
     .agents/skills/codebase-design/SKILL.md: sha256:a8d50abac5a4018f60e1d911d4b6f4e36454ca14d6c390c0695a578c7de65dad
-    .agents/skills/domain-modeling/ADR-FORMAT.md: sha256:f1f36cd3f8d3b6474ddd5855da4e233bfc4ae1a1c5024909ccf11871819a41b2
-    .agents/skills/domain-modeling/CONTEXT-FORMAT.md: sha256:b8cc318f2a4285b530e908b6bc43901c3c5cd11100362636bbc4216639bef597
-    .agents/skills/domain-modeling/SKILL.md: sha256:152e2c97239affb12a60c5f4a7e74ab546a49ae169688c81f4e2ccc42dafa579
     .agents/skills/grill-with-docs/SKILL.md: sha256:610d091047bcfb9db0f75c057d15538481a721111579fc5ec7f83ad9131a2165
     .agents/skills/grilling/SKILL.md: sha256:5a35925d03a391bcfa46940868b649b72dba89ec9c19525e785bbb6bd3a7f478
   content_hash: sha256:3a26aa108d8b0b740315c7e62921597f2cc2c99412e63c1f8b3d4c403a5e30b8
   skill_subset:
   - codebase-design
-  - domain-modeling
   - grill-with-docs
   - grilling
   target_subset:
@@ -292,8 +270,8 @@ deployments:
   runtime: null
   scope: project
   owners:
-  - intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams
-  active_owner: intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
   content_hash: null
 - kind: project-relative
   target: agent-skills
@@ -301,18 +279,18 @@ deployments:
   runtime: null
   scope: project
   owners:
-  - intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams
-  active_owner: intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams
-  content_hash: sha256:5ba43fe1b6e7c763beab75aaa897f314a6b259ed42285ca4db6c00cdf59510c5
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:1e7d597f24a015fc44cb9052fc0f8b665d136bd5c2f3a60a242adfedd98d17b4
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/c4-diagrams/templates.md
   runtime: null
   scope: project
   owners:
-  - intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams
-  active_owner: intent-driven-dev/intent-driven-template/.agents/skills/c4-diagrams
-  content_hash: sha256:0eaae951dd4781538f50661f0cb2fea9b5d41ffe8256809fadb19ce3adc0fc10
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:d5f6096cccd57d0d6b36adabd7d027c41b71961304db825dba8ea53ddbebc5a0
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/change-summary
@@ -472,8 +450,8 @@ deployments:
   runtime: null
   scope: project
   owners:
-  - mattpocock/skills
-  active_owner: mattpocock/skills
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
   content_hash: null
 - kind: project-relative
   target: agent-skills
@@ -481,45 +459,27 @@ deployments:
   runtime: null
   scope: project
   owners:
-  - mattpocock/skills
-  active_owner: mattpocock/skills
-  content_hash: sha256:f1f36cd3f8d3b6474ddd5855da4e233bfc4ae1a1c5024909ccf11871819a41b2
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:987ffed2f666ddae4135cff5b049d03379a53141bdbe82af50852cfcfdee493e
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/domain-modeling/CONTEXT-FORMAT.md
   runtime: null
   scope: project
   owners:
-  - mattpocock/skills
-  active_owner: mattpocock/skills
-  content_hash: sha256:b8cc318f2a4285b530e908b6bc43901c3c5cd11100362636bbc4216639bef597
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:709fb2ce20067248fe4e1a23fe18007de12cd1d97d7f7f772c6d634a76f380cd
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/domain-modeling/SKILL.md
   runtime: null
   scope: project
   owners:
-  - mattpocock/skills
-  active_owner: mattpocock/skills
-  content_hash: sha256:152e2c97239affb12a60c5f4a7e74ab546a49ae169688c81f4e2ccc42dafa579
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/gherkin-authoring
-  runtime: null
-  scope: project
-  owners:
-  - intent-driven-dev/intent-driven-template/.agents/skills/gherkin-authoring
-  active_owner: intent-driven-dev/intent-driven-template/.agents/skills/gherkin-authoring
-  content_hash: null
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/gherkin-authoring/SKILL.md
-  runtime: null
-  scope: project
-  owners:
-  - intent-driven-dev/intent-driven-template/.agents/skills/gherkin-authoring
-  active_owner: intent-driven-dev/intent-driven-template/.agents/skills/gherkin-authoring
-  content_hash: sha256:6be226f25e2968f6175e59067f05915508c60eddf4717a46f21f332a403943ac
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:601e8ac96664064793acc470e7eb454bc78dddb06ea4e380834210183130a071
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/grill-with-docs
@@ -745,6 +705,24 @@ deployments:
   - fission-ai/openspec
   active_owner: fission-ai/openspec
   content_hash: sha256:7e0281fc4f094dcced0c5469e7cbceba2dce9f113f22a4e34efcdce4315edf81
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-gherkin-authoring
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/openspec-gherkin-authoring/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:d6520b4823eaee953b39c6c9354516a71b8a76c816ffbfc56690353e34732a2e
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-new-change
