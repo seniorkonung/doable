@@ -7,7 +7,7 @@ rules:
     - Must use domain-modeling skill for decision qualification and terminology; follow the schema-defined ADR format
     - Use grill-with-docs skill before completing ADR review when the design contains consequential unresolved decisions
   specs:
-    - Must use gherkin-authoring skill
+    - Must use openspec-gherkin-authoring skill
   plan:
     - Must use phased-planning skill
   tasks:
