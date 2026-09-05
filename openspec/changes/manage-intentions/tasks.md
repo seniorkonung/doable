@@ -644,6 +644,32 @@
   - **Вероятно затронутые файлы:** `build.yaml`, `lib/src/data/local/database_connection.dart`, общий SQLite setup module, `test/support/local_database_harness.dart`, connection/bootstrap/migration/schema-verification tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
+- [ ] 6.20b Сделать обязательный SQLite setup типобезопасной границей создания `AppDatabase`
+  - **Критерии приёмки:**
+    - Согласно текущему ADR-0002 со статусом `proposed` закрытый platform-neutral тип `ConfiguredLocalDatabaseConnection` владеет низкоуровневым `QueryExecutor` и может быть создан только factories local connection module после обязательного setup; обычный constructor `AppDatabase` принимает capability, а `LocalDataBootstrap` — фабрику таких значений, не раскрывая Android paths или platform APIs. Критерий заменяет исторические детали выполненных задач 4.1 и 6.20a только в части допуска raw `QueryExecutor` через обычную connection seam; эти выполненные блоки сохраняются как история реализации, а текущую архитектурную границу определяет напрямую уточнённый ADR-0002, который остаётся редактируемым до архивации change.
+    - Production background, in-memory/file-backed, migration и обе schema-verification стороны получают capability через общую factory/composition boundary; fault decorator или interceptor принимает и возвращает тот же configured-тип без повторного открытия connection и без ослабления его инварианта.
+    - Дополнительный fixture setup выполняется до канонической регистрации зарезервированных schema-functions, поэтому обычная композиция не может оставить переопределёнными их имя и arity; generic function registry/DSL и production unsafe constructor не вводятся.
+  - **Проверка:**
+    - Выполнить `flutter test test/data/local/database_connection_test.dart test/data/local/bootstrap/local_data_bootstrap_test.dart test/data/local/app_database_schema_test.dart` с production-like, in-memory/file-backed, composed-setup и decorated-connection fixtures.
+    - Выполнить `flutter analyze` и проверить, что обычный constructor `AppDatabase` больше не принимает raw `QueryExecutor`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.20a.
+  - **Вероятно затронутые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/database_connection.dart`, `lib/src/data/local/sqlite_connection_setup.dart`, `lib/src/data/local/bootstrap/local_data_bootstrap.dart`, focused connection/bootstrap/schema tests.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 6.20c Закрыть обходы настроенной connection capability во всех repository, bootstrap, migration и verification harnesses
+  - **Критерии приёмки:**
+    - Все поддерживаемые repository, bootstrap, migration и schema-verification harnesses создают `AppDatabase` только из `ConfiguredLocalDatabaseConnection`; прямые вызовы `AppDatabase(NativeDatabase...)` отсутствуют, а общий test harness и fault injection сохраняют единый lifetime/close contract.
+    - Contract tests подтверждают одинаковый результат прямого Dart- и SQL-вызова `doable_title_search_key(TEXT)` на production-like background, in-memory/file-backed, migration и обеих verification connections; попытка зарегистрировать то же имя и arity через обычный fixture setup не заменяет канонический callback.
+    - Missing-setup и две реализации mapping-drift проверяются отдельными явно названными raw test-only fixtures ниже защищённой границы: зависимая schema не может быть успешно создана или изменена без регистрации, а намеренная подмена не становится альтернативным constructor для production `AppDatabase`.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/intention/data/drift_intention_repository_fault_test.dart`.
+    - Выполнить `flutter test test/data/local` с direct-SQL, reserved-name collision, missing-setup, mapping-drift, migration и schema-verification fixtures, затем `flutter analyze`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 6.20b.
+  - **Вероятно затронутые файлы:** `test/support/local_database_harness.dart`, repository catalog/command/watch/fault tests, connection/bootstrap tests, migration/schema-verification tests, test-only raw SQLite fixtures.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
 - [ ] 6.21 Сделать `title` единственным записываемым источником поисковой проекции и count
   - **Критерии приёмки:**
     - Schema version 1 объявляет `title_search_key` как `NOT NULL STORED GENERATED ALWAYS AS (doable_title_search_key(title))`; generated Drift companion, repository create/update и raw supported write paths не принимают отдельное значение ключа, а создание и любая последующая запись строки позволяют SQLite пересчитать эту восстанавливаемую проекцию без изменения канонического `title`. Этот критерий supersedes выполненную задачу 6.5 в части прикладной записи и синхронизации отдельного `title_search_key`.
@@ -653,14 +679,14 @@
     - Выполнить `dart run build_runner build --delete-conflicting-outputs`, затем `flutter test test/data/local/app_database_schema_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart test/data/local/fts_consistency_test.dart`.
     - Выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_repository_watch_test.dart test/intention/data/drift_intention_catalog_test.dart` и `flutter analyze`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 6.20a.
+  - **Зависимости:** 6.20c.
   - **Вероятно затронутые файлы:** `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/fts_query.dart`, `lib/src/intention/data/drift_intention_repository.dart`, generated Drift/schema snapshot artifacts, schema/migration/repository tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
 - [ ] 6.22 Доказать целостность generated search key, FTS и ограниченных catalog snapshots
   - **Критерии приёмки:**
     - Schema tests доказывают, что прямые `INSERT`/`UPDATE` значения `title_search_key` отклоняются, запись только `title` пересчитывает ключ, а отсутствие обязательного connection setup не может привести к успешному созданию или изменению строки; Unicode corpus, включая `K`/`k` и многокодовые mappings, подтверждает равенство Dart operation, SQLite function, generated value и ключа фильтра в пределах одной сборки, не заявляя неизменность всех mappings между обновлениями.
-    - File-backed fixture с двумя тестовыми реализациями `doable_title_search_key` последовательно открывает одну schema version, подтверждает неизменность исходного `title` и отсутствие обязательного массового rebuild, а после любой записи затронутой строки доказывает атомарный пересчёт generated key и соответствующей FTS-записи. Исторический ключ, корректно вычисленный прежней сборкой, не классифицируется как corruption только из-за отличия от функции текущей сборки; этот критерий supersedes противоположные search-key claims задач 6.16 и 6.17.
+    - Явно отделённая raw test-only file-backed fixture из 6.20c с двумя реализациями `doable_title_search_key` последовательно открывает одну schema version, подтверждает неизменность исходного `title` и отсутствие обязательного массового rebuild, а после любой записи затронутой строки доказывает атомарный пересчёт generated key и соответствующей FTS-записи. Исторический ключ, корректно вычисленный прежней сборкой, не классифицируется как corruption только из-за отличия от функции текущей сборки; fixture не расширяет production connection API, а этот критерий supersedes противоположные search-key claims задач 6.16 и 6.17.
     - FTS и catalog tests подтверждают единственную индексируемую колонку, транзакционное обновление после изменения `title` и другого поля строки, index-aware `integrity-check` и `rebuild`, буквальную parameterized семантику короткой и длинной ветвей без резервного поиска по исходному `title`, точный count по фактически сохранённой проекции и прежние пределы одного `COUNT`, `pageSize + 1`, отсутствия `OFFSET`, ограниченной materialization и regression budget.
   - **Проверка:**
     - Выполнить `flutter test test/data/local/app_database_schema_test.dart test/data/local/fts_consistency_test.dart test/data/local/migrations/migration_test.dart test/data/local/migrations/file_backed_migration_test.dart test/intention/data/drift_intention_catalog_test.dart` с direct-write, missing-setup, Unicode, mapping-drift и multi-page fixtures.

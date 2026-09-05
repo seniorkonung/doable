@@ -1,6 +1,7 @@
 # ADR-0006: Считать timestamps с часов устройства наблюдениями, а не причинным порядком
 
-- Status: accepted
+- Status: proposed
+- Originating change: manage-intentions
 - Date: 2026-09-03
 
 ## Контекст

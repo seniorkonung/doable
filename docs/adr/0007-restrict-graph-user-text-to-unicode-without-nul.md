@@ -1,6 +1,7 @@
 # ADR-0007: Ограничить пользовательский текст графа корректным Unicode без NUL
 
-- Status: accepted
+- Status: proposed
+- Originating change: manage-intentions
 - Date: 2026-09-04
 
 ## Контекст

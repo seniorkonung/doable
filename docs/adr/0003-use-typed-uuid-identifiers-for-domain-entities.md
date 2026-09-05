@@ -1,6 +1,7 @@
 # ADR-0003: Использовать отдельные типы UUID-идентификаторов предметных сущностей
 
-- Status: accepted
+- Status: proposed
+- Originating change: manage-intentions
 - Date: 2026-08-31
 
 ## Контекст

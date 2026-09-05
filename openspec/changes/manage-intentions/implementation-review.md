@@ -4,62 +4,68 @@
 
 **Result:** No unresolved findings
 
-Активных findings не осталось. Remediation поисковой проекции передана
-согласованной последовательности задач 6.20–6.23: отдельно зафиксированы
-воспроизводимая Unicode-операция, обязательная регистрация schema-function,
-перевод схемы и repository на generated projection и интеграционный checkpoint.
-Это planning handoff, а не утверждение, что текущая реализация уже исправлена.
-Ранее принятый риск `AR1` остаётся применимым и не считается активным finding.
+Активных findings не осталось. Исправление F2 передано обновлённому design и
+новым незавершённым задачам 6.20b–6.20c: отдельно зафиксированы типобезопасная
+connection capability, невозможность обычного обхода либо затенения setup и
+перевод всех repository/migration/verification harnesses. Это planning handoff,
+а не утверждение, что текущая реализация уже исправлена. Ранее принятый риск
+`AR1` остаётся применимым и не считается активным finding.
 
 ## Review target
 
-- **Baseline:** configured `origin/main` @
-  `0d8f9cfecce5d62db0b4847c8c8a393fbc68de48`
-- **Reviewed head:** `faf205fbf1c4429cefe695cba06a7c938210ef83`
-- **Target commits:** 3
-- **Reviewable paths:** 9; excludes `implementation-review.md`
+- **Baseline:** user-requested local parent `fac05cb^` @
+  `d4d45bed8337f097db6f736c0ebb63e9c486213d`
+- **Reviewed head:** `fac05cba31fb354a7f95e263a84dabaa79e07a18`
+- **Target commits:** 1
+- **Reviewable paths:** 13; `implementation-review.md` не входил в target
 - **OpenSpec change:** `manage-intentions` (`intent-driven`)
-- **Target scope:** Complete pre-push range
-- **Baseline freshness:** Local tracking state; no fetch performed
-- **Excluded worktree state:** неподтверждённые коммитом remediation-изменения
-  `tasks.md` и этого отчёта не входят в immutable review target
+- **Target scope:** User-requested bounded range
+- **Baseline freshness:** Explicit local ref; no fetch performed
+- **Excluded committed state:** текущий branch `HEAD`
+  `f42d5732c41071b9e5bc33a3c748aee94cbc1681` и его изменение
+  `apm.lock.yaml` находятся после reviewed head и исключены по прямому указанию
+  пользователя
 
 ## Reviewed increment
 
-### U1 · Семантически целостные ограниченные snapshots каталога намерений
+### U1 · Единая SQLite connection setup для поисковой проекции названия
 
-- **Work items:** 6.15, 6.16, 6.17
-- **Requirements and scenarios:** `Каталог намерений и его охват` · сводные
-  данные намерения; `Фильтрация каталога по названию` · регистронезависимое
-  буквальное вхождение; `Ограниченная выдача и автоматическая подгрузка
-  каталога` · ограниченная первая порция и последовательность порций; `Точное
-  количество совпадений каталога`
-- **Affected boundary:** локальная persistence boundary и вызывающие стороны
-  `IntentionRepository.getCatalogPage`
-- **Implementation target:** `drift_schemas/drift_schema_v1.json`,
-  `lib/src/data/local/app_database.g.dart`,
-  `lib/src/data/local/fts_query.dart`,
-  `lib/src/data/local/schema/intention_schema.drift`,
-  `lib/src/intention/data/drift_intention_repository.dart`,
+- **Work items:** 6.20a; выполненная 6.20 является входной зависимостью
+- **Requirements and scenarios:** `Фильтрация каталога по названию` · единое
+  locale-independent Unicode Default Case Folding; ADR-0008 · долговечное имя,
+  сигнатура, регистрация и trust boundary SQLite schema-function
+- **Affected boundary:** Android production background connection,
+  in-memory/file-backed test executors, migration connections и фактическая и
+  эталонная стороны schema verification
+- **Implementation target:** `build.yaml`,
+  `lib/src/data/local/database_connection.dart`,
+  `lib/src/data/local/sqlite_connection_setup.dart`,
+  `test/data/local/app_database_schema_test.dart`,
+  `test/data/local/bootstrap/local_data_bootstrap_test.dart`,
+  `test/data/local/database_connection_test.dart`,
+  `test/data/local/file_backed_database_test.dart`,
   `test/data/local/fts_consistency_test.dart`,
-  `test/intention/data/drift_intention_catalog_test.dart`,
-  `test/intention/data/drift_intention_repository_large_fixture_test.dart`
-- **Applicable constraints and non-goals:** первая страница получает count и
-  строки из одного SQLite snapshot; каждая порция читает не больше
-  `pageSize + 1` строк, не использует `OFFSET`, не проецирует полный текст
-  описания и не материализует неограниченный результат в Dart; публичная seam
-  остаётся storage-neutral
-- **Excluded change scope:** cursor ownership, remediation поисковой проекции и
-  финальные проверки 6.18–6.23,
-  Flutter navigation, presentation state и Views
+  `test/data/local/migrations/fault_injection_test.dart`,
+  `test/data/local/migrations/file_backed_migration_test.dart`,
+  `test/data/local/migrations/migration_test.dart`,
+  `test/support/local_database_harness.dart`
+- **Applicable constraints and non-goals:** callback делегирует единственной
+  чистой storage-neutral операции, остаётся sendable, deterministic, не
+  выполняет I/O и не читает изменяемое состояние; `directOnly: false` допустим
+  только для внутреннего app-specific SQLite-файла; публичная
+  `IntentionRepository` seam остаётся storage-neutral; schema, FTS/catalog
+  behavior и общая Unicode text boundary в этом инкременте не меняются
+- **Excluded change scope:** типобезопасная connection remediation 6.20b–6.20c,
+  generated search projection и repository changes 6.21, mapping-drift и
+  missing-setup matrix 6.22, checkpoints и общая text integrity 6.23–6.26
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | свежий zero-history reviewer проверил восемь delivery/test-путей U1 на точном `0d8f9cf…faf205f`; planning-артефакты, commit history, прежний отчёт и accepted risks ему не раскрывались |
-| OpenSpec conformance | Complete | полный граф proposal/specs/design/ADR/plan/tasks сопоставлен с 6.15–6.17 и immutable diff; все девять путей классифицированы, будущая 6.18+ исключена, task-prescribed и полный project workflow выполнены, строгая OpenSpec-валидация успешна |
-| Code quality | Complete | полный delivery-path subset и затронутые domain, schema, search, repository, migration и diagnostics boundaries проверены по correctness, readability, architecture, security, performance и evidence |
+| Independent decision review | Complete | свежий zero-history reviewer проверил все 12 delivery/test/configuration путей U1 на точном `d4d45be…fac05cb`; planning artifacts, commit history, прежний отчёт и accepted risks ему не раскрывались |
+| OpenSpec conformance | Complete | полный artifact graph и ADR-0008 сопоставлены с 6.20a и immutable diff; все 13 путей классифицированы, последующая remediation 6.20b–6.20c и будущие 6.21–6.26 не приняты за обязанности этого инкремента, completion claim и предписанная verification matrix проверены отдельно |
+| Code quality | Complete | изменённые setup, factories, harnesses и tests вместе с окружающими AppDatabase/repository connection paths и pinned Drift/sqlite3 behavior проверены по correctness, readability, architecture, security, performance и evidence |
 
 ## Findings
 
@@ -69,7 +75,9 @@ No unresolved findings remain in the implementation review.
 
 ### AR1 · Показания системных часов могут не отражать фактическую хронологию операций
 
-- **Evidence:** `_changeReadiness` и `_changeArchiveState` в
+- **Evidence:** на предыдущем reviewed head
+  `faf205fbf1c4429cefe695cba06a7c938210ef83`
+  `_changeReadiness` и `_changeArchiveState` в
   `lib/src/intention/data/drift_intention_repository.dart:262` получают
   `updatedAt` непосредственно из `_now()` без логического счётчика или
   синтетического продвижения относительно прежнего значения. Каталог сравнивает
@@ -102,26 +110,30 @@ No unresolved findings remain in the implementation review.
   `specs/intention-management/spec.md` · требования `Время создания и обновления
   намерения` и `Упорядочивание каталогов намерений`; `design.md` · wall-clock
   contract и запись в `Риски / компромиссы`; ADR-0006
-- **Current target relation:** сохранён; текущий инкремент не меняет контракт
-  сортировки по timestamps или границу принятия риска
+- **Current target relation:** Carried forward; not re-reviewed — текущий
+  инкремент не меняет timestamp contract или границу принятия риска
 
 ## Review coverage
 
-Все девять reviewable paths классифицированы: восемь delivery/test-путей входят
-в U1, а `openspec/changes/manage-intentions/tasks.md` является planning evidence
-с изменёнными completion claims 6.15–6.17. Несопоставленных и посторонних путей
-нет. Проверены исходная, generated и snapshot schema, FTS columns/triggers,
-короткая и длинная ветви фильтра, exact count, первая и последующие keyset
-порции, summary rehydration, Unicode-нормализация, nullable description,
-параметризация SQL, diagnostics и regression budget. Перезапись ещё не
-опубликованной schema version 1 согласуется с явно зафиксированным ограничением
-change и поэтому не требует migration step для прежних production-данных.
+Все 13 reviewable paths классифицированы: 12 delivery/test/configuration путей
+входят в U1, а `openspec/changes/manage-intentions/tasks.md` является planning
+evidence с изменённым completion claim 6.20a. Несопоставленных и посторонних
+путей нет. Проверены порядок и sendability connection setup, arity и flags
+SQLite-функции, делегирование `titleSearchKey`, Android background connection,
+in-memory/file-backed factories, fixture composition, migration/bootstrap
+connections, обе стороны schema verification, прямые repository-test executors,
+analyzer configuration, diagnostics и internal-file trust boundary.
 
-Сфокусированный combined run задач 6.15–6.17 прошёл 109 тестов. `mise run check`
-прошёл форматирование, полный `flutter analyze` и 156 тестов, включая
-large-fixture; targeted Dart MCP analysis изменённых Dart-путей не нашёл ошибок.
-`openspec validate manage-intentions --type change --strict --no-interactive
---json` успешен как структурная проверка, `git diff --check` чист. Android build
-не запускался: он относится к будущему checkpoint 6.20, а текущий инкремент не
-меняет host/UI delivery. Аудит не изменял Dart/Flutter code, поэтому DTD hot
-reload/restart не применим.
+Проверка выполнена в изолированном checkout точного reviewed head. Предписанный
+6.20a набор прошёл 35 тестов; оставшиеся изменённые file-backed/FTS tests — ещё
+17; полный `flutter test` — 164. `flutter analyze` не нашёл замечаний.
+`dart run build_runner build --delete-conflicting-outputs` завершился успешно,
+создал 107 outputs и не оставил diff (текущая версия build_runner сообщила, что
+этот флаг удалён и проигнорирован). `dart format --output=none
+--set-exit-if-changed` подтвердил 11 изменённых Dart-файлов без изменений,
+`git diff --check` чист, а `openspec validate manage-intentions --type change
+--strict --no-interactive` успешен. При исходном discovery staged, unstaged и
+untracked work отсутствовали и не использовались как evidence. Последующие
+изменения `design.md` и `tasks.md`, передающие F2 в planning, не входят в
+immutable review target и не считаются доказательством исправленного code.
+Аудит не изменял Dart/Flutter code, поэтому DTD hot reload/restart не применим.

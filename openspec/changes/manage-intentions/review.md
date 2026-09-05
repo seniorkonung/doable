@@ -2,46 +2,119 @@
 
 ## Оценка
 
-**Результат:** Существенных замечаний нет.
+**Результат:** Changes needed
 
-Граф артефактов согласован в обоих направлениях. Specs определяют общую границу
-пользовательского текста как корректную последовательность скалярных значений
-Unicode без `U+0000`, отдельные правила названия, описания и фильтра и
-наблюдаемое поведение при отказе. Design проводит этот контракт до lossy
-UTF-8/SQLite/FTS-перехода, сохраняет field-specific типы, добавляет NUL-защиту
-схемы и полную проверку описания внутри ограниченной catalog materialization.
-ADR-0007 распространяет решение на будущие текстовые поля графа, импорт и
-синхронизацию, а ADR-0008 закрепляет lifecycle и trust boundary сохраняемой
-SQLite schema-function.
+Новая типобезопасная connection boundary направлена на правильную корневую
+проблему, а последовательность зависимостей `6.20b → 6.20c → 6.21 → 6.22 →
+6.23 → 6.24 → 6.25 → 6.26` не содержит обратных или пропущенных связей. Однако
+артефакты пока не дают implementer непротиворечивого и полностью исполнимого
+контракта: design и задачи описывают ленивый Drift setup как уже выполненный
+и ошибочно распространяют одну executor capability на эталонное соединение
+schema verifier, которое создаётся самим
+`drift_dev` через отдельный callback. Кроме того, ownership mapping-drift
+evidence пересекается между 6.20c и 6.22.
 
-Незавершённая Phase 6 имеет последовательную corrective chain 6.24–6.26 после
-cursor/search checkpoint: общий Unicode contract предшествует schema/catalog
-integrity, а финальный checkpoint зависит от обоих результатов. Phase 7 владеет
-локализованным field-specific объяснением без потери ввода. Выполненные задачи и
-завершённые Phase 1–5 не переписаны. Текущий код ещё не соответствует новому
-контракту; это ожидаемая implementation delta, явно принадлежащая unchecked
-задачам, а не разрешение на Apply или утверждение о готовности реализации.
+Предложение и behavioral specs менять не требуется: они владеют наблюдаемым
+пользовательским и local-data lifecycle поведением, а обсуждаемая correction
+остаётся внутренним механизмом исполнения уже утверждённого schema-function
+contract. Принятый остаточный риск `AR1` сохраняется и не считается активным
+замечанием.
 
 **Валидация:** `openspec validate manage-intentions --type change --strict
---no-interactive --json` успешна: 1/1, структурных issues нет. Команда проверяет
-структуру OpenSpec, но не доказывает будущую реализацию задач, runtime-поведение
-SQLite/FTS или Android UI.
+--no-interactive`, `openspec schema validate intent-driven --json` и
+`git diff --check` успешны. Структурная валидация OpenSpec не выявляет
+перечисленные архитектурные и dependency-semantics расхождения.
 
 ## Замечания
 
-Существенных замечаний в проверенных артефактах change и относящемся к ним
-контексте репозитория не найдено.
+### F2 · High — `ConfiguredLocalDatabaseConnection` обещает состояние, которого не может доказать на всех connection paths
+
+- **Доказательства:** `design.md:340`, `design.md:543` и `tasks.md:649` описывают
+  capability как создаваемую после уже применённого обязательного setup. В
+  текущих factories `lib/src/data/local/database_connection.dart:32`–`45`
+  создаётся ленивый `QueryExecutor`; Drift вызывает `_setup` только при первом
+  открытии underlying database, до migrations/schema use, а не при создании
+  wrapper. Отдельно `design.md:522` и `tasks.md:650` утверждают, что обе стороны
+  schema verification проходят через capability. Фактические вызовы
+  `validateDatabaseSchema` в
+  `test/data/local/migrations/migration_test.dart:19` и
+  `test/data/local/file_backed_database_test.dart:180`/`:215` передают
+  `configureDoableSqliteConnection` отдельным параметром `setup:`; эталонную
+  database создаёт внутри себя `drift_dev`, поэтому она не может получить
+  `ConfiguredLocalDatabaseConnection` от application factory.
+- **Влияние:** реализация может формально ввести новый тип и всё равно оставить
+  недоказанный verifier callback либо неверно считать функцию уже
+  зарегистрированной до открытия. Новый тип тогда создаёт ложную гарантию и не
+  закрывает фундаментальный класс обхода для следующих schema-functions.
+- **Требуемое изменение:** определить capability как доказательство того, что
+  канонический setup привязан к ленивому executor и будет выполнен до любого
+  schema use, а не как доказательство уже завершённой регистрации. Для verifier
+  нужна отдельная закрытая Doable verification seam/helper, которая принимает
+  configured actual database и сама передаёт тот же канонический setup каждой
+  создаваемой `drift_dev` эталонной connection; прямые вызовы
+  `validateDatabaseSchema(setup: ...)` должны исчезнуть из обычных harnesses.
+  Diagram, risk, migration plan, 6.20b и 6.20c должны различать эти две формы
+  enforcement.
+
+### F3 · Medium — Задачи смешивают synthetic connection evidence с фактическим mapping drift generated schema
+
+- **Доказательства:** 6.20c в `tasks.md:664` уже требует две реализации
+  mapping-drift и dependent-schema evidence до выполнения 6.21, тогда как 6.22
+  в `tasks.md:689` снова назначает той же fixture две реализации и только после
+  6.21 проверяет реальный `STORED GENERATED ALWAYS` key и FTS. До 6.21 текущая
+  schema хранит независимо записываемый `title_search_key`, поэтому реальный
+  межрелизный mapping-drift contract приложения ещё нечему наблюдать. При этом
+  6.20c не объявляет, что supersedes оставшиеся невыполненные claims завершённой
+  6.20a о missing-setup/composed-setup evidence и прежний ownership wording
+  задачи 6.8.
+- **Влияние:** implementer либо преждевременно потянет schema work 6.21 в 6.20c,
+  либо продублирует file-backed drift matrix в двух задачах; completion ledger
+  продолжит одновременно считать старый широкий контракт 6.20a выполненным и
+  планировать его недостающие части без однозначного ownership.
+- **Требуемое изменение:** оставить 6.20c migration/collision/missing-setup
+  evidence на минимальной synthetic dependent schema и явно передать ей
+  оставшиеся corrective claims 6.20a и lifecycle wording 6.8. Фактические две
+  версии mapping function над `title_search_key STORED GENERATED` и FTS должны
+  принадлежать только 6.22 после 6.21. Финальный checkpoint 6.26 должен явно
+  включить evidence типизированной connection и verifier boundaries, а не
+  полагаться только на транзитивную зависимость.
+
+## Принятые риски
+
+### AR1 · Показания системных часов могут не отражать фактическую хронологию операций
+
+- **Доказательства:** действующие specs, design и ADR-0006 считают UTC
+  wall-clock timestamps наблюдениями; каталог использует сохранённое значение и
+  `IntentionId` как tie-breaker без causal clock.
+- **Потенциальное влияние:** быстрые операции или перевод часов могут дать
+  одинаковые либо убывающие timestamps, поэтому выбранный пользователем порядок
+  иногда не совпадёт с фактической последовательностью действий.
+- **Обоснование принятия:** отдельная revision/logical-clock модель или
+  синтетическое продвижение времени несоразмерны вспомогательной сортировке и
+  исказили бы наблюдаемое wall-clock значение.
+- **Граница и предпосылки:** timestamps не используются как revision, causal
+  order, средство синхронизации, аудита или разрешения конфликтов.
+- **Пересмотреть, когда:** timestamps получают хронологически значимое
+  поведение, появляется синхронизация/разрешение конфликтов либо наблюдается
+  существенный пользовательский ущерб от перестановок.
+- **Кем принято:** явное решение пользователя от 2026-09-03.
+- **Исходное замечание:** F1 предыдущего implementation review.
+- **Запись решения:** ADR-0006, соответствующие требования intention-management
+  spec и раздел рисков design.
 
 ## Охват проверки
 
-Перечитаны полный artifact graph `proposal → specs → design → adr → plan →
-tasks`, предметный glossary, действующие и superseded ADR, текущий review,
-implementation-review и затронутые domain/application/Drift/SQLite/FTS seams и
-tests. Проверены intent и non-goals, capability ownership, Unicode scalar/NUL и
-malformed UTF-16 boundaries, буквальный поиск, описание в ограниченном каталоге,
-generated search projection, schema-function lifecycle и security boundary,
-неопубликованная schema version 1, rollback, bounded materialization,
-локализация, diagnostics без пользовательского текста, будущие описания, теги,
-импорт и синхронизация. Отдельно сверены двусторонняя traceability,
-dependency-order, сохранность завершённого task ledger и исполнимость каждого
-нового acceptance/verification contract по существующим путям репозитория.
+В рамках выбранного исправления проверено согласование ADR-0002, ADR manifest,
+design, Phase 6 и задачи 6.20b с общей типизированной connection boundary.
+Статусы и принадлежность ADR сверены с правилами схемы: собственные ADR активного
+change остаются `proposed` и редактируются до архивации, которая переводит их в
+`accepted`. Проверено, что proposal и behavioral specs не требуют изменений,
+а корректирующая задача явно заменяет прежний допуск raw executor без
+переписывания выполненных задач и фаз.
+
+Замечания F2 и F3 и принятый риск AR1 сохранены; эта сфокусированная проверка
+не является повторным полным аудитом и не закрывает оставшиеся замечания.
+Их доказательства опираются на проверенные при исходном аудите connection
+factories, test harnesses и pinned исходники Drift: native setup выполняется
+лениво, а `drift_dev` создаёт reference database через собственный `setup:`
+callback. Код реализации не менялся; runtime-проверки не выполнялись.
