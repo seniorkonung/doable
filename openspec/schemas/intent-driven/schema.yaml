@@ -209,12 +209,13 @@ artifacts:
 
       Process:
 
-      1. Review repository ADRs for decisions applicable to this change. Treat
-      accepted ADRs as project-wide constraints, following accepted Supersedes
-      links. Treat relevant proposed ADRs from other active changes as mutable
-      coordination context. Use Originating change and this change's existing
-      manifest, if present, to find its owned ADRs. Note the highest ADR sequence
-      number.
+      1. Read <repo>/docs/adr/README.md first as the ADR navigation index. Use
+      it to identify decisions potentially applicable to this change, then read
+      those ADRs in full. Treat accepted ADRs as project-wide constraints,
+      following accepted Supersedes links. Treat relevant proposed ADRs from
+      other active changes as mutable coordination context. Use Originating
+      change and this change's existing manifest, if present, to find its owned
+      ADRs. Note the highest ADR sequence number.
 
       2. Re-read design.md. Record a decision as an ADR only when it meets ALL
       of these:
