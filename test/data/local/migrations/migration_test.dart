@@ -1,7 +1,7 @@
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
+import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:drift/drift.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';

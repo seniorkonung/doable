@@ -24,7 +24,7 @@ void main() {
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
       final trace = _SelectTrace();
-      final database = await harness.openReadyDatabase(queryInterceptor: trace);
+      final database = await harness.openReadyDatabase(observer: trace);
       final repository = DriftIntentionRepository(
         database,
         UuidV7IntentionIdGenerator(),
@@ -359,22 +359,20 @@ enum _IndexDirection {
   final String sql;
 }
 
-final class _SelectTrace extends QueryInterceptor {
+final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final selects = <_TracedSelect>[];
   var isRecording = true;
 
   void clear() => selects.clear();
 
   @override
-  Future<List<Map<String, Object?>>> runSelect(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> arguments,
-  ) {
-    if (isRecording) {
-      selects.add(_TracedSelect(statement, arguments));
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (isRecording &&
+        statement.operation == LocalDatabaseSqlOperation.select) {
+      selects.add(
+        _TracedSelect(statement.statements.single, statement.arguments),
+      );
     }
-    return super.runSelect(executor, statement, arguments);
   }
 }
 

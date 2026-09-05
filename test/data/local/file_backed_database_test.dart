@@ -1,8 +1,8 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
-import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
+import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -141,9 +141,10 @@ void main() {
 
       final sqlTrace = _SqlTrace();
       final bootstrap = LocalDataBootstrap(
-        executorFactory: () =>
-            openFileBackedLocalDatabase(harness.databaseFile)
-                .interceptWith(sqlTrace),
+        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+          openFileBackedLocalDatabase(harness.databaseFile),
+          sqlTrace,
+        ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
       );
       addTearDown(bootstrap.close);
@@ -359,53 +360,11 @@ Future<void> _insertIntention(
   );
 }
 
-final class _SqlTrace extends QueryInterceptor {
+final class _SqlTrace extends LocalDatabaseConnectionObserver {
   final statements = <String>[];
 
   @override
-  Future<bool> ensureOpen(QueryExecutor executor, QueryExecutorUser user) =>
-      executor.ensureOpen(_TracingQueryExecutorUser(user, this));
-
-  @override
-  Future<void> runBatched(
-    QueryExecutor executor,
-    BatchedStatements statements,
-  ) {
-    this.statements.addAll(statements.statements);
-    return super.runBatched(executor, statements);
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    statements.addAll(statement.statements);
   }
-
-  @override
-  Future<void> runCustom(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) {
-    statements.add(statement);
-    return super.runCustom(executor, statement, args);
-  }
-
-  @override
-  Future<List<Map<String, Object?>>> runSelect(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) {
-    statements.add(statement);
-    return super.runSelect(executor, statement, args);
-  }
-}
-
-final class _TracingQueryExecutorUser implements QueryExecutorUser {
-  const _TracingQueryExecutorUser(this._delegate, this._sqlTrace);
-
-  final QueryExecutorUser _delegate;
-  final _SqlTrace _sqlTrace;
-
-  @override
-  int get schemaVersion => _delegate.schemaVersion;
-
-  @override
-  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) =>
-      _delegate.beforeOpen(executor.interceptWith(_sqlTrace), details);
 }

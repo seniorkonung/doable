@@ -1,22 +1,22 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
-import 'package:drift/drift.dart';
 
 import 'local_data_bootstrap_result.dart';
 import '../sqlite_failure_classifier.dart';
 
-typedef LocalDataExecutorFactory = QueryExecutor Function();
+typedef LocalDataConnectionFactory =
+    ConfiguredLocalDatabaseConnection Function();
 
 final class LocalDataBootstrap {
   factory LocalDataBootstrap({
-    required LocalDataExecutorFactory executorFactory,
+    required LocalDataConnectionFactory connectionFactory,
     required DiagnosticsSink diagnosticsSink,
-  }) => LocalDataBootstrap._(executorFactory, diagnosticsSink);
+  }) => LocalDataBootstrap._(connectionFactory, diagnosticsSink);
 
-  LocalDataBootstrap._(this._executorFactory, this._diagnosticsSink);
+  LocalDataBootstrap._(this._connectionFactory, this._diagnosticsSink);
 
-  final LocalDataExecutorFactory _executorFactory;
+  final LocalDataConnectionFactory _connectionFactory;
   final DiagnosticsSink _diagnosticsSink;
   AppDatabase? _database;
   Future<LocalDataBootstrapResult>? _opening;
@@ -51,7 +51,7 @@ final class LocalDataBootstrap {
     AppDatabase? database;
     try {
       database = AppDatabase(
-        _executorFactory(),
+        _connectionFactory(),
         diagnosticsSink: _diagnosticsSink,
       );
       await database.open();

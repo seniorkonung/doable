@@ -9,7 +9,6 @@ import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -22,7 +21,7 @@ void main() {
 
   setUp(() async {
     diagnostics = InMemoryDiagnosticsSink();
-    database = AppDatabase(NativeDatabase.memory());
+    database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();
     repository = _repository(database, diagnostics);
   });
@@ -363,13 +362,16 @@ void main() {
 
 Future<({AppDatabase database, DriftIntentionRepository repository})>
 _replaceDatabase(
-  QueryInterceptor interceptor,
+  LocalDatabaseConnectionObserver observer,
   AppDatabase previousDatabase,
   InMemoryDiagnosticsSink diagnostics,
 ) async {
   await previousDatabase.close();
   final database = AppDatabase(
-    NativeDatabase.memory().interceptWith(interceptor),
+    observeConfiguredLocalDatabaseConnection(
+      openInMemoryLocalDatabase(),
+      observer,
+    ),
   );
   await database.open();
   return (database: database, repository: _repository(database, diagnostics));
@@ -486,7 +488,7 @@ final class _DeterministicIntentionIdGenerator implements IntentionIdGenerator {
 
 enum _DmlOperation { insert, update, delete }
 
-final class _FailAfterDmlInterceptor extends QueryInterceptor {
+final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
   _FailAfterDmlInterceptor(this._operation);
 
   final _DmlOperation _operation;
@@ -495,44 +497,23 @@ final class _FailAfterDmlInterceptor extends QueryInterceptor {
 
   void arm() => _armed = true;
 
-  Future<int> _afterDml(Future<int> Function() operation) async {
-    final rows = await operation();
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (!_matches(statement.operation)) return;
     if (_armed && !_hasFailed) {
       _hasFailed = true;
       throw StateError('CANARY-after-dml-failure');
     }
-    return rows;
   }
 
-  @override
-  Future<int> runInsert(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) => _operation == _DmlOperation.insert
-      ? _afterDml(() => super.runInsert(executor, statement, args))
-      : super.runInsert(executor, statement, args);
-
-  @override
-  Future<int> runUpdate(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) => _operation == _DmlOperation.update
-      ? _afterDml(() => super.runUpdate(executor, statement, args))
-      : super.runUpdate(executor, statement, args);
-
-  @override
-  Future<int> runDelete(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) => _operation == _DmlOperation.delete
-      ? _afterDml(() => super.runDelete(executor, statement, args))
-      : super.runDelete(executor, statement, args);
+  bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
+    _DmlOperation.insert => operation == LocalDatabaseSqlOperation.insert,
+    _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
+    _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
+  };
 }
 
-final class _FailBeforeDmlInterceptor extends QueryInterceptor {
+final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
   _FailBeforeDmlInterceptor(this._operation, this._failure);
 
   final _DmlOperation _operation;
@@ -541,25 +522,16 @@ final class _FailBeforeDmlInterceptor extends QueryInterceptor {
 
   void arm() => _armed = true;
 
-  Future<int> _fail() => Future<int>.error(_failure);
-
   @override
-  Future<int> runUpdate(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) => _armed && _operation == _DmlOperation.update
-      ? _fail()
-      : super.runUpdate(executor, statement, args);
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (_armed && _matches(statement.operation)) throw _failure;
+  }
 
-  @override
-  Future<int> runDelete(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) => _armed && _operation == _DmlOperation.delete
-      ? _fail()
-      : super.runDelete(executor, statement, args);
+  bool _matches(LocalDatabaseSqlOperation operation) => switch (_operation) {
+    _DmlOperation.insert => operation == LocalDatabaseSqlOperation.insert,
+    _DmlOperation.update => operation == LocalDatabaseSqlOperation.update,
+    _DmlOperation.delete => operation == LocalDatabaseSqlOperation.delete,
+  };
 }
 
 const _firstUuid = '018f0b5d-6b2e-7c80-8000-000000000401';

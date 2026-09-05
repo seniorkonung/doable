@@ -2,10 +2,8 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
-import 'package:doable/src/data/local/database_connection.dart';
+import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
-import 'package:drift/drift.dart';
-import 'package:drift/isolate.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -20,7 +18,7 @@ void main() {
       'открывает новую базу и предоставляет её только в результате ready',
       () async {
         final bootstrap = LocalDataBootstrap(
-          executorFactory: openInMemoryLocalDatabase,
+          connectionFactory: openInMemoryLocalDatabase,
           diagnosticsSink: InMemoryDiagnosticsSink(),
         );
         addTearDown(bootstrap.close);
@@ -54,7 +52,7 @@ void main() {
     test('объединяет параллельные попытки открытия в один bootstrap', () async {
       var createdExecutors = 0;
       final bootstrap = LocalDataBootstrap(
-        executorFactory: () {
+        connectionFactory: () {
           createdExecutors += 1;
           return openInMemoryLocalDatabase();
         },
@@ -151,23 +149,21 @@ void main() {
     test(
       'классифицирует неизвестную причину открытия как unexpected',
       () async {
-        QueryExecutor? failedExecutor;
+        _CloseTrackingObserver? failedObserver;
         final diagnosticsSink = InMemoryDiagnosticsSink();
         final bootstrap = LocalDataBootstrap(
-          executorFactory: () {
-            return failedExecutor = openInMemoryLocalDatabase(
+          connectionFactory: () => _trackedConnection(
+            openInMemoryLocalDatabase(
               setup: (_) => throw StateError('Недоступное хранилище'),
-            );
-          },
+            ),
+            (observer) => failedObserver = observer,
+          ),
           diagnosticsSink: diagnosticsSink,
         );
         addTearDown(bootstrap.close);
 
         expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
-        await expectLater(
-          failedExecutor!.ensureOpen(_NoopQueryExecutorUser()),
-          throwsStateError,
-        );
+        expect(failedObserver!.closeCalls, 1);
         _expectBootstrapFailureCode(
           diagnosticsSink,
           DiagnosticsFailureCode.unexpected,
@@ -218,20 +214,25 @@ void main() {
           final preservedBytes = await databaseFile.readAsBytes();
 
           final diagnosticsSink = InMemoryDiagnosticsSink();
-          _CloseTrackingExecutor? failedExecutor;
+          _BoundedVerificationFailureObserver? failedObserver;
           final bootstrap = LocalDataBootstrap(
-            executorFactory: () => failedExecutor = _CloseTrackingExecutor(
-              openFileBackedLocalDatabase(databaseFile).interceptWith(
-                _BoundedVerificationFailureInterceptor(scenario.failure),
-              ),
-            ),
+            connectionFactory: () {
+              final observer = _BoundedVerificationFailureObserver(
+                scenario.failure,
+              );
+              failedObserver = observer;
+              return observeConfiguredLocalDatabaseConnection(
+                openFileBackedLocalDatabase(databaseFile),
+                observer,
+              );
+            },
             diagnosticsSink: diagnosticsSink,
           );
           addTearDown(bootstrap.close);
 
           expect(await bootstrap.open(), scenario.expectedResult);
           expect(await databaseFile.readAsBytes(), preservedBytes);
-          expect(failedExecutor!.closeCalls, 1);
+          expect(failedObserver!.closeCalls, 1);
           _expectBootstrapFailureCode(diagnosticsSink, scenario.expectedCode);
         }
       },
@@ -240,22 +241,27 @@ void main() {
     test(
       'раскрывает SQLite BUSY чтения версии схемы из background executor',
       () async {
-        final isolate = await DriftIsolate.spawn(
-          _openBackgroundExecutorWithBusyVerificationFailure,
-        );
+        final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
         addTearDown(isolate.shutdownAll);
         final connection = await isolate.connect();
         final diagnosticsSink = InMemoryDiagnosticsSink();
-        _CloseTrackingExecutor? failedExecutor;
+        final failedObserver = _BoundedVerificationFailureObserver(
+          SqliteException(
+            extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
+            message: 'SQLite-файл повреждён',
+          ),
+        );
         final bootstrap = LocalDataBootstrap(
-          executorFactory: () =>
-              failedExecutor = _CloseTrackingExecutor(connection.executor),
+          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+            connection,
+            failedObserver,
+          ),
           diagnosticsSink: diagnosticsSink,
         );
         addTearDown(bootstrap.close);
 
         expect(await bootstrap.open(), isA<LocalDataRetryableFailure>());
-        expect(failedExecutor!.closeCalls, 1);
+        expect(failedObserver.closeCalls, 1);
         _expectBootstrapFailureCode(
           diagnosticsSink,
           DiagnosticsFailureCode.unavailable,
@@ -266,22 +272,24 @@ void main() {
     test(
       'классифицирует неизвестную причину background executor как unexpected',
       () async {
-        final isolate = await DriftIsolate.spawn(
-          _openBackgroundExecutorWithUnexpectedVerificationFailure,
-        );
+        final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
         addTearDown(isolate.shutdownAll);
         final connection = await isolate.connect();
         final diagnosticsSink = InMemoryDiagnosticsSink();
-        _CloseTrackingExecutor? failedExecutor;
+        final failedObserver = _BoundedVerificationFailureObserver(
+          StateError('Неизвестная причина'),
+        );
         final bootstrap = LocalDataBootstrap(
-          executorFactory: () =>
-              failedExecutor = _CloseTrackingExecutor(connection.executor),
+          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+            connection,
+            failedObserver,
+          ),
           diagnosticsSink: diagnosticsSink,
         );
         addTearDown(bootstrap.close);
 
         expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
-        expect(failedExecutor!.closeCalls, 1);
+        expect(failedObserver.closeCalls, 1);
         _expectBootstrapFailureCode(
           diagnosticsSink,
           DiagnosticsFailureCode.unexpected,
@@ -293,10 +301,11 @@ void main() {
       final databaseFile = await _temporaryDatabaseFile();
       await databaseFile.writeAsString('это не SQLite database');
       final diagnosticsSink = InMemoryDiagnosticsSink();
-      _CloseTrackingExecutor? failedExecutor;
+      _CloseTrackingObserver? failedObserver;
       final bootstrap = LocalDataBootstrap(
-        executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+        connectionFactory: () => _trackedConnection(
           openFileBackedLocalDatabase(databaseFile),
+          (observer) => failedObserver = observer,
         ),
         diagnosticsSink: diagnosticsSink,
       );
@@ -305,7 +314,7 @@ void main() {
       final result = await bootstrap.open();
 
       expect(result, isA<LocalDataCorruption>());
-      expect(failedExecutor!.closeCalls, 1);
+      expect(failedObserver!.closeCalls, 1);
       _expectBootstrapFailureCode(
         diagnosticsSink,
         DiagnosticsFailureCode.corruption,
@@ -324,17 +333,18 @@ void main() {
         ),
       ]) {
         final diagnosticsSink = InMemoryDiagnosticsSink();
-        _CloseTrackingExecutor? failedExecutor;
+        _CloseTrackingObserver? failedObserver;
         final bootstrap = LocalDataBootstrap(
-          executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+          connectionFactory: () => _trackedConnection(
             openInMemoryLocalDatabase(setup: (_) => throw exception),
+            (observer) => failedObserver = observer,
           ),
           diagnosticsSink: diagnosticsSink,
         );
         addTearDown(bootstrap.close);
 
         expect(await bootstrap.open(), isA<LocalDataCorruption>());
-        expect(failedExecutor!.closeCalls, 1);
+        expect(failedObserver!.closeCalls, 1);
         _expectBootstrapFailureCode(
           diagnosticsSink,
           DiagnosticsFailureCode.corruption,
@@ -374,17 +384,18 @@ void main() {
         ),
       ]) {
         final diagnosticsSink = InMemoryDiagnosticsSink();
-        _CloseTrackingExecutor? failedExecutor;
+        _CloseTrackingObserver? failedObserver;
         final bootstrap = LocalDataBootstrap(
-          executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+          connectionFactory: () => _trackedConnection(
             openInMemoryLocalDatabase(setup: (_) => throw exception),
+            (observer) => failedObserver = observer,
           ),
           diagnosticsSink: diagnosticsSink,
         );
         addTearDown(bootstrap.close);
 
         expect(await bootstrap.open(), isA<LocalDataRetryableFailure>());
-        expect(failedExecutor!.closeCalls, 1);
+        expect(failedObserver!.closeCalls, 1);
         _expectBootstrapFailureCode(
           diagnosticsSink,
           DiagnosticsFailureCode.unavailable,
@@ -418,17 +429,18 @@ void main() {
           ),
         ]) {
           final diagnosticsSink = InMemoryDiagnosticsSink();
-          _CloseTrackingExecutor? failedExecutor;
+          _CloseTrackingObserver? failedObserver;
           final bootstrap = LocalDataBootstrap(
-            executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+            connectionFactory: () => _trackedConnection(
               openInMemoryLocalDatabase(setup: (_) => throw exception),
+              (observer) => failedObserver = observer,
             ),
             diagnosticsSink: diagnosticsSink,
           );
           addTearDown(bootstrap.close);
 
           expect(await bootstrap.open(), isA<LocalDataUnexpectedFailure>());
-          expect(failedExecutor!.closeCalls, 1);
+          expect(failedObserver!.closeCalls, 1);
           _expectBootstrapFailureCode(
             diagnosticsSink,
             DiagnosticsFailureCode.unexpected,
@@ -439,22 +451,23 @@ void main() {
 
     test('классифицирует IOERR_DATA как non-retryable corruption', () async {
       final diagnosticsSink = InMemoryDiagnosticsSink();
-      _CloseTrackingExecutor? failedExecutor;
+      _CloseTrackingObserver? failedObserver;
       final bootstrap = LocalDataBootstrap(
-        executorFactory: () => failedExecutor = _CloseTrackingExecutor(
+        connectionFactory: () => _trackedConnection(
           openInMemoryLocalDatabase(
             setup: (_) => throw SqliteException(
               extendedResultCode: SqlExtendedError.SQLITE_IOERR_DATA,
               message: 'CANARY-личные-данные',
             ),
           ),
+          (observer) => failedObserver = observer,
         ),
         diagnosticsSink: diagnosticsSink,
       );
       addTearDown(bootstrap.close);
 
       expect(await bootstrap.open(), isA<LocalDataCorruption>());
-      expect(failedExecutor!.closeCalls, 1);
+      expect(failedObserver!.closeCalls, 1);
       _expectBootstrapFailureCode(
         diagnosticsSink,
         DiagnosticsFailureCode.corruption,
@@ -464,7 +477,7 @@ void main() {
     test('записывает безопасные события bootstrap и миграции', () async {
       final diagnosticsSink = InMemoryDiagnosticsSink();
       final bootstrap = LocalDataBootstrap(
-        executorFactory: openInMemoryLocalDatabase,
+        connectionFactory: openInMemoryLocalDatabase,
         diagnosticsSink: diagnosticsSink,
       );
       addTearDown(bootstrap.close);
@@ -490,7 +503,7 @@ void main() {
       final databaseFile = await _temporaryDatabaseFile();
       final diagnosticsSink = InMemoryDiagnosticsSink();
       final bootstrap = LocalDataBootstrap(
-        executorFactory: () => openFileBackedLocalDatabase(
+        connectionFactory: () => openFileBackedLocalDatabase(
           databaseFile,
           setup: (database) => database.execute('PRAGMA user_version = 2'),
         ),
@@ -526,7 +539,7 @@ void main() {
 
 LocalDataBootstrap _bootstrapFor(File databaseFile, {DatabaseSetup? setup}) {
   return LocalDataBootstrap(
-    executorFactory: () =>
+    connectionFactory: () =>
         openFileBackedLocalDatabase(databaseFile, setup: setup),
     diagnosticsSink: InMemoryDiagnosticsSink(),
   );
@@ -538,92 +551,37 @@ Future<File> _temporaryDatabaseFile() async {
   return File('${directory.path}/doable.sqlite');
 }
 
-final class _NoopQueryExecutorUser implements QueryExecutorUser {
-  @override
-  int get schemaVersion => 1;
-
-  @override
-  Future<void> beforeOpen(
-    QueryExecutor executor,
-    OpeningDetails details,
-  ) async {}
+ConfiguredLocalDatabaseConnection _trackedConnection(
+  ConfiguredLocalDatabaseConnection connection,
+  void Function(_CloseTrackingObserver observer) onCreated,
+) {
+  final observer = _CloseTrackingObserver();
+  onCreated(observer);
+  return observeConfiguredLocalDatabaseConnection(connection, observer);
 }
 
-QueryExecutor _openBackgroundExecutorWithBusyVerificationFailure() {
-  return openInMemoryLocalDatabase().interceptWith(
-    _BoundedVerificationFailureInterceptor(
-      SqliteException(
-        extendedResultCode: SqlExtendedError.SQLITE_BUSY_RECOVERY,
-        message: 'SQLite-файл повреждён',
-      ),
-    ),
-  );
-}
-
-QueryExecutor _openBackgroundExecutorWithUnexpectedVerificationFailure() {
-  return openInMemoryLocalDatabase().interceptWith(
-    _BoundedVerificationFailureInterceptor(StateError('Неизвестная причина')),
-  );
-}
-
-final class _BoundedVerificationFailureInterceptor extends QueryInterceptor {
-  _BoundedVerificationFailureInterceptor(this._failure);
+final class _BoundedVerificationFailureObserver
+    extends LocalDatabaseConnectionObserver {
+  _BoundedVerificationFailureObserver(this._failure);
 
   final Object _failure;
+  var closeCalls = 0;
 
   @override
-  Future<bool> ensureOpen(QueryExecutor executor, QueryExecutorUser user) {
-    return executor.ensureOpen(
-      _BoundedVerificationFailureQueryExecutorUser(user, this),
-    );
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (_isBoundedVerificationQuery(statement.statements.single)) {
+      throw _failure;
+    }
   }
 
   @override
-  Future<List<Map<String, Object?>>> runSelect(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) {
-    if (_isBoundedVerificationQuery(statement)) {
-      return Future.error(_failure);
-    }
-    return super.runSelect(executor, statement, args);
-  }
-
-  @override
-  Future<void> runCustom(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) {
-    if (_isBoundedVerificationQuery(statement)) {
-      return Future.error(_failure);
-    }
-    return super.runCustom(executor, statement, args);
+  void beforeClose() {
+    closeCalls += 1;
   }
 
   bool _isBoundedVerificationQuery(String statement) {
     final normalizedStatement = statement.trim().toUpperCase();
     return RegExp(r'^PRAGMA USER_VERSION;?$').hasMatch(normalizedStatement);
-  }
-}
-
-final class _BoundedVerificationFailureQueryExecutorUser
-    implements QueryExecutorUser {
-  const _BoundedVerificationFailureQueryExecutorUser(
-    this._delegate,
-    this._interceptor,
-  );
-
-  final QueryExecutorUser _delegate;
-  final QueryInterceptor _interceptor;
-
-  @override
-  int get schemaVersion => _delegate.schemaVersion;
-
-  @override
-  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) {
-    return _delegate.beforeOpen(executor.interceptWith(_interceptor), details);
   }
 }
 
@@ -642,53 +600,11 @@ void _expectBootstrapFailureCode(
   );
 }
 
-final class _CloseTrackingExecutor implements QueryExecutor {
-  _CloseTrackingExecutor(this._delegate);
-
-  final QueryExecutor _delegate;
+final class _CloseTrackingObserver extends LocalDatabaseConnectionObserver {
   var closeCalls = 0;
 
   @override
-  SqlDialect get dialect => _delegate.dialect;
-
-  @override
-  Future<bool> ensureOpen(QueryExecutorUser user) => _delegate.ensureOpen(user);
-
-  @override
-  Future<List<Map<String, Object?>>> runSelect(
-    String statement,
-    List<Object?> args,
-  ) => _delegate.runSelect(statement, args);
-
-  @override
-  Future<int> runInsert(String statement, List<Object?> args) =>
-      _delegate.runInsert(statement, args);
-
-  @override
-  Future<int> runUpdate(String statement, List<Object?> args) =>
-      _delegate.runUpdate(statement, args);
-
-  @override
-  Future<int> runDelete(String statement, List<Object?> args) =>
-      _delegate.runDelete(statement, args);
-
-  @override
-  Future<void> runCustom(String statement, [List<Object?>? args]) =>
-      _delegate.runCustom(statement, args);
-
-  @override
-  Future<void> runBatched(BatchedStatements statements) =>
-      _delegate.runBatched(statements);
-
-  @override
-  TransactionExecutor beginTransaction() => _delegate.beginTransaction();
-
-  @override
-  QueryExecutor beginExclusive() => _delegate.beginExclusive();
-
-  @override
-  Future<void> close() {
+  void beforeClose() {
     closeCalls += 1;
-    return _delegate.close();
   }
 }

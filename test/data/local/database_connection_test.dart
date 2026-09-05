@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/data/local/database_connection.dart';
+import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -60,24 +60,22 @@ void main() {
   });
 
   test(
-    'production connection создаёт SQLite-файл через QueryExecutor',
+    'production connection создаёт SQLite-файл через настроенное соединение',
     () async {
-      final QueryExecutor connection =
-          openAndroidProductionDatabaseConnection();
-
-      expect(await connection.ensureOpen(_TestQueryExecutorUser()), isTrue);
+      final database = AppDatabase(openAndroidProductionDatabaseConnection());
+      addTearDown(database.close);
+      await database.open();
 
       expect(
         File.fromUri(applicationDocumentsDirectory.uri.resolve('doable.sqlite'))
             .existsSync(),
         isTrue,
       );
-      await AppDatabase(connection).close();
     },
   );
 
   test(
-    'AppDatabase принимает QueryExecutor без platform-specific параметров',
+    'AppDatabase принимает настроенное platform-neutral соединение',
     () async {
       final database = AppDatabase(openInMemoryLocalDatabase());
 
@@ -86,7 +84,7 @@ void main() {
   );
 
   test('регистрирует search-key function на production, in-memory и file-backed соединениях', () async {
-    final executors = <QueryExecutor Function()>[
+    final connections = <ConfiguredLocalDatabaseConnection Function()>[
       openAndroidProductionDatabaseConnection,
       openInMemoryLocalDatabase,
       () => openFileBackedLocalDatabase(
@@ -94,8 +92,8 @@ void main() {
       ),
     ];
 
-    for (final executor in executors) {
-      final database = AppDatabase(executor());
+    for (final connection in connections) {
+      final database = AppDatabase(connection());
       try {
         final row = await database
             .customSelect(
@@ -127,6 +125,24 @@ void main() {
     expect(fixture.read<String>('value'), 'готово');
     expect(searchKey.read<String>('search_key'), 'strasse');
   });
+
+  test(
+    'канонический search-key setup заменяет fixture-реализацию с тем же именем',
+    () async {
+      final database = AppDatabase(
+        openInMemoryLocalDatabase(setup: _replaceSearchKeyFunction),
+      );
+      addTearDown(database.close);
+
+      final searchKey = await database
+          .customSelect(
+            "SELECT doable_title_search_key('Straße') AS search_key",
+          )
+          .getSingle();
+
+      expect(searchKey.read<String>('search_key'), 'strasse');
+    },
+  );
 }
 
 void _registerFixtureFunction(sqlite.Database database) {
@@ -137,13 +153,12 @@ void _registerFixtureFunction(sqlite.Database database) {
   );
 }
 
-final class _TestQueryExecutorUser implements QueryExecutorUser {
-  @override
-  int get schemaVersion => 1;
-
-  @override
-  Future<void> beforeOpen(
-    QueryExecutor executor,
-    OpeningDetails details,
-  ) async {}
+void _replaceSearchKeyFunction(sqlite.Database database) {
+  database.createFunction(
+    functionName: doableTitleSearchKeyFunctionName,
+    argumentCount: const sqlite.AllowedArgumentCount(1),
+    deterministic: true,
+    directOnly: false,
+    function: (_) => 'fixture-implementation',
+  );
 }

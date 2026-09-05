@@ -10,7 +10,6 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -26,7 +25,12 @@ void main() {
 
   setUp(() async {
     writeTrace = _WriteTrace();
-    database = AppDatabase(NativeDatabase.memory().interceptWith(writeTrace));
+    database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        writeTrace,
+      ),
+    );
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
     idGenerator = _DeterministicIntentionIdGenerator([_id(_firstUuid)]);
@@ -863,7 +867,10 @@ void main() {
         });
         await database.close();
         database = AppDatabase(
-          NativeDatabase.memory().interceptWith(storageFailure),
+          observeConfiguredLocalDatabaseConnection(
+            openInMemoryLocalDatabase(),
+            storageFailure,
+          ),
         );
         await database.open();
         repository = DriftIntentionRepository(
@@ -1004,29 +1011,24 @@ final class _DeterministicClock {
   }
 }
 
-final class _WriteTrace extends QueryInterceptor {
+final class _WriteTrace extends LocalDatabaseConnectionObserver {
   final List<String> updateStatements = [];
 
   @override
-  Future<int> runUpdate(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) {
-    updateStatements.add(statement);
-    return super.runUpdate(executor, statement, args);
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation == LocalDatabaseSqlOperation.update) {
+      updateStatements.add(statement.statements.single);
+    }
   }
 }
 
-final class _InsertFailureInterceptor extends QueryInterceptor {
+final class _InsertFailureInterceptor extends LocalDatabaseConnectionObserver {
   _InsertFailureInterceptor(this.failure);
 
   final Object failure;
 
   @override
-  Future<int> runInsert(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) => Future<int>.error(failure);
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation == LocalDatabaseSqlOperation.insert) throw failure;
+  }
 }

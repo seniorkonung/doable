@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
-import 'package:doable/src/data/local/database_connection.dart';
-import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
 import 'in_memory_diagnostics_sink.dart';
@@ -46,7 +44,7 @@ final class LocalDatabaseHarness {
 
   Future<LocalDataBootstrapResult> open({
     DatabaseSetup? setup,
-    QueryInterceptor? queryInterceptor,
+    LocalDatabaseConnectionObserver? observer,
   }) {
     if (_isDisposed) {
       throw StateError('Нельзя открыть уже освобождённый database harness.');
@@ -56,8 +54,8 @@ final class LocalDatabaseHarness {
     }
 
     final bootstrap = LocalDataBootstrap(
-      executorFactory: () {
-        final executor = switch (_storage) {
+      connectionFactory: () {
+        final connection = switch (_storage) {
           _LocalDatabaseStorage.inMemory => openInMemoryLocalDatabase(
             setup: setup,
           ),
@@ -66,9 +64,12 @@ final class LocalDatabaseHarness {
             setup: setup,
           ),
         };
-        return switch (queryInterceptor) {
-          null => executor,
-          final interceptor => executor.interceptWith(interceptor),
+        return switch (observer) {
+          null => connection,
+          final observer => observeConfiguredLocalDatabaseConnection(
+            connection,
+            observer,
+          ),
         };
       },
       diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -79,9 +80,9 @@ final class LocalDatabaseHarness {
 
   Future<AppDatabase> openReadyDatabase({
     DatabaseSetup? setup,
-    QueryInterceptor? queryInterceptor,
+    LocalDatabaseConnectionObserver? observer,
   }) async {
-    final result = await open(setup: setup, queryInterceptor: queryInterceptor);
+    final result = await open(setup: setup, observer: observer);
     if (result is LocalDataReady) return result.database;
     throw StateError('Bootstrap не предоставил готовое локальное хранилище.');
   }

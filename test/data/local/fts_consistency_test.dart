@@ -1,5 +1,4 @@
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/data/local/database_connection.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/fts_query.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
@@ -13,7 +12,12 @@ void main() {
 
   setUp(() async {
     sqlTrace = _SqlTrace();
-    database = AppDatabase(openInMemoryLocalDatabase().interceptWith(sqlTrace));
+    database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        sqlTrace,
+      ),
+    );
     await database.open();
     sqlTrace.clear();
   });
@@ -282,7 +286,7 @@ List<String> get _lastSelectArguments =>
 
 late _SqlTrace _currentSqlTrace;
 
-final class _SqlTrace extends QueryInterceptor {
+final class _SqlTrace extends LocalDatabaseConnectionObserver {
   final selects = <_SelectStatement>[];
 
   _SelectStatement get lastSelect => selects.last;
@@ -293,13 +297,12 @@ final class _SqlTrace extends QueryInterceptor {
   }
 
   @override
-  Future<List<Map<String, Object?>>> runSelect(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) {
-    selects.add(_SelectStatement(statement, List.unmodifiable(args)));
-    return super.runSelect(executor, statement, args);
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation == LocalDatabaseSqlOperation.select) {
+      selects.add(
+        _SelectStatement(statement.statements.single, statement.arguments),
+      );
+    }
   }
 }
 

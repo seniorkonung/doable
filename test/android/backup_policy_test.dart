@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:doable/src/data/local/database_connection.dart';
+import 'package:doable/src/data/local/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -10,7 +10,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -22,7 +21,7 @@ void main() {
   late DriftIntentionRepository repository;
 
   setUp(() async {
-    database = AppDatabase(NativeDatabase.memory());
+    database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
     repository = _repository(database, diagnostics);
@@ -369,7 +368,10 @@ void main() {
       final interceptor = _RawRowValueInterceptor();
       await database.close();
       database = AppDatabase(
-        NativeDatabase.memory().interceptWith(interceptor),
+        observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          interceptor,
+        ),
       );
       await database.open();
       repository = _repository(database, diagnostics);
@@ -391,7 +393,10 @@ void main() {
       final interceptor = _SelectFailureInterceptor();
       await database.close();
       database = AppDatabase(
-        NativeDatabase.memory().interceptWith(interceptor),
+        observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          interceptor,
+        ),
       );
       await database.open();
       repository = _repository(database, diagnostics);
@@ -418,7 +423,10 @@ void main() {
         final interceptor = _SelectFailureInterceptor();
         await database.close();
         database = AppDatabase(
-          NativeDatabase.memory().interceptWith(interceptor),
+          observeConfiguredLocalDatabaseConnection(
+            openInMemoryLocalDatabase(),
+            interceptor,
+          ),
         );
         await database.open();
         repository = _repository(database, diagnostics);
@@ -438,7 +446,10 @@ void main() {
       final interceptor = _SelectFailureInterceptor();
       await database.close();
       database = AppDatabase(
-        NativeDatabase.memory().interceptWith(interceptor),
+        observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          interceptor,
+        ),
       );
       await database.open();
       repository = _repository(database, diagnostics);
@@ -595,32 +606,25 @@ Matcher _isFailure<TFailure extends IntentionFailure>() =>
       isA<TFailure>(),
     );
 
-final class _SelectFailureInterceptor extends QueryInterceptor {
+final class _SelectFailureInterceptor extends LocalDatabaseConnectionObserver {
   Object? failure;
 
   @override
-  Future<List<Map<String, Object?>>> runSelect(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) {
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation != LocalDatabaseSqlOperation.select) return;
     final failure = this.failure;
-    return failure == null
-        ? super.runSelect(executor, statement, args)
-        : Future.error(failure);
+    if (failure != null) throw failure;
   }
 }
 
-final class _RawRowValueInterceptor extends QueryInterceptor {
+final class _RawRowValueInterceptor extends LocalDatabaseConnectionObserver {
   Map<String, Object?>? overrides;
 
   @override
-  Future<List<Map<String, Object?>>> runSelect(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) async {
-    final rows = await super.runSelect(executor, statement, args);
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
     final overrides = this.overrides;
     return overrides == null
         ? rows

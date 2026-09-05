@@ -18,6 +18,6 @@ void configureDoableSqliteConnection(CommonDatabase database) {
 
 DatabaseSetup composeDoableSqliteConnectionSetup(DatabaseSetup? fixtureSetup) =>
     (database) {
-      configureDoableSqliteConnection(database);
       fixtureSetup?.call(database);
+      configureDoableSqliteConnection(database);
     };

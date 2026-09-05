@@ -7,7 +7,6 @@ import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -21,7 +20,12 @@ void main() {
 
   setUp(() async {
     trace = _SelectTrace();
-    database = AppDatabase(NativeDatabase.memory().interceptWith(trace));
+    database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        trace,
+      ),
+    );
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
     repository = DriftIntentionRepository(
@@ -826,7 +830,10 @@ void main() {
             previousMultipleDatabaseWarning,
       );
       final foreignDatabase = AppDatabase(
-        NativeDatabase.memory().interceptWith(foreignTrace),
+        observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          foreignTrace,
+        ),
       );
       await foreignDatabase.open();
       addTearDown(foreignDatabase.close);
@@ -1122,19 +1129,15 @@ final class _ForeignCatalogCursor implements IntentionCatalogCursor {
   const _ForeignCatalogCursor();
 }
 
-final class _SelectTrace extends QueryInterceptor {
+final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final List<String> statements = [];
   Object? failure;
 
   @override
-  Future<List<Map<String, Object?>>> runSelect(
-    QueryExecutor executor,
-    String statement,
-    List<Object?> args,
-  ) {
-    statements.add(statement);
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation != LocalDatabaseSqlOperation.select) return;
+    statements.add(statement.statements.single);
     final failure = this.failure;
-    if (failure != null) return Future.error(failure);
-    return super.runSelect(executor, statement, args);
+    if (failure != null) throw failure;
   }
 }
