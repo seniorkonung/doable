@@ -361,18 +361,7 @@ final class DriftIntentionRepository implements IntentionRepository {
       ])
       ..limit(query.pageSize + 1);
     final rows = await rowsQuery.get();
-    final summaries = [
-      for (final row in rows)
-        _rehydrateSummary(
-          id: row.read(intentions.id)!,
-          title: row.read(intentions.title)!,
-          description: row.read(intentions.description),
-          isActionReady: row.read(intentions.isActionReady)!,
-          isArchived: row.read(intentions.isArchived)!,
-          createdAt: row.read(intentions.createdAt)!,
-          updatedAt: row.read(intentions.updatedAt)!,
-        ),
-    ];
+    final summaries = [for (final row in rows) _rehydrateSummary(row)];
     final items = summaries.take(query.pageSize).toList(growable: false);
     final hasNextPage = rows.length > query.pageSize;
 
@@ -405,18 +394,7 @@ final class DriftIntentionRepository implements IntentionRepository {
       ])
       ..limit(query.pageSize + 1);
     final rows = await rowsQuery.get();
-    final summaries = [
-      for (final row in rows)
-        _rehydrateSummary(
-          id: row.read(intentions.id)!,
-          title: row.read(intentions.title)!,
-          description: row.read(intentions.description),
-          isActionReady: row.read(intentions.isActionReady)!,
-          isArchived: row.read(intentions.isArchived)!,
-          createdAt: row.read(intentions.createdAt)!,
-          updatedAt: row.read(intentions.updatedAt)!,
-        ),
-    ];
+    final summaries = [for (final row in rows) _rehydrateSummary(row)];
     final items = summaries.take(query.pageSize).toList(growable: false);
     final hasNextPage = rows.length > query.pageSize;
 
@@ -481,44 +459,30 @@ final class DriftIntentionRepository implements IntentionRepository {
             ));
   }
 
-  IntentionSummary _rehydrateSummary({
-    required String id,
-    required String title,
-    required String? description,
-    required bool isActionReady,
-    required bool isArchived,
-    required int createdAt,
-    required int updatedAt,
-  }) {
-    final intentionId = switch (IntentionId.decode(id)) {
+  IntentionSummary _rehydrateSummary(TypedResult row) {
+    final stored = _StoredIntentionDetail.fromCatalogRow(row);
+    final intentionId = switch (IntentionId.decode(stored.id)) {
       IntentionIdDecodingSuccess(:final id) => id,
       InvalidIntentionIdDecoding() => throw const _StoredIntentionCorruption(),
     };
 
     try {
-      final normalizedTitle = IntentionText.normalizeTitle(title);
-      final normalizedDescription = description == null
+      final normalizedTitle = IntentionText.normalizeTitle(stored.title);
+      final normalizedDescription = stored.description == null
           ? null
-          : IntentionText.normalizeDescription(description);
-      if (normalizedTitle != title || normalizedDescription != description) {
+          : IntentionText.normalizeDescription(stored.description!);
+      if (normalizedTitle != stored.title ||
+          normalizedDescription != stored.description) {
         throw const _StoredIntentionCorruption();
       }
       return IntentionSummary(
         id: intentionId,
-        title: title,
+        title: stored.title,
         hasDescription: normalizedDescription != null,
-        readiness: isActionReady
-            ? domain.IntentionReadiness.ready
-            : domain.IntentionReadiness.notReady,
-        archiveState: isArchived
-            ? domain.IntentionArchiveState.archived
-            : domain.IntentionArchiveState.active,
-        createdAt: domain.IntentionTimestamp(
-          DateTime.fromMicrosecondsSinceEpoch(createdAt, isUtc: true),
-        ),
-        updatedAt: domain.IntentionTimestamp(
-          DateTime.fromMicrosecondsSinceEpoch(updatedAt, isUtc: true),
-        ),
+        readiness: stored.readiness,
+        archiveState: stored.archiveState,
+        createdAt: stored.createdAt,
+        updatedAt: stored.updatedAt,
       );
     } on Object catch (error) {
       if (error is IntentionTextValidationException ||
@@ -636,15 +600,31 @@ final class _StoredIntentionDetail {
   });
 
   factory _StoredIntentionDetail.fromRawRow(QueryRow row) {
-    final data = row.data;
+    return _StoredIntentionDetail._fromRawData(
+      row.data,
+      _StoredIntentionColumnNames.detail,
+    );
+  }
+
+  factory _StoredIntentionDetail.fromCatalogRow(TypedResult row) {
+    return _StoredIntentionDetail._fromRawData(
+      row.rawData.data,
+      _StoredIntentionColumnNames.catalog,
+    );
+  }
+
+  factory _StoredIntentionDetail._fromRawData(
+    Map<String, dynamic> data,
+    _StoredIntentionColumnNames columns,
+  ) {
     return _StoredIntentionDetail(
-      id: _requiredString(data, 'id'),
-      title: _requiredString(data, 'title'),
-      description: _nullableString(data, 'description'),
-      readiness: _readiness(data, 'is_action_ready'),
-      archiveState: _archiveState(data, 'is_archived'),
-      createdAt: _timestamp(data, 'created_at'),
-      updatedAt: _timestamp(data, 'updated_at'),
+      id: _requiredString(data, columns.id),
+      title: _requiredString(data, columns.title),
+      description: _nullableString(data, columns.description),
+      readiness: _readiness(data, columns.isActionReady),
+      archiveState: _archiveState(data, columns.isArchived),
+      createdAt: _timestamp(data, columns.createdAt),
+      updatedAt: _timestamp(data, columns.updatedAt),
     );
   }
 
@@ -705,6 +685,46 @@ final class _StoredIntentionDetail {
     if (value is int) return value;
     throw const _StoredIntentionCorruption();
   }
+}
+
+final class _StoredIntentionColumnNames {
+  const _StoredIntentionColumnNames({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.isActionReady,
+    required this.isArchived,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  static const detail = _StoredIntentionColumnNames(
+    id: 'id',
+    title: 'title',
+    description: 'description',
+    isActionReady: 'is_action_ready',
+    isArchived: 'is_archived',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+  );
+
+  static const catalog = _StoredIntentionColumnNames(
+    id: 'intentions.id',
+    title: 'intentions.title',
+    description: 'intentions.description',
+    isActionReady: 'intentions.is_action_ready',
+    isArchived: 'intentions.is_archived',
+    createdAt: 'intentions.created_at',
+    updatedAt: 'intentions.updated_at',
+  );
+
+  final String id;
+  final String title;
+  final String description;
+  final String isActionReady;
+  final String isArchived;
+  final String createdAt;
+  final String updatedAt;
 }
 
 final class _CatalogCursorOwner {}

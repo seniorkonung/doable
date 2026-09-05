@@ -697,6 +697,100 @@ void main() {
   });
 
   test(
+    'не публикует первую страницу с BLOB-описанием до typed Drift mapping',
+    () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000079',
+        title: 'Первая допустимая строка',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertRawIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000080',
+        title: 'Строка с BLOB-описанием',
+        description: Uint8List.fromList([1]),
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+
+      final result = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: null,
+          order: const IntentionCatalogOrder(
+            field: IntentionCatalogSortField.createdAt,
+            direction: IntentionCatalogSortDirection.ascending,
+          ),
+          pageSize: 1,
+        ),
+      );
+
+      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+      expect(
+        (result as ResultFailure<IntentionCatalogPage>).failure,
+        isA<IntentionCorruptionFailure>(),
+      );
+    },
+  );
+
+  test(
+    'не публикует следующую страницу с BLOB-описанием до typed Drift mapping',
+    () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000081',
+        title: 'Первая допустимая строка',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000082',
+        title: 'Вторая допустимая строка',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      await _insertRawIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000083',
+        title: 'Строка с BLOB-описанием',
+        description: Uint8List.fromList([1]),
+        createdAt: DateTime.utc(2026, 9, 2, 12),
+      );
+      final firstQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: const IntentionCatalogOrder(
+          field: IntentionCatalogSortField.createdAt,
+          direction: IntentionCatalogSortDirection.ascending,
+        ),
+        pageSize: 1,
+      );
+      final cursor = _firstPage(await repository.getCatalogPage(firstQuery))
+          .nextCursor!;
+
+      trace.statements.clear();
+      final result = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: firstQuery.scope,
+          titleFilter: null,
+          order: firstQuery.order,
+          pageSize: firstQuery.pageSize,
+          cursor: cursor,
+        ),
+      );
+
+      expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+      expect(
+        (result as ResultFailure<IntentionCatalogPage>).failure,
+        isA<IntentionCorruptionFailure>(),
+      );
+      expect(
+        trace.statements.where((statement) => statement.contains('COUNT(')),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
     'продолжает каталог keyset-порциями для всех порядков без повторного COUNT',
     () async {
       await _insertIntention(
@@ -1217,6 +1311,26 @@ Future<void> _insertIntention(
         updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
       ),
     );
+
+Future<void> _insertRawIntention(
+  AppDatabase database, {
+  required String id,
+  required String title,
+  required Object description,
+  required DateTime createdAt,
+}) => database.customStatement(
+  '''
+    INSERT INTO intentions (id, title, description, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  ''',
+  [
+    id,
+    title,
+    description,
+    createdAt.microsecondsSinceEpoch,
+    createdAt.microsecondsSinceEpoch,
+  ],
+);
 
 IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
