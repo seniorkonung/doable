@@ -721,7 +721,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/domain/intention_text.dart`, `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_result.dart`, `lib/src/intention/data/drift_intention_repository.dart`, соответствующие domain/application/repository/diagnostics tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.25 Обеспечить NUL-защиту схемы и полную проверку описания в ограниченном каталоге
+- [x] 6.25 Обеспечить NUL-защиту схемы и полную проверку описания в ограниченном каталоге
   - **Критерии приёмки:**
     - Неопубликованная schema version 1 и её generated/snapshot artifacts запрещают нулевой UTF-8 byte в `title`, присутствующем `description` и generated `title_search_key` через BLOB-safe `CHECK`, не используют SQLite `length()` как меру графем и атомарно отклоняют raw `INSERT`/`UPDATE` канонического текста либо результат тестовой search-key function с NUL без изменения прежней строки или FTS.
     - Catalog query получает исходное nullable-описание только для не более чем `pageSize + 1` выбранных строк, проверяет общий Unicode-repertoire, семантику отсутствия и предел 4096 графем той же domain operation и отбрасывает текст до построения `IntentionSummary`; `COUNT` не читает описание, а недопустимая строка возвращает `IntentionCorruptionFailure` без успешной страницы, ложного `hasDescription` или публикации count. Этот критерий supersedes description-части выполненных задач 6.16 и 6.17.
