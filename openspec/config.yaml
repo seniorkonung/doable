@@ -1,12 +1,11 @@
 schema: intent-driven
 
 rules:
-  proposal:
-    - Must use grill-with-docs skill
   design:
-    - Must use c4-diagrams skill
+    - Use c4-diagrams when boundaries, dependencies, data flow, or runtime interactions benefit from visualization
   adr:
-    - Must use domain-modeling skill
+    - Must use domain-modeling skill for decision qualification and terminology; follow the schema-defined ADR format
+    - Use grill-with-docs skill before completing ADR review when the design contains consequential unresolved decisions
   specs:
     - Must use gherkin-authoring skill
   plan:
@@ -31,3 +30,13 @@ operations:
         that phase, never as completion of the whole change. Stop and direct the
         user to update tasks.md with the next single phase package instead of
         archiving.
+      - >-
+        For intent-driven changes, after all archive checks and any requested
+        spec sync succeed, resolve finalization targets from the ADR manifest's
+        owned-ADR list; relevance references are not targets. Before moving the
+        change, verify that every target exists, has Status: proposed, and has a
+        matching Originating change. Then move the change and set those ADRs to
+        accepted without changing other fields. A failed move leaves their
+        statuses unchanged. If finalization fails after the move, resume from
+        the archive location and report the remaining ADRs. Report completion
+        only when every target is accepted.

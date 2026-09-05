@@ -24,4 +24,4 @@
 
 ## Open Questions
 
-<!-- Outstanding decisions, including any in-force ADRs that need supersession -->
+<!-- Outstanding decisions or unknowns to resolve -->

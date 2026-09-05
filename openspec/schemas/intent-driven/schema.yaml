@@ -1,5 +1,5 @@
 name: intent-driven
-version: 3
+version: 5
 description: >-
   Intent-driven OpenSpec workflow - proposal -> Gherkin-style specs -> design ->
   adr -> plan -> phase-by-phase tasks
@@ -161,18 +161,6 @@ artifacts:
       - Ambiguity that benefits from technical decisions before coding
 
 
-      Prior decisions (read existing ADRs first):
-
-      Before writing, list every file in <repo>/docs/adr/. Build the supersession
-      graph from each ADR's Supersedes field - an ADR is no longer in force if
-      a later ADR's Supersedes points at it. Only the currently-in-force ADRs
-      (accepted, not superseded) constrain this design. Older superseded ADRs
-      are historical context only and MUST NOT be treated as live commitments.
-      New design choices MUST be coherent with the in-force set. If a current
-      ADR needs to be revisited, do not propose modifying it; flag it under
-      Open Questions and let the adr step record a new superseding ADR.
-
-
       Sections:
 
       - **Context**: Background, current state, constraints, stakeholders
@@ -188,8 +176,6 @@ artifacts:
       - **Migration Plan**: Steps to deploy, rollback strategy (if applicable)
 
       - **Open Questions**: Outstanding decisions or unknowns to resolve.
-      Include any in-force ADRs that this design suggests revisiting; the adr
-      step will record the supersession.
 
 
       Focus on architecture and approach, not line-by-line implementation.
@@ -206,69 +192,56 @@ artifacts:
     description: Per-change ADR review manifest and durable decision handoff
     template: adr.md
     instruction: >
-      Complete ADR review for this change by writing a concise manifest at
-      openspec/changes/<change>/docs/adr.md. This change-local file is the artifact
-      completion marker for the adr step. Existing files under <repo>/docs/adr/ are
-      required context for the review, but they MUST NOT satisfy completion for
-      a new change.
+      Complete ADR review for this change. Once the review is coherent with
+      design.md, write a concise manifest at openspec/changes/<change>/adr.md
+      using the template. Repository-level decisions live under
+      <repo>/docs/adr/.
 
 
-      If the change introduces a major durable architectural decision, also
-      create an Architecture Decision Record under <repo>/docs/adr/. The path
-      <repo>/docs/adr/ means the target repository's top-level adr/ folder beside
-      openspec/, not any folder inside openspec/. Repository-level ADR files
-      persist across changes and MUST be written outside openspec/.
+      ADR lifecycle:
 
 
-      IRON RULE - ADRs are immutable once accepted. You MUST NOT edit a prior
-      ADR file under any circumstance, not its Status, not its body, not its
-      date. To change a previously accepted decision, record a NEW ADR whose
-      Status is "accepted, supersedes ADR-NNNN" and whose `Supersedes:` field
-      names the prior one. Design consumers derive what is currently in force
-      by walking Supersedes links across the folder. The prior ADR's contents
-      stay frozen as a historical record.
+      ADRs owned by an active change remain proposed and editable until
+      archival. Accepted ADRs are immutable; revisiting one requires a new
+      proposed ADR with Supersedes. The manifest's completed status means that
+      ADR review and design reconciliation are complete.
 
 
       Process:
 
-      1. Read every existing ADR in <repo>/docs/adr/. Build the supersession graph
-      from each ADR's Supersedes field. Note the highest sequence number in
-      use.
+      1. Review repository ADRs for decisions applicable to this change. Treat
+      accepted ADRs as project-wide constraints, following accepted Supersedes
+      links. Treat relevant proposed ADRs from other active changes as mutable
+      coordination context. Use Originating change and this change's existing
+      manifest, if present, to find its owned ADRs. Note the highest ADR sequence
+      number.
 
-      2. Re-read design.md. Identify decisions that meet ALL of these:
+      2. Re-read design.md. Record a decision as an ADR only when it meets ALL
+      of these:
 
       - Establish a long-term architectural commitment (pattern, technology,
       boundary, contract) - not a tactical implementation detail.
 
       - Will affect future changes beyond this one.
 
-      - Either aren't already captured by a currently-in-force ADR, OR
-      intentionally diverge from one. If diverging, the new ADR supersedes the
-      prior.
+      - Either aren't already captured by an applicable ADR, OR intentionally
+      revise one.
 
-      3. For each qualifying decision, create a NEW repository-level file at
-      <repo>/docs/adr/NNNN-kebab-title.md, where NNNN is a 4-digit sequence one
-      greater than the highest existing. Include title, Status, Date, optional
-      Supersedes, and MADR-short sections: Context, Decision, and
-      Consequences. If this decision replaces a prior in-force ADR, set Status to
-      "accepted, supersedes ADR-NNNN", populate the `Supersedes:` field, and
-      explain in Context why the prior decision is being revisited. Do NOT
-      touch the prior ADR's file.
+      3. Revise this change's proposed ADRs in place. For a new decision or a
+      replacement of an accepted ADR, create the next
+      <repo>/docs/adr/NNNN-kebab-title.md. Include title, Status: proposed, Date,
+      Originating change: <change-name>, an optional separate Supersedes field,
+      and MADR-short sections: Context, Decision, and Consequences. Explain any
+      replacement in Context.
 
-      4. Write openspec/changes/<change>/docs/adr.md using the template. The
-      manifest MUST state that ADR review completed for this change, list the
-      in-force ADR context reviewed, and reference every repository-level ADR
-      file created for this change. It MUST NOT duplicate full Context,
-      Decision, or Consequences content from repository-level ADR files.
+      4. Reconcile the resulting decisions with design.md. If contradictions or
+      omissions remain, report them and return to the design step before
+      completing the manifest or proceeding to plan.
 
-      5. If nothing meets the bar, do not invent ADRs. The manifest MUST
-      explicitly state that no major durable architectural decisions were
-      introduced and no new repository-level ADR files were created.
-
-
-      Filename convention: NNNN-kebab-title.md (e.g.,
-      0042-use-postgres-for-catalog.md). Sequence is monotonic across the
-      whole repo and never reused.
+      5. Once coherent, complete the manifest with applicable ADRs and every ADR
+      owned by this change. Link ADRs without duplicating their contents. If no
+      decision qualifies and the change owns no ADRs, state that no ADR was
+      created.
     requires:
       - design
   - id: plan
@@ -439,3 +412,5 @@ apply:
 
     Do not implement unrepresented phases or recommend archive after an
     intermediate package. Pause on blockers or unclear tasks.
+
+    Apply leaves this change's ADRs proposed; only archival makes them accepted.
