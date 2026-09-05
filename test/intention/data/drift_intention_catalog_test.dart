@@ -606,6 +606,96 @@ void main() {
     },
   );
 
+  test('не публикует каталог с предметно недопустимым сохранённым описанием', () async {
+    final maximumLengthDescription = List.filled(4096, 'а').join();
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000071',
+      title: 'Описание предельной длины',
+      description: maximumLengthDescription,
+      createdAt: DateTime.utc(2026, 9, 2, 10),
+    );
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000072',
+      title: 'Многострочное описание',
+      description: 'Первая строка\nВторая строка',
+      createdAt: DateTime.utc(2026, 9, 2, 11),
+    );
+
+    final validPage = _firstPage(
+      await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 2,
+        ),
+      ),
+    );
+    expect(validPage.items, hasLength(2));
+    expect(
+      validPage.items.map((summary) => summary.hasDescription),
+      everyElement(isTrue),
+    );
+
+    final invalidDescriptions = [
+      'недопустимый\u0000NUL',
+      '',
+      ' \t\r\n ',
+      '\u00a0',
+      '\ufeff',
+      List.filled(4097, 'а').join(),
+    ];
+    await database.customStatement('PRAGMA ignore_check_constraints = ON');
+    for (var index = 0; index < invalidDescriptions.length; index++) {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-${(0x73 + index).toRadixString(16).padLeft(12, '0')}',
+        title: 'Повреждённое описание $index',
+        description: invalidDescriptions[index],
+        createdAt: DateTime.utc(2026, 9, 3, index),
+      );
+    }
+    await database.customStatement('PRAGMA ignore_check_constraints = OFF');
+
+    trace.statements.clear();
+    final result = await repository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 10,
+      ),
+    );
+
+    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+    expect(
+      (result as ResultFailure<IntentionCatalogPage>).failure,
+      isA<IntentionCorruptionFailure>(),
+    );
+    expect(
+      trace.statements.where((statement) => statement.contains('COUNT(')),
+      hasLength(1),
+    );
+    expect(
+      diagnostics.events.last,
+      isA<CatalogPageReadDiagnosticsEvent>().having(
+        (event) => event.status,
+        'status',
+        isA<DiagnosticsFailed>().having(
+          (status) => status.code,
+          'code',
+          DiagnosticsFailureCode.corruption,
+        ),
+      ),
+    );
+    expect(
+      diagnostics.events.toString(),
+      isNot(contains('недопустимый\u0000NUL')),
+    );
+  });
+
   test(
     'продолжает каталог keyset-порциями для всех порядков без повторного COUNT',
     () async {

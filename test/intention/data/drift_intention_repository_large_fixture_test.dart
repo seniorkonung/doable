@@ -275,9 +275,10 @@ void _expectSingleCountAndBoundedRead(_SelectTrace trace) {
 
   expect(counts, hasLength(1));
   expect(reads, hasLength(1));
+  expect(counts.single.statement, isNot(contains('"description"')));
   expect(reads.single.statement, contains('LIMIT ${_pageSize + 1}'));
-  expect(reads.single.statement, contains('"description" IS NOT NULL'));
-  expect(reads.single.statement, isNot(contains('"description" AS')));
+  expect(reads.single.statement, contains('"description"'));
+  expect(reads.single.statement, isNot(contains('IS NOT NULL')));
 }
 
 void _expectNoOffset(_SelectTrace trace) => expect(

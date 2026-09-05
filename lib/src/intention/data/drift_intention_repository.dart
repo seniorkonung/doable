@@ -344,13 +344,11 @@ final class DriftIntentionRepository implements IntentionRepository {
       ..addColumns([countExpression])
       ..where(condition);
     final totalCount = (await countQuery.getSingle()).read(countExpression)!;
-    final hasDescriptionExpression = intentions.description.isNotNull();
-
     final rowsQuery = _database.selectOnly(intentions)
-      ..addColumns([hasDescriptionExpression])
       ..addColumns([
         intentions.id,
         intentions.title,
+        intentions.description,
         intentions.isActionReady,
         intentions.isArchived,
         intentions.createdAt,
@@ -368,7 +366,7 @@ final class DriftIntentionRepository implements IntentionRepository {
         _rehydrateSummary(
           id: row.read(intentions.id)!,
           title: row.read(intentions.title)!,
-          hasDescription: row.read(hasDescriptionExpression)!,
+          description: row.read(intentions.description),
           isActionReady: row.read(intentions.isActionReady)!,
           isArchived: row.read(intentions.isArchived)!,
           createdAt: row.read(intentions.createdAt)!,
@@ -390,12 +388,11 @@ final class DriftIntentionRepository implements IntentionRepository {
     _DriftIntentionCatalogCursor cursor,
   ) async {
     final intentions = _database.intentions;
-    final hasDescriptionExpression = intentions.description.isNotNull();
     final rowsQuery = _database.selectOnly(intentions)
-      ..addColumns([hasDescriptionExpression])
       ..addColumns([
         intentions.id,
         intentions.title,
+        intentions.description,
         intentions.isActionReady,
         intentions.isArchived,
         intentions.createdAt,
@@ -413,7 +410,7 @@ final class DriftIntentionRepository implements IntentionRepository {
         _rehydrateSummary(
           id: row.read(intentions.id)!,
           title: row.read(intentions.title)!,
-          hasDescription: row.read(hasDescriptionExpression)!,
+          description: row.read(intentions.description),
           isActionReady: row.read(intentions.isActionReady)!,
           isArchived: row.read(intentions.isArchived)!,
           createdAt: row.read(intentions.createdAt)!,
@@ -487,7 +484,7 @@ final class DriftIntentionRepository implements IntentionRepository {
   IntentionSummary _rehydrateSummary({
     required String id,
     required String title,
-    required bool hasDescription,
+    required String? description,
     required bool isActionReady,
     required bool isArchived,
     required int createdAt,
@@ -500,13 +497,16 @@ final class DriftIntentionRepository implements IntentionRepository {
 
     try {
       final normalizedTitle = IntentionText.normalizeTitle(title);
-      if (normalizedTitle != title) {
+      final normalizedDescription = description == null
+          ? null
+          : IntentionText.normalizeDescription(description);
+      if (normalizedTitle != title || normalizedDescription != description) {
         throw const _StoredIntentionCorruption();
       }
       return IntentionSummary(
         id: intentionId,
         title: title,
-        hasDescription: hasDescription,
+        hasDescription: normalizedDescription != null,
         readiness: isActionReady
             ? domain.IntentionReadiness.ready
             : domain.IntentionReadiness.notReady,
