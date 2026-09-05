@@ -1,4 +1,6 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -54,6 +56,107 @@ void main() {
           updateTrigger.read<String>('sql'),
           contains('AFTER UPDATE ON intentions'),
         );
+      },
+    );
+
+    test(
+      'отклоняет прямую запись search key и согласует Unicode-проекции',
+      () async {
+        const fixtures = [
+          (
+            id: '018f0b5d-6b2e-7c80-8000-000000000007',
+            title: 'K',
+            expectedSearchKey: 'k',
+          ),
+          (
+            id: '018f0b5d-6b2e-7c80-8000-000000000008',
+            title: 'Straße',
+            expectedSearchKey: 'strasse',
+          ),
+          (
+            id: '018f0b5d-6b2e-7c80-8000-000000000009',
+            title: 'İ',
+            expectedSearchKey: 'i\u0307',
+          ),
+        ];
+
+        for (final fixture in fixtures) {
+          final sqliteSearchKey = await database
+              .customSelect(
+                'SELECT doable_title_search_key(?) AS search_key',
+                variables: [Variable.withString(fixture.title)],
+              )
+              .getSingle();
+          await _insertIntention(
+            database,
+            id: fixture.id,
+            title: fixture.title,
+            description: null,
+            createdAt: 1000000,
+            updatedAt: 1000000,
+          );
+          final stored = await database
+              .customSelect(
+                'SELECT title_search_key FROM intentions WHERE id = ?',
+                variables: [Variable.withString(fixture.id)],
+              )
+              .getSingle();
+          final filter = IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: fixture.title,
+            order: IntentionCatalogOrder.createdAtDescending,
+            pageSize: 1,
+          ).titleFilter!;
+
+          expect(titleSearchKey(fixture.title), fixture.expectedSearchKey);
+          expect(
+            sqliteSearchKey.read<String>('search_key'),
+            fixture.expectedSearchKey,
+          );
+          expect(
+            stored.read<String>('title_search_key'),
+            fixture.expectedSearchKey,
+          );
+          expect(filter.map(titleSearchKey), fixture.expectedSearchKey);
+        }
+
+        await expectLater(
+          database.customStatement(
+            '''
+              INSERT INTO intentions (
+                id, title, title_search_key, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?)
+            ''',
+            [
+              '018f0b5d-6b2e-7c80-8000-000000000010',
+              'Нельзя записать ключ',
+              'подменённый ключ',
+              1000000,
+              1000000,
+            ],
+          ),
+          throwsA(isA<Exception>()),
+        );
+        await expectLater(
+          database.customStatement(
+            'UPDATE intentions SET title_search_key = ? WHERE id = ?',
+            ['подменённый ключ', fixtures.first.id],
+          ),
+          throwsA(isA<Exception>()),
+        );
+
+        await database.customStatement(
+          'UPDATE intentions SET title = ? WHERE id = ?',
+          ['Straße', fixtures.first.id],
+        );
+        final recalculated = await database
+            .customSelect(
+              'SELECT title_search_key FROM intentions WHERE id = ?',
+              variables: [Variable.withString(fixtures.first.id)],
+            )
+            .getSingle();
+
+        expect(recalculated.read<String>('title_search_key'), 'strasse');
       },
     );
 

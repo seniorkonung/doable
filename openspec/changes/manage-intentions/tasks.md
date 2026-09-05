@@ -684,7 +684,7 @@
   - **Вероятно затронутые файлы:** `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/fts_query.dart`, `lib/src/intention/data/drift_intention_repository.dart`, generated Drift/schema snapshot artifacts, schema/migration/repository tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 6.22 Доказать целостность generated search key, FTS и ограниченных catalog snapshots
+- [x] 6.22 Доказать целостность generated search key, FTS и ограниченных catalog snapshots
   - **Критерии приёмки:**
     - Schema tests через уже доказанную в 6.20c configured connection boundary подтверждают, что прямые `INSERT`/`UPDATE` значения `title_search_key` отклоняются, а запись только `title` пересчитывает ключ; Unicode corpus, включая `K`/`k` и многокодовые mappings, подтверждает равенство Dart operation, SQLite function, generated value и ключа фильтра в пределах одной сборки, не заявляя неизменность всех mappings между обновлениями.
     - Принадлежащая этой задаче явно отделённая raw test-only file-backed fixture с двумя реализациями `doable_title_search_key` последовательно открывает одну фактическую schema version после 6.21, подтверждает неизменность исходного `title` и отсутствие обязательного массового rebuild, а после любой записи затронутой строки доказывает атомарный пересчёт generated key и соответствующей FTS-записи. Исторический ключ, корректно вычисленный прежней сборкой, не классифицируется как corruption только из-за отличия от функции текущей сборки; fixture может повторно использовать низкоуровневые raw-test primitives 6.20c, но только 6.22 владеет product mapping-drift evidence, не расширяет production connection API, а этот критерий supersedes противоположные search-key claims задач 6.16 и 6.17.

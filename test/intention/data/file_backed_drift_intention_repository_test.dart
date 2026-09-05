@@ -2,14 +2,17 @@ import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/fts_integrity.dart';
+import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
@@ -291,6 +294,130 @@ void main() {
       await verifyIntentionTitlesFtsIntegrity(reopenedDatabase);
     });
 
+    test('не считает историческую generated search key corruption и пересчитывает её после записи', () async {
+      const idValue = '018f0b5d-6b2e-7c80-8000-000000000821';
+      const title = 'Kxyz';
+      const historicalSearchKey = 'устаревшая-проекция';
+      final id = _id(idValue);
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+
+      await harness.openReadyDatabase();
+      await harness.closePersistenceObjectGraph();
+
+      final legacyDatabase = sqlite.sqlite3.open(harness.databaseFile.path);
+      try {
+        _registerSearchKeyFunction(legacyDatabase, historicalSearchKey);
+        legacyDatabase.execute(
+          '''
+              INSERT INTO intentions (id, title, created_at, updated_at)
+              VALUES (?, ?, ?, ?)
+            ''',
+          [
+            idValue,
+            title,
+            DateTime.utc(2026, 9, 4, 10).microsecondsSinceEpoch,
+            DateTime.utc(2026, 9, 4, 10).microsecondsSinceEpoch,
+          ],
+        );
+        expect(
+          legacyDatabase
+              .select('SELECT title_search_key FROM intentions')
+              .single['title_search_key'],
+          historicalSearchKey,
+        );
+      } finally {
+        legacyDatabase.close();
+      }
+
+      final historicalDatabase = await harness.openReadyDatabase();
+      final IntentionRepository historicalRepository = DriftIntentionRepository(
+        historicalDatabase,
+        _SequenceIntentionIdGenerator(const []),
+        () => DateTime.utc(2026, 9, 4, 11),
+        InMemoryDiagnosticsSink(),
+      );
+
+      final allPage = _firstPage(
+        await historicalRepository.getCatalogPage(
+          _catalogQuery(IntentionScope.all),
+        ),
+      );
+      final historicalFilterPage = _firstPage(
+        await historicalRepository.getCatalogPage(
+          _catalogQuery(IntentionScope.all, titleFilter: 'kxyz'),
+        ),
+      );
+      expect(allPage.items.map((item) => item.id), [id]);
+      expect(allPage.items.single.title, title);
+      expect(historicalFilterPage.totalCount, 0);
+      expect(historicalFilterPage.items, isEmpty);
+      await harness.closePersistenceObjectGraph();
+
+      final currentDatabase = sqlite.sqlite3.open(harness.databaseFile.path);
+      try {
+        configureDoableSqliteConnection(currentDatabase);
+        expect(
+          currentDatabase
+              .select('SELECT title_search_key FROM intentions')
+              .single['title_search_key'],
+          historicalSearchKey,
+        );
+
+        currentDatabase.execute(
+          'UPDATE intentions SET description = ? WHERE id = ?',
+          ['Запись пересчитывает поисковую проекцию', idValue],
+        );
+
+        expect(
+          currentDatabase
+              .select('SELECT title, title_search_key FROM intentions')
+              .single,
+          {'title': title, 'title_search_key': titleSearchKey(title)},
+        );
+        expect(
+          currentDatabase.select('''
+              SELECT rowid
+              FROM intention_titles_fts
+              WHERE title_search_key MATCH '"kxyz"'
+            '''),
+          hasLength(1),
+        );
+        currentDatabase
+          ..execute('''
+              INSERT INTO intention_titles_fts(intention_titles_fts, rank)
+              VALUES ('integrity-check', 1)
+            ''')
+          ..execute('''
+              INSERT INTO intention_titles_fts(intention_titles_fts)
+              VALUES ('rebuild')
+            ''')
+          ..execute('''
+              INSERT INTO intention_titles_fts(intention_titles_fts, rank)
+              VALUES ('integrity-check', 1)
+            ''');
+      } finally {
+        currentDatabase.close();
+      }
+
+      final updatedDatabase = await harness.openReadyDatabase();
+      final IntentionRepository updatedRepository = DriftIntentionRepository(
+        updatedDatabase,
+        _SequenceIntentionIdGenerator(const []),
+        () => DateTime.utc(2026, 9, 4, 12),
+        InMemoryDiagnosticsSink(),
+      );
+      final updatedPage = _firstPage(
+        await updatedRepository.getCatalogPage(
+          _catalogQuery(IntentionScope.all, titleFilter: 'kxyz'),
+        ),
+      );
+
+      expect(updatedPage.totalCount, 1);
+      expect(updatedPage.items.map((item) => item.id), [id]);
+      await verifyIntentionTitlesFtsIntegrity(updatedDatabase);
+    });
+
     for (final fixture in [
       (description: 'некорректным', id: 'not-a-uuid'),
       (description: 'nil UUID', id: '00000000-0000-0000-0000-000000000000'),
@@ -484,6 +611,16 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw ArgumentError.value(value, 'value'),
 };
+
+void _registerSearchKeyFunction(sqlite.Database database, String searchKey) {
+  database.createFunction(
+    functionName: doableTitleSearchKeyFunctionName,
+    argumentCount: const sqlite.AllowedArgumentCount(1),
+    deterministic: true,
+    directOnly: false,
+    function: (_) => searchKey,
+  );
+}
 
 enum _DmlOperation { insert, update, delete }
 

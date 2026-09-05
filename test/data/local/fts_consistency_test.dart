@@ -41,6 +41,17 @@ void main() {
         expect(await _findByTitleFilter(database, 'молоко'), isEmpty);
         expect(await _findByTitleFilter(database, 'хлеб'), [id]);
 
+        await database.customStatement(
+          'UPDATE intentions SET description = ? WHERE id = ?',
+          ['Изменено неиндексируемое поле', id],
+        );
+
+        expect(await _findByTitleFilter(database, 'хлеб'), [id]);
+        await expectLater(
+          verifyIntentionTitlesFtsIntegrity(database),
+          completes,
+        );
+
         await database.customStatement('DELETE FROM intentions WHERE id = ?', [
           id,
         ]);
