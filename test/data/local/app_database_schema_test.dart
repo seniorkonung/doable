@@ -233,6 +233,23 @@ void main() {
           ),
           throwsA(isA<sqlite.SqliteException>()),
         );
+        await expectLater(
+          database.customStatement(
+            '''
+              INSERT INTO intentions (
+                id, title, description, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?)
+            ''',
+            [
+              '018f0b5d-6b2e-7c80-8000-000000000015',
+              'Допустимый заголовок',
+              'Недопустимое\u0000описание',
+              1000000,
+              1000000,
+            ],
+          ),
+          throwsA(isA<sqlite.SqliteException>()),
+        );
 
         for (final statement in [
           (
