@@ -1,10 +1,11 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
-import 'package:doable/src/data/local/sqlite_connection_setup.dart';
+import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart';
-import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/doable_schema_verifier.dart';
 
 void main() {
   late AppDatabase database;
@@ -16,11 +17,22 @@ void main() {
   tearDown(() => database.close());
 
   test('схема версии 1 проходит сгенерированную валидацию', () async {
-    await database.validateDatabaseSchema(
-      options: const ValidationOptions(validateDropped: true),
-      setup: configureDoableSqliteConnection,
-    );
+    await verifyDoableDatabaseSchema(database);
   });
+
+  test(
+    'migration connection возвращает тот же search key, что и Dart',
+    () async {
+      final row = await database
+          .customSelect(
+            'SELECT doable_title_search_key(?) AS search_key',
+            variables: [Variable.withString('Straße')],
+          )
+          .getSingle();
+
+      expect(row.read<String>('search_key'), titleSearchKey('Straße'));
+    },
+  );
 
   test('отключает внешние ключи до транзакции записи и возвращает их после миграции', () async {
     await database.customStatement('PRAGMA foreign_keys = ON');

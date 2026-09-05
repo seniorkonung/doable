@@ -2,12 +2,12 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
-import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/doable_schema_verifier.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -178,10 +178,7 @@ void main() {
         );
         try {
           await expectLater(
-            verifierDatabase.validateDatabaseSchema(
-              options: const ValidationOptions(validateDropped: true),
-              setup: configureDoableSqliteConnection,
-            ),
+            verifyDoableDatabaseSchema(verifierDatabase),
             throwsA(isA<sqlite.SqliteException>()),
           );
         } finally {
@@ -213,10 +210,7 @@ void main() {
           );
           try {
             await expectLater(
-              verifierDatabase.validateDatabaseSchema(
-                options: const ValidationOptions(validateDropped: true),
-                setup: configureDoableSqliteConnection,
-              ),
+              verifyDoableDatabaseSchema(verifierDatabase),
               throwsA(isA<SchemaMismatch>()),
             );
           } finally {
