@@ -745,3 +745,227 @@
   - **Зависимости:** 6.23, 6.25.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
+
+## Phase 7: Пользователь управляет намерениями в доступном локализованном интерфейсе
+
+- [ ] 7.1 Реализовать общий presentation-механизм `ExclusiveOperation` и неизменяемое состояние изменяющей операции
+  - **Критерии приёмки:**
+    - Синхронный `start` атомарно возвращает принятое выполнение с его `Future` либо `alreadyRunning`; повторный вызов занятого экземпляра не запускается и не ставится в очередь.
+    - `OperationState<TResult>` исчерпывающе представляет `idle`, `running`, `succeeded` и `failed`, позволяя ViewModel синхронно опубликовать `running` до ожидания результата.
+    - Gate освобождается после success, typed failure и неожиданной ошибки; разные экземпляры работают независимо и не знают о repository, навигации или локализации.
+  - **Проверка:**
+    - Выполнить `flutter test test/shared/presentation/exclusive_operation_test.dart`.
+    - Выполнить `flutter analyze`.
+  - **Зависимости:** Нет.
+  - **Вероятно затронутые файлы:** `lib/src/shared/presentation/exclusive_operation.dart`, `test/shared/presentation/exclusive_operation_test.dart`.
+  - **Оценка:** S (2 файла).
+
+- [ ] 7.2 Провести типизированный bootstrap локального хранилища через владеющий ресурсами Riverpod composition root
+  - **Критерии приёмки:**
+    - Один корневой `ProviderScope` с отключённым automatic retry создаёт diagnostics, `LocalDataBootstrap`, подтверждённый `DriftIntentionRepository` и остальные app dependencies через generated `keepAlive` providers без service locator или глобальных singleton.
+    - Локализованный bootstrap shell различает loading, retryable, corruption, incompatible schema и unexpected; feature routes доступны только после `LocalDataReady`, а retry предлагается только для retryable outcome.
+    - Освобождение object graph прекращает потребителей repository до единственного вызова `LocalDataBootstrap.close()`; неготовое или повторно открываемое соединение не утрачивает установленное ownership.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
+    - Выполнить `flutter test test/app/bootstrap test/data/local/bootstrap/local_data_bootstrap_test.dart` и `flutter analyze`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** Нет.
+  - **Вероятно затронутые файлы:** `lib/main.dart`, новые файлы в `lib/src/app/bootstrap/` и `lib/src/app/`, generated Riverpod artifacts, `test/app/bootstrap/`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 7.3 Заменить экран-заглушку типизированным маршрутом начального каталога с подтверждёнными состояниями первой страницы
+  - **Критерии приёмки:**
+    - `MaterialApp.router` и generated AutoRoute открывают каталог только через типизированный `PageRouteInfo`; router принадлежит provider graph, а строковые named routes, ручные path и deep-link adapter отсутствуют.
+    - Generated Catalog ViewModel начинает с active scope и `createdAt descending`, запрашивает ограниченную первую страницу по проверенной `CatalogPagingPolicy` и различает initial loading, data, scope-specific empty, retryable failure и non-retryable failure.
+    - Catalog View показывает подтверждённые summaries и точный count без optimistic-данных; unavailable допускает целевой retry, а corruption и unexpected не изображаются как пустой результат, not-found или обычная повторяемая ошибка.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
+    - Выполнить `flutter test test/app/routing test/intention/presentation/catalog` и `flutter analyze`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.2.
+  - **Вероятно затронутые файлы:** новые файлы в `lib/src/app/routing/` и `lib/src/intention/presentation/catalog/`, generated AutoRoute/Riverpod artifacts, `lib/main.dart`, тесты routing/catalog.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 7.4 Проверить composition, bootstrap и начальную пользовательскую границу каталога
+  - **Критерии приёмки:**
+    - Проверки подтверждают явные bootstrap outcomes, отсутствие feature routes до готовности и корректное закрытие app-owned persistence object graph.
+    - Начальный каталог получает только ограниченную active-выдачу с порядком `createdAt descending`, отличает загрузку, пустой результат и failures и не показывает неподтверждённое состояние.
+    - `ExclusiveOperation`, generated providers и типизированный начальный маршрут проходят сфокусированные тесты, генерацию и статический анализ.
+  - **Проверка:**
+    - Выполнить `flutter test test/shared/presentation test/app/bootstrap test/app/routing test/intention/presentation/catalog`.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.1, 7.2, 7.3.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 7.5 Реализовать живое изменение охвата, фильтра и четырёх порядков каталога без публикации устаревшего результата
+  - **Критерии приёмки:**
+    - Доступные локализованные controls выбирают active, archived или all и четыре комбинации поля/направления; начальные значения утверждены, а смена scope сохраняет исходный текст фильтра и порядок.
+    - Фильтр применяется после 250 мс без кнопки отправки; недопустимый Unicode или превышение длины получает field-specific сообщение, сохраняет введённый текст и не вызывает repository.
+    - Любое изменение параметров начинает новую generation с первой страницы и верхней позиции, а поздний результат прежней generation не заменяет более новый результат.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/catalog` с fake-repository матрицей scope, order, debounce, validation и out-of-order completion.
+    - Выполнить `flutter gen-l10n`, `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.3.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/**`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb`, generated localization/Riverpod artifacts, `test/intention/presentation/catalog/**`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 7.6 Добавить автоматическую cursor-подгрузку каталога с единым count и локальным retry следующей порции
+  - **Критерии приёмки:**
+    - `CatalogPagingPolicy` проверяет `pageSize` 1–100 и `prefetchRemaining` от 0 до значения меньше `pageSize`; production использует 100/30, а недопустимая policy отклоняется до repository call.
+    - При достижении threshold ViewModel выполняет не более одного продолжения, добавляет только новые summaries, сохраняет count первой страницы, обновляет cursor и прекращает запросы после `nextCursor == null`.
+    - Loading или retryable failure следующей порции отображаются в конце списка без потери уже загруженных данных; retry повторяет ту же порцию, а неизменный query сохраняет порядок без пропусков и повторов.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/catalog` с multi-page, single-flight, end-of-list, inline-failure и retry fixtures.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.5.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/**`, generated Riverpod artifacts, `test/intention/presentation/catalog/**`.
+  - **Оценка:** M (до 4 файлов или групп артефактов).
+
+- [ ] 7.7 Проверить полный интерактивный контракт ограниченного каталога
+  - **Критерии приёмки:**
+    - Provider и widget tests подтверждают три scope, четыре порядка, debounce, field-specific ошибки фильтра, защиту от устаревших результатов и сброс к первой странице.
+    - Multi-page evidence подтверждает production policy 100/30, single-flight, точный count, inline retry, конец выдачи и отсутствие повторов.
+    - Системные подписи каталога локализованы, а loading, empty и failure состояния различимы автоматизированно.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/catalog test/app/localization`.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.5, 7.6.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 7.8 Реализовать типизированный поток создания намерения с сохраняющей введённые данные локализованной формой
+  - **Критерии приёмки:**
+    - Каталог открывает generated route формы с названием и необязательным описанием; readiness не вводится пользователем, а успешный `CreateIntention` возвращает каталогу подтверждённый `IntentionSaved`.
+    - Каждый экземпляр формы владеет отдельным `ExclusiveOperation`: повторная отправка во время `running` не запускается и не ставится в очередь, а независимая форма не блокируется.
+    - Validation и любой failure сохраняют исходные поля без optimistic-сущности; field-specific причины локализованы, а явная повторная отправка доступна после unavailable.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
+    - Выполнить `flutter test test/intention/presentation/editor test/app/routing` с duplicate-submit, validation, unavailable, unexpected и success fixtures.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.1, 7.3.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/editor/**`, `lib/src/app/routing/**`, localization и generated artifacts, `test/intention/presentation/editor/**`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 7.9 Реализовать типизированный подробный просмотр активного и архивированного намерения
+  - **Критерии приёмки:**
+    - Строка любого охвата открывает generated details route с предметным `IntentionId`; строковые идентификаторы, named routes и внешний deep-link format не вводятся.
+    - Auto-dispose Stream provider представляет initial loading, подтверждённое намерение, успешное отсутствие, unavailable, corruption и unexpected как разные состояния; retry unavailable инвалидирует только provider данного идентификатора.
+    - View показывает название, описание, readiness, archive state и timestamps без перевода пользовательского текста; уход последнего слушателя отменяет подписку, а повторное открытие создаёт новую.
+  - **Проверка:**
+    - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
+    - Выполнить `flutter test test/intention/presentation/details test/app/routing` с loading, data, archived, null, failure, retry и disposal fixtures.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.3.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/**`, `lib/src/app/routing/**`, localization и generated artifacts, `test/intention/presentation/details/**`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 7.10 Провести изменение названия и описания через единый per-intention gate подробного представления
+  - **Критерии приёмки:**
+    - Details ViewModel выполняет `UpdateIntention` для активного или архивированного намерения без изменения идентификатора и хранит вид текущей операции в неизменяемом state.
+    - Во время сохранения все изменяющие controls этого намерения недоступны; success публикуется только из подтверждённого `IntentionSaved`, а failure сохраняет последний snapshot и введённые значения без optimistic update.
+    - Пустое, слишком длинное или недопустимое Unicode-значение связывается с соответствующим полем и остаётся доступным для исправления; повтор предлагается только для unavailable.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/details` с active, archived, no-op, field-validation, unavailable, unexpected и confirmed-success fixtures.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.1, 7.9.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/**`, localization и generated artifacts, `test/intention/presentation/details/**`.
+  - **Оценка:** M (до 4 файлов или групп артефактов).
+
+- [ ] 7.11 Проверить создание, подробное чтение и изменение данных намерения через presentation boundary
+  - **Критерии приёмки:**
+    - Widget/provider tests подтверждают создание с минимальными данными, одинаковыми названиями, сохранение текста формы и отсутствие повторной отправки.
+    - Подробный просмотр различает loading, not-found и failures, корректно управляет подпиской и показывает активное либо архивированное подтверждённое состояние.
+    - Изменение названия и описания сохраняет идентификатор, поддерживает field-specific исправление ввода и не показывает незафиксированные данные как сохранённые.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/editor test/intention/presentation/details test/app/routing`.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.8, 7.9, 7.10.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 7.12 Реализовать явную готовность к действию, архивирование и восстановление через общий gate намерения
+  - **Критерии приёмки:**
+    - Включение readiness требует отдельного локализованного объяснения однодневной выполнимости и операционной понятности; отмена ничего не меняет, а выключение readiness остаётся обратимым явным действием.
+    - Активное намерение можно архивировать, архивированное — восстановить; обе операции сохраняют остальные данные и readiness, не изображая архивирование выполнением или удалением.
+    - Все операции используют единый gate данного `IntentionId`, не ставятся в очередь и оставляют подтверждённый snapshot при failure; другой `IntentionId` остаётся независимо изменяемым.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/details` с readiness-confirmation, cancellation, archive, restore, same-id serialization и different-id independence fixtures.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.10.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/**`, localization и generated artifacts, `test/intention/presentation/details/**`.
+  - **Оценка:** M (до 4 файлов или групп артефактов).
+
+- [ ] 7.13 Реализовать подтверждаемое физическое удаление активного или архивированного намерения
+  - **Критерии приёмки:**
+    - Удаление доступно для активного и архивированного намерения только после отдельного локализованного подтверждения необратимости; отмена не выполняет command.
+    - Успешный `IntentionDeleted` завершает подробный просмотр и возвращается каталогу без показа данных или controls удалённого намерения.
+    - Conflict, unavailable, corruption и unexpected отображаются безопасно; failure сохраняет подробное подтверждённое состояние, а обычный retry предлагается только для unavailable.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/details test/app/routing` с active/archive delete, cancellation, conflict, unavailable, unexpected и success fixtures.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.12.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/**`, `lib/src/app/routing/**`, localization и generated artifacts, соответствующие tests.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 7.14 Проверить последовательный пользовательский lifecycle изменяющих операций одного намерения
+  - **Критерии приёмки:**
+    - Presentation tests подтверждают изменение данных, readiness, архивирование, восстановление и удаление активного либо архивированного намерения через единый per-id gate.
+    - Второе изменение того же намерения не запускается и не ставится в очередь, тогда как операция другого намерения выполняется независимо.
+    - Success показывает только подтверждённое состояние, failure сохраняет прежний snapshot, а успешное удаление завершает подробный просмотр.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/details test/shared/presentation`.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.12, 7.13.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.
+
+- [ ] 7.15 Согласовать подтверждённые результаты команд с ограниченным префиксом, count и cursor каталога
+  - **Критерии приёмки:**
+    - Catalog ViewModel применяет только `IntentionSaved` и `IntentionDeleted`, используя storage-neutral `includes` и `compare`; membership transition немедленно корректирует count, а неподтверждённая операция не меняет каталог.
+    - При полностью загруженном результате подходящий summary вставляется или перемещается в любое правильное место; при наличии cursor обновляется только непрерывный префикс до прежней boundary, а сущность после неё исключается или не добавляется.
+    - Cursor сохраняется неизменным, следующая порция дедуплицируется по `IntentionId`, а матрица четырёх порядков подтверждает отсутствие пропусков, повторов и преждевременной публикации после создания, изменения, архивирования, восстановления и удаления.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/catalog` с membership, boundary, count, cursor и four-order command-result matrix.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.7, 7.8, 7.14.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/**`, `test/intention/presentation/catalog/**`.
+  - **Оценка:** M (до 4 файлов или групп артефактов).
+
+- [ ] 7.16 Сохранить загруженные порции и visual anchor каталога при типизированных внутренних переходах
+  - **Критерии приёмки:**
+    - Переход к форме или подробным данным и возврат без изменения сохраняют query, накопленные порции и scroll position того же экранного состояния через `PageStorageKey` и принадлежащий View `ScrollController`.
+    - Перед согласованием результата каталог фиксирует первое видимое намерение и внутристочный offset, затем восстанавливает этот anchor либо ближайшего оставшегося соседа без сброса к началу.
+    - Typed result создания или подробного просмотра согласуется один раз и доступно сообщает об успехе независимо от попадания намерения в загруженный префикс; отмена и failure не меняют подтверждённый список.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/presentation/catalog test/app/routing` с multi-page navigation, unchanged return, inserted/moved/removed-before-anchor и nearest-neighbour fixtures.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.15.
+  - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/**`, `lib/src/app/routing/**`, соответствующие widget/provider tests.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 7.17 Закрыть автоматизированную матрицу локализации, доступности и полного app-level lifecycle
+  - **Критерии приёмки:**
+    - Все системные строки Phase 7 существуют в русском и английском ARB, неизвестная локаль выбирает английский fallback, ручного переключателя нет, а названия и описания не переводятся и не изменяются при смене локали.
+    - Semantics сообщает названия, роли, archive/readiness state, ошибки и результаты; состояния различимы без одного цвета, targets и contrast проходят Flutter guidelines, а основные потоки остаются доступны при text scale 200%.
+    - App-level tests через fake repository проходят bootstrap, каталог, создание, просмотр, изменение, readiness, архивирование, восстановление и удаление, одновременно подтверждая serialization одного намерения, независимость разных намерений и отсутствие optimistic-состояния.
+  - **Проверка:**
+    - Выполнить `flutter gen-l10n` и `flutter test test/app test/intention/presentation test/shared/presentation`.
+    - Выполнить accessibility widget tests с `meetsGuideline` и text scale 200%.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.4, 7.7, 7.11, 7.14, 7.16.
+  - **Вероятно затронутые файлы:** `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb`, generated localizations, presentation Views, `test/app/**`, `test/intention/presentation/**`.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
+- [ ] 7.18 Подтвердить готовность Phase 7 к общесистемной интеграционной проверке
+  - **Критерии приёмки:**
+    - Автоматизированное evidence подтверждает полный пользовательский lifecycle, сериализацию операций одного намерения, независимость разных намерений и отсутствие показа несохранённого состояния.
+    - Catalog evidence подтверждает сохранение параметров, порций, count, cursor и visual anchor при типизированных переходах и подтверждённых изменениях.
+    - Русская, английская и fallback локали, field-specific исправление текста, semantics, contrast, tap targets и text scale 200% проходят; checkpoint не заявляет ручной TalkBack, Android release evidence, CI gate или финальный review Phase 8.
+  - **Проверка:**
+    - Выполнить `flutter gen-l10n`, `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие незапланированных результатов генерации.
+    - Выполнить `flutter test` и `flutter analyze`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 7.17.
+  - **Вероятно затронутые файлы:** Нет, только проверка.
+  - **Оценка:** XS.

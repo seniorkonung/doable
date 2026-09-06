@@ -2,37 +2,94 @@
 
 ## Оценка
 
-**Результат:** No unresolved findings
+**Результат:** Changes needed
 
-Planning artifacts однозначно разделяют connection evidence и фактический
-межрелизный drift поисковой проекции. Задача 6.20c владеет типизированными
-Doable-owned connection paths, отдельной `drift_dev` verifier boundary,
-missing-setup и collision evidence на минимальной synthetic dependent schema.
-Она явно supersedes только соответствующие недоказанные claims завершённой
-6.20a и прежнюю формулировку 6.8 о прямом владении `QueryExecutor`.
-
-Задача 6.22 после schema work 6.21 единолично владеет file-backed evidence двух
-реализаций `doable_title_search_key` над фактическими `STORED GENERATED` key и
-FTS. Повторное использование низкоуровневых test primitives не смешивает
-ownership результатов. Финальный checkpoint 6.26 прямо включает evidence
-6.20b и 6.20c. Последовательность `6.20b → 6.20c → 6.21 → 6.22 → 6.23 → 6.24
-→ 6.25 → 6.26` остаётся ацикличной и исполнимой.
-
-Предложение и behavioral specs менять не требуется: они владеют наблюдаемым
-пользовательским и local-data lifecycle поведением, а обсуждаемая correction
-остаётся внутренним механизмом исполнения уже утверждённого schema-function
-contract. Принятый остаточный риск `AR1` сохраняется и не считается активным
-замечанием.
+Пакет Phase 7 образует последовательную и в основном полную пользовательскую
+вертикаль: composition root и начальный каталог предшествуют интерактивному
+каталогу, изменяющие потоки сходятся в локальном согласовании подтверждённых
+результатов, а локализация и доступность проверяются перед фазовым checkpoint.
+Однако текущий план не определяет судьбу уже принятой команды при уходе с
+auto-dispose route, добавляет пользовательское отображение timestamps без
+upstream-контракта и не доводит типизированную failure-модель до достаточного
+presentation evidence.
 
 **Валидация:** `openspec validate manage-intentions --type change --strict
---no-interactive`, `openspec schema validate intent-driven --json` и
-`git diff --check` успешны. Код реализации в рамках исправления planning
-artifacts не изменялся, поэтому runtime-тесты не запускались.
+--no-interactive` и `openspec schema validate intent-driven --json` успешны.
+Phase 7 ещё не реализована, поэтому runtime- и widget-тесты её поведения в
+рамках этого planning audit не запускались.
 
 ## Замечания
 
-В проверенных planning artifacts и релевантном repository context нерешённых
-замечаний не осталось.
+### F2 · Medium — Уход с auto-dispose route может потерять подтверждённый результат команды
+
+- **Доказательства:** `design.md`, решение 3, задаёт auto-dispose для editor и
+  details providers, выполняет изменяющую операцию как принятый `Future` и
+  передаёт каталогу результат через необязательный typed route result.
+  Задачи 7.8, 7.10, 7.12 и 7.13 блокируют только повторные изменяющие controls,
+  а 7.16 согласует только уже полученный route result. Ни критерии, ни проверки
+  не определяют системный Back, back gesture или иной уход с экрана во время
+  `running`.
+- **Влияние:** экран и его provider могут быть освобождены раньше завершения
+  уже принятого repository `Future`. Команда после этого способна успешно
+  закоммитить создание, изменение, архивирование, восстановление или удаление,
+  но каталог не получит `IntentionSaved`/`IntentionDeleted`: его count,
+  ограниченный префикс и сообщение о результате останутся устаревшими до нового
+  запроса.
+- **Требуемое изменение:** определить наблюдаемое поведение ухода с editor и
+  details во время принятой операции и провести его через work и verification.
+  После commit каталог должен получить подтверждённый результат ровно один раз
+  либо уход должен оставаться недоступным до terminal outcome; failure и отмена
+  не должны менять подтверждённый каталог. Проверка должна покрыть как минимум
+  создание и общий details gate, включая успешное удаление.
+- **Требуется решение:** пользователь может покидать экран во время `running`,
+  сохраняя доставку результата вне lifetime route, или навигацию назад следует
+  временно блокировать до завершения операции?
+
+### F3 · Medium — Задача 7.9 вводит показ timestamps без пользовательского контракта
+
+- **Доказательства:** behavioral spec требует сохранять `createdAt`/`updatedAt`
+  и использовать их в четырёх порядках каталога, но не обещает показывать эти
+  значения в подробном представлении. `proposal.md` и Phase 7 `plan.md` также не
+  вводят такое отображение. При этом задача 7.9 требует показывать оба
+  timestamps и не задаёт формат, timezone, абсолютное или относительное
+  представление и локализованное evidence. `AR1` отдельно фиксирует, что эти
+  wall-clock observations могут не отражать фактическую хронологию.
+- **Влияние:** downstream-задача добавляет новое наблюдаемое поведение и
+  оставляет implementer решать продуктовую семантику времени. Разные допустимые
+  реализации могут показывать пользователю разные даты после смены timezone
+  или усиливать ложное восприятие фактической последовательности операций.
+- **Требуемое изменение:** либо убрать показ timestamps из 7.9 как не
+  обусловленный контрактом, либо определить его в intent/behavioral contract и
+  design, включая timezone, локализованный формат, поведение при смене локали и
+  часов и применимость границ принятого риска `AR1`, после чего добавить
+  соответствующее verification evidence.
+- **Требуется решение:** должны ли `createdAt` и `updatedAt` вообще быть видимы
+  в подробном представлении; если да, какую точную пользовательскую семантику
+  они несут?
+
+### F4 · Medium — Verification не доказывает failure-контракт всех изменяющих потоков
+
+- **Доказательства:** публичная seam исчерпывающе различает `validation`,
+  `notFound`, `conflict`, `unavailable`, `corruption` и `unexpected`, а specs и
+  design требуют retry только для доказанно устранимой ошибки и безопасного
+  сохранения формы либо последнего snapshot для остальных отказов. Но проверка
+  7.8 перечисляет только validation/unavailable/unexpected, 7.10 не включает
+  not-found/corruption, 7.12 и 7.14 не называют ни одной failure-категории, а
+  7.13 требует безопасно показать corruption, но не включает её в fixtures.
+  Общая app-level матрица 7.17 перечисляет lifecycle и concurrency, но не
+  закрывает этот пробел.
+- **Влияние:** задачи могут считаться выполненными при ошибочном retry для
+  terminal failure, потере введённых данных, очистке подтверждённого snapshot
+  либо неверном сообщении о not-found/corruption/unexpected на части commands.
+  Исчерпывающий Dart `switch` докажет наличие ветвей, но не их пользовательскую
+  семантику.
+- **Требуемое изменение:** назначить одной задаче общее presentation evidence
+  для каждого применимого варианта `IntentionFailure` и дополнить его
+  command-specific fixtures там, где смысл различается. Evidence должно
+  наблюдаемо подтверждать сохранение формы/snapshot, отсутствие optimistic
+  state, retry только для unavailable, безопасное различение terminal outcomes
+  и повторную доступность gate после failure; полный декартов набор для каждой
+  команды не требуется, если общий механизм проверен отдельно.
 
 ## Принятые риски
 
@@ -59,12 +116,13 @@ artifacts не изменялся, поэтому runtime-тесты не зап
 
 ## Охват проверки
 
-Сфокусированно проверены task ownership, dependency order и verification
-coverage 6.20a–6.22 и 6.26 против ADR-0002, ADR-0008, design, Phase 6,
-behavioral search contract и текущей SQLite schema. Отдельно проверено, что
-synthetic connection evidence не требует преждевременной реализации generated
-schema, а product mapping-drift evidence не дублируется до 6.21.
-
-Предложение, specs, design, ADR и plan менять не потребовалось: исправление
-уточняет исполнение уже утверждённых connection и search-projection contracts.
-Принятый риск AR1 остаётся применим в прежней границе.
+Сфокусированно проверены задачи 7.1–7.18 и их dependency graph против Phase 7,
+обеих capability specs, MVVM/Riverpod/AutoRoute и bootstrap решений design,
+ADR-0002–ADR-0008 и завершённой repository boundary Phase 6. В repository
+context просмотрены текущие `MainApp`, локализация, `LocalDataBootstrap`,
+`IntentionRepository`, commands и sealed results/failures. Углублённо проверены
+architecture и resource ownership, typed routing и public interfaces,
+асинхронные races, paging/cursor reconciliation, безопасное представление
+отказов, privacy, localization, accessibility и граница Phase 8 delivery
+evidence. Иные implementation details завершённых фаз повторно не
+пересматривались, кроме необходимых для проверки входной seam Phase 7.
