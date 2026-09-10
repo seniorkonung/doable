@@ -2,7 +2,7 @@
 flutter = "3.47"
 "github:microsoft/apm" = "latest"
 lefthook = "2"
-"npm:@fission-ai/openspec" = "1.10"
+"npm:@fission-ai/openspec" = "1.12"
 
 [tasks]
 prepare = "lefthook install"
