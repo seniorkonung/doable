@@ -748,6 +748,18 @@
 
 ## Phase 7: Пользователь управляет намерениями в доступном локализованном интерфейсе
 
+- [ ] 7.19 Ввести process-local revision protocol для согласования catalog pages и подтверждённых command results
+  - **Критерии приёмки:**
+    - Публичный storage-neutral contract добавляет непрозрачную сравнимую `IntentionCatalogRevision` к каждой успешной странице и sealed `IntentionCatalogMutation` к каждому command success; варианты mutation содержат точные непрозрачные `before`/`after` catalog entry snapshots, делают комбинацию без обеих сторон непредставимой, у создания не допускают `before`, у удаления — `after`, а у no-op сохраняют один и тот же снимок с обеих сторон.
+    - Один закрытый асинхронный sequencer экземпляра `DriftIntentionRepository` упорядочивает полные snapshot-чтения страниц и commits изменяющих commands; фактический commit продвигает монотонную sequence ровно один раз, no-op/failure её не меняют, а новая process-local эпоха после пересоздания repository несравнима со старой и не сохраняется в SQLite.
+    - Entry snapshot отвечает о принадлежности scope/filter по фактически сохранённой до/после commit поисковой проекции и предоставляет публичный summary для порядка, не раскрывая SQLite, FTS или сырой search key; существующие cursor, transaction, typed failure, diagnostics и bounded-materialization contracts сохраняются.
+  - **Проверка:**
+    - Выполнить `flutter test test/intention/application/intention_contract_test.dart test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_command_test.dart` с управляемым порядком page reads и commits, no-op/failure, пересозданием repository и fixture исторической Unicode-проекции.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** Нет.
+  - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_result.dart`, `lib/src/intention/data/drift_intention_repository.dart`, связанные application/data tests.
+  - **Оценка:** M (до 5 файлов или групп артефактов).
+
 - [ ] 7.1 Реализовать feature-specific coordinator принятой команды и неизменяемое presentation-состояние операции
   - **Критерии приёмки:**
     - Generated keep-alive `IntentionCommandCoordinator` принимает command до первого asynchronous gap, возвращает принятое выполнение с его `Future` либо `alreadyRunning` и владеет repository `Future` до единственной публикации типизированного terminal completion с process-local token.
@@ -756,7 +768,7 @@
   - **Проверка:**
     - Выполнить `flutter test test/shared/presentation/exclusive_operation_test.dart test/intention/presentation/operation` с controlled-completer fixtures для disposal, repeated open, exactly-once completion и независимых идентификаторов.
     - Выполнить `flutter analyze`.
-  - **Зависимости:** Нет.
+  - **Зависимости:** 7.19.
   - **Вероятно затронутые файлы:** `lib/src/shared/presentation/exclusive_operation.dart`, новые файлы в `lib/src/intention/presentation/operation/`, generated Riverpod artifacts и соответствующие tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
@@ -776,7 +788,7 @@
 - [ ] 7.3 Заменить экран-заглушку типизированным маршрутом начального каталога с подтверждёнными состояниями первой страницы
   - **Критерии приёмки:**
     - `MaterialApp.router` и generated AutoRoute открывают каталог только через типизированный `PageRouteInfo`; router принадлежит provider graph, а строковые named routes, ручные path и deep-link adapter отсутствуют.
-    - Generated Catalog ViewModel начинает с active scope и `createdAt descending`, запрашивает ограниченную первую страницу по проверенной `CatalogPagingPolicy` и различает initial loading, data, scope-specific empty, retryable failure и non-retryable failure.
+    - Generated Catalog ViewModel начинает с active scope и `createdAt descending`, запрашивает ограниченную первую страницу по проверенной `CatalogPagingPolicy`, принимает её count/cursor/revision как авторитетную основу query generation и различает initial loading, data, scope-specific empty, retryable failure и non-retryable failure.
     - Catalog View показывает подтверждённые summaries и точный count без optimistic-данных; unavailable допускает целевой retry, а corruption и unexpected не изображаются как пустой результат, not-found или обычная повторяемая ошибка.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
@@ -802,7 +814,7 @@
   - **Критерии приёмки:**
     - Доступные локализованные controls выбирают active, archived или all и четыре комбинации поля/направления; начальные значения утверждены, а смена scope сохраняет исходный текст фильтра и порядок.
     - Фильтр применяется после 250 мс без кнопки отправки; недопустимый Unicode или превышение длины получает field-specific сообщение, сохраняет введённый текст и не вызывает repository.
-    - Любое изменение параметров начинает новую generation с первой страницы и верхней позиции, а поздний результат прежней generation не заменяет более новый результат.
+    - Любое изменение параметров начинает новую generation с первой страницы и верхней позиции, а поздний результат прежней generation не заменяет более новый результат; terminal completion принятой ранее операции согласуется только с текущими scope/filter/order и их revision.
   - **Проверка:**
     - Выполнить `flutter test test/intention/presentation/catalog` с fake-repository матрицей scope, order, debounce, validation и out-of-order completion.
     - Выполнить `flutter gen-l10n`, `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
@@ -922,11 +934,12 @@
 
 - [ ] 7.15 Согласовать подтверждённые результаты команд с ограниченным префиксом, count и cursor каталога
   - **Критерии приёмки:**
-    - Catalog ViewModel сохраняет одну подписку на `IntentionCommandCompletion`, обрабатывает каждый новый process-local token ровно один раз и применяет только подтверждённые `IntentionSaved` и `IntentionDeleted`, используя storage-neutral `includes` и `compare`; failure не меняет каталог и создаёт безопасное одноразовое сообщение.
-    - При полностью загруженном результате подходящий summary вставляется или перемещается в любое правильное место; при наличии cursor обновляется только непрерывный префикс до прежней boundary, а сущность после неё исключается или не добавляется.
-    - Cursor сохраняется неизменным, следующая порция дедуплицируется по `IntentionId`, а матрица четырёх порядков подтверждает отсутствие пропусков, повторов и преждевременной публикации после создания, изменения, архивирования, восстановления и удаления; новый каталог без прежней подписки начинает с repository snapshot без replay completion history.
+    - Catalog ViewModel сохраняет одну непереигрывающую подписку на `IntentionCommandCompletion`, применяет подтверждённые `IntentionCatalogMutation` по repository revision и точным `before`/`after` membership snapshots, а failure не меняет каталог и создаёт безопасное одноразовое сообщение; process-local token остаётся только presentation identity и не накапливается в множестве дедупликации данных.
+    - Первая страница новой query generation задаёт основу: completions во время её получения упорядочиваются относительно page revision. Для продолжений страница старее применённой revision отбрасывается и повторяется только с тем же cursor без перечитывания прежних порций, равная объединяется, а более новая удерживается как единственная pending page до предшествующих completions; mutation, уже включённая в страницу, не меняет membership или count второй раз.
+    - При полностью загруженном результате подходящий `after.summary` вставляется или перемещается в любое правильное место; при наличии cursor обновляется только непрерывный префикс до прежней boundary, а сущность после неё исключается или не добавляется. Точный переход `before.matches(query)` → `after.matches(query)` корректирует count ровно один раз, включая историческую Unicode-проекцию.
+    - Cursor и visual anchor сохраняются неизменными при retry старой страницы, следующая порция дедуплицируется по `IntentionId`, а матрица четырёх порядков подтверждает отсутствие пропусков, повторов, возврата прежнего состояния и преждевременной публикации после создания, изменения, архивирования, восстановления и удаления. Новый каталог или новая repository epoch начинает с первой страницы без replay completion history; состояние ограничено текущей revision, одной pending page и выполняющимися операциями.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/catalog` с membership, boundary, count, cursor, failure, duplicate-token и four-order completion matrix.
+    - Выполнить `flutter test test/intention/presentation/catalog` с membership, historical-projection, boundary, count, cursor, failure и four-order completion matrix, а также для first/continuation pages с перестановками «поздняя старая страница», «страница уже включает commit», «новая страница раньше completion», несколькими последовательными completions и «смена query во время command».
     - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
   - **Зависимости:** 7.7, 7.8, 7.14.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/**`, `test/intention/presentation/catalog/**`.
@@ -948,7 +961,7 @@
   - **Критерии приёмки:**
     - Все системные строки Phase 7 существуют в русском и английском ARB, неизвестная локаль выбирает английский fallback, ручного переключателя нет, а названия и описания не переводятся и не изменяются при смене локали.
     - Semantics сообщает названия, роли, archive/readiness state, ошибки и результаты; состояния различимы без одного цвета, targets и contrast проходят Flutter guidelines, а основные потоки остаются доступны при text scale 200%.
-    - App-level tests через delayed fake repository проходят bootstrap, каталог, создание, просмотр, изменение, readiness, архивирование, восстановление и удаление, включая уход до terminal outcome, одновременно подтверждая serialization одного намерения между экземплярами details, независимость разных намерений и ровно одно согласование completion. Единая табличная presentation-матрица исчерпывающе покрывает применимые `validation`, `notFound`, `conflict`, `unavailable`, `corruption` и `unexpected`: сохраняет поля формы либо последний подтверждённый snapshot, не публикует optimistic state, безопасно различает terminal outcomes, предоставляет обычный retry только для unavailable и повторно открывает gate после любого failure; command-specific fixtures задач 7.8, 7.10, 7.12 и 7.13 доказывают различающуюся семантику без полного декартова набора каждой команды и failure.
+    - App-level tests через delayed fake repository проходят bootstrap, каталог, создание, просмотр, изменение, readiness, архивирование, восстановление и удаление, включая уход до terminal outcome, позднюю старую страницу, страницу, уже включающую commit, более новую страницу до completion и смену query во время command. Одновременно они подтверждают serialization одного намерения между экземплярами details, независимость разных намерений, ровно одно применение membership/count и ограниченное revision-aware состояние без replay-журнала или множества всех operation tokens. Единая табличная presentation-матрица исчерпывающе покрывает применимые `validation`, `notFound`, `conflict`, `unavailable`, `corruption` и `unexpected`: сохраняет поля формы либо последний подтверждённый snapshot, не публикует optimistic state, безопасно различает terminal outcomes, предоставляет обычный retry только для unavailable и повторно открывает gate после любого failure; command-specific fixtures задач 7.8, 7.10, 7.12 и 7.13 доказывают различающуюся семантику без полного декартова набора каждой команды и failure.
   - **Проверка:**
     - Выполнить `flutter gen-l10n` и `flutter test test/app test/intention/presentation test/shared/presentation`.
     - Выполнить общий table-driven suite presentation policy для всех шести вариантов `IntentionFailure` и сфокусированные command-specific failure fixtures из задач 7.8, 7.10, 7.12 и 7.13.
@@ -960,13 +973,13 @@
 
 - [ ] 7.18 Подтвердить готовность Phase 7 к общесистемной интеграционной проверке
   - **Критерии приёмки:**
-    - Автоматизированное evidence подтверждает полный пользовательский lifecycle, продолжение принятой операции после ухода с экрана, однократную обработку terminal outcome, сериализацию операций одного намерения между повторными открытиями, независимость разных намерений и отсутствие показа несохранённого состояния.
-    - Catalog evidence подтверждает сохранение параметров, порций, count, cursor и visual anchor при типизированных переходах и подтверждённых изменениях.
+    - Автоматизированное evidence подтверждает полный пользовательский lifecycle, продолжение принятой операции после ухода с экрана, однократное revision-aware согласование terminal outcome, сериализацию операций одного намерения между повторными открытиями, независимость разных намерений и отсутствие показа несохранённого или возвращённого поздним snapshot состояния.
+    - Catalog evidence подтверждает сохранение параметров, порций, count, cursor и visual anchor при типизированных переходах и подтверждённых изменениях, точный результат при обеих перестановках page/commit/completion, целевой retry только устаревшей страницы, корректность после смены query и ограниченность process-local coordination state.
     - Русская, английская и fallback локали, field-specific исправление текста, semantics, contrast, tap targets и text scale 200% проходят; checkpoint не заявляет ручной TalkBack, Android release evidence, CI gate или финальный review Phase 8.
   - **Проверка:**
     - Выполнить `flutter gen-l10n`, `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие незапланированных результатов генерации.
     - Выполнить `flutter test` и `flutter analyze`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
-  - **Зависимости:** 7.17.
+  - **Зависимости:** 7.17, 7.19.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.

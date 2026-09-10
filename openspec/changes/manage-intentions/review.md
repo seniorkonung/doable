@@ -6,39 +6,19 @@
 **Result:** Changes needed
 **Coverage status:** Complete
 **Summary:** Feature-specific keep-alive coordinator теперь задаёт lifetime
-  принятых операций за пределами auto-dispose routes, не запрещая Back. Однако
-  ADR-0005 всё ещё задаёт прежнюю зависимость ViewModels (F5), порядок
-  согласования completions с конкурентными snapshot-запросами не определён
-  (F6), владелец пользовательского сообщения при остающемся открытым дочернем
-  экране не выбран (F7), а для следующей порции каталога отсутствует terminal
-  failure state (F8). Принятый риск AR1 сохраняется в прежних границах.
+  принятых операций за пределами auto-dispose routes, не запрещая Back, а
+  ADR-0005 теперь согласованно разделяет прямой read/query path и
+  coordinator-owned command path. Порядок согласования completions с
+  конкурентными snapshot-запросами не определён (F6), владелец пользовательского
+  сообщения при остающемся открытым дочернем экране не выбран (F7), а для
+  следующей порции каталога отсутствует terminal failure state (F8). Принятый
+  риск AR1 сохраняется в прежних границах.
 **Validation:** `openspec validate manage-intentions --type change --strict
   --no-interactive` и `openspec schema validate intent-driven --json` успешны.
   Phase 7 ещё не реализована, поэтому runtime- и widget-тесты её поведения в
   рамках этого planning audit не запускались.
 
 ## Findings
-
-### F5 · Medium — ADR-0005 сохраняет прежний путь ViewModel → Repository
-
-- **Evidence:** действующий внутри change
-  документ `docs/adr/0005-use-bounded-catalog-snapshots.md` прямо закрепляет зависимость
-  ViewModels от `IntentionRepository` и локальное согласование command results в
-  Catalog ViewModel. `design.md`, решение 3, теперь требует, чтобы editor/details
-  ViewModels передавали commands в `IntentionCommandCoordinator`, а Catalog
-  ViewModel потребляла его `IntentionCommandCompletion`. ADR-0005 имеет статус
-  решения `proposed`, принадлежит этому change и остаётся долговечным источником решения,
-  но `adr.md` и задачи не устраняют расхождение.
-- **Impact:** implementer может обоснованно последовать ADR и вызвать repository
-  прямо из auto-dispose ViewModel, вновь связав lifetime операции с экраном,
-  либо последовать design и поставить реализацию в формальное противоречие с
-  архитектурным решением. Следующие change также получат две разные схемы
-  dependency direction.
-- **Required change:** согласовать ADR-0005 с выбранным coordinator-подходом либо
-  вернуть design к совместимому с ADR решению. Канонический текст должен явно
-  различать query/read path, command path, владельца lifetime принятого `Future`
-  и потребителя terminal completions, сохраняя `IntentionRepository` единственной
-  storage-neutral seam.
 
 ### F6 · Medium — Completion невозможно однозначно согласовать с конкурентным snapshot каталога
 
@@ -47,12 +27,17 @@
   независимо применяет асинхронные first/continuation page results и
   тип `IntentionCommandCompletion`; payload содержит только новый `IntentionSaved`
   либо ID в `IntentionDeleted` и не задаёт ordering/watermark относительно
-  snapshot-запроса. После Back пользователь уже может сменить scope, filter или
-  order до terminal outcome, поэтому прежний summary может отсутствовать в новой
-  generation, а page result не сообщает, включает ли его snapshot выполненный
-  commit. Задачи 7.5, 7.15–7.17 проверяют устаревшую query generation и delayed
-  completion по отдельности, но не их пересечение; требуемая в design
-  дедупликация tokens также не имеет ограниченной политики удаления.
+  snapshot-запроса. Оба публичных page-типа — `IntentionCatalogFirstPage`
+  и `IntentionCatalogContinuationPage` — не несут версии snapshot. Текущая
+  реализация `DriftIntentionRepository` выдаёт cursor только с query parameters
+  и value boundary, а repository test намеренно сохраняет его допустимым после
+  удаления и вставок между порциями. После Back пользователь уже может сменить
+  scope, filter или order до terminal outcome, поэтому прежний summary может
+  отсутствовать в новой generation, а page result не сообщает, включает ли его
+  snapshot выполненный commit. Задачи 7.5, 7.15–7.17 проверяют устаревшую query
+  generation и delayed completion по отдельности, но не их пересечение;
+  требуемая в design дедупликация tokens также не имеет ограниченной политики
+  удаления.
 - **Impact:** допустимый порядок завершения может повторно добавить удалённую или
   старую строку, потерять только что применённое изменение либо увеличить или
   уменьшить точный count дважды. Особенно неоднозначны удаление и изменение
@@ -156,4 +141,8 @@ presentation, bounded state, privacy, localization, accessibility, delivery и
 Phase 7. После remediation F4 отдельно сверены общая табличная матрица всех
 вариантов `IntentionFailure`, применимые command-specific fixtures, сохранение
 формы или подтверждённого snapshot, retry-policy, отсутствие optimistic state и
-повторная доступность gate.
+повторная доступность gate. После remediation F5 сверены ADR-0005, ADR index,
+change ADR manifest, coordinator/read paths design, behavioral contract
+независимости принятой операции от экрана и задачи 7.1, 7.8–7.16; расхождение
+dependency direction и ownership принятого `Future` устранено без изменения
+capability boundary.

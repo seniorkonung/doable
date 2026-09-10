@@ -1,13 +1,13 @@
 # Манифест проверки ADR
 
 - Status: completed
-- Review date: 2026-09-05
+- Review date: 2026-09-10
 
 ## Результат проверки
 
 Проверка ADR для change `manage-intentions` завершена. Статус `completed` относится к проверке: все созданные этим активным change ADR имеют `Status: proposed` и `Originating change: manage-intentions`, остаются редактируемыми и получают окончательный `Status: accepted` только при архивации change. Завершение реализации или отдельной проверки не меняет этот статус.
 
-Действующий набор решений внутри change — ADR-0002–ADR-0008. ADR-0005 через отдельное поле `Supersedes: ADR-0001` заменяет прежний repository contract в рамках этого change; ADR-0001 остаётся историческим контекстом. Эта связь сохраняется при переходе статусов во время архивации.
+Действующий набор решений внутри change — ADR-0002–ADR-0008. ADR-0005 через отдельное поле `Supersedes: ADR-0001` заменяет прежний repository contract в рамках этого change; ADR-0001 остаётся историческим контекстом. ADR-0005 согласован с design: read/query path использует `IntentionRepository` напрямую, изменяющие ViewModels передают команды coordinator, а snapshot pages и command successes получают общую эфемерную process-local revision одного repository. Coordinator владеет принятым выполнением и публикует completions каталогу, не создавая вторую storage-neutral seam. Ревизия не сохраняется в SQLite, не является timestamp или sync metadata и исчезает при пересоздании repository. Эта связь сохраняется при переходе статусов во время архивации.
 
 Ключевые ADR выделены по близости к теме change и помогают определить, каким решениям уделить внимание в первую очередь. Эта группировка не меняет принадлежность, статус или силу решений; `proposed` не отменяет выбранных человеком решений и принятых остаточных рисков внутри change. ADR-0002 и ADR-0008 согласованно различают два способа enforcement: capability для Doable-owned ленивых executors и специализированный adapter для соединений, создаваемых внешним инструментом. Только закрытые adapters local-data module сохраняют capability при tracing и fault injection; generic `QueryInterceptor` её не сохраняет. `LocalDataReady` остаётся удобным для тестов runtime-result production bootstrap, а не неподделываемым type proof; отдельный eager-open typestate не вводится. Список собственных ADR для архивации ведётся отдельно. Новых ADR при уточнении манифеста не создано.
 
@@ -15,7 +15,7 @@
 
 Все ADR этого раздела имеют статус `proposed` и принадлежат `manage-intentions`.
 
-- [ADR-0005](../../../docs/adr/0005-use-bounded-catalog-snapshots.md) — задаёт границу управления намерениями и модель ограниченных снимков каталога, вокруг которых строятся repository, прикладное состояние и пользовательские представления.
+- [ADR-0005](../../../docs/adr/0005-use-bounded-catalog-snapshots.md) — задаёт единственную storage-neutral repository seam, ограниченные снимки каталога, разделение прямого read/query path с coordinator-owned command path и их согласование эфемерной process-local revision.
 - [ADR-0002](../../../docs/adr/0002-use-drift-sqlite-for-local-graph.md) — определяет основу постоянного хранения намерений: Drift/SQLite, транзакции, миграции, capability для Doable-owned соединений и adapter boundary для внешнего владельца соединения.
 - [ADR-0003](../../../docs/adr/0003-use-typed-uuid-identifiers-for-domain-entities.md) — важен для идентичности намерения во всех операциях change и её независимости от названия, хранилища и стратегии генерации UUID.
 - [ADR-0004](../../../docs/adr/0004-keep-personal-graph-device-local.md) — определяет защиту личных данных на текущем Android host и границы обещанной долговечности без неуправляемого backup/transfer.
