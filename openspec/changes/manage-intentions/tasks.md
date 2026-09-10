@@ -766,21 +766,24 @@
     - Для существующих намерений coordinator сохраняет единый gate по `IntentionId` после disposal экранной ViewModel, освобождает terminal entry после success, typed failure или неожиданной ошибки и не блокирует другой идентификатор; `ExclusiveOperation` остаётся скрытым конкурентным primitive, а отдельная форма создания сохраняет собственный duplicate-submit gate.
     - `OperationState<TResult>` исчерпывающе представляет `idle`, `running`, `succeeded` и `failed`; coordinator не хранит завершённую историю, формы, каталог, навигацию или локализацию и не вводит durable queue, sync abstraction либо экспериментальные Riverpod Mutations.
     - Каждый token имеет один сериализованный типизированный presentation claim: смонтированная инициировавшая ViewModel приоритетно публикует и подтверждает outcome, disposal освобождает непотреблённый claim, а Catalog ViewModel может получить только `catalogFallback`. Data completion доставляется каталогу независимо от presentation owner; terminal entry удаляется после публикации completion и разрешения claim без replay-журнала.
+    - Внутренняя lifecycle-операция controlled shutdown синхронно переводит coordinator в draining и запрещает принятие новых commands до первого asynchronous gap, после чего единый Future дожидается всех уже принятых repository operations без обращения к уничтоженному `Ref`. Для завершаемого object graph presentation claims и terminal entries не удерживают drain после окончания соответствующего repository Future; повторный shutdown присоединяется к тому же завершению и не создаёт второй lifecycle.
   - **Проверка:**
-    - Выполнить `flutter test test/shared/presentation/exclusive_operation_test.dart test/intention/presentation/operation` с controlled-completer fixtures для disposal, repeated open, exactly-once completion, независимых идентификаторов, взаимоисключающих initiator/fallback claims и гонки terminal outcome с освобождением экранной сессии.
+    - Выполнить `flutter test test/shared/presentation/exclusive_operation_test.dart test/intention/presentation/operation` с controlled-completer fixtures для disposal, repeated open, exactly-once completion, независимых идентификаторов, взаимоисключающих initiator/fallback claims, гонки terminal outcome с освобождением экранной сессии и shutdown при одной или нескольких принятых операциях.
     - Выполнить `flutter analyze`.
   - **Зависимости:** 7.19.
   - **Вероятно затронутые файлы:** `lib/src/shared/presentation/exclusive_operation.dart`, новые файлы в `lib/src/intention/presentation/operation/`, generated Riverpod artifacts и соответствующие tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 7.2 Провести типизированный bootstrap локального хранилища через владеющий ресурсами Riverpod composition root
+- [ ] 7.2 Провести типизированный bootstrap через явно владеющий ресурсами process-local object graph
   - **Критерии приёмки:**
-    - Один корневой `ProviderScope` с отключённым automatic retry создаёт diagnostics, `LocalDataBootstrap`, подтверждённый `DriftIntentionRepository`, `IntentionCommandCoordinator` и остальные app dependencies через generated `keepAlive` providers без service locator или глобальных singleton.
+    - Один неглобальный `AppRuntime` владеет `LocalDataBootstrap` и вручную созданным `ProviderContainer` с отключённым automatic retry; UI получает этот container через `UncontrolledProviderScope`, а generated `keepAlive` providers связывают подтверждённый `DriftIntentionRepository`, `IntentionCommandCoordinator`, router и остальные app dependencies без service locator или глобальных singleton. `ref.onDispose` не считается завершением асинхронного storage shutdown.
     - Локализованный bootstrap shell различает loading, retryable, corruption, incompatible schema и unexpected; feature routes доступны только после `LocalDataReady`, а retry предлагается только для retryable outcome.
-    - Освобождение object graph прекращает экранных потребителей и process-local coordinator до единственного вызова `LocalDataBootstrap.close()`; неготовое или повторно открываемое соединение не утрачивает установленное ownership.
+    - Управляемый `AppRuntime.shutdown()` синхронно запрещает новую работу, переводит coordinator в draining, уничтожает provider consumers через `ProviderContainer.dispose()`, дожидается уже принятых repository operations и затем дожидается единственного `LocalDataBootstrap.close()`; повторный shutdown присоединяется к тому же Future, а следующий object graph над тем же SQLite-файлом создаётся только после его завершения.
+    - Первый `LocalDataBootstrap.close()` переводит bootstrap в terminal closing state до любого ожидания, при необходимости дожидается выполняющегося `open()` и полностью закрывает единственный созданный database. Повторный `close()` не закрывает ресурс второй раз, а `open()` после начала closing или после closed не может создать connection; явный retry устранимого bootstrap failure остаётся допустимым только до shutdown.
+    - Внезапное завершение Android-процесса не представляется как ожидаемый Flutter/Riverpod disposal: незавершённая транзакция остаётся crash-recovery границей SQLite, а новый process bootstrap восстанавливается из последнего подтверждённого состояния.
   - **Проверка:**
     - Выполнить `dart run build_runner build --delete-conflicting-outputs`.
-    - Выполнить `flutter test test/app/bootstrap test/data/local/bootstrap/local_data_bootstrap_test.dart` и `flutter analyze`.
+    - Выполнить `flutter test test/app/bootstrap test/data/local/bootstrap/local_data_bootstrap_test.dart` с controlled-completer fixtures для ready и in-flight open, coordinator drain, повторного shutdown/close, запрета open после closing и недоступности нового object graph до полного закрытия; затем выполнить `flutter analyze`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`.
   - **Зависимости:** 7.1.
   - **Вероятно затронутые файлы:** `lib/main.dart`, новые файлы в `lib/src/app/bootstrap/` и `lib/src/app/`, generated Riverpod artifacts, `test/app/bootstrap/`.
@@ -801,7 +804,7 @@
 
 - [ ] 7.4 Проверить composition, bootstrap и начальную пользовательскую границу каталога
   - **Критерии приёмки:**
-    - Проверки подтверждают явные bootstrap outcomes, отсутствие feature routes до готовности и корректное закрытие app-owned persistence object graph.
+    - Проверки подтверждают явные bootstrap outcomes, отсутствие feature routes до готовности и полный controlled shutdown app-owned object graph: новые commands запрещаются до disposal, принятые operations завершаются до database close, повторный shutdown идемпотентен, а следующий graph не пересекается с ready или in-flight bootstrap прежнего.
     - Начальный каталог получает только ограниченную active-выдачу с порядком `createdAt descending`, отличает загрузку, пустой результат и failures и не показывает неподтверждённое состояние.
     - `ExclusiveOperation`, generated providers и типизированный начальный маршрут проходят сфокусированные тесты, генерацию и статический анализ.
   - **Проверка:**
