@@ -3,7 +3,7 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
 **Summary:** Feature-specific keep-alive coordinator теперь задаёт lifetime
   принятых операций за пределами auto-dispose routes, не запрещая Back, а
@@ -11,8 +11,10 @@
   coordinator-owned command path. Revision protocol устранил неоднозначность
   порядка между completions и конкурентными snapshot-запросами, а единственный
   typed presentation claim исключает повтор уже показанного outcome после
-  возврата в каталог. Для следующей порции каталога отсутствует terminal failure
-  state (F8). Принятый риск AR1 сохраняется в прежних границах.
+  возврата в каталог. Закрытые состояния продолжения теперь различают локальный
+  retry `unavailable`, terminal-результаты и явное восстановление `validation`
+  с первой страницы; F8 устранён. Принятый риск AR1 сохраняется в прежних
+  границах.
 **Validation:** `openspec validate manage-intentions --type change --strict
   --no-interactive` и `openspec schema validate intent-driven --json` успешны.
   Phase 7 ещё не реализована, поэтому runtime- и widget-тесты её поведения в
@@ -20,26 +22,7 @@
 
 ## Findings
 
-### F8 · Medium — Следующая порция каталога не имеет non-retryable failure state
-
-- **Evidence:** Метод `IntentionRepository.getCatalogPage` может вернуть
-  результаты `validation`, `corruption` или `unexpected` не только для первой страницы. Behavioral spec
-  требует сохранить уже загруженные намерения при ошибке следующей порции и
-  разрешает retry только там, где он способен восстановить работу. Однако
-  При этом `design.md`, решение 3, предоставляет retry для любого failure продолжения, а
-  задача 7.6 определяет состояние и verification только для retryable failure;
-  7.7 не добавляет fixtures terminal-отказов после уже загруженных страниц.
-- **Impact:** corruption или unexpected при чтении продолжения может быть
-  потерян, ошибочно превращён в бесконечный retry либо заменить весь каталог
-  общим failure state. Пользователь тогда не получит безопасного terminal
-  сообщения или потеряет доступ к уже подтверждённому префиксу и count.
-- **Required change:** определить presentation state для каждого применимого
-  non-retryable результата следующей порции: сохранить подтверждённые items,
-  count и неприменённую cursor boundary, показать безопасное различимое
-  сообщение без обычного retry и проверить это после одной и нескольких
-  загруженных порций. Если внутренний validation outcome должен приводить к
-  иному восстановлению query, это поведение также должно быть задано явно и
-  проверено.
+No unresolved findings remain in the reviewed change artifacts and relevant repository context.
 
 ## Accepted risks
 
@@ -103,3 +86,10 @@ completion для текущей выдачи; F6 устранён без дол
 согласует подтверждённые данные, но показывает только непотреблённый дочерним
 экраном outcome. Проверки явно охватывают открытый экран, уход до terminal
 outcome, гонку disposal и failure → retry → success без ожидающей прежней ошибки.
+После remediation F8 повторно сверены behavioral requirement и сценарии
+получения данных, закрытая модель continuation state в `design.md`, repository
+failure variants и задачи 7.6, 7.7 и 7.18. `unavailable` повторяет только ту же
+порцию, `corruption` и `unexpected` сохраняют подтверждённый префикс без
+обычного retry, а `validation` запускает только явное получение первой страницы
+с `cursor: null`, защитой query generation и атомарной заменой snapshot после
+успеха; требование и verification теперь прослеживаются полностью.

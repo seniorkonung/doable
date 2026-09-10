@@ -827,9 +827,9 @@
   - **Критерии приёмки:**
     - `CatalogPagingPolicy` проверяет `pageSize` 1–100 и `prefetchRemaining` от 0 до значения меньше `pageSize`; production использует 100/30, а недопустимая policy отклоняется до repository call.
     - При достижении threshold ViewModel выполняет не более одного продолжения, добавляет только новые summaries, сохраняет count первой страницы, обновляет cursor и прекращает запросы после `nextCursor == null`.
-    - Loading или retryable failure следующей порции отображаются в конце списка без потери уже загруженных данных; retry повторяет ту же порцию, а неизменный query сохраняет порядок без пропусков и повторов.
+    - Закрытые взаимоисключающие состояния продолжения сохраняют загруженные items, последнее подтверждённое точное количество и cursor boundary: loading и `unavailable` отображаются в конце списка с retry той же порции только для `unavailable`, `corruption` и `unexpected` — как различимые terminal-состояния без обычного retry, а `validation` предоставляет отдельное явное восстановление первой страницей текущих scope/filter/order с `cursor: null`. Во время восстановления прежний префикс остаётся видимым, поздние результаты прежней generation отбрасываются, success целиком заменяет items/count/cursor/revision, а failure сохраняет прежний префикс и использует initial-page классификацию без автоматического цикла.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/catalog` с multi-page, single-flight, end-of-list, inline-failure и retry fixtures.
+    - Выполнить `flutter test test/intention/presentation/catalog` с multi-page, single-flight и end-of-list fixtures, а после одной и нескольких загруженных порций — с `unavailable` retry того же cursor, terminal `corruption`/`unexpected`, `validation` recovery через `cursor: null`, успешной полной заменой snapshot, failure восстановления и поздним ответом прежней generation.
     - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
   - **Зависимости:** 7.5.
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/**`, generated Riverpod artifacts, `test/intention/presentation/catalog/**`.
@@ -838,10 +838,10 @@
 - [ ] 7.7 Проверить полный интерактивный контракт ограниченного каталога
   - **Критерии приёмки:**
     - Provider и widget tests подтверждают три scope, четыре порядка, debounce, field-specific ошибки фильтра, защиту от устаревших результатов и сброс к первой странице.
-    - Multi-page evidence подтверждает production policy 100/30, single-flight, точный count, inline retry, конец выдачи и отсутствие повторов.
-    - Системные подписи каталога локализованы, а loading, empty и failure состояния различимы автоматизированно.
+    - Multi-page evidence подтверждает production policy 100/30, single-flight, точный count, retry только устранимой следующей порции, terminal-состояния `corruption`/`unexpected`, восстановление `validation` без прежнего cursor, конец выдачи и отсутствие повторов после одной и нескольких порций.
+    - Системные подписи каталога, terminal-сообщения и отдельное действие восстановления локализованы, а loading, empty и все continuation failure states различимы визуально и через semantics; terminal-состояния не предоставляют обычный retry.
   - **Проверка:**
-    - Выполнить `flutter test test/intention/presentation/catalog test/app/localization`.
+    - Выполнить `flutter test test/intention/presentation/catalog test/app/localization` с provider/widget fixtures всех continuation outcomes, доступности правильного действия и отсутствия retry у terminal-состояний.
     - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
   - **Зависимости:** 7.5, 7.6.
   - **Вероятно затронутые файлы:** Нет, только проверка.
@@ -975,7 +975,7 @@
 - [ ] 7.18 Подтвердить готовность Phase 7 к общесистемной интеграционной проверке
   - **Критерии приёмки:**
     - Автоматизированное evidence подтверждает полный пользовательский lifecycle, продолжение принятой операции после ухода с экрана, однократное revision-aware согласование terminal outcome, единственного presentation owner при открытом и покинутом инициирующем экране, отсутствие устаревшего failure после успешного retry, сериализацию операций одного намерения между повторными открытиями, независимость разных намерений и отсутствие показа несохранённого или возвращённого поздним snapshot состояния.
-    - Catalog evidence подтверждает сохранение параметров, порций, count, cursor и visual anchor при типизированных переходах и подтверждённых изменениях, точный результат при обеих перестановках page/commit/completion, целевой retry только устаревшей страницы, корректность после смены query и ограниченность process-local coordination state.
+    - Catalog evidence подтверждает сохранение параметров, порций, count, cursor и visual anchor при типизированных переходах и подтверждённых изменениях, точный результат при обеих перестановках page/commit/completion, целевой retry только устаревшей или доказанно unavailable-страницы, terminal continuation outcomes без обычного retry, восстановление `validation` первой страницей без прежнего cursor, корректность после смены query и ограниченность process-local coordination state.
     - Русская, английская и fallback локали, field-specific исправление текста, semantics, contrast, tap targets и text scale 200% проходят; checkpoint не заявляет ручной TalkBack, Android release evidence, CI gate или финальный review Phase 8.
   - **Проверка:**
     - Выполнить `flutter gen-l10n`, `dart run build_runner build --delete-conflicting-outputs` и `git status --short`, ожидая отсутствие незапланированных результатов генерации.
