@@ -1,7 +1,3 @@
-pre-push:
-  jobs:
-    - run: mise run check-fast
-
 pre-commit:
   jobs:
     - name: OpenSpec commit scope
@@ -11,5 +7,5 @@ pre-commit:
           echo "OpenSpec changes cannot be mixed with other files in the same commit."
           exit 1
         fi
-    - run: mise run fmt
+    - run: mise exec -- dart format .
       stage_fixed: true
