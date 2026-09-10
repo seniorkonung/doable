@@ -8,74 +8,17 @@
 **Summary:** Feature-specific keep-alive coordinator теперь задаёт lifetime
   принятых операций за пределами auto-dispose routes, не запрещая Back, а
   ADR-0005 теперь согласованно разделяет прямой read/query path и
-  coordinator-owned command path. Порядок согласования completions с
-  конкурентными snapshot-запросами не определён (F6), владелец пользовательского
-  сообщения при остающемся открытым дочернем экране не выбран (F7), а для
-  следующей порции каталога отсутствует terminal failure state (F8). Принятый
-  риск AR1 сохраняется в прежних границах.
+  coordinator-owned command path. Revision protocol устранил неоднозначность
+  порядка между completions и конкурентными snapshot-запросами, а единственный
+  typed presentation claim исключает повтор уже показанного outcome после
+  возврата в каталог. Для следующей порции каталога отсутствует terminal failure
+  state (F8). Принятый риск AR1 сохраняется в прежних границах.
 **Validation:** `openspec validate manage-intentions --type change --strict
   --no-interactive` и `openspec schema validate intent-driven --json` успешны.
   Phase 7 ещё не реализована, поэтому runtime- и widget-тесты её поведения в
   рамках этого planning audit не запускались.
 
 ## Findings
-
-### F6 · Medium — Completion невозможно однозначно согласовать с конкурентным snapshot каталога
-
-- **Evidence:** intention-management spec требует после принятой операции точно
-  согласовать текущую загруженную часть и `totalCount`. `design.md`, решение 3,
-  независимо применяет асинхронные first/continuation page results и
-  тип `IntentionCommandCompletion`; payload содержит только новый `IntentionSaved`
-  либо ID в `IntentionDeleted` и не задаёт ordering/watermark относительно
-  snapshot-запроса. Оба публичных page-типа — `IntentionCatalogFirstPage`
-  и `IntentionCatalogContinuationPage` — не несут версии snapshot. Текущая
-  реализация `DriftIntentionRepository` выдаёт cursor только с query parameters
-  и value boundary, а repository test намеренно сохраняет его допустимым после
-  удаления и вставок между порциями. После Back пользователь уже может сменить
-  scope, filter или order до terminal outcome, поэтому прежний summary может
-  отсутствовать в новой generation, а page result не сообщает, включает ли его
-  snapshot выполненный commit. Задачи 7.5, 7.15–7.17 проверяют устаревшую query
-  generation и delayed completion по отдельности, но не их пересечение;
-  требуемая в design дедупликация tokens также не имеет ограниченной политики
-  удаления.
-- **Impact:** допустимый порядок завершения может повторно добавить удалённую или
-  старую строку, потерять только что применённое изменение либо увеличить или
-  уменьшить точный count дважды. Особенно неоднозначны удаление и изменение
-  membership после смены фильтра, когда целевое намерение находится за текущей
-  загруженной границей. Исправление обычным refresh способно нарушить обещание не
-  перечитывать предшествующие порции, а бессрочный набор обработанных tokens —
-  создать неограниченно растущее process-local состояние.
-- **Required change:** определить один ограниченный протокол порядка и
-  идемпотентности между page requests и command completions, который даёт
-  достаточно pre/post-commit evidence для точного membership/count либо
-  безопасно отклоняет и повторяет только затронутый snapshot. Добавить
-  controlled-completer проверки completion до и после first/continuation page,
-  смены query generation, нескольких последовательных completions и ограниченного
-  удаления token bookkeeping.
-
-### F7 · Medium — Один failure может быть повторно показан после успешного retry
-
-- **Evidence:** `design.md`, решение 3, требует от остающейся открытой экранной
-  ViewModel показать terminal failure и одновременно заставляет Catalog
-  ViewModel создать и удерживать одноразовое сообщение до возвращения каталога.
-  Задачи 7.8, 7.10 и 7.13 сохраняют failure и retry на дочернем экране, а 7.15
-  создаёт catalog message для каждого failure. Не определено, считается ли
-  failure уже представленным, должен ли каталог повторять его и как хранить
-  несколько outcomes, если пользователь получил failure, повторил операцию и
-  достиг success до закрытия route.
-- **Impact:** после успешного retry пользователь может вернуться в каталог и
-  получить устаревшее сообщение о неуспехе либо увидеть одну и ту же ошибку
-  дважды. Перезапись единственного event, напротив, способна потерять сообщение о
-  failure, который завершился уже после ухода с экрана.
-- **Required change:** определить единственного presentation-owner или
-  типизированное подтверждение потребления для каждого completion и явную
-  политику нескольких outcomes, сохраняя обязательное сообщение для failure
-  после ухода и не дублируя уже показанный результат. Проверки должны покрыть
-  failure при открытом route, failure после Back и failure → retry → success до
-  возврата в каталог.
-- **Decision needed:** должен ли каталог повторять failure, уже показанный на
-  остающемся открытым editor/details, или такой outcome считается там полностью
-  представленным?
 
 ### F8 · Medium — Следующая порция каталога не имеет non-retryable failure state
 
@@ -145,4 +88,18 @@ Phase 7. После remediation F4 отдельно сверены общая т
 change ADR manifest, coordinator/read paths design, behavioral contract
 независимости принятой операции от экрана и задачи 7.1, 7.8–7.16; расхождение
 dependency direction и ownership принятого `Future` устранено без изменения
-capability boundary.
+capability boundary. После remediation F6 повторно проверены новые сценарии
+сохранения загруженного каталога, ADR-0005 и тип ревизии
+каталога `IntentionCatalogRevision` вместе с моделью мутации данных
+типа `IntentionCatalogMutation`. Сверены единый repository sequencer и точные
+снимки `before`/`after`, правила first/continuation pages, смена query generation,
+ограниченность coordination state и задачи 7.19, 7.15, 7.17–7.18. Протокол
+однозначно различает страницу до commit, страницу с уже включённым commit и
+completion для текущей выдачи; F6 устранён без долговечной revision или
+перечитывания подтверждённых порций. После remediation F7 сверены требование
+независимости принятой операции от экрана, coordinator и UI ownership в
+техническом `design.md`, а также задачи 7.1, 7.8, 7.10, 7.13 и 7.15–7.18. Каждый token теперь
+имеет взаимоисключающий initiator либо catalog-fallback claim: каталог всегда
+согласует подтверждённые данные, но показывает только непотреблённый дочерним
+экраном outcome. Проверки явно охватывают открытый экран, уход до terminal
+outcome, гонку disposal и failure → retry → success без ожидающей прежней ошибки.
