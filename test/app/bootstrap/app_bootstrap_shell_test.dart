@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/routing/app_placeholder_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         LocalDatabaseConnectionObserver,
@@ -14,11 +15,9 @@ import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
 
-const _featureKey = Key('готовая возможность');
-
 void main() {
   testWidgets(
-    'не монтирует возможность до ready и передаёт runtime container',
+    'не монтирует начальный route до ready и передаёт runtime container',
     (tester) async {
       _useEnglishLocale(tester);
       final openingStarted = Completer<void>();
@@ -35,22 +34,17 @@ void main() {
         await runtime.shutdown();
       });
 
-      await tester.pumpWidget(
-        MainApp(
-          runtime: runtime,
-          readyChild: const SizedBox(key: _featureKey),
-        ),
-      );
+      await tester.pumpWidget(MainApp(runtime: runtime));
       await openingStarted.future;
 
       expect(find.text('Preparing local data…'), findsOneWidget);
-      expect(find.byKey(_featureKey), findsNothing);
+      expect(find.byType(AppPlaceholderPage), findsNothing);
 
       allowOpening.complete();
       await tester.pumpAndSettle();
 
       final ready = await runtime.bootstrap() as AppRuntimeReady;
-      final featureContext = tester.element(find.byKey(_featureKey));
+      final featureContext = tester.element(find.byType(AppPlaceholderPage));
       expect(
         ProviderScope.containerOf(featureContext, listen: false),
         same(ready.container),
@@ -80,12 +74,7 @@ void main() {
     );
     addTearDown(runtime.shutdown);
 
-    await tester.pumpWidget(
-      MainApp(
-        runtime: runtime,
-        readyChild: const SizedBox(key: _featureKey),
-      ),
-    );
+    await tester.pumpWidget(MainApp(runtime: runtime));
     await tester.pumpAndSettle();
 
     expect(
@@ -95,13 +84,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.widgetWithText(FilledButton, 'Try again'), findsOneWidget);
-    expect(find.byKey(_featureKey), findsNothing);
+    expect(find.byType(AppPlaceholderPage), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await tester.pumpAndSettle();
 
     expect(attempts, 2);
-    expect(find.byKey(_featureKey), findsOneWidget);
+    expect(find.byType(AppPlaceholderPage), findsOneWidget);
   });
 
   testWidgets('corruption имеет terminal-состояние без retry', (tester) async {

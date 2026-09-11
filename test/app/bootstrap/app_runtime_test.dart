@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         ConfiguredLocalDatabaseConnection,
@@ -44,6 +45,8 @@ void main() {
           intentionCommandCoordinatorProvider.notifier,
         );
         expect(coordinator, same(runtime.commandCoordinator));
+        final router = ready.container.read(appRouterProvider);
+        expect(ready.container.read(appRouterProvider), same(router));
         expect(ready.container.retry!(0, Exception('отказ provider')), isNull);
 
         final repeated = await runtime.bootstrap();

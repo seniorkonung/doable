@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../app_runtime.dart';
+import '../localization/app_locale_resolution.dart';
 
 final class AppBootstrapShell extends StatefulWidget {
   const AppBootstrapShell({
@@ -40,18 +41,16 @@ final class _AppBootstrapShellState extends State<AppBootstrapShell> {
     return FutureBuilder<AppRuntimeBootstrapResult>(
       future: _bootstrapping,
       builder: (context, snapshot) {
-        final localizations = AppLocalizations.of(context);
         if (snapshot.connectionState != ConnectionState.done) {
-          return _BootstrapStatus(
-            message: localizations.bootstrapLoading,
-            progressIndicator: true,
+          return const _BootstrapStatusApp(
+            status: _BootstrapStatusKind.loading,
           );
         }
 
         final result = snapshot.data;
         if (snapshot.hasError || result == null) {
-          return _BootstrapStatus(
-            message: localizations.bootstrapUnexpectedFailure,
+          return const _BootstrapStatusApp(
+            status: _BootstrapStatusKind.unexpected,
           );
         }
 
@@ -60,19 +59,18 @@ final class _AppBootstrapShellState extends State<AppBootstrapShell> {
             container: container,
             child: widget.child,
           ),
-          AppRuntimeRetryableFailure() => _BootstrapStatus(
-            message: localizations.bootstrapMigrationFailure,
-            retryLabel: localizations.commonRetry,
+          AppRuntimeRetryableFailure() => _BootstrapStatusApp(
+            status: _BootstrapStatusKind.retryable,
             onRetry: _retry,
           ),
-          AppRuntimeCorruption() => _BootstrapStatus(
-            message: localizations.bootstrapCorruption,
+          AppRuntimeCorruption() => const _BootstrapStatusApp(
+            status: _BootstrapStatusKind.corruption,
           ),
-          AppRuntimeIncompatibleSchema() => _BootstrapStatus(
-            message: localizations.bootstrapIncompatibleSchema,
+          AppRuntimeIncompatibleSchema() => const _BootstrapStatusApp(
+            status: _BootstrapStatusKind.incompatibleSchema,
           ),
-          AppRuntimeUnexpectedFailure() => _BootstrapStatus(
-            message: localizations.bootstrapUnexpectedFailure,
+          AppRuntimeUnexpectedFailure() => const _BootstrapStatusApp(
+            status: _BootstrapStatusKind.unexpected,
           ),
         };
       },
@@ -83,6 +81,53 @@ final class _AppBootstrapShellState extends State<AppBootstrapShell> {
     setState(() {
       _bootstrapping = widget.runtime.bootstrap();
     });
+  }
+}
+
+enum _BootstrapStatusKind {
+  loading,
+  retryable,
+  corruption,
+  incompatibleSchema,
+  unexpected,
+}
+
+final class _BootstrapStatusApp extends StatelessWidget {
+  const _BootstrapStatusApp({required this.status, this.onRetry});
+
+  final _BootstrapStatusKind status;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      onGenerateTitle: _appTitle,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeListResolutionCallback: resolveAppLocale,
+      home: Builder(
+        builder: (context) {
+          final localizations = AppLocalizations.of(context);
+          final message = switch (status) {
+            _BootstrapStatusKind.loading => localizations.bootstrapLoading,
+            _BootstrapStatusKind.retryable =>
+              localizations.bootstrapMigrationFailure,
+            _BootstrapStatusKind.corruption =>
+              localizations.bootstrapCorruption,
+            _BootstrapStatusKind.incompatibleSchema =>
+              localizations.bootstrapIncompatibleSchema,
+            _BootstrapStatusKind.unexpected =>
+              localizations.bootstrapUnexpectedFailure,
+          };
+          return _BootstrapStatus(
+            message: message,
+            progressIndicator: status == _BootstrapStatusKind.loading,
+            retryLabel: onRetry == null ? null : localizations.commonRetry,
+            onRetry: onRetry,
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -130,3 +175,5 @@ final class _BootstrapStatus extends StatelessWidget {
     );
   }
 }
+
+String _appTitle(BuildContext context) => AppLocalizations.of(context).appTitle;

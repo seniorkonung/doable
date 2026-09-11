@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/local/app_database.dart';
 import '../data/local/bootstrap/local_data_bootstrap.dart';
 import '../data/local/bootstrap/local_data_bootstrap_result.dart';
+import 'routing/app_router_provider.dart';
 import '../intention/application/intention_id_generator.dart';
 import '../intention/application/intention_repository.dart';
 import '../intention/data/drift_intention_repository.dart';
@@ -151,6 +152,7 @@ final class AppRuntime {
       final coordinator = container.read(
         intentionCommandCoordinatorProvider.notifier,
       );
+      container.read(appRouterProvider);
       _commandCoordinator = coordinator;
       return _ready = AppRuntimeReady(container);
     } on Object {
