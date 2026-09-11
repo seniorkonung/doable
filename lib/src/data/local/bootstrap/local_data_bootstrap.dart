@@ -20,8 +20,16 @@ final class LocalDataBootstrap {
   final DiagnosticsSink _diagnosticsSink;
   AppDatabase? _database;
   Future<LocalDataBootstrapResult>? _opening;
+  Future<void>? _closing;
+  var _lifecycle = _LocalDataBootstrapLifecycle.open;
 
   Future<LocalDataBootstrapResult> open() {
+    if (_lifecycle != _LocalDataBootstrapLifecycle.open) {
+      throw StateError(
+        'Нельзя открыть локальные данные после начала закрытия bootstrap.',
+      );
+    }
+
     final existingDatabase = _database;
     if (existingDatabase != null) {
       return Future.value(LocalDataReady(existingDatabase));
@@ -110,11 +118,27 @@ final class LocalDataBootstrap {
     };
   }
 
-  Future<void> close() async {
+  Future<void> close() {
+    final existingClosing = _closing;
+    if (existingClosing != null) return existingClosing;
+
+    _lifecycle = _LocalDataBootstrapLifecycle.closing;
+    final closing = _close();
+    _closing = closing;
+    return closing;
+  }
+
+  Future<void> _close() async {
     final opening = _opening;
-    if (opening != null) await opening;
-    final database = _database;
-    _database = null;
-    await database?.close();
+    try {
+      if (opening != null) await opening;
+      final database = _database;
+      _database = null;
+      await database?.close();
+    } finally {
+      _lifecycle = _LocalDataBootstrapLifecycle.closed;
+    }
   }
 }
+
+enum _LocalDataBootstrapLifecycle { open, closing, closed }

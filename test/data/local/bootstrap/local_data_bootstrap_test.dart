@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
@@ -14,6 +15,77 @@ const _sqliteIoerrCorruptFs = 8458;
 
 void main() {
   group('LocalDataBootstrap', () {
+    test('close синхронно запрещает open, ждёт открытие и закрывает ресурс один раз', () async {
+      final openingStarted = Completer<void>();
+      final allowOpening = Completer<void>();
+      late _ControlledLifecycleObserver observer;
+      var connectionFactoryCalls = 0;
+      final bootstrap = LocalDataBootstrap(
+        connectionFactory: () {
+          connectionFactoryCalls += 1;
+          observer = _ControlledLifecycleObserver(
+            openingStarted: openingStarted,
+            allowOpening: allowOpening,
+          );
+          return observeConfiguredLocalDatabaseConnection(
+            openInMemoryLocalDatabase(),
+            observer,
+          );
+        },
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(() async {
+        if (!allowOpening.isCompleted) allowOpening.complete();
+        await bootstrap.close();
+      });
+
+      final opening = bootstrap.open();
+      await openingStarted.future;
+
+      final closing = bootstrap.close();
+
+      expect(bootstrap.close(), same(closing));
+      expect(bootstrap.open, throwsStateError);
+      expect(connectionFactoryCalls, 1);
+
+      var closingCompleted = false;
+      closing.then((_) => closingCompleted = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(closingCompleted, isFalse);
+
+      allowOpening.complete();
+      expect(await opening, isA<LocalDataReady>());
+      await closing;
+
+      expect(observer.closeCalls, 1);
+      expect(bootstrap.open, throwsStateError);
+      expect(connectionFactoryCalls, 1);
+    });
+
+    test(
+      'повторный close готового bootstrap присоединяется к одному Future',
+      () async {
+        late _CloseTrackingObserver observer;
+        final bootstrap = LocalDataBootstrap(
+          connectionFactory: () => _trackedConnection(
+            openInMemoryLocalDatabase(),
+            (createdObserver) => observer = createdObserver,
+          ),
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+        );
+        addTearDown(bootstrap.close);
+        expect(await bootstrap.open(), isA<LocalDataReady>());
+
+        final firstClose = bootstrap.close();
+        final repeatedClose = bootstrap.close();
+
+        expect(repeatedClose, same(firstClose));
+        await firstClose;
+        expect(observer.closeCalls, 1);
+        expect(bootstrap.open, throwsStateError);
+      },
+    );
+
     test(
       'открывает новую базу и предоставляет её только в результате ready',
       () async {
@@ -602,6 +674,29 @@ void _expectBootstrapFailureCode(
 
 final class _CloseTrackingObserver extends LocalDatabaseConnectionObserver {
   var closeCalls = 0;
+
+  @override
+  void beforeClose() {
+    closeCalls += 1;
+  }
+}
+
+final class _ControlledLifecycleObserver
+    extends LocalDatabaseConnectionObserver {
+  _ControlledLifecycleObserver({
+    required this.openingStarted,
+    required this.allowOpening,
+  });
+
+  final Completer<void> openingStarted;
+  final Completer<void> allowOpening;
+  var closeCalls = 0;
+
+  @override
+  Future<void> beforeOpen() async {
+    if (!openingStarted.isCompleted) openingStarted.complete();
+    await allowOpening.future;
+  }
 
   @override
   void beforeClose() {
