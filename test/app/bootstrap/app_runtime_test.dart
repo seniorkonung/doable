@@ -105,14 +105,12 @@ void main() {
               ),
               result: isA<AppRuntimeIncompatibleSchema>()
                   .having(
-                    (result) => (result as AppRuntimeIncompatibleSchema)
-                        .expectedSchemaVersion,
+                    (result) => result.expectedSchemaVersion,
                     'ожидаемая версия',
                     1,
                   )
                   .having(
-                    (result) => (result as AppRuntimeIncompatibleSchema)
-                        .detectedSchemaVersion,
+                    (result) => result.detectedSchemaVersion,
                     'обнаруженная версия',
                     2,
                   ),
