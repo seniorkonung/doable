@@ -748,7 +748,7 @@
 
 ## Phase 7: Пользователь управляет намерениями в доступном локализованном интерфейсе
 
-- [ ] 7.19 Ввести process-local revision protocol для согласования catalog pages и подтверждённых command results
+- [x] 7.19 Ввести process-local revision protocol для согласования catalog pages и подтверждённых command results
   - **Критерии приёмки:**
     - Публичный storage-neutral contract добавляет непрозрачную сравнимую `IntentionCatalogRevision` к каждой успешной странице и sealed `IntentionCatalogMutation` к каждому command success; варианты mutation содержат точные непрозрачные `before`/`after` catalog entry snapshots, делают комбинацию без обеих сторон непредставимой, у создания не допускают `before`, у удаления — `after`, а у no-op сохраняют один и тот же снимок с обеих сторон.
     - Один закрытый асинхронный sequencer экземпляра `DriftIntentionRepository` упорядочивает полные snapshot-чтения страниц и commits изменяющих commands; фактический commit продвигает монотонную sequence ровно один раз, no-op/failure её не меняют, а новая process-local эпоха после пересоздания repository несравнима со старой и не сохраняется в SQLite.

@@ -27,6 +27,7 @@ final class DriftIntentionRepository implements IntentionRepository {
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
   final _CatalogCursorOwner _cursorOwner = _CatalogCursorOwner();
+  final _AsyncSequencer _sequencer = _AsyncSequencer();
   var _mutationSequence = 0;
 
   IntentionCatalogRevision get _currentRevision =>
@@ -63,14 +64,18 @@ final class DriftIntentionRepository implements IntentionRepository {
     }
 
     try {
-      final page = switch (cursor) {
-        null => await _database.transaction(() => _readFirstCatalogPage(query)),
-        _DriftIntentionCatalogCursor() => await _readCatalogContinuationPage(
-          query,
-          cursor,
-        ),
-        _ => throw StateError('Недопустимый cursor каталога.'),
-      };
+      final page = await _sequencer.run(
+        () async => switch (cursor) {
+          null => await _database.transaction(
+            () => _readFirstCatalogPage(query),
+          ),
+          _DriftIntentionCatalogCursor() => await _readCatalogContinuationPage(
+            query,
+            cursor,
+          ),
+          _ => throw StateError('Недопустимый cursor каталога.'),
+        },
+      );
       _diagnosticsSink.record(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
@@ -149,33 +154,35 @@ final class DriftIntentionRepository implements IntentionRepository {
 
     try {
       _validateCommandText(command);
-      final committed = await _database.transaction(
-        () => switch (command) {
-          CreateIntention() => _createIntention(command),
-          UpdateIntention() => _updateIntention(command),
-          EnableIntentionReadiness() => _changeReadiness(
-            command.id,
-            domain.IntentionReadiness.ready,
-          ),
-          DisableIntentionReadiness() => _changeReadiness(
-            command.id,
-            domain.IntentionReadiness.notReady,
-          ),
-          ArchiveIntention() => _changeArchiveState(
-            command.id,
-            domain.IntentionArchiveState.archived,
-          ),
-          RestoreIntention() => _changeArchiveState(
-            command.id,
-            domain.IntentionArchiveState.active,
-          ),
-          DeleteIntention() => _deleteIntention(command.id),
-        },
-      );
-      if (committed.didMutate) {
-        _mutationSequence++;
-      }
-      final success = committed.toSuccess(_currentRevision);
+      final success = await _sequencer.run(() async {
+        final committed = await _database.transaction(
+          () => switch (command) {
+            CreateIntention() => _createIntention(command),
+            UpdateIntention() => _updateIntention(command),
+            EnableIntentionReadiness() => _changeReadiness(
+              command.id,
+              domain.IntentionReadiness.ready,
+            ),
+            DisableIntentionReadiness() => _changeReadiness(
+              command.id,
+              domain.IntentionReadiness.notReady,
+            ),
+            ArchiveIntention() => _changeArchiveState(
+              command.id,
+              domain.IntentionArchiveState.archived,
+            ),
+            RestoreIntention() => _changeArchiveState(
+              command.id,
+              domain.IntentionArchiveState.active,
+            ),
+            DeleteIntention() => _deleteIntention(command.id),
+          },
+        );
+        if (committed.didMutate) {
+          _mutationSequence++;
+        }
+        return committed.toSuccess(_currentRevision);
+      });
       _diagnosticsSink.record(
         IntentionCommandDiagnosticsEvent(
           commandType: commandType,
@@ -801,6 +808,16 @@ final class _StoredIntentionColumnNames {
 
 final class _CatalogCursorOwner {}
 
+final class _AsyncSequencer {
+  Future<void> _tail = Future<void>.value();
+
+  Future<T> run<T>(Future<T> Function() operation) {
+    final result = _tail.then((_) => operation());
+    _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+}
+
 final class _DriftIntentionCatalogRevision implements IntentionCatalogRevision {
   const _DriftIntentionCatalogRevision(this._owner, this._sequence);
 
@@ -826,8 +843,8 @@ final class _DriftIntentionCatalogEntrySnapshot
     implements IntentionCatalogEntrySnapshot {
   const _DriftIntentionCatalogEntrySnapshot({
     required this.summary,
-    required String storedTitleSearchKey,
-  }) : _storedTitleSearchKey = storedTitleSearchKey;
+    required this._storedTitleSearchKey,
+  });
 
   @override
   final IntentionSummary summary;

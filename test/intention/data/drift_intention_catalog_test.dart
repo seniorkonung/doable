@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -1242,6 +1245,98 @@ void main() {
     },
   );
 
+  test(
+    'не допускает commit между полным чтением страницы и её revision',
+    () async {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000091',
+        title: 'Первое',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000092',
+        title: 'Второе',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      final firstQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: const IntentionCatalogOrder(
+          field: IntentionCatalogSortField.createdAt,
+          direction: IntentionCatalogSortDirection.ascending,
+        ),
+        pageSize: 1,
+      );
+      final firstPage = _firstPage(await repository.getCatalogPage(firstQuery));
+      final continuationQuery = IntentionCatalogQuery(
+        scope: firstQuery.scope,
+        titleFilter: null,
+        order: firstQuery.order,
+        pageSize: firstQuery.pageSize,
+        cursor: firstPage.nextCursor,
+      );
+      trace.blockNextSelect();
+
+      final pageFuture = repository.getCatalogPage(continuationQuery);
+      await trace.selectBlocked;
+      var commandCompleted = false;
+      final commandFuture = repository
+          .execute(
+            const CreateIntention(
+              title: 'Создано после страницы',
+              description: null,
+            ),
+          )
+          .whenComplete(() => commandCompleted = true);
+      await pumpEventQueue(times: 20);
+      final completedBeforePageRead = commandCompleted;
+      trace.releaseSelect();
+
+      final page = _continuationPage(await pageFuture);
+      final commandResult = await commandFuture;
+      expect(completedBeforePageRead, isFalse);
+      expect(commandResult, isA<ResultSuccess<IntentionCommandSuccess>>());
+      final mutation = (commandResult as ResultSuccess<IntentionCommandSuccess>)
+          .value
+          .catalogMutation;
+      expect(
+        page.revision.compareTo(mutation.revision),
+        IntentionCatalogRevisionOrder.older,
+      );
+    },
+  );
+
+  test('создаёт несравнимую revision после пересоздания repository', () async {
+    final query = IntentionCatalogQuery(
+      scope: IntentionScope.all,
+      titleFilter: null,
+      order: IntentionCatalogOrder.createdAtDescending,
+      pageSize: 1,
+    );
+    final originalRevision = _firstPage(await repository.getCatalogPage(query))
+        .revision;
+    final recreatedRepository = DriftIntentionRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 9, 2),
+      diagnostics,
+    );
+    final recreatedRevision = _firstPage(
+      await recreatedRepository.getCatalogPage(query),
+    ).revision;
+
+    expect(
+      originalRevision.compareTo(recreatedRevision),
+      IntentionCatalogRevisionOrder.differentEpoch,
+    );
+    expect(
+      recreatedRevision.compareTo(originalRevision),
+      IntentionCatalogRevisionOrder.differentEpoch,
+    );
+  });
+
   test('диагностирует typed failure чтения первой страницы без пользовательских данных', () async {
     trace.failure = SqliteException(
       extendedResultCode: SqlError.SQLITE_BUSY,
@@ -1360,12 +1455,41 @@ final class _ForeignCatalogCursor implements IntentionCatalogCursor {
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final List<String> statements = [];
   Object? failure;
+  Completer<void>? _blockedSelectStarted;
+  Completer<void>? _blockedSelectRelease;
+
+  void blockNextSelect() {
+    if (_blockedSelectStarted != null) {
+      throw StateError('SELECT уже заблокирован.');
+    }
+    _blockedSelectStarted = Completer<void>();
+    _blockedSelectRelease = Completer<void>();
+  }
+
+  Future<void> get selectBlocked {
+    final started = _blockedSelectStarted;
+    if (started == null) throw StateError('SELECT не был заблокирован.');
+    return started.future;
+  }
+
+  void releaseSelect() {
+    final release = _blockedSelectRelease;
+    if (release == null) throw StateError('SELECT не был заблокирован.');
+    release.complete();
+  }
 
   @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
+  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     statements.add(statement.statements.single);
     final failure = this.failure;
     if (failure != null) throw failure;
+    final started = _blockedSelectStarted;
+    if (started == null || started.isCompleted) return;
+    final release = _blockedSelectRelease!;
+    started.complete();
+    await release.future;
+    _blockedSelectStarted = null;
+    _blockedSelectRelease = null;
   }
 }
