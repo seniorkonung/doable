@@ -1,5 +1,3 @@
-import '../domain/intention.dart';
-import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
 
 sealed class Result<T> {
@@ -16,22 +14,6 @@ final class ResultFailure<T> extends Result<T> {
   const ResultFailure(this.failure);
 
   final IntentionFailure failure;
-}
-
-sealed class IntentionCommandSuccess {
-  const IntentionCommandSuccess();
-}
-
-final class IntentionSaved extends IntentionCommandSuccess {
-  const IntentionSaved(this.intention);
-
-  final Intention intention;
-}
-
-final class IntentionDeleted extends IntentionCommandSuccess {
-  const IntentionDeleted(this.id);
-
-  final IntentionId id;
 }
 
 enum IntentionFailureCode {

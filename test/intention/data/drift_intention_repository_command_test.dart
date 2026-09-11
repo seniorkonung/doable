@@ -104,6 +104,118 @@ void main() {
       expect(await database.select(database.intentions).get(), hasLength(2));
     });
 
+    test('публикует точные catalog mutations и меняет revision только после commit', () async {
+      clock = _DeterministicClock([
+        DateTime.utc(2026, 9, 3, 12),
+        DateTime.utc(2026, 9, 3, 13),
+      ]);
+      repository = DriftIntentionRepository(
+        database,
+        idGenerator,
+        clock.call,
+        diagnostics,
+      );
+      final milkQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: 'молоко',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 100,
+      );
+      final doctorQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: 'врачу',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 100,
+      );
+      final initialPage = _firstCatalogPage(
+        await repository.getCatalogPage(milkQuery),
+      );
+
+      final created = _commandSuccess(
+        await repository.execute(
+          const CreateIntention(title: 'Купить молоко', description: null),
+        ),
+      ) as IntentionSaved;
+      final createdMutation =
+          created.catalogMutation as IntentionCatalogCreated;
+
+      expect(
+        initialPage.revision.compareTo(createdMutation.revision),
+        IntentionCatalogRevisionOrder.older,
+      );
+      expect(createdMutation.before, isNull);
+      expect(createdMutation.after, same(createdMutation.entry));
+      expect(createdMutation.entry.summary.id, created.intention.id);
+      expect(createdMutation.entry.matches(milkQuery), isTrue);
+      expect(createdMutation.entry.matches(doctorQuery), isFalse);
+
+      final unchanged = _commandSuccess(
+        await repository.execute(
+          UpdateIntention(
+            id: created.intention.id,
+            title: created.intention.title,
+            description: created.intention.description,
+          ),
+        ),
+      ) as IntentionSaved;
+      final unchangedMutation =
+          unchanged.catalogMutation as IntentionCatalogUnchanged;
+
+      expect(
+        createdMutation.revision.compareTo(unchangedMutation.revision),
+        IntentionCatalogRevisionOrder.same,
+      );
+      expect(unchangedMutation.before, same(unchangedMutation.after));
+
+      final updated = _commandSuccess(
+        await repository.execute(
+          UpdateIntention(
+            id: created.intention.id,
+            title: 'Позвонить врачу',
+            description: null,
+          ),
+        ),
+      ) as IntentionSaved;
+      final updatedMutation =
+          updated.catalogMutation as IntentionCatalogUpdated;
+
+      expect(
+        unchangedMutation.revision.compareTo(updatedMutation.revision),
+        IntentionCatalogRevisionOrder.older,
+      );
+      expect(updatedMutation.before.matches(milkQuery), isTrue);
+      expect(updatedMutation.before.matches(doctorQuery), isFalse);
+      expect(updatedMutation.after.matches(milkQuery), isFalse);
+      expect(updatedMutation.after.matches(doctorQuery), isTrue);
+      expect(updatedMutation.after.summary.title, 'Позвонить врачу');
+
+      final deleted = _commandSuccess(
+        await repository.execute(DeleteIntention(created.intention.id)),
+      ) as IntentionDeleted;
+      final deletedMutation =
+          deleted.catalogMutation as IntentionCatalogDeleted;
+
+      expect(
+        updatedMutation.revision.compareTo(deletedMutation.revision),
+        IntentionCatalogRevisionOrder.older,
+      );
+      expect(deletedMutation.before, same(deletedMutation.entry));
+      expect(deletedMutation.after, isNull);
+      expect(deletedMutation.entry.matches(doctorQuery), isTrue);
+
+      final failed = await repository.execute(
+        DeleteIntention(created.intention.id),
+      );
+      expect(failed, _failure<IntentionNotFoundFailure>());
+      final pageAfterFailure = _firstCatalogPage(
+        await repository.getCatalogPage(doctorQuery),
+      );
+      expect(
+        deletedMutation.revision.compareTo(pageAfterFailure.revision),
+        IntentionCatalogRevisionOrder.same,
+      );
+    });
+
     test(
       'отклоняет недопустимый Unicode title до генерации ID и записи',
       () async {
@@ -984,10 +1096,25 @@ const _firstUuid = '018f0b5d-6b2e-7c80-8000-000000000401';
 const _secondUuid = '018f0b5d-6b2e-7c80-8000-000000000402';
 
 Intention _saved(Result<IntentionCommandSuccess> result) {
-  expect(result, isA<ResultSuccess<IntentionCommandSuccess>>());
-  final success = (result as ResultSuccess<IntentionCommandSuccess>).value;
+  final success = _commandSuccess(result);
   expect(success, isA<IntentionSaved>());
   return (success as IntentionSaved).intention;
+}
+
+IntentionCommandSuccess _commandSuccess(
+  Result<IntentionCommandSuccess> result,
+) {
+  expect(result, isA<ResultSuccess<IntentionCommandSuccess>>());
+  return (result as ResultSuccess<IntentionCommandSuccess>).value;
+}
+
+IntentionCatalogFirstPage _firstCatalogPage(
+  Result<IntentionCatalogPage> result,
+) {
+  expect(result, isA<ResultSuccess<IntentionCatalogPage>>());
+  final page = (result as ResultSuccess<IntentionCatalogPage>).value;
+  expect(page, isA<IntentionCatalogFirstPage>());
+  return page as IntentionCatalogFirstPage;
 }
 
 Matcher _failure<TFailure extends IntentionFailure>() =>

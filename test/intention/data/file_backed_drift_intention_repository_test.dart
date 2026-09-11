@@ -348,27 +348,48 @@ void main() {
           _catalogQuery(IntentionScope.all, titleFilter: 'kxyz'),
         ),
       );
+      final historicalProjectionQuery = _catalogQuery(
+        IntentionScope.all,
+        titleFilter: 'устаревшая',
+      );
       expect(allPage.items.map((item) => item.id), [id]);
       expect(allPage.items.single.title, title);
       expect(historicalFilterPage.totalCount, 0);
       expect(historicalFilterPage.items, isEmpty);
+
+      final updateResult = await historicalRepository.execute(
+        UpdateIntention(
+          id: id,
+          title: title,
+          description: 'Запись пересчитывает поисковую проекцию',
+        ),
+      );
+      expect(updateResult, isA<ResultSuccess<IntentionCommandSuccess>>());
+      final updateSuccess =
+          (updateResult as ResultSuccess<IntentionCommandSuccess>).value
+              as IntentionSaved;
+      final mutation = updateSuccess.catalogMutation as IntentionCatalogUpdated;
+      expect(mutation.before.summary.title, title);
+      expect(mutation.before.matches(historicalProjectionQuery), isTrue);
+      expect(
+        mutation.before.matches(
+          _catalogQuery(IntentionScope.all, titleFilter: 'kxyz'),
+        ),
+        isFalse,
+      );
+      expect(mutation.after.summary.title, title);
+      expect(mutation.after.matches(historicalProjectionQuery), isFalse);
+      expect(
+        mutation.after.matches(
+          _catalogQuery(IntentionScope.all, titleFilter: 'kxyz'),
+        ),
+        isTrue,
+      );
       await harness.closePersistenceObjectGraph();
 
       final currentDatabase = sqlite.sqlite3.open(harness.databaseFile.path);
       try {
         configureDoableSqliteConnection(currentDatabase);
-        expect(
-          currentDatabase
-              .select('SELECT title_search_key FROM intentions')
-              .single['title_search_key'],
-          historicalSearchKey,
-        );
-
-        currentDatabase.execute(
-          'UPDATE intentions SET description = ? WHERE id = ?',
-          ['Запись пересчитывает поисковую проекцию', idValue],
-        );
-
         expect(
           currentDatabase
               .select('SELECT title, title_search_key FROM intentions')

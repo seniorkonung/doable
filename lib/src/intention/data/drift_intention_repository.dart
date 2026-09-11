@@ -6,6 +6,7 @@ import '../application/intention_command.dart';
 import '../application/intention_id_generator.dart';
 import '../application/intention_repository.dart';
 import '../application/intention_result.dart';
+import '../application/title_search_key.dart';
 import '../domain/intention.dart' as domain;
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
@@ -26,6 +27,10 @@ final class DriftIntentionRepository implements IntentionRepository {
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
   final _CatalogCursorOwner _cursorOwner = _CatalogCursorOwner();
+  var _mutationSequence = 0;
+
+  IntentionCatalogRevision get _currentRevision =>
+      _DriftIntentionCatalogRevision(_cursorOwner, _mutationSequence);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -144,7 +149,7 @@ final class DriftIntentionRepository implements IntentionRepository {
 
     try {
       _validateCommandText(command);
-      final success = await _database.transaction(
+      final committed = await _database.transaction(
         () => switch (command) {
           CreateIntention() => _createIntention(command),
           UpdateIntention() => _updateIntention(command),
@@ -167,6 +172,10 @@ final class DriftIntentionRepository implements IntentionRepository {
           DeleteIntention() => _deleteIntention(command.id),
         },
       );
+      if (committed.didMutate) {
+        _mutationSequence++;
+      }
+      final success = committed.toSuccess(_currentRevision);
       _diagnosticsSink.record(
         IntentionCommandDiagnosticsEvent(
           commandType: commandType,
@@ -189,7 +198,9 @@ final class DriftIntentionRepository implements IntentionRepository {
     }
   }
 
-  Future<IntentionSaved> _createIntention(CreateIntention command) async {
+  Future<_CommittedIntentionCommand> _createIntention(
+    CreateIntention command,
+  ) async {
     final title = IntentionText.normalizeTitle(command.title);
     final description = switch (command.description) {
       null => null,
@@ -219,10 +230,19 @@ final class DriftIntentionRepository implements IntentionRepository {
             updatedAt: intention.updatedAt.value.microsecondsSinceEpoch,
           ),
         );
-    return IntentionSaved(intention);
+    final stored =
+        await (_database.select(_database.intentions)
+              ..where((row) => row.id.equals(intention.id.toCanonicalString())))
+            .getSingle();
+    return _CommittedIntentionCreated(
+      intention: _rehydrate(stored),
+      after: _catalogEntrySnapshot(stored),
+    );
   }
 
-  Future<IntentionSaved> _updateIntention(UpdateIntention command) async {
+  Future<_CommittedIntentionCommand> _updateIntention(
+    UpdateIntention command,
+  ) async {
     final title = IntentionText.normalizeTitle(command.title);
     final description = switch (command.description) {
       null => null,
@@ -235,8 +255,9 @@ final class DriftIntentionRepository implements IntentionRepository {
     if (row == null) throw const _IntentionNotFound();
 
     final existing = _rehydrate(row);
+    final before = _catalogEntrySnapshot(row);
     if (existing.title == title && existing.description == description) {
-      return IntentionSaved(existing);
+      return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
 
     final updated = domain.Intention(
@@ -257,10 +278,18 @@ final class DriftIntentionRepository implements IntentionRepository {
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
     );
-    return IntentionSaved(updated);
+    final stored =
+        await (_database.select(_database.intentions)
+              ..where((row) => row.id.equals(command.id.toCanonicalString())))
+            .getSingle();
+    return _CommittedIntentionUpdated(
+      intention: _rehydrate(stored),
+      before: before,
+      after: _catalogEntrySnapshot(stored),
+    );
   }
 
-  Future<IntentionSaved> _changeReadiness(
+  Future<_CommittedIntentionCommand> _changeReadiness(
     IntentionId id,
     domain.IntentionReadiness readiness,
   ) async {
@@ -270,7 +299,10 @@ final class DriftIntentionRepository implements IntentionRepository {
     if (row == null) throw const _IntentionNotFound();
 
     final existing = _rehydrate(row);
-    if (existing.readiness == readiness) return IntentionSaved(existing);
+    final before = _catalogEntrySnapshot(row);
+    if (existing.readiness == readiness) {
+      return _CommittedIntentionUnchanged(intention: existing, entry: before);
+    }
 
     final updated = domain.Intention(
       id: existing.id,
@@ -289,10 +321,17 @@ final class DriftIntentionRepository implements IntentionRepository {
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
     );
-    return IntentionSaved(updated);
+    final stored = await (_database.select(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+    return _CommittedIntentionUpdated(
+      intention: _rehydrate(stored),
+      before: before,
+      after: _catalogEntrySnapshot(stored),
+    );
   }
 
-  Future<IntentionSaved> _changeArchiveState(
+  Future<_CommittedIntentionCommand> _changeArchiveState(
     IntentionId id,
     domain.IntentionArchiveState archiveState,
   ) async {
@@ -302,7 +341,10 @@ final class DriftIntentionRepository implements IntentionRepository {
     if (row == null) throw const _IntentionNotFound();
 
     final existing = _rehydrate(row);
-    if (existing.archiveState == archiveState) return IntentionSaved(existing);
+    final before = _catalogEntrySnapshot(row);
+    if (existing.archiveState == archiveState) {
+      return _CommittedIntentionUnchanged(intention: existing, entry: before);
+    }
 
     final updated = domain.Intention(
       id: existing.id,
@@ -323,15 +365,27 @@ final class DriftIntentionRepository implements IntentionRepository {
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
     );
-    return IntentionSaved(updated);
+    final stored = await (_database.select(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+    return _CommittedIntentionUpdated(
+      intention: _rehydrate(stored),
+      before: before,
+      after: _catalogEntrySnapshot(stored),
+    );
   }
 
-  Future<IntentionDeleted> _deleteIntention(IntentionId id) async {
+  Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
+    final row = await (_database.select(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingleOrNull();
+    if (row == null) throw const _IntentionNotFound();
+    final before = _catalogEntrySnapshot(row);
     final deletedRows = await (_database.delete(
       _database.intentions,
     )..where((row) => row.id.equals(id.toCanonicalString()))).go();
     if (deletedRows == 0) throw const _IntentionNotFound();
-    return IntentionDeleted(id);
+    return _CommittedIntentionDeleted(id: id, before: before);
   }
 
   Future<IntentionCatalogFirstPage> _readFirstCatalogPage(
@@ -369,6 +423,7 @@ final class DriftIntentionRepository implements IntentionRepository {
       items: items,
       totalCount: totalCount,
       nextCursor: hasNextPage ? _cursorAt(query, items.last) : null,
+      revision: _currentRevision,
     );
   }
 
@@ -401,6 +456,7 @@ final class DriftIntentionRepository implements IntentionRepository {
     return IntentionCatalogContinuationPage(
       items: items,
       nextCursor: hasNextPage ? _cursorAt(query, items.last) : null,
+      revision: _currentRevision,
     );
   }
 
@@ -531,6 +587,22 @@ final class DriftIntentionRepository implements IntentionRepository {
     } on ArgumentError catch (_) {
       throw const _StoredIntentionCorruption();
     }
+  }
+
+  IntentionCatalogEntrySnapshot _catalogEntrySnapshot(local.Intention row) {
+    final intention = _rehydrate(row);
+    return _DriftIntentionCatalogEntrySnapshot(
+      summary: IntentionSummary(
+        id: intention.id,
+        title: intention.title,
+        hasDescription: intention.description != null,
+        readiness: intention.readiness,
+        archiveState: intention.archiveState,
+        createdAt: intention.createdAt,
+        updatedAt: intention.updatedAt,
+      ),
+      storedTitleSearchKey: row.titleSearchKey,
+    );
   }
 
   domain.Intention _rehydrateDetailRow(QueryRow row) {
@@ -728,6 +800,155 @@ final class _StoredIntentionColumnNames {
 }
 
 final class _CatalogCursorOwner {}
+
+final class _DriftIntentionCatalogRevision implements IntentionCatalogRevision {
+  const _DriftIntentionCatalogRevision(this._owner, this._sequence);
+
+  final _CatalogCursorOwner _owner;
+  final int _sequence;
+
+  @override
+  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) {
+    if (other is! _DriftIntentionCatalogRevision ||
+        !identical(_owner, other._owner)) {
+      return IntentionCatalogRevisionOrder.differentEpoch;
+    }
+    final comparison = _sequence.compareTo(other._sequence);
+    return switch (comparison) {
+      < 0 => IntentionCatalogRevisionOrder.older,
+      0 => IntentionCatalogRevisionOrder.same,
+      _ => IntentionCatalogRevisionOrder.newer,
+    };
+  }
+}
+
+final class _DriftIntentionCatalogEntrySnapshot
+    implements IntentionCatalogEntrySnapshot {
+  const _DriftIntentionCatalogEntrySnapshot({
+    required this.summary,
+    required String storedTitleSearchKey,
+  }) : _storedTitleSearchKey = storedTitleSearchKey;
+
+  @override
+  final IntentionSummary summary;
+  final String _storedTitleSearchKey;
+
+  @override
+  bool matches(IntentionCatalogQuery query) {
+    final matchesScope = switch (query.scope) {
+      IntentionScope.active =>
+        summary.archiveState == domain.IntentionArchiveState.active,
+      IntentionScope.archived =>
+        summary.archiveState == domain.IntentionArchiveState.archived,
+      IntentionScope.all => true,
+    };
+    if (!matchesScope) return false;
+
+    final filter = query.titleFilter;
+    return filter == null ||
+        _storedTitleSearchKey.contains(filter.map(titleSearchKey));
+  }
+}
+
+sealed class _CommittedIntentionCommand {
+  const _CommittedIntentionCommand();
+
+  bool get didMutate;
+
+  IntentionCommandSuccess toSuccess(IntentionCatalogRevision revision);
+}
+
+final class _CommittedIntentionCreated extends _CommittedIntentionCommand {
+  const _CommittedIntentionCreated({
+    required this.intention,
+    required this.after,
+  });
+
+  final domain.Intention intention;
+  final IntentionCatalogEntrySnapshot after;
+
+  @override
+  bool get didMutate => true;
+
+  @override
+  IntentionCommandSuccess toSuccess(IntentionCatalogRevision revision) =>
+      IntentionSaved(
+        intention,
+        catalogMutation: IntentionCatalogCreated(
+          revision: revision,
+          entry: after,
+        ),
+      );
+}
+
+final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
+  const _CommittedIntentionUpdated({
+    required this.intention,
+    required this.before,
+    required this.after,
+  });
+
+  final domain.Intention intention;
+  final IntentionCatalogEntrySnapshot before;
+  final IntentionCatalogEntrySnapshot after;
+
+  @override
+  bool get didMutate => true;
+
+  @override
+  IntentionCommandSuccess toSuccess(IntentionCatalogRevision revision) =>
+      IntentionSaved(
+        intention,
+        catalogMutation: IntentionCatalogUpdated(
+          revision: revision,
+          before: before,
+          after: after,
+        ),
+      );
+}
+
+final class _CommittedIntentionUnchanged extends _CommittedIntentionCommand {
+  const _CommittedIntentionUnchanged({
+    required this.intention,
+    required this.entry,
+  });
+
+  final domain.Intention intention;
+  final IntentionCatalogEntrySnapshot entry;
+
+  @override
+  bool get didMutate => false;
+
+  @override
+  IntentionCommandSuccess toSuccess(IntentionCatalogRevision revision) =>
+      IntentionSaved(
+        intention,
+        catalogMutation: IntentionCatalogUnchanged(
+          revision: revision,
+          entry: entry,
+        ),
+      );
+}
+
+final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
+  const _CommittedIntentionDeleted({required this.id, required this.before});
+
+  final IntentionId id;
+  final IntentionCatalogEntrySnapshot before;
+
+  @override
+  bool get didMutate => true;
+
+  @override
+  IntentionCommandSuccess toSuccess(IntentionCatalogRevision revision) =>
+      IntentionDeleted(
+        id,
+        catalogMutation: IntentionCatalogDeleted(
+          revision: revision,
+          entry: before,
+        ),
+      );
+}
 
 final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   const _DriftIntentionCatalogCursor({

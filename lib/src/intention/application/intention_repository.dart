@@ -180,6 +180,12 @@ final class IntentionTitleFilter {
 
 abstract interface class IntentionCatalogCursor {}
 
+enum IntentionCatalogRevisionOrder { older, same, newer, differentEpoch }
+
+abstract interface class IntentionCatalogRevision {
+  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other);
+}
+
 final class IntentionSummary {
   IntentionSummary({
     required this.id,
@@ -200,14 +206,103 @@ final class IntentionSummary {
   final IntentionTimestamp updatedAt;
 }
 
+abstract interface class IntentionCatalogEntrySnapshot {
+  IntentionSummary get summary;
+
+  bool matches(IntentionCatalogQuery query);
+}
+
+sealed class IntentionCatalogMutation {
+  const IntentionCatalogMutation({required this.revision});
+
+  final IntentionCatalogRevision revision;
+
+  IntentionCatalogEntrySnapshot? get before;
+
+  IntentionCatalogEntrySnapshot? get after;
+}
+
+final class IntentionCatalogCreated extends IntentionCatalogMutation {
+  const IntentionCatalogCreated({required super.revision, required this.entry});
+
+  final IntentionCatalogEntrySnapshot entry;
+
+  @override
+  IntentionCatalogEntrySnapshot? get before => null;
+
+  @override
+  IntentionCatalogEntrySnapshot get after => entry;
+}
+
+final class IntentionCatalogUpdated extends IntentionCatalogMutation {
+  const IntentionCatalogUpdated({
+    required super.revision,
+    required this.before,
+    required this.after,
+  });
+
+  @override
+  final IntentionCatalogEntrySnapshot before;
+
+  @override
+  final IntentionCatalogEntrySnapshot after;
+}
+
+final class IntentionCatalogDeleted extends IntentionCatalogMutation {
+  const IntentionCatalogDeleted({required super.revision, required this.entry});
+
+  final IntentionCatalogEntrySnapshot entry;
+
+  @override
+  IntentionCatalogEntrySnapshot get before => entry;
+
+  @override
+  IntentionCatalogEntrySnapshot? get after => null;
+}
+
+final class IntentionCatalogUnchanged extends IntentionCatalogMutation {
+  const IntentionCatalogUnchanged({
+    required super.revision,
+    required this.entry,
+  });
+
+  final IntentionCatalogEntrySnapshot entry;
+
+  @override
+  IntentionCatalogEntrySnapshot get before => entry;
+
+  @override
+  IntentionCatalogEntrySnapshot get after => entry;
+}
+
+sealed class IntentionCommandSuccess {
+  const IntentionCommandSuccess({required this.catalogMutation});
+
+  final IntentionCatalogMutation catalogMutation;
+}
+
+final class IntentionSaved extends IntentionCommandSuccess {
+  const IntentionSaved(this.intention, {required super.catalogMutation});
+
+  final Intention intention;
+}
+
+final class IntentionDeleted extends IntentionCommandSuccess {
+  const IntentionDeleted(this.id, {required super.catalogMutation});
+
+  final IntentionId id;
+}
+
 sealed class IntentionCatalogPage {
   IntentionCatalogPage({
     required List<IntentionSummary> items,
     required this.nextCursor,
+    required this.revision,
   }) : items = List.unmodifiable(items);
 
   final List<IntentionSummary> items;
   final IntentionCatalogCursor? nextCursor;
+  final IntentionCatalogRevision revision;
 }
 
 final class IntentionCatalogFirstPage extends IntentionCatalogPage {
@@ -215,6 +310,7 @@ final class IntentionCatalogFirstPage extends IntentionCatalogPage {
     required super.items,
     required int totalCount,
     required super.nextCursor,
+    required super.revision,
   }) : totalCount = _requireTotalCount(totalCount, items.length);
 
   final int totalCount;
@@ -235,5 +331,6 @@ final class IntentionCatalogContinuationPage extends IntentionCatalogPage {
   IntentionCatalogContinuationPage({
     required super.items,
     required super.nextCursor,
+    required super.revision,
   });
 }

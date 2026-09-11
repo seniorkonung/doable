@@ -300,18 +300,39 @@ void main() {
       () {
         final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
         const cursor = _TestCatalogCursor();
+        const revision = _TestCatalogRevision(epoch: 'первая', sequence: 0);
         final pages = <IntentionCatalogPage>[
           IntentionCatalogFirstPage(
             items: [summary],
             totalCount: 2,
             nextCursor: cursor,
+            revision: revision,
           ),
-          IntentionCatalogContinuationPage(items: const [], nextCursor: null),
+          IntentionCatalogContinuationPage(
+            items: const [],
+            nextCursor: null,
+            revision: revision,
+          ),
         ];
 
         expect(pages.map(_pageDescription), ['first:2', 'continuation']);
+        expect(pages.map((page) => page.revision), everyElement(revision));
       },
     );
+
+    test('сравнимая revision различает порядок и process-local эпоху', () {
+      const first = _TestCatalogRevision(epoch: 'первая', sequence: 0);
+      const second = _TestCatalogRevision(epoch: 'первая', sequence: 1);
+      const anotherEpoch = _TestCatalogRevision(epoch: 'вторая', sequence: 0);
+
+      expect(first.compareTo(second), IntentionCatalogRevisionOrder.older);
+      expect(second.compareTo(first), IntentionCatalogRevisionOrder.newer);
+      expect(second.compareTo(second), IntentionCatalogRevisionOrder.same);
+      expect(
+        first.compareTo(anotherEpoch),
+        IntentionCatalogRevisionOrder.differentEpoch,
+      );
+    });
 
     test('первая страница отклоняет недопустимый total count в release', () {
       final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
@@ -321,6 +342,7 @@ void main() {
           items: [summary],
           totalCount: 0,
           nextCursor: null,
+          revision: const _TestCatalogRevision(epoch: 'первая', sequence: 0),
         ),
         throwsA(isA<IntentionCatalogPageValidationException>()),
       );
@@ -329,6 +351,7 @@ void main() {
           items: const [],
           totalCount: -1,
           nextCursor: null,
+          revision: const _TestCatalogRevision(epoch: 'первая', sequence: 0),
         ),
         throwsA(isA<IntentionCatalogPageValidationException>()),
       );
@@ -382,9 +405,29 @@ void main() {
 
     test('saved, deleted и failures имеют исчерпывающие типы', () {
       final intention = _intention();
+      final entry = _TestCatalogEntrySnapshot(
+        _summary(id: intention.id.toCanonicalString()),
+      );
+      const revision = _TestCatalogRevision(epoch: 'первая', sequence: 1);
       final results = <Result<IntentionCommandSuccess>>[
-        ResultSuccess(IntentionSaved(intention)),
-        ResultSuccess(IntentionDeleted(intention.id)),
+        ResultSuccess(
+          IntentionSaved(
+            intention,
+            catalogMutation: IntentionCatalogCreated(
+              revision: revision,
+              entry: entry,
+            ),
+          ),
+        ),
+        ResultSuccess(
+          IntentionDeleted(
+            intention.id,
+            catalogMutation: IntentionCatalogDeleted(
+              revision: revision,
+              entry: entry,
+            ),
+          ),
+        ),
         const ResultFailure(IntentionGenericValidationFailure()),
         const ResultFailure(IntentionNotFoundFailure()),
         const ResultFailure(IntentionConflictFailure()),
@@ -415,6 +458,41 @@ void main() {
         const IntentionUnexpectedFailure().code,
         IntentionFailureCode.unexpected,
       );
+    });
+
+    test('sealed catalog mutations выражают допустимые before и after', () {
+      final before = _TestCatalogEntrySnapshot(
+        _summary(id: '00000000-0000-4000-8000-000000000001'),
+      );
+      final after = _TestCatalogEntrySnapshot(
+        _summary(id: '00000000-0000-4000-8000-000000000001'),
+      );
+      const revision = _TestCatalogRevision(epoch: 'первая', sequence: 1);
+      final mutations = <IntentionCatalogMutation>[
+        IntentionCatalogCreated(revision: revision, entry: after),
+        IntentionCatalogUpdated(
+          revision: revision,
+          before: before,
+          after: after,
+        ),
+        IntentionCatalogDeleted(revision: revision, entry: before),
+        IntentionCatalogUnchanged(revision: revision, entry: before),
+      ];
+
+      expect(mutations.map(_mutationDescription), [
+        'created',
+        'updated',
+        'deleted',
+        'unchanged',
+      ]);
+      expect(mutations[0].before, isNull);
+      expect(mutations[0].after, same(after));
+      expect(mutations[1].before, same(before));
+      expect(mutations[1].after, same(after));
+      expect(mutations[2].before, same(before));
+      expect(mutations[2].after, isNull);
+      expect(mutations[3].before, same(before));
+      expect(mutations[3].after, same(before));
     });
 
     test(
@@ -512,6 +590,14 @@ String _successDescription(IntentionCommandSuccess success) =>
       IntentionDeleted() => 'deleted',
     };
 
+String _mutationDescription(IntentionCatalogMutation mutation) =>
+    switch (mutation) {
+      IntentionCatalogCreated() => 'created',
+      IntentionCatalogUpdated() => 'updated',
+      IntentionCatalogDeleted() => 'deleted',
+      IntentionCatalogUnchanged() => 'unchanged',
+    };
+
 String _commandDescription(IntentionCommand command) => switch (command) {
   CreateIntention() => 'create',
   UpdateIntention() => 'update',
@@ -598,4 +684,33 @@ final class _FailingRepository implements IntentionRepository {
 
 final class _TestCatalogCursor implements IntentionCatalogCursor {
   const _TestCatalogCursor();
+}
+
+final class _TestCatalogRevision implements IntentionCatalogRevision {
+  const _TestCatalogRevision({required this.epoch, required this.sequence});
+
+  final String epoch;
+  final int sequence;
+
+  @override
+  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) {
+    if (other is! _TestCatalogRevision || other.epoch != epoch) {
+      return IntentionCatalogRevisionOrder.differentEpoch;
+    }
+    return switch (sequence.compareTo(other.sequence)) {
+      < 0 => IntentionCatalogRevisionOrder.older,
+      > 0 => IntentionCatalogRevisionOrder.newer,
+      _ => IntentionCatalogRevisionOrder.same,
+    };
+  }
+}
+
+final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
+  const _TestCatalogEntrySnapshot(this.summary);
+
+  @override
+  final IntentionSummary summary;
+
+  @override
+  bool matches(IntentionCatalogQuery query) => query.includes(summary);
 }
