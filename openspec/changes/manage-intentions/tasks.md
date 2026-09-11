@@ -774,7 +774,7 @@
   - **Вероятно затронутые файлы:** `lib/src/shared/presentation/exclusive_operation.dart`, новые файлы в `lib/src/intention/presentation/operation/`, generated Riverpod artifacts и соответствующие tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 7.2 Провести типизированный bootstrap через явно владеющий ресурсами process-local object graph
+- [x] 7.2 Провести типизированный bootstrap через явно владеющий ресурсами process-local object graph
   - **Критерии приёмки:**
     - Один неглобальный `AppRuntime` владеет `LocalDataBootstrap` и вручную созданным `ProviderContainer` с отключённым automatic retry; UI получает этот container через `UncontrolledProviderScope`, а generated `keepAlive` providers связывают подтверждённый `DriftIntentionRepository`, `IntentionCommandCoordinator`, router и остальные app dependencies без service locator или глобальных singleton. `ref.onDispose` не считается завершением асинхронного storage shutdown.
     - Локализованный bootstrap shell различает loading, retryable, corruption, incompatible schema и unexpected; feature routes доступны только после `LocalDataReady`, а retry предлагается только для retryable outcome.
