@@ -6,6 +6,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
+import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,8 +14,10 @@ void main() {
   group('IntentionCommandCoordinator', () {
     test('generated provider сохраняет один keep-alive coordinator', () {
       final repository = _ControlledIntentionRepository();
-      final container = ProviderContainer.test();
-      final provider = intentionCommandCoordinatorProvider(repository);
+      final container = ProviderContainer.test(
+        overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+      );
+      final provider = intentionCommandCoordinatorProvider;
 
       final first = container.read(provider.notifier);
       final second = container.read(provider.notifier);
@@ -459,11 +462,11 @@ Result<IntentionCommandSuccess> _deletedResult(IntentionId id) => ResultSuccess(
 IntentionCommandCoordinator _coordinator(
   _ControlledIntentionRepository repository,
 ) {
-  final container = ProviderContainer.test();
-  addTearDown(container.dispose);
-  return container.read(
-    intentionCommandCoordinatorProvider(repository).notifier,
+  final container = ProviderContainer.test(
+    overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
   );
+  addTearDown(container.dispose);
+  return container.read(intentionCommandCoordinatorProvider.notifier);
 }
 
 final class _ControlledIntentionRepository implements IntentionRepository {

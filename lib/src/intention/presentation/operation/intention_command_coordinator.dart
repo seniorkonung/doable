@@ -7,6 +7,7 @@ import '../../application/intention_command.dart';
 import '../../application/intention_repository.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention_id.dart';
+import 'intention_repository_provider.dart';
 
 part 'intention_command_coordinator.g.dart';
 
@@ -97,8 +98,8 @@ final class IntentionCommandCoordinator extends _$IntentionCommandCoordinator {
   Completer<void>? _shutdownCompleter;
 
   @override
-  void build(IntentionRepository repository) {
-    _repository = repository;
+  void build() {
+    _repository = ref.watch(intentionRepositoryProvider);
   }
 
   Stream<IntentionCommandCompletion> get completions =>
