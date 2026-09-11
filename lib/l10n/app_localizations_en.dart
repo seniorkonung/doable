@@ -38,6 +38,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Local data couldn’t be prepared. Your data wasn’t changed. Try again.';
 
   @override
+  String get bootstrapCorruption =>
+      'Local data is damaged and can’t be opened.';
+
+  @override
   String get bootstrapIncompatibleSchema =>
       'Install a compatible Doable update to continue.';
+
+  @override
+  String get bootstrapUnexpectedFailure =>
+      'Local data couldn’t be opened because of an unexpected error.';
 }

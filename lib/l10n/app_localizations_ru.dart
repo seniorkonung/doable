@@ -38,6 +38,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось подготовить локальные данные. Данные не изменены. Повторите попытку.';
 
   @override
+  String get bootstrapCorruption =>
+      'Локальные данные повреждены и не могут быть открыты.';
+
+  @override
   String get bootstrapIncompatibleSchema =>
       'Чтобы продолжить, установите совместимое обновление Doable.';
+
+  @override
+  String get bootstrapUnexpectedFailure =>
+      'Не удалось открыть локальные данные из-за непредвиденной ошибки.';
 }

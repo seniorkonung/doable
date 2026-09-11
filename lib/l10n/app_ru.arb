@@ -9,5 +9,7 @@
   "commonRetry": "Повторить",
   "bootstrapLoading": "Подготавливаем локальные данные…",
   "bootstrapMigrationFailure": "Не удалось подготовить локальные данные. Данные не изменены. Повторите попытку.",
-  "bootstrapIncompatibleSchema": "Чтобы продолжить, установите совместимое обновление Doable."
+  "bootstrapCorruption": "Локальные данные повреждены и не могут быть открыты.",
+  "bootstrapIncompatibleSchema": "Чтобы продолжить, установите совместимое обновление Doable.",
+  "bootstrapUnexpectedFailure": "Не удалось открыть локальные данные из-за непредвиденной ошибки."
 }

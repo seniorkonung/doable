@@ -36,8 +36,16 @@
   "@bootstrapMigrationFailure": {
     "description": "Безопасное сообщение об устранимой ошибке открытия или миграции"
   },
+  "bootstrapCorruption": "Local data is damaged and can’t be opened.",
+  "@bootstrapCorruption": {
+    "description": "Терминальное состояние повреждённого локального хранилища"
+  },
   "bootstrapIncompatibleSchema": "Install a compatible Doable update to continue.",
   "@bootstrapIncompatibleSchema": {
     "description": "Требование обновить приложение при более новой версии локального хранилища"
+  },
+  "bootstrapUnexpectedFailure": "Local data couldn’t be opened because of an unexpected error.",
+  "@bootstrapUnexpectedFailure": {
+    "description": "Терминальное состояние непредвиденной ошибки локального хранилища"
   }
 }

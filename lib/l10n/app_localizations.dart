@@ -152,11 +152,23 @@ abstract class AppLocalizations {
   /// **'Local data couldn’t be prepared. Your data wasn’t changed. Try again.'**
   String get bootstrapMigrationFailure;
 
+  /// Терминальное состояние повреждённого локального хранилища
+  ///
+  /// In en, this message translates to:
+  /// **'Local data is damaged and can’t be opened.'**
+  String get bootstrapCorruption;
+
   /// Требование обновить приложение при более новой версии локального хранилища
   ///
   /// In en, this message translates to:
   /// **'Install a compatible Doable update to continue.'**
   String get bootstrapIncompatibleSchema;
+
+  /// Терминальное состояние непредвиденной ошибки локального хранилища
+  ///
+  /// In en, this message translates to:
+  /// **'Local data couldn’t be opened because of an unexpected error.'**
+  String get bootstrapUnexpectedFailure;
 }
 
 class _AppLocalizationsDelegate

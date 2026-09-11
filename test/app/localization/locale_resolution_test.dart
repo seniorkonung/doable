@@ -1,8 +1,13 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
+import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/localization/app_locale_resolution.dart';
+import 'package:doable/src/data/local/app_database.dart'
+    show openInMemoryLocalDatabase;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
   group('разрешение системной локали', () {
@@ -78,12 +83,28 @@ void main() {
         'Повторите попытку.',
       );
       expect(
+        english.bootstrapCorruption,
+        'Local data is damaged and can’t be opened.',
+      );
+      expect(
+        russian.bootstrapCorruption,
+        'Локальные данные повреждены и не могут быть открыты.',
+      );
+      expect(
         english.bootstrapIncompatibleSchema,
         'Install a compatible Doable update to continue.',
       );
       expect(
         russian.bootstrapIncompatibleSchema,
         'Чтобы продолжить, установите совместимое обновление Doable.',
+      );
+      expect(
+        english.bootstrapUnexpectedFailure,
+        'Local data couldn’t be opened because of an unexpected error.',
+      );
+      expect(
+        russian.bootstrapUnexpectedFailure,
+        'Не удалось открыть локальные данные из-за непредвиденной ошибки.',
       );
     },
   );
@@ -93,8 +114,11 @@ void main() {
       Locale('ru', 'RU'),
     ];
     addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    final runtime = _testRuntime();
+    addTearDown(runtime.shutdown);
 
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await tester.pumpAndSettle();
     final context = tester.element(find.byType(Scaffold));
 
     expect(Localizations.localeOf(context), const Locale('ru'));
@@ -108,11 +132,19 @@ void main() {
       Locale('de', 'DE'),
     ];
     addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    final runtime = _testRuntime();
+    addTearDown(runtime.shutdown);
 
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await tester.pumpAndSettle();
     final context = tester.element(find.byType(Scaffold));
 
     expect(Localizations.localeOf(context), const Locale('en'));
     expect(AppLocalizations.of(context).commonRetry, 'Try again');
   });
 }
+
+AppRuntime _testRuntime() => AppRuntime(
+  connectionFactory: openInMemoryLocalDatabase,
+  diagnosticsSink: InMemoryDiagnosticsSink(),
+);
