@@ -760,7 +760,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/application/intention_result.dart`, `lib/src/intention/data/drift_intention_repository.dart`, связанные application/data tests.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 7.1 Реализовать feature-specific coordinator принятой команды и неизменяемое presentation-состояние операции
+- [x] 7.1 Реализовать feature-specific coordinator принятой команды и неизменяемое presentation-состояние операции
   - **Критерии приёмки:**
     - Generated keep-alive `IntentionCommandCoordinator` принимает command до первого asynchronous gap, возвращает принятое выполнение с его `Future` либо `alreadyRunning` и владеет repository `Future` до единственной публикации типизированного terminal completion с process-local token.
     - Для существующих намерений coordinator сохраняет единый gate по `IntentionId` после disposal экранной ViewModel, освобождает terminal entry после success, typed failure или неожиданной ошибки и не блокирует другой идентификатор; `ExclusiveOperation` остаётся скрытым конкурентным primitive, а отдельная форма создания сохраняет собственный duplicate-submit gate.
