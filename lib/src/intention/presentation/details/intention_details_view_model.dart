@@ -91,6 +91,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
     state = current.copyWith(
       edit: IntentionDetailsEdit.fromIntention(current.intention),
+      clearStateChange: true,
       clearEvent: true,
     );
   }
@@ -171,6 +172,27 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
+  void enableReadiness() =>
+      _startStateChange(IntentionDetailsStateChangeKind.enableReadiness);
+
+  void disableReadiness() =>
+      _startStateChange(IntentionDetailsStateChangeKind.disableReadiness);
+
+  void archive() => _startStateChange(IntentionDetailsStateChangeKind.archive);
+
+  void restore() => _startStateChange(IntentionDetailsStateChangeKind.restore);
+
+  void retryStateChange() {
+    final current = state;
+    final stateChange = current is IntentionDetailsLoaded
+        ? current.stateChange
+        : null;
+    if (stateChange == null || !stateChange.canRetry) {
+      return;
+    }
+    _startStateChange(stateChange.kind);
+  }
+
   void consumeEvent() {
     final current = state;
     if (current is IntentionDetailsLoaded && current.event != null) {
@@ -235,6 +257,9 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
           intention: intention,
           isOperationRunning: _isOperationRunning,
           edit: loaded?.edit,
+          stateChange: identical(_activeToken, completion.token)
+              ? loaded?.stateChange
+              : null,
           event: loaded?.event,
         );
         _startObservation();
@@ -309,6 +334,135 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
+  void _startStateChange(IntentionDetailsStateChangeKind kind) {
+    final current = state;
+    if (current is! IntentionDetailsLoaded ||
+        current.edit != null ||
+        _isOperationRunning ||
+        !_isStateChangeApplicable(current.intention, kind)) {
+      return;
+    }
+
+    final start = _coordinator.accept(_commandForStateChange(kind));
+    switch (start) {
+      case IntentionCommandAccepted(:final token, :final future):
+        _activeToken = token;
+        state = current.copyWith(
+          isOperationRunning: true,
+          stateChange: IntentionDetailsStateChange.running(kind),
+          clearEvent: true,
+        );
+        unawaited(_finishStateChange(kind, future));
+      case IntentionCommandAlreadyRunning():
+        state = current.copyWith(isOperationRunning: true);
+      case IntentionCommandCoordinatorDraining():
+        state = current.copyWith(
+          stateChange: IntentionDetailsStateChange.failed(
+            kind,
+            const IntentionUnexpectedFailure(),
+          ),
+          clearEvent: true,
+        );
+    }
+  }
+
+  Future<void> _finishStateChange(
+    IntentionDetailsStateChangeKind kind,
+    Future<IntentionCommandCompletion> future,
+  ) async {
+    try {
+      final completion = await future;
+      if (!ref.mounted || !identical(_activeToken, completion.token)) {
+        return;
+      }
+
+      final claim = _coordinator.claimInitiator(completion.token);
+      if (claim == null) {
+        _activeToken = null;
+        _failStateChangeUnexpectedly(kind);
+        _scheduleGateRefresh();
+        return;
+      }
+      _activeToken = null;
+      try {
+        final current = state;
+        if (current is IntentionDetailsLoaded) {
+          state = switch (completion.result) {
+            ResultSuccess(value: IntentionSaved(:final intention))
+                when intention.id == _intentionId =>
+              current.copyWith(
+                clearStateChange: true,
+                event: _successEventFor(kind),
+              ),
+            ResultSuccess(value: IntentionSaved() || IntentionDeleted()) =>
+              current.copyWith(
+                stateChange: IntentionDetailsStateChange.failed(
+                  kind,
+                  const IntentionUnexpectedFailure(),
+                ),
+                clearEvent: true,
+              ),
+            ResultFailure(:final failure) => current.copyWith(
+              stateChange: IntentionDetailsStateChange.failed(kind, failure),
+              clearEvent: true,
+            ),
+          };
+        }
+      } finally {
+        _coordinator.confirmPresentation(claim);
+        _scheduleGateRefresh();
+      }
+    } on Object {
+      if (!ref.mounted) {
+        return;
+      }
+      final token = _activeToken;
+      _activeToken = null;
+      if (token != null) {
+        _coordinator.releaseInitiatorPresentation(token);
+      }
+      _failStateChangeUnexpectedly(kind);
+      _scheduleGateRefresh();
+    }
+  }
+
+  IntentionCommand _commandForStateChange(
+    IntentionDetailsStateChangeKind kind,
+  ) => switch (kind) {
+    IntentionDetailsStateChangeKind.enableReadiness => EnableIntentionReadiness(
+      _intentionId,
+    ),
+    IntentionDetailsStateChangeKind.disableReadiness =>
+      DisableIntentionReadiness(_intentionId),
+    IntentionDetailsStateChangeKind.archive => ArchiveIntention(_intentionId),
+    IntentionDetailsStateChangeKind.restore => RestoreIntention(_intentionId),
+  };
+
+  bool _isStateChangeApplicable(
+    Intention intention,
+    IntentionDetailsStateChangeKind kind,
+  ) => switch (kind) {
+    IntentionDetailsStateChangeKind.enableReadiness =>
+      intention.readiness == IntentionReadiness.notReady,
+    IntentionDetailsStateChangeKind.disableReadiness =>
+      intention.readiness == IntentionReadiness.ready,
+    IntentionDetailsStateChangeKind.archive =>
+      intention.archiveState == IntentionArchiveState.active,
+    IntentionDetailsStateChangeKind.restore =>
+      intention.archiveState == IntentionArchiveState.archived,
+  };
+
+  IntentionDetailsEvent _successEventFor(
+    IntentionDetailsStateChangeKind kind,
+  ) => switch (kind) {
+    IntentionDetailsStateChangeKind.enableReadiness =>
+      const IntentionDetailsReadinessEnabled(),
+    IntentionDetailsStateChangeKind.disableReadiness =>
+      const IntentionDetailsReadinessDisabled(),
+    IntentionDetailsStateChangeKind.archive => const IntentionDetailsArchived(),
+    IntentionDetailsStateChangeKind.restore => const IntentionDetailsRestored(),
+  };
+
   void _failUpdateUnexpectedly() {
     final current = state;
     final edit = current is IntentionDetailsLoaded ? current.edit : null;
@@ -316,6 +470,19 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       state = current.copyWith(
         edit: edit.withOperation(
           const OperationFailed<Intention>(IntentionUnexpectedFailure()),
+        ),
+        clearEvent: true,
+      );
+    }
+  }
+
+  void _failStateChangeUnexpectedly(IntentionDetailsStateChangeKind kind) {
+    final current = state;
+    if (current is IntentionDetailsLoaded) {
+      state = current.copyWith(
+        stateChange: IntentionDetailsStateChange.failed(
+          kind,
+          const IntentionUnexpectedFailure(),
         ),
         clearEvent: true,
       );
@@ -365,6 +532,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       intention: intention,
       isOperationRunning: isOperationRunning,
       edit: previousLoaded?.edit,
+      stateChange: previousLoaded?.stateChange,
       event: previousLoaded?.event,
     ),
     ResultSuccess(value: null) => IntentionDetailsNotFound(

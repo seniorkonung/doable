@@ -18,11 +18,13 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     required this.intention,
     required super.isOperationRunning,
     this.edit,
+    this.stateChange,
     this.event,
   });
 
   final Intention intention;
   final IntentionDetailsEdit? edit;
+  final IntentionDetailsStateChange? stateChange;
   final IntentionDetailsEvent? event;
 
   IntentionDetailsLoaded copyWith({
@@ -30,14 +32,43 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     bool? isOperationRunning,
     IntentionDetailsEdit? edit,
     bool clearEdit = false,
+    IntentionDetailsStateChange? stateChange,
+    bool clearStateChange = false,
     IntentionDetailsEvent? event,
     bool clearEvent = false,
   }) => IntentionDetailsLoaded(
     intention: intention ?? this.intention,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     edit: clearEdit ? null : edit ?? this.edit,
+    stateChange: clearStateChange ? null : stateChange ?? this.stateChange,
     event: clearEvent ? null : event ?? this.event,
   );
+}
+
+enum IntentionDetailsStateChangeKind {
+  enableReadiness,
+  disableReadiness,
+  archive,
+  restore,
+}
+
+final class IntentionDetailsStateChange {
+  const IntentionDetailsStateChange.running(this.kind)
+    : operation = const OperationRunning<Intention>();
+
+  IntentionDetailsStateChange.failed(this.kind, IntentionFailure failure)
+    : operation = OperationFailed<Intention>(failure);
+
+  final IntentionDetailsStateChangeKind kind;
+  final OperationState<Intention> operation;
+
+  bool get canRetry => switch (operation) {
+    OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
+    OperationIdle<Intention>() ||
+    OperationRunning<Intention>() ||
+    OperationSucceeded<Intention>() ||
+    OperationFailed<Intention>() => false,
+  };
 }
 
 final class IntentionDetailsEdit {
@@ -113,6 +144,22 @@ sealed class IntentionDetailsEvent {
 
 final class IntentionDetailsSaved extends IntentionDetailsEvent {
   const IntentionDetailsSaved();
+}
+
+final class IntentionDetailsReadinessEnabled extends IntentionDetailsEvent {
+  const IntentionDetailsReadinessEnabled();
+}
+
+final class IntentionDetailsReadinessDisabled extends IntentionDetailsEvent {
+  const IntentionDetailsReadinessDisabled();
+}
+
+final class IntentionDetailsArchived extends IntentionDetailsEvent {
+  const IntentionDetailsArchived();
+}
+
+final class IntentionDetailsRestored extends IntentionDetailsEvent {
+  const IntentionDetailsRestored();
 }
 
 final class IntentionDetailsNotFound extends IntentionDetailsState {
