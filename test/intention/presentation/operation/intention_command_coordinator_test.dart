@@ -5,6 +5,7 @@ import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
 import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -311,6 +312,107 @@ void main() {
 
         await subscription.cancel();
         await coordinator.shutdown();
+      },
+    );
+
+    test(
+      'табличная матрица failures сохраняет единственного presentation owner',
+      () async {
+        final failures = <IntentionFailure>[
+          const IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(
+              field: IntentionTextField.title,
+              reason: IntentionTextValidationReason.empty,
+            ),
+          ),
+          const IntentionNotFoundFailure(),
+          const IntentionConflictFailure(),
+          const IntentionUnavailableFailure(),
+          const IntentionCorruptionFailure(),
+          const IntentionUnexpectedFailure(),
+        ];
+
+        for (var index = 0; index < failures.length; index += 1) {
+          final repository = _ControlledIntentionRepository();
+          final coordinator = _coordinator(repository);
+          final completions = <IntentionCommandCompletion>[];
+          final fallbackClaims =
+              <Future<IntentionCatalogFallbackPresentationClaim?>>[];
+          final subscription = coordinator.completions.listen((completion) {
+            completions.add(completion);
+            fallbackClaims.add(
+              coordinator.claimCatalogFallback(completion.token),
+            );
+          });
+          final id = _id(_firstUuid);
+          final failure = failures[index];
+
+          final owned = coordinator.accept(
+            ArchiveIntention(id),
+          ) as IntentionCommandAccepted;
+          repository.complete(
+            0,
+            ResultFailure<IntentionCommandSuccess>(failure),
+          );
+          final ownedCompletion = await owned.future;
+          final initiator = coordinator.claimInitiator(owned.token);
+
+          expect(
+            ownedCompletion.result,
+            isA<ResultFailure<IntentionCommandSuccess>>().having(
+              (result) => result.failure,
+              'failure',
+              same(failure),
+            ),
+          );
+          expect(initiator, isA<IntentionInitiatorPresentationClaim>());
+          coordinator.confirmPresentation(initiator!);
+          expect(await fallbackClaims[0], isNull);
+          expect(coordinator.isRunning(id), isFalse);
+
+          final released = coordinator.accept(
+            RestoreIntention(id),
+          ) as IntentionCommandAccepted;
+          if (index.isEven) {
+            coordinator.releaseInitiatorPresentation(released.token);
+            repository.complete(
+              1,
+              ResultFailure<IntentionCommandSuccess>(failure),
+            );
+            await released.future;
+          } else {
+            repository.complete(
+              1,
+              ResultFailure<IntentionCommandSuccess>(failure),
+            );
+            await released.future;
+            coordinator.releaseInitiatorPresentation(released.token);
+          }
+
+          final fallback = await fallbackClaims[1];
+          expect(completions, hasLength(2));
+          expect(identical(owned.token, released.token), isFalse);
+          expect(fallback, isA<IntentionCatalogFallbackPresentationClaim>());
+          expect(
+            fallback!.completion.result,
+            isA<ResultFailure<IntentionCommandSuccess>>().having(
+              (result) => result.failure,
+              'failure',
+              same(failure),
+            ),
+          );
+          expect(coordinator.claimInitiator(released.token), isNull);
+          expect(coordinator.isRunning(id), isFalse);
+          coordinator.confirmPresentation(fallback);
+          coordinator.confirmPresentation(fallback);
+          expect(
+            await coordinator.claimCatalogFallback(released.token),
+            isNull,
+          );
+
+          await subscription.cancel();
+          await coordinator.shutdown();
+        }
       },
     );
 
