@@ -56,6 +56,9 @@ jobs:
       - name: Verify generated artifacts
         run: mise run codegen-check
 
+      - name: Verify generated-artifact detector negative paths
+        run: mise run codegen-check-test
+
       - name: Run full project checks
         run: mise run check
 
