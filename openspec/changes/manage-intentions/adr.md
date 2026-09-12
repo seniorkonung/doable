@@ -1,7 +1,7 @@
 # Манифест проверки ADR
 
 - Status: completed
-- Review date: 2026-09-10
+- Review date: 2026-09-12
 
 ## Результат проверки
 
@@ -18,7 +18,7 @@
 - [ADR-0005](../../../docs/adr/0005-use-bounded-catalog-snapshots.md) — задаёт единственную storage-neutral repository seam, ограниченные снимки каталога, разделение прямого read/query path с coordinator-owned command path и их согласование эфемерной process-local revision.
 - [ADR-0002](../../../docs/adr/0002-use-drift-sqlite-for-local-graph.md) — определяет основу постоянного хранения намерений: Drift/SQLite, транзакции, миграции, capability для Doable-owned соединений и adapter boundary для внешнего владельца соединения.
 - [ADR-0003](../../../docs/adr/0003-use-typed-uuid-identifiers-for-domain-entities.md) — важен для идентичности намерения во всех операциях change и её независимости от названия, хранилища и стратегии генерации UUID.
-- [ADR-0004](../../../docs/adr/0004-keep-personal-graph-device-local.md) — определяет защиту личных данных на текущем Android host и границы обещанной долговечности без неуправляемого backup/transfer.
+- [ADR-0004](../../../docs/adr/0004-keep-personal-graph-device-local.md) — определяет защиту личных данных на текущем Android host, exact allowlist packaged permissions и границы обещанной долговечности без неуправляемого backup/transfer.
 - [ADR-0006](../../../docs/adr/0006-treat-device-clock-timestamps-as-observations.md) — нужен для корректной трактовки времени создания и изменения намерений, проверки сохранённых данных и сортировки каталога.
 - [ADR-0007](../../../docs/adr/0007-restrict-graph-user-text-to-unicode-without-nul.md) — связывает названия, описания и фильтр единым допустимым Unicode-repertoire на всём пути от ввода до хранения и поиска.
 - [ADR-0008](../../../docs/adr/0008-treat-sqlite-schema-functions-as-durable-contract.md) — важен для вычисляемого поискового ключа названия: его schema-function должна регистрироваться на каждом физическом соединении через принадлежащую соответствующему connection-owning path границу.

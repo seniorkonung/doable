@@ -1073,11 +1073,11 @@
 
 - [ ] 8.7 Закрыть lossless raw-storage boundary для всех command snapshots намерения
   - **Критерии приёмки:**
-    - Update, readiness, archive/restore и delete получают исходные SQLite storage classes каждого поля, участвующего в `IntentionSaved` или `before`/`after` catalog snapshot, через одну каноническую lossless-границу до generated Drift mapping; title search projection также остаётся проверенной строкой и не раскрывается через публичную seam.
-    - BLOB вместо текста, нецелые либо выходящие за `0`/`1` boolean values, REAL/string timestamps и иное malformed сохранённое значение возвращают `IntentionCorruptionFailure` с безопасной diagnostics category, не изменяют строку, не удаляют её, не публикуют частичный success и не продвигают repository revision.
-    - Допустимые update/state/delete и no-op сохраняют существующие транзакционные, timestamp, точные membership snapshot и revision contracts без изменения application interface.
+    - Create post-insert, update, readiness, archive/restore и delete получают исходные SQLite storage classes каждого поля, участвующего в `IntentionSaved` или `before`/`after` catalog snapshot, через одну каноническую lossless-границу до generated Drift mapping; title search projection проверяется как строка с собственными schema-инвариантами, не пересчитывается по текущим Unicode-данным и не раскрывается через публичную seam.
+    - BLOB вместо текста, нецелые либо выходящие за `0`/`1` boolean values, REAL/string timestamps и иное malformed сохранённое значение возвращают `IntentionCorruptionFailure` с безопасной diagnostics category, не изменяют строку, не удаляют её, не публикуют частичный success и не продвигают repository revision; недопустимый post-insert или `after` откатывает транзакцию.
+    - Допустимые create/update/state/delete и no-op сохраняют существующие транзакционные, timestamp, точные membership snapshot и revision contracts без изменения application interface и без обязательного изменения SQLite schema.
   - **Проверка:**
-    - По TDD добавить command fixtures для raw BLOB/text, boolean и timestamp coercion, включая state transition, delete и representative update/no-op, затем выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_catalog_test.dart test/intention/data/file_backed_drift_intention_repository_test.dart`.
+    - По TDD добавить command fixtures для raw BLOB/text, boolean и timestamp coercion, включая state transition, delete и representative update/no-op. Отдельно подменить raw result post-insert через закрытый connection observer и доказать `IntentionCorruptionFailure`, rollback создания и неизменную revision; затем выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_catalog_test.dart test/intention/data/file_backed_drift_intention_repository_test.dart`.
     - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
   - **Зависимости:** 8.6.
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`; при необходимости общий data test support.
@@ -1085,7 +1085,8 @@
 
 - [ ] 8.8 Сделать packaged Android permission policy полной относительно privacy boundary
   - **Критерии приёмки:**
-    - Проверка merged manifest собранного release APK отклоняет `INTERNET` и любой неутверждённый доступ к shared/external storage либо media, включая permissions, добавленные транзитивными зависимостями; новые Android permission names не попадают в молчаливый пробел конечного denylist.
+    - Для текущего release утверждённый набор запрашиваемых permissions состоит только из принадлежащего package разрешения `software.doable.doable.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`; packaged manifest одновременно объявляет его с уровнем защиты `signature`. Любой другой `uses-permission` или `uses-permission-sdk-23`, включая `INTERNET`, системный либо сторонний permission и неизвестное текущему Android SDK имя, делает проверку неуспешной.
+    - Расширение утверждённого набора требует отдельного явного продуктового решения и согласованного изменения privacy contract; permission, добавленный транзитивной зависимостью или manifest edit без такого решения, не может пройти обязательный gate. Новые Android permission names не попадают в молчаливый пробел конечного denylist.
     - Negative fixtures отклоняют существующий набор запрещённых permissions, `READ_MEDIA_VISUAL_USER_SELECTED`, `ACCESS_MEDIA_LOCATION` и смешанный permission dump, а утверждённый набор без таких разрешений проходит; parser не принимает отсутствие либо неожиданный формат evidence за успех.
     - Тот же проверенный механизм используется обязательным `Full checks` после release APK build и сохраняет текущую проверку `allowBackup`, `fullBackupContent` и `dataExtractionRules` без заявления о runtime privacy на устройстве.
   - **Проверка:**
