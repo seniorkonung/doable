@@ -153,4 +153,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get catalogNoDescription => 'No description';
+
+  @override
+  String get editorTitle => 'Create intention';
+
+  @override
+  String get editorCreateAction => 'Create intention';
+
+  @override
+  String get editorCreating => 'Creating…';
+
+  @override
+  String get editorTitleLabel => 'Title';
+
+  @override
+  String get editorDescriptionLabel => 'Description (optional)';
+
+  @override
+  String get editorTitleEmpty => 'Enter a title.';
+
+  @override
+  String get editorTitleTooLong => 'Use no more than 255 characters.';
+
+  @override
+  String get editorTitleInvalidUnicode =>
+      'Enter valid Unicode text without NUL.';
+
+  @override
+  String get editorDescriptionTooLong => 'Use no more than 4096 characters.';
+
+  @override
+  String get editorDescriptionInvalidUnicode =>
+      'Enter valid Unicode text without NUL.';
+
+  @override
+  String get editorInvalidInput => 'Check the entered data.';
+
+  @override
+  String get editorCreateConflict =>
+      'The intention couldn’t be created because of a conflict.';
+
+  @override
+  String get editorCreateUnavailable =>
+      'The intention couldn’t be created. Try again.';
+
+  @override
+  String get editorCreateCorruption =>
+      'Stored data is damaged. The intention wasn’t created.';
+
+  @override
+  String get editorCreateUnexpected =>
+      'The intention couldn’t be created because of an unexpected error.';
+
+  @override
+  String get editorCreated => 'Intention created.';
 }

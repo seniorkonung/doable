@@ -361,6 +361,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No description'**
   String get catalogNoDescription;
+
+  /// Заголовок формы создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create intention'**
+  String get editorTitle;
+
+  /// Действие создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create intention'**
+  String get editorCreateAction;
+
+  /// Состояние выполняющегося создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Creating…'**
+  String get editorCreating;
+
+  /// Подпись поля названия намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get editorTitleLabel;
+
+  /// Подпись необязательного поля описания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Description (optional)'**
+  String get editorDescriptionLabel;
+
+  /// Ошибка пустого названия намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a title.'**
+  String get editorTitleEmpty;
+
+  /// Ошибка превышения длины названия намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Use no more than 255 characters.'**
+  String get editorTitleTooLong;
+
+  /// Ошибка недопустимого Unicode в названии намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Enter valid Unicode text without NUL.'**
+  String get editorTitleInvalidUnicode;
+
+  /// Ошибка превышения длины описания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Use no more than 4096 characters.'**
+  String get editorDescriptionTooLong;
+
+  /// Ошибка недопустимого Unicode в описании намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Enter valid Unicode text without NUL.'**
+  String get editorDescriptionInvalidUnicode;
+
+  /// Общая ошибка проверки формы создания
+  ///
+  /// In en, this message translates to:
+  /// **'Check the entered data.'**
+  String get editorInvalidInput;
+
+  /// Безопасное сообщение о конфликте создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention couldn’t be created because of a conflict.'**
+  String get editorCreateConflict;
+
+  /// Устранимая недоступность создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention couldn’t be created. Try again.'**
+  String get editorCreateUnavailable;
+
+  /// Терминальное повреждение данных при создании намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The intention wasn’t created.'**
+  String get editorCreateCorruption;
+
+  /// Терминальная непредвиденная ошибка создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention couldn’t be created because of an unexpected error.'**
+  String get editorCreateUnexpected;
+
+  /// Подтверждение успешного создания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention created.'**
+  String get editorCreated;
 }
 
 class _AppLocalizationsDelegate

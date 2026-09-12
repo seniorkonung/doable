@@ -43,5 +43,21 @@
   "catalogReady": "Готово к действию",
   "catalogNotReady": "Не готово к действию",
   "catalogHasDescription": "Есть описание",
-  "catalogNoDescription": "Нет описания"
+  "catalogNoDescription": "Нет описания",
+  "editorTitle": "Создать намерение",
+  "editorCreateAction": "Создать намерение",
+  "editorCreating": "Создаём…",
+  "editorTitleLabel": "Название",
+  "editorDescriptionLabel": "Описание (необязательно)",
+  "editorTitleEmpty": "Введите название.",
+  "editorTitleTooLong": "Используйте не более 255 символов.",
+  "editorTitleInvalidUnicode": "Введите корректный Unicode-текст без NUL.",
+  "editorDescriptionTooLong": "Используйте не более 4096 символов.",
+  "editorDescriptionInvalidUnicode": "Введите корректный Unicode-текст без NUL.",
+  "editorInvalidInput": "Проверьте введённые данные.",
+  "editorCreateConflict": "Не удалось создать намерение из-за конфликта.",
+  "editorCreateUnavailable": "Не удалось создать намерение. Повторите попытку.",
+  "editorCreateCorruption": "Сохранённые данные повреждены. Намерение не создано.",
+  "editorCreateUnexpected": "Не удалось создать намерение из-за непредвиденной ошибки.",
+  "editorCreated": "Намерение создано."
 }

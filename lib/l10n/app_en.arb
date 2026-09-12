@@ -180,5 +180,69 @@
   "catalogNoDescription": "No description",
   "@catalogNoDescription": {
     "description": "Признак отсутствия описания намерения"
+  },
+  "editorTitle": "Create intention",
+  "@editorTitle": {
+    "description": "Заголовок формы создания намерения"
+  },
+  "editorCreateAction": "Create intention",
+  "@editorCreateAction": {
+    "description": "Действие создания намерения"
+  },
+  "editorCreating": "Creating…",
+  "@editorCreating": {
+    "description": "Состояние выполняющегося создания намерения"
+  },
+  "editorTitleLabel": "Title",
+  "@editorTitleLabel": {
+    "description": "Подпись поля названия намерения"
+  },
+  "editorDescriptionLabel": "Description (optional)",
+  "@editorDescriptionLabel": {
+    "description": "Подпись необязательного поля описания намерения"
+  },
+  "editorTitleEmpty": "Enter a title.",
+  "@editorTitleEmpty": {
+    "description": "Ошибка пустого названия намерения"
+  },
+  "editorTitleTooLong": "Use no more than 255 characters.",
+  "@editorTitleTooLong": {
+    "description": "Ошибка превышения длины названия намерения"
+  },
+  "editorTitleInvalidUnicode": "Enter valid Unicode text without NUL.",
+  "@editorTitleInvalidUnicode": {
+    "description": "Ошибка недопустимого Unicode в названии намерения"
+  },
+  "editorDescriptionTooLong": "Use no more than 4096 characters.",
+  "@editorDescriptionTooLong": {
+    "description": "Ошибка превышения длины описания намерения"
+  },
+  "editorDescriptionInvalidUnicode": "Enter valid Unicode text without NUL.",
+  "@editorDescriptionInvalidUnicode": {
+    "description": "Ошибка недопустимого Unicode в описании намерения"
+  },
+  "editorInvalidInput": "Check the entered data.",
+  "@editorInvalidInput": {
+    "description": "Общая ошибка проверки формы создания"
+  },
+  "editorCreateConflict": "The intention couldn’t be created because of a conflict.",
+  "@editorCreateConflict": {
+    "description": "Безопасное сообщение о конфликте создания намерения"
+  },
+  "editorCreateUnavailable": "The intention couldn’t be created. Try again.",
+  "@editorCreateUnavailable": {
+    "description": "Устранимая недоступность создания намерения"
+  },
+  "editorCreateCorruption": "Stored data is damaged. The intention wasn’t created.",
+  "@editorCreateCorruption": {
+    "description": "Терминальное повреждение данных при создании намерения"
+  },
+  "editorCreateUnexpected": "The intention couldn’t be created because of an unexpected error.",
+  "@editorCreateUnexpected": {
+    "description": "Терминальная непредвиденная ошибка создания намерения"
+  },
+  "editorCreated": "Intention created.",
+  "@editorCreated": {
+    "description": "Подтверждение успешного создания намерения"
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/routing/app_router.gr.dart';
 import '../../application/intention_repository.dart';
 import '../../domain/intention.dart';
 import 'intention_catalog_state.dart';
@@ -39,6 +40,14 @@ final class _IntentionCatalogPageState
     final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
       appBar: AppBar(title: Text(localizations.catalogTitle)),
+      floatingActionButton: FloatingActionButton.extended(
+        key: const ValueKey('catalog-create-intention'),
+        onPressed: () {
+          context.router.push(const IntentionEditorRoute());
+        },
+        icon: const Icon(Icons.add),
+        label: Text(localizations.editorCreateAction),
+      ),
       body: Column(
         children: [
           _CatalogControls(

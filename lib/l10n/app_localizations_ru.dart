@@ -154,4 +154,58 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get catalogNoDescription => 'Нет описания';
+
+  @override
+  String get editorTitle => 'Создать намерение';
+
+  @override
+  String get editorCreateAction => 'Создать намерение';
+
+  @override
+  String get editorCreating => 'Создаём…';
+
+  @override
+  String get editorTitleLabel => 'Название';
+
+  @override
+  String get editorDescriptionLabel => 'Описание (необязательно)';
+
+  @override
+  String get editorTitleEmpty => 'Введите название.';
+
+  @override
+  String get editorTitleTooLong => 'Используйте не более 255 символов.';
+
+  @override
+  String get editorTitleInvalidUnicode =>
+      'Введите корректный Unicode-текст без NUL.';
+
+  @override
+  String get editorDescriptionTooLong => 'Используйте не более 4096 символов.';
+
+  @override
+  String get editorDescriptionInvalidUnicode =>
+      'Введите корректный Unicode-текст без NUL.';
+
+  @override
+  String get editorInvalidInput => 'Проверьте введённые данные.';
+
+  @override
+  String get editorCreateConflict =>
+      'Не удалось создать намерение из-за конфликта.';
+
+  @override
+  String get editorCreateUnavailable =>
+      'Не удалось создать намерение. Повторите попытку.';
+
+  @override
+  String get editorCreateCorruption =>
+      'Сохранённые данные повреждены. Намерение не создано.';
+
+  @override
+  String get editorCreateUnexpected =>
+      'Не удалось создать намерение из-за непредвиденной ошибки.';
+
+  @override
+  String get editorCreated => 'Намерение создано.';
 }
