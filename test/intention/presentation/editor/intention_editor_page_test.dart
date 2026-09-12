@@ -197,40 +197,55 @@ void main() {
     }
   });
 
-  testWidgets('возвращается в каталог только после подтверждённого success', (
-    tester,
-  ) async {
-    final repository = ControlledCatalogRepository();
-    final router = await _openEditor(tester, repository);
-    await tester.enterText(
-      find.byKey(const ValueKey('intention-editor-title')),
-      'Новое намерение',
-    );
-    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
-    await tester.pump();
-
-    expect(router.current.name, IntentionEditorRoute.name);
-    repository.completeCommand(0, _savedResult(title: 'Новое намерение'));
-    await tester.pump();
-    await tester.pump();
-    if (repository.queries.length > 1) {
-      repository.complete(
-        1,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: const [],
-            totalCount: 0,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
-        ),
+  testWidgets(
+    'создаёт намерение с минимальными данными и возвращается после success',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      final router = await _openEditor(tester, repository);
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Новое намерение',
       );
-    }
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await tester.pump();
 
-    expect(router.current.name, IntentionCatalogRoute.name);
-    expect(find.text('Intention created.'), findsOneWidget);
-  });
+      expect(
+        repository.commands.single,
+        isA<CreateIntention>()
+            .having(
+              (command) => command.title,
+              'минимальное название',
+              'Новое намерение',
+            )
+            .having(
+              (command) => command.description,
+              'отсутствующее необязательное описание',
+              isNull,
+            ),
+      );
+      expect(router.current.name, IntentionEditorRoute.name);
+      repository.completeCommand(0, _savedResult(title: 'Новое намерение'));
+      await tester.pump();
+      await tester.pump();
+      if (repository.queries.length > 1) {
+        repository.complete(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: const [],
+              totalCount: 0,
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+      }
+      await tester.pumpAndSettle();
+
+      expect(router.current.name, IntentionCatalogRoute.name);
+      expect(find.text('Intention created.'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'не повторяет в каталоге failure, представленный открытой формой',

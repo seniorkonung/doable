@@ -56,29 +56,42 @@ void main() {
     },
   );
 
-  test('независимые экземпляры формы не блокируют друг друга', () {
-    final repository = ControlledCatalogRepository();
-    final container = _container(repository);
-    final firstProvider = intentionEditorViewModelProvider(
-      IntentionEditorSession(),
-    );
-    final secondProvider = intentionEditorViewModelProvider(
-      IntentionEditorSession(),
-    );
-    final firstSubscription = container.listen(firstProvider, (_, _) {});
-    final secondSubscription = container.listen(secondProvider, (_, _) {});
-    addTearDown(firstSubscription.close);
-    addTearDown(secondSubscription.close);
+  test(
+    'независимые формы позволяют создать намерения с одинаковым названием',
+    () {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final firstProvider = intentionEditorViewModelProvider(
+        IntentionEditorSession(),
+      );
+      final secondProvider = intentionEditorViewModelProvider(
+        IntentionEditorSession(),
+      );
+      final firstSubscription = container.listen(firstProvider, (_, _) {});
+      final secondSubscription = container.listen(secondProvider, (_, _) {});
+      addTearDown(firstSubscription.close);
+      addTearDown(secondSubscription.close);
 
-    container.read(firstProvider.notifier)
-      ..changeTitle('Первое намерение')
-      ..submit();
-    container.read(secondProvider.notifier)
-      ..changeTitle('Второе намерение')
-      ..submit();
+      container.read(firstProvider.notifier)
+        ..changeTitle('Одинаковое намерение')
+        ..submit();
+      container.read(secondProvider.notifier)
+        ..changeTitle('Одинаковое намерение')
+        ..submit();
 
-    expect(repository.commands, hasLength(2));
-  });
+      expect(repository.commands, hasLength(2));
+      expect(
+        repository.commands,
+        everyElement(
+          isA<CreateIntention>().having(
+            (command) => command.title,
+            'название',
+            'Одинаковое намерение',
+          ),
+        ),
+      );
+    },
+  );
 
   test('сохраняет поля и field-specific validation для исправления', () async {
     final repository = ControlledCatalogRepository();
