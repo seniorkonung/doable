@@ -48,4 +48,44 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bootstrapUnexpectedFailure =>
       'Local data couldn’t be opened because of an unexpected error.';
+
+  @override
+  String get catalogLoading => 'Loading intentions…';
+
+  @override
+  String catalogTotalCount(int count) {
+    return 'Total intentions: $count';
+  }
+
+  @override
+  String get catalogActiveEmpty => 'No active intentions yet.';
+
+  @override
+  String get catalogArchivedEmpty => 'No archived intentions yet.';
+
+  @override
+  String get catalogAllEmpty => 'No intentions yet.';
+
+  @override
+  String get catalogUnavailable => 'Intentions couldn’t be loaded. Try again.';
+
+  @override
+  String get catalogCorruption =>
+      'Stored intention data is damaged and can’t be shown.';
+
+  @override
+  String get catalogUnexpectedFailure =>
+      'Intentions couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get catalogReady => 'Ready for action';
+
+  @override
+  String get catalogNotReady => 'Not ready for action';
+
+  @override
+  String get catalogHasDescription => 'Has description';
+
+  @override
+  String get catalogNoDescription => 'No description';
 }

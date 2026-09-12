@@ -47,5 +47,58 @@
   "bootstrapUnexpectedFailure": "Local data couldn’t be opened because of an unexpected error.",
   "@bootstrapUnexpectedFailure": {
     "description": "Терминальное состояние непредвиденной ошибки локального хранилища"
+  },
+  "catalogLoading": "Loading intentions…",
+  "@catalogLoading": {
+    "description": "Начальная загрузка каталога намерений"
+  },
+  "catalogTotalCount": "Total intentions: {count}",
+  "@catalogTotalCount": {
+    "description": "Точное количество намерений в текущей выдаче",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catalogActiveEmpty": "No active intentions yet.",
+  "@catalogActiveEmpty": {
+    "description": "Пустой каталог активных намерений"
+  },
+  "catalogArchivedEmpty": "No archived intentions yet.",
+  "@catalogArchivedEmpty": {
+    "description": "Пустой каталог архивированных намерений"
+  },
+  "catalogAllEmpty": "No intentions yet.",
+  "@catalogAllEmpty": {
+    "description": "Пустой каталог всех намерений"
+  },
+  "catalogUnavailable": "Intentions couldn’t be loaded. Try again.",
+  "@catalogUnavailable": {
+    "description": "Устранимая недоступность первой страницы каталога"
+  },
+  "catalogCorruption": "Stored intention data is damaged and can’t be shown.",
+  "@catalogCorruption": {
+    "description": "Терминальное состояние повреждённых данных каталога"
+  },
+  "catalogUnexpectedFailure": "Intentions couldn’t be loaded because of an unexpected error.",
+  "@catalogUnexpectedFailure": {
+    "description": "Терминальное состояние непредвиденной ошибки каталога"
+  },
+  "catalogReady": "Ready for action",
+  "@catalogReady": {
+    "description": "Признак готовности намерения к действию"
+  },
+  "catalogNotReady": "Not ready for action",
+  "@catalogNotReady": {
+    "description": "Признак отсутствия готовности намерения к действию"
+  },
+  "catalogHasDescription": "Has description",
+  "@catalogHasDescription": {
+    "description": "Признак наличия описания намерения"
+  },
+  "catalogNoDescription": "No description",
+  "@catalogNoDescription": {
+    "description": "Признак отсутствия описания намерения"
   }
 }

@@ -48,4 +48,45 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get bootstrapUnexpectedFailure =>
       'Не удалось открыть локальные данные из-за непредвиденной ошибки.';
+
+  @override
+  String get catalogLoading => 'Загружаем намерения…';
+
+  @override
+  String catalogTotalCount(int count) {
+    return 'Всего намерений: $count';
+  }
+
+  @override
+  String get catalogActiveEmpty => 'Активных намерений пока нет.';
+
+  @override
+  String get catalogArchivedEmpty => 'Архивных намерений пока нет.';
+
+  @override
+  String get catalogAllEmpty => 'Намерений пока нет.';
+
+  @override
+  String get catalogUnavailable =>
+      'Не удалось загрузить намерения. Повторите попытку.';
+
+  @override
+  String get catalogCorruption =>
+      'Сохранённые данные намерений повреждены и не могут быть показаны.';
+
+  @override
+  String get catalogUnexpectedFailure =>
+      'Не удалось загрузить намерения из-за непредвиденной ошибки.';
+
+  @override
+  String get catalogReady => 'Готово к действию';
+
+  @override
+  String get catalogNotReady => 'Не готово к действию';
+
+  @override
+  String get catalogHasDescription => 'Есть описание';
+
+  @override
+  String get catalogNoDescription => 'Нет описания';
 }

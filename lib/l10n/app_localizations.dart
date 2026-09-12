@@ -169,6 +169,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Local data couldn’t be opened because of an unexpected error.'**
   String get bootstrapUnexpectedFailure;
+
+  /// Начальная загрузка каталога намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading intentions…'**
+  String get catalogLoading;
+
+  /// Точное количество намерений в текущей выдаче
+  ///
+  /// In en, this message translates to:
+  /// **'Total intentions: {count}'**
+  String catalogTotalCount(int count);
+
+  /// Пустой каталог активных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'No active intentions yet.'**
+  String get catalogActiveEmpty;
+
+  /// Пустой каталог архивированных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'No archived intentions yet.'**
+  String get catalogArchivedEmpty;
+
+  /// Пустой каталог всех намерений
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions yet.'**
+  String get catalogAllEmpty;
+
+  /// Устранимая недоступность первой страницы каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions couldn’t be loaded. Try again.'**
+  String get catalogUnavailable;
+
+  /// Терминальное состояние повреждённых данных каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Stored intention data is damaged and can’t be shown.'**
+  String get catalogCorruption;
+
+  /// Терминальное состояние непредвиденной ошибки каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions couldn’t be loaded because of an unexpected error.'**
+  String get catalogUnexpectedFailure;
+
+  /// Признак готовности намерения к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for action'**
+  String get catalogReady;
+
+  /// Признак отсутствия готовности намерения к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Not ready for action'**
+  String get catalogNotReady;
+
+  /// Признак наличия описания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Has description'**
+  String get catalogHasDescription;
+
+  /// Признак отсутствия описания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get catalogNoDescription;
 }
 
 class _AppLocalizationsDelegate

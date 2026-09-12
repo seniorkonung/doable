@@ -11,20 +11,21 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:auto_route/auto_route.dart' as _i2;
-import 'package:doable/src/app/routing/app_placeholder_page.dart' as _i1;
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
+    as _i1;
 
 /// generated route for
-/// [_i1.AppPlaceholderPage]
-class AppPlaceholderRoute extends _i2.PageRouteInfo<void> {
-  const AppPlaceholderRoute({List<_i2.PageRouteInfo>? children})
-    : super(AppPlaceholderRoute.name, initialChildren: children);
+/// [_i1.IntentionCatalogPage]
+class IntentionCatalogRoute extends _i2.PageRouteInfo<void> {
+  const IntentionCatalogRoute({List<_i2.PageRouteInfo>? children})
+    : super(IntentionCatalogRoute.name, initialChildren: children);
 
-  static const String name = 'AppPlaceholderRoute';
+  static const String name = 'IntentionCatalogRoute';
 
   static _i2.PageInfo page = _i2.PageInfo(
     name,
     builder: (data) {
-      return const _i1.AppPlaceholderPage();
+      return const _i1.IntentionCatalogPage();
     },
   );
 }

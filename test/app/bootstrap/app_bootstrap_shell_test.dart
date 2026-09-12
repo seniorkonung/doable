@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
-import 'package:doable/src/app/routing/app_placeholder_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         LocalDatabaseConnectionObserver,
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,13 +38,13 @@ void main() {
       await openingStarted.future;
 
       expect(find.text('Preparing local data…'), findsOneWidget);
-      expect(find.byType(AppPlaceholderPage), findsNothing);
+      expect(find.byType(IntentionCatalogPage), findsNothing);
 
       allowOpening.complete();
       await tester.pumpAndSettle();
 
       final ready = await runtime.bootstrap() as AppRuntimeReady;
-      final featureContext = tester.element(find.byType(AppPlaceholderPage));
+      final featureContext = tester.element(find.byType(IntentionCatalogPage));
       expect(
         ProviderScope.containerOf(featureContext, listen: false),
         same(ready.container),
@@ -84,13 +84,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.widgetWithText(FilledButton, 'Try again'), findsOneWidget);
-    expect(find.byType(AppPlaceholderPage), findsNothing);
+    expect(find.byType(IntentionCatalogPage), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await tester.pumpAndSettle();
 
     expect(attempts, 2);
-    expect(find.byType(AppPlaceholderPage), findsOneWidget);
+    expect(find.byType(IntentionCatalogPage), findsOneWidget);
   });
 
   testWidgets('corruption имеет terminal-состояние без retry', (tester) async {

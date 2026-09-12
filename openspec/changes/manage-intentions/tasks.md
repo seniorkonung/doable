@@ -789,7 +789,7 @@
   - **Вероятно затронутые файлы:** `lib/main.dart`, новые файлы в `lib/src/app/bootstrap/` и `lib/src/app/`, generated Riverpod artifacts, `test/app/bootstrap/`.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 7.3 Заменить экран-заглушку типизированным маршрутом начального каталога с подтверждёнными состояниями первой страницы
+- [x] 7.3 Заменить экран-заглушку типизированным маршрутом начального каталога с подтверждёнными состояниями первой страницы
   - **Критерии приёмки:**
     - `MaterialApp.router` и generated AutoRoute открывают каталог только через типизированный `PageRouteInfo`; router принадлежит provider graph, а строковые named routes, ручные path и deep-link adapter отсутствуют.
     - Generated Catalog ViewModel начинает с active scope и `createdAt descending`, запрашивает ограниченную первую страницу по проверенной `CatalogPagingPolicy`, принимает её count/cursor/revision как авторитетную основу query generation и различает initial loading, data, scope-specific empty, retryable failure и non-retryable failure.
