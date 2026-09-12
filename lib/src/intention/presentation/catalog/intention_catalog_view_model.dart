@@ -13,6 +13,8 @@ part 'intention_catalog_view_model.g.dart';
 
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
+  final _presentationListeners =
+      <void Function(IntentionCatalogPresentationEvent)>{};
   IntentionScope _scope = IntentionCatalogSelection.initial.scope;
   String _titleFilterText = IntentionCatalogSelection.initial.titleFilterText;
   IntentionCatalogOrder _order = IntentionCatalogSelection.initial.order;
@@ -29,6 +31,18 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     order: _order,
     filterValidationFailure: _filterValidationFailure,
   );
+
+  void addPresentationListener(
+    void Function(IntentionCatalogPresentationEvent) listener,
+  ) {
+    _presentationListeners.add(listener);
+  }
+
+  void removePresentationListener(
+    void Function(IntentionCatalogPresentationEvent) listener,
+  ) {
+    _presentationListeners.remove(listener);
+  }
 
   @override
   Future<IntentionCatalogState> build() {
@@ -435,6 +449,18 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   void _handleCompletion(IntentionCommandCompletion completion) {
+    if (completion.kind == IntentionCommandKind.create) {
+      final coordinator = ref.read(
+        intentionCommandCoordinatorProvider.notifier,
+      );
+      unawaited(
+        _publishCreateFallback(
+          coordinator.claimCatalogFallback(completion.token),
+          coordinator,
+        ),
+      );
+    }
+
     switch (completion.result) {
       case ResultSuccess():
         if (_isDebouncingFilter ||
@@ -448,4 +474,44 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         return;
     }
   }
+
+  Future<void> _publishCreateFallback(
+    Future<IntentionCatalogFallbackPresentationClaim?> pendingClaim,
+    IntentionCommandCoordinator coordinator,
+  ) async {
+    final claim = await pendingClaim;
+    if (claim == null) {
+      return;
+    }
+    if (!ref.mounted) {
+      coordinator.confirmPresentation(claim);
+      return;
+    }
+
+    final event = IntentionCatalogPresentationEvent.create(
+      _createOutcome(claim.completion.result),
+    );
+    for (final listener in _presentationListeners.toList(growable: false)) {
+      listener(event);
+    }
+    coordinator.confirmPresentation(claim);
+  }
+
+  IntentionCatalogCreateOutcome _createOutcome(
+    Result<IntentionCommandSuccess> result,
+  ) => switch (result) {
+    ResultSuccess(value: IntentionSaved()) =>
+      IntentionCatalogCreateOutcome.succeeded,
+    ResultSuccess(value: IntentionDeleted()) =>
+      IntentionCatalogCreateOutcome.unexpected,
+    ResultFailure(:final failure) => switch (failure) {
+      IntentionValidationFailure() => IntentionCatalogCreateOutcome.validation,
+      IntentionConflictFailure() => IntentionCatalogCreateOutcome.conflict,
+      IntentionUnavailableFailure() =>
+        IntentionCatalogCreateOutcome.unavailable,
+      IntentionCorruptionFailure() => IntentionCatalogCreateOutcome.corruption,
+      IntentionNotFoundFailure() ||
+      IntentionUnexpectedFailure() => IntentionCatalogCreateOutcome.unexpected,
+    },
+  };
 }

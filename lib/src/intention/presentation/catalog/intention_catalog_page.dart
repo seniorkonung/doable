@@ -24,9 +24,18 @@ final class _IntentionCatalogPageState
     extends ConsumerState<IntentionCatalogPage> {
   final _filterController = TextEditingController();
   final _scrollController = ScrollController();
+  late final IntentionCatalogViewModel _notifier;
+
+  @override
+  void initState() {
+    super.initState();
+    _notifier = ref.read(intentionCatalogViewModelProvider.notifier);
+    _notifier.addPresentationListener(_showPresentationEvent);
+  }
 
   @override
   void dispose() {
+    _notifier.removePresentationListener(_showPresentationEvent);
     _filterController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -92,6 +101,28 @@ final class _IntentionCatalogPageState
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
+  }
+
+  void _showPresentationEvent(IntentionCatalogPresentationEvent event) {
+    if (!mounted) {
+      return;
+    }
+    final localizations = AppLocalizations.of(context);
+    final message = switch (event.createOutcome) {
+      IntentionCatalogCreateOutcome.succeeded => localizations.editorCreated,
+      IntentionCatalogCreateOutcome.validation =>
+        localizations.editorInvalidInput,
+      IntentionCatalogCreateOutcome.conflict =>
+        localizations.editorCreateConflict,
+      IntentionCatalogCreateOutcome.unavailable =>
+        localizations.editorCreateUnavailable,
+      IntentionCatalogCreateOutcome.corruption =>
+        localizations.editorCreateCorruption,
+      IntentionCatalogCreateOutcome.unexpected =>
+        localizations.editorCreateUnexpected,
+    };
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

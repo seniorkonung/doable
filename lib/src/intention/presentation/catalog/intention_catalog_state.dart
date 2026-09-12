@@ -1,5 +1,20 @@
 import '../../application/intention_repository.dart';
 
+enum IntentionCatalogCreateOutcome {
+  succeeded,
+  validation,
+  conflict,
+  unavailable,
+  corruption,
+  unexpected,
+}
+
+final class IntentionCatalogPresentationEvent {
+  const IntentionCatalogPresentationEvent.create(this.createOutcome);
+
+  final IntentionCatalogCreateOutcome createOutcome;
+}
+
 enum IntentionCatalogFilterValidationFailure {
   invalidUnicodeRepertoire,
   tooLong,

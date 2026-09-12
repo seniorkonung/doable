@@ -233,6 +233,148 @@ void main() {
     expect(find.text('Intention created.'), findsOneWidget);
   });
 
+  testWidgets(
+    'не повторяет в каталоге failure, представленный открытой формой',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      await _openEditor(tester, repository);
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Намерение',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('The intention couldn’t be created. Try again.'),
+        findsOneWidget,
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('The intention couldn’t be created. Try again.'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'передаёт поздний failure ушедшей формы каталогу ровно один раз',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      await _openEditor(tester, repository);
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Намерение',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.text(
+          'The intention couldn’t be created because of an unexpected error.',
+        ),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        find.text(
+          'The intention couldn’t be created because of an unexpected error.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('передаёт поздний success ушедшей формы каталогу', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await _openEditor(tester, repository);
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-title')),
+      'Позднее намерение',
+    );
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    repository.completeCommand(0, _savedResult(title: 'Позднее намерение'));
+    await tester.pump();
+    await tester.pump();
+    if (repository.queries.length > 1) {
+      repository.complete(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+    }
+    await tester.pumpAndSettle();
+
+    expect(find.text('Intention created.'), findsOneWidget);
+  });
+
+  testWidgets('успешный retry не оставляет сообщение прежнего failure', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await _openEditor(tester, repository);
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-title')),
+      'Намерение',
+    );
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
+    repository.completeCommand(1, _savedResult(title: 'Намерение'));
+    await tester.pump();
+    await tester.pump();
+    if (repository.queries.length > 1) {
+      repository.complete(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+    }
+    await tester.pumpAndSettle();
+
+    expect(find.text('Intention created.'), findsOneWidget);
+    expect(
+      find.text('The intention couldn’t be created. Try again.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('локализует форму и validation на русском', (tester) async {
     final repository = ControlledCatalogRepository();
     await _openEditor(tester, repository, locale: const Locale('ru'));
