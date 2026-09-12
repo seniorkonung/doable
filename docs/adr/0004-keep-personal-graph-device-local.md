@@ -1,6 +1,6 @@
 # ADR-0004: Хранить текущий граф во внутреннем хранилище Android
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-intentions
 - Date: 2026-08-28
 
