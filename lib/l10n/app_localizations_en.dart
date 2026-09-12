@@ -118,6 +118,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'Intentions couldn’t be loaded because of an unexpected error.';
 
   @override
+  String get catalogLoadingMore => 'Loading more intentions…';
+
+  @override
+  String get catalogLoadMoreUnavailable =>
+      'More intentions couldn’t be loaded.';
+
+  @override
+  String get catalogLoadMoreCorruption =>
+      'Stored intention data is damaged; no more intentions can be shown.';
+
+  @override
+  String get catalogLoadMoreUnexpected =>
+      'More intentions couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get catalogLoadMoreValidation =>
+      'The saved catalog position is no longer valid.';
+
+  @override
+  String get catalogReload => 'Reload catalog';
+
+  @override
+  String get catalogReloading => 'Reloading catalog…';
+
+  @override
   String get catalogReady => 'Ready for action';
 
   @override

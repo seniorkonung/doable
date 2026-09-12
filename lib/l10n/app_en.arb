@@ -137,6 +137,34 @@
   "@catalogUnexpectedFailure": {
     "description": "Терминальное состояние непредвиденной ошибки каталога"
   },
+  "catalogLoadingMore": "Loading more intentions…",
+  "@catalogLoadingMore": {
+    "description": "Загрузка следующей порции каталога"
+  },
+  "catalogLoadMoreUnavailable": "More intentions couldn’t be loaded.",
+  "@catalogLoadMoreUnavailable": {
+    "description": "Устранимая недоступность следующей порции каталога"
+  },
+  "catalogLoadMoreCorruption": "Stored intention data is damaged; no more intentions can be shown.",
+  "@catalogLoadMoreCorruption": {
+    "description": "Терминальное повреждение при загрузке следующей порции"
+  },
+  "catalogLoadMoreUnexpected": "More intentions couldn’t be loaded because of an unexpected error.",
+  "@catalogLoadMoreUnexpected": {
+    "description": "Терминальная непредвиденная ошибка следующей порции"
+  },
+  "catalogLoadMoreValidation": "The saved catalog position is no longer valid.",
+  "@catalogLoadMoreValidation": {
+    "description": "Недопустимый cursor следующей порции"
+  },
+  "catalogReload": "Reload catalog",
+  "@catalogReload": {
+    "description": "Явное восстановление каталога с первой страницы"
+  },
+  "catalogReloading": "Reloading catalog…",
+  "@catalogReloading": {
+    "description": "Восстановление каталога с первой страницы"
+  },
   "catalogReady": "Ready for action",
   "@catalogReady": {
     "description": "Признак готовности намерения к действию"

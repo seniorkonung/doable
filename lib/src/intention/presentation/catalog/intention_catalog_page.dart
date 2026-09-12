@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -256,15 +258,17 @@ final class _CatalogContent extends ConsumerWidget {
       };
 }
 
-final class _LoadedCatalog extends StatelessWidget {
+final class _LoadedCatalog extends ConsumerWidget {
   const _LoadedCatalog({required this.state, required this.scrollController});
 
   final IntentionCatalogLoaded state;
   final ScrollController scrollController;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final localizations = AppLocalizations.of(context);
+    final hasContinuationStatus =
+        state.continuation is! IntentionCatalogContinuationIdle;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -279,12 +283,113 @@ final class _LoadedCatalog extends StatelessWidget {
           child: ListView.builder(
             key: const ValueKey('catalog-list'),
             controller: scrollController,
-            itemCount: state.items.length,
-            itemBuilder: (context, index) =>
-                _IntentionSummaryTile(summary: state.items[index]),
+            itemCount: state.items.length + (hasContinuationStatus ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == state.items.length) {
+                return _CatalogContinuationStatus(
+                  continuation: state.continuation,
+                );
+              }
+              _requestNextPage(context, ref, index);
+              return _IntentionSummaryTile(summary: state.items[index]);
+            },
           ),
         ),
       ],
+    );
+  }
+
+  void _requestNextPage(BuildContext context, WidgetRef ref, int visibleIndex) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) {
+        return;
+      }
+      unawaited(
+        ref
+            .read(intentionCatalogViewModelProvider.notifier)
+            .loadNextPageIfNeeded(visibleIndex: visibleIndex),
+      );
+    });
+  }
+}
+
+final class _CatalogContinuationStatus extends ConsumerWidget {
+  const _CatalogContinuationStatus({required this.continuation});
+
+  final IntentionCatalogContinuationState continuation;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localizations = AppLocalizations.of(context);
+    final notifier = ref.read(intentionCatalogViewModelProvider.notifier);
+    return switch (continuation) {
+      IntentionCatalogContinuationIdle() => const SizedBox.shrink(),
+      IntentionCatalogContinuationLoading() => _CatalogInlineStatus(
+        message: localizations.catalogLoadingMore,
+      ),
+      IntentionCatalogContinuationUnavailable() => _CatalogInlineStatus(
+        message: localizations.catalogLoadMoreUnavailable,
+        actionLabel: localizations.commonRetry,
+        onAction: notifier.retryNextPage,
+      ),
+      IntentionCatalogContinuationCorruption() => _CatalogInlineStatus(
+        message: localizations.catalogLoadMoreCorruption,
+      ),
+      IntentionCatalogContinuationUnexpected() => _CatalogInlineStatus(
+        message: localizations.catalogLoadMoreUnexpected,
+      ),
+      IntentionCatalogContinuationValidation() => _CatalogInlineStatus(
+        message: localizations.catalogLoadMoreValidation,
+        actionLabel: localizations.catalogReload,
+        onAction: notifier.recoverFromInvalidCursor,
+      ),
+      IntentionCatalogContinuationRecovering() => _CatalogInlineStatus(
+        message: localizations.catalogReloading,
+      ),
+      IntentionCatalogRecoveryUnavailable() => _CatalogInlineStatus(
+        message: localizations.catalogUnavailable,
+        actionLabel: localizations.commonRetry,
+        onAction: notifier.retryRecovery,
+      ),
+      IntentionCatalogRecoveryCorruption() => _CatalogInlineStatus(
+        message: localizations.catalogCorruption,
+      ),
+      IntentionCatalogRecoveryUnexpected() => _CatalogInlineStatus(
+        message: localizations.catalogUnexpectedFailure,
+      ),
+    };
+  }
+}
+
+final class _CatalogInlineStatus extends StatelessWidget {
+  const _CatalogInlineStatus({
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  }) : assert((actionLabel == null) == (onAction == null));
+
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            if (onAction case final action?) ...[
+              const SizedBox(height: 12),
+              FilledButton(onPressed: action, child: Text(actionLabel!)),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

@@ -119,6 +119,31 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить намерения из-за непредвиденной ошибки.';
 
   @override
+  String get catalogLoadingMore => 'Загружаем ещё намерения…';
+
+  @override
+  String get catalogLoadMoreUnavailable =>
+      'Не удалось загрузить следующие намерения.';
+
+  @override
+  String get catalogLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующие намерения нельзя показать.';
+
+  @override
+  String get catalogLoadMoreUnexpected =>
+      'Не удалось загрузить следующие намерения из-за непредвиденной ошибки.';
+
+  @override
+  String get catalogLoadMoreValidation =>
+      'Сохранённая позиция каталога больше недействительна.';
+
+  @override
+  String get catalogReload => 'Перезагрузить каталог';
+
+  @override
+  String get catalogReloading => 'Перезагружаем каталог…';
+
+  @override
   String get catalogReady => 'Готово к действию';
 
   @override
