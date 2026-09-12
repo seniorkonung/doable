@@ -3,12 +3,10 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Подтверждены три blocking finding: F2 на lossless storage boundary
-  command-path, F3 в packaged Android permission policy и F4 в обязательном
-  evidence проверки generated-artifact detector. Принятые риски AR1, AR2 и AR3
-  остаются применимыми в своих границах.
+**Summary:** Активных findings нет. Принятые риски AR1, AR2 и AR3 остаются
+  применимыми в своих границах.
 
 ## Review target
 
@@ -59,32 +57,7 @@
 
 ## Findings
 
-### F2 · Medium — Command-path допускает lossy coercion повреждённых SQLite-значений
-
-- **Evidence:** На `lib/src/intention/data/drift_intention_repository.dart:258`, `:303`, `:345` и `:385` update, readiness, archive/restore и delete читают строку типизированным Drift select до `_rehydrate`. Generated mapper `lib/src/data/local/app_database.g.dart:193` использует `DriftSqlType.string`, `bool` и `int`; закреплённый Drift 2.34.3 преобразует произвольное значение в строку через `toString()`, любое ненулевое значение в `true`, а `double` в усечённый `int`. Catalog/detail paths уже обходят это через raw decoder, а `test/intention/data/drift_intention_catalog_test.dart:702` подтверждает достижимость BLOB-описания в corrupt fixture.
-- **Evidence revisions:** ["870f208d11bdb220eae05da3a59df4b37a92efe2"]
-- **Impact:** Изменение состояния или удаление повреждённой строки может вернуть success и точный mutation snapshot со сфабрикованными значениями вместо terminal `IntentionCorruptionFailure`; один и тот же row тогда по-разному трактуется command и read paths.
-- **Required outcome:** Каждое сохранённое поле, участвующее в command success или `before`/`after` catalog snapshot, проходит lossless проверку исходного SQLite storage class и предметных инвариантов до преобразования; malformed row не изменяется и даёт typed corruption без частичного success или продвижения revision.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/intention/data/drift_intention_repository.dart", "test/intention/data/drift_intention_repository_command_test.dart", "specs/local-data-lifecycle: Целостность сохранённого пользовательского текста"]
-
-### F3 · Medium — Packaged permission gate не выражает полную privacy policy
-
-- **Evidence:** `.github/workflows/ci.yml:72-87` отклоняет семь точных permission names, но пропускает Android permissions доступа к общим media данным, включая `READ_MEDIA_VISUAL_USER_SELECTED` и `ACCESS_MEDIA_LOCATION`. Проверка source manifest в `test/android/backup_policy_test.dart:9-35` ещё уже и не защищает от permissions, добавленных зависимостью в merged release manifest.
-- **Evidence revisions:** ["870f208d11bdb220eae05da3a59df4b37a92efe2"]
-- **Impact:** Транзитивная Android-зависимость или manifest edit может добавить доступ к shared/external media, а обязательный `Full checks` останется зелёным вопреки утверждённой границе отсутствия внешнего storage доступа.
-- **Required outcome:** Release APK с `INTERNET` либо любым неутверждённым доступом к shared/external storage и media не может пройти packaged manifest gate; политика и parser имеют negative regression evidence для разрешённых и запрещённых наборов.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** [".github/workflows/ci.yml", "test/android/backup_policy_test.dart", "ADR-0004"]
-
-### F4 · Medium — Negative-path проверка generated-artifact detector не входит в обязательный gate
-
-- **Evidence:** `tool/check_generated_test.sh:36-52` доказывает отклонение изменённого tracked и нового untracked artifact и локально проходит. Однако `.github/workflows/ci.yml:44-55` запускает только `codegen-check`, `mise run check` и OpenSpec validation, а `mise.toml:11-15` не включает зарегистрированный `codegen-check-test` из строки 28.
-- **Evidence revisions:** ["870f208d11bdb220eae05da3a59df4b37a92efe2"]
-- **Impact:** Регрессия самого `assert_clean_tree` может остаться незаметной на чистом checkout и превратить обязательную проверку воспроизводимости в false success.
-- **Required outcome:** Обязательный CI path исполняет negative-path regression evidence detector и становится неуспешным, если detector перестаёт замечать tracked либо untracked drift.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** [".github/workflows/ci.yml", "mise.toml", "tool/check_generated.sh", "tool/check_generated_test.sh"]
+No unresolved findings remain in the implementation review.
 
 ## Accepted risks
 
