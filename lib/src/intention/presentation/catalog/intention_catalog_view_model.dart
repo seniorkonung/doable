@@ -491,10 +491,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     final event = IntentionCatalogPresentationEvent.create(
       _createOutcome(claim.completion.result),
     );
-    for (final listener in _presentationListeners.toList(growable: false)) {
-      listener(event);
+    try {
+      for (final listener in _presentationListeners.toList(growable: false)) {
+        listener(event);
+      }
+    } finally {
+      coordinator.confirmPresentation(claim);
     }
-    coordinator.confirmPresentation(claim);
   }
 
   IntentionCatalogCreateOutcome _createOutcome(

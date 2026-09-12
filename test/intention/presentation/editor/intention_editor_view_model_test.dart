@@ -16,33 +16,45 @@ import 'package:flutter_test/flutter_test.dart';
 import '../catalog/catalog_test_support.dart';
 
 void main() {
-  test('синхронно принимает только одну отправку одного экземпляра формы', () {
-    final repository = ControlledCatalogRepository();
-    final container = _container(repository);
-    final provider = intentionEditorViewModelProvider(IntentionEditorSession());
-    final subscription = container.listen(provider, (_, _) {});
-    addTearDown(subscription.close);
-    final editor = container.read(provider.notifier)
-      ..changeTitle('  Быть здоровым  ')
-      ..changeDescription('  Сохранить буквально\n');
+  test(
+    'синхронно принимает одну отправку и не ставит повторную в очередь',
+    () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionEditorSession(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('  Быть здоровым  ')
+        ..changeDescription('  Сохранить буквально\n');
 
-    editor.submit();
-    editor.submit();
+      editor.submit();
+      editor.submit();
 
-    final state = container.read(provider);
-    expect(state.operation, isA<OperationRunning<Intention>>());
-    expect(repository.commands, hasLength(1));
-    expect(
-      repository.commands.single,
-      isA<CreateIntention>()
-          .having((command) => command.title, 'title', '  Быть здоровым  ')
-          .having(
-            (command) => command.description,
-            'description',
-            '  Сохранить буквально\n',
-          ),
-    );
-  });
+      final state = container.read(provider);
+      expect(state.operation, isA<OperationRunning<Intention>>());
+      expect(repository.commands, hasLength(1));
+      expect(
+        repository.commands.single,
+        isA<CreateIntention>()
+            .having((command) => command.title, 'title', '  Быть здоровым  ')
+            .having(
+              (command) => command.description,
+              'description',
+              '  Сохранить буквально\n',
+            ),
+      );
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await _settle(container);
+
+      expect(repository.commands, hasLength(1));
+    },
+  );
 
   test('независимые экземпляры формы не блокируют друг друга', () {
     final repository = ControlledCatalogRepository();
@@ -123,6 +135,12 @@ void main() {
       );
       final subscription = container.listen(provider, (_, _) {});
       addTearDown(subscription.close);
+      final tokens = <IntentionOperationToken>[];
+      final coordinatorSubscription = container
+          .read(intentionCommandCoordinatorProvider.notifier)
+          .completions
+          .listen((completion) => tokens.add(completion.token));
+      addTearDown(coordinatorSubscription.cancel);
       final editor = container.read(provider.notifier)
         ..changeTitle('Намерение')
         ..submit();
@@ -147,6 +165,8 @@ void main() {
       final succeeded = container.read(provider);
       expect(succeeded.operation, isA<OperationSucceeded<Intention>>());
       expect(succeeded.event, isA<IntentionEditorCreated>());
+      expect(tokens, hasLength(2));
+      expect(identical(tokens.first, tokens.last), isFalse);
     },
   );
 

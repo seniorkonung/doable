@@ -98,20 +98,23 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         return;
       }
       _activeToken = null;
-      state = switch (completion.result) {
-        ResultSuccess(value: IntentionSaved(:final intention)) =>
-          state.withOperation(
-            OperationSucceeded<Intention>(intention),
-            event: const IntentionEditorCreated(),
+      try {
+        state = switch (completion.result) {
+          ResultSuccess(value: IntentionSaved(:final intention)) =>
+            state.withOperation(
+              OperationSucceeded<Intention>(intention),
+              event: const IntentionEditorCreated(),
+            ),
+          ResultSuccess(value: IntentionDeleted()) => state.withOperation(
+            const OperationFailed<Intention>(IntentionUnexpectedFailure()),
           ),
-        ResultSuccess(value: IntentionDeleted()) => state.withOperation(
-          const OperationFailed<Intention>(IntentionUnexpectedFailure()),
-        ),
-        ResultFailure(:final failure) => state.withOperation(
-          OperationFailed<Intention>(failure),
-        ),
-      };
-      _coordinator.confirmPresentation(claim);
+          ResultFailure(:final failure) => state.withOperation(
+            OperationFailed<Intention>(failure),
+          ),
+        };
+      } finally {
+        _coordinator.confirmPresentation(claim);
+      }
     } on Object {
       if (!ref.mounted) {
         return;
