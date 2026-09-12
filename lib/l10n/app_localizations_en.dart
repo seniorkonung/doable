@@ -53,6 +53,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogLoading => 'Loading intentions…';
 
   @override
+  String get catalogTitle => 'Intentions';
+
+  @override
+  String get catalogScopeLabel => 'Scope';
+
+  @override
+  String get catalogScopeActive => 'Active';
+
+  @override
+  String get catalogScopeArchived => 'Archived';
+
+  @override
+  String get catalogScopeAll => 'All';
+
+  @override
+  String get catalogFilterLabel => 'Filter by title';
+
+  @override
+  String get catalogFilterInvalidUnicode =>
+      'Enter valid Unicode text without NUL.';
+
+  @override
+  String get catalogFilterTooLong => 'Use no more than 255 characters.';
+
+  @override
+  String get catalogOrderLabel => 'Order';
+
+  @override
+  String get catalogOrderCreatedNewest => 'Created: newest first';
+
+  @override
+  String get catalogOrderCreatedOldest => 'Created: oldest first';
+
+  @override
+  String get catalogOrderUpdatedNewest => 'Updated: newest first';
+
+  @override
+  String get catalogOrderUpdatedOldest => 'Updated: oldest first';
+
+  @override
   String catalogTotalCount(int count) {
     return 'Total intentions: $count';
   }

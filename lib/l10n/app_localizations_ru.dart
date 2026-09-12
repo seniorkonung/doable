@@ -53,6 +53,46 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogLoading => 'Загружаем намерения…';
 
   @override
+  String get catalogTitle => 'Намерения';
+
+  @override
+  String get catalogScopeLabel => 'Охват';
+
+  @override
+  String get catalogScopeActive => 'Активные';
+
+  @override
+  String get catalogScopeArchived => 'Архивные';
+
+  @override
+  String get catalogScopeAll => 'Все';
+
+  @override
+  String get catalogFilterLabel => 'Фильтр по названию';
+
+  @override
+  String get catalogFilterInvalidUnicode =>
+      'Введите корректный Unicode-текст без NUL.';
+
+  @override
+  String get catalogFilterTooLong => 'Используйте не более 255 символов.';
+
+  @override
+  String get catalogOrderLabel => 'Порядок';
+
+  @override
+  String get catalogOrderCreatedNewest => 'По созданию: сначала новые';
+
+  @override
+  String get catalogOrderCreatedOldest => 'По созданию: сначала старые';
+
+  @override
+  String get catalogOrderUpdatedNewest => 'По изменению: сначала новые';
+
+  @override
+  String get catalogOrderUpdatedOldest => 'По изменению: сначала старые';
+
+  @override
   String catalogTotalCount(int count) {
     return 'Всего намерений: $count';
   }

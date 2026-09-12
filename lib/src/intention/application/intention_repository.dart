@@ -24,8 +24,23 @@ enum IntentionCatalogSortDirection { ascending, descending }
 final class IntentionCatalogOrder {
   const IntentionCatalogOrder({required this.field, required this.direction});
 
+  static const createdAtAscending = IntentionCatalogOrder(
+    field: IntentionCatalogSortField.createdAt,
+    direction: IntentionCatalogSortDirection.ascending,
+  );
+
   static const createdAtDescending = IntentionCatalogOrder(
     field: IntentionCatalogSortField.createdAt,
+    direction: IntentionCatalogSortDirection.descending,
+  );
+
+  static const updatedAtAscending = IntentionCatalogOrder(
+    field: IntentionCatalogSortField.updatedAt,
+    direction: IntentionCatalogSortDirection.ascending,
+  );
+
+  static const updatedAtDescending = IntentionCatalogOrder(
+    field: IntentionCatalogSortField.updatedAt,
     direction: IntentionCatalogSortDirection.descending,
   );
 

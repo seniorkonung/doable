@@ -9,38 +9,226 @@ import 'intention_catalog_state.dart';
 import 'intention_catalog_view_model.dart';
 
 @RoutePage()
-final class IntentionCatalogPage extends ConsumerWidget {
+final class IntentionCatalogPage extends ConsumerStatefulWidget {
   const IntentionCatalogPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<IntentionCatalogPage> createState() =>
+      _IntentionCatalogPageState();
+}
+
+final class _IntentionCatalogPageState
+    extends ConsumerState<IntentionCatalogPage> {
+  final _filterController = TextEditingController();
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final catalog = ref.watch(intentionCatalogViewModelProvider);
+    final notifier = ref.read(intentionCatalogViewModelProvider.notifier);
+    final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
-      appBar: AppBar(title: Text(localizations.navigationActiveIntentions)),
-      body: catalog.when(
-        data: (state) => _CatalogContent(state: state),
-        error: (_, _) =>
-            _CatalogStatus(message: localizations.catalogUnexpectedFailure),
-        loading: () => _CatalogStatus(
-          message: localizations.catalogLoading,
-          progressIndicator: true,
-        ),
+      appBar: AppBar(title: Text(localizations.catalogTitle)),
+      body: Column(
+        children: [
+          _CatalogControls(
+            selection: selection,
+            filterController: _filterController,
+            onScopeChanged: (scope) {
+              _scrollToTop();
+              notifier.changeScope(scope);
+            },
+            onFilterChanged: (value) {
+              _scrollToTop();
+              notifier.changeTitleFilter(value);
+            },
+            onOrderChanged: (order) {
+              _scrollToTop();
+              notifier.changeOrder(order);
+            },
+          ),
+          Expanded(
+            child: catalog.when(
+              skipLoadingOnReload: false,
+              skipLoadingOnRefresh: false,
+              data: (state) => _CatalogContent(
+                state: state,
+                scrollController: _scrollController,
+              ),
+              error: (_, _) => _CatalogStatus(
+                message: localizations.catalogUnexpectedFailure,
+              ),
+              loading: () => _CatalogStatus(
+                message: localizations.catalogLoading,
+                progressIndicator: true,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  void _scrollToTop() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+  }
+}
+
+final class _CatalogControls extends StatelessWidget {
+  const _CatalogControls({
+    required this.selection,
+    required this.filterController,
+    required this.onScopeChanged,
+    required this.onFilterChanged,
+    required this.onOrderChanged,
+  });
+
+  final IntentionCatalogSelection selection;
+  final TextEditingController filterController;
+  final ValueChanged<IntentionScope> onScopeChanged;
+  final ValueChanged<String> onFilterChanged;
+  final ValueChanged<IntentionCatalogOrder> onOrderChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        children: [
+          DropdownButtonFormField<IntentionScope>(
+            key: const ValueKey('catalog-scope-control'),
+            initialValue: selection.scope,
+            decoration: InputDecoration(
+              labelText: localizations.catalogScopeLabel,
+            ),
+            items: [
+              for (final scope in IntentionScope.values)
+                DropdownMenuItem(
+                  value: scope,
+                  child: Text(_scopeLabel(localizations, scope)),
+                ),
+            ],
+            onChanged: (scope) {
+              if (scope != null) {
+                onScopeChanged(scope);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('catalog-filter-field'),
+            controller: filterController,
+            decoration: InputDecoration(
+              labelText: localizations.catalogFilterLabel,
+              errorText: _filterError(localizations),
+            ),
+            onChanged: onFilterChanged,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<IntentionCatalogOrder>(
+            key: const ValueKey('catalog-order-control'),
+            initialValue: selection.order,
+            decoration: InputDecoration(
+              labelText: localizations.catalogOrderLabel,
+            ),
+            items: [
+              for (final order in _orders)
+                DropdownMenuItem(
+                  value: order,
+                  child: Text(_orderLabel(localizations, order)),
+                ),
+            ],
+            onChanged: (order) {
+              if (order != null) {
+                onOrderChanged(order);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _filterError(AppLocalizations localizations) =>
+      switch (selection.filterValidationFailure) {
+        IntentionCatalogFilterValidationFailure.invalidUnicodeRepertoire =>
+          localizations.catalogFilterInvalidUnicode,
+        IntentionCatalogFilterValidationFailure.tooLong =>
+          localizations.catalogFilterTooLong,
+        null => null,
+      };
+
+  static const _orders = [
+    IntentionCatalogOrder.createdAtDescending,
+    IntentionCatalogOrder.createdAtAscending,
+    IntentionCatalogOrder.updatedAtDescending,
+    IntentionCatalogOrder.updatedAtAscending,
+  ];
+
+  String _scopeLabel(AppLocalizations localizations, IntentionScope scope) =>
+      switch (scope) {
+        IntentionScope.active => localizations.catalogScopeActive,
+        IntentionScope.archived => localizations.catalogScopeArchived,
+        IntentionScope.all => localizations.catalogScopeAll,
+      };
+
+  String _orderLabel(
+    AppLocalizations localizations,
+    IntentionCatalogOrder order,
+  ) => switch ((order.field, order.direction)) {
+    (
+      IntentionCatalogSortField.createdAt,
+      IntentionCatalogSortDirection.descending,
+    ) =>
+      localizations.catalogOrderCreatedNewest,
+    (
+      IntentionCatalogSortField.createdAt,
+      IntentionCatalogSortDirection.ascending,
+    ) =>
+      localizations.catalogOrderCreatedOldest,
+    (
+      IntentionCatalogSortField.updatedAt,
+      IntentionCatalogSortDirection.descending,
+    ) =>
+      localizations.catalogOrderUpdatedNewest,
+    (
+      IntentionCatalogSortField.updatedAt,
+      IntentionCatalogSortDirection.ascending,
+    ) =>
+      localizations.catalogOrderUpdatedOldest,
+  };
 }
 
 final class _CatalogContent extends ConsumerWidget {
-  const _CatalogContent({required this.state});
+  const _CatalogContent({required this.state, required this.scrollController});
 
   final IntentionCatalogState state;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final localizations = AppLocalizations.of(context);
     return switch (state) {
-      IntentionCatalogLoaded loaded => _LoadedCatalog(state: loaded),
+      IntentionCatalogDebouncing() => _CatalogStatus(
+        message: localizations.catalogLoading,
+        progressIndicator: true,
+      ),
+      IntentionCatalogInvalidFilter() => const SizedBox.shrink(),
+      IntentionCatalogLoaded loaded => _LoadedCatalog(
+        state: loaded,
+        scrollController: scrollController,
+      ),
       IntentionCatalogEmpty empty => _CatalogStatus(
         message: _emptyMessage(localizations, empty.scope),
       ),
@@ -69,9 +257,10 @@ final class _CatalogContent extends ConsumerWidget {
 }
 
 final class _LoadedCatalog extends StatelessWidget {
-  const _LoadedCatalog({required this.state});
+  const _LoadedCatalog({required this.state, required this.scrollController});
 
   final IntentionCatalogLoaded state;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +277,8 @@ final class _LoadedCatalog extends StatelessWidget {
         ),
         Expanded(
           child: ListView.builder(
+            key: const ValueKey('catalog-list'),
+            controller: scrollController,
             itemCount: state.items.length,
             itemBuilder: (context, index) =>
                 _IntentionSummaryTile(summary: state.items[index]),

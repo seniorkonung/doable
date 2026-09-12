@@ -52,6 +52,58 @@
   "@catalogLoading": {
     "description": "Начальная загрузка каталога намерений"
   },
+  "catalogTitle": "Intentions",
+  "@catalogTitle": {
+    "description": "Заголовок единого каталога намерений"
+  },
+  "catalogScopeLabel": "Scope",
+  "@catalogScopeLabel": {
+    "description": "Подпись выбора охвата каталога"
+  },
+  "catalogScopeActive": "Active",
+  "@catalogScopeActive": {
+    "description": "Охват активных намерений"
+  },
+  "catalogScopeArchived": "Archived",
+  "@catalogScopeArchived": {
+    "description": "Охват архивированных намерений"
+  },
+  "catalogScopeAll": "All",
+  "@catalogScopeAll": {
+    "description": "Охват всех существующих намерений"
+  },
+  "catalogFilterLabel": "Filter by title",
+  "@catalogFilterLabel": {
+    "description": "Подпись поля фильтра каталога по названию"
+  },
+  "catalogFilterInvalidUnicode": "Enter valid Unicode text without NUL.",
+  "@catalogFilterInvalidUnicode": {
+    "description": "Ошибка недопустимого Unicode в фильтре каталога"
+  },
+  "catalogFilterTooLong": "Use no more than 255 characters.",
+  "@catalogFilterTooLong": {
+    "description": "Ошибка превышения длины фильтра каталога"
+  },
+  "catalogOrderLabel": "Order",
+  "@catalogOrderLabel": {
+    "description": "Подпись выбора порядка каталога"
+  },
+  "catalogOrderCreatedNewest": "Created: newest first",
+  "@catalogOrderCreatedNewest": {
+    "description": "Убывающий порядок по времени создания"
+  },
+  "catalogOrderCreatedOldest": "Created: oldest first",
+  "@catalogOrderCreatedOldest": {
+    "description": "Возрастающий порядок по времени создания"
+  },
+  "catalogOrderUpdatedNewest": "Updated: newest first",
+  "@catalogOrderUpdatedNewest": {
+    "description": "Убывающий порядок по времени изменения"
+  },
+  "catalogOrderUpdatedOldest": "Updated: oldest first",
+  "@catalogOrderUpdatedOldest": {
+    "description": "Возрастающий порядок по времени изменения"
+  },
   "catalogTotalCount": "Total intentions: {count}",
   "@catalogTotalCount": {
     "description": "Точное количество намерений в текущей выдаче",

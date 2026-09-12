@@ -9,11 +9,17 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 final class ControlledCatalogRepository implements IntentionRepository {
   final queries = <IntentionCatalogQuery>[];
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
+  final commands = <IntentionCommand>[];
+  final _commandRequests = <Completer<Result<IntentionCommandSuccess>>>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
   void complete(int index, Result<IntentionCatalogPage> result) {
     _requests[index].complete(result);
+  }
+
+  void completeCommand(int index, Result<IntentionCommandSuccess> result) {
+    _commandRequests[index].complete(result);
   }
 
   @override
@@ -27,8 +33,12 @@ final class ControlledCatalogRepository implements IntentionRepository {
   }
 
   @override
-  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command) =>
-      throw UnsupportedError('Изменяющие операции не используются в тесте.');
+  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command) {
+    commands.add(command);
+    final request = Completer<Result<IntentionCommandSuccess>>();
+    _commandRequests.add(request);
+    return request.future;
+  }
 
   @override
   Stream<Result<Intention?>> watchById(IntentionId id) =>
@@ -56,6 +66,16 @@ final class TestCatalogRevision implements IntentionCatalogRevision {
   }
 }
 
+final class TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
+  const TestCatalogEntrySnapshot(this.summary);
+
+  @override
+  final IntentionSummary summary;
+
+  @override
+  bool matches(IntentionCatalogQuery query) => query.includes(summary);
+}
+
 IntentionSummary testSummary({
   int index = 1,
   String title = 'Намерение',
@@ -79,5 +99,18 @@ IntentionSummary testSummary({
     archiveState: IntentionArchiveState.active,
     createdAt: timestamp,
     updatedAt: timestamp,
+  );
+}
+
+Intention testIntention({int index = 1, String title = 'Намерение'}) {
+  final summary = testSummary(index: index, title: title);
+  return Intention(
+    id: summary.id,
+    title: summary.title,
+    description: null,
+    readiness: summary.readiness,
+    archiveState: summary.archiveState,
+    createdAt: summary.createdAt,
+    updatedAt: summary.updatedAt,
   );
 }

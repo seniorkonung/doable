@@ -129,15 +129,166 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     }
   });
+
+  testWidgets('показывает локализованные параметры каталога и четыре порядка', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.queryAt(0);
+
+    expect(find.text('Scope'), findsOneWidget);
+    expect(find.text('Filter by title'), findsOneWidget);
+    expect(find.text('Order'), findsOneWidget);
+    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('Created: newest first'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Active'), findsWidgets);
+    expect(find.text('Archived'), findsOneWidget);
+    expect(find.text('All'), findsOneWidget);
+
+    await tester.tap(find.text('Active').last);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const ValueKey('catalog-order-control')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Created: newest first'), findsWidgets);
+    expect(find.text('Created: oldest first'), findsOneWidget);
+    expect(find.text('Updated: newest first'), findsOneWidget);
+    expect(find.text('Updated: oldest first'), findsOneWidget);
+  });
+
+  testWidgets('применяет фильтр через 250 мс без кнопки отправки', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.queryAt(0);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('catalog-filter-field')),
+      'milk',
+    );
+    await tester.pump(const Duration(milliseconds: 249));
+    expect(repository.queries, hasLength(1));
+    expect(find.widgetWithText(FilledButton, 'Search'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(repository.queries, hasLength(2));
+    expect(repository.queryAt(1).titleFilter?.map((value) => value), 'milk');
+  });
+
+  testWidgets('сохраняет недопустимый фильтр и показывает ошибку поля', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.queryAt(0);
+    final invalidFilter = List.filled(256, 'a').join();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('catalog-filter-field')),
+      invalidFilter,
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump();
+
+    expect(repository.queries, hasLength(1));
+    expect(find.text('Use no more than 255 characters.'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('catalog-filter-field')))
+          .controller
+          ?.text,
+      invalidFilter,
+    );
+  });
+
+  testWidgets('начинает новый охват с верхней позиции', (tester) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [
+            for (var index = 1; index <= 30; index++)
+              testSummary(index: index, title: 'Намерение $index'),
+          ],
+          totalCount: 30,
+          nextCursor: null,
+          revision: const TestCatalogRevision(0),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const ValueKey('catalog-list')),
+      const Offset(0, -800),
+    );
+    await tester.pumpAndSettle();
+    expect(_catalogScrollPosition(tester).pixels, greaterThan(0));
+
+    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Archived').last);
+    await tester.pump();
+    expect(repository.queryAt(1).scope, IntentionScope.archived);
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [
+            for (var index = 31; index <= 60; index++)
+              testSummary(index: index, title: 'Архивное $index'),
+          ],
+          totalCount: 30,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_catalogScrollPosition(tester).pixels, 0);
+  });
+
+  testWidgets('локализует параметры каталога на русский язык', (tester) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
+    repository.queryAt(0);
+
+    expect(find.text('Охват'), findsOneWidget);
+    expect(find.text('Фильтр по названию'), findsOneWidget);
+    expect(find.text('Порядок'), findsOneWidget);
+    expect(find.text('Активные'), findsOneWidget);
+    expect(find.text('По созданию: сначала новые'), findsOneWidget);
+  });
 }
 
-Widget _testApp(ControlledCatalogRepository repository) => ProviderScope(
+ScrollPosition _catalogScrollPosition(WidgetTester tester) => tester
+    .state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(const ValueKey('catalog-list')),
+        matching: find.byType(Scrollable),
+      ),
+    )
+    .position;
+
+Widget _testApp(
+  ControlledCatalogRepository repository, {
+  Locale locale = const Locale('en'),
+}) => ProviderScope(
   overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
   retry: (retryCount, error) => null,
-  child: const MaterialApp(
-    locale: Locale('en'),
+  child: MaterialApp(
+    locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: IntentionCatalogPage(),
+    home: const IntentionCatalogPage(),
   ),
 );

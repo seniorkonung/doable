@@ -176,6 +176,84 @@ abstract class AppLocalizations {
   /// **'Loading intentions…'**
   String get catalogLoading;
 
+  /// Заголовок единого каталога намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions'**
+  String get catalogTitle;
+
+  /// Подпись выбора охвата каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Scope'**
+  String get catalogScopeLabel;
+
+  /// Охват активных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get catalogScopeActive;
+
+  /// Охват архивированных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get catalogScopeArchived;
+
+  /// Охват всех существующих намерений
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get catalogScopeAll;
+
+  /// Подпись поля фильтра каталога по названию
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by title'**
+  String get catalogFilterLabel;
+
+  /// Ошибка недопустимого Unicode в фильтре каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Enter valid Unicode text without NUL.'**
+  String get catalogFilterInvalidUnicode;
+
+  /// Ошибка превышения длины фильтра каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Use no more than 255 characters.'**
+  String get catalogFilterTooLong;
+
+  /// Подпись выбора порядка каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get catalogOrderLabel;
+
+  /// Убывающий порядок по времени создания
+  ///
+  /// In en, this message translates to:
+  /// **'Created: newest first'**
+  String get catalogOrderCreatedNewest;
+
+  /// Возрастающий порядок по времени создания
+  ///
+  /// In en, this message translates to:
+  /// **'Created: oldest first'**
+  String get catalogOrderCreatedOldest;
+
+  /// Убывающий порядок по времени изменения
+  ///
+  /// In en, this message translates to:
+  /// **'Updated: newest first'**
+  String get catalogOrderUpdatedNewest;
+
+  /// Возрастающий порядок по времени изменения
+  ///
+  /// In en, this message translates to:
+  /// **'Updated: oldest first'**
+  String get catalogOrderUpdatedOldest;
+
   /// Точное количество намерений в текущей выдаче
   ///
   /// In en, this message translates to:

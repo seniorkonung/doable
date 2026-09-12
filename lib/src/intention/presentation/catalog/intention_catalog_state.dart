@@ -1,19 +1,55 @@
 import '../../application/intention_repository.dart';
 
-sealed class IntentionCatalogState {
-  const IntentionCatalogState({required this.query});
+enum IntentionCatalogFilterValidationFailure {
+  invalidUnicodeRepertoire,
+  tooLong,
+}
 
-  final IntentionCatalogQuery query;
+final class IntentionCatalogSelection {
+  const IntentionCatalogSelection({
+    required this.scope,
+    required this.titleFilterText,
+    required this.order,
+    required this.filterValidationFailure,
+  });
+
+  static const initial = IntentionCatalogSelection(
+    scope: IntentionScope.active,
+    titleFilterText: '',
+    order: IntentionCatalogOrder.createdAtDescending,
+    filterValidationFailure: null,
+  );
+
+  final IntentionScope scope;
+  final String titleFilterText;
+  final IntentionCatalogOrder order;
+  final IntentionCatalogFilterValidationFailure? filterValidationFailure;
+}
+
+sealed class IntentionCatalogState {
+  const IntentionCatalogState({required this.selection});
+
+  final IntentionCatalogSelection selection;
+}
+
+final class IntentionCatalogDebouncing extends IntentionCatalogState {
+  const IntentionCatalogDebouncing({required super.selection});
+}
+
+final class IntentionCatalogInvalidFilter extends IntentionCatalogState {
+  const IntentionCatalogInvalidFilter({required super.selection});
 }
 
 sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
   const IntentionCatalogConfirmedState({
-    required super.query,
+    required super.selection,
+    required this.query,
     required this.totalCount,
     required this.nextCursor,
     required this.revision,
   });
 
+  final IntentionCatalogQuery query;
   final int totalCount;
   final IntentionCatalogCursor? nextCursor;
   final IntentionCatalogRevision revision;
@@ -21,6 +57,7 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
 
 final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
   IntentionCatalogLoaded({
+    required super.selection,
     required super.query,
     required List<IntentionSummary> items,
     required super.totalCount,
@@ -32,20 +69,38 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
 }
 
 final class IntentionCatalogEmpty extends IntentionCatalogConfirmedState {
-  const IntentionCatalogEmpty({required super.query, required super.revision})
-    : super(totalCount: 0, nextCursor: null);
+  const IntentionCatalogEmpty({
+    required super.selection,
+    required super.query,
+    required super.revision,
+  }) : super(totalCount: 0, nextCursor: null);
 
   IntentionScope get scope => query.scope;
 }
 
 final class IntentionCatalogUnavailable extends IntentionCatalogState {
-  const IntentionCatalogUnavailable({required super.query});
+  const IntentionCatalogUnavailable({
+    required super.selection,
+    required this.query,
+  });
+
+  final IntentionCatalogQuery query;
 }
 
 final class IntentionCatalogCorruption extends IntentionCatalogState {
-  const IntentionCatalogCorruption({required super.query});
+  const IntentionCatalogCorruption({
+    required super.selection,
+    required this.query,
+  });
+
+  final IntentionCatalogQuery query;
 }
 
 final class IntentionCatalogUnexpected extends IntentionCatalogState {
-  const IntentionCatalogUnexpected({required super.query});
+  const IntentionCatalogUnexpected({
+    required super.selection,
+    required this.query,
+  });
+
+  final IntentionCatalogQuery query;
 }
