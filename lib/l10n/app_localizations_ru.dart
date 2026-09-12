@@ -198,6 +198,41 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsArchived => 'В архиве';
 
   @override
+  String get detailsEditAction => 'Изменить';
+
+  @override
+  String get detailsSaveAction => 'Сохранить изменения';
+
+  @override
+  String get detailsCancelEditAction => 'Отмена';
+
+  @override
+  String get detailsSaved => 'Изменения сохранены.';
+
+  @override
+  String get detailsUpdateInvalidInput => 'Проверьте введённые данные.';
+
+  @override
+  String get detailsUpdateNotFound =>
+      'Намерение больше не существует. Изменения не сохранены.';
+
+  @override
+  String get detailsUpdateConflict =>
+      'Намерение было изменено в другом месте. Ваши изменения не сохранены.';
+
+  @override
+  String get detailsUpdateUnavailable =>
+      'Не удалось сохранить изменения. Повторите попытку.';
+
+  @override
+  String get detailsUpdateCorruption =>
+      'Сохранённые данные повреждены. Изменения не сохранены.';
+
+  @override
+  String get detailsUpdateUnexpected =>
+      'Не удалось сохранить изменения из-за непредвиденной ошибки.';
+
+  @override
   String get editorTitle => 'Создать намерение';
 
   @override

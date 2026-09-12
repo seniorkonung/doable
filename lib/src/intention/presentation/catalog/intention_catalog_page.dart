@@ -108,18 +108,38 @@ final class _IntentionCatalogPageState
       return;
     }
     final localizations = AppLocalizations.of(context);
-    final message = switch (event.createOutcome) {
-      IntentionCatalogCreateOutcome.succeeded => localizations.editorCreated,
-      IntentionCatalogCreateOutcome.validation =>
-        localizations.editorInvalidInput,
-      IntentionCatalogCreateOutcome.conflict =>
-        localizations.editorCreateConflict,
-      IntentionCatalogCreateOutcome.unavailable =>
-        localizations.editorCreateUnavailable,
-      IntentionCatalogCreateOutcome.corruption =>
-        localizations.editorCreateCorruption,
-      IntentionCatalogCreateOutcome.unexpected =>
-        localizations.editorCreateUnexpected,
+    final message = switch (event) {
+      IntentionCatalogCreatePresentationEvent(:final outcome) =>
+        switch (outcome) {
+          IntentionCatalogCreateOutcome.succeeded =>
+            localizations.editorCreated,
+          IntentionCatalogCreateOutcome.validation =>
+            localizations.editorInvalidInput,
+          IntentionCatalogCreateOutcome.conflict =>
+            localizations.editorCreateConflict,
+          IntentionCatalogCreateOutcome.unavailable =>
+            localizations.editorCreateUnavailable,
+          IntentionCatalogCreateOutcome.corruption =>
+            localizations.editorCreateCorruption,
+          IntentionCatalogCreateOutcome.unexpected =>
+            localizations.editorCreateUnexpected,
+        },
+      IntentionCatalogUpdatePresentationEvent(:final outcome) =>
+        switch (outcome) {
+          IntentionCatalogUpdateOutcome.succeeded => localizations.detailsSaved,
+          IntentionCatalogUpdateOutcome.validation =>
+            localizations.detailsUpdateInvalidInput,
+          IntentionCatalogUpdateOutcome.notFound =>
+            localizations.detailsUpdateNotFound,
+          IntentionCatalogUpdateOutcome.conflict =>
+            localizations.detailsUpdateConflict,
+          IntentionCatalogUpdateOutcome.unavailable =>
+            localizations.detailsUpdateUnavailable,
+          IntentionCatalogUpdateOutcome.corruption =>
+            localizations.detailsUpdateCorruption,
+          IntentionCatalogUpdateOutcome.unexpected =>
+            localizations.detailsUpdateUnexpected,
+        },
     };
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));

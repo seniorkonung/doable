@@ -449,16 +449,23 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   void _handleCompletion(IntentionCommandCompletion completion) {
-    if (completion.kind == IntentionCommandKind.create) {
-      final coordinator = ref.read(
-        intentionCommandCoordinatorProvider.notifier,
-      );
-      unawaited(
-        _publishCreateFallback(
-          coordinator.claimCatalogFallback(completion.token),
-          coordinator,
-        ),
-      );
+    switch (completion.kind) {
+      case IntentionCommandKind.create || IntentionCommandKind.update:
+        final coordinator = ref.read(
+          intentionCommandCoordinatorProvider.notifier,
+        );
+        unawaited(
+          _publishFallback(
+            coordinator.claimCatalogFallback(completion.token),
+            coordinator,
+          ),
+        );
+      case IntentionCommandKind.enableReadiness ||
+          IntentionCommandKind.disableReadiness ||
+          IntentionCommandKind.archive ||
+          IntentionCommandKind.restore ||
+          IntentionCommandKind.delete:
+        break;
     }
 
     switch (completion.result) {
@@ -475,7 +482,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
   }
 
-  Future<void> _publishCreateFallback(
+  Future<void> _publishFallback(
     Future<IntentionCatalogFallbackPresentationClaim?> pendingClaim,
     IntentionCommandCoordinator coordinator,
   ) async {
@@ -488,9 +495,23 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return;
     }
 
-    final event = IntentionCatalogPresentationEvent.create(
-      _createOutcome(claim.completion.result),
-    );
+    final event = switch (claim.completion.kind) {
+      IntentionCommandKind.create => IntentionCatalogCreatePresentationEvent(
+        _createOutcome(claim.completion.result),
+      ),
+      IntentionCommandKind.update => IntentionCatalogUpdatePresentationEvent(
+        _updateOutcome(claim.completion.result),
+      ),
+      IntentionCommandKind.enableReadiness ||
+      IntentionCommandKind.disableReadiness ||
+      IntentionCommandKind.archive ||
+      IntentionCommandKind.restore ||
+      IntentionCommandKind.delete => null,
+    };
+    if (event == null) {
+      coordinator.confirmPresentation(claim);
+      return;
+    }
     try {
       for (final listener in _presentationListeners.toList(growable: false)) {
         listener(event);
@@ -515,6 +536,24 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCorruptionFailure() => IntentionCatalogCreateOutcome.corruption,
       IntentionNotFoundFailure() ||
       IntentionUnexpectedFailure() => IntentionCatalogCreateOutcome.unexpected,
+    },
+  };
+
+  IntentionCatalogUpdateOutcome _updateOutcome(
+    Result<IntentionCommandSuccess> result,
+  ) => switch (result) {
+    ResultSuccess(value: IntentionSaved()) =>
+      IntentionCatalogUpdateOutcome.succeeded,
+    ResultSuccess(value: IntentionDeleted()) =>
+      IntentionCatalogUpdateOutcome.unexpected,
+    ResultFailure(:final failure) => switch (failure) {
+      IntentionValidationFailure() => IntentionCatalogUpdateOutcome.validation,
+      IntentionNotFoundFailure() => IntentionCatalogUpdateOutcome.notFound,
+      IntentionConflictFailure() => IntentionCatalogUpdateOutcome.conflict,
+      IntentionUnavailableFailure() =>
+        IntentionCatalogUpdateOutcome.unavailable,
+      IntentionCorruptionFailure() => IntentionCatalogUpdateOutcome.corruption,
+      IntentionUnexpectedFailure() => IntentionCatalogUpdateOutcome.unexpected,
     },
   };
 }

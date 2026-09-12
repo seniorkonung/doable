@@ -1096,6 +1096,94 @@ void main() {
       );
     },
   );
+
+  test('публикует update outcome только как освобождённый fallback', () async {
+    final intention = testIntention(index: 90, title: 'Изменённое намерение');
+    final success = ResultSuccess<IntentionCommandSuccess>(
+      IntentionSaved(
+        intention,
+        catalogMutation: IntentionCatalogUnchanged(
+          revision: const TestCatalogRevision(9),
+          entry: TestCatalogEntrySnapshot(testSummary(index: 90)),
+        ),
+      ),
+    );
+    final scenarios =
+        <(Result<IntentionCommandSuccess>, IntentionCatalogUpdateOutcome)>[
+          (success, IntentionCatalogUpdateOutcome.succeeded),
+          (
+            const ResultFailure(IntentionGenericValidationFailure()),
+            IntentionCatalogUpdateOutcome.validation,
+          ),
+          (
+            const ResultFailure(IntentionNotFoundFailure()),
+            IntentionCatalogUpdateOutcome.notFound,
+          ),
+          (
+            const ResultFailure(IntentionConflictFailure()),
+            IntentionCatalogUpdateOutcome.conflict,
+          ),
+          (
+            const ResultFailure(IntentionUnavailableFailure()),
+            IntentionCatalogUpdateOutcome.unavailable,
+          ),
+          (
+            const ResultFailure(IntentionCorruptionFailure()),
+            IntentionCatalogUpdateOutcome.corruption,
+          ),
+          (
+            const ResultFailure(IntentionUnexpectedFailure()),
+            IntentionCatalogUpdateOutcome.unexpected,
+          ),
+        ];
+
+    for (final (result, expectedOutcome) in scenarios) {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(repository);
+      final subscription = container.listen(
+        intentionCatalogViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      final notifier = container.read(
+        intentionCatalogViewModelProvider.notifier,
+      );
+      final event = Completer<IntentionCatalogPresentationEvent>();
+      void listener(IntentionCatalogPresentationEvent value) {
+        if (!event.isCompleted) {
+          event.complete(value);
+        }
+      }
+
+      notifier.addPresentationListener(listener);
+      final coordinator = container.read(
+        intentionCommandCoordinatorProvider.notifier,
+      );
+      final started = coordinator.accept(
+        UpdateIntention(
+          id: intention.id,
+          title: intention.title,
+          description: intention.description,
+        ),
+      );
+      final token = (started as IntentionCommandAccepted).token;
+      coordinator.releaseInitiatorPresentation(token);
+      repository.completeCommand(0, result);
+
+      expect(
+        await event.future,
+        isA<IntentionCatalogUpdatePresentationEvent>().having(
+          (value) => value.outcome,
+          'безопасный update outcome',
+          expectedOutcome,
+        ),
+      );
+
+      notifier.removePresentationListener(listener);
+      subscription.close();
+      container.dispose();
+    }
+  });
 }
 
 ProviderContainer _catalogContainer(

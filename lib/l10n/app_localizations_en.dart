@@ -197,6 +197,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsArchived => 'Archived';
 
   @override
+  String get detailsEditAction => 'Edit';
+
+  @override
+  String get detailsSaveAction => 'Save changes';
+
+  @override
+  String get detailsCancelEditAction => 'Cancel';
+
+  @override
+  String get detailsSaved => 'Changes saved.';
+
+  @override
+  String get detailsUpdateInvalidInput => 'Check the entered data.';
+
+  @override
+  String get detailsUpdateNotFound =>
+      'The intention no longer exists. Your changes weren’t saved.';
+
+  @override
+  String get detailsUpdateConflict =>
+      'The intention changed elsewhere. Your changes weren’t saved.';
+
+  @override
+  String get detailsUpdateUnavailable =>
+      'The changes couldn’t be saved. Try again.';
+
+  @override
+  String get detailsUpdateCorruption =>
+      'Stored data is damaged. The changes weren’t saved.';
+
+  @override
+  String get detailsUpdateUnexpected =>
+      'The changes couldn’t be saved because of an unexpected error.';
+
+  @override
   String get editorTitle => 'Create intention';
 
   @override

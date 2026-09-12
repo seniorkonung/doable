@@ -9,10 +9,32 @@ enum IntentionCatalogCreateOutcome {
   unexpected,
 }
 
-final class IntentionCatalogPresentationEvent {
-  const IntentionCatalogPresentationEvent.create(this.createOutcome);
+enum IntentionCatalogUpdateOutcome {
+  succeeded,
+  validation,
+  notFound,
+  conflict,
+  unavailable,
+  corruption,
+  unexpected,
+}
 
-  final IntentionCatalogCreateOutcome createOutcome;
+sealed class IntentionCatalogPresentationEvent {
+  const IntentionCatalogPresentationEvent();
+}
+
+final class IntentionCatalogCreatePresentationEvent
+    extends IntentionCatalogPresentationEvent {
+  const IntentionCatalogCreatePresentationEvent(this.outcome);
+
+  final IntentionCatalogCreateOutcome outcome;
+}
+
+final class IntentionCatalogUpdatePresentationEvent
+    extends IntentionCatalogPresentationEvent {
+  const IntentionCatalogUpdatePresentationEvent(this.outcome);
+
+  final IntentionCatalogUpdateOutcome outcome;
 }
 
 enum IntentionCatalogFilterValidationFailure {

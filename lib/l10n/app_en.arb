@@ -233,6 +233,46 @@
   "@detailsArchived": {
     "description": "Архивное состояние намерения в подробных данных"
   },
+  "detailsEditAction": "Edit",
+  "@detailsEditAction": {
+    "description": "Действие перехода к изменению намерения"
+  },
+  "detailsSaveAction": "Save changes",
+  "@detailsSaveAction": {
+    "description": "Действие сохранения изменённых данных намерения"
+  },
+  "detailsCancelEditAction": "Cancel",
+  "@detailsCancelEditAction": {
+    "description": "Действие отмены изменения намерения до отправки"
+  },
+  "detailsSaved": "Changes saved.",
+  "@detailsSaved": {
+    "description": "Подтверждение успешного изменения намерения"
+  },
+  "detailsUpdateInvalidInput": "Check the entered data.",
+  "@detailsUpdateInvalidInput": {
+    "description": "Общая ошибка проверки формы изменения"
+  },
+  "detailsUpdateNotFound": "The intention no longer exists. Your changes weren’t saved.",
+  "@detailsUpdateNotFound": {
+    "description": "Безопасное сообщение об отсутствующем изменяемом намерении"
+  },
+  "detailsUpdateConflict": "The intention changed elsewhere. Your changes weren’t saved.",
+  "@detailsUpdateConflict": {
+    "description": "Безопасное сообщение о конфликте изменения намерения"
+  },
+  "detailsUpdateUnavailable": "The changes couldn’t be saved. Try again.",
+  "@detailsUpdateUnavailable": {
+    "description": "Устранимая недоступность изменения намерения"
+  },
+  "detailsUpdateCorruption": "Stored data is damaged. The changes weren’t saved.",
+  "@detailsUpdateCorruption": {
+    "description": "Терминальное повреждение данных при изменении намерения"
+  },
+  "detailsUpdateUnexpected": "The changes couldn’t be saved because of an unexpected error.",
+  "@detailsUpdateUnexpected": {
+    "description": "Терминальная непредвиденная ошибка изменения намерения"
+  },
   "editorTitle": "Create intention",
   "@editorTitle": {
     "description": "Заголовок формы создания намерения"

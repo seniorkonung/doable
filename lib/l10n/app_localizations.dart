@@ -440,6 +440,66 @@ abstract class AppLocalizations {
   /// **'Archived'**
   String get detailsArchived;
 
+  /// Действие перехода к изменению намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get detailsEditAction;
+
+  /// Действие сохранения изменённых данных намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get detailsSaveAction;
+
+  /// Действие отмены изменения намерения до отправки
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get detailsCancelEditAction;
+
+  /// Подтверждение успешного изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Changes saved.'**
+  String get detailsSaved;
+
+  /// Общая ошибка проверки формы изменения
+  ///
+  /// In en, this message translates to:
+  /// **'Check the entered data.'**
+  String get detailsUpdateInvalidInput;
+
+  /// Безопасное сообщение об отсутствующем изменяемом намерении
+  ///
+  /// In en, this message translates to:
+  /// **'The intention no longer exists. Your changes weren’t saved.'**
+  String get detailsUpdateNotFound;
+
+  /// Безопасное сообщение о конфликте изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention changed elsewhere. Your changes weren’t saved.'**
+  String get detailsUpdateConflict;
+
+  /// Устранимая недоступность изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The changes couldn’t be saved. Try again.'**
+  String get detailsUpdateUnavailable;
+
+  /// Терминальное повреждение данных при изменении намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The changes weren’t saved.'**
+  String get detailsUpdateCorruption;
+
+  /// Терминальная непредвиденная ошибка изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The changes couldn’t be saved because of an unexpected error.'**
+  String get detailsUpdateUnexpected;
+
   /// Заголовок формы создания намерения
   ///
   /// In en, this message translates to:

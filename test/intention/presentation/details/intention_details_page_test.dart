@@ -9,6 +9,7 @@ import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
 import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
@@ -164,12 +165,324 @@ void main() {
     expect(find.text('Saving changes…'), findsOneWidget);
     expect(find.text('Loading intention…'), findsOneWidget);
 
+    repository.detailRequests.single.add(ResultSuccess(intention));
+    await tester.pump();
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey('intention-details-edit')),
+          )
+          .onPressed,
+      isNull,
+    );
+
     repository.completeCommand(
       0,
       const ResultFailure(IntentionUnavailableFailure()),
     );
     await (start as IntentionCommandAccepted).future;
+    await tester.pump();
   });
+
+  testWidgets(
+    'изменяет поля без optimistic state и блокирует mutating controls на время записи',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(
+        index: 50,
+        title: 'Прежнее название',
+        description: 'Прежнее описание',
+      );
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
+      await tester.pump();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('intention-details-edit-title')),
+            )
+            .controller
+            ?.text,
+        'Прежнее название',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-details-edit-title')),
+        '  Новое название  ',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-details-edit-description')),
+        '  Новое описание\n',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('intention-details-edit-submit')),
+      );
+      await tester.pump();
+
+      expect(repository.commands, hasLength(1));
+      expect(
+        repository.commands.single,
+        isA<UpdateIntention>()
+            .having(
+              (command) => command.title,
+              'исходное название',
+              '  Новое название  ',
+            )
+            .having(
+              (command) => command.description,
+              'исходное описание',
+              '  Новое описание\n',
+            ),
+      );
+      expect(find.text('Прежнее название'), findsOneWidget);
+      expect(find.text('Saving changes…'), findsNWidgets(2));
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('intention-details-edit-title')),
+            )
+            .enabled,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<ButtonStyleButton>(
+              find.byKey(const ValueKey('intention-details-edit-submit')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<ButtonStyleButton>(
+              find.byKey(const ValueKey('intention-details-edit-cancel')),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('прикрепляет ошибки текста к полю и сохраняет исправимый ввод', (
+    tester,
+  ) async {
+    final scenarios =
+        <(IntentionTextField, IntentionTextValidationReason, String)>[
+          (
+            IntentionTextField.title,
+            IntentionTextValidationReason.empty,
+            'Enter a title.',
+          ),
+          (
+            IntentionTextField.title,
+            IntentionTextValidationReason.tooLong,
+            'Use no more than 255 characters.',
+          ),
+          (
+            IntentionTextField.title,
+            IntentionTextValidationReason.invalidUnicodeRepertoire,
+            'Enter valid Unicode text without NUL.',
+          ),
+          (
+            IntentionTextField.description,
+            IntentionTextValidationReason.tooLong,
+            'Use no more than 4096 characters.',
+          ),
+          (
+            IntentionTextField.description,
+            IntentionTextValidationReason.invalidUnicodeRepertoire,
+            'Enter valid Unicode text without NUL.',
+          ),
+        ];
+
+    for (var index = 0; index < scenarios.length; index += 1) {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 60 + index);
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
+      await tester.pump();
+
+      final (field, reason, message) = scenarios[index];
+      final key = switch (field) {
+        IntentionTextField.title => const ValueKey(
+          'intention-details-edit-title',
+        ),
+        IntentionTextField.description => const ValueKey(
+          'intention-details-edit-description',
+        ),
+        IntentionTextField.titleFilter => throw StateError(
+          'Фильтр каталога не относится к форме подробного представления.',
+        ),
+      };
+      final entered = 'Исправляемый ввод $index';
+      await tester.enterText(find.byKey(key), entered);
+      await tester.tap(
+        find.byKey(const ValueKey('intention-details-edit-submit')),
+      );
+      repository.completeCommand(
+        0,
+        ResultFailure(
+          IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(field: field, reason: reason),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(message), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byKey(key)).controller?.text,
+        entered,
+      );
+      expect(tester.widget<TextField>(find.byKey(key)).enabled, isTrue);
+      expect(
+        tester
+            .widget<ButtonStyleButton>(
+              find.byKey(const ValueKey('intention-details-edit-submit')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.enterText(find.byKey(key), '$entered исправлен');
+      await tester.pump();
+      expect(find.text(message), findsNothing);
+      expect(
+        tester
+            .widget<ButtonStyleButton>(
+              find.byKey(const ValueKey('intention-details-edit-submit')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+  });
+
+  testWidgets('показывает confirmed success только после completion', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final before = testDetailsIntention(index: 70, title: 'До изменения');
+    final saved = testDetailsIntention(index: 70, title: 'После изменения');
+    await _pumpDetailsPage(tester, repository, before.id);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(before));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-details-edit-title')),
+      saved.title,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('intention-details-edit-submit')),
+    );
+    await tester.pump();
+
+    expect(find.text('До изменения'), findsOneWidget);
+    expect(find.text('После изменения'), findsOneWidget);
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(saved, before: before),
+    );
+    await tester.pump();
+    await waitForDetailRequests(repository, 2);
+    await tester.pump();
+
+    expect(find.text('Changes saved.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('intention-details-edit-title')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('intention-details-title')),
+      findsOneWidget,
+    );
+    expect(find.text('После изменения'), findsOneWidget);
+  });
+
+  testWidgets(
+    'оставляет уход доступным и передаёт поздний update outcome каталогу',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(
+        index: 71,
+        title: 'Изменяемое намерение',
+      );
+      repository.catalogResult = ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [testDetailsSummary(intention)],
+          totalCount: 1,
+          nextCursor: null,
+          revision: const _DetailsTestRevision(),
+        ),
+      );
+      final router = AppRouter();
+      final container = _detailsContainer(repository);
+      addTearDown(router.dispose);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(intention.title));
+      await tester.pump();
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-details-edit-title')),
+        'Позднее изменение',
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('intention-details-edit-submit')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('intention-details-edit-submit')),
+      );
+      await tester.pump();
+      expect(find.text('Saving changes…'), findsNWidgets(2));
+
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(router.current.name, IntentionCatalogRoute.name);
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('The changes couldn’t be saved. Try again.'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('строка каталога открывает generated details route', (
     tester,

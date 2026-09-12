@@ -888,7 +888,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/**`, `lib/src/intention/presentation/operation/**`, generated Riverpod artifacts и соответствующие tests.
   - **Оценка:** M (до 4 файлов или групп артефактов).
 
-- [ ] 7.10 Провести изменение названия и описания через единый per-intention gate подробного представления
+- [x] 7.10 Провести изменение названия и описания через единый per-intention gate подробного представления
   - **Критерии приёмки:**
     - Details ViewModel передаёт `UpdateIntention` активного или архивированного намерения coordinator без изменения идентификатора и хранит вид наблюдаемой операции в неизменяемом state только в течение lifetime экрана.
     - Во время сохранения все изменяющие controls этого намерения недоступны даже после ухода и повторного открытия details; `IntentionSaved` с тем же `IntentionId` согласует success только через generation barrier 7.20, не применяя accepted `Future` как второй data path, а failure сохраняет последний snapshot и введённые значения остающейся экранной сессии без optimistic update. Остающийся открытым details потребляет presentation claim, а каталог получает его только как fallback после ухода до представления outcome.

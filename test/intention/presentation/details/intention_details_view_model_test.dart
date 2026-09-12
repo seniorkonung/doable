@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
 import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
+import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -251,6 +255,361 @@ void main() {
       const ResultFailure(IntentionUnavailableFailure()),
     );
     await (start as IntentionCommandAccepted).future;
+  });
+
+  test('передаёт изменение активного и архивного намерения через coordinator без optimistic state', () async {
+    for (final archiveState in IntentionArchiveState.values) {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      final intention = testDetailsIntention(
+        index: archiveState.index + 51,
+        title: 'Прежнее название',
+        description: 'Прежнее описание',
+        archiveState: archiveState,
+      );
+      final provider = intentionDetailsViewModelProvider(intention.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(ResultSuccess(intention));
+      await pumpEventQueue();
+
+      final details = container.read(provider.notifier)
+        ..beginEditing()
+        ..changeTitle('  Новое название  ')
+        ..changeDescription('  Новое описание\n')
+        ..saveChanges()
+        ..saveChanges();
+
+      expect(repository.commands, hasLength(1));
+      expect(
+        repository.commands.single,
+        isA<UpdateIntention>()
+            .having((command) => command.id, 'идентификатор', intention.id)
+            .having(
+              (command) => command.title,
+              'название',
+              '  Новое название  ',
+            )
+            .having(
+              (command) => command.description,
+              'описание',
+              '  Новое описание\n',
+            ),
+      );
+      expect(
+        container.read(provider),
+        isA<IntentionDetailsLoaded>()
+            .having(
+              (state) => state.intention,
+              'последнее подтверждённое намерение',
+              same(intention),
+            )
+            .having(
+              (state) => state.edit?.operation,
+              'наблюдаемая update-операция',
+              isA<OperationRunning<Intention>>(),
+            )
+            .having(
+              (state) => state.isOperationRunning,
+              'единый gate намерения',
+              isTrue,
+            ),
+      );
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await pumpEventQueue();
+      subscription.close();
+      container.dispose();
+      expect(details, isNotNull);
+    }
+  });
+
+  test('сохраняет поля и snapshot для всех failures изменения', () async {
+    final scenarios = <(IntentionFailure, bool)>[
+      (
+        const IntentionTextInputValidationFailure(
+          IntentionTextValidationFailure(
+            field: IntentionTextField.title,
+            reason: IntentionTextValidationReason.empty,
+          ),
+        ),
+        false,
+      ),
+      (const IntentionNotFoundFailure(), false),
+      (const IntentionConflictFailure(), false),
+      (const IntentionUnavailableFailure(), true),
+      (const IntentionCorruptionFailure(), false),
+      (const IntentionUnexpectedFailure(), false),
+    ];
+
+    for (var index = 0; index < scenarios.length; index += 1) {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      final intention = testDetailsIntention(index: index + 70);
+      final provider = intentionDetailsViewModelProvider(intention.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(ResultSuccess(intention));
+      await pumpEventQueue();
+      container.read(provider.notifier)
+        ..beginEditing()
+        ..changeTitle('Введённое название $index')
+        ..changeDescription('Введённое описание $index')
+        ..saveChanges();
+
+      final (failure, canRetry) = scenarios[index];
+      repository.completeCommand(0, ResultFailure(failure));
+      await pumpEventQueue();
+
+      expect(
+        container.read(provider),
+        isA<IntentionDetailsLoaded>()
+            .having(
+              (state) => state.intention,
+              'последний подтверждённый snapshot',
+              same(intention),
+            )
+            .having(
+              (state) => state.edit?.title,
+              'введённое название',
+              'Введённое название $index',
+            )
+            .having(
+              (state) => state.edit?.description,
+              'введённое описание',
+              'Введённое описание $index',
+            )
+            .having(
+              (state) => state.edit?.canRetry,
+              'доступность обычного повтора',
+              canRetry,
+            )
+            .having(
+              (state) => state.isOperationRunning,
+              'освобождённый gate',
+              isFalse,
+            ),
+      );
+
+      subscription.close();
+      container.dispose();
+    }
+  });
+
+  test('подтверждённое изменение проходит generation barrier и принадлежит открытому details', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final before = testDetailsIntention(index: 80, title: 'Прежнее');
+    final saved = testDetailsIntention(
+      index: 80,
+      title: 'Сохранённое',
+      description: 'Сохранённое описание',
+    );
+    final refreshed = testDetailsIntention(index: 80, title: 'Перечитанное');
+    final provider = intentionDetailsViewModelProvider(before.id);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(before));
+    await pumpEventQueue();
+
+    final coordinator = container.read(
+      intentionCommandCoordinatorProvider.notifier,
+    );
+    final fallback =
+        Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
+    final completionTokens = <IntentionOperationToken>[];
+    final completionSubscription = coordinator.completions.listen((event) {
+      completionTokens.add(event.token);
+      fallback.complete(coordinator.claimCatalogFallback(event.token));
+    });
+    addTearDown(completionSubscription.cancel);
+
+    container.read(provider.notifier)
+      ..beginEditing()
+      ..changeTitle(saved.title)
+      ..changeDescription(saved.description!)
+      ..saveChanges();
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(saved, before: before),
+    );
+    await waitForDetailRequests(repository, 2);
+
+    expect(
+      container.read(provider),
+      isA<IntentionDetailsLoaded>()
+          .having(
+            (state) => state.intention,
+            'подтверждённый success',
+            same(saved),
+          )
+          .having((state) => state.edit, 'завершённая форма', isNull)
+          .having(
+            (state) => state.event,
+            'одноразовое подтверждение',
+            isA<IntentionDetailsSaved>(),
+          ),
+    );
+    expect(await (await fallback.future), isNull);
+
+    repository.detailRequests[0].add(ResultSuccess(before));
+    await pumpEventQueue();
+    expect(
+      (container.read(provider) as IntentionDetailsLoaded).intention,
+      same(saved),
+    );
+
+    repository.detailRequests[1].add(ResultSuccess(refreshed));
+    await pumpEventQueue();
+    expect(
+      (container.read(provider) as IntentionDetailsLoaded).intention,
+      same(refreshed),
+    );
+    expect(completionTokens, hasLength(1));
+  });
+
+  test('disposal передаёт update outcome каталогу и сохраняет gate при повторном открытии', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final intention = testDetailsIntention(index: 81);
+    final provider = intentionDetailsViewModelProvider(intention.id);
+    final firstSubscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await pumpEventQueue();
+    container.read(provider.notifier)
+      ..beginEditing()
+      ..changeTitle('Позднее изменение')
+      ..saveChanges();
+
+    final coordinator = container.read(
+      intentionCommandCoordinatorProvider.notifier,
+    );
+    final fallback =
+        Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
+    final completionSubscription = coordinator.completions.listen((event) {
+      fallback.complete(coordinator.claimCatalogFallback(event.token));
+    });
+    addTearDown(completionSubscription.cancel);
+    firstSubscription.close();
+    await pumpEventQueue();
+
+    final reopenedSubscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(reopenedSubscription.close);
+    await waitForDetailRequests(repository, 2);
+    repository.detailRequests[1].add(ResultSuccess(intention));
+    await pumpEventQueue();
+    final reopened = container.read(provider) as IntentionDetailsLoaded;
+    expect(reopened.isOperationRunning, isTrue);
+    container.read(provider.notifier).beginEditing();
+    expect((container.read(provider) as IntentionDetailsLoaded).edit, isNull);
+
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    final claim = await (await fallback.future);
+    expect(claim, isA<IntentionCatalogFallbackPresentationClaim>());
+    coordinator.confirmPresentation(claim!);
+    await pumpEventQueue();
+
+    expect(
+      (container.read(provider) as IntentionDetailsLoaded).isOperationRunning,
+      isFalse,
+    );
+    container.read(provider.notifier).beginEditing();
+    expect(
+      (container.read(provider) as IntentionDetailsLoaded).edit,
+      isNotNull,
+    );
+  });
+
+  test('retry изменения получает новый token без прежнего failure', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final intention = testDetailsIntention(index: 82);
+    final provider = intentionDetailsViewModelProvider(intention.id);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await pumpEventQueue();
+    final tokens = <IntentionOperationToken>[];
+    final fallbackClaims =
+        <Future<IntentionCatalogFallbackPresentationClaim?>>[];
+    final coordinator = container.read(
+      intentionCommandCoordinatorProvider.notifier,
+    );
+    final coordinatorSubscription = coordinator.completions.listen((
+      completion,
+    ) {
+      tokens.add(completion.token);
+      fallbackClaims.add(coordinator.claimCatalogFallback(completion.token));
+    });
+    addTearDown(coordinatorSubscription.cancel);
+
+    final details = container.read(provider.notifier)
+      ..beginEditing()
+      ..changeTitle('Исправленное намерение')
+      ..saveChanges();
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await pumpEventQueue();
+    expect(
+      (container.read(provider) as IntentionDetailsLoaded).edit?.canRetry,
+      isTrue,
+    );
+
+    details.saveChanges();
+    repository.completeCommand(
+      1,
+      testDetailsSavedResult(
+        testDetailsIntention(index: 82, title: 'Исправленное намерение'),
+        before: intention,
+      ),
+    );
+    await waitForDetailRequests(repository, 2);
+
+    expect(tokens, hasLength(2));
+    expect(identical(tokens.first, tokens.last), isFalse);
+    expect(await Future.wait(fallbackClaims), everyElement(isNull));
+    expect(
+      (container.read(provider) as IntentionDetailsLoaded).event,
+      isA<IntentionDetailsSaved>(),
+    );
   });
 
   test(
