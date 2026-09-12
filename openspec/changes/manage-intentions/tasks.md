@@ -826,7 +826,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/catalog/**`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb`, generated localization/Riverpod artifacts, `test/intention/presentation/catalog/**`.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 7.6 Добавить автоматическую cursor-подгрузку каталога с единым count и локальным retry следующей порции
+- [x] 7.6 Добавить автоматическую cursor-подгрузку каталога с единым count и локальным retry следующей порции
   - **Критерии приёмки:**
     - `CatalogPagingPolicy` проверяет `pageSize` 1–100 и `prefetchRemaining` от 0 до значения меньше `pageSize`; production использует 100/30, а недопустимая policy отклоняется до repository call.
     - При достижении threshold ViewModel выполняет не более одного продолжения, добавляет только новые summaries, сохраняет count первой страницы, обновляет cursor и прекращает запросы после `nextCursor == null`.
