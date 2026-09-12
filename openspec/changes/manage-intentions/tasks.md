@@ -802,7 +802,7 @@
   - **Вероятно затронутые файлы:** новые файлы в `lib/src/app/routing/` и `lib/src/intention/presentation/catalog/`, generated AutoRoute/Riverpod artifacts, `lib/main.dart`, тесты routing/catalog.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 7.4 Проверить composition, bootstrap и начальную пользовательскую границу каталога
+- [x] 7.4 Проверить composition, bootstrap и начальную пользовательскую границу каталога
   - **Критерии приёмки:**
     - Проверки подтверждают явные bootstrap outcomes, отсутствие feature routes до готовности и полный controlled shutdown app-owned object graph: новые commands запрещаются до disposal, принятые operations завершаются до database close, повторный shutdown идемпотентен, а следующий graph не пересекается с ready или in-flight bootstrap прежнего.
     - Начальный каталог получает только ограниченную active-выдачу с порядком `createdAt descending`, отличает загрузку, пустой результат и failures и не показывает неподтверждённое состояние.
