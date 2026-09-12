@@ -1,8 +1,9 @@
 [tools]
-flutter = "3.47"
-"github:microsoft/apm" = "latest"
-lefthook = "2"
-"npm:@fission-ai/openspec" = "1.12"
+flutter = "3.47.1"
+node = "26.4.0"
+"github:microsoft/apm" = "0.28.0"
+lefthook = "2.1.9"
+"npm:@fission-ai/openspec" = "1.12.0"
 
 [tasks]
 prepare = "lefthook install"
@@ -19,8 +20,12 @@ check-fast = [
 ]
 codegen = [
     "flutter gen-l10n",
-    "dart run build_runner build"
+    "dart run build_runner build --delete-conflicting-outputs",
+    "dart run drift_dev schema dump lib/src/data/local/app_database.dart drift_schemas/",
+    "dart run drift_dev schema steps drift_schemas/ lib/src/data/local/migrations/generated_schema.dart"
 ]
+codegen-check = "bash tool/check_generated.sh"
+codegen-check-test = "bash tool/check_generated_test.sh"
 setup = [
     "cp -R ~/projects/doable/apm_modules ./apm_modules/",
     "apm install --frozen",
