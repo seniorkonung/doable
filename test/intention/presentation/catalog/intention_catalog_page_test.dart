@@ -1,16 +1,23 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
 import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_test_support.dart';
+import 'catalog_reconciliation_test_support.dart';
 
 void main() {
   testWidgets('показывает загрузку до подтверждённой первой страницы', (
@@ -282,6 +289,221 @@ void main() {
     );
   });
 
+  testWidgets('сохраняет visual anchor при изменениях перед видимой позицией', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(repository);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(_testAppWithContainer(container));
+    final items = [
+      for (var index = 30; index >= 1; index--)
+        testSummary(index: index, title: 'Намерение $index'),
+    ];
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: items,
+          totalCount: items.length,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
+      const Offset(0, -600),
+    );
+    await tester.pumpAndSettle();
+    final anchor = _firstVisibleCatalogTile(tester);
+    final anchorIndex = items.indexWhere((item) => item.title == anchor.title);
+    final anchorSummary = items[anchorIndex];
+    final nearestSummary = items[anchorIndex + 1];
+
+    final inserted = testSummary(index: 31, title: 'Новое намерение');
+    await _completeCatalogWidgetCommand(
+      tester,
+      container,
+      repository,
+      const CreateIntention(title: 'Новое намерение', description: null),
+      IntentionSaved(
+        testIntention(index: 31, title: 'Новое намерение'),
+        catalogMutation: IntentionCatalogCreated(
+          revision: const TestCatalogRevision(2),
+          entry: TestCatalogEntrySnapshot(inserted),
+        ),
+      ),
+    );
+
+    expect(
+      _catalogTileTop(tester, anchor.title),
+      moreOrLessEquals(anchor.top, epsilon: 0.01),
+    );
+
+    final movedBeforeAnchor = testSummary(
+      index: 1,
+      title: 'Намерение 1',
+      createdDay: 32,
+    );
+    await _completeCatalogWidgetCommand(
+      tester,
+      container,
+      repository,
+      UpdateIntention(
+        id: movedBeforeAnchor.id,
+        title: movedBeforeAnchor.title,
+        description: null,
+      ),
+      IntentionSaved(
+        testIntention(index: 1, title: 'Намерение 1'),
+        catalogMutation: IntentionCatalogUpdated(
+          revision: const TestCatalogRevision(3),
+          before: TestCatalogEntrySnapshot(items.last),
+          after: TestCatalogEntrySnapshot(movedBeforeAnchor),
+        ),
+      ),
+    );
+
+    expect(
+      _catalogTileTop(tester, anchor.title),
+      moreOrLessEquals(anchor.top, epsilon: 0.01),
+    );
+
+    await _completeCatalogWidgetCommand(
+      tester,
+      container,
+      repository,
+      DeleteIntention(movedBeforeAnchor.id),
+      IntentionDeleted(
+        movedBeforeAnchor.id,
+        catalogMutation: IntentionCatalogDeleted(
+          revision: const TestCatalogRevision(4),
+          entry: TestCatalogEntrySnapshot(movedBeforeAnchor),
+        ),
+      ),
+    );
+
+    expect(
+      _catalogTileTop(tester, anchor.title),
+      moreOrLessEquals(anchor.top, epsilon: 0.01),
+    );
+
+    await _completeCatalogWidgetCommand(
+      tester,
+      container,
+      repository,
+      DeleteIntention(anchorSummary.id),
+      IntentionDeleted(
+        anchorSummary.id,
+        catalogMutation: IntentionCatalogDeleted(
+          revision: const TestCatalogRevision(5),
+          entry: TestCatalogEntrySnapshot(anchorSummary),
+        ),
+      ),
+    );
+
+    expect(find.text(anchor.title), findsNothing);
+    expect(
+      _catalogTileTop(tester, nearestSummary.title),
+      moreOrLessEquals(anchor.top, epsilon: 0.01),
+    );
+  });
+
+  testWidgets('сохраняет порции и позицию после типизированного перехода', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(
+      repository,
+      pageSize: 20,
+      prefetchRemaining: 2,
+    );
+    final router = AppRouter();
+    addTearDown(container.dispose);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_routerTestAppWithContainer(container, router));
+    await tester.pump();
+    repository.queryAt(0);
+    await tester.enterText(
+      find.byKey(const ValueKey('catalog-filter-field')),
+      'Намерение',
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(repository.queries, hasLength(2));
+    expect(
+      repository.queryAt(1).titleFilter?.map((value) => value),
+      'Намерение',
+    );
+    const cursor = TestCatalogCursor();
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [
+            for (var index = 30; index >= 11; index--)
+              testSummary(index: index, title: 'Намерение $index'),
+          ],
+          totalCount: 30,
+          nextCursor: cursor,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
+      const Offset(0, -1000),
+    );
+    await _pumpUntilQueries(tester, repository, 3);
+    repository.complete(
+      2,
+      ResultSuccess(
+        IntentionCatalogContinuationPage(
+          items: [
+            for (var index = 10; index >= 1; index--)
+              testSummary(index: index, title: 'Намерение $index'),
+          ],
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final beforePosition = _catalogScrollPosition(tester).pixels;
+    final beforeState =
+        container.read(intentionCatalogViewModelProvider).requireValue
+            as IntentionCatalogLoaded;
+    expect(beforeState.items, hasLength(30));
+    expect(beforePosition, greaterThan(0));
+    expect(beforeState.query.titleFilter?.map((value) => value), 'Намерение');
+
+    await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
+    await tester.pumpAndSettle();
+    expect(router.current.name, IntentionEditorRoute.name);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    final afterState =
+        container.read(intentionCatalogViewModelProvider).requireValue
+            as IntentionCatalogLoaded;
+    expect(router.current.name, IntentionCatalogRoute.name);
+    expect(repository.queries, hasLength(3));
+    expect(afterState.query, same(beforeState.query));
+    expect(
+      afterState.items.map((item) => item.id),
+      beforeState.items.map((item) => item.id),
+    );
+    expect(
+      _catalogScrollPosition(tester).pixels,
+      moreOrLessEquals(beforePosition, epsilon: 0.01),
+    );
+  });
+
   testWidgets('локализует параметры каталога на русский язык', (tester) async {
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
@@ -492,6 +714,88 @@ Widget _testApp(
     home: const IntentionCatalogPage(),
   ),
 );
+
+Widget _testAppWithContainer(ProviderContainer container) =>
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: const IntentionCatalogPage(),
+      ),
+    );
+
+Widget _routerTestAppWithContainer(
+  ProviderContainer container,
+  AppRouter router,
+) => UncontrolledProviderScope(
+  container: container,
+  child: MaterialApp.router(
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    routerConfig: router.config(),
+  ),
+);
+
+({String title, double top}) _firstVisibleCatalogTile(WidgetTester tester) {
+  final listRect = tester.getRect(
+    find.byKey(const PageStorageKey<String>('intention-catalog-list')),
+  );
+  final visible = <({String title, double top})>[];
+  for (final element in find.byType(ListTile).evaluate()) {
+    final tile = element.widget as ListTile;
+    final title = tile.title;
+    if (title is! Text || title.data == null) {
+      continue;
+    }
+    final finder = find.byElementPredicate(
+      (candidate) => identical(candidate, element),
+    );
+    final rect = tester.getRect(finder);
+    if (rect.bottom > listRect.top && rect.top < listRect.bottom) {
+      visible.add((title: title.data!, top: rect.top));
+    }
+  }
+  visible.sort((left, right) => left.top.compareTo(right.top));
+  return visible.first;
+}
+
+double _catalogTileTop(WidgetTester tester, String title) => tester
+    .getTopLeft(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is ListTile &&
+            widget.title is Text &&
+            (widget.title! as Text).data == title,
+      ),
+    )
+    .dy;
+
+Future<void> _completeCatalogWidgetCommand(
+  WidgetTester tester,
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  IntentionCommand command,
+  IntentionCommandSuccess success,
+) async {
+  final coordinator = container.read(
+    intentionCommandCoordinatorProvider.notifier,
+  );
+  final commandIndex = repository.commands.length;
+  final start = coordinator.accept(command);
+  expect(start, isA<IntentionCommandAccepted>());
+  final accepted = start as IntentionCommandAccepted;
+  repository.completeCommand(commandIndex, ResultSuccess(success));
+  final completion = await accepted.future;
+  final claim = coordinator.claimInitiator(completion.token);
+  if (claim != null) {
+    coordinator.confirmPresentation(claim);
+  }
+  await tester.pump();
+  await tester.pump();
+}
 
 Future<void> _pumpUntilQueries(
   WidgetTester tester,

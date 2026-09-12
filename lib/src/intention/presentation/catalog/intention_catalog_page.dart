@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../application/intention_repository.dart';
 import '../../domain/intention.dart';
+import '../../domain/intention_id.dart';
 import 'intention_catalog_state.dart';
 import 'intention_catalog_view_model.dart';
 
@@ -24,7 +26,10 @@ final class _IntentionCatalogPageState
     extends ConsumerState<IntentionCatalogPage> {
   final _filterController = TextEditingController();
   final _scrollController = ScrollController();
+  final _itemKeys = <IntentionId, GlobalKey>{};
   late final IntentionCatalogViewModel _notifier;
+  _CatalogVisualAnchor? _pendingVisualAnchor;
+  bool _catalogMaintenanceScheduled = false;
 
   @override
   void initState() {
@@ -45,6 +50,7 @@ final class _IntentionCatalogPageState
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final catalog = ref.watch(intentionCatalogViewModelProvider);
+    ref.listen(intentionCatalogViewModelProvider, _handleCatalogStateChanged);
     final notifier = ref.read(intentionCatalogViewModelProvider.notifier);
     final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
@@ -82,6 +88,7 @@ final class _IntentionCatalogPageState
               data: (state) => _CatalogContent(
                 state: state,
                 scrollController: _scrollController,
+                itemKeyFor: _itemKeyFor,
               ),
               error: (_, _) => _CatalogStatus(
                 message: localizations.catalogUnexpectedFailure,
@@ -101,6 +108,126 @@ final class _IntentionCatalogPageState
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
+  }
+
+  GlobalKey _itemKeyFor(IntentionId id) =>
+      _itemKeys.putIfAbsent(id, () => GlobalKey());
+
+  void _handleCatalogStateChanged(
+    AsyncValue<IntentionCatalogState>? previous,
+    AsyncValue<IntentionCatalogState> next,
+  ) {
+    final previousState = previous?.value;
+    final nextState = next.value;
+    if (nextState is! IntentionCatalogLoaded) {
+      return;
+    }
+
+    if (_pendingVisualAnchor == null &&
+        previousState is IntentionCatalogLoaded &&
+        identical(previousState.query, nextState.query) &&
+        _catalogLayoutChanged(previousState.items, nextState.items)) {
+      _pendingVisualAnchor = _captureVisualAnchor(previousState.items);
+    }
+    _scheduleCatalogMaintenance();
+  }
+
+  bool _catalogLayoutChanged(
+    List<IntentionSummary> previous,
+    List<IntentionSummary> next,
+  ) {
+    if (previous.length != next.length) {
+      return true;
+    }
+    for (var index = 0; index < previous.length; index++) {
+      if (!identical(previous[index], next[index])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  _CatalogVisualAnchor? _captureVisualAnchor(List<IntentionSummary> items) {
+    if (!_scrollController.hasClients) {
+      return null;
+    }
+    final currentOffset = _scrollController.position.pixels;
+    for (var index = 0; index < items.length; index++) {
+      final renderObject = _itemKeys[items[index].id]?.currentContext
+          ?.findRenderObject();
+      if (renderObject == null || !renderObject.attached) {
+        continue;
+      }
+      final viewport = RenderAbstractViewport.maybeOf(renderObject);
+      if (viewport == null) {
+        continue;
+      }
+      final revealed = viewport.getOffsetToReveal(renderObject, 0);
+      final itemStart = revealed.offset;
+      final itemEnd = itemStart + revealed.rect.height;
+      if (itemStart <= currentOffset && itemEnd > currentOffset) {
+        return _CatalogVisualAnchor(
+          candidateIds: [
+            items[index].id,
+            if (index + 1 < items.length) items[index + 1].id,
+            if (index > 0) items[index - 1].id,
+          ],
+          offsetWithinItem: currentOffset - itemStart,
+        );
+      }
+    }
+    return null;
+  }
+
+  void _scheduleCatalogMaintenance() {
+    if (_catalogMaintenanceScheduled) {
+      return;
+    }
+    _catalogMaintenanceScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _catalogMaintenanceScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      _restoreVisualAnchor();
+      _pruneItemKeys();
+    });
+  }
+
+  void _restoreVisualAnchor() {
+    final anchor = _pendingVisualAnchor;
+    _pendingVisualAnchor = null;
+    if (anchor == null || !_scrollController.hasClients) {
+      return;
+    }
+
+    for (final id in anchor.candidateIds) {
+      final renderObject = _itemKeys[id]?.currentContext?.findRenderObject();
+      if (renderObject == null || !renderObject.attached) {
+        continue;
+      }
+      final viewport = RenderAbstractViewport.maybeOf(renderObject);
+      if (viewport == null) {
+        continue;
+      }
+      final target =
+          viewport.getOffsetToReveal(renderObject, 0).offset +
+          anchor.offsetWithinItem;
+      final position = _scrollController.position;
+      position.jumpTo(
+        target.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+      return;
+    }
+  }
+
+  void _pruneItemKeys() {
+    final state = ref.read(intentionCatalogViewModelProvider).value;
+    if (state is! IntentionCatalogLoaded) {
+      return;
+    }
+    final currentIds = state.items.map((item) => item.id).toSet();
+    _itemKeys.removeWhere((id, _) => !currentIds.contains(id));
   }
 
   void _showPresentationEvent(IntentionCatalogPresentationEvent event) {
@@ -290,10 +417,15 @@ final class _CatalogControls extends StatelessWidget {
 }
 
 final class _CatalogContent extends ConsumerWidget {
-  const _CatalogContent({required this.state, required this.scrollController});
+  const _CatalogContent({
+    required this.state,
+    required this.scrollController,
+    required this.itemKeyFor,
+  });
 
   final IntentionCatalogState state;
   final ScrollController scrollController;
+  final Key Function(IntentionId) itemKeyFor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -307,6 +439,7 @@ final class _CatalogContent extends ConsumerWidget {
       IntentionCatalogLoaded loaded => _LoadedCatalog(
         state: loaded,
         scrollController: scrollController,
+        itemKeyFor: itemKeyFor,
       ),
       IntentionCatalogEmpty empty => _CatalogStatus(
         message: _emptyMessage(localizations, empty.scope),
@@ -336,10 +469,15 @@ final class _CatalogContent extends ConsumerWidget {
 }
 
 final class _LoadedCatalog extends ConsumerWidget {
-  const _LoadedCatalog({required this.state, required this.scrollController});
+  const _LoadedCatalog({
+    required this.state,
+    required this.scrollController,
+    required this.itemKeyFor,
+  });
 
   final IntentionCatalogLoaded state;
   final ScrollController scrollController;
+  final Key Function(IntentionId) itemKeyFor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -370,6 +508,7 @@ final class _LoadedCatalog extends ConsumerWidget {
               _requestNextPage(context, ref, index);
               final summary = state.items[index];
               return _IntentionSummaryTile(
+                key: itemKeyFor(summary.id),
                 summary: summary,
                 onTap: () {
                   context.router.push(
@@ -480,7 +619,11 @@ final class _CatalogInlineStatus extends StatelessWidget {
 }
 
 final class _IntentionSummaryTile extends StatelessWidget {
-  const _IntentionSummaryTile({required this.summary, required this.onTap});
+  const _IntentionSummaryTile({
+    required this.summary,
+    required this.onTap,
+    super.key,
+  });
 
   final IntentionSummary summary;
   final VoidCallback onTap;
@@ -504,6 +647,16 @@ final class _IntentionSummaryTile extends StatelessWidget {
       ),
     );
   }
+}
+
+final class _CatalogVisualAnchor {
+  const _CatalogVisualAnchor({
+    required this.candidateIds,
+    required this.offsetWithinItem,
+  });
+
+  final List<IntentionId> candidateIds;
+  final double offsetWithinItem;
 }
 
 final class _CatalogStatus extends StatelessWidget {
