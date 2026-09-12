@@ -10,11 +10,13 @@ prepare = "lefthook install"
 start = "flutter run"
 check = [
     "dart format --output=none --set-exit-if-changed .",
+    "bash test/tool/check_ci_scope_test.sh",
     "flutter analyze",
     "flutter test"
 ]
 check-fast = [
     "dart format --output=none --set-exit-if-changed .",
+    "bash test/tool/check_ci_scope_test.sh",
     "flutter analyze",
     "flutter test --exclude-tags=slow"
 ]
