@@ -2,13 +2,70 @@ name: CI
 
 on:
   pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
 
 permissions:
+  actions: read
+  checks: read
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
-  full-checks:
-    name: Full checks
+  scope_detector:
+    name: Detect Android artifact scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      android_required: ${{ steps.scope.outputs.android_required }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect Android artifact scope
+        id: scope
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash tool/check_ci_scope.sh
+
+  project_checks:
+    name: Project checks
+    needs: scope_detector
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.1
+
+      - name: Verify generated artifacts
+        run: mise run codegen-check
+
+      - name: Run full project checks
+        run: mise run check
+
+      - name: Validate OpenSpec changes
+        run: mise exec -- openspec validate --all --strict --no-interactive
+
+  android_artifact:
+    name: Android artifact evidence
+    needs: scope_detector
+    if: ${{ needs.scope_detector.outputs.android_required == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -42,15 +99,6 @@ jobs:
             "platforms;android-${ANDROID_PLATFORM_VERSION}" \
             "build-tools;${ANDROID_BUILD_TOOLS_VERSION}"
 
-      - name: Verify generated artifacts
-        run: mise run codegen-check
-
-      - name: Run full project checks
-        run: mise run check
-
-      - name: Validate OpenSpec changes
-        run: mise exec -- openspec validate --all --strict --no-interactive
-
       - name: Build release APK
         run: flutter build apk --release
 
@@ -65,3 +113,48 @@ jobs:
           dart run tool/check_android_privacy_manifest.dart \
             "${aapt2}" \
             "${RELEASE_APK}"
+
+  full_checks:
+    name: Full checks
+    needs:
+      - scope_detector
+      - project_checks
+      - android_artifact
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Enforce aggregate gate
+        shell: bash
+        env:
+          ANDROID_REQUIRED: ${{ needs.scope_detector.outputs.android_required }}
+          ANDROID_RESULT: ${{ needs.android_artifact.result }}
+          PROJECT_RESULT: ${{ needs.project_checks.result }}
+          SCOPE_RESULT: ${{ needs.scope_detector.result }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$SCOPE_RESULT" != success || "$PROJECT_RESULT" != success ]]; then
+            echo "Scope detector or project checks did not succeed" >&2
+            exit 1
+          fi
+
+          case "$ANDROID_REQUIRED" in
+            true)
+              if [[ "$ANDROID_RESULT" != success ]]; then
+                echo "Required Android artifact evidence did not succeed" >&2
+                exit 1
+              fi
+              ;;
+            false)
+              if [[ "$ANDROID_RESULT" != skipped ]]; then
+                echo "Android artifact job was not safely skipped" >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Android artifact decision is missing or invalid" >&2
+              exit 1
+              ;;
+          esac
