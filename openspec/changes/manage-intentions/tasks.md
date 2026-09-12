@@ -1096,7 +1096,19 @@
   - **Вероятно затронутые файлы:** `.github/workflows/ci.yml`, новый проверяемый helper и его tests в `tool/`, `test/android/backup_policy_test.dart` при необходимости.
   - **Оценка:** M (до 4 файлов или групп артефактов).
 
-- [ ] 8.9 Включить negative-path evidence generated-artifact detector в обязательный CI gate
+- [ ] 8.9 Сократить стоимость обязательного PR gate без ослабления Android privacy evidence
+  - **Критерии приёмки:**
+    - Workflow использует `concurrency` по PR с `cancel-in-progress: true`, а project checks и требуемый Android artifact job могут выполняться параллельно после scope detector. Единственный агрегирующий job с точным именем `Full checks` завершается успешно только после успешных project checks, успешного требуемого Android job либо его явного обоснованного пропуска; отказ, отмена или отсутствие обязательного prerequisite не трактуются как успех.
+    - Проверяемый fail-closed scope detector требует release APK build для изменений `android/**`, `pubspec.yaml`, `pubspec.lock`, `mise.toml`, CI workflow, packaged-manifest helper и любого неизвестного или неклассифицированного пути. Incremental diff от предыдущего HEAD допустим только когда тот является предком текущего и имеет успешный доверенный `Full checks` этого workflow; иначе detector проверяет полный PR diff и не позволяет отменённому либо незавершённому Android evidence превратиться в doc-only пропуск. Только полностью классифицированный не влияющий на packaged manifest scope, включая документацию, OpenSpec и изолированные Dart/test изменения без dependency или Android-конфигурации, может пропустить Android job; ручной и еженедельный полные запуски требуют его безусловно.
+    - Эффективная branch protection продолжает требовать тот же status context `Full checks`. Фактический artifact-impacting PR run показывает release APK build и packaged-manifest verification, а последующий doc-only run того же PR явно пропускает Android job, сохраняет зелёные project checks и успешно завершает агрегатор без pending status или второго required context.
+  - **Проверка:**
+    - По TDD добавить focused fixtures scope detector для Android, dependency, toolchain, workflow, privacy-helper, неизвестного и доказанно не влияющих documentation, OpenSpec и Dart/test-only путей; отдельно покрыть успешный предыдущий gate, отсутствующий, отменённый, выполняющийся и неуспешный gate, non-ancestor range и malformed change evidence. Выполнить соответствующий focused test и `mise run check`.
+    - Выполнить `git diff --check` и `openspec validate manage-intentions --type change --strict --no-interactive`; сопоставить commit SHA и шаги двух фактических PR runs для artifact-impacting и doc-only путей, затем проверить эффективное required-check правило без merge.
+  - **Зависимости:** 8.8.
+  - **Вероятно затронутые файлы:** `.github/workflows/ci.yml`, новый scope helper и его tests в `tool/` и `test/tool/`; `mise.toml` только при необходимости зарегистрировать focused command.
+  - **Оценка:** M (до 4 файлов или групп артефактов).
+
+- [ ] 8.10 Включить negative-path evidence generated-artifact detector в обязательный CI gate
   - **Критерии приёмки:**
     - Тот же required job `Full checks` исполняет `tool/check_generated_test.sh` либо эквивалентную зарегистрированную задачу и становится неуспешным, если detector перестаёт замечать изменённый tracked или новый untracked artifact.
     - Fixture-проверка остаётся изолированной, очищает временную рабочую копию и не зависит от пользовательского `apm_modules`, hooks или состояния основного checkout; обычный `codegen-check` по-прежнему повторно генерирует полный утверждённый набор artifacts.
@@ -1104,18 +1116,18 @@
   - **Проверка:**
     - Выполнить `bash tool/check_generated_test.sh`, `mise run codegen-check` и `mise run check`.
     - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`, затем сопоставить шаг с фактическим PR `Full checks`.
-  - **Зависимости:** 8.6.
+  - **Зависимости:** 8.6, 8.9.
   - **Вероятно затронутые файлы:** `.github/workflows/ci.yml`, `mise.toml`; существующие `tool/check_generated.sh` и `tool/check_generated_test.sh` изменяются только при подтверждённой необходимости.
   - **Оценка:** S (до 2 файлов).
 
-- [ ] 8.10 Подтвердить готовность управления намерениями к интеграции на окончательном коммите
+- [ ] 8.11 Подтвердить готовность управления намерениями к интеграции на окончательном коммите
   - **Критерии приёмки:**
-    - Все задачи Phase 8 и добавленные по её review обязательные исправления завершены; окончательный commit имеет успешный обязательный CI gate, а blocking review findings отсутствуют.
+    - Все задачи Phase 8 и добавленные по её review обязательные исправления завершены; окончательный commit имеет успешный обязательный агрегирующий `Full checks`, последнее artifact-impacting изменение PR имеет успешные release APK build и packaged-manifest evidence, а blocking review findings отсутствуют.
     - Итог явно разделяет доказанное существующими автоматизированными accessibility проверками и не квалифицированную вручную работу TalkBack на Android, а также принятые ограничения Android runtime/performance evidence; новые интеграционные тесты и их инфраструктура не являются условием готовности.
     - Change соответствует утверждённому scope, строго валиден и готов к интеграции без заявления о публикации, production signing или поддержке других platform hosts.
   - **Проверка:**
-    - Сопоставить `git rev-parse HEAD` с успешным required CI run и review target; при изменении затронутого поведения обновить соответствующее автоматизированное evidence и проверить актуальность принятой границы отсутствия ручной TalkBack qualification.
+    - Сопоставить `git rev-parse HEAD` с успешным required `Full checks`, а SHA последнего artifact-impacting изменения — с успешным Android artifact job и review target; при изменении затронутого поведения обновить соответствующее автоматизированное evidence и проверить актуальность принятой границы отсутствия ручной TalkBack qualification.
     - Выполнить `openspec validate --all --strict --no-interactive` и `git diff --check`; проверить актуальные required-check настройки и отсутствие незавершённых обязательных задач.
-  - **Зависимости:** 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9.
+  - **Зависимости:** 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.10.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
