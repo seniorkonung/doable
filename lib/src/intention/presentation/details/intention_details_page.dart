@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +21,11 @@ final class IntentionDetailsPage extends ConsumerWidget {
     final localizations = AppLocalizations.of(context);
     final provider = intentionDetailsViewModelProvider(intentionId);
     final details = ref.watch(provider);
+    ref.listen(provider, (previous, next) {
+      if (next is IntentionDetailsDeleted) {
+        unawaited(context.router.maybePop());
+      }
+    });
     return Scaffold(
       appBar: AppBar(title: Text(localizations.detailsTitle)),
       body: SafeArea(
@@ -93,6 +100,9 @@ final class _DetailsContent extends ConsumerWidget {
       ),
       IntentionDetailsUnexpected() => _DetailsStatus(
         message: localizations.detailsUnexpected,
+      ),
+      IntentionDetailsDeleted() => _DetailsStatus(
+        message: localizations.detailsNotFound,
       ),
     };
   }

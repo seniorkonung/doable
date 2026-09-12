@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -217,6 +219,56 @@ void main() {
     expect(router.current.name, IntentionDetailsRoute.name);
     expect(find.byType(IntentionDetailsPage), findsOneWidget);
     expect(repository.detailIds.single, intention.id);
+  });
+
+  testWidgets('IntentionDeleted завершает открытый details route', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    repository.catalogResult = ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: const [],
+        totalCount: 0,
+        nextCursor: null,
+        revision: const _DetailsTestRevision(),
+      ),
+    );
+    final intention = testDetailsIntention(index: 70);
+    final router = AppRouter();
+    final container = _detailsContainer(repository);
+    addTearDown(router.dispose);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router.config(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await tester.pump();
+    expect(router.current.name, IntentionDetailsRoute.name);
+
+    final start = container
+        .read(intentionCommandCoordinatorProvider.notifier)
+        .accept(DeleteIntention(intention.id));
+    repository.completeCommand(0, testDetailsDeletedResult(intention));
+    await (start as IntentionCommandAccepted).future;
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(router.current.name, IntentionCatalogRoute.name);
+    expect(find.byType(IntentionDetailsPage), findsNothing);
   });
 }
 

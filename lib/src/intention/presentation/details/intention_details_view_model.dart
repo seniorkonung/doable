@@ -1,5 +1,9 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../application/intention_repository.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
@@ -28,18 +32,6 @@ final class _DetailObservationGeneration {
 }
 
 @riverpod
-final class _DetailObservationGenerationController
-    extends _$DetailObservationGenerationController {
-  @override
-  _DetailObservationGeneration build(IntentionId intentionId) =>
-      _DetailObservationGeneration.initial;
-
-  void advance() {
-    state = state.next();
-  }
-}
-
-@riverpod
 Stream<Result<Intention?>> _intentionDetailsObservation(
   Ref ref,
   IntentionId intentionId,
@@ -49,38 +41,109 @@ Stream<Result<Intention?>> _intentionDetailsObservation(
 @riverpod
 final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   late IntentionId _intentionId;
+  late IntentionCommandCoordinator _coordinator;
+  late _DetailObservationGeneration _generation;
+  late StreamSubscription<IntentionCommandCompletion> _completionSubscription;
+  ProviderSubscription<AsyncValue<Result<Intention?>>>?
+  _observationSubscription;
+  var _preserveAuthoritativeStateWhileLoading = false;
+  var _isDeleted = false;
 
   @override
   IntentionDetailsState build(IntentionId intentionId) {
     _intentionId = intentionId;
-    final generation = ref.watch(
-      _detailObservationGenerationControllerProvider(intentionId),
+    _generation = _DetailObservationGeneration.initial;
+    _coordinator = ref.watch(intentionCommandCoordinatorProvider.notifier);
+    _completionSubscription = _coordinator.completions.listen(
+      _handleCompletion,
     );
-    final observation = ref.watch(
-      _intentionDetailsObservationProvider(intentionId, generation),
-    );
-    final isOperationRunning = ref
-        .watch(intentionCommandCoordinatorProvider.notifier)
-        .isRunning(intentionId);
-    return observation.when(
-      data: (result) => _stateFromResult(result, isOperationRunning),
-      error: (_, _) =>
-          IntentionDetailsUnexpected(isOperationRunning: isOperationRunning),
-      loading: () =>
-          IntentionDetailsLoading(isOperationRunning: isOperationRunning),
-    );
+    ref.onDispose(() {
+      _observationSubscription?.close();
+      unawaited(_completionSubscription.cancel());
+    });
+
+    final initialObservation = _startObservation();
+    return _stateFromObservation(initialObservation);
   }
 
   void retry() {
     if (state is! IntentionDetailsUnavailable) {
       return;
     }
-    ref
-        .read(
-          _detailObservationGenerationControllerProvider(_intentionId).notifier,
-        )
-        .advance();
+    _advanceGeneration();
+    _preserveAuthoritativeStateWhileLoading = false;
+    state = _stateFromObservation(_startObservation());
   }
+
+  AsyncValue<Result<Intention?>> _startObservation() {
+    _observationSubscription?.close();
+    final generation = _generation;
+    final subscription = ref.listen(
+      _intentionDetailsObservationProvider(_intentionId, generation),
+      (previous, next) => _handleObservation(generation, next),
+    );
+    _observationSubscription = subscription;
+    return subscription.read();
+  }
+
+  void _handleObservation(
+    _DetailObservationGeneration generation,
+    AsyncValue<Result<Intention?>> observation,
+  ) {
+    if (!ref.mounted || _isDeleted || generation != _generation) {
+      return;
+    }
+    if (observation is AsyncLoading<Result<Intention?>> &&
+        _preserveAuthoritativeStateWhileLoading) {
+      return;
+    }
+    if (observation is! AsyncLoading<Result<Intention?>>) {
+      _preserveAuthoritativeStateWhileLoading = false;
+    }
+    state = _stateFromObservation(observation);
+  }
+
+  void _handleCompletion(IntentionCommandCompletion completion) {
+    if (!ref.mounted || _isDeleted) {
+      return;
+    }
+    switch (completion.result) {
+      case ResultSuccess(value: IntentionSaved(:final intention))
+          when intention.id == _intentionId:
+        _advanceGeneration();
+        _preserveAuthoritativeStateWhileLoading = true;
+        state = IntentionDetailsLoaded(
+          intention: intention,
+          isOperationRunning: _isOperationRunning,
+        );
+        _startObservation();
+      case ResultSuccess(value: IntentionDeleted(:final id))
+          when id == _intentionId:
+        _advanceGeneration();
+        _isDeleted = true;
+        _observationSubscription?.close();
+        _observationSubscription = null;
+        state = const IntentionDetailsDeleted();
+      case ResultSuccess() || ResultFailure():
+        return;
+    }
+  }
+
+  void _advanceGeneration() {
+    _generation = _generation.next();
+  }
+
+  bool get _isOperationRunning => _coordinator.isRunning(_intentionId);
+
+  IntentionDetailsState _stateFromObservation(
+    AsyncValue<Result<Intention?>> observation,
+  ) => observation.when(
+    data: (result) => _stateFromResult(result, _isOperationRunning),
+    error: (_, _) =>
+        IntentionDetailsUnexpected(isOperationRunning: _isOperationRunning),
+    loading: () =>
+        IntentionDetailsLoading(isOperationRunning: _isOperationRunning),
+  );
 
   IntentionDetailsState _stateFromResult(
     Result<Intention?> result,

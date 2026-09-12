@@ -9,122 +9,6 @@ part of 'intention_details_view_model.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(_DetailObservationGenerationController)
-final _detailObservationGenerationControllerProvider =
-    _DetailObservationGenerationControllerFamily._();
-
-final class _DetailObservationGenerationControllerProvider
-    extends
-        $NotifierProvider<
-          _DetailObservationGenerationController,
-          _DetailObservationGeneration
-        > {
-  _DetailObservationGenerationControllerProvider._({
-    required _DetailObservationGenerationControllerFamily super.from,
-    required IntentionId super.argument,
-  }) : super(
-         retry: null,
-         name: r'_detailObservationGenerationControllerProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() =>
-      _$_detailObservationGenerationControllerHash();
-
-  @override
-  String toString() {
-    return r'_detailObservationGenerationControllerProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  _DetailObservationGenerationController create() =>
-      _DetailObservationGenerationController();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(_DetailObservationGeneration value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<_DetailObservationGeneration>(value),
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is _DetailObservationGenerationControllerProvider &&
-        other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$_detailObservationGenerationControllerHash() =>
-    r'466070d2489d9988d9ef5e435ed0cd31de3978eb';
-
-final class _DetailObservationGenerationControllerFamily extends $Family
-    with
-        $ClassFamilyOverride<
-          _DetailObservationGenerationController,
-          _DetailObservationGeneration,
-          _DetailObservationGeneration,
-          _DetailObservationGeneration,
-          IntentionId
-        > {
-  _DetailObservationGenerationControllerFamily._()
-    : super(
-        retry: null,
-        name: r'_detailObservationGenerationControllerProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  _DetailObservationGenerationControllerProvider call(
-    IntentionId intentionId,
-  ) => _DetailObservationGenerationControllerProvider._(
-    argument: intentionId,
-    from: this,
-  );
-
-  @override
-  String toString() => r'_detailObservationGenerationControllerProvider';
-}
-
-abstract class _$DetailObservationGenerationController
-    extends $Notifier<_DetailObservationGeneration> {
-  late final _$args = ref.$arg as IntentionId;
-  IntentionId get intentionId => _$args;
-
-  _DetailObservationGeneration build(IntentionId intentionId);
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref =
-        this.ref
-            as $Ref<_DetailObservationGeneration, _DetailObservationGeneration>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<
-                _DetailObservationGeneration,
-                _DetailObservationGeneration
-              >,
-              _DetailObservationGeneration,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, () => build(_$args));
-  }
-}
-
 @ProviderFor(_intentionDetailsObservation)
 final _intentionDetailsObservationProvider =
     _IntentionDetailsObservationFamily._();
@@ -267,7 +151,7 @@ final class IntentionDetailsViewModelProvider
 }
 
 String _$intentionDetailsViewModelHash() =>
-    r'beed3dd7789da57d402e7c77c76dc3c5b41e7595';
+    r'34dc33210894d1ba9d042b6178bffe7509df73ba';
 
 final class IntentionDetailsViewModelFamily extends $Family
     with

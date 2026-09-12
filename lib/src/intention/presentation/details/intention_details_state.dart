@@ -34,3 +34,7 @@ final class IntentionDetailsCorruption extends IntentionDetailsState {
 final class IntentionDetailsUnexpected extends IntentionDetailsState {
   const IntentionDetailsUnexpected({required super.isOperationRunning});
 }
+
+final class IntentionDetailsDeleted extends IntentionDetailsState {
+  const IntentionDetailsDeleted() : super(isOperationRunning: false);
+}

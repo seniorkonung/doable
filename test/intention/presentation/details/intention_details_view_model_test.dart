@@ -252,6 +252,235 @@ void main() {
     );
     await (start as IntentionCommandAccepted).future;
   });
+
+  test(
+    'IntentionSaved становится авторитетным до snapshot новой generation',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final before = testDetailsIntention(index: 60, title: 'Прежнее');
+      final saved = testDetailsIntention(index: 60, title: 'Сохранённое');
+      final refreshed = testDetailsIntention(index: 60, title: 'Перечитанное');
+      final subscription = container.listen(
+        intentionDetailsViewModelProvider(before.id),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(before));
+      await pumpEventQueue();
+
+      final start = container
+          .read(intentionCommandCoordinatorProvider.notifier)
+          .accept(
+            UpdateIntention(
+              id: before.id,
+              title: saved.title,
+              description: saved.description,
+            ),
+          );
+      expect(start, isA<IntentionCommandAccepted>());
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(saved, before: before),
+      );
+      await (start as IntentionCommandAccepted).future;
+      await waitForDetailRequests(repository, 2);
+
+      expect(
+        container.read(intentionDetailsViewModelProvider(before.id)),
+        isA<IntentionDetailsLoaded>().having(
+          (state) => state.intention,
+          'подтверждённое намерение',
+          same(saved),
+        ),
+      );
+
+      repository.detailRequests[0].add(ResultSuccess(before));
+      await pumpEventQueue();
+      expect(
+        container.read(intentionDetailsViewModelProvider(before.id)),
+        isA<IntentionDetailsLoaded>().having(
+          (state) => state.intention,
+          'намерение после запоздалого snapshot',
+          same(saved),
+        ),
+      );
+
+      repository.detailRequests[1].add(ResultSuccess(refreshed));
+      await pumpEventQueue();
+      expect(
+        container.read(intentionDetailsViewModelProvider(before.id)),
+        isA<IntentionDetailsLoaded>().having(
+          (state) => state.intention,
+          'snapshot новой generation',
+          same(refreshed),
+        ),
+      );
+    },
+  );
+
+  test('no-op IntentionSaved запускает новую detail generation', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final intention = testDetailsIntention(index: 61);
+    final subscription = container.listen(
+      intentionDetailsViewModelProvider(intention.id),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await pumpEventQueue();
+
+    final start = container
+        .read(intentionCommandCoordinatorProvider.notifier)
+        .accept(
+          UpdateIntention(
+            id: intention.id,
+            title: intention.title,
+            description: intention.description,
+          ),
+        );
+    repository.completeCommand(0, testDetailsSavedResult(intention));
+    await (start as IntentionCommandAccepted).future;
+    await waitForDetailRequests(repository, 2);
+
+    expect(
+      container.read(intentionDetailsViewModelProvider(intention.id)),
+      isA<IntentionDetailsLoaded>().having(
+        (state) => state.intention,
+        'подтверждённое намерение',
+        same(intention),
+      ),
+    );
+  });
+
+  test(
+    'повторно открытый details слушает completion до первого чтения',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final before = testDetailsIntention(index: 64, title: 'Прежнее');
+      final saved = testDetailsIntention(index: 64, title: 'Сохранённое');
+      final start = container
+          .read(intentionCommandCoordinatorProvider.notifier)
+          .accept(
+            UpdateIntention(
+              id: before.id,
+              title: saved.title,
+              description: saved.description,
+            ),
+          );
+      expect(start, isA<IntentionCommandAccepted>());
+      repository.onWatchById = (id) {
+        repository.onWatchById = null;
+        repository.completeCommand(
+          0,
+          testDetailsSavedResult(saved, before: before),
+        );
+      };
+
+      final subscription = container.listen(
+        intentionDetailsViewModelProvider(before.id),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await (start as IntentionCommandAccepted).future;
+      await waitForDetailRequests(repository, 2);
+
+      expect(repository.detailIds, [before.id, before.id]);
+      expect(
+        container.read(intentionDetailsViewModelProvider(before.id)),
+        isA<IntentionDetailsLoaded>().having(
+          (state) => state.intention,
+          'подтверждённое намерение',
+          same(saved),
+        ),
+      );
+    },
+  );
+
+  test('failure completion сохраняет snapshot и текущую generation', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final intention = testDetailsIntention(index: 62);
+    final subscription = container.listen(
+      intentionDetailsViewModelProvider(intention.id),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await pumpEventQueue();
+
+    final start = container
+        .read(intentionCommandCoordinatorProvider.notifier)
+        .accept(DeleteIntention(intention.id));
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await (start as IntentionCommandAccepted).future;
+    await pumpEventQueue();
+
+    expect(repository.detailRequests, hasLength(1));
+    expect(
+      container.read(intentionDetailsViewModelProvider(intention.id)),
+      isA<IntentionDetailsLoaded>().having(
+        (state) => state.intention,
+        'последний подтверждённый snapshot',
+        same(intention),
+      ),
+    );
+  });
+
+  test(
+    'IntentionDeleted завершает details и отбрасывает прежний snapshot',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final intention = testDetailsIntention(index: 63);
+      final subscription = container.listen(
+        intentionDetailsViewModelProvider(intention.id),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await pumpEventQueue();
+
+      final start = container
+          .read(intentionCommandCoordinatorProvider.notifier)
+          .accept(DeleteIntention(intention.id));
+      repository.completeCommand(0, testDetailsDeletedResult(intention));
+      await (start as IntentionCommandAccepted).future;
+      await pumpEventQueue();
+
+      expect(
+        container.read(intentionDetailsViewModelProvider(intention.id)),
+        isA<IntentionDetailsDeleted>(),
+      );
+      expect(repository.detailRequests[0].cancellationCount, 1);
+
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await pumpEventQueue();
+      expect(
+        container.read(intentionDetailsViewModelProvider(intention.id)),
+        isA<IntentionDetailsDeleted>(),
+      );
+    },
+  );
 }
 
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>

@@ -33,6 +33,7 @@ final class ControlledDetailsRepository implements IntentionRepository {
   final _commandRequests = <Completer<Result<IntentionCommandSuccess>>>[];
 
   Result<IntentionCatalogPage>? catalogResult;
+  void Function(IntentionId id)? onWatchById;
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -51,6 +52,7 @@ final class ControlledDetailsRepository implements IntentionRepository {
     detailIds.add(id);
     final request = ControlledDetailRequest();
     detailRequests.add(request);
+    onWatchById?.call(id);
     return request.controller.stream;
   }
 
@@ -119,4 +121,55 @@ Future<void> waitForDetailRequests(
     await Future<void>.delayed(Duration.zero);
   }
   throw StateError('Не дождались $count запросов подробных данных.');
+}
+
+Result<IntentionCommandSuccess> testDetailsSavedResult(
+  Intention intention, {
+  Intention? before,
+}) {
+  final afterSnapshot = _DetailsCatalogEntrySnapshot(intention);
+  final mutation = before == null
+      ? IntentionCatalogUnchanged(
+          revision: const _DetailsCatalogRevision(),
+          entry: afterSnapshot,
+        )
+      : IntentionCatalogUpdated(
+          revision: const _DetailsCatalogRevision(),
+          before: _DetailsCatalogEntrySnapshot(before),
+          after: afterSnapshot,
+        );
+  return ResultSuccess(IntentionSaved(intention, catalogMutation: mutation));
+}
+
+Result<IntentionCommandSuccess> testDetailsDeletedResult(Intention intention) =>
+    ResultSuccess(
+      IntentionDeleted(
+        intention.id,
+        catalogMutation: IntentionCatalogDeleted(
+          revision: const _DetailsCatalogRevision(),
+          entry: _DetailsCatalogEntrySnapshot(intention),
+        ),
+      ),
+    );
+
+final class _DetailsCatalogEntrySnapshot
+    implements IntentionCatalogEntrySnapshot {
+  _DetailsCatalogEntrySnapshot(Intention intention)
+    : summary = testDetailsSummary(intention);
+
+  @override
+  final IntentionSummary summary;
+
+  @override
+  bool matches(IntentionCatalogQuery query) => query.includes(summary);
+}
+
+final class _DetailsCatalogRevision implements IntentionCatalogRevision {
+  const _DetailsCatalogRevision();
+
+  @override
+  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) =>
+      other is _DetailsCatalogRevision
+      ? IntentionCatalogRevisionOrder.same
+      : IntentionCatalogRevisionOrder.differentEpoch;
 }

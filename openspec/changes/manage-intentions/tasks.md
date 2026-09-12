@@ -876,7 +876,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/details/**`, `lib/src/app/routing/**`, localization и generated artifacts, `test/intention/presentation/details/**`.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 7.20 Ввести presentation-local generation barrier между подробным чтением и command completions
+- [x] 7.20 Ввести presentation-local generation barrier между подробным чтением и command completions
   - **Критерии приёмки:**
     - Details ViewModel синхронно устанавливает listener непереигрываемых data completions coordinator до запуска первой `watchById` generation; каждый обработчик чтения захватывает приватную `DetailObservationGeneration`, публикует результат только для текущего значения и не полагается на отмену подписки как на доказательство отсутствия уже поставленного в очередь события.
     - `IntentionSaved` с тем же `IntentionId`, включая no-op и outcome операции, принятой прежним экземпляром details, является единственным terminal data path команды: при его получении Details ViewModel до первого asynchronous gap продвигает generation, публикует возвращённое после commit намерение как авторитетное и запускает новую подписку, тогда как accepted `Future` отдельно управляет только состоянием операции и presentation claim инициировавшей экранной сессии. До первого результата новой generation остаётся видимым `IntentionSaved`, прежние generations игнорируются, а failure completion не согласует подробные данные, не продвигает generation и сохраняет последний подтверждённый snapshot.
