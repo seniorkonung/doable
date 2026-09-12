@@ -62,48 +62,6 @@ jobs:
           android_sdk="${ANDROID_HOME:?ANDROID_HOME is not set}"
           aapt2="${android_sdk}/build-tools/${ANDROID_BUILD_TOOLS_VERSION}/aapt2"
 
-          test -x "${aapt2}"
-          test -f "${RELEASE_APK}"
-
-          permissions="$("${aapt2}" dump permissions "${RELEASE_APK}")"
-          manifest="$("${aapt2}" dump xmltree "${RELEASE_APK}" --file AndroidManifest.xml)"
-          resources="$("${aapt2}" dump resources "${RELEASE_APK}")"
-
-          forbidden_permissions=(
-            android.permission.INTERNET
-            android.permission.READ_EXTERNAL_STORAGE
-            android.permission.WRITE_EXTERNAL_STORAGE
-            android.permission.MANAGE_EXTERNAL_STORAGE
-            android.permission.READ_MEDIA_IMAGES
-            android.permission.READ_MEDIA_VIDEO
-            android.permission.READ_MEDIA_AUDIO
-          )
-
-          for permission in "${forbidden_permissions[@]}"; do
-            if grep -Fq "uses-permission: name='${permission}'" <<<"${permissions}"; then
-              echo "Forbidden permission in release APK: ${permission}" >&2
-              exit 1
-            fi
-          done
-
-          if ! grep -Eq ':allowBackup\([^)]*\)=true$' <<<"${manifest}"; then
-            echo "Release APK does not enable the approved backup rules" >&2
-            exit 1
-          fi
-
-          assert_xml_reference() {
-            local attribute="$1"
-            local expected_resource="$2"
-            local resource_id
-
-            resource_id="$(sed -nE "s/.*:${attribute}\\([^)]*\\)=@(0x[[:xdigit:]]+).*/\\1/p" <<<"${manifest}")"
-
-            if [[ -z "${resource_id}" ]] ||
-              ! grep -Fq "resource ${resource_id} xml/${expected_resource}" <<<"${resources}"; then
-              echo "Release APK has no ${attribute} reference to @xml/${expected_resource}" >&2
-              exit 1
-            fi
-          }
-
-          assert_xml_reference fullBackupContent backup_rules
-          assert_xml_reference dataExtractionRules data_extraction_rules
+          dart run tool/check_android_privacy_manifest.dart \
+            "${aapt2}" \
+            "${RELEASE_APK}"
