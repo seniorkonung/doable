@@ -294,112 +294,124 @@ void main() {
     }
   });
 
-  test(
-    'добавляет порции у порога без дублей и прекращает запросы в конце',
-    () async {
-      final repository = ControlledCatalogRepository();
-      final container = _catalogContainer(
-        repository,
-        pageSize: 3,
-        prefetchRemaining: 1,
-      );
-      final subscription = container.listen(
-        intentionCatalogViewModelProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      addTearDown(container.dispose);
+  test('добавляет порции, повторяет после нескольких и завершается', () async {
+    final repository = ControlledCatalogRepository();
+    final container = _catalogContainer(
+      repository,
+      pageSize: 3,
+      prefetchRemaining: 1,
+    );
+    final subscription = container.listen(
+      intentionCatalogViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    addTearDown(container.dispose);
 
-      const firstCursor = TestCatalogCursor();
-      const secondCursor = TestCatalogCursor();
-      const revision = TestCatalogRevision(5);
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [
-              testSummary(index: 1),
-              testSummary(index: 2),
-              testSummary(index: 3),
-            ],
-            totalCount: 5,
-            nextCursor: firstCursor,
-            revision: revision,
-          ),
+    const firstCursor = TestCatalogCursor();
+    const secondCursor = TestCatalogCursor();
+    const revision = TestCatalogRevision(5);
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [
+            testSummary(index: 1),
+            testSummary(index: 2),
+            testSummary(index: 3),
+          ],
+          totalCount: 5,
+          nextCursor: firstCursor,
+          revision: revision,
         ),
-      );
-      await container.read(intentionCatalogViewModelProvider.future);
-      final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
-      );
+      ),
+    );
+    await container.read(intentionCatalogViewModelProvider.future);
+    final notifier = container.read(intentionCatalogViewModelProvider.notifier);
 
-      await notifier.loadNextPageIfNeeded(visibleIndex: 0);
-      expect(repository.queries, hasLength(1));
+    await notifier.loadNextPageIfNeeded(visibleIndex: 0);
+    expect(repository.queries, hasLength(1));
 
-      final firstLoad = notifier.loadNextPageIfNeeded(visibleIndex: 1);
-      await _waitForQueries(repository, 2);
-      expect(repository.queryAt(1).cursor, same(firstCursor));
-      expect(
-        container.read(intentionCatalogViewModelProvider).requireValue,
-        isA<IntentionCatalogLoaded>().having(
-          (state) => state.continuation,
-          'состояние продолжения',
-          isA<IntentionCatalogContinuationLoading>(),
+    final firstLoad = notifier.loadNextPageIfNeeded(visibleIndex: 1);
+    await _waitForQueries(repository, 2);
+    expect(repository.queryAt(1).cursor, same(firstCursor));
+    expect(
+      container.read(intentionCatalogViewModelProvider).requireValue,
+      isA<IntentionCatalogLoaded>().having(
+        (state) => state.continuation,
+        'состояние продолжения',
+        isA<IntentionCatalogContinuationLoading>(),
+      ),
+    );
+    await notifier.loadNextPageIfNeeded(visibleIndex: 2);
+    expect(repository.queries, hasLength(2));
+
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogContinuationPage(
+          items: [testSummary(index: 3), testSummary(index: 4)],
+          nextCursor: secondCursor,
+          revision: revision,
         ),
-      );
-      await notifier.loadNextPageIfNeeded(visibleIndex: 2);
-      expect(repository.queries, hasLength(2));
+      ),
+    );
+    await firstLoad;
 
-      repository.complete(
-        1,
-        ResultSuccess(
-          IntentionCatalogContinuationPage(
-            items: [testSummary(index: 3), testSummary(index: 4)],
-            nextCursor: secondCursor,
-            revision: revision,
-          ),
+    final afterSecondPage =
+        container.read(intentionCatalogViewModelProvider).requireValue
+            as IntentionCatalogLoaded;
+    expect(afterSecondPage.items.map((item) => item.id), hasLength(4));
+    expect(afterSecondPage.totalCount, 5);
+    expect(afterSecondPage.nextCursor, same(secondCursor));
+    expect(
+      afterSecondPage.continuation,
+      isA<IntentionCatalogContinuationIdle>(),
+    );
+
+    final secondLoad = notifier.loadNextPageIfNeeded(visibleIndex: 2);
+    await _waitForQueries(repository, 3);
+    expect(repository.queryAt(2).cursor, same(secondCursor));
+    repository.complete(2, const ResultFailure(IntentionUnavailableFailure()));
+    await secondLoad;
+
+    final failedAfterSeveralPages =
+        container.read(intentionCatalogViewModelProvider).requireValue
+            as IntentionCatalogLoaded;
+    expect(failedAfterSeveralPages.items, hasLength(4));
+    expect(failedAfterSeveralPages.totalCount, 5);
+    expect(failedAfterSeveralPages.nextCursor, same(secondCursor));
+    expect(
+      failedAfterSeveralPages.continuation,
+      isA<IntentionCatalogContinuationUnavailable>(),
+    );
+
+    final finalLoad = notifier.retryNextPage();
+    await _waitForQueries(repository, 4);
+    expect(repository.queryAt(3).cursor, same(secondCursor));
+    repository.complete(
+      3,
+      ResultSuccess(
+        IntentionCatalogContinuationPage(
+          items: [testSummary(index: 5)],
+          nextCursor: null,
+          revision: revision,
         ),
-      );
-      await firstLoad;
+      ),
+    );
+    await finalLoad;
 
-      final afterSecondPage =
-          container.read(intentionCatalogViewModelProvider).requireValue
-              as IntentionCatalogLoaded;
-      expect(afterSecondPage.items.map((item) => item.id), hasLength(4));
-      expect(afterSecondPage.totalCount, 5);
-      expect(afterSecondPage.nextCursor, same(secondCursor));
-      expect(
-        afterSecondPage.continuation,
-        isA<IntentionCatalogContinuationIdle>(),
-      );
+    final complete =
+        container.read(intentionCatalogViewModelProvider).requireValue
+            as IntentionCatalogLoaded;
+    expect(complete.items.map((item) => item.id).toSet(), hasLength(5));
+    expect(complete.totalCount, 5);
+    expect(complete.nextCursor, isNull);
 
-      final secondLoad = notifier.loadNextPageIfNeeded(visibleIndex: 2);
-      await _waitForQueries(repository, 3);
-      expect(repository.queryAt(2).cursor, same(secondCursor));
-      repository.complete(
-        2,
-        ResultSuccess(
-          IntentionCatalogContinuationPage(
-            items: [testSummary(index: 5)],
-            nextCursor: null,
-            revision: revision,
-          ),
-        ),
-      );
-      await secondLoad;
-
-      final complete =
-          container.read(intentionCatalogViewModelProvider).requireValue
-              as IntentionCatalogLoaded;
-      expect(complete.items.map((item) => item.id).toSet(), hasLength(5));
-      expect(complete.totalCount, 5);
-      expect(complete.nextCursor, isNull);
-
-      await notifier.loadNextPageIfNeeded(visibleIndex: 4);
-      expect(repository.queries, hasLength(3));
-    },
-  );
+    await notifier.loadNextPageIfNeeded(visibleIndex: 4);
+    expect(repository.queries, hasLength(4));
+  });
 
   test('повторяет недоступное продолжение с тем же cursor', () async {
     final repository = ControlledCatalogRepository();
