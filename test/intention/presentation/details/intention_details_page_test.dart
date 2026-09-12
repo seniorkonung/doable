@@ -72,6 +72,199 @@ void main() {
     expect(find.text('Not ready for action'), findsOneWidget);
   });
 
+  testWidgets(
+    'объясняет оба критерия готовности и не запускает команду после отмены',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final before = testDetailsIntention(index: 20);
+      final saved = testDetailsIntention(
+        index: 20,
+        readiness: IntentionReadiness.ready,
+      );
+      await _pumpDetailsPage(tester, repository, before.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(before));
+      await tester.pumpAndSettle();
+
+      final enableReadiness = find.byKey(
+        const ValueKey('intention-details-enable-readiness'),
+      );
+      await tester.ensureVisible(enableReadiness);
+      await tester.tap(enableReadiness);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ready for action?'), findsOneWidget);
+      expect(
+        find.text('It can be completed fully within one day.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('It is clear enough for a person to carry out.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(repository.commands, isEmpty);
+      expect(find.text('Not ready for action'), findsOneWidget);
+
+      await tester.tap(enableReadiness);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Mark as ready'));
+      await tester.pump();
+
+      expect(repository.commands.single, isA<EnableIntentionReadiness>());
+      expect(find.text('Not ready for action'), findsOneWidget);
+      expect(find.text('Saving changes…'), findsOneWidget);
+
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(saved, before: before),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 2);
+      await tester.pump();
+
+      expect(find.text('Marked as ready for action.'), findsOneWidget);
+      expect(find.text('Ready for action'), findsOneWidget);
+      repository.detailRequests[0].add(ResultSuccess(before));
+      await tester.pump();
+      expect(find.text('Ready for action'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'явно выключает готовность, архивирует и восстанавливает намерение',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final ready = testDetailsIntention(
+        index: 21,
+        readiness: IntentionReadiness.ready,
+      );
+      final notReady = testDetailsIntention(index: 21);
+      final archived = testDetailsIntention(
+        index: 21,
+        archiveState: IntentionArchiveState.archived,
+      );
+      final restored = testDetailsIntention(index: 21);
+      await _pumpDetailsPage(tester, repository, ready.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(ready));
+      await tester.pumpAndSettle();
+
+      final disableReadiness = find.byKey(
+        const ValueKey('intention-details-disable-readiness'),
+      );
+      await tester.ensureVisible(disableReadiness);
+      await tester.tap(disableReadiness);
+      await tester.pump();
+      expect(repository.commands[0], isA<DisableIntentionReadiness>());
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(notReady, before: ready),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 2);
+      await tester.pumpAndSettle();
+      expect(find.text('Marked as not ready for action.'), findsOneWidget);
+
+      final archive = find.byKey(const ValueKey('intention-details-archive'));
+      await tester.ensureVisible(archive);
+      await tester.tap(archive);
+      await tester.pump();
+      expect(repository.commands[1], isA<ArchiveIntention>());
+      repository.completeCommand(
+        1,
+        testDetailsSavedResult(archived, before: notReady),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 3);
+      await tester.pumpAndSettle();
+      expect(find.text('Intention archived.'), findsOneWidget);
+      expect(find.text('Archived'), findsOneWidget);
+      expect(find.text('Not ready for action'), findsOneWidget);
+
+      final restore = find.byKey(const ValueKey('intention-details-restore'));
+      await tester.ensureVisible(restore);
+      await tester.tap(restore);
+      await tester.pump();
+      expect(repository.commands[2], isA<RestoreIntention>());
+      repository.completeCommand(
+        2,
+        testDetailsSavedResult(restored, before: archived),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 4);
+      await tester.pumpAndSettle();
+      expect(find.text('Intention restored.'), findsOneWidget);
+      expect(find.text('Active'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'безопасно показывает отказы перехода и повторяет только недоступный',
+    (tester) async {
+      final scenarios = <(IntentionFailure, String, bool)>[
+        (
+          const IntentionNotFoundFailure(),
+          'The intention no longer exists. Its state wasn’t changed.',
+          false,
+        ),
+        (
+          const IntentionUnavailableFailure(),
+          'The intention state couldn’t be changed. Try again.',
+          true,
+        ),
+        (
+          const IntentionCorruptionFailure(),
+          'Stored data is damaged. The intention state wasn’t changed.',
+          false,
+        ),
+        (
+          const IntentionUnexpectedFailure(),
+          'The intention state couldn’t be changed because of an unexpected error.',
+          false,
+        ),
+      ];
+
+      for (var index = 0; index < scenarios.length; index += 1) {
+        final repository = ControlledDetailsRepository();
+        final intention = testDetailsIntention(index: 30 + index);
+        await _pumpDetailsPage(tester, repository, intention.id);
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests[0].add(ResultSuccess(intention));
+        await tester.pumpAndSettle();
+        final archive = find.byKey(const ValueKey('intention-details-archive'));
+        await tester.ensureVisible(archive);
+        await tester.tap(archive);
+        await tester.pump();
+
+        final (failure, message, canRetry) = scenarios[index];
+        repository.completeCommand(0, ResultFailure(failure));
+        await tester.pumpAndSettle();
+
+        expect(find.text(message), findsOneWidget);
+        expect(find.text('Active'), findsOneWidget);
+        final retry = find.byKey(
+          const ValueKey('intention-details-state-change-retry'),
+        );
+        expect(retry, canRetry ? findsOneWidget : findsNothing);
+        if (canRetry) {
+          await tester.tap(retry);
+          await tester.pump();
+          expect(repository.commands, hasLength(2));
+          repository.completeCommand(
+            1,
+            const ResultFailure(IntentionUnexpectedFailure()),
+          );
+          await tester.pumpAndSettle();
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    },
+  );
+
   testWidgets('отличает подтверждённое отсутствие от загрузки', (tester) async {
     final repository = ControlledDetailsRepository();
     final id = testDetailsIntentionId(3);

@@ -464,6 +464,114 @@ abstract class AppLocalizations {
   /// **'Changes saved.'**
   String get detailsSaved;
 
+  /// Действие начала явного включения готовности намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as ready for action'**
+  String get detailsEnableReadinessAction;
+
+  /// Явное действие выключения готовности намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as not ready for action'**
+  String get detailsDisableReadinessAction;
+
+  /// Заголовок объяснения критериев готовности к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for action?'**
+  String get detailsReadinessConfirmationTitle;
+
+  /// Критерий полной однодневной выполнимости действия
+  ///
+  /// In en, this message translates to:
+  /// **'It can be completed fully within one day.'**
+  String get detailsReadinessOneDayCriterion;
+
+  /// Критерий операционной понятности действия человеку
+  ///
+  /// In en, this message translates to:
+  /// **'It is clear enough for a person to carry out.'**
+  String get detailsReadinessClarityCriterion;
+
+  /// Подтверждение соответствия обоим критериям действия
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as ready'**
+  String get detailsConfirmReadinessAction;
+
+  /// Явное действие архивирования намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get detailsArchiveAction;
+
+  /// Явное действие восстановления намерения из архива
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get detailsRestoreAction;
+
+  /// Подтверждение включённой готовности к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as ready for action.'**
+  String get detailsReadinessEnabled;
+
+  /// Подтверждение выключенной готовности к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as not ready for action.'**
+  String get detailsReadinessDisabled;
+
+  /// Подтверждение архивирования намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention archived.'**
+  String get detailsArchivedSuccess;
+
+  /// Подтверждение восстановления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention restored.'**
+  String get detailsRestoredSuccess;
+
+  /// Безопасная ошибка недопустимого перехода состояния
+  ///
+  /// In en, this message translates to:
+  /// **'The intention state couldn’t be changed.'**
+  String get detailsStateChangeInvalid;
+
+  /// Безопасная ошибка перехода отсутствующего намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention no longer exists. Its state wasn’t changed.'**
+  String get detailsStateChangeNotFound;
+
+  /// Безопасная ошибка конфликта перехода состояния
+  ///
+  /// In en, this message translates to:
+  /// **'The intention changed elsewhere. Its state wasn’t changed.'**
+  String get detailsStateChangeConflict;
+
+  /// Устранимая недоступность перехода состояния намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention state couldn’t be changed. Try again.'**
+  String get detailsStateChangeUnavailable;
+
+  /// Терминальное повреждение при переходе состояния
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The intention state wasn’t changed.'**
+  String get detailsStateChangeCorruption;
+
+  /// Терминальная непредвиденная ошибка перехода состояния
+  ///
+  /// In en, this message translates to:
+  /// **'The intention state couldn’t be changed because of an unexpected error.'**
+  String get detailsStateChangeUnexpected;
+
   /// Общая ошибка проверки формы изменения
   ///
   /// In en, this message translates to:

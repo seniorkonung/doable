@@ -249,6 +249,78 @@
   "@detailsSaved": {
     "description": "Подтверждение успешного изменения намерения"
   },
+  "detailsEnableReadinessAction": "Mark as ready for action",
+  "@detailsEnableReadinessAction": {
+    "description": "Действие начала явного включения готовности намерения"
+  },
+  "detailsDisableReadinessAction": "Mark as not ready for action",
+  "@detailsDisableReadinessAction": {
+    "description": "Явное действие выключения готовности намерения"
+  },
+  "detailsReadinessConfirmationTitle": "Ready for action?",
+  "@detailsReadinessConfirmationTitle": {
+    "description": "Заголовок объяснения критериев готовности к действию"
+  },
+  "detailsReadinessOneDayCriterion": "It can be completed fully within one day.",
+  "@detailsReadinessOneDayCriterion": {
+    "description": "Критерий полной однодневной выполнимости действия"
+  },
+  "detailsReadinessClarityCriterion": "It is clear enough for a person to carry out.",
+  "@detailsReadinessClarityCriterion": {
+    "description": "Критерий операционной понятности действия человеку"
+  },
+  "detailsConfirmReadinessAction": "Mark as ready",
+  "@detailsConfirmReadinessAction": {
+    "description": "Подтверждение соответствия обоим критериям действия"
+  },
+  "detailsArchiveAction": "Archive",
+  "@detailsArchiveAction": {
+    "description": "Явное действие архивирования намерения"
+  },
+  "detailsRestoreAction": "Restore",
+  "@detailsRestoreAction": {
+    "description": "Явное действие восстановления намерения из архива"
+  },
+  "detailsReadinessEnabled": "Marked as ready for action.",
+  "@detailsReadinessEnabled": {
+    "description": "Подтверждение включённой готовности к действию"
+  },
+  "detailsReadinessDisabled": "Marked as not ready for action.",
+  "@detailsReadinessDisabled": {
+    "description": "Подтверждение выключенной готовности к действию"
+  },
+  "detailsArchivedSuccess": "Intention archived.",
+  "@detailsArchivedSuccess": {
+    "description": "Подтверждение архивирования намерения"
+  },
+  "detailsRestoredSuccess": "Intention restored.",
+  "@detailsRestoredSuccess": {
+    "description": "Подтверждение восстановления намерения"
+  },
+  "detailsStateChangeInvalid": "The intention state couldn’t be changed.",
+  "@detailsStateChangeInvalid": {
+    "description": "Безопасная ошибка недопустимого перехода состояния"
+  },
+  "detailsStateChangeNotFound": "The intention no longer exists. Its state wasn’t changed.",
+  "@detailsStateChangeNotFound": {
+    "description": "Безопасная ошибка перехода отсутствующего намерения"
+  },
+  "detailsStateChangeConflict": "The intention changed elsewhere. Its state wasn’t changed.",
+  "@detailsStateChangeConflict": {
+    "description": "Безопасная ошибка конфликта перехода состояния"
+  },
+  "detailsStateChangeUnavailable": "The intention state couldn’t be changed. Try again.",
+  "@detailsStateChangeUnavailable": {
+    "description": "Устранимая недоступность перехода состояния намерения"
+  },
+  "detailsStateChangeCorruption": "Stored data is damaged. The intention state wasn’t changed.",
+  "@detailsStateChangeCorruption": {
+    "description": "Терминальное повреждение при переходе состояния"
+  },
+  "detailsStateChangeUnexpected": "The intention state couldn’t be changed because of an unexpected error.",
+  "@detailsStateChangeUnexpected": {
+    "description": "Терминальная непредвиденная ошибка перехода состояния"
+  },
   "detailsUpdateInvalidInput": "Check the entered data.",
   "@detailsUpdateInvalidInput": {
     "description": "Общая ошибка проверки формы изменения"

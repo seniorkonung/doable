@@ -28,10 +28,20 @@ final class IntentionDetailsPage extends ConsumerWidget {
       if (next is IntentionDetailsDeleted) {
         unawaited(context.router.maybePop());
       }
-      if (next case IntentionDetailsLoaded(event: IntentionDetailsSaved())) {
+      if (next case IntentionDetailsLoaded(event: final event?)) {
         ref.read(provider.notifier).consumeEvent();
+        final message = switch (event) {
+          IntentionDetailsSaved() => localizations.detailsSaved,
+          IntentionDetailsReadinessEnabled() =>
+            localizations.detailsReadinessEnabled,
+          IntentionDetailsReadinessDisabled() =>
+            localizations.detailsReadinessDisabled,
+          IntentionDetailsArchived() => localizations.detailsArchivedSuccess,
+          IntentionDetailsRestored() => localizations.detailsRestoredSuccess,
+        };
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(localizations.detailsSaved)));
+          ..removeCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
       }
     });
     return Scaffold(
@@ -107,6 +117,21 @@ final class _DetailsContent extends ConsumerWidget {
         onSave: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .saveChanges,
+        onEnableReadiness: ref
+            .read(intentionDetailsViewModelProvider(intentionId).notifier)
+            .enableReadiness,
+        onDisableReadiness: ref
+            .read(intentionDetailsViewModelProvider(intentionId).notifier)
+            .disableReadiness,
+        onArchive: ref
+            .read(intentionDetailsViewModelProvider(intentionId).notifier)
+            .archive,
+        onRestore: ref
+            .read(intentionDetailsViewModelProvider(intentionId).notifier)
+            .restore,
+        onRetryStateChange: ref
+            .read(intentionDetailsViewModelProvider(intentionId).notifier)
+            .retryStateChange,
       ),
       IntentionDetailsNotFound() => _DetailsStatus(
         message: localizations.detailsNotFound,
@@ -139,6 +164,11 @@ final class _LoadedDetails extends StatelessWidget {
     required this.onTitleChanged,
     required this.onDescriptionChanged,
     required this.onSave,
+    required this.onEnableReadiness,
+    required this.onDisableReadiness,
+    required this.onArchive,
+    required this.onRestore,
+    required this.onRetryStateChange,
   });
 
   final IntentionDetailsLoaded state;
@@ -147,6 +177,11 @@ final class _LoadedDetails extends StatelessWidget {
   final ValueChanged<String> onTitleChanged;
   final ValueChanged<String> onDescriptionChanged;
   final VoidCallback onSave;
+  final VoidCallback onEnableReadiness;
+  final VoidCallback onDisableReadiness;
+  final VoidCallback onArchive;
+  final VoidCallback onRestore;
+  final VoidCallback onRetryStateChange;
 
   @override
   Widget build(BuildContext context) {
@@ -197,17 +232,169 @@ final class _LoadedDetails extends StatelessWidget {
             onSave: onSave,
           )
         else
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const ValueKey('intention-details-edit'),
-              onPressed: state.isOperationRunning ? null : onBeginEditing,
-              icon: const Icon(Icons.edit_outlined),
-              label: Text(localizations.detailsEditAction),
-            ),
+          _DetailsActions(
+            state: state,
+            onBeginEditing: onBeginEditing,
+            onEnableReadiness: onEnableReadiness,
+            onDisableReadiness: onDisableReadiness,
+            onArchive: onArchive,
+            onRestore: onRestore,
+            onRetryStateChange: onRetryStateChange,
           ),
       ],
     );
+  }
+}
+
+final class _DetailsActions extends StatelessWidget {
+  const _DetailsActions({
+    required this.state,
+    required this.onBeginEditing,
+    required this.onEnableReadiness,
+    required this.onDisableReadiness,
+    required this.onArchive,
+    required this.onRestore,
+    required this.onRetryStateChange,
+  });
+
+  final IntentionDetailsLoaded state;
+  final VoidCallback onBeginEditing;
+  final VoidCallback onEnableReadiness;
+  final VoidCallback onDisableReadiness;
+  final VoidCallback onArchive;
+  final VoidCallback onRestore;
+  final VoidCallback onRetryStateChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final controlsEnabled = !state.isOperationRunning;
+    final failure = _failureMessage(localizations);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (failure != null) ...[
+          Semantics(
+            container: true,
+            liveRegion: true,
+            child: Text(
+              failure,
+              key: const ValueKey('intention-details-state-change-failure'),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+          if (state.stateChange?.canRetry ?? false) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton(
+                key: const ValueKey('intention-details-state-change-retry'),
+                onPressed: controlsEnabled ? onRetryStateChange : null,
+                child: Text(localizations.commonRetry),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+        ],
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            OutlinedButton.icon(
+              key: const ValueKey('intention-details-edit'),
+              onPressed: controlsEnabled ? onBeginEditing : null,
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(localizations.detailsEditAction),
+            ),
+            if (state.intention.readiness == IntentionReadiness.notReady)
+              OutlinedButton.icon(
+                key: const ValueKey('intention-details-enable-readiness'),
+                onPressed: controlsEnabled
+                    ? () => unawaited(_confirmReadiness(context))
+                    : null,
+                icon: const Icon(Icons.check_circle_outline),
+                label: Text(localizations.detailsEnableReadinessAction),
+              )
+            else
+              OutlinedButton.icon(
+                key: const ValueKey('intention-details-disable-readiness'),
+                onPressed: controlsEnabled ? onDisableReadiness : null,
+                icon: const Icon(Icons.remove_circle_outline),
+                label: Text(localizations.detailsDisableReadinessAction),
+              ),
+            if (state.intention.archiveState == IntentionArchiveState.active)
+              OutlinedButton.icon(
+                key: const ValueKey('intention-details-archive'),
+                onPressed: controlsEnabled ? onArchive : null,
+                icon: const Icon(Icons.archive_outlined),
+                label: Text(localizations.detailsArchiveAction),
+              )
+            else
+              OutlinedButton.icon(
+                key: const ValueKey('intention-details-restore'),
+                onPressed: controlsEnabled ? onRestore : null,
+                icon: const Icon(Icons.unarchive_outlined),
+                label: Text(localizations.detailsRestoreAction),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmReadiness(BuildContext context) async {
+    final localizations = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(localizations.detailsReadinessConfirmationTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(localizations.detailsReadinessOneDayCriterion),
+            const SizedBox(height: 12),
+            Text(localizations.detailsReadinessClarityCriterion),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(localizations.detailsCancelEditAction),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(localizations.detailsConfirmReadinessAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) {
+      onEnableReadiness();
+    }
+  }
+
+  String? _failureMessage(AppLocalizations localizations) {
+    final operation = state.stateChange?.operation;
+    return switch (operation) {
+      OperationFailed<Intention>(:final failure) => switch (failure) {
+        IntentionGenericValidationFailure() ||
+        IntentionTextInputValidationFailure() =>
+          localizations.detailsStateChangeInvalid,
+        IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
+        IntentionConflictFailure() => localizations.detailsStateChangeConflict,
+        IntentionUnavailableFailure() =>
+          localizations.detailsStateChangeUnavailable,
+        IntentionCorruptionFailure() =>
+          localizations.detailsStateChangeCorruption,
+        IntentionUnexpectedFailure() =>
+          localizations.detailsStateChangeUnexpected,
+      },
+      null ||
+      OperationIdle<Intention>() ||
+      OperationRunning<Intention>() ||
+      OperationSucceeded<Intention>() => null,
+    };
   }
 }
 

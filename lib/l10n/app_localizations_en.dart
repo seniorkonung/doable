@@ -209,6 +209,68 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsSaved => 'Changes saved.';
 
   @override
+  String get detailsEnableReadinessAction => 'Mark as ready for action';
+
+  @override
+  String get detailsDisableReadinessAction => 'Mark as not ready for action';
+
+  @override
+  String get detailsReadinessConfirmationTitle => 'Ready for action?';
+
+  @override
+  String get detailsReadinessOneDayCriterion =>
+      'It can be completed fully within one day.';
+
+  @override
+  String get detailsReadinessClarityCriterion =>
+      'It is clear enough for a person to carry out.';
+
+  @override
+  String get detailsConfirmReadinessAction => 'Mark as ready';
+
+  @override
+  String get detailsArchiveAction => 'Archive';
+
+  @override
+  String get detailsRestoreAction => 'Restore';
+
+  @override
+  String get detailsReadinessEnabled => 'Marked as ready for action.';
+
+  @override
+  String get detailsReadinessDisabled => 'Marked as not ready for action.';
+
+  @override
+  String get detailsArchivedSuccess => 'Intention archived.';
+
+  @override
+  String get detailsRestoredSuccess => 'Intention restored.';
+
+  @override
+  String get detailsStateChangeInvalid =>
+      'The intention state couldn’t be changed.';
+
+  @override
+  String get detailsStateChangeNotFound =>
+      'The intention no longer exists. Its state wasn’t changed.';
+
+  @override
+  String get detailsStateChangeConflict =>
+      'The intention changed elsewhere. Its state wasn’t changed.';
+
+  @override
+  String get detailsStateChangeUnavailable =>
+      'The intention state couldn’t be changed. Try again.';
+
+  @override
+  String get detailsStateChangeCorruption =>
+      'Stored data is damaged. The intention state wasn’t changed.';
+
+  @override
+  String get detailsStateChangeUnexpected =>
+      'The intention state couldn’t be changed because of an unexpected error.';
+
+  @override
   String get detailsUpdateInvalidInput => 'Check the entered data.';
 
   @override

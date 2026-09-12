@@ -210,6 +210,70 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsSaved => 'Изменения сохранены.';
 
   @override
+  String get detailsEnableReadinessAction => 'Отметить готовым к действию';
+
+  @override
+  String get detailsDisableReadinessAction => 'Отметить неготовым к действию';
+
+  @override
+  String get detailsReadinessConfirmationTitle => 'Готово к действию?';
+
+  @override
+  String get detailsReadinessOneDayCriterion =>
+      'Его можно полностью выполнить в течение одного дня.';
+
+  @override
+  String get detailsReadinessClarityCriterion =>
+      'Человеку достаточно понятно, что именно нужно сделать.';
+
+  @override
+  String get detailsConfirmReadinessAction => 'Отметить готовым';
+
+  @override
+  String get detailsArchiveAction => 'Архивировать';
+
+  @override
+  String get detailsRestoreAction => 'Восстановить';
+
+  @override
+  String get detailsReadinessEnabled =>
+      'Намерение отмечено готовым к действию.';
+
+  @override
+  String get detailsReadinessDisabled =>
+      'Намерение отмечено неготовым к действию.';
+
+  @override
+  String get detailsArchivedSuccess => 'Намерение архивировано.';
+
+  @override
+  String get detailsRestoredSuccess => 'Намерение восстановлено.';
+
+  @override
+  String get detailsStateChangeInvalid =>
+      'Не удалось изменить состояние намерения.';
+
+  @override
+  String get detailsStateChangeNotFound =>
+      'Намерение больше не существует. Его состояние не изменено.';
+
+  @override
+  String get detailsStateChangeConflict =>
+      'Намерение было изменено в другом месте. Его состояние не изменено.';
+
+  @override
+  String get detailsStateChangeUnavailable =>
+      'Не удалось изменить состояние намерения. Повторите попытку.';
+
+  @override
+  String get detailsStateChangeCorruption =>
+      'Сохранённые данные повреждены. Состояние намерения не изменено.';
+
+  @override
+  String get detailsStateChangeUnexpected =>
+      'Не удалось изменить состояние намерения из-за непредвиденной ошибки.';
+
+  @override
   String get detailsUpdateInvalidInput => 'Проверьте введённые данные.';
 
   @override
