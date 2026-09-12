@@ -113,10 +113,10 @@ Repository, presentation и app-level проверки подтверждают 
 Собрать независимое сквозное доказательство того, что capability соответствует specs и архитектурным ограничениям в условиях, близких к интеграции в основную ветку.
 
 **Outcome:**
-Долговечность после повторного открытия, локализация, автоматизированные accessibility checks, Android privacy boundary, безопасная диагностика, соблюдение долговечных Unicode и SQLite schema-function решений, воспроизводимая генерация и обязательный CI gate подтверждены вместе с многоосевым review и строгой OpenSpec-валидацией.
+Долговечность после повторного открытия, локализация, автоматизированные accessibility checks, Android privacy boundary, безопасная диагностика, соблюдение долговечных Unicode и SQLite schema-function решений, воспроизводимая генерация и обязательный CI gate с ограниченной стоимостью подтверждены вместе с многоосевым review и строгой OpenSpec-валидацией. Каждый PR получает единый обязательный агрегирующий статус, а release APK evidence покрывает последнее artifact-impacting изменение PR и безусловные еженедельные и ручные полные запуски.
 
 **Boundaries:**
 Фаза устраняет только замечания, необходимые для соответствия утверждённым артефактам и production-ready bar. Ручная TalkBack qualification и device/emulator evidence не входят в change, поэтому фактическая работа экранного диктора на Android не объявляется доказанной. Публикация, store metadata, production signing, канал распространения и квалификация других platform hosts также не входят в change.
 
 **Ready to advance:**
-Полный набор предусмотренных автоматизированных evidence согласован, граница отсутствия ручной TalkBack qualification явно сохранена, обязательные проверки текущего commit успешны, blocking review findings устранены, а change строго валиден и не выходит за утверждённый scope.
+Полный набор предусмотренных автоматизированных evidence согласован, граница отсутствия ручной TalkBack qualification явно сохранена, обязательный агрегирующий status текущего commit успешен, последнее artifact-impacting изменение PR имеет успешные release APK build и packaged-manifest evidence, blocking review findings устранены, а change строго валиден и не выходит за утверждённый scope.
