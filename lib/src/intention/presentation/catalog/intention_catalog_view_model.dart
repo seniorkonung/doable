@@ -20,6 +20,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   CatalogPagingPolicy _policy = CatalogPagingPolicy.production;
   Timer? _filterTimer;
   bool _isDebouncingFilter = false;
+  int _queryGeneration = 0;
+  Object? _activePageRequest;
 
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
     scope: _scope,
@@ -30,6 +32,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   @override
   Future<IntentionCatalogState> build() {
+    _invalidatePageRequest();
     final repository = ref.watch(intentionRepositoryProvider);
     _policy = ref.watch(catalogPagingPolicyProvider);
     final completionSubscription = ref
@@ -91,6 +94,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     _titleFilterText = value;
     _filterValidationFailure = null;
     _isDebouncingFilter = true;
+    _invalidatePageRequest();
     _filterTimer?.cancel();
     ref.invalidateSelf();
     _filterTimer = Timer(_policy.filterDebounce, () {
@@ -109,7 +113,47 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
 
     state = const AsyncLoading();
+    _invalidatePageRequest();
     ref.invalidateSelf();
+  }
+
+  Future<void> loadNextPageIfNeeded({required int visibleIndex}) {
+    final current = state.value;
+    if (current is! IntentionCatalogLoaded ||
+        current.nextCursor == null ||
+        current.continuation is! IntentionCatalogContinuationIdle ||
+        visibleIndex < 0 ||
+        current.items.length - visibleIndex - 1 > _policy.prefetchRemaining) {
+      return Future.value();
+    }
+    return _loadNextPage(current);
+  }
+
+  Future<void> retryNextPage() {
+    final current = state.value;
+    if (current is! IntentionCatalogLoaded ||
+        current.continuation is! IntentionCatalogContinuationUnavailable) {
+      return Future.value();
+    }
+    return _loadNextPage(current);
+  }
+
+  Future<void> recoverFromInvalidCursor() {
+    final current = state.value;
+    if (current is! IntentionCatalogLoaded ||
+        current.continuation is! IntentionCatalogContinuationValidation) {
+      return Future.value();
+    }
+    return _recoverFirstPage(current);
+  }
+
+  Future<void> retryRecovery() {
+    final current = state.value;
+    if (current is! IntentionCatalogLoaded ||
+        current.continuation is! IntentionCatalogRecoveryUnavailable) {
+      return Future.value();
+    }
+    return _recoverFirstPage(current);
   }
 
   Future<IntentionCatalogState> _loadFirstPage(
@@ -192,9 +236,201 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ),
   };
 
+  Future<void> _loadNextPage(IntentionCatalogLoaded confirmed) async {
+    if (_activePageRequest != null || confirmed.nextCursor == null) {
+      return;
+    }
+    final request = Object();
+    final generation = _queryGeneration;
+    _activePageRequest = request;
+    state = AsyncData(
+      _withContinuation(confirmed, const IntentionCatalogContinuationLoading()),
+    );
+
+    try {
+      final repository = ref.read(intentionRepositoryProvider);
+      final query = _continuationQuery(confirmed);
+      final result = await repository.getCatalogPage(query);
+      if (!_ownsRequest(request, generation)) {
+        return;
+      }
+      state = AsyncData(switch (result) {
+        ResultSuccess(:final value) => _appendPage(confirmed, value),
+        ResultFailure(:final failure) => _withContinuation(
+          confirmed,
+          _continuationFailure(failure),
+        ),
+      });
+    } on Object {
+      if (_ownsRequest(request, generation)) {
+        state = AsyncData(
+          _withContinuation(
+            confirmed,
+            const IntentionCatalogContinuationUnexpected(),
+          ),
+        );
+      }
+    } finally {
+      if (identical(_activePageRequest, request)) {
+        _activePageRequest = null;
+      }
+    }
+  }
+
+  Future<void> _recoverFirstPage(IntentionCatalogLoaded confirmed) async {
+    _invalidatePageRequest();
+    final request = Object();
+    final generation = _queryGeneration;
+    _activePageRequest = request;
+    state = AsyncData(
+      _withContinuation(
+        confirmed,
+        const IntentionCatalogContinuationRecovering(),
+      ),
+    );
+
+    try {
+      final repository = ref.read(intentionRepositoryProvider);
+      final query = _firstPageQuery(confirmed);
+      final result = await repository.getCatalogPage(query);
+      if (!_ownsRequest(request, generation)) {
+        return;
+      }
+      state = AsyncData(switch (result) {
+        ResultSuccess(:final value) => _mapPage(
+          confirmed.selection,
+          query,
+          value,
+        ),
+        ResultFailure(:final failure) => _withContinuation(
+          confirmed,
+          _recoveryFailure(failure),
+        ),
+      });
+    } on Object {
+      if (_ownsRequest(request, generation)) {
+        state = AsyncData(
+          _withContinuation(
+            confirmed,
+            const IntentionCatalogRecoveryUnexpected(),
+          ),
+        );
+      }
+    } finally {
+      if (identical(_activePageRequest, request)) {
+        _activePageRequest = null;
+      }
+    }
+  }
+
+  IntentionCatalogState _appendPage(
+    IntentionCatalogLoaded confirmed,
+    IntentionCatalogPage page,
+  ) {
+    if (page is! IntentionCatalogContinuationPage ||
+        page.items.length > confirmed.query.pageSize ||
+        page.revision.compareTo(confirmed.revision) !=
+            IntentionCatalogRevisionOrder.same) {
+      return _withContinuation(
+        confirmed,
+        const IntentionCatalogContinuationUnexpected(),
+      );
+    }
+
+    final knownIds = confirmed.items.map((item) => item.id).toSet();
+    final combined = [...confirmed.items];
+    for (final item in page.items) {
+      if (knownIds.add(item.id)) {
+        combined.add(item);
+      }
+    }
+    if (combined.length > confirmed.totalCount) {
+      return _withContinuation(
+        confirmed,
+        const IntentionCatalogContinuationUnexpected(),
+      );
+    }
+    return IntentionCatalogLoaded(
+      selection: confirmed.selection,
+      query: confirmed.query,
+      items: combined,
+      totalCount: confirmed.totalCount,
+      nextCursor: page.nextCursor,
+      revision: confirmed.revision,
+    );
+  }
+
+  IntentionCatalogContinuationState _continuationFailure(
+    IntentionFailure failure,
+  ) => switch (failure) {
+    IntentionUnavailableFailure() =>
+      const IntentionCatalogContinuationUnavailable(),
+    IntentionCorruptionFailure() =>
+      const IntentionCatalogContinuationCorruption(),
+    IntentionValidationFailure() =>
+      const IntentionCatalogContinuationValidation(),
+    IntentionUnexpectedFailure() ||
+    IntentionNotFoundFailure() ||
+    IntentionConflictFailure() =>
+      const IntentionCatalogContinuationUnexpected(),
+  };
+
+  IntentionCatalogContinuationState _recoveryFailure(
+    IntentionFailure failure,
+  ) => switch (failure) {
+    IntentionUnavailableFailure() =>
+      const IntentionCatalogRecoveryUnavailable(),
+    IntentionCorruptionFailure() => const IntentionCatalogRecoveryCorruption(),
+    IntentionValidationFailure() ||
+    IntentionUnexpectedFailure() ||
+    IntentionNotFoundFailure() ||
+    IntentionConflictFailure() => const IntentionCatalogRecoveryUnexpected(),
+  };
+
+  IntentionCatalogQuery _continuationQuery(IntentionCatalogLoaded confirmed) =>
+      IntentionCatalogQuery(
+        scope: confirmed.query.scope,
+        titleFilter: confirmed.query.titleFilter?.map((value) => value),
+        order: confirmed.query.order,
+        pageSize: confirmed.query.pageSize,
+        cursor: confirmed.nextCursor,
+      );
+
+  IntentionCatalogQuery _firstPageQuery(IntentionCatalogLoaded confirmed) =>
+      IntentionCatalogQuery(
+        scope: confirmed.query.scope,
+        titleFilter: confirmed.query.titleFilter?.map((value) => value),
+        order: confirmed.query.order,
+        pageSize: confirmed.query.pageSize,
+      );
+
+  IntentionCatalogLoaded _withContinuation(
+    IntentionCatalogLoaded confirmed,
+    IntentionCatalogContinuationState continuation,
+  ) => IntentionCatalogLoaded(
+    selection: confirmed.selection,
+    query: confirmed.query,
+    items: confirmed.items,
+    totalCount: confirmed.totalCount,
+    nextCursor: confirmed.nextCursor,
+    revision: confirmed.revision,
+    continuation: continuation,
+  );
+
+  bool _ownsRequest(Object request, int generation) =>
+      ref.mounted &&
+      _queryGeneration == generation &&
+      identical(_activePageRequest, request);
+
+  void _invalidatePageRequest() {
+    _queryGeneration += 1;
+    _activePageRequest = null;
+  }
+
   void _applyParametersImmediately() {
     _filterTimer?.cancel();
     _isDebouncingFilter = false;
+    _invalidatePageRequest();
     ref.invalidateSelf();
   }
 
@@ -206,6 +442,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
             !ref.mounted) {
           return;
         }
+        _invalidatePageRequest();
         ref.invalidateSelf();
       case ResultFailure():
         return;
