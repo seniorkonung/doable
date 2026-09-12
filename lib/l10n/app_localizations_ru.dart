@@ -156,6 +156,48 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogNoDescription => 'Нет описания';
 
   @override
+  String get detailsTitle => 'Подробности намерения';
+
+  @override
+  String get detailsLoading => 'Загрузка намерения…';
+
+  @override
+  String get detailsNotFound => 'Намерение не найдено.';
+
+  @override
+  String get detailsUnavailable =>
+      'Не удалось загрузить намерение. Повторите попытку.';
+
+  @override
+  String get detailsCorruption =>
+      'Сохранённые данные намерения повреждены, их нельзя показать.';
+
+  @override
+  String get detailsUnexpected =>
+      'Не удалось загрузить намерение из-за непредвиденной ошибки.';
+
+  @override
+  String get detailsOperationRunning => 'Сохранение изменений…';
+
+  @override
+  String get detailsDescriptionLabel => 'Описание';
+
+  @override
+  String get detailsNoDescription => 'Нет описания';
+
+  @override
+  String get detailsReadinessLabel => 'Готовность к действию';
+
+  @override
+  String get detailsArchiveStateLabel => 'Состояние';
+
+  @override
+  String get detailsActive => 'Активно';
+
+  @override
+  String get detailsArchived => 'В архиве';
+
+  @override
   String get editorTitle => 'Создать намерение';
 
   @override

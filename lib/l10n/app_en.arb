@@ -181,6 +181,58 @@
   "@catalogNoDescription": {
     "description": "Признак отсутствия описания намерения"
   },
+  "detailsTitle": "Intention details",
+  "@detailsTitle": {
+    "description": "Заголовок подробного просмотра намерения"
+  },
+  "detailsLoading": "Loading intention…",
+  "@detailsLoading": {
+    "description": "Начальная загрузка подробных данных намерения"
+  },
+  "detailsNotFound": "Intention not found.",
+  "@detailsNotFound": {
+    "description": "Подтверждённое отсутствие намерения"
+  },
+  "detailsUnavailable": "The intention couldn’t be loaded. Try again.",
+  "@detailsUnavailable": {
+    "description": "Устранимая недоступность подробных данных намерения"
+  },
+  "detailsCorruption": "Stored intention data is damaged and can’t be shown.",
+  "@detailsCorruption": {
+    "description": "Терминальное повреждение подробных данных намерения"
+  },
+  "detailsUnexpected": "The intention couldn’t be loaded because of an unexpected error.",
+  "@detailsUnexpected": {
+    "description": "Терминальная непредвиденная ошибка подробного чтения"
+  },
+  "detailsOperationRunning": "Saving changes…",
+  "@detailsOperationRunning": {
+    "description": "Сохраняющаяся между экранами выполняющаяся операция намерения"
+  },
+  "detailsDescriptionLabel": "Description",
+  "@detailsDescriptionLabel": {
+    "description": "Подпись описания в подробных данных намерения"
+  },
+  "detailsNoDescription": "No description",
+  "@detailsNoDescription": {
+    "description": "Отсутствующее описание в подробных данных намерения"
+  },
+  "detailsReadinessLabel": "Readiness",
+  "@detailsReadinessLabel": {
+    "description": "Подпись готовности к действию в подробных данных"
+  },
+  "detailsArchiveStateLabel": "State",
+  "@detailsArchiveStateLabel": {
+    "description": "Подпись архивного состояния в подробных данных"
+  },
+  "detailsActive": "Active",
+  "@detailsActive": {
+    "description": "Активное состояние намерения в подробных данных"
+  },
+  "detailsArchived": "Archived",
+  "@detailsArchived": {
+    "description": "Архивное состояние намерения в подробных данных"
+  },
   "editorTitle": "Create intention",
   "@editorTitle": {
     "description": "Заголовок формы создания намерения"

@@ -863,7 +863,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/presentation/editor/**`, `lib/src/app/routing/**`, localization и generated artifacts, `test/intention/presentation/editor/**`.
   - **Оценка:** M (до 5 файлов или групп артефактов).
 
-- [ ] 7.9 Реализовать типизированный подробный просмотр активного и архивированного намерения
+- [x] 7.9 Реализовать типизированный подробный просмотр активного и архивированного намерения
   - **Критерии приёмки:**
     - Строка любого охвата открывает generated details route с предметным `IntentionId`; строковые идентификаторы, named routes и внешний deep-link format не вводятся.
     - Закрытый auto-dispose Stream provider параметризован предметным идентификатором и приватной `DetailObservationGeneration`, а Details ViewModel представляет initial loading, подтверждённое намерение, успешное отсутствие, unavailable, corruption и unexpected как разные эффективные состояния и принимает результат только своей текущей generation; retry unavailable продвигает generation и инвалидирует только подписку данного идентификатора.

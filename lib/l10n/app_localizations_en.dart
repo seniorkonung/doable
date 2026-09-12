@@ -155,6 +155,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogNoDescription => 'No description';
 
   @override
+  String get detailsTitle => 'Intention details';
+
+  @override
+  String get detailsLoading => 'Loading intention…';
+
+  @override
+  String get detailsNotFound => 'Intention not found.';
+
+  @override
+  String get detailsUnavailable =>
+      'The intention couldn’t be loaded. Try again.';
+
+  @override
+  String get detailsCorruption =>
+      'Stored intention data is damaged and can’t be shown.';
+
+  @override
+  String get detailsUnexpected =>
+      'The intention couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get detailsOperationRunning => 'Saving changes…';
+
+  @override
+  String get detailsDescriptionLabel => 'Description';
+
+  @override
+  String get detailsNoDescription => 'No description';
+
+  @override
+  String get detailsReadinessLabel => 'Readiness';
+
+  @override
+  String get detailsArchiveStateLabel => 'State';
+
+  @override
+  String get detailsActive => 'Active';
+
+  @override
+  String get detailsArchived => 'Archived';
+
+  @override
   String get editorTitle => 'Create intention';
 
   @override

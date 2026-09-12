@@ -362,6 +362,84 @@ abstract class AppLocalizations {
   /// **'No description'**
   String get catalogNoDescription;
 
+  /// Заголовок подробного просмотра намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention details'**
+  String get detailsTitle;
+
+  /// Начальная загрузка подробных данных намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Loading intention…'**
+  String get detailsLoading;
+
+  /// Подтверждённое отсутствие намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention not found.'**
+  String get detailsNotFound;
+
+  /// Устранимая недоступность подробных данных намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention couldn’t be loaded. Try again.'**
+  String get detailsUnavailable;
+
+  /// Терминальное повреждение подробных данных намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Stored intention data is damaged and can’t be shown.'**
+  String get detailsCorruption;
+
+  /// Терминальная непредвиденная ошибка подробного чтения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention couldn’t be loaded because of an unexpected error.'**
+  String get detailsUnexpected;
+
+  /// Сохраняющаяся между экранами выполняющаяся операция намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Saving changes…'**
+  String get detailsOperationRunning;
+
+  /// Подпись описания в подробных данных намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get detailsDescriptionLabel;
+
+  /// Отсутствующее описание в подробных данных намерения
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get detailsNoDescription;
+
+  /// Подпись готовности к действию в подробных данных
+  ///
+  /// In en, this message translates to:
+  /// **'Readiness'**
+  String get detailsReadinessLabel;
+
+  /// Подпись архивного состояния в подробных данных
+  ///
+  /// In en, this message translates to:
+  /// **'State'**
+  String get detailsArchiveStateLabel;
+
+  /// Активное состояние намерения в подробных данных
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get detailsActive;
+
+  /// Архивное состояние намерения в подробных данных
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get detailsArchived;
+
   /// Заголовок формы создания намерения
   ///
   /// In en, this message translates to:

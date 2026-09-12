@@ -331,7 +331,15 @@ final class _LoadedCatalog extends ConsumerWidget {
                 );
               }
               _requestNextPage(context, ref, index);
-              return _IntentionSummaryTile(summary: state.items[index]);
+              final summary = state.items[index];
+              return _IntentionSummaryTile(
+                summary: summary,
+                onTap: () {
+                  context.router.push(
+                    IntentionDetailsRoute(intentionId: summary.id),
+                  );
+                },
+              );
             },
           ),
         ),
@@ -435,9 +443,10 @@ final class _CatalogInlineStatus extends StatelessWidget {
 }
 
 final class _IntentionSummaryTile extends StatelessWidget {
-  const _IntentionSummaryTile({required this.summary});
+  const _IntentionSummaryTile({required this.summary, required this.onTap});
 
   final IntentionSummary summary;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -450,6 +459,7 @@ final class _IntentionSummaryTile extends StatelessWidget {
         ? localizations.catalogHasDescription
         : localizations.catalogNoDescription;
     return ListTile(
+      onTap: onTap,
       title: Text(summary.title),
       subtitle: Wrap(
         spacing: 12,
