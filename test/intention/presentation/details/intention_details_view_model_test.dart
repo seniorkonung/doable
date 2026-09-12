@@ -1079,17 +1079,27 @@ void main() {
       repository.detailRequests[0].add(ResultSuccess(intention));
       await pumpEventQueue();
 
-      final start = container
-          .read(intentionCommandCoordinatorProvider.notifier)
-          .accept(DeleteIntention(intention.id));
+      final coordinator = container.read(
+        intentionCommandCoordinatorProvider.notifier,
+      );
+      final fallback =
+          Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
+      final completionSubscription = coordinator.completions.listen((event) {
+        fallback.complete(coordinator.claimCatalogFallback(event.token));
+      });
+      addTearDown(completionSubscription.cancel);
+
+      container
+          .read(intentionDetailsViewModelProvider(intention.id).notifier)
+          .delete();
       repository.completeCommand(0, testDetailsDeletedResult(intention));
-      await (start as IntentionCommandAccepted).future;
       await pumpEventQueue();
 
       expect(
         container.read(intentionDetailsViewModelProvider(intention.id)),
         isA<IntentionDetailsDeleted>(),
       );
+      expect(await (await fallback.future), isNull);
       expect(repository.detailRequests[0].cancellationCount, 1);
 
       repository.detailRequests[0].add(ResultSuccess(intention));

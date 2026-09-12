@@ -19,6 +19,16 @@ enum IntentionCatalogUpdateOutcome {
   unexpected,
 }
 
+enum IntentionCatalogDeleteOutcome {
+  succeeded,
+  validation,
+  notFound,
+  conflict,
+  unavailable,
+  corruption,
+  unexpected,
+}
+
 sealed class IntentionCatalogPresentationEvent {
   const IntentionCatalogPresentationEvent();
 }
@@ -35,6 +45,13 @@ final class IntentionCatalogUpdatePresentationEvent
   const IntentionCatalogUpdatePresentationEvent(this.outcome);
 
   final IntentionCatalogUpdateOutcome outcome;
+}
+
+final class IntentionCatalogDeletePresentationEvent
+    extends IntentionCatalogPresentationEvent {
+  const IntentionCatalogDeletePresentationEvent(this.outcome);
+
+  final IntentionCatalogDeleteOutcome outcome;
 }
 
 enum IntentionCatalogFilterValidationFailure {

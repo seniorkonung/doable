@@ -182,6 +182,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   void restore() => _startStateChange(IntentionDetailsStateChangeKind.restore);
 
+  void delete() => _startStateChange(IntentionDetailsStateChangeKind.delete);
+
   void retryStateChange() {
     final current = state;
     final stateChange = current is IntentionDetailsLoaded
@@ -389,7 +391,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         if (current is IntentionDetailsLoaded) {
           state = switch (completion.result) {
             ResultSuccess(value: IntentionSaved(:final intention))
-                when intention.id == _intentionId =>
+                when intention.id == _intentionId &&
+                    kind != IntentionDetailsStateChangeKind.delete =>
               current.copyWith(
                 clearStateChange: true,
                 event: _successEventFor(kind),
@@ -436,6 +439,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       DisableIntentionReadiness(_intentionId),
     IntentionDetailsStateChangeKind.archive => ArchiveIntention(_intentionId),
     IntentionDetailsStateChangeKind.restore => RestoreIntention(_intentionId),
+    IntentionDetailsStateChangeKind.delete => DeleteIntention(_intentionId),
   };
 
   bool _isStateChangeApplicable(
@@ -450,6 +454,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       intention.archiveState == IntentionArchiveState.active,
     IntentionDetailsStateChangeKind.restore =>
       intention.archiveState == IntentionArchiveState.archived,
+    IntentionDetailsStateChangeKind.delete => true,
   };
 
   IntentionDetailsEvent _successEventFor(
@@ -461,6 +466,9 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       const IntentionDetailsReadinessDisabled(),
     IntentionDetailsStateChangeKind.archive => const IntentionDetailsArchived(),
     IntentionDetailsStateChangeKind.restore => const IntentionDetailsRestored(),
+    IntentionDetailsStateChangeKind.delete => throw StateError(
+      'Физическое удаление завершает подробный просмотр без success event.',
+    ),
   };
 
   void _failUpdateUnexpectedly() {

@@ -281,6 +281,26 @@
   "@detailsRestoreAction": {
     "description": "Явное действие восстановления намерения из архива"
   },
+  "detailsDeleteAction": "Delete permanently",
+  "@detailsDeleteAction": {
+    "description": "Действие начала физического удаления намерения"
+  },
+  "detailsDeleteConfirmationTitle": "Delete intention permanently?",
+  "@detailsDeleteConfirmationTitle": {
+    "description": "Заголовок подтверждения необратимого удаления намерения"
+  },
+  "detailsDeleteConfirmationMessage": "This can’t be undone. The intention and its description will be permanently deleted.",
+  "@detailsDeleteConfirmationMessage": {
+    "description": "Объяснение необратимости физического удаления намерения"
+  },
+  "detailsConfirmDeleteAction": "Delete permanently",
+  "@detailsConfirmDeleteAction": {
+    "description": "Явное подтверждение физического удаления намерения"
+  },
+  "detailsDeleted": "Intention deleted.",
+  "@detailsDeleted": {
+    "description": "Подтверждение физического удаления намерения после ухода из подробного просмотра"
+  },
   "detailsReadinessEnabled": "Marked as ready for action.",
   "@detailsReadinessEnabled": {
     "description": "Подтверждение включённой готовности к действию"
@@ -320,6 +340,30 @@
   "detailsStateChangeUnexpected": "The intention state couldn’t be changed because of an unexpected error.",
   "@detailsStateChangeUnexpected": {
     "description": "Терминальная непредвиденная ошибка перехода состояния"
+  },
+  "detailsDeleteInvalid": "The intention couldn’t be deleted.",
+  "@detailsDeleteInvalid": {
+    "description": "Безопасная ошибка недопустимого физического удаления"
+  },
+  "detailsDeleteNotFound": "The intention no longer exists. It wasn’t deleted.",
+  "@detailsDeleteNotFound": {
+    "description": "Безопасная ошибка удаления отсутствующего намерения"
+  },
+  "detailsDeleteConflict": "The intention is still linked and can’t be deleted.",
+  "@detailsDeleteConflict": {
+    "description": "Безопасная ошибка блокирующей связи при удалении намерения"
+  },
+  "detailsDeleteUnavailable": "The intention couldn’t be deleted. Try again.",
+  "@detailsDeleteUnavailable": {
+    "description": "Устранимая недоступность физического удаления намерения"
+  },
+  "detailsDeleteCorruption": "Stored data is damaged. The intention wasn’t deleted.",
+  "@detailsDeleteCorruption": {
+    "description": "Терминальное повреждение при физическом удалении намерения"
+  },
+  "detailsDeleteUnexpected": "The intention couldn’t be deleted because of an unexpected error.",
+  "@detailsDeleteUnexpected": {
+    "description": "Терминальная непредвиденная ошибка физического удаления"
   },
   "detailsUpdateInvalidInput": "Check the entered data.",
   "@detailsUpdateInvalidInput": {

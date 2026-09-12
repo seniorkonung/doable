@@ -50,6 +50,7 @@ enum IntentionDetailsStateChangeKind {
   disableReadiness,
   archive,
   restore,
+  delete,
 }
 
 final class IntentionDetailsStateChange {

@@ -236,6 +236,22 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsRestoreAction => 'Восстановить';
 
   @override
+  String get detailsDeleteAction => 'Удалить навсегда';
+
+  @override
+  String get detailsDeleteConfirmationTitle => 'Удалить намерение навсегда?';
+
+  @override
+  String get detailsDeleteConfirmationMessage =>
+      'Это действие нельзя отменить. Намерение и его описание будут удалены навсегда.';
+
+  @override
+  String get detailsConfirmDeleteAction => 'Удалить навсегда';
+
+  @override
+  String get detailsDeleted => 'Намерение удалено.';
+
+  @override
   String get detailsReadinessEnabled =>
       'Намерение отмечено готовым к действию.';
 
@@ -272,6 +288,29 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get detailsStateChangeUnexpected =>
       'Не удалось изменить состояние намерения из-за непредвиденной ошибки.';
+
+  @override
+  String get detailsDeleteInvalid => 'Не удалось удалить намерение.';
+
+  @override
+  String get detailsDeleteNotFound =>
+      'Намерение больше не существует. Оно не удалено.';
+
+  @override
+  String get detailsDeleteConflict =>
+      'Намерение всё ещё связано с другими данными, поэтому его нельзя удалить.';
+
+  @override
+  String get detailsDeleteUnavailable =>
+      'Не удалось удалить намерение. Повторите попытку.';
+
+  @override
+  String get detailsDeleteCorruption =>
+      'Сохранённые данные повреждены. Намерение не удалено.';
+
+  @override
+  String get detailsDeleteUnexpected =>
+      'Не удалось удалить намерение из-за непредвиденной ошибки.';
 
   @override
   String get detailsUpdateInvalidInput => 'Проверьте введённые данные.';

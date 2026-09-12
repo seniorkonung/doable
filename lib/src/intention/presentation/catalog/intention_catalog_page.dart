@@ -140,6 +140,23 @@ final class _IntentionCatalogPageState
           IntentionCatalogUpdateOutcome.unexpected =>
             localizations.detailsUpdateUnexpected,
         },
+      IntentionCatalogDeletePresentationEvent(:final outcome) =>
+        switch (outcome) {
+          IntentionCatalogDeleteOutcome.succeeded =>
+            localizations.detailsDeleted,
+          IntentionCatalogDeleteOutcome.validation =>
+            localizations.detailsDeleteInvalid,
+          IntentionCatalogDeleteOutcome.notFound =>
+            localizations.detailsDeleteNotFound,
+          IntentionCatalogDeleteOutcome.conflict =>
+            localizations.detailsDeleteConflict,
+          IntentionCatalogDeleteOutcome.unavailable =>
+            localizations.detailsDeleteUnavailable,
+          IntentionCatalogDeleteOutcome.corruption =>
+            localizations.detailsDeleteCorruption,
+          IntentionCatalogDeleteOutcome.unexpected =>
+            localizations.detailsDeleteUnexpected,
+        },
     };
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));

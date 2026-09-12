@@ -129,6 +129,9 @@ final class _DetailsContent extends ConsumerWidget {
         onRestore: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .restore,
+        onDelete: ref
+            .read(intentionDetailsViewModelProvider(intentionId).notifier)
+            .delete,
         onRetryStateChange: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .retryStateChange,
@@ -168,6 +171,7 @@ final class _LoadedDetails extends StatelessWidget {
     required this.onDisableReadiness,
     required this.onArchive,
     required this.onRestore,
+    required this.onDelete,
     required this.onRetryStateChange,
   });
 
@@ -181,6 +185,7 @@ final class _LoadedDetails extends StatelessWidget {
   final VoidCallback onDisableReadiness;
   final VoidCallback onArchive;
   final VoidCallback onRestore;
+  final VoidCallback onDelete;
   final VoidCallback onRetryStateChange;
 
   @override
@@ -239,6 +244,7 @@ final class _LoadedDetails extends StatelessWidget {
             onDisableReadiness: onDisableReadiness,
             onArchive: onArchive,
             onRestore: onRestore,
+            onDelete: onDelete,
             onRetryStateChange: onRetryStateChange,
           ),
       ],
@@ -254,6 +260,7 @@ final class _DetailsActions extends StatelessWidget {
     required this.onDisableReadiness,
     required this.onArchive,
     required this.onRestore,
+    required this.onDelete,
     required this.onRetryStateChange,
   });
 
@@ -263,6 +270,7 @@ final class _DetailsActions extends StatelessWidget {
   final VoidCallback onDisableReadiness;
   final VoidCallback onArchive;
   final VoidCallback onRestore;
+  final VoidCallback onDelete;
   final VoidCallback onRetryStateChange;
 
   @override
@@ -336,6 +344,18 @@ final class _DetailsActions extends StatelessWidget {
                 icon: const Icon(Icons.unarchive_outlined),
                 label: Text(localizations.detailsRestoreAction),
               ),
+            FilledButton.icon(
+              key: const ValueKey('intention-details-delete'),
+              onPressed: controlsEnabled
+                  ? () => unawaited(_confirmDeletion(context))
+                  : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              icon: const Icon(Icons.delete_forever_outlined),
+              label: Text(localizations.detailsDeleteAction),
+            ),
           ],
         ),
       ],
@@ -374,28 +394,77 @@ final class _DetailsActions extends StatelessWidget {
     }
   }
 
+  Future<void> _confirmDeletion(BuildContext context) async {
+    final localizations = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(localizations.detailsDeleteConfirmationTitle),
+        content: Text(localizations.detailsDeleteConfirmationMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(localizations.detailsCancelEditAction),
+          ),
+          FilledButton(
+            key: const ValueKey('intention-details-confirm-delete'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            child: Text(localizations.detailsConfirmDeleteAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) {
+      onDelete();
+    }
+  }
+
   String? _failureMessage(AppLocalizations localizations) {
-    final operation = state.stateChange?.operation;
+    final stateChange = state.stateChange;
+    final operation = stateChange?.operation;
     return switch (operation) {
-      OperationFailed<Intention>(:final failure) => switch (failure) {
-        IntentionGenericValidationFailure() ||
-        IntentionTextInputValidationFailure() =>
-          localizations.detailsStateChangeInvalid,
-        IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
-        IntentionConflictFailure() => localizations.detailsStateChangeConflict,
-        IntentionUnavailableFailure() =>
-          localizations.detailsStateChangeUnavailable,
-        IntentionCorruptionFailure() =>
-          localizations.detailsStateChangeCorruption,
-        IntentionUnexpectedFailure() =>
-          localizations.detailsStateChangeUnexpected,
-      },
+      OperationFailed<Intention>(:final failure) =>
+        stateChange!.kind == IntentionDetailsStateChangeKind.delete
+            ? _deleteFailureMessage(localizations, failure)
+            : _stateChangeFailureMessage(localizations, failure),
       null ||
       OperationIdle<Intention>() ||
       OperationRunning<Intention>() ||
       OperationSucceeded<Intention>() => null,
     };
   }
+
+  String _deleteFailureMessage(
+    AppLocalizations localizations,
+    IntentionFailure failure,
+  ) => switch (failure) {
+    IntentionGenericValidationFailure() ||
+    IntentionTextInputValidationFailure() => localizations.detailsDeleteInvalid,
+    IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
+    IntentionConflictFailure() => localizations.detailsDeleteConflict,
+    IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
+    IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
+    IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
+  };
+
+  String _stateChangeFailureMessage(
+    AppLocalizations localizations,
+    IntentionFailure failure,
+  ) => switch (failure) {
+    IntentionGenericValidationFailure() ||
+    IntentionTextInputValidationFailure() =>
+      localizations.detailsStateChangeInvalid,
+    IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
+    IntentionConflictFailure() => localizations.detailsStateChangeConflict,
+    IntentionUnavailableFailure() =>
+      localizations.detailsStateChangeUnavailable,
+    IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
+    IntentionUnexpectedFailure() => localizations.detailsStateChangeUnexpected,
+  };
 }
 
 final class _DetailsEditForm extends StatefulWidget {

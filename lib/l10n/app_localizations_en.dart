@@ -235,6 +235,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsRestoreAction => 'Restore';
 
   @override
+  String get detailsDeleteAction => 'Delete permanently';
+
+  @override
+  String get detailsDeleteConfirmationTitle => 'Delete intention permanently?';
+
+  @override
+  String get detailsDeleteConfirmationMessage =>
+      'This can’t be undone. The intention and its description will be permanently deleted.';
+
+  @override
+  String get detailsConfirmDeleteAction => 'Delete permanently';
+
+  @override
+  String get detailsDeleted => 'Intention deleted.';
+
+  @override
   String get detailsReadinessEnabled => 'Marked as ready for action.';
 
   @override
@@ -269,6 +285,29 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsStateChangeUnexpected =>
       'The intention state couldn’t be changed because of an unexpected error.';
+
+  @override
+  String get detailsDeleteInvalid => 'The intention couldn’t be deleted.';
+
+  @override
+  String get detailsDeleteNotFound =>
+      'The intention no longer exists. It wasn’t deleted.';
+
+  @override
+  String get detailsDeleteConflict =>
+      'The intention is still linked and can’t be deleted.';
+
+  @override
+  String get detailsDeleteUnavailable =>
+      'The intention couldn’t be deleted. Try again.';
+
+  @override
+  String get detailsDeleteCorruption =>
+      'Stored data is damaged. The intention wasn’t deleted.';
+
+  @override
+  String get detailsDeleteUnexpected =>
+      'The intention couldn’t be deleted because of an unexpected error.';
 
   @override
   String get detailsUpdateInvalidInput => 'Check the entered data.';

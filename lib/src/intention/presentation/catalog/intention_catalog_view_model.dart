@@ -450,7 +450,9 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   void _handleCompletion(IntentionCommandCompletion completion) {
     switch (completion.kind) {
-      case IntentionCommandKind.create || IntentionCommandKind.update:
+      case IntentionCommandKind.create ||
+          IntentionCommandKind.update ||
+          IntentionCommandKind.delete:
         final coordinator = ref.read(
           intentionCommandCoordinatorProvider.notifier,
         );
@@ -463,8 +465,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       case IntentionCommandKind.enableReadiness ||
           IntentionCommandKind.disableReadiness ||
           IntentionCommandKind.archive ||
-          IntentionCommandKind.restore ||
-          IntentionCommandKind.delete:
+          IntentionCommandKind.restore:
         break;
     }
 
@@ -502,11 +503,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCommandKind.update => IntentionCatalogUpdatePresentationEvent(
         _updateOutcome(claim.completion.result),
       ),
+      IntentionCommandKind.delete => IntentionCatalogDeletePresentationEvent(
+        _deleteOutcome(claim.completion.result),
+      ),
       IntentionCommandKind.enableReadiness ||
       IntentionCommandKind.disableReadiness ||
       IntentionCommandKind.archive ||
-      IntentionCommandKind.restore ||
-      IntentionCommandKind.delete => null,
+      IntentionCommandKind.restore => null,
     };
     if (event == null) {
       coordinator.confirmPresentation(claim);
@@ -554,6 +557,24 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         IntentionCatalogUpdateOutcome.unavailable,
       IntentionCorruptionFailure() => IntentionCatalogUpdateOutcome.corruption,
       IntentionUnexpectedFailure() => IntentionCatalogUpdateOutcome.unexpected,
+    },
+  };
+
+  IntentionCatalogDeleteOutcome _deleteOutcome(
+    Result<IntentionCommandSuccess> result,
+  ) => switch (result) {
+    ResultSuccess(value: IntentionDeleted()) =>
+      IntentionCatalogDeleteOutcome.succeeded,
+    ResultSuccess(value: IntentionSaved()) =>
+      IntentionCatalogDeleteOutcome.unexpected,
+    ResultFailure(:final failure) => switch (failure) {
+      IntentionValidationFailure() => IntentionCatalogDeleteOutcome.validation,
+      IntentionNotFoundFailure() => IntentionCatalogDeleteOutcome.notFound,
+      IntentionConflictFailure() => IntentionCatalogDeleteOutcome.conflict,
+      IntentionUnavailableFailure() =>
+        IntentionCatalogDeleteOutcome.unavailable,
+      IntentionCorruptionFailure() => IntentionCatalogDeleteOutcome.corruption,
+      IntentionUnexpectedFailure() => IntentionCatalogDeleteOutcome.unexpected,
     },
   };
 }

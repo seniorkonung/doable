@@ -762,19 +762,30 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await waitForDetailRequests(repository, 1);
     repository.detailRequests[0].add(ResultSuccess(intention));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(router.current.name, IntentionDetailsRoute.name);
 
-    final start = container
-        .read(intentionCommandCoordinatorProvider.notifier)
-        .accept(DeleteIntention(intention.id));
+    final delete = find.byKey(const ValueKey('intention-details-delete'));
+    await tester.ensureVisible(delete);
+    await tester.tap(delete);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('intention-details-confirm-delete')),
+    );
+    await tester.pump();
+    expect(repository.commands.single, isA<DeleteIntention>());
+
     repository.completeCommand(0, testDetailsDeletedResult(intention));
-    await (start as IntentionCommandAccepted).future;
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
     expect(router.current.name, IntentionCatalogRoute.name);
     expect(find.byType(IntentionDetailsPage), findsNothing);
+
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await tester.pump();
+    expect(router.current.name, IntentionCatalogRoute.name);
+    expect(find.text(intention.title), findsNothing);
   });
 }
 

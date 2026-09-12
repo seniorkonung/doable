@@ -512,6 +512,36 @@ abstract class AppLocalizations {
   /// **'Restore'**
   String get detailsRestoreAction;
 
+  /// Действие начала физического удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete permanently'**
+  String get detailsDeleteAction;
+
+  /// Заголовок подтверждения необратимого удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete intention permanently?'**
+  String get detailsDeleteConfirmationTitle;
+
+  /// Объяснение необратимости физического удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'This can’t be undone. The intention and its description will be permanently deleted.'**
+  String get detailsDeleteConfirmationMessage;
+
+  /// Явное подтверждение физического удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete permanently'**
+  String get detailsConfirmDeleteAction;
+
+  /// Подтверждение физического удаления намерения после ухода из подробного просмотра
+  ///
+  /// In en, this message translates to:
+  /// **'Intention deleted.'**
+  String get detailsDeleted;
+
   /// Подтверждение включённой готовности к действию
   ///
   /// In en, this message translates to:
@@ -571,6 +601,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention state couldn’t be changed because of an unexpected error.'**
   String get detailsStateChangeUnexpected;
+
+  /// Безопасная ошибка недопустимого физического удаления
+  ///
+  /// In en, this message translates to:
+  /// **'The intention couldn’t be deleted.'**
+  String get detailsDeleteInvalid;
+
+  /// Безопасная ошибка удаления отсутствующего намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention no longer exists. It wasn’t deleted.'**
+  String get detailsDeleteNotFound;
+
+  /// Безопасная ошибка блокирующей связи при удалении намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention is still linked and can’t be deleted.'**
+  String get detailsDeleteConflict;
+
+  /// Устранимая недоступность физического удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention couldn’t be deleted. Try again.'**
+  String get detailsDeleteUnavailable;
+
+  /// Терминальное повреждение при физическом удалении намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The intention wasn’t deleted.'**
+  String get detailsDeleteCorruption;
+
+  /// Терминальная непредвиденная ошибка физического удаления
+  ///
+  /// In en, this message translates to:
+  /// **'The intention couldn’t be deleted because of an unexpected error.'**
+  String get detailsDeleteUnexpected;
 
   /// Общая ошибка проверки формы изменения
   ///
