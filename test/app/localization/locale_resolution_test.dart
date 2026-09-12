@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -109,6 +112,33 @@ void main() {
     },
   );
 
+  test('русский и английский ARB содержат один полный набор строк', () async {
+    final english = jsonDecode(
+      await File('lib/l10n/app_en.arb').readAsString(),
+    ) as Map<String, Object?>;
+    final russian = jsonDecode(
+      await File('lib/l10n/app_ru.arb').readAsString(),
+    ) as Map<String, Object?>;
+    final englishKeys = english.keys
+        .where((key) => !key.startsWith('@'))
+        .toSet();
+    final russianKeys = russian.keys
+        .where((key) => !key.startsWith('@'))
+        .toSet();
+
+    expect(russianKeys, equals(englishKeys));
+    for (final key in englishKeys) {
+      expect(
+        english[key],
+        isA<String>().having((value) => value.trim(), key, isNotEmpty),
+      );
+      expect(
+        russian[key],
+        isA<String>().having((value) => value.trim(), key, isNotEmpty),
+      );
+    }
+  });
+
   testWidgets('приложение применяет русскую локаль платформы', (tester) async {
     tester.binding.platformDispatcher.localesTestValue = const <Locale>[
       Locale('ru', 'RU'),
@@ -141,6 +171,14 @@ void main() {
 
     expect(Localizations.localeOf(context), const Locale('en'));
     expect(AppLocalizations.of(context).commonRetry, 'Try again');
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is DropdownButton<Locale> ||
+            widget is DropdownButtonFormField<Locale>,
+      ),
+      findsNothing,
+    );
   });
 }
 

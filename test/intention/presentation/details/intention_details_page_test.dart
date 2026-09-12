@@ -72,6 +72,79 @@ void main() {
     expect(find.text('Not ready for action'), findsOneWidget);
   });
 
+  testWidgets('смена локали не изменяет пользовательский текст', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final locale = ValueNotifier(const Locale('en'));
+    addTearDown(locale.dispose);
+    final intention = testDetailsIntention(
+      title: 'Сохранить русский заголовок',
+      description: '  Пользовательское описание\nбез преобразования  ',
+      readiness: IntentionReadiness.ready,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+        retry: (retryCount, error) => null,
+        child: ValueListenableBuilder<Locale>(
+          valueListenable: locale,
+          builder: (context, value, child) => _localizedApp(
+            IntentionDetailsPage(intentionId: intention.id),
+            locale: value,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Intention details'), findsOneWidget);
+    expect(find.text(intention.title), findsOneWidget);
+    expect(find.text(intention.description!), findsOneWidget);
+
+    locale.value = const Locale('ru');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Подробности намерения'), findsOneWidget);
+    expect(find.text('Intention details'), findsNothing);
+    expect(find.text(intention.title), findsOneWidget);
+    expect(find.text(intention.description!), findsOneWidget);
+  });
+
+  testWidgets(
+    'подробный просмотр проходит accessibility guidelines при масштабе 200%',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(
+        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+      );
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(
+        title: 'Доступное намерение',
+        description: 'Описание доступного намерения',
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+      );
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('intention-details-delete')),
+      );
+      await tester.pumpAndSettle();
+
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+      semantics.dispose();
+    },
+  );
+
   testWidgets(
     'объясняет оба критерия готовности и не запускает команду после отмены',
     (tester) async {
@@ -810,12 +883,13 @@ ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
       retry: (retryCount, error) => null,
     );
 
-Widget _localizedApp(Widget home) => MaterialApp(
-  locale: const Locale('en'),
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
-  supportedLocales: AppLocalizations.supportedLocales,
-  home: home,
-);
+Widget _localizedApp(Widget home, {Locale locale = const Locale('en')}) =>
+    MaterialApp(
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: home,
+    );
 
 final class _DetailsTestRevision implements IntentionCatalogRevision {
   const _DetailsTestRevision();

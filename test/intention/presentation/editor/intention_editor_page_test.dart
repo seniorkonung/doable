@@ -32,6 +32,27 @@ void main() {
     expect(find.byType(Switch), findsNothing);
   });
 
+  testWidgets('форма проходит accessibility guidelines при масштабе 200%', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(
+      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+    );
+    final repository = ControlledCatalogRepository();
+    await _openEditor(tester, repository);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('intention-editor-submit')),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    semantics.dispose();
+  });
+
   testWidgets('блокирует повторную отправку, сохраняя доступный Back', (
     tester,
   ) async {

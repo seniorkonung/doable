@@ -129,6 +129,41 @@ void main() {
     );
   });
 
+  testWidgets('каталог проходит accessibility guidelines при масштабе 200%', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(
+      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+    );
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [
+            testSummary(
+              title: 'Доступное намерение',
+              hasDescription: true,
+              readiness: IntentionReadiness.ready,
+            ),
+          ],
+          totalCount: 1,
+          nextCursor: null,
+          revision: const TestCatalogRevision(0),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    semantics.dispose();
+  });
+
   testWidgets('показывает отдельное пустое состояние активного охвата', (
     tester,
   ) async {
