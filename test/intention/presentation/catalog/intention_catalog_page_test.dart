@@ -228,7 +228,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.drag(
-      find.byKey(const ValueKey('catalog-list')),
+      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
       const Offset(0, -800),
     );
     await tester.pumpAndSettle();
@@ -256,6 +256,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_catalogScrollPosition(tester).pixels, 0);
+  });
+
+  testWidgets('сохраняет позицию списка через постоянный PageStorageKey', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [testSummary(index: 1)],
+          totalCount: 1,
+          nextCursor: null,
+          revision: const TestCatalogRevision(0),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<ListView>(find.byType(ListView)).key,
+      const PageStorageKey<String>('intention-catalog-list'),
+    );
   });
 
   testWidgets('локализует параметры каталога на русский язык', (tester) async {
@@ -297,14 +321,14 @@ void main() {
     expect(repository.queries, hasLength(1));
 
     await tester.drag(
-      find.byKey(const ValueKey('catalog-list')),
+      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
       const Offset(0, -1000),
     );
     await _pumpUntilQueries(tester, repository, 2);
     await tester.pump();
     expect(repository.queryAt(1).cursor, same(cursor));
     await tester.drag(
-      find.byKey(const ValueKey('catalog-list')),
+      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
       const Offset(0, -300),
     );
     await tester.pump();
@@ -438,7 +462,7 @@ void main() {
 ScrollPosition _catalogScrollPosition(WidgetTester tester) => tester
     .state<ScrollableState>(
       find.descendant(
-        of: find.byKey(const ValueKey('catalog-list')),
+        of: find.byKey(const PageStorageKey<String>('intention-catalog-list')),
         matching: find.byType(Scrollable),
       ),
     )

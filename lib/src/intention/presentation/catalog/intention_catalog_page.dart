@@ -358,7 +358,7 @@ final class _LoadedCatalog extends ConsumerWidget {
         ),
         Expanded(
           child: ListView.builder(
-            key: const ValueKey('catalog-list'),
+            key: const PageStorageKey<String>('intention-catalog-list'),
             controller: scrollController,
             itemCount: state.items.length + (hasContinuationStatus ? 1 : 0),
             itemBuilder: (context, index) {
