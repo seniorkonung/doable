@@ -1,6 +1,6 @@
 # ADR-0002: Хранить локальный граф в SQLite через Drift
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-intentions
 - Date: 2026-08-28
 

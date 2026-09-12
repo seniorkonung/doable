@@ -1,6 +1,6 @@
 # ADR-0005: Читать каталог намерений ограниченными снимками
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-intentions
 - Date: 2026-08-30
 - Supersedes: ADR-0001

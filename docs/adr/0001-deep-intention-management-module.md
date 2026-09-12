@@ -1,6 +1,6 @@
 # ADR-0001: Сосредоточить управление намерениями в глубоком модуле
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-intentions
 - Date: 2026-08-28
 

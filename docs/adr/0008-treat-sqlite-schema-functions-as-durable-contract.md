@@ -1,6 +1,6 @@
 # ADR-0008: Считать SQLite schema-functions долговечным контрактом
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-intentions
 - Date: 2026-09-04
 
