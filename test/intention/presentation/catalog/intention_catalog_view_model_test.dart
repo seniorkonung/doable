@@ -995,7 +995,7 @@ void main() {
   });
 
   test(
-    'после прежней команды перечитывает только текущие параметры и ревизию',
+    'согласует completion только с текущими параметрами без повторного чтения',
     () async {
       final repository = ControlledCatalogRepository();
       final container = _catalogContainer(
@@ -1064,36 +1064,29 @@ void main() {
       );
       await accepted.future;
       expect(observedCompletions, hasLength(1));
-      await _waitForQueries(repository, 5);
-
-      final refreshedQuery = repository.queryAt(4);
-      expect(refreshedQuery.scope, IntentionScope.archived);
-      expect(refreshedQuery.titleFilter?.map((value) => value), 'архив');
-      expect(refreshedQuery.order, IntentionCatalogOrder.updatedAtDescending);
-      expect(refreshedQuery.cursor, isNull);
-
       repository.complete(
-        4,
+        3,
         ResultSuccess(
           IntentionCatalogFirstPage(
             items: const [],
             totalCount: 0,
             nextCursor: null,
-            revision: const TestCatalogRevision(4),
+            revision: const TestCatalogRevision(3),
           ),
         ),
       );
-      final refreshed = await container.read(
+      final reconciled = await container.read(
         intentionCatalogViewModelProvider.future,
       );
       expect(
-        refreshed,
+        reconciled,
         isA<IntentionCatalogEmpty>().having(
           (value) => value.revision,
           'ревизия',
           const TestCatalogRevision(4),
         ),
       );
+      expect(repository.queries, hasLength(4));
     },
   );
 

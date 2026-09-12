@@ -18,6 +18,10 @@ final class ControlledCatalogRepository implements IntentionRepository {
     _requests[index].complete(result);
   }
 
+  void failPage(int index, Object error) {
+    _requests[index].completeError(error);
+  }
+
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
     _commandRequests[index].complete(result);
   }
@@ -50,13 +54,14 @@ final class TestCatalogCursor implements IntentionCatalogCursor {
 }
 
 final class TestCatalogRevision implements IntentionCatalogRevision {
-  const TestCatalogRevision(this.sequence);
+  const TestCatalogRevision(this.sequence, {this.epoch = 0});
 
   final int sequence;
+  final int epoch;
 
   @override
   IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) {
-    if (other is! TestCatalogRevision) {
+    if (other is! TestCatalogRevision || epoch != other.epoch) {
       return IntentionCatalogRevisionOrder.differentEpoch;
     }
     final comparison = sequence.compareTo(other.sequence);
@@ -67,13 +72,16 @@ final class TestCatalogRevision implements IntentionCatalogRevision {
 }
 
 final class TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
-  const TestCatalogEntrySnapshot(this.summary);
+  const TestCatalogEntrySnapshot(this.summary, {this.matchesResult});
 
   @override
   final IntentionSummary summary;
 
+  final bool? matchesResult;
+
   @override
-  bool matches(IntentionCatalogQuery query) => query.includes(summary);
+  bool matches(IntentionCatalogQuery query) =>
+      matchesResult ?? query.includes(summary);
 }
 
 IntentionSummary testSummary({
@@ -81,6 +89,9 @@ IntentionSummary testSummary({
   String title = 'Намерение',
   bool hasDescription = false,
   IntentionReadiness readiness = IntentionReadiness.notReady,
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
+  int? createdDay,
+  int? updatedDay,
 }) {
   final encodedId =
       '018f0000-0000-7000-8000-${index.toString().padLeft(12, '0')}';
@@ -90,15 +101,20 @@ IntentionSummary testSummary({
       'Некорректный fixture ID.',
     ),
   };
-  final timestamp = IntentionTimestamp(DateTime.utc(2026, 1, index));
+  final createdAt = IntentionTimestamp(
+    DateTime.utc(2026, 1, createdDay ?? index),
+  );
+  final updatedAt = IntentionTimestamp(
+    DateTime.utc(2026, 1, updatedDay ?? createdDay ?? index),
+  );
   return IntentionSummary(
     id: id,
     title: title,
     hasDescription: hasDescription,
     readiness: readiness,
-    archiveState: IntentionArchiveState.active,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    archiveState: archiveState,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
   );
 }
 
