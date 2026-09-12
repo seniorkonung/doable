@@ -510,6 +510,7 @@ final class _LoadedCatalog extends ConsumerWidget {
               return _IntentionSummaryTile(
                 key: itemKeyFor(summary.id),
                 summary: summary,
+                showArchiveState: state.query.scope == IntentionScope.all,
                 onTap: () {
                   context.router.push(
                     IntentionDetailsRoute(intentionId: summary.id),
@@ -621,11 +622,13 @@ final class _CatalogInlineStatus extends StatelessWidget {
 final class _IntentionSummaryTile extends StatelessWidget {
   const _IntentionSummaryTile({
     required this.summary,
+    required this.showArchiveState,
     required this.onTap,
     super.key,
   });
 
   final IntentionSummary summary;
+  final bool showArchiveState;
   final VoidCallback onTap;
 
   @override
@@ -638,12 +641,20 @@ final class _IntentionSummaryTile extends StatelessWidget {
     final description = summary.hasDescription
         ? localizations.catalogHasDescription
         : localizations.catalogNoDescription;
+    final archiveState = switch (summary.archiveState) {
+      IntentionArchiveState.active => localizations.detailsActive,
+      IntentionArchiveState.archived => localizations.detailsArchived,
+    };
     return ListTile(
       onTap: onTap,
       title: Text(summary.title),
       subtitle: Wrap(
         spacing: 12,
-        children: [Text(readiness), Text(description)],
+        children: [
+          Text(readiness),
+          Text(description),
+          if (showArchiveState) Text(archiveState),
+        ],
       ),
     );
   }

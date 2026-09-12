@@ -78,6 +78,57 @@ void main() {
     expect(find.text('Has description'), findsOneWidget);
   });
 
+  testWidgets('явно сообщает архивное состояние строки в охвате всех', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const TestCatalogRevision(0),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All').last);
+    await tester.pump();
+
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [
+            testSummary(
+              title: 'Архивное намерение',
+              archiveState: IntentionArchiveState.archived,
+            ),
+          ],
+          totalCount: 1,
+          nextCursor: null,
+          revision: const TestCatalogRevision(0),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Архивное намерение'), findsOneWidget);
+    expect(find.text('Archived'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        RegExp('Архивное намерение.*Archived', dotAll: true),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('показывает отдельное пустое состояние активного охвата', (
     tester,
   ) async {
