@@ -1026,7 +1026,7 @@
   - **Вероятно затронутые файлы:** новый workflow в `.github/workflows/` — каталог пока отсутствует; `mise.toml`, `README.md`.
   - **Оценка:** M (до 3 файлов).
 
-- [ ] 8.3 Проверять Android privacy boundary собранного release APK в том же CI
+- [x] 8.3 Проверять Android privacy boundary собранного release APK в том же CI
   - **Критерии приёмки:**
     - После успешных автоматизированных проверок workflow собирает `flutter build apk --release` с закреплёнными Android build tools и JDK, без production signing secrets или канала распространения.
     - Проверка читает manifest именно собранного APK и отклоняет `INTERNET`, разрешения внешнего хранилища и отсутствие ссылок на утверждённые backup rules; существующий `backup_policy_test.dart` продолжает доказывать исключение `root/app_flutter/` вместе со служебными файлами.
