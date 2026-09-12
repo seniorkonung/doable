@@ -29,3 +29,12 @@ diff, and commit it. The detector itself has an isolated Git-fixture check:
 ```sh
 mise run codegen-check-test
 ```
+
+## Pull request checks
+
+Every pull request must pass the single `Full checks` status. Project checks
+always run, while the release APK and packaged Android privacy-manifest check
+run for artifact-impacting or unclassified changes. A documentation-only,
+OpenSpec-only, or isolated Dart/test-only update may skip that Android job only
+after the preceding pull request commit has a trusted successful `Full checks`
+run; manual and weekly runs always include the Android evidence.
