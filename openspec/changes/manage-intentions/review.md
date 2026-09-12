@@ -5,111 +5,72 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Нерешёнными остаются две границы: фактический Android
-  bootstrap/restart и производительность короткого фильтра на целевом Android
-  host. Принятый риск AR1 о wall-clock timestamps остаётся применимым в прежнем
-  объёме.
-**Validation:** Строгая проверка change успешна (`openspec validate manage-intentions --type change --strict --no-interactive`).
-  Проверка schema успешна (`openspec schema validate intent-driven --json`), как
-  и целевой Dart-анализ текущих application/data/bootstrap seams. Проверка
-  статуса (`openspec status --change manage-intentions --json`) подтвердила
-  фактический граф `intent-driven` и наличие всех требуемых planning artifacts.
-  Phase 7 ещё не реализована, поэтому её runtime- и widget-поведение не
-  запускалось; Phase 8 по правилам schema получит task package только после
-  завершения текущего пакета Phase 7.
+**Summary:** F13–F15 блокируют финальную интеграционную готовность: command-path
+  нарушает lossless storage boundary, packaged permission gate допускает часть
+  неутверждённых media permissions, а negative-path detector test не входит в
+  обязательный CI path. AR1, AR2 и AR3 остаются явно принятыми рисками.
+**Validation:** `openspec validate manage-intentions --type change --strict --no-interactive` успешен на reviewed head; Dart MCP analysis, воспроизводимая генерация и `mise run check` с 331 тестом также успешны. GitHub подтверждает зелёный `Full checks` на tree reviewed head и required status context `Full checks` для `main`. Эти результаты не доказывают Android process restart, Android latency или фактическую работу TalkBack на устройстве.
 
 ## Findings
 
-### F11 · High — Ключевая долговечность Android host не имеет runtime-доказательства
+### F13 · Medium — Command-path публикует coerced значения повреждённой SQLite-строки
 
-- **Evidence:** `proposal.md` обещает проверить Android host adapter и сохранять
-  намерения между полными запусками. `design.md`, стратегия проверки, прямо
-  исключает Android device/emulator job и признаёт, что unit, widget,
-  file-backed tests, сборка APK и статическая проверка manifest не доказывают
-  platform bootstrap после завершения процесса. Phase 8 требует интеграционное
-  доказательство и ручной TalkBack smoke, но её readiness не требует создать
-  намерение через production Android connection, полностью завершить процесс и
-  восстановить данные после нового запуска. Текущий `lib/main.dart` остаётся
-  заглушкой, поэтому существующий host wiring такого evidence не даёт.
-- **Impact:** APK может собираться и backup rules могут быть корректны, но
-  production composition, plugin path, background SQLite connection или
-  lifecycle процесса могут не открыться либо не восстановить данные на
-  единственной заявленной платформе. Это нарушит центральное обещание change
-  только после интеграции Phase 7.
-- **Required change:** выбрать и зафиксировать либо воспроизводимую Android
-  runtime-проверку production bootstrap и сценария create → полное завершение
-  процесса → relaunch → read, либо явно принять ограниченный остаточный риск и
-  согласовать его scope, rationale и reopening conditions с design и текущим
-  review state.
-- **Decision needed:** должен ли change включать Android device/emulator evidence
-  долговечности, или вы явно принимаете отсутствие такого доказательства для
-  первой интеграции?
+- **Evidence:** `design.md:615` требует lossless rehydration до необратимого typed coercion, а `specs/local-data-lifecycle/spec.md:27` запрещает успешную модель или сводку из непроверенного сохранённого представления. Но `lib/src/intention/data/drift_intention_repository.dart:258`, `:303`, `:345` и `:385` читают command row через generated Drift mapper; `lib/src/data/local/app_database.g.dart:193` преобразует storage values как `string`, `bool` и `int`. В Drift 2.34.3 это означает `toString()`, nonzero → `true` и `double.toInt()`, тогда как catalog/details уже валидируют raw storage classes.
+- **Impact:** Readiness, archive/restore, update либо delete повреждённой строки может вернуть success и mutation snapshot со сфабрикованными значениями вместо `IntentionCorruptionFailure`, а необратимое удаление может состояться до обнаружения повреждения.
+- **Required change:** Проверять raw SQLite storage classes и предметные инварианты всех полей command `before`/`after` до преобразования или mutation; malformed row должен остаться неизменным, вернуть typed corruption и не продвинуть revision.
 
-### F12 · Medium — Бюджет короткого фильтра не проверяется на единственном целевом host
+### F14 · Medium — Packaged Android permission gate покрывает privacy policy неполным denylist
 
-- **Evidence:** `design.md`, решения 3–4 и риск короткого фильтра, задаёт
-  debounce 250 мс и выполняет для строки из одной-двух кодовых точек линейный
-  scan через SQL-операцию `instr` вместе с точным `COUNT`; задача 6.9 проверяет
-  p95 ≤ 100 мс на Linux CI для 50 000 намерений, а design прямо говорит, что
-  это не обещание Android latency и что Android device performance job
-  отсутствует. Phase 7 применяет фильтр автоматически при вводе, но Phase 8 не
-  задаёт Android budget, representative device profile или критерий приемлемого
-  отклика.
-- **Impact:** функциональные и Linux regression tests могут пройти, тогда как
-  ввод первого или второго символа на целевом Android-устройстве будет регулярно
-  задерживать актуальный результат и создавать очередь новых query generations;
-  implementer не знает, при каком наблюдаемом результате менять search strategy.
-- **Required change:** определить приемлемое наблюдаемое поведение короткого
-  фильтра на representative Android profile и добавить соответствующее evidence
-  и advance/hold criterion, либо явно принять ограниченный остаточный риск с
-  условиями пересмотра до того, как Phase 8 назовёт capability доказанной.
-- **Decision needed:** требуется ли Android performance evidence для короткого
-  фильтра в этом change, или вы явно принимаете переносимость Linux-бюджета как
-  остаточный риск?
+- **Evidence:** ADR-0004 и `design.md:598` запрещают `INTERNET` и разрешения внешнего хранилища для capability. `.github/workflows/ci.yml:72-87` отклоняет семь имён, но не отклоняет, например, `READ_MEDIA_VISUAL_USER_SELECTED` и `ACCESS_MEDIA_LOCATION`; source-manifest test не видит permissions, добавленные при manifest merge зависимостями.
+- **Impact:** Release APK с неутверждённым доступом к shared/external media способен получить зелёный обязательный gate, хотя packaged manifest является финальной privacy boundary.
+- **Required change:** Сделать packaged permission policy полной относительно утверждённой границы и покрыть её negative fixtures так, чтобы `INTERNET` и любой неутверждённый shared/external storage или media access гарантированно делали gate неуспешным.
+
+### F15 · Medium — Обязательный CI path не исполняет negative test generated-artifact detector
+
+- **Evidence:** Task 8.1 требует отдельно доказать, что detector замечает изменённый tracked и новый untracked artifact. Это делает `tool/check_generated_test.sh:36-52`, но `.github/workflows/ci.yml:44-55` его не запускает, а `mise run check` не включает зарегистрированный `codegen-check-test` из `mise.toml:28`.
+- **Impact:** Регрессия `assert_clean_tree` может пройти на чистой генерации и дать false-success обязательного gate именно в той части, которая должна доказывать воспроизводимость committed artifacts.
+- **Required change:** Включить negative-path regression evidence detector в обязательный CI path и сохранять failure gate при утрате обнаружения tracked или untracked drift.
 
 ## Accepted risks
 
 ### AR1 · Показания системных часов могут не отражать фактическую хронологию операций
 
-- **Evidence:** действующие specs, design и ADR-0006 считают UTC wall-clock
-  timestamps наблюдениями; каталог использует сохранённое значение и тип `IntentionId`
-  как tie-breaker без causal clock.
-- **Potential impact:** быстрые операции или перевод часов могут дать
-  одинаковые либо убывающие timestamps, поэтому выбранный пользователем порядок
-  иногда не совпадёт с фактической последовательностью действий.
-- **Acceptance rationale:** отдельная revision/logical-clock модель или
-  синтетическое продвижение времени несоразмерны вспомогательной сортировке и
-  исказили бы наблюдаемое wall-clock значение.
-- **Scope and assumptions:** timestamps не используются как revision, causal
-  order, средство синхронизации, аудита или разрешения конфликтов.
-- **Reopen when:** timestamps получают хронологически значимое поведение,
-  появляется синхронизация/разрешение конфликтов либо наблюдается существенный
-  пользовательский ущерб от перестановок.
-- **Acceptance authority:** явное решение пользователя от 2026-09-03.
+- **Evidence:** ADR-0006, действующие specs и `design.md` считают UTC wall-clock timestamps независимыми наблюдениями; каталог использует сохранённое значение и `IntentionId` как tie-breaker без causal clock.
+- **Potential impact:** Быстрые операции или перевод часов могут дать одинаковые либо убывающие timestamps, поэтому выбранный порядок иногда не совпадёт с фактической последовательностью действий.
+- **Acceptance rationale:** Отдельная revision/logical-clock модель или синтетическое продвижение времени несоразмерны вспомогательной сортировке и исказили бы наблюдаемое wall-clock значение.
+- **Scope and assumptions:** Timestamps не используются как revision, causal order, средство синхронизации, аудита или разрешения конфликтов.
+- **Reopen when:** Timestamps получают хронологически значимое поведение, появляется синхронизация/разрешение конфликтов либо наблюдается существенный ущерб от перестановок.
+- **Acceptance authority:** Явное решение пользователя от 2026-09-03.
 - **Originating finding:** F1
 - **Acceptance lifetime:** Durable
-- **Decision record:** ADR-0006, соответствующие требования intention-management
-  spec и раздел рисков design.
+- **Decision record:** ADR-0006, соответствующие требования intention-management spec и раздел рисков `design.md`.
+
+### AR2 · Android process restart и production wiring не проверены на device/emulator
+
+- **Evidence:** File-backed и app-runtime tests закрывают и повторно открывают тот же SQLite object graph, CI собирает release APK и проверяет packaged manifest, но `design.md` и task 8.6 исключают device/emulator integration test и не называют эти проверки Android relaunch evidence.
+- **Potential impact:** Ошибка только в Android plugin/host wiring может проявиться при production bootstrap или повторном запуске, несмотря на успешные platform-neutral и file-backed tests.
+- **Acceptance rationale:** Для первой интеграции человек решил не добавлять device/E2E infrastructure; имеющееся evidence остаётся полезным в своей более узкой границе без ложной runtime qualification.
+- **Scope and assumptions:** Первая локальная Android capability внутри одной установки; публикация, device qualification и production release readiness остаются вне change.
+- **Reopen when:** Наблюдается Android bootstrap/relaunch failure, меняется host wiring или capability готовится к publication/device qualification.
+- **Acceptance authority:** Явное решение пользователя не добавлять интеграционные тесты, закреплённое в task 8.6 и `design.md`.
+- **Originating finding:** F11
+- **Acceptance lifetime:** Change-scoped
+
+### AR3 · Linux budget короткого фильтра не доказывает Android latency
+
+- **Evidence:** Large file-backed suite на 50 000 строк проверяет p95 не выше 100 мс в Linux; `design.md` и tasks 8.2/8.6 прямо запрещают считать результат Android latency measurement, а device benchmark отсутствует.
+- **Potential impact:** На слабом Android-устройстве scan одной-двух кодовых точек вместе с точным `COUNT` может задерживать актуальный результат после debounce.
+- **Acceptance rationale:** Человек решил не добавлять Android performance/integration infrastructure; bounded paging, debounce и Linux regression budget ограничивают риск без ложного Android SLO.
+- **Scope and assumptions:** До 50 000 локальных намерений, текущие query/schema/search strategy и отсутствие обещанного Android latency SLO.
+- **Reopen when:** Появляется наблюдаемая задержка, меняется объём или search strategy либо вводится Android latency/SLO или publication criterion.
+- **Acceptance authority:** Явное решение пользователя не добавлять интеграционные тесты, закреплённое в task 8.6 и `design.md`.
+- **Originating finding:** F12
+- **Acceptance lifetime:** Change-scoped
 
 ## Review coverage
 
-Проверен фактический schema graph `proposal → specs → design → adr → plan →
-tasks`, оба delta spec, ADR manifest и ADR-0001–ADR-0008, корневой предметный
-словарь, прежний change review и implementation review. Commitments прослежены
-через текущий Phase 7 package к verification; отсутствие Phase 8 package
-признано ожидаемым по phase-by-phase правилам schema, поскольку Phase 7 ещё не
-завершена. Сверены текущие `MainApp`, `IntentionRepository`, commands, sealed
-results/failures, `DriftIntentionRepository`, `LocalDataBootstrap`, Android
-connection/backup boundary, test layout и зафиксированные lifecycle signatures
-Riverpod 3.4.2. Углублённо проверены capability ownership, public interface,
-persistence, migration и rollback assumptions, async disposal, page/command и
-detail/command races, operation lifetime, paging/count/cursor reconciliation,
-bounded state, failure/retry semantics, privacy diagnostics, Android runtime и
-performance evidence, localization, accessibility и delivery boundary. Текущая
-реализация Phase 6 сохраняет прямой неревизионный `watchById` и отдельные
-command successes с предметным `IntentionId`. Требование, design и новый
-dependency-ordered task Phase 7 теперь согласованно задают presentation-local
-generation barrier, единственный command data path для details и управляемые
-перестановки старого snapshot, success, новой подписки и удаления без изменения
-публичной repository seam или ADR-0005. Новых противоречий в затронутых границах
-не обнаружено.
+Broad re-audit охватил proposal, оба delta spec, design, ADR manifest и ADR-0001–ADR-0008, plan, tasks, прежние review states и полный committed implementation range после предыдущего reviewed head. Требования прослежены через repository raw data, schema functions, revisions, process-local coordinator, bootstrap ownership, routing, локализацию, автоматизированную доступность, diagnostics allowlist, Android host privacy и Phase 8 CI.
+
+Предыдущий implementation review доказал Phase 6 schema/NUL/bounded-catalog increment и сохранил AR1; текущий implementation review повторно проверил изменившийся repository и независимо покрыл presentation/composition и CI. Автоматизированные проверки подтвердили Unicode corpus, schema-function setup, file-backed persistence, migration/schema validation, localization, semantics/guidelines/text scale, release APK build и packaged backup references в указанных границах.
+
+Ручная TalkBack qualification и device/emulator evidence отсутствуют по утверждённой границе. APK build и Linux tests не считаются доказательством Android restart, Android latency или фактического TalkBack. F11 и F12 поэтому заменены явно принятыми AR2 и AR3, а не объявлены исправленными; F13–F15 остаются blocking до выполнения новых Phase 8 remediation-задач.
