@@ -1059,7 +1059,7 @@
   - **Вероятно затронутые файлы:** Нет; настройки GitHub и результат проверки.
   - **Оценка:** S.
 
-- [ ] 8.6 Завершить многоосевое ревью реализации и согласовать границы доказанной готовности
+- [x] 8.6 Завершить многоосевое ревью реализации и согласовать границы доказанной готовности
   - **Критерии приёмки:**
     - Ревью привязано к committed range, заканчивающемуся проверяемым HEAD, и использует результаты предшествующих ревью с явным указанием их покрытия. Дополнительно проверяются ещё не покрытые изменения presentation/composition и CI по корректности, читаемости, архитектуре, безопасности и производительности.
     - Подтверждены соответствие specs, ADR-0002–ADR-0008, приватность diagnostics и Android host, а также результаты существующих Unicode, schema-function, persistence, localization и автоматизированных accessibility проверок; ни сборка APK, ни Linux tests не объявляются доказательством Android restart, latency или фактической работы TalkBack на устройстве.
@@ -1071,7 +1071,43 @@
   - **Вероятно затронутые файлы:** `openspec/changes/manage-intentions/implementation-review.md`; `openspec/changes/manage-intentions/review.md` через соответствующий review workflow. Новые implementation-исправления определяются только по конкретным findings.
   - **Оценка:** M.
 
-- [ ] 8.7 Подтвердить готовность управления намерениями к интеграции на окончательном коммите
+- [ ] 8.7 Закрыть lossless raw-storage boundary для всех command snapshots намерения
+  - **Критерии приёмки:**
+    - Update, readiness, archive/restore и delete получают исходные SQLite storage classes каждого поля, участвующего в `IntentionSaved` или `before`/`after` catalog snapshot, через одну каноническую lossless-границу до generated Drift mapping; title search projection также остаётся проверенной строкой и не раскрывается через публичную seam.
+    - BLOB вместо текста, нецелые либо выходящие за `0`/`1` boolean values, REAL/string timestamps и иное malformed сохранённое значение возвращают `IntentionCorruptionFailure` с безопасной diagnostics category, не изменяют строку, не удаляют её, не публикуют частичный success и не продвигают repository revision.
+    - Допустимые update/state/delete и no-op сохраняют существующие транзакционные, timestamp, точные membership snapshot и revision contracts без изменения application interface.
+  - **Проверка:**
+    - По TDD добавить command fixtures для raw BLOB/text, boolean и timestamp coercion, включая state transition, delete и representative update/no-op, затем выполнить `flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/data/drift_intention_catalog_test.dart test/intention/data/file_backed_drift_intention_repository_test.dart`.
+    - Выполнить `flutter analyze` и `openspec validate manage-intentions --type change --strict --no-interactive`.
+  - **Зависимости:** 8.6.
+  - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`; при необходимости общий data test support.
+  - **Оценка:** M (до 3 файлов или групп артефактов).
+
+- [ ] 8.8 Сделать packaged Android permission policy полной относительно privacy boundary
+  - **Критерии приёмки:**
+    - Проверка merged manifest собранного release APK отклоняет `INTERNET` и любой неутверждённый доступ к shared/external storage либо media, включая permissions, добавленные транзитивными зависимостями; новые Android permission names не попадают в молчаливый пробел конечного denylist.
+    - Negative fixtures отклоняют существующий набор запрещённых permissions, `READ_MEDIA_VISUAL_USER_SELECTED`, `ACCESS_MEDIA_LOCATION` и смешанный permission dump, а утверждённый набор без таких разрешений проходит; parser не принимает отсутствие либо неожиданный формат evidence за успех.
+    - Тот же проверенный механизм используется обязательным `Full checks` после release APK build и сохраняет текущую проверку `allowBackup`, `fullBackupContent` и `dataExtractionRules` без заявления о runtime privacy на устройстве.
+  - **Проверка:**
+    - Выполнить focused tests нового packaged-manifest helper на положительных и отрицательных fixtures, `flutter test test/android/backup_policy_test.dart` и локальную проверку permissions/backup references собранного `flutter build apk --release`.
+    - Выполнить `git diff --check` и `openspec validate manage-intentions --type change --strict --no-interactive`; затем сопоставить обязательный шаг с фактическим PR `Full checks`.
+  - **Зависимости:** 8.6.
+  - **Вероятно затронутые файлы:** `.github/workflows/ci.yml`, новый проверяемый helper и его tests в `tool/`, `test/android/backup_policy_test.dart` при необходимости.
+  - **Оценка:** M (до 4 файлов или групп артефактов).
+
+- [ ] 8.9 Включить negative-path evidence generated-artifact detector в обязательный CI gate
+  - **Критерии приёмки:**
+    - Тот же required job `Full checks` исполняет `tool/check_generated_test.sh` либо эквивалентную зарегистрированную задачу и становится неуспешным, если detector перестаёт замечать изменённый tracked или новый untracked artifact.
+    - Fixture-проверка остаётся изолированной, очищает временную рабочую копию и не зависит от пользовательского `apm_modules`, hooks или состояния основного checkout; обычный `codegen-check` по-прежнему повторно генерирует полный утверждённый набор artifacts.
+    - Фактический PR run показывает успешное выполнение negative-path шага внутри того же обязательного status context без ослабления остальных проверок.
+  - **Проверка:**
+    - Выполнить `bash tool/check_generated_test.sh`, `mise run codegen-check` и `mise run check`.
+    - Выполнить `openspec validate manage-intentions --type change --strict --no-interactive`, затем сопоставить шаг с фактическим PR `Full checks`.
+  - **Зависимости:** 8.6.
+  - **Вероятно затронутые файлы:** `.github/workflows/ci.yml`, `mise.toml`; существующие `tool/check_generated.sh` и `tool/check_generated_test.sh` изменяются только при подтверждённой необходимости.
+  - **Оценка:** S (до 2 файлов).
+
+- [ ] 8.10 Подтвердить готовность управления намерениями к интеграции на окончательном коммите
   - **Критерии приёмки:**
     - Все задачи Phase 8 и добавленные по её review обязательные исправления завершены; окончательный commit имеет успешный обязательный CI gate, а blocking review findings отсутствуют.
     - Итог явно разделяет доказанное существующими автоматизированными accessibility проверками и не квалифицированную вручную работу TalkBack на Android, а также принятые ограничения Android runtime/performance evidence; новые интеграционные тесты и их инфраструктура не являются условием готовности.
@@ -1079,6 +1115,6 @@
   - **Проверка:**
     - Сопоставить `git rev-parse HEAD` с успешным required CI run и review target; при изменении затронутого поведения обновить соответствующее автоматизированное evidence и проверить актуальность принятой границы отсутствия ручной TalkBack qualification.
     - Выполнить `openspec validate --all --strict --no-interactive` и `git diff --check`; проверить актуальные required-check настройки и отсутствие незавершённых обязательных задач.
-  - **Зависимости:** 8.1, 8.2, 8.3, 8.4, 8.5, 8.6.
+  - **Зависимости:** 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9.
   - **Вероятно затронутые файлы:** Нет, только проверка.
   - **Оценка:** XS.
