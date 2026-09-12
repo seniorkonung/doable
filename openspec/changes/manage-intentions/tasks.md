@@ -1083,7 +1083,7 @@
   - **Вероятно затронутые файлы:** `lib/src/intention/data/drift_intention_repository.dart`, `test/intention/data/drift_intention_repository_command_test.dart`; при необходимости общий data test support.
   - **Оценка:** M (до 3 файлов или групп артефактов).
 
-- [ ] 8.8 Сделать packaged Android permission policy полной относительно privacy boundary
+- [x] 8.8 Сделать packaged Android permission policy полной относительно privacy boundary
   - **Критерии приёмки:**
     - Для текущего release утверждённый набор запрашиваемых permissions состоит только из принадлежащего package разрешения `software.doable.doable.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`; packaged manifest одновременно объявляет его с уровнем защиты `signature`. Любой другой `uses-permission` или `uses-permission-sdk-23`, включая `INTERNET`, системный либо сторонний permission и неизвестное текущему Android SDK имя, делает проверку неуспешной.
     - Расширение утверждённого набора требует отдельного явного продуктового решения и согласованного изменения privacy contract; permission, добавленный транзитивной зависимостью или manifest edit без такого решения, не может пройти обязательный gate. Новые Android permission names не попадают в молчаливый пробел конечного denylist.
