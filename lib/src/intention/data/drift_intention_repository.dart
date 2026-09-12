@@ -237,12 +237,10 @@ final class DriftIntentionRepository implements IntentionRepository {
             updatedAt: intention.updatedAt.value.microsecondsSinceEpoch,
           ),
         );
-    final stored =
-        await (_database.select(_database.intentions)
-              ..where((row) => row.id.equals(intention.id.toCanonicalString())))
-            .getSingle();
+    final stored = await _readCommandSnapshot(intention.id);
+    if (stored == null) throw const _StoredIntentionCorruption();
     return _CommittedIntentionCreated(
-      intention: _rehydrate(stored),
+      intention: _rehydrateStored(stored.detail),
       after: _catalogEntrySnapshot(stored),
     );
   }
@@ -255,14 +253,11 @@ final class DriftIntentionRepository implements IntentionRepository {
       null => null,
       final value => IntentionText.normalizeDescription(value),
     };
-    final row =
-        await (_database.select(_database.intentions)
-              ..where((row) => row.id.equals(command.id.toCanonicalString())))
-            .getSingleOrNull();
-    if (row == null) throw const _IntentionNotFound();
+    final storedBefore = await _readCommandSnapshot(command.id);
+    if (storedBefore == null) throw const _IntentionNotFound();
 
-    final existing = _rehydrate(row);
-    final before = _catalogEntrySnapshot(row);
+    final existing = _rehydrateStored(storedBefore.detail);
+    final before = _catalogEntrySnapshot(storedBefore);
     if (existing.title == title && existing.description == description) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -285,12 +280,10 @@ final class DriftIntentionRepository implements IntentionRepository {
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
     );
-    final stored =
-        await (_database.select(_database.intentions)
-              ..where((row) => row.id.equals(command.id.toCanonicalString())))
-            .getSingle();
+    final stored = await _readCommandSnapshot(command.id);
+    if (stored == null) throw const _StoredIntentionCorruption();
     return _CommittedIntentionUpdated(
-      intention: _rehydrate(stored),
+      intention: _rehydrateStored(stored.detail),
       before: before,
       after: _catalogEntrySnapshot(stored),
     );
@@ -300,13 +293,11 @@ final class DriftIntentionRepository implements IntentionRepository {
     IntentionId id,
     domain.IntentionReadiness readiness,
   ) async {
-    final row = await (_database.select(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingleOrNull();
-    if (row == null) throw const _IntentionNotFound();
+    final storedBefore = await _readCommandSnapshot(id);
+    if (storedBefore == null) throw const _IntentionNotFound();
 
-    final existing = _rehydrate(row);
-    final before = _catalogEntrySnapshot(row);
+    final existing = _rehydrateStored(storedBefore.detail);
+    final before = _catalogEntrySnapshot(storedBefore);
     if (existing.readiness == readiness) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -328,11 +319,10 @@ final class DriftIntentionRepository implements IntentionRepository {
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
     );
-    final stored = await (_database.select(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+    final stored = await _readCommandSnapshot(id);
+    if (stored == null) throw const _StoredIntentionCorruption();
     return _CommittedIntentionUpdated(
-      intention: _rehydrate(stored),
+      intention: _rehydrateStored(stored.detail),
       before: before,
       after: _catalogEntrySnapshot(stored),
     );
@@ -342,13 +332,11 @@ final class DriftIntentionRepository implements IntentionRepository {
     IntentionId id,
     domain.IntentionArchiveState archiveState,
   ) async {
-    final row = await (_database.select(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingleOrNull();
-    if (row == null) throw const _IntentionNotFound();
+    final storedBefore = await _readCommandSnapshot(id);
+    if (storedBefore == null) throw const _IntentionNotFound();
 
-    final existing = _rehydrate(row);
-    final before = _catalogEntrySnapshot(row);
+    final existing = _rehydrateStored(storedBefore.detail);
+    final before = _catalogEntrySnapshot(storedBefore);
     if (existing.archiveState == archiveState) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -372,27 +360,49 @@ final class DriftIntentionRepository implements IntentionRepository {
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
       ),
     );
-    final stored = await (_database.select(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+    final stored = await _readCommandSnapshot(id);
+    if (stored == null) throw const _StoredIntentionCorruption();
     return _CommittedIntentionUpdated(
-      intention: _rehydrate(stored),
+      intention: _rehydrateStored(stored.detail),
       before: before,
       after: _catalogEntrySnapshot(stored),
     );
   }
 
   Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
-    final row = await (_database.select(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).getSingleOrNull();
-    if (row == null) throw const _IntentionNotFound();
-    final before = _catalogEntrySnapshot(row);
+    final storedBefore = await _readCommandSnapshot(id);
+    if (storedBefore == null) throw const _IntentionNotFound();
+    final before = _catalogEntrySnapshot(storedBefore);
     final deletedRows = await (_database.delete(
       _database.intentions,
     )..where((row) => row.id.equals(id.toCanonicalString()))).go();
     if (deletedRows == 0) throw const _IntentionNotFound();
     return _CommittedIntentionDeleted(id: id, before: before);
+  }
+
+  Future<_StoredIntentionCommandSnapshot?> _readCommandSnapshot(
+    IntentionId id,
+  ) async {
+    final row = await _database
+        .customSelect(
+          '''
+            SELECT
+              id,
+              title,
+              title_search_key,
+              description,
+              is_action_ready,
+              is_archived,
+              created_at,
+              updated_at
+            FROM intentions
+            WHERE id = ?
+          ''',
+          variables: [Variable<String>(id.toCanonicalString())],
+          readsFrom: {_database.intentions},
+        )
+        .getSingleOrNull();
+    return row == null ? null : _StoredIntentionCommandSnapshot.fromRawRow(row);
   }
 
   Future<IntentionCatalogFirstPage> _readFirstCatalogPage(
@@ -572,32 +582,21 @@ final class DriftIntentionRepository implements IntentionRepository {
     boundaryId: boundary.id,
   );
 
-  domain.Intention _rehydrate(local.Intention row) {
-    try {
-      return _rehydrateValues(
-        id: row.id,
-        title: row.title,
-        description: row.description,
-        readiness: row.isActionReady
-            ? domain.IntentionReadiness.ready
-            : domain.IntentionReadiness.notReady,
-        archiveState: row.isArchived
-            ? domain.IntentionArchiveState.archived
-            : domain.IntentionArchiveState.active,
-        createdAt: domain.IntentionTimestamp(
-          DateTime.fromMicrosecondsSinceEpoch(row.createdAt, isUtc: true),
-        ),
-        updatedAt: domain.IntentionTimestamp(
-          DateTime.fromMicrosecondsSinceEpoch(row.updatedAt, isUtc: true),
-        ),
+  domain.Intention _rehydrateStored(_StoredIntentionDetail stored) =>
+      _rehydrateValues(
+        id: stored.id,
+        title: stored.title,
+        description: stored.description,
+        readiness: stored.readiness,
+        archiveState: stored.archiveState,
+        createdAt: stored.createdAt,
+        updatedAt: stored.updatedAt,
       );
-    } on ArgumentError catch (_) {
-      throw const _StoredIntentionCorruption();
-    }
-  }
 
-  IntentionCatalogEntrySnapshot _catalogEntrySnapshot(local.Intention row) {
-    final intention = _rehydrate(row);
+  IntentionCatalogEntrySnapshot _catalogEntrySnapshot(
+    _StoredIntentionCommandSnapshot stored,
+  ) {
+    final intention = _rehydrateStored(stored.detail);
     return _DriftIntentionCatalogEntrySnapshot(
       summary: IntentionSummary(
         id: intention.id,
@@ -608,21 +607,12 @@ final class DriftIntentionRepository implements IntentionRepository {
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
       ),
-      storedTitleSearchKey: row.titleSearchKey,
+      storedTitleSearchKey: stored.titleSearchKey,
     );
   }
 
   domain.Intention _rehydrateDetailRow(QueryRow row) {
-    final stored = _StoredIntentionDetail.fromRawRow(row);
-    return _rehydrateValues(
-      id: stored.id,
-      title: stored.title,
-      description: stored.description,
-      readiness: stored.readiness,
-      archiveState: stored.archiveState,
-      createdAt: stored.createdAt,
-      updatedAt: stored.updatedAt,
-    );
+    return _rehydrateStored(_StoredIntentionDetail.fromRawRow(row));
   }
 
   domain.Intention _rehydrateValues({
@@ -665,6 +655,41 @@ final class DriftIntentionRepository implements IntentionRepository {
       rethrow;
     }
   }
+}
+
+final class _StoredIntentionCommandSnapshot {
+  const _StoredIntentionCommandSnapshot({
+    required this.detail,
+    required this.titleSearchKey,
+  });
+
+  factory _StoredIntentionCommandSnapshot.fromRawRow(QueryRow row) {
+    final data = row.data;
+    final titleSearchKey = _StoredIntentionDetail._requiredString(
+      data,
+      _StoredIntentionColumnNames.titleSearchKey,
+    );
+    try {
+      IntentionText.ensureValidUnicodeRepertoire(
+        titleSearchKey,
+        field: IntentionTextField.title,
+      );
+    } on IntentionTextValidationException catch (_) {
+      throw const _StoredIntentionCorruption();
+    }
+    if (titleSearchKey.isEmpty) throw const _StoredIntentionCorruption();
+
+    return _StoredIntentionCommandSnapshot(
+      detail: _StoredIntentionDetail._fromRawData(
+        data,
+        _StoredIntentionColumnNames.detail,
+      ),
+      titleSearchKey: titleSearchKey,
+    );
+  }
+
+  final _StoredIntentionDetail detail;
+  final String titleSearchKey;
 }
 
 final class _StoredIntentionDetail {
@@ -796,6 +821,8 @@ final class _StoredIntentionColumnNames {
     createdAt: 'intentions.created_at',
     updatedAt: 'intentions.updated_at',
   );
+
+  static const titleSearchKey = 'title_search_key';
 
   final String id;
   final String title;

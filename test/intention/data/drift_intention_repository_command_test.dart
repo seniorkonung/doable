@@ -1089,6 +1089,237 @@ void main() {
         expect(writerWasCalled, isTrue);
       },
     );
+
+    test(
+      'отклоняет malformed raw command snapshots до typed Drift mapping',
+      () async {
+        final fixtures =
+            <
+              ({
+                IntentionCommand Function(IntentionId) command,
+                IntentionCommandDiagnosticsType commandType,
+                bool isArchived,
+                Map<String, Object?> overrides,
+              })
+            >[
+              (
+                command: (id) => UpdateIntention(
+                  id: id,
+                  title: 'Обновлённое название',
+                  description: 'Обновлённое описание',
+                ),
+                commandType: IntentionCommandDiagnosticsType.update,
+                isArchived: false,
+                overrides: {
+                  'title': Uint8List.fromList([1]),
+                },
+              ),
+              (
+                command: (id) => UpdateIntention(
+                  id: id,
+                  title: 'Исходное название',
+                  description: 'Исходное описание',
+                ),
+                commandType: IntentionCommandDiagnosticsType.update,
+                isArchived: false,
+                overrides: {
+                  'description': Uint8List.fromList([2]),
+                },
+              ),
+              (
+                command: EnableIntentionReadiness.new,
+                commandType: IntentionCommandDiagnosticsType.enableReadiness,
+                isArchived: false,
+                overrides: const {'is_action_ready': 2},
+              ),
+              (
+                command: ArchiveIntention.new,
+                commandType: IntentionCommandDiagnosticsType.archive,
+                isArchived: false,
+                overrides: const {'is_archived': -1},
+              ),
+              (
+                command: RestoreIntention.new,
+                commandType: IntentionCommandDiagnosticsType.restore,
+                isArchived: true,
+                overrides: {
+                  'title_search_key': Uint8List.fromList([3]),
+                },
+              ),
+              (
+                command: DisableIntentionReadiness.new,
+                commandType: IntentionCommandDiagnosticsType.disableReadiness,
+                isArchived: false,
+                overrides: const {'title_search_key': ''},
+              ),
+              (
+                command: RestoreIntention.new,
+                commandType: IntentionCommandDiagnosticsType.restore,
+                isArchived: true,
+                overrides: const {'title_search_key': 'ключ\u0000поиска'},
+              ),
+              (
+                command: DeleteIntention.new,
+                commandType: IntentionCommandDiagnosticsType.delete,
+                isArchived: false,
+                overrides: const {'created_at': 1.5},
+              ),
+              (
+                command: DeleteIntention.new,
+                commandType: IntentionCommandDiagnosticsType.delete,
+                isArchived: true,
+                overrides: const {'updated_at': '1725271200000000'},
+              ),
+            ];
+        final query = IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
+        );
+
+        for (var index = 0; index < fixtures.length; index++) {
+          final fixture = fixtures[index];
+          final id = _idForSequence(500 + index);
+          final createdAt = DateTime.utc(2026, 9, 2, 10, index);
+          await _insertIntention(
+            database,
+            id: id.toCanonicalString(),
+            title: 'Исходное название',
+            description: 'Исходное описание',
+            isArchived: fixture.isArchived,
+            createdAt: createdAt,
+          );
+          final revisionBefore = _firstCatalogPage(
+            await repository.getCatalogPage(query),
+          ).revision;
+          writeTrace.overrideNextSelect(fixture.overrides);
+
+          final result = await repository.execute(fixture.command(id));
+
+          expect(result, _failure<IntentionCorruptionFailure>());
+          expect(
+            diagnostics.events
+                .whereType<IntentionCommandDiagnosticsEvent>()
+                .last,
+            _failedCommand(
+              fixture.commandType,
+              DiagnosticsFailureCode.corruption,
+            ),
+          );
+          final stored = await (database.select(
+            database.intentions,
+          )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+          expect(stored.title, 'Исходное название');
+          expect(stored.description, 'Исходное описание');
+          expect(stored.isActionReady, isFalse);
+          expect(stored.isArchived, fixture.isArchived);
+          expect(stored.createdAt, createdAt.microsecondsSinceEpoch);
+          expect(stored.updatedAt, createdAt.microsecondsSinceEpoch);
+          final revisionAfter = _firstCatalogPage(
+            await repository.getCatalogPage(query),
+          ).revision;
+          expect(
+            revisionBefore.compareTo(revisionAfter),
+            IntentionCatalogRevisionOrder.same,
+          );
+        }
+
+        expect(clock.calls, 0);
+      },
+    );
+
+    test('откатывает create при malformed raw post-insert snapshot', () async {
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.all,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 100,
+      );
+      final revisionBefore = _firstCatalogPage(
+        await repository.getCatalogPage(query),
+      ).revision;
+      writeTrace.overrideNextSelect(const {'is_action_ready': 2});
+
+      final result = await repository.execute(
+        const CreateIntention(
+          title: 'Новое намерение',
+          description: 'Новое описание',
+        ),
+      );
+
+      expect(result, _failure<IntentionCorruptionFailure>());
+      expect(await database.select(database.intentions).get(), isEmpty);
+      expect(
+        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
+        _failedCommand(
+          IntentionCommandDiagnosticsType.create,
+          DiagnosticsFailureCode.corruption,
+        ),
+      );
+      final revisionAfter = _firstCatalogPage(
+        await repository.getCatalogPage(query),
+      ).revision;
+      expect(
+        revisionBefore.compareTo(revisionAfter),
+        IntentionCatalogRevisionOrder.same,
+      );
+    });
+
+    test('откатывает update при malformed raw after snapshot', () async {
+      final id = _id(_firstUuid);
+      final createdAt = DateTime.utc(2026, 9, 2, 10);
+      await _insertIntention(
+        database,
+        id: id.toCanonicalString(),
+        title: 'Исходное название',
+        description: 'Исходное описание',
+        createdAt: createdAt,
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.all,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 100,
+      );
+      final revisionBefore = _firstCatalogPage(
+        await repository.getCatalogPage(query),
+      ).revision;
+      writeTrace.overrideSelectAfter(
+        skippedNonEmptySelects: 1,
+        overrides: const {'updated_at': 1.5},
+      );
+
+      final result = await repository.execute(
+        UpdateIntention(
+          id: id,
+          title: 'Обновлённое название',
+          description: 'Обновлённое описание',
+        ),
+      );
+
+      expect(result, _failure<IntentionCorruptionFailure>());
+      final stored = await (database.select(
+        database.intentions,
+      )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
+      expect(stored.title, 'Исходное название');
+      expect(stored.description, 'Исходное описание');
+      expect(stored.updatedAt, createdAt.microsecondsSinceEpoch);
+      expect(
+        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
+        _failedCommand(
+          IntentionCommandDiagnosticsType.update,
+          DiagnosticsFailureCode.corruption,
+        ),
+      );
+      final revisionAfter = _firstCatalogPage(
+        await repository.getCatalogPage(query),
+      ).revision;
+      expect(
+        revisionBefore.compareTo(revisionAfter),
+        IntentionCatalogRevisionOrder.same,
+      );
+    });
   });
 }
 
@@ -1239,6 +1470,23 @@ final class _DeterministicClock {
 final class _WriteTrace extends LocalDatabaseConnectionObserver {
   final List<LocalDatabaseSqlOperation> operations = [];
   final List<String> updateStatements = [];
+  Map<String, Object?>? _nextSelectOverrides;
+  var _nonEmptySelectsToSkip = 0;
+
+  void overrideNextSelect(Map<String, Object?> overrides) {
+    overrideSelectAfter(skippedNonEmptySelects: 0, overrides: overrides);
+  }
+
+  void overrideSelectAfter({
+    required int skippedNonEmptySelects,
+    required Map<String, Object?> overrides,
+  }) {
+    if (_nextSelectOverrides != null) {
+      throw StateError('Предыдущая подмена raw SELECT ещё не использована.');
+    }
+    _nonEmptySelectsToSkip = skippedNonEmptySelects;
+    _nextSelectOverrides = overrides;
+  }
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
@@ -1246,6 +1494,23 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
     if (statement.operation == LocalDatabaseSqlOperation.update) {
       updateStatements.add(statement.statements.single);
     }
+  }
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    final overrides = _nextSelectOverrides;
+    if (overrides == null || rows.isEmpty) return rows;
+    if (_nonEmptySelectsToSkip > 0) {
+      _nonEmptySelectsToSkip--;
+      return rows;
+    }
+    _nextSelectOverrides = null;
+    return [
+      for (final row in rows) {...row, ...overrides},
+    ];
   }
 }
 

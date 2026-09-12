@@ -1071,7 +1071,7 @@
   - **Вероятно затронутые файлы:** `openspec/changes/manage-intentions/implementation-review.md`; `openspec/changes/manage-intentions/review.md` через соответствующий review workflow. Новые implementation-исправления определяются только по конкретным findings.
   - **Оценка:** M.
 
-- [ ] 8.7 Закрыть lossless raw-storage boundary для всех command snapshots намерения
+- [x] 8.7 Закрыть lossless raw-storage boundary для всех command snapshots намерения
   - **Критерии приёмки:**
     - Create post-insert, update, readiness, archive/restore и delete получают исходные SQLite storage classes каждого поля, участвующего в `IntentionSaved` или `before`/`after` catalog snapshot, через одну каноническую lossless-границу до generated Drift mapping; title search projection проверяется как строка с собственными schema-инвариантами, не пересчитывается по текущим Unicode-данным и не раскрывается через публичную seam.
     - BLOB вместо текста, нецелые либо выходящие за `0`/`1` boolean values, REAL/string timestamps и иное malformed сохранённое значение возвращают `IntentionCorruptionFailure` с безопасной diagnostics category, не изменяют строку, не удаляют её, не публикуют частичный success и не продвигают repository revision; недопустимый post-insert или `after` откатывает транзакцию.
