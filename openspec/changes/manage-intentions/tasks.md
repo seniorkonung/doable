@@ -1108,7 +1108,7 @@
   - **Вероятно затронутые файлы:** `.github/workflows/ci.yml`, новый scope helper и его tests в `tool/` и `test/tool/`; `mise.toml` только при необходимости зарегистрировать focused command.
   - **Оценка:** M (до 4 файлов или групп артефактов).
 
-- [ ] 8.10 Включить negative-path evidence generated-artifact detector в обязательный CI gate
+- [x] 8.10 Включить negative-path evidence generated-artifact detector в обязательный CI gate
   - **Критерии приёмки:**
     - Тот же required job `Full checks` исполняет `tool/check_generated_test.sh` либо эквивалентную зарегистрированную задачу и становится неуспешным, если detector перестаёт замечать изменённый tracked или новый untracked artifact.
     - Fixture-проверка остаётся изолированной, очищает временную рабочую копию и не зависит от пользовательского `apm_modules`, hooks или состояния основного checkout; обычный `codegen-check` по-прежнему повторно генерирует полный утверждённый набор artifacts.
@@ -1120,7 +1120,7 @@
   - **Вероятно затронутые файлы:** `.github/workflows/ci.yml`, `mise.toml`; существующие `tool/check_generated.sh` и `tool/check_generated_test.sh` изменяются только при подтверждённой необходимости.
   - **Оценка:** S (до 2 файлов).
 
-- [ ] 8.11 Подтвердить готовность управления намерениями к интеграции на окончательном коммите
+- [x] 8.11 Подтвердить готовность управления намерениями к интеграции на окончательном коммите
   - **Критерии приёмки:**
     - Все задачи Phase 8 и добавленные по её review обязательные исправления завершены; окончательный commit имеет успешный обязательный агрегирующий `Full checks`, последнее artifact-impacting изменение PR имеет успешные release APK build и packaged-manifest evidence, а blocking review findings отсутствуют.
     - Итог явно разделяет доказанное существующими автоматизированными accessibility проверками и не квалифицированную вручную работу TalkBack на Android, а также принятые ограничения Android runtime/performance evidence; новые интеграционные тесты и их инфраструктура не являются условием готовности.
