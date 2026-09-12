@@ -1096,7 +1096,7 @@
   - **Вероятно затронутые файлы:** `.github/workflows/ci.yml`, новый проверяемый helper и его tests в `tool/`, `test/android/backup_policy_test.dart` при необходимости.
   - **Оценка:** M (до 4 файлов или групп артефактов).
 
-- [ ] 8.9 Сократить стоимость обязательного PR gate без ослабления Android privacy evidence
+- [x] 8.9 Сократить стоимость обязательного PR gate без ослабления Android privacy evidence
   - **Критерии приёмки:**
     - Workflow использует `concurrency` по PR с `cancel-in-progress: true`, а project checks и требуемый Android artifact job могут выполняться параллельно после scope detector. Единственный агрегирующий job с точным именем `Full checks` завершается успешно только после успешных project checks, успешного требуемого Android job либо его явного обоснованного пропуска; отказ, отмена или отсутствие обязательного prerequisite не трактуются как успех.
     - Проверяемый fail-closed scope detector требует release APK build для изменений `android/**`, `pubspec.yaml`, `pubspec.lock`, `mise.toml`, CI workflow, packaged-manifest helper и любого неизвестного или неклассифицированного пути. Incremental diff от предыдущего HEAD допустим только когда тот является предком текущего и имеет успешный доверенный `Full checks` этого workflow; иначе detector проверяет полный PR diff и не позволяет отменённому либо незавершённому Android evidence превратиться в doc-only пропуск. Только полностью классифицированный не влияющий на packaged manifest scope, включая документацию, OpenSpec и изолированные Dart/test изменения без dependency или Android-конфигурации, может пропустить Android job; ручной и еженедельный полные запуски требуют его безусловно.
