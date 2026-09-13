@@ -123,7 +123,7 @@
   - **Вероятные файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `test/intention/presentation/catalog/intention_catalog_revision_protocol_test.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`; производный файл ViewModel.
   - **Размер:** M.
 
-- [ ] 1.13 Подтвердить время жизни команд и согласование каталога в приложении
+- [x] 1.13 Подтвердить время жизни команд и согласование каталога в приложении
   - **Критерии приёмки:**
     - Подключённый модуль сохраняет единственное выполнение, блокировки и порядок подтверждённых результатов при навигации, одновременных командах и завершении работы.
     - Каталог согласует эти результаты с ограниченными страницами без потери подтверждённых данных или повторного изменения числа совпадений.
