@@ -4,10 +4,11 @@ library;
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -25,7 +26,7 @@ void main() {
       addTearDown(harness.dispose);
       final trace = _SelectTrace();
       final database = await harness.openReadyDatabase(observer: trace);
-      final repository = DriftIntentionRepository(
+      final PersonalGraphRepository repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
         () => DateTime.utc(2026, 9, 3),
@@ -134,7 +135,7 @@ Future<List<String>> _queryPlan(AppDatabase database, String statement) async {
   return [for (final row in rows) row.read<String>('detail')];
 }
 
-Future<void> _expectBoundedPages(DriftIntentionRepository repository) async {
+Future<void> _expectBoundedPages(PersonalGraphRepository repository) async {
   for (final scope in IntentionScope.values) {
     for (final order in _catalogOrders) {
       for (final filter in _allFilters) {
@@ -150,7 +151,7 @@ Future<void> _expectBoundedPages(DriftIntentionRepository repository) async {
 }
 
 Future<void> _expectFirstPageSql(
-  DriftIntentionRepository repository,
+  PersonalGraphRepository repository,
   _SelectTrace trace,
 ) async {
   for (final filter in _allFilters) {
@@ -175,7 +176,7 @@ Future<void> _expectFirstPageSql(
 }
 
 Future<void> _expectWarmedShortFilterLatency(
-  DriftIntentionRepository repository,
+  PersonalGraphRepository repository,
   _SelectTrace trace,
 ) async {
   for (final filter in _shortFilters) {
@@ -214,7 +215,7 @@ Future<void> _expectWarmedShortFilterLatency(
 }
 
 Future<void> _expectCompleteKeysetTraversal(
-  DriftIntentionRepository repository,
+  PersonalGraphRepository repository,
   _SelectTrace trace,
 ) async {
   trace.clear();

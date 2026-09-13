@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
-import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,7 +20,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
-  group('file-backed DriftIntentionRepository', () {
+  group('file-backed DriftPersonalGraphRepository', () {
     test('после отказавшего создания открывает тот же файл без созданного намерения', () async {
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
@@ -27,12 +29,13 @@ void main() {
       final firstDatabase = await harness.openReadyDatabase(
         observer: interceptor,
       );
-      final IntentionRepository firstRepository = DriftIntentionRepository(
-        firstDatabase,
-        _SequenceIntentionIdGenerator([id]),
-        () => DateTime.utc(2026, 9, 3, 10),
-        InMemoryDiagnosticsSink(),
-      );
+      final PersonalGraphRepository firstRepository =
+          DriftPersonalGraphRepository(
+            firstDatabase,
+            _SequenceIntentionIdGenerator([id]),
+            () => DateTime.utc(2026, 9, 3, 10),
+            InMemoryDiagnosticsSink(),
+          );
 
       interceptor.arm();
       final result = await firstRepository.execute(
@@ -43,23 +46,27 @@ void main() {
       );
 
       expect(result, _unexpectedCommandFailure());
-      final firstSnapshot = Completer<Result<Intention?>>();
+      final firstSnapshot = Completer<Result<GraphSnapshot<Intention?>>>();
       final subscription = firstRepository
-          .watchById(id)
+          .watchIntention(id)
           .listen(firstSnapshot.complete);
       expect(_watched(await firstSnapshot.future), isNull);
       await subscription.cancel();
       await harness.closePersistenceObjectGraph();
 
       final reopenedDatabase = await harness.openReadyDatabase();
-      final IntentionRepository reopenedRepository = DriftIntentionRepository(
-        reopenedDatabase,
-        _SequenceIntentionIdGenerator(const []),
-        () => DateTime.utc(2026, 9, 3, 11),
-        InMemoryDiagnosticsSink(),
-      );
+      final PersonalGraphRepository reopenedRepository =
+          DriftPersonalGraphRepository(
+            reopenedDatabase,
+            _SequenceIntentionIdGenerator(const []),
+            () => DateTime.utc(2026, 9, 3, 11),
+            InMemoryDiagnosticsSink(),
+          );
 
-      expect(_watched(await reopenedRepository.watchById(id).first), isNull);
+      expect(
+        _watched(await reopenedRepository.watchIntention(id).first),
+        isNull,
+      );
       final page = _firstPage(
         await reopenedRepository.getCatalogPage(
           _catalogQuery(
@@ -132,17 +139,18 @@ void main() {
           final firstDatabase = await harness.openReadyDatabase(
             observer: interceptor,
           );
-          final IntentionRepository firstRepository = DriftIntentionRepository(
-            firstDatabase,
-            _SequenceIntentionIdGenerator([scenario.id]),
-            _SequenceClock([
-              DateTime.utc(2026, 9, 3, 10),
-              DateTime.utc(2026, 9, 3, 11),
-              DateTime.utc(2026, 9, 3, 12),
-              DateTime.utc(2026, 9, 3, 13),
-            ]).call,
-            InMemoryDiagnosticsSink(),
-          );
+          final PersonalGraphRepository firstRepository =
+              DriftPersonalGraphRepository(
+                firstDatabase,
+                _SequenceIntentionIdGenerator([scenario.id]),
+                _SequenceClock([
+                  DateTime.utc(2026, 9, 3, 10),
+                  DateTime.utc(2026, 9, 3, 11),
+                  DateTime.utc(2026, 9, 3, 12),
+                  DateTime.utc(2026, 9, 3, 13),
+                ]).call,
+                InMemoryDiagnosticsSink(),
+              );
 
           _saved(
             await firstRepository.execute(
@@ -161,17 +169,17 @@ void main() {
             await firstRepository.execute(scenario.failedCommand(scenario.id)),
             _unexpectedCommandFailure(),
           );
-          final firstSnapshot = Completer<Result<Intention?>>();
+          final firstSnapshot = Completer<Result<GraphSnapshot<Intention?>>>();
           final subscription = firstRepository
-              .watchById(scenario.id)
+              .watchIntention(scenario.id)
               .listen(firstSnapshot.complete);
           _expectIntention(_watched(await firstSnapshot.future), scenario);
           await subscription.cancel();
           await harness.closePersistenceObjectGraph();
 
           final reopenedDatabase = await harness.openReadyDatabase();
-          final IntentionRepository reopenedRepository =
-              DriftIntentionRepository(
+          final PersonalGraphRepository reopenedRepository =
+              DriftPersonalGraphRepository(
                 reopenedDatabase,
                 _SequenceIntentionIdGenerator(const []),
                 () => DateTime.utc(2026, 9, 3, 14),
@@ -179,7 +187,9 @@ void main() {
               );
 
           _expectIntention(
-            _watched(await reopenedRepository.watchById(scenario.id).first),
+            _watched(
+              await reopenedRepository.watchIntention(scenario.id).first,
+            ),
             scenario,
           );
           final scopePage = _firstPage(
@@ -228,7 +238,7 @@ void main() {
       final archivedId = _id('018f0b5d-6b2e-7c80-8000-000000000801');
       final deletedId = _id('018f0b5d-6b2e-7c80-8000-000000000802');
 
-      await _createFirstObjectGraph(
+      final firstRevision = await _createFirstObjectGraph(
         harness,
         activeId: activeId,
         archivedId: archivedId,
@@ -236,14 +246,21 @@ void main() {
       );
 
       final reopenedDatabase = await harness.openReadyDatabase();
-      final IntentionRepository repository = DriftIntentionRepository(
+      final PersonalGraphRepository repository = DriftPersonalGraphRepository(
         reopenedDatabase,
         _SequenceIntentionIdGenerator(const []),
         () => DateTime.utc(2026, 9, 3, 18),
         InMemoryDiagnosticsSink(),
       );
 
-      final active = _watched(await repository.watchById(activeId).first);
+      final reopenedSnapshot = _graphSnapshot(
+        await repository.watchIntention(activeId).first,
+      );
+      expect(
+        firstRevision.compareTo(reopenedSnapshot.revision),
+        GraphRevisionOrder.differentEpoch,
+      );
+      final active = reopenedSnapshot.value;
       expect(active, isNotNull);
       expect(active!.id, activeId);
       expect(active.title, 'Переписать "статью"');
@@ -253,7 +270,9 @@ void main() {
       expect(active.createdAt.value, DateTime.utc(2026, 9, 3, 10));
       expect(active.updatedAt.value, DateTime.utc(2026, 9, 3, 12));
 
-      final archived = _watched(await repository.watchById(archivedId).first);
+      final archived = _watched(
+        await repository.watchIntention(archivedId).first,
+      );
       expect(archived, isNotNull);
       expect(archived!.id, archivedId);
       expect(archived.title, 'Архивировать журнал');
@@ -263,7 +282,10 @@ void main() {
       expect(archived.createdAt.value, DateTime.utc(2026, 9, 3, 13));
       expect(archived.updatedAt.value, DateTime.utc(2026, 9, 3, 16));
 
-      expect(_watched(await repository.watchById(deletedId).first), isNull);
+      expect(
+        _watched(await repository.watchIntention(deletedId).first),
+        isNull,
+      );
 
       final activePage = _firstPage(
         await repository.getCatalogPage(_catalogQuery(IntentionScope.active)),
@@ -331,12 +353,13 @@ void main() {
       }
 
       final historicalDatabase = await harness.openReadyDatabase();
-      final IntentionRepository historicalRepository = DriftIntentionRepository(
-        historicalDatabase,
-        _SequenceIntentionIdGenerator(const []),
-        () => DateTime.utc(2026, 9, 4, 11),
-        InMemoryDiagnosticsSink(),
-      );
+      final PersonalGraphRepository historicalRepository =
+          DriftPersonalGraphRepository(
+            historicalDatabase,
+            _SequenceIntentionIdGenerator(const []),
+            () => DateTime.utc(2026, 9, 4, 11),
+            InMemoryDiagnosticsSink(),
+          );
 
       final allPage = _firstPage(
         await historicalRepository.getCatalogPage(
@@ -364,9 +387,17 @@ void main() {
           description: 'Запись пересчитывает поисковую проекцию',
         ),
       );
-      expect(updateResult, isA<ResultSuccess<IntentionCommandSuccess>>());
+      expect(
+        updateResult,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
       final updateSuccess =
-          (updateResult as ResultSuccess<IntentionCommandSuccess>).value
+          (updateResult
+                      as ResultSuccess<
+                        ConfirmedGraphResult<IntentionCommandSuccess>
+                      >)
+                  .value
+                  .value
               as IntentionSaved;
       final mutation = updateSuccess.catalogMutation as IntentionCatalogUpdated;
       expect(mutation.before.summary.title, title);
@@ -422,12 +453,13 @@ void main() {
       }
 
       final updatedDatabase = await harness.openReadyDatabase();
-      final IntentionRepository updatedRepository = DriftIntentionRepository(
-        updatedDatabase,
-        _SequenceIntentionIdGenerator(const []),
-        () => DateTime.utc(2026, 9, 4, 12),
-        InMemoryDiagnosticsSink(),
-      );
+      final PersonalGraphRepository updatedRepository =
+          DriftPersonalGraphRepository(
+            updatedDatabase,
+            _SequenceIntentionIdGenerator(const []),
+            () => DateTime.utc(2026, 9, 4, 12),
+            InMemoryDiagnosticsSink(),
+          );
       final updatedPage = _firstPage(
         await updatedRepository.getCatalogPage(
           _catalogQuery(IntentionScope.all, titleFilter: 'kxyz'),
@@ -474,12 +506,13 @@ void main() {
           await harness.closePersistenceObjectGraph();
 
           final reopenedDatabase = await harness.openReadyDatabase();
-          final IntentionRepository repository = DriftIntentionRepository(
-            reopenedDatabase,
-            _SequenceIntentionIdGenerator(const []),
-            () => DateTime.utc(2026, 9, 3, 11),
-            InMemoryDiagnosticsSink(),
-          );
+          final PersonalGraphRepository repository =
+              DriftPersonalGraphRepository(
+                reopenedDatabase,
+                _SequenceIntentionIdGenerator(const []),
+                () => DateTime.utc(2026, 9, 3, 11),
+                InMemoryDiagnosticsSink(),
+              );
 
           final result = await repository.getCatalogPage(
             _catalogQuery(IntentionScope.all),
@@ -500,14 +533,14 @@ void main() {
   });
 }
 
-Future<void> _createFirstObjectGraph(
+Future<GraphRevision> _createFirstObjectGraph(
   LocalDatabaseHarness harness, {
   required IntentionId activeId,
   required IntentionId archivedId,
   required IntentionId deletedId,
 }) async {
   final database = await harness.openReadyDatabase();
-  final IntentionRepository repository = DriftIntentionRepository(
+  final PersonalGraphRepository repository = DriftPersonalGraphRepository(
     database,
     _SequenceIntentionIdGenerator([activeId, archivedId, deletedId]),
     _SequenceClock([
@@ -558,14 +591,16 @@ Future<void> _createFirstObjectGraph(
     _deleted(deletedId),
   );
 
-  final firstSnapshot = Completer<Result<Intention?>>();
+  final firstSnapshot = Completer<Result<GraphSnapshot<Intention?>>>();
   final subscription = repository
-      .watchById(activeId)
+      .watchIntention(activeId)
       .listen(firstSnapshot.complete);
-  expect(_watched(await firstSnapshot.future)?.id, activeId);
+  final snapshot = _graphSnapshot(await firstSnapshot.future);
+  expect(snapshot.value?.id, activeId);
   await subscription.cancel();
 
   await harness.closePersistenceObjectGraph();
+  return snapshot.revision;
 }
 
 IntentionCatalogQuery _catalogQuery(
@@ -588,27 +623,38 @@ IntentionCatalogFirstPage _firstPage(Result<IntentionCatalogPage> result) {
   return page as IntentionCatalogFirstPage;
 }
 
-Intention _saved(Result<IntentionCommandSuccess> result) {
-  expect(result, isA<ResultSuccess<IntentionCommandSuccess>>());
-  final success = (result as ResultSuccess<IntentionCommandSuccess>).value;
+Intention _saved(Result<ConfirmedGraphResult<IntentionCommandSuccess>> result) {
+  expect(
+    result,
+    isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+  );
+  final success =
+      (result as ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>)
+          .value
+          .value;
   expect(success, isA<IntentionSaved>());
   return (success as IntentionSaved).intention;
 }
 
-Intention? _watched(Result<Intention?> result) {
-  expect(result, isA<ResultSuccess<Intention?>>());
-  return (result as ResultSuccess<Intention?>).value;
+GraphSnapshot<Intention?> _graphSnapshot(
+  Result<GraphSnapshot<Intention?>> result,
+) {
+  expect(result, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+  return (result as ResultSuccess<GraphSnapshot<Intention?>>).value;
 }
 
+Intention? _watched(Result<GraphSnapshot<Intention?>> result) =>
+    _graphSnapshot(result).value;
+
 Matcher _deleted(IntentionId id) =>
-    isA<ResultSuccess<IntentionCommandSuccess>>().having(
-      (result) => result.value,
+    isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>().having(
+      (result) => result.value.value,
       'value',
       isA<IntentionDeleted>().having((success) => success.id, 'id', id),
     );
 
 Matcher _unexpectedCommandFailure() =>
-    isA<ResultFailure<IntentionCommandSuccess>>().having(
+    isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>().having(
       (result) => result.failure,
       'failure',
       isA<IntentionUnexpectedFailure>(),
