@@ -163,7 +163,7 @@
   - **Вероятные файлы:** `lib/main.dart`, новый `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, производные файлы локализации, `test/app/intention_app_lifecycle_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.17 Подтвердить прежний контракт намерений на файловом хранилище через новую границу графа
+- [x] 1.17 Подтвердить прежний контракт намерений на файловом хранилище через новую границу графа
   - **Критерии приёмки:**
     - Оставшиеся проверки адаптера обращаются к `PersonalGraphRepository`; повторное открытие сохраняет намерения и подтверждённое удаление, а экземпляр репозитория начинает новую эпоху.
     - Проверки больших каталогов сохраняют буквальный фильтр, ограниченную материализацию, исторические поисковые проекции и действующие ограничения стоимости чтения.
