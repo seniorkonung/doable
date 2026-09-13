@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -18,7 +19,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 void main() {
   late AppDatabase database;
   late InMemoryDiagnosticsSink diagnostics;
-  late DriftIntentionRepository repository;
+  late DriftPersonalGraphRepository repository;
 
   setUp(() async {
     database = AppDatabase(openInMemoryLocalDatabase());
@@ -29,12 +30,63 @@ void main() {
 
   tearDown(() => database.close());
 
-  group('DriftIntentionRepository.watchById', () {
-    test('публикует начальное подтверждённое отсутствие', () async {
-      final result = await repository.watchById(_id(_uuidV7)).first;
+  test(
+    'согласует снимки намерения с подтверждённой ревизией команды графа',
+    () async {
+      final id = _id(_uuidV7);
+      await _insertIntention(
+        database,
+        id: id.toCanonicalString(),
+        title: 'Прочитать книгу',
+      );
+      final graphRepository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 3, 12),
+        diagnostics,
+      );
+      final events = StreamIterator(graphRepository.watchIntention(id));
+      addTearDown(events.cancel);
 
-      expect(result, isA<ResultSuccess<Intention?>>());
-      expect((result as ResultSuccess<Intention?>).value, isNull);
+      expect(await events.moveNext(), isTrue);
+      final initial = _graphSnapshot(events.current);
+      expect(initial.value?.archiveState, IntentionArchiveState.active);
+
+      final result = await graphRepository.execute(ArchiveIntention(id));
+      expect(
+        result,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      final confirmed =
+          (result
+                  as ResultSuccess<
+                    ConfirmedGraphResult<IntentionCommandSuccess>
+                  >)
+              .value;
+
+      expect(await events.moveNext(), isTrue);
+      final updated = _graphSnapshot(events.current);
+      expect(updated.value?.archiveState, IntentionArchiveState.archived);
+      expect(
+        initial.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.older,
+      );
+      expect(
+        updated.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
+      );
+    },
+  );
+
+  group('DriftPersonalGraphRepository.watchIntention', () {
+    test('публикует начальное подтверждённое отсутствие', () async {
+      final result = await repository.watchIntention(_id(_uuidV7)).first;
+
+      expect(result, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+      expect(
+        (result as ResultSuccess<GraphSnapshot<Intention?>>).value.value,
+        isNull,
+      );
       expect(diagnostics.events, [
         isA<IntentionDetailReadDiagnosticsEvent>().having(
           (event) => event.status,
@@ -53,24 +105,23 @@ void main() {
       'публикует новую строку только после подтверждения transaction',
       () async {
         final id = _id(_uuidV7);
-        final events = StreamIterator(repository.watchById(id));
+        final events = StreamIterator(repository.watchIntention(id));
         addTearDown(events.cancel);
 
         expect(await events.moveNext(), isTrue);
         expect(events.current, _isSuccessfulAbsence());
 
-        await database.transaction(() async {
-          await _insertIntention(
-            database,
-            id: id.toCanonicalString(),
+        final result = await repository.execute(
+          const CreateIntention(
             title: 'Купить молоко',
             description: 'В фермерском магазине',
-            isActionReady: true,
-            isArchived: true,
-            createdAt: DateTime.utc(2026, 9, 2, 10),
-            updatedAt: DateTime.utc(2026, 9, 2, 11),
-          );
-        });
+          ),
+        );
+
+        expect(
+          result,
+          isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+        );
 
         expect(await events.moveNext(), isTrue);
         expect(
@@ -79,10 +130,7 @@ void main() {
             id: id,
             title: 'Купить молоко',
             description: 'В фермерском магазине',
-            readiness: IntentionReadiness.ready,
-            archiveState: IntentionArchiveState.archived,
             createdAt: DateTime.utc(2026, 9, 2, 10),
-            updatedAt: DateTime.utc(2026, 9, 2, 11),
           ),
         );
       },
@@ -101,13 +149,13 @@ void main() {
           isActionReady: true,
           createdAt: createdAt,
         );
-        repository = DriftIntentionRepository(
+        repository = DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
           () => DateTime.utc(2026, 9, 3, 12),
           diagnostics,
         );
-        final events = StreamIterator(repository.watchById(id));
+        final events = StreamIterator(repository.watchIntention(id));
         addTearDown(events.cancel);
 
         expect(await events.moveNext(), isTrue);
@@ -124,7 +172,10 @@ void main() {
 
         final result = await repository.execute(ArchiveIntention(id));
 
-        expect(result, isA<ResultSuccess<IntentionCommandSuccess>>());
+        expect(
+          result,
+          isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+        );
         expect(await events.moveNext(), isTrue);
         expect(
           events.current,
@@ -148,7 +199,7 @@ void main() {
         id: id.toCanonicalString(),
         title: 'Прочитать книгу',
       );
-      final events = StreamIterator(repository.watchById(id));
+      final events = StreamIterator(repository.watchIntention(id));
       addTearDown(events.cancel);
 
       expect(await events.moveNext(), isTrue);
@@ -157,11 +208,12 @@ void main() {
         _isSuccessfulIntention(id: id, title: 'Прочитать книгу'),
       );
 
-      await database.transaction(() async {
-        await (database.delete(
-          database.intentions,
-        )..where((row) => row.id.equals(id.toCanonicalString()))).go();
-      });
+      final result = await repository.execute(DeleteIntention(id));
+
+      expect(
+        result,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
 
       expect(await events.moveNext(), isTrue);
       expect(events.current, _isSuccessfulAbsence());
@@ -213,7 +265,7 @@ void main() {
           );
 
           expect(
-            await repository.watchById(fixture.id).first,
+            await repository.watchIntention(fixture.id).first,
             _isSuccessfulIntention(
               id: fixture.id,
               title: fixture.title,
@@ -270,7 +322,7 @@ void main() {
 
         for (final fixture in fixtures) {
           await expectLater(
-            repository.watchById(fixture.id),
+            repository.watchIntention(fixture.id),
             emitsInOrder([_isFailure<IntentionCorruptionFailure>(), emitsDone]),
           );
         }
@@ -357,7 +409,7 @@ void main() {
 
         for (final fixture in fixtures) {
           await expectLater(
-            repository.watchById(fixture.id),
+            repository.watchIntention(fixture.id),
             emitsInOrder([_isFailure<IntentionCorruptionFailure>(), emitsDone]),
           );
         }
@@ -384,7 +436,7 @@ void main() {
       interceptor.overrides = const {'title': null};
 
       await expectLater(
-        repository.watchById(id),
+        repository.watchIntention(id),
         emitsInOrder([_isFailure<IntentionCorruptionFailure>(), emitsDone]),
       );
     });
@@ -406,13 +458,13 @@ void main() {
       );
 
       await expectLater(
-        repository.watchById(_id(_uuidV7)),
+        repository.watchIntention(_id(_uuidV7)),
         emitsInOrder([_isFailure<IntentionUnavailableFailure>(), emitsDone]),
       );
 
       interceptor.failure = null;
       await expectLater(
-        repository.watchById(_id(_uuidV7)),
+        repository.watchIntention(_id(_uuidV7)),
         emits(_isSuccessfulAbsence()),
       );
     });
@@ -436,7 +488,7 @@ void main() {
         );
 
         await expectLater(
-          repository.watchById(_id(_uuidV7)),
+          repository.watchIntention(_id(_uuidV7)),
           emitsInOrder([_isFailure<IntentionCorruptionFailure>(), emitsDone]),
         );
       },
@@ -475,7 +527,7 @@ void main() {
       ]) {
         interceptor.failure = failure;
         await expectLater(
-          repository.watchById(_id(_uuidV7)),
+          repository.watchIntention(_id(_uuidV7)),
           emitsInOrder([_isFailure<IntentionUnexpectedFailure>(), emitsDone]),
         );
       }
@@ -487,13 +539,13 @@ const _uuidV4 = '550e8400-e29b-41d4-a716-446655440000';
 const _uuidV7 = '018f0b5d-6b2e-7c80-8000-000000000300';
 const _sqliteIoerrCorruptFs = 8458;
 
-DriftIntentionRepository _repository(
+DriftPersonalGraphRepository _repository(
   AppDatabase database,
   DiagnosticsSink diagnostics,
-) => DriftIntentionRepository(
+) => DriftPersonalGraphRepository(
   database,
-  UuidV7IntentionIdGenerator(),
-  () => DateTime.utc(2026, 9, 2),
+  _FixedIntentionIdGenerator(_id(_uuidV7)),
+  () => DateTime.utc(2026, 9, 2, 10),
   diagnostics,
 );
 
@@ -560,11 +612,19 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   InvalidIntentionIdDecoding() => throw ArgumentError.value(value, 'value'),
 };
 
-Matcher _isSuccessfulAbsence() => isA<ResultSuccess<Intention?>>().having(
-  (result) => result.value,
-  'value',
-  isNull,
-);
+Matcher _isSuccessfulAbsence() =>
+    isA<ResultSuccess<GraphSnapshot<Intention?>>>().having(
+      (result) => result.value.value,
+      'value',
+      isNull,
+    );
+
+GraphSnapshot<Intention?> _graphSnapshot(
+  Result<GraphSnapshot<Intention?>> result,
+) {
+  expect(result, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+  return (result as ResultSuccess<GraphSnapshot<Intention?>>).value;
+}
 
 Matcher _isSuccessfulIntention({
   required IntentionId id,
@@ -574,34 +634,47 @@ Matcher _isSuccessfulIntention({
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   DateTime? createdAt,
   DateTime? updatedAt,
-}) => isA<ResultSuccess<Intention?>>()
-    .having((result) => result.value, 'value', isNotNull)
-    .having((result) => result.value!.id, 'id', id)
-    .having((result) => result.value!.title, 'title', title)
-    .having((result) => result.value!.description, 'description', description)
-    .having((result) => result.value!.readiness, 'readiness', readiness)
+}) => isA<ResultSuccess<GraphSnapshot<Intention?>>>()
+    .having((result) => result.value.value, 'value', isNotNull)
+    .having((result) => result.value.value!.id, 'id', id)
+    .having((result) => result.value.value!.title, 'title', title)
     .having(
-      (result) => result.value!.archiveState,
+      (result) => result.value.value!.description,
+      'description',
+      description,
+    )
+    .having((result) => result.value.value!.readiness, 'readiness', readiness)
+    .having(
+      (result) => result.value.value!.archiveState,
       'archiveState',
       archiveState,
     )
     .having(
-      (result) => result.value!.createdAt.value,
+      (result) => result.value.value!.createdAt.value,
       'createdAt',
       createdAt ?? DateTime.utc(2026, 9, 2, 10),
     )
     .having(
-      (result) => result.value!.updatedAt.value,
+      (result) => result.value.value!.updatedAt.value,
       'updatedAt',
       updatedAt ?? createdAt ?? DateTime.utc(2026, 9, 2, 10),
     );
 
 Matcher _isFailure<TFailure extends IntentionFailure>() =>
-    isA<ResultFailure<Intention?>>().having(
+    isA<ResultFailure<GraphSnapshot<Intention?>>>().having(
       (result) => result.failure,
       'failure',
       isA<TFailure>(),
     );
+
+final class _FixedIntentionIdGenerator implements IntentionIdGenerator {
+  _FixedIntentionIdGenerator(this.id);
+
+  final IntentionId id;
+
+  @override
+  IntentionId generate() => id;
+}
 
 final class _SelectFailureInterceptor extends LocalDatabaseConnectionObserver {
   Object? failure;
