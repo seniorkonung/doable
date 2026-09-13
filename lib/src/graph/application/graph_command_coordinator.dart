@@ -55,11 +55,13 @@ final class IntentionCommandCompletion {
   const IntentionCommandCompletion._({
     required this.token,
     required this.kind,
+    required this.target,
     required this.confirmedResult,
   });
 
   final IntentionOperationToken token;
   final IntentionCommandKind kind;
+  final IntentionOperationTarget target;
   final Result<ConfirmedGraphResult<IntentionCommandSuccess>> confirmedResult;
 
   Result<IntentionCommandSuccess> get result => switch (confirmedResult) {
@@ -71,6 +73,42 @@ final class IntentionCommandCompletion {
     ResultSuccess(:final value) => value.revision,
     ResultFailure() => null,
   };
+
+  String? get presentationTitle => switch (result) {
+    ResultSuccess(value: IntentionSaved(:final intention)) => intention.title,
+    ResultSuccess(value: IntentionDeleted()) ||
+    ResultFailure() => switch (target) {
+      ExistingIntentionOperationTarget(:final title) => title,
+      CreatingIntentionOperationTarget() ||
+      UnlabelledIntentionOperationTarget() => null,
+    },
+  };
+}
+
+sealed class IntentionOperationTarget {
+  const IntentionOperationTarget();
+}
+
+final class CreatingIntentionOperationTarget extends IntentionOperationTarget {
+  const CreatingIntentionOperationTarget();
+}
+
+final class ExistingIntentionOperationTarget extends IntentionOperationTarget {
+  const ExistingIntentionOperationTarget({
+    required this.intentionId,
+    required this.title,
+  });
+
+  final IntentionId intentionId;
+  final String title;
+}
+
+@Deprecated('Передавайте presentationTitle при принятии команды.')
+final class UnlabelledIntentionOperationTarget
+    extends IntentionOperationTarget {
+  const UnlabelledIntentionOperationTarget(this.intentionId);
+
+  final IntentionId intentionId;
 }
 
 sealed class IntentionCommandStart {
@@ -109,14 +147,17 @@ final class IntentionInitiatorPresentationClaim
   ) : super._();
 }
 
-final class IntentionCatalogFallbackPresentationClaim
-    extends IntentionPresentationClaim {
-  const IntentionCatalogFallbackPresentationClaim._(
+final class IntentionAppPresentationClaim extends IntentionPresentationClaim {
+  const IntentionAppPresentationClaim._(
     super.token,
     super.completion,
     super._entry,
   ) : super._();
 }
+
+@Deprecated('Используйте IntentionAppPresentationClaim.')
+typedef IntentionCatalogFallbackPresentationClaim =
+    IntentionAppPresentationClaim;
 
 @Riverpod(keepAlive: true)
 final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
@@ -152,10 +193,21 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   IntentionCommandStart acceptCreation(
     IntentionCreationFormKey formKey,
     CreateIntention command,
-  ) => _accept(formKey, command);
+  ) => _accept(formKey, command, const CreatingIntentionOperationTarget());
 
-  IntentionCommandStart acceptExisting(ExistingIntentionCommand command) =>
-      _accept(ExistingIntentionKey(command.id), command);
+  IntentionCommandStart acceptExisting(
+    ExistingIntentionCommand command, {
+    String? presentationTitle,
+  }) => _accept(
+    ExistingIntentionKey(command.id),
+    command,
+    presentationTitle == null
+        ? UnlabelledIntentionOperationTarget(command.id)
+        : ExistingIntentionOperationTarget(
+            intentionId: command.id,
+            title: presentationTitle,
+          ),
+  );
 
   @Deprecated('Используйте acceptCreation с ключом формы или acceptExisting.')
   IntentionCommandStart accept(IntentionCommand command) => switch (command) {
@@ -163,7 +215,11 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     ExistingIntentionCommand() => acceptExisting(command),
   };
 
-  IntentionCommandStart _accept(GraphCommandKey key, IntentionCommand command) {
+  IntentionCommandStart _accept(
+    GraphCommandKey key,
+    IntentionCommand command,
+    IntentionOperationTarget target,
+  ) {
     if (_isDraining) {
       return const IntentionCommandCoordinatorDraining();
     }
@@ -181,6 +237,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     final entry = _PresentationEntry(
       token: token,
       kind: _kindOf(command),
+      target: target,
       completionCompleter: Completer<IntentionCommandCompletion>(),
     );
     _entries[token] = entry;
@@ -245,7 +302,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     );
   }
 
-  Future<IntentionCatalogFallbackPresentationClaim?> claimCatalogFallback(
+  Future<IntentionAppPresentationClaim?> claimAppPresentation(
     IntentionOperationToken token,
   ) {
     final entry = _entries[token];
@@ -253,13 +310,18 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return Future.value(null);
     }
 
-    final request = Completer<IntentionCatalogFallbackPresentationClaim?>();
+    final request = Completer<IntentionAppPresentationClaim?>();
     entry.fallbackRequest = request;
     if (entry.initiatorReleased && entry.completion != null) {
       _grantFallback(entry);
     }
     return request.future;
   }
+
+  @Deprecated('Используйте claimAppPresentation.')
+  Future<IntentionCatalogFallbackPresentationClaim?> claimCatalogFallback(
+    IntentionOperationToken token,
+  ) => claimAppPresentation(token);
 
   void releaseInitiatorPresentation(IntentionOperationToken token) {
     final entry = _entries[token];
@@ -286,7 +348,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
           return;
         }
         _discardEntry(entry);
-      case IntentionCatalogFallbackPresentationClaim():
+      case IntentionAppPresentationClaim():
         if (!identical(entry!.fallbackClaim, claim)) {
           return;
         }
@@ -326,6 +388,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     final completion = IntentionCommandCompletion._(
       token: entry.token,
       kind: entry.kind,
+      target: entry.target,
       confirmedResult: confirmedResult,
     );
     entry.completion = completion;
@@ -347,7 +410,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return;
     }
 
-    final claim = IntentionCatalogFallbackPresentationClaim._(
+    final claim = IntentionAppPresentationClaim._(
       entry.token,
       completion,
       entry,
@@ -386,17 +449,19 @@ final class _PresentationEntry {
   _PresentationEntry({
     required this.token,
     required this.kind,
+    required this.target,
     required this.completionCompleter,
   });
 
   final IntentionOperationToken token;
   final IntentionCommandKind kind;
+  final IntentionOperationTarget target;
   final Completer<IntentionCommandCompletion> completionCompleter;
   IntentionCommandCompletion? completion;
   bool initiatorReleased = false;
   IntentionInitiatorPresentationClaim? initiatorClaim;
-  Completer<IntentionCatalogFallbackPresentationClaim?>? fallbackRequest;
-  IntentionCatalogFallbackPresentationClaim? fallbackClaim;
+  Completer<IntentionAppPresentationClaim?>? fallbackRequest;
+  IntentionAppPresentationClaim? fallbackClaim;
 }
 
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {

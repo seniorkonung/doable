@@ -38,7 +38,7 @@ final class IntentionCatalogViewModelProvider
 }
 
 String _$intentionCatalogViewModelHash() =>
-    r'e8783a4a73e852eb39cb01b479b083e2b3a4c53a';
+    r'40ff2d443bd7ef9040e9566ed04673431de9f2f3';
 
 abstract class _$IntentionCatalogViewModel
     extends $AsyncNotifier<IntentionCatalogState> {

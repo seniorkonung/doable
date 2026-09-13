@@ -3,6 +3,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -15,6 +16,12 @@ import 'package:flutter_test/flutter_test.dart';
 import '../catalog/catalog_test_support.dart';
 
 void main() {
+  setUp(() {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+  });
+
   testWidgets('открывает generated route формы из каталога без readiness', (
     tester,
   ) async {
@@ -299,7 +306,7 @@ void main() {
   );
 
   testWidgets(
-    'передаёт поздний failure ушедшей формы каталогу ровно один раз',
+    'передаёт поздний failure ушедшей формы оболочке ровно один раз',
     (tester) async {
       final repository = ControlledCatalogRepository();
       await _openEditor(tester, repository);
@@ -315,26 +322,25 @@ void main() {
         0,
         const ResultFailure(IntentionUnexpectedFailure()),
       );
-      await tester.pump();
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(
         find.text(
-          'The intention couldn’t be created because of an unexpected error.',
+          'Create — “new intention”: The intention couldn’t be created because of an unexpected error.',
         ),
         findsOneWidget,
       );
       await tester.pump(const Duration(seconds: 1));
       expect(
         find.text(
-          'The intention couldn’t be created because of an unexpected error.',
+          'Create — “new intention”: The intention couldn’t be created because of an unexpected error.',
         ),
         findsOneWidget,
       );
     },
   );
 
-  testWidgets('передаёт поздний success ушедшей формы каталогу', (
+  testWidgets('передаёт поздний success ушедшей формы оболочке', (
     tester,
   ) async {
     final repository = ControlledCatalogRepository();
@@ -365,7 +371,10 @@ void main() {
     }
     await tester.pumpAndSettle();
 
-    expect(find.text('Intention created.'), findsOneWidget);
+    expect(
+      find.text('Create — “Позднее намерение”: Intention created.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('успешный retry не оставляет сообщение прежнего failure', (
@@ -454,6 +463,8 @@ Future<AppRouter> _openEditor(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(),
+        builder: (context, child) =>
+            GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
       ),
     ),
   );

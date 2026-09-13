@@ -520,131 +520,112 @@ void main() {
     },
   );
 
-  test(
-    'согласует данные для обоих owners, но сообщает только fallback',
-    () async {
-      final repository = ControlledCatalogRepository();
-      final container = reconciliationCatalogContainer(repository);
-      final subscription = container.listen(
-        intentionCatalogViewModelProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      addTearDown(container.dispose);
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: const [],
-            totalCount: 0,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
+  test('согласует данные независимо от владельца предъявления', () async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(repository);
+    final subscription = container.listen(
+      intentionCatalogViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    addTearDown(container.dispose);
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await container.read(intentionCatalogViewModelProvider.future);
+
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final created = testSummary(index: 30, title: 'Новое');
+    final create = coordinator.acceptCreation(
+      IntentionCreationFormKey(),
+      const CreateIntention(title: 'Новое', description: null),
+    ) as IntentionCommandAccepted;
+    repository.completeCommand(
+      0,
+      ResultSuccess(
+        IntentionSaved(
+          testIntention(index: 30, title: 'Новое'),
+          catalogMutation: IntentionCatalogCreated(
+            revision: const TestCatalogRevision(2),
+            entry: TestCatalogEntrySnapshot(created),
           ),
         ),
-      );
-      await container.read(intentionCatalogViewModelProvider.future);
+      ),
+    );
+    final createCompletion = await create.future;
+    final initiatorClaim = coordinator.claimInitiator(createCompletion.token);
+    coordinator.confirmPresentation(initiatorClaim!);
+    await Future<void>.delayed(Duration.zero);
 
-      final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
-      );
-      final events = <IntentionCatalogPresentationEvent>[];
-      notifier.addPresentationListener(events.add);
-      final coordinator = container.read(
-        graphCommandCoordinatorProvider.notifier,
-      );
-      final created = testSummary(index: 30, title: 'Новое');
-      final create = coordinator.acceptCreation(
-        IntentionCreationFormKey(),
-        const CreateIntention(title: 'Новое', description: null),
-      ) as IntentionCommandAccepted;
-      repository.completeCommand(
-        0,
-        ResultSuccess(
-          IntentionSaved(
-            testIntention(index: 30, title: 'Новое'),
-            catalogMutation: IntentionCatalogCreated(
-              revision: const TestCatalogRevision(2),
-              entry: TestCatalogEntrySnapshot(created),
-            ),
+    var current =
+        container.read(intentionCatalogViewModelProvider).requireValue
+            as IntentionCatalogLoaded;
+    expect(current.items.single.id, created.id);
+    expect(current.totalCount, 1);
+
+    final ready = testSummary(
+      index: 30,
+      title: 'Новое',
+      readiness: IntentionReadiness.ready,
+    );
+    final readiness = coordinator.acceptExisting(
+      EnableIntentionReadiness(created.id),
+    ) as IntentionCommandAccepted;
+    coordinator.releaseInitiatorPresentation(readiness.token);
+    repository.completeCommand(
+      1,
+      ResultSuccess(
+        IntentionSaved(
+          testIntention(index: 30, title: 'Новое'),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(3),
+            before: TestCatalogEntrySnapshot(created),
+            after: TestCatalogEntrySnapshot(ready),
           ),
         ),
-      );
-      final createCompletion = await create.future;
-      final initiatorClaim = coordinator.claimInitiator(createCompletion.token);
-      coordinator.confirmPresentation(initiatorClaim!);
-      await Future<void>.delayed(Duration.zero);
+      ),
+    );
+    await readiness.future;
+    await Future<void>.delayed(Duration.zero);
+    final readinessClaim = await coordinator.claimAppPresentation(
+      readiness.token,
+    );
+    coordinator.confirmPresentation(readinessClaim!);
 
-      var current =
-          container.read(intentionCatalogViewModelProvider).requireValue
-              as IntentionCatalogLoaded;
-      expect(current.items.single.id, created.id);
-      expect(current.totalCount, 1);
-      expect(events, isEmpty);
+    current =
+        container.read(intentionCatalogViewModelProvider).requireValue
+            as IntentionCatalogLoaded;
+    expect(current.items.single.readiness, IntentionReadiness.ready);
 
-      final ready = testSummary(
-        index: 30,
-        title: 'Новое',
-        readiness: IntentionReadiness.ready,
-      );
-      final readiness = coordinator.acceptExisting(
-        EnableIntentionReadiness(created.id),
-      ) as IntentionCommandAccepted;
-      coordinator.releaseInitiatorPresentation(readiness.token);
-      repository.completeCommand(
-        1,
-        ResultSuccess(
-          IntentionSaved(
-            testIntention(index: 30, title: 'Новое'),
-            catalogMutation: IntentionCatalogUpdated(
-              revision: const TestCatalogRevision(3),
-              before: TestCatalogEntrySnapshot(created),
-              after: TestCatalogEntrySnapshot(ready),
-            ),
-          ),
-        ),
-      );
-      await readiness.future;
-      await Future<void>.delayed(Duration.zero);
+    final beforeFailure = current;
+    final failed = coordinator.acceptExisting(
+      ArchiveIntention(created.id),
+    ) as IntentionCommandAccepted;
+    coordinator.releaseInitiatorPresentation(failed.token);
+    repository.completeCommand(
+      2,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await failed.future;
+    await Future<void>.delayed(Duration.zero);
+    final failureClaim = await coordinator.claimAppPresentation(failed.token);
+    coordinator.confirmPresentation(failureClaim!);
 
-      current =
-          container.read(intentionCatalogViewModelProvider).requireValue
-              as IntentionCatalogLoaded;
-      expect(current.items.single.readiness, IntentionReadiness.ready);
-      expect(events, [
-        isA<IntentionCatalogUpdatePresentationEvent>().having(
-          (event) => event.outcome,
-          'outcome',
-          IntentionCatalogUpdateOutcome.succeeded,
-        ),
-      ]);
-
-      final beforeFailure = current;
-      final failed = coordinator.acceptExisting(
-        ArchiveIntention(created.id),
-      ) as IntentionCommandAccepted;
-      coordinator.releaseInitiatorPresentation(failed.token);
-      repository.completeCommand(
-        2,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await failed.future;
-      await Future<void>.delayed(Duration.zero);
-
-      expect(
-        container.read(intentionCatalogViewModelProvider).requireValue,
-        same(beforeFailure),
-      );
-      expect(
-        events.last,
-        isA<IntentionCatalogUpdatePresentationEvent>().having(
-          (event) => event.outcome,
-          'outcome',
-          IntentionCatalogUpdateOutcome.unavailable,
-        ),
-      );
-      expect(events, hasLength(2));
-      expect(repository.queries, hasLength(1));
-    },
-  );
+    expect(
+      container.read(intentionCatalogViewModelProvider).requireValue,
+      same(beforeFailure),
+    );
+    expect(repository.queries, hasLength(1));
+  });
 }

@@ -452,5 +452,56 @@
   "editorCreated": "Intention created.",
   "@editorCreated": {
     "description": "Подтверждение успешного создания намерения"
+  },
+  "graphOperationCreate": "Create",
+  "@graphOperationCreate": {
+    "description": "Вид операции создания намерения в сообщении оболочки"
+  },
+  "graphOperationUpdate": "Edit",
+  "@graphOperationUpdate": {
+    "description": "Вид операции изменения намерения в сообщении оболочки"
+  },
+  "graphOperationEnableReadiness": "Mark ready",
+  "@graphOperationEnableReadiness": {
+    "description": "Вид операции включения готовности в сообщении оболочки"
+  },
+  "graphOperationDisableReadiness": "Mark not ready",
+  "@graphOperationDisableReadiness": {
+    "description": "Вид операции отключения готовности в сообщении оболочки"
+  },
+  "graphOperationArchive": "Archive",
+  "@graphOperationArchive": {
+    "description": "Вид операции архивирования намерения в сообщении оболочки"
+  },
+  "graphOperationRestore": "Restore",
+  "@graphOperationRestore": {
+    "description": "Вид операции восстановления намерения в сообщении оболочки"
+  },
+  "graphOperationDelete": "Delete",
+  "@graphOperationDelete": {
+    "description": "Вид операции удаления намерения в сообщении оболочки"
+  },
+  "graphOperationNewIntention": "new intention",
+  "@graphOperationNewIntention": {
+    "description": "Безопасное обозначение создаваемого намерения до подтверждения"
+  },
+  "graphOperationIntention": "intention",
+  "@graphOperationIntention": {
+    "description": "Безопасное обозначение намерения без доступного названия"
+  },
+  "graphOperationMessage": "{operation} — “{target}”: {outcome}",
+  "@graphOperationMessage": {
+    "description": "Сообщение оболочки о результате принятой операции",
+    "placeholders": {
+      "operation": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      },
+      "outcome": {
+        "type": "String"
+      }
+    }
   }
 }

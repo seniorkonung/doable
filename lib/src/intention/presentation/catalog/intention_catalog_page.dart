@@ -27,20 +27,11 @@ final class _IntentionCatalogPageState
   final _filterController = TextEditingController();
   final _scrollController = ScrollController();
   final _itemKeys = <IntentionId, GlobalKey>{};
-  late final IntentionCatalogViewModel _notifier;
   _CatalogVisualAnchor? _pendingVisualAnchor;
   bool _catalogMaintenanceScheduled = false;
 
   @override
-  void initState() {
-    super.initState();
-    _notifier = ref.read(intentionCatalogViewModelProvider.notifier);
-    _notifier.addPresentationListener(_showPresentationEvent);
-  }
-
-  @override
   void dispose() {
-    _notifier.removePresentationListener(_showPresentationEvent);
     _filterController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -228,65 +219,6 @@ final class _IntentionCatalogPageState
     }
     final currentIds = state.items.map((item) => item.id).toSet();
     _itemKeys.removeWhere((id, _) => !currentIds.contains(id));
-  }
-
-  void _showPresentationEvent(IntentionCatalogPresentationEvent event) {
-    if (!mounted) {
-      return;
-    }
-    final localizations = AppLocalizations.of(context);
-    final message = switch (event) {
-      IntentionCatalogCreatePresentationEvent(:final outcome) =>
-        switch (outcome) {
-          IntentionCatalogCreateOutcome.succeeded =>
-            localizations.editorCreated,
-          IntentionCatalogCreateOutcome.validation =>
-            localizations.editorInvalidInput,
-          IntentionCatalogCreateOutcome.conflict =>
-            localizations.editorCreateConflict,
-          IntentionCatalogCreateOutcome.unavailable =>
-            localizations.editorCreateUnavailable,
-          IntentionCatalogCreateOutcome.corruption =>
-            localizations.editorCreateCorruption,
-          IntentionCatalogCreateOutcome.unexpected =>
-            localizations.editorCreateUnexpected,
-        },
-      IntentionCatalogUpdatePresentationEvent(:final outcome) =>
-        switch (outcome) {
-          IntentionCatalogUpdateOutcome.succeeded => localizations.detailsSaved,
-          IntentionCatalogUpdateOutcome.validation =>
-            localizations.detailsUpdateInvalidInput,
-          IntentionCatalogUpdateOutcome.notFound =>
-            localizations.detailsUpdateNotFound,
-          IntentionCatalogUpdateOutcome.conflict =>
-            localizations.detailsUpdateConflict,
-          IntentionCatalogUpdateOutcome.unavailable =>
-            localizations.detailsUpdateUnavailable,
-          IntentionCatalogUpdateOutcome.corruption =>
-            localizations.detailsUpdateCorruption,
-          IntentionCatalogUpdateOutcome.unexpected =>
-            localizations.detailsUpdateUnexpected,
-        },
-      IntentionCatalogDeletePresentationEvent(:final outcome) =>
-        switch (outcome) {
-          IntentionCatalogDeleteOutcome.succeeded =>
-            localizations.detailsDeleted,
-          IntentionCatalogDeleteOutcome.validation =>
-            localizations.detailsDeleteInvalid,
-          IntentionCatalogDeleteOutcome.notFound =>
-            localizations.detailsDeleteNotFound,
-          IntentionCatalogDeleteOutcome.conflict =>
-            localizations.detailsDeleteConflict,
-          IntentionCatalogDeleteOutcome.unavailable =>
-            localizations.detailsDeleteUnavailable,
-          IntentionCatalogDeleteOutcome.corruption =>
-            localizations.detailsDeleteCorruption,
-          IntentionCatalogDeleteOutcome.unexpected =>
-            localizations.detailsDeleteUnexpected,
-        },
-    };
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

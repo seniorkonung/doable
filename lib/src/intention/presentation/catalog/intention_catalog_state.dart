@@ -1,60 +1,6 @@
 import '../../../graph/application/graph_revision.dart';
 import '../../application/intention_repository.dart';
 
-enum IntentionCatalogCreateOutcome {
-  succeeded,
-  validation,
-  conflict,
-  unavailable,
-  corruption,
-  unexpected,
-}
-
-enum IntentionCatalogUpdateOutcome {
-  succeeded,
-  validation,
-  notFound,
-  conflict,
-  unavailable,
-  corruption,
-  unexpected,
-}
-
-enum IntentionCatalogDeleteOutcome {
-  succeeded,
-  validation,
-  notFound,
-  conflict,
-  unavailable,
-  corruption,
-  unexpected,
-}
-
-sealed class IntentionCatalogPresentationEvent {
-  const IntentionCatalogPresentationEvent();
-}
-
-final class IntentionCatalogCreatePresentationEvent
-    extends IntentionCatalogPresentationEvent {
-  const IntentionCatalogCreatePresentationEvent(this.outcome);
-
-  final IntentionCatalogCreateOutcome outcome;
-}
-
-final class IntentionCatalogUpdatePresentationEvent
-    extends IntentionCatalogPresentationEvent {
-  const IntentionCatalogUpdatePresentationEvent(this.outcome);
-
-  final IntentionCatalogUpdateOutcome outcome;
-}
-
-final class IntentionCatalogDeletePresentationEvent
-    extends IntentionCatalogPresentationEvent {
-  const IntentionCatalogDeletePresentationEvent(this.outcome);
-
-  final IntentionCatalogDeleteOutcome outcome;
-}
-
 enum IntentionCatalogFilterValidationFailure {
   invalidUnicodeRepertoire,
   tooLong,

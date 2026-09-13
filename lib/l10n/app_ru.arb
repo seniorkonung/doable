@@ -111,5 +111,15 @@
   "editorCreateUnavailable": "Не удалось создать намерение. Повторите попытку.",
   "editorCreateCorruption": "Сохранённые данные повреждены. Намерение не создано.",
   "editorCreateUnexpected": "Не удалось создать намерение из-за непредвиденной ошибки.",
-  "editorCreated": "Намерение создано."
+  "editorCreated": "Намерение создано.",
+  "graphOperationCreate": "Создание",
+  "graphOperationUpdate": "Изменение",
+  "graphOperationEnableReadiness": "Включение готовности",
+  "graphOperationDisableReadiness": "Отключение готовности",
+  "graphOperationArchive": "Архивирование",
+  "graphOperationRestore": "Восстановление",
+  "graphOperationDelete": "Удаление",
+  "graphOperationNewIntention": "новое намерение",
+  "graphOperationIntention": "намерение",
+  "graphOperationMessage": "{operation} — «{target}»: {outcome}"
 }

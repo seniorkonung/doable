@@ -3,6 +3,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -18,6 +19,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'details_test_support.dart';
 
 void main() {
+  setUp(() {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+  });
+
   testWidgets(
     'удаляет активное и архивированное намерение только после подтверждения',
     (tester) async {
@@ -261,74 +268,77 @@ void main() {
     },
   );
 
-  testWidgets(
-    'после Back каталог становится единственным fallback-владельцем удаления',
-    (tester) async {
-      final repository = ControlledDetailsRepository();
-      final intention = testDetailsIntention(
-        index: 72,
-        title: 'Удаляемое намерение',
-      );
-      repository.catalogResult = ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testDetailsSummary(intention)],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const _DeleteTestRevision(),
+  testWidgets('после Back оболочка становится fallback-владельцем удаления', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(
+      index: 72,
+      title: 'Удаляемое намерение',
+    );
+    repository.catalogResult = ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: [testDetailsSummary(intention)],
+        totalCount: 1,
+        nextCursor: null,
+        revision: const _DeleteTestRevision(),
+      ),
+    );
+    final router = AppRouter();
+    final container = _detailsContainer(repository);
+    addTearDown(router.dispose);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router.config(),
+          builder: (context, child) =>
+              GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
         ),
-      );
-      final router = AppRouter();
-      final container = _detailsContainer(repository);
-      addTearDown(router.dispose);
-      addTearDown(container.dispose);
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(
-            locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            routerConfig: router.config(),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(intention.title));
-      await tester.pump();
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(ResultSuccess(intention));
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(intention.title));
+    await tester.pump();
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
 
-      final delete = find.byKey(const ValueKey('intention-details-delete'));
-      await tester.ensureVisible(delete);
-      await tester.tap(delete);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
-      );
-      await tester.pump();
-      expect(repository.commands.single, isA<DeleteIntention>());
+    final delete = find.byKey(const ValueKey('intention-details-delete'));
+    await tester.ensureVisible(delete);
+    await tester.tap(delete);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('intention-details-confirm-delete')),
+    );
+    await tester.pump();
+    expect(repository.commands.single, isA<DeleteIntention>());
 
-      await tester.tap(find.byTooltip('Back'));
-      await tester.pumpAndSettle();
-      expect(router.current.name, IntentionCatalogRoute.name);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(router.current.name, IntentionCatalogRoute.name);
 
-      repository.completeCommand(
-        0,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await tester.pumpAndSettle();
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
 
-      expect(
-        find.text('The intention couldn’t be deleted. Try again.'),
-        findsOneWidget,
-      );
-      expect(find.text(intention.title), findsOneWidget);
-    },
-  );
+    expect(
+      find.text(
+        'Delete — “Удаляемое намерение”: The intention couldn’t be deleted. Try again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(intention.title), findsOneWidget);
+  });
 
   testWidgets(
-    'успешное удаление после Back закрывает fallback и обновляет каталог',
+    'успешное удаление после Back предъявляется оболочкой и обновляет каталог',
     (tester) async {
       final repository = ControlledDetailsRepository();
       final intention = testDetailsIntention(
@@ -355,6 +365,9 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             routerConfig: router.config(),
+            builder: (context, child) => GraphOperationPresenter(
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         ),
       );
@@ -388,7 +401,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(router.current.name, IntentionCatalogRoute.name);
-      expect(find.text('Intention deleted.'), findsOneWidget);
+      expect(
+        find.text(
+          'Delete — “Удаляемое после ухода намерение”: Intention deleted.',
+        ),
+        findsOneWidget,
+      );
       expect(find.text(intention.title), findsNothing);
     },
   );
