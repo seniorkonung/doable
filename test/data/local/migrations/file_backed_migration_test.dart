@@ -11,6 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/local_database_harness.dart';
 
+const _nextSchemaVersion = AppDatabase.currentSchemaVersion + 1;
+
 void main() {
   test('прерванное первичное создание не оставляет schema objects и допускает повтор', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
@@ -34,7 +36,7 @@ void main() {
         .customSelect('PRAGMA foreign_keys')
         .getSingle();
 
-    expect(version.read<int>('user_version'), 1);
+    expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
     expect(foreignKeys.read<int>('foreign_keys'), 1);
     await expectLater(
       verifyIntentionTitlesFtsIntegrity(reopenedDatabase),
@@ -47,12 +49,11 @@ void main() {
     addTearDown(harness.dispose);
     final firstDatabase = await harness.openReadyDatabase();
     await _insertIntention(firstDatabase);
-    await firstDatabase.customStatement('PRAGMA user_version = 1');
 
     await expectLater(
       runAtomicMigration(
         firstDatabase,
-        targetSchemaVersion: 2,
+        targetSchemaVersion: _nextSchemaVersion,
         migrate: () async {
           await firstDatabase.customStatement(
             'ALTER TABLE intentions ADD COLUMN migration_probe TEXT',
@@ -88,7 +89,7 @@ void main() {
       isNot(contains('migration_probe')),
     );
     expect(intention.read<String>('title'), 'Сохранённое намерение');
-    expect(version.read<int>('user_version'), 1);
+    expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
     expect(foreignKeys.read<int>('foreign_keys'), 1);
     await expectLater(
       verifyIntentionTitlesFtsIntegrity(reopenedDatabase),
@@ -97,13 +98,13 @@ void main() {
 
     await runAtomicMigration(
       reopenedDatabase,
-      targetSchemaVersion: 2,
+      targetSchemaVersion: _nextSchemaVersion,
       migrate: () async {},
     );
     final retriedVersion = await reopenedDatabase
         .customSelect('PRAGMA user_version')
         .getSingle();
-    expect(retriedVersion.read<int>('user_version'), 2);
+    expect(retriedVersion.read<int>('user_version'), _nextSchemaVersion);
   });
 }
 
