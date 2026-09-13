@@ -84,7 +84,7 @@
   - **Вероятные файлы:** новый путь `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `test/data/local/migrations/fault_injection_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.9 Подтвердить единый контракт хранения и согласования намерений
+- [x] 1.9 Подтвердить единый контракт хранения и согласования намерений
   - **Критерии приёмки:**
     - Контрактные проверки используют ту же границу графа, которая предоставляется приложению; прежний совместимый вход делегирует тому же владельцу состояния.
     - Сохранены ограниченное чтение каталога, точные снимки, реактивное чтение одного намерения, атомарность команд и безопасные ошибки на схеме 2.
