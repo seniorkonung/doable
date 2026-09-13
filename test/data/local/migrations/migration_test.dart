@@ -64,6 +64,125 @@ void main() {
     );
   });
 
+  test('переходит со схемы 1 на схему 2 без переписывания намерений', () async {
+    await database.close();
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    late final Map<String, int> originalRowIds;
+
+    await createSchemaV1Fixture(
+      harness.databaseFile,
+      seed: (rawDatabase) {
+        rawDatabase.execute('''
+          INSERT INTO intentions (
+            id,
+            title,
+            description,
+            is_action_ready,
+            is_archived,
+            created_at,
+            updated_at
+          ) VALUES
+            (
+              '018f0b5d-6b2e-7c80-8000-000000000211',
+              'Straße',
+              'Активное описание',
+              1,
+              0,
+              2000000,
+              1000000
+            ),
+            (
+              '018f0b5d-6b2e-7c80-8000-000000000212',
+              'Архивное намерение',
+              NULL,
+              0,
+              1,
+              3000000,
+              4000000
+            )
+        ''');
+        originalRowIds = {
+          for (final row in rawDatabase.select(
+            'SELECT rowid, id FROM intentions',
+          ))
+            row['id']! as String: row['rowid']! as int,
+        };
+      },
+    );
+
+    final migratedDatabase = await harness.openReadyDatabase();
+    final version = await migratedDatabase
+        .customSelect('PRAGMA user_version')
+        .getSingle();
+    final intentions = await migratedDatabase.customSelect('''
+      SELECT
+        rowid,
+        id,
+        title,
+        title_search_key,
+        description,
+        is_action_ready,
+        is_archived,
+        created_at,
+        updated_at
+      FROM intentions
+      ORDER BY id
+    ''').get();
+    final relations = await migratedDatabase
+        .customSelect('SELECT id FROM long_term_relations')
+        .get();
+
+    expect(version.read<int>('user_version'), 2);
+    expect(
+      intentions
+          .map(
+            (row) => (
+              rowId: row.read<int>('rowid'),
+              id: row.read<String>('id'),
+              title: row.read<String>('title'),
+              searchKey: row.read<String>('title_search_key'),
+              description: row.read<String?>('description'),
+              isActionReady: row.read<bool>('is_action_ready'),
+              isArchived: row.read<bool>('is_archived'),
+              createdAt: row.read<int>('created_at'),
+              updatedAt: row.read<int>('updated_at'),
+            ),
+          )
+          .toList(),
+      [
+        (
+          rowId: originalRowIds['018f0b5d-6b2e-7c80-8000-000000000211']!,
+          id: '018f0b5d-6b2e-7c80-8000-000000000211',
+          title: 'Straße',
+          searchKey: 'strasse',
+          description: 'Активное описание',
+          isActionReady: true,
+          isArchived: false,
+          createdAt: 2000000,
+          updatedAt: 1000000,
+        ),
+        (
+          rowId: originalRowIds['018f0b5d-6b2e-7c80-8000-000000000212']!,
+          id: '018f0b5d-6b2e-7c80-8000-000000000212',
+          title: 'Архивное намерение',
+          searchKey: 'архивное намерение',
+          description: null,
+          isActionReady: false,
+          isArchived: true,
+          createdAt: 3000000,
+          updatedAt: 4000000,
+        ),
+      ],
+    );
+    expect(relations, isEmpty);
+    await expectLater(
+      verifyIntentionTitlesFtsIntegrity(migratedDatabase),
+      completes,
+    );
+    await expectLater(verifyDoableDatabaseSchema(migratedDatabase), completes);
+  });
+
   test(
     'migration connection возвращает тот же search key, что и Dart',
     () async {

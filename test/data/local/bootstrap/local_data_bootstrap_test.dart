@@ -567,7 +567,10 @@ void main() {
           .whereType<MigrationDiagnosticsEvent>()
           .toList();
       expect(migrationEvents[0].fromSchemaVersion, 0);
-      expect(migrationEvents[0].toSchemaVersion, 1);
+      expect(
+        migrationEvents[0].toSchemaVersion,
+        AppDatabase.currentSchemaVersion,
+      );
       expect(migrationEvents[0].status, isA<DiagnosticsStarted>());
       expect(migrationEvents[1].status, isA<DiagnosticsSucceeded>());
     });
