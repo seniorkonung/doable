@@ -11,6 +11,8 @@ import '../../support/doable_schema_verifier.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
+const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
+
 void main() {
   group('lifecycle постоянного локального хранилища', () {
     test('in-memory bootstrap включает внешние ключи и проверяет согласованность FTS', () async {
@@ -103,12 +105,25 @@ void main() {
             database
               ..execute('CREATE TABLE future_data (value TEXT NOT NULL)')
               ..execute("INSERT INTO future_data(value) VALUES ('сохранённое')")
-              ..execute('PRAGMA user_version = 2');
+              ..execute('PRAGMA user_version = $_unsupportedSchemaVersion');
             originalBytes = harness.databaseFile.readAsBytesSync();
           },
         );
 
-        expect(result, isA<LocalDataIncompatibleSchema>());
+        expect(
+          result,
+          isA<LocalDataIncompatibleSchema>()
+              .having(
+                (failure) => failure.expectedSchemaVersion,
+                'ожидаемая версия',
+                AppDatabase.currentSchemaVersion,
+              )
+              .having(
+                (failure) => failure.detectedSchemaVersion,
+                'обнаруженная версия',
+                _unsupportedSchemaVersion,
+              ),
+        );
         expect(await harness.databaseFile.readAsBytes(), originalBytes);
       },
     );
