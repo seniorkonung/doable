@@ -2,12 +2,11 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../shared/presentation/exclusive_operation.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../application/intention_command.dart';
 import '../../application/intention_repository.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
-import '../operation/intention_command_coordinator.dart';
 import '../operation/operation_state.dart';
 import 'intention_editor_state.dart';
 
@@ -15,13 +14,14 @@ part 'intention_editor_view_model.g.dart';
 
 @riverpod
 final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
-  final _submission = ExclusiveOperation<IntentionCommandCompletion>();
-  late IntentionCommandCoordinator _coordinator;
+  late GraphCommandCoordinator _coordinator;
+  late IntentionCreationFormKey _formKey;
   IntentionOperationToken? _activeToken;
 
   @override
-  IntentionEditorState build(IntentionEditorSession session) {
-    _coordinator = ref.watch(intentionCommandCoordinatorProvider.notifier);
+  IntentionEditorState build(IntentionCreationFormKey formKey) {
+    _formKey = formKey;
+    _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     ref.onDispose(() {
       final token = _activeToken;
       if (token != null) {
@@ -48,15 +48,25 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       return;
     }
 
-    final started = _submission.start(_acceptCurrentValues);
-    switch (started) {
-      case ExclusiveOperationAlreadyRunning<IntentionCommandCompletion>():
-        return;
-      case ExclusiveOperationAccepted<IntentionCommandCompletion>(
-        :final future,
-      ):
+    final description = state.description;
+    final start = _coordinator.acceptCreation(
+      _formKey,
+      CreateIntention(
+        title: state.title,
+        description: description.isEmpty ? null : description,
+      ),
+    );
+    switch (start) {
+      case IntentionCommandAccepted(:final token, :final future):
+        _activeToken = token;
         state = state.withOperation(const OperationRunning<Intention>());
         unawaited(_finish(future));
+      case IntentionCommandAlreadyRunning():
+        return;
+      case IntentionCommandCoordinatorDraining():
+        state = state.withOperation(
+          const OperationFailed<Intention>(IntentionUnexpectedFailure()),
+        );
     }
   }
 
@@ -64,26 +74,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     if (state.event != null) {
       state = state.withoutEvent();
     }
-  }
-
-  Future<IntentionCommandCompletion> _acceptCurrentValues() {
-    final description = state.description;
-    final start = _coordinator.accept(
-      CreateIntention(
-        title: state.title,
-        description: description.isEmpty ? null : description,
-      ),
-    );
-    return switch (start) {
-      IntentionCommandAccepted(:final token, :final future) => () {
-        _activeToken = token;
-        return future;
-      }(),
-      IntentionCommandAlreadyRunning() ||
-      IntentionCommandCoordinatorDraining() => Future.error(
-        StateError('Coordinator не принял создание намерения.'),
-      ),
-    };
   }
 
   Future<void> _finish(Future<IntentionCommandCompletion> future) async {

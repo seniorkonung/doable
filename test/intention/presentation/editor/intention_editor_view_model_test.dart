@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
@@ -8,7 +9,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
 import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,7 +22,7 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = _container(repository);
       final provider = intentionEditorViewModelProvider(
-        IntentionEditorSession(),
+        IntentionCreationFormKey(),
       );
       final subscription = container.listen(provider, (_, _) {});
       addTearDown(subscription.close);
@@ -57,15 +57,46 @@ void main() {
   );
 
   test(
+    'не принимает повтор той же формы после пересоздания ViewModel',
+    () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final formKey = IntentionCreationFormKey();
+      final provider = intentionEditorViewModelProvider(formKey);
+      final firstSubscription = container.listen(provider, (_, _) {});
+
+      container.read(provider.notifier)
+        ..changeTitle('Первое намерение')
+        ..submit();
+      expect(repository.commands, hasLength(1));
+
+      firstSubscription.close();
+      await _settle(container);
+      final reopenedSubscription = container.listen(provider, (_, _) {});
+      addTearDown(reopenedSubscription.close);
+      container.read(provider.notifier)
+        ..changeTitle('Повтор той же формы')
+        ..submit();
+
+      expect(repository.commands, hasLength(1));
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await _settle(container);
+    },
+  );
+
+  test(
     'независимые формы позволяют создать намерения с одинаковым названием',
     () {
       final repository = ControlledCatalogRepository();
       final container = _container(repository);
       final firstProvider = intentionEditorViewModelProvider(
-        IntentionEditorSession(),
+        IntentionCreationFormKey(),
       );
       final secondProvider = intentionEditorViewModelProvider(
-        IntentionEditorSession(),
+        IntentionCreationFormKey(),
       );
       final firstSubscription = container.listen(firstProvider, (_, _) {});
       final secondSubscription = container.listen(secondProvider, (_, _) {});
@@ -96,7 +127,9 @@ void main() {
   test('сохраняет поля и field-specific validation для исправления', () async {
     final repository = ControlledCatalogRepository();
     final container = _container(repository);
-    final provider = intentionEditorViewModelProvider(IntentionEditorSession());
+    final provider = intentionEditorViewModelProvider(
+      IntentionCreationFormKey(),
+    );
     final subscription = container.listen(provider, (_, _) {});
     addTearDown(subscription.close);
     final editor = container.read(provider.notifier)
@@ -144,13 +177,13 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = _container(repository);
       final provider = intentionEditorViewModelProvider(
-        IntentionEditorSession(),
+        IntentionCreationFormKey(),
       );
       final subscription = container.listen(provider, (_, _) {});
       addTearDown(subscription.close);
       final tokens = <IntentionOperationToken>[];
       final coordinatorSubscription = container
-          .read(intentionCommandCoordinatorProvider.notifier)
+          .read(graphCommandCoordinatorProvider.notifier)
           .completions
           .listen((completion) => tokens.add(completion.token));
       addTearDown(coordinatorSubscription.cancel);
@@ -187,9 +220,11 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = _container(repository);
     final coordinator = container.read(
-      intentionCommandCoordinatorProvider.notifier,
+      graphCommandCoordinatorProvider.notifier,
     );
-    final provider = intentionEditorViewModelProvider(IntentionEditorSession());
+    final provider = intentionEditorViewModelProvider(
+      IntentionCreationFormKey(),
+    );
     final subscription = container.listen(provider, (_, _) {});
     addTearDown(subscription.close);
     final fallback =

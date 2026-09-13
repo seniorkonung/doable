@@ -3,10 +3,6 @@ import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
 
-final class IntentionEditorSession {
-  IntentionEditorSession();
-}
-
 sealed class IntentionEditorEvent {
   const IntentionEditorEvent();
 }

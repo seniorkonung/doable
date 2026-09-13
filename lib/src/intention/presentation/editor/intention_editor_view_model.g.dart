@@ -16,7 +16,7 @@ final class IntentionEditorViewModelProvider
     extends $NotifierProvider<IntentionEditorViewModel, IntentionEditorState> {
   IntentionEditorViewModelProvider._({
     required IntentionEditorViewModelFamily super.from,
-    required IntentionEditorSession super.argument,
+    required IntentionCreationFormKey super.argument,
   }) : super(
          retry: null,
          name: r'intentionEditorViewModelProvider',
@@ -60,7 +60,7 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'9ba7615809b17ef7d84e8aba3826221c8119da27';
+    r'53b5537fc92db2ec2a5325c607ea17db01541f70';
 
 final class IntentionEditorViewModelFamily extends $Family
     with
@@ -69,7 +69,7 @@ final class IntentionEditorViewModelFamily extends $Family
           IntentionEditorState,
           IntentionEditorState,
           IntentionEditorState,
-          IntentionEditorSession
+          IntentionCreationFormKey
         > {
   IntentionEditorViewModelFamily._()
     : super(
@@ -80,8 +80,8 @@ final class IntentionEditorViewModelFamily extends $Family
         isAutoDispose: true,
       );
 
-  IntentionEditorViewModelProvider call(IntentionEditorSession session) =>
-      IntentionEditorViewModelProvider._(argument: session, from: this);
+  IntentionEditorViewModelProvider call(IntentionCreationFormKey formKey) =>
+      IntentionEditorViewModelProvider._(argument: formKey, from: this);
 
   @override
   String toString() => r'intentionEditorViewModelProvider';
@@ -89,10 +89,10 @@ final class IntentionEditorViewModelFamily extends $Family
 
 abstract class _$IntentionEditorViewModel
     extends $Notifier<IntentionEditorState> {
-  late final _$args = ref.$arg as IntentionEditorSession;
-  IntentionEditorSession get session => _$args;
+  late final _$args = ref.$arg as IntentionCreationFormKey;
+  IntentionCreationFormKey get formKey => _$args;
 
-  IntentionEditorState build(IntentionEditorSession session);
+  IntentionEditorState build(IntentionCreationFormKey formKey);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
