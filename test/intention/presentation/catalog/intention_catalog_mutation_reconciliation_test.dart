@@ -581,6 +581,7 @@ void main() {
     );
     final readiness = coordinator.acceptExisting(
       EnableIntentionReadiness(created.id),
+      presentationTitle: created.title,
     ) as IntentionCommandAccepted;
     coordinator.releaseInitiatorPresentation(readiness.token);
     repository.completeCommand(
@@ -611,6 +612,7 @@ void main() {
     final beforeFailure = current;
     final failed = coordinator.acceptExisting(
       ArchiveIntention(created.id),
+      presentationTitle: created.title,
     ) as IntentionCommandAccepted;
     coordinator.releaseInitiatorPresentation(failed.token);
     repository.completeCommand(

@@ -873,7 +873,10 @@ Future<void> _completeCatalogWidgetCommand(
       IntentionCreationFormKey(),
       command,
     ),
-    ExistingIntentionCommand() => coordinator.acceptExisting(command),
+    ExistingIntentionCommand() => coordinator.acceptExisting(
+      command,
+      presentationTitle: 'Намерение',
+    ),
   };
   expect(start, isA<IntentionCommandAccepted>());
   final accepted = start as IntentionCommandAccepted;

@@ -230,7 +230,10 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final start = coordinator.acceptExisting(DeleteIntention(intention.id));
+    final start = coordinator.acceptExisting(
+      DeleteIntention(intention.id),
+      presentationTitle: intention.title,
+    );
     expect(start, isA<IntentionCommandAccepted>());
 
     final subscription = container.listen(
@@ -432,12 +435,11 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final fallback =
-        Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
+    final fallback = Completer<Future<IntentionAppPresentationClaim?>>();
     final completionTokens = <IntentionOperationToken>[];
     final completionSubscription = coordinator.completions.listen((event) {
       completionTokens.add(event.token);
-      fallback.complete(coordinator.claimCatalogFallback(event.token));
+      fallback.complete(coordinator.claimAppPresentation(event.token));
     });
     addTearDown(completionSubscription.cancel);
 
@@ -507,10 +509,9 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final fallback =
-        Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
+    final fallback = Completer<Future<IntentionAppPresentationClaim?>>();
     final completionSubscription = coordinator.completions.listen((event) {
-      fallback.complete(coordinator.claimCatalogFallback(event.token));
+      fallback.complete(coordinator.claimAppPresentation(event.token));
     });
     addTearDown(completionSubscription.cancel);
     firstSubscription.close();
@@ -535,7 +536,7 @@ void main() {
       const ResultFailure(IntentionUnavailableFailure()),
     );
     final claim = await (await fallback.future);
-    expect(claim, isA<IntentionCatalogFallbackPresentationClaim>());
+    expect(claim, isA<IntentionAppPresentationClaim>());
     coordinator.confirmPresentation(claim!);
     await pumpEventQueue();
 
@@ -566,8 +567,7 @@ void main() {
     repository.detailRequests[0].add(ResultSuccess(intention));
     await pumpEventQueue();
     final tokens = <IntentionOperationToken>[];
-    final fallbackClaims =
-        <Future<IntentionCatalogFallbackPresentationClaim?>>[];
+    final fallbackClaims = <Future<IntentionAppPresentationClaim?>>[];
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
@@ -575,7 +575,7 @@ void main() {
       completion,
     ) {
       tokens.add(completion.token);
-      fallbackClaims.add(coordinator.claimCatalogFallback(completion.token));
+      fallbackClaims.add(coordinator.claimAppPresentation(completion.token));
     });
     addTearDown(coordinatorSubscription.cancel);
 
@@ -899,6 +899,7 @@ void main() {
               title: saved.title,
               description: saved.description,
             ),
+            presentationTitle: before.title,
           );
       expect(start, isA<IntentionCommandAccepted>());
       repository.completeCommand(
@@ -1070,6 +1071,7 @@ void main() {
             title: intention.title,
             description: intention.description,
           ),
+          presentationTitle: intention.title,
         );
     repository.completeCommand(0, testDetailsSavedResult(intention));
     await (start as IntentionCommandAccepted).future;
@@ -1101,6 +1103,7 @@ void main() {
               title: saved.title,
               description: saved.description,
             ),
+            presentationTitle: before.title,
           );
       expect(start, isA<IntentionCommandAccepted>());
       repository.onWatchIntention = (id) {
@@ -1149,7 +1152,10 @@ void main() {
 
     final start = container
         .read(graphCommandCoordinatorProvider.notifier)
-        .acceptExisting(DeleteIntention(intention.id));
+        .acceptExisting(
+          DeleteIntention(intention.id),
+          presentationTitle: intention.title,
+        );
     repository.completeCommand(
       0,
       const ResultFailure(IntentionUnavailableFailure()),
@@ -1188,10 +1194,9 @@ void main() {
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
-      final fallback =
-          Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
+      final fallback = Completer<Future<IntentionAppPresentationClaim?>>();
       final completionSubscription = coordinator.completions.listen((event) {
-        fallback.complete(coordinator.claimCatalogFallback(event.token));
+        fallback.complete(coordinator.claimAppPresentation(event.token));
       });
       addTearDown(completionSubscription.cancel);
 

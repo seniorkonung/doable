@@ -185,8 +185,7 @@ void main() {
         await pumpEventQueue();
 
         final tokens = <IntentionOperationToken>[];
-        final fallbackClaims =
-            <Future<IntentionCatalogFallbackPresentationClaim?>>[];
+        final fallbackClaims = <Future<IntentionAppPresentationClaim?>>[];
         final coordinator = container.read(
           graphCommandCoordinatorProvider.notifier,
         );
@@ -195,7 +194,7 @@ void main() {
         ) {
           tokens.add(completion.token);
           fallbackClaims.add(
-            coordinator.claimCatalogFallback(completion.token),
+            coordinator.claimAppPresentation(completion.token),
           );
         });
 

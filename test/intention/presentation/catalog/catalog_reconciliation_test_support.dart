@@ -54,7 +54,10 @@ Future<IntentionCommandCompletion> completeCatalogCommand(
       IntentionCreationFormKey(),
       command,
     ),
-    ExistingIntentionCommand() => coordinator.acceptExisting(command),
+    ExistingIntentionCommand() => coordinator.acceptExisting(
+      command,
+      presentationTitle: 'Намерение',
+    ),
   };
   expect(start, isA<IntentionCommandAccepted>());
   final accepted = start as IntentionCommandAccepted;
