@@ -1,6 +1,16 @@
-# doable
+# Doable
 
-A new Flutter project.
+Doable is an Android-first Flutter application for preserving intentions and,
+through the planned intention graph, connecting them to meaningful daily
+actions. The current implementation provides the complete local lifecycle of
+an intention: creation, bounded catalog browsing, editing, explicit action
+readiness, archiving, restoration, deletion, Russian and English localization,
+and persistence within one application installation.
+
+The product model is maintained in
+[`docs/discussions/action-centered-goal-system.md`](docs/discussions/action-centered-goal-system.md),
+and the implementation sequence is maintained in
+[`docs/discussions/development-change-sequence.md`](docs/discussions/development-change-sequence.md).
 
 ## Reproducible generation
 
