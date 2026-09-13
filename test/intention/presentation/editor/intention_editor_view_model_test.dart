@@ -227,10 +227,9 @@ void main() {
     );
     final subscription = container.listen(provider, (_, _) {});
     addTearDown(subscription.close);
-    final fallback =
-        Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
+    final fallback = Completer<Future<IntentionAppPresentationClaim?>>();
     final completionSubscription = coordinator.completions.listen((completion) {
-      fallback.complete(coordinator.claimCatalogFallback(completion.token));
+      fallback.complete(coordinator.claimAppPresentation(completion.token));
     });
     addTearDown(completionSubscription.cancel);
 

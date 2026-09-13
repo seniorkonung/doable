@@ -133,8 +133,7 @@ String _messageFor(
       switch (completion.target) {
         CreatingIntentionOperationTarget() =>
           localizations.graphOperationNewIntention,
-        ExistingIntentionOperationTarget() ||
-        UnlabelledIntentionOperationTarget() =>
+        ExistingIntentionOperationTarget() =>
           localizations.graphOperationIntention,
       };
   return localizations.graphOperationMessage(

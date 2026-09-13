@@ -427,7 +427,10 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final start = coordinator.acceptExisting(DeleteIntention(intention.id));
+    final start = coordinator.acceptExisting(
+      DeleteIntention(intention.id),
+      presentationTitle: intention.title,
+    );
     expect(start, isA<IntentionCommandAccepted>());
 
     await tester.pumpWidget(

@@ -63,7 +63,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         unawaited(_finish(future));
       case IntentionCommandAlreadyRunning():
         return;
-      case IntentionCommandCoordinatorDraining():
+      case GraphCommandCoordinatorDraining():
         state = state.withOperation(
           const OperationFailed<Intention>(IntentionUnexpectedFailure()),
         );

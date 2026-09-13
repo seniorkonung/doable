@@ -185,7 +185,8 @@ void main() {
       addTearDown(runtime.shutdown);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final coordinator = runtime.commandCoordinator;
-      final accepted = coordinator.accept(
+      final accepted = coordinator.acceptCreation(
+        IntentionCreationFormKey(),
         const CreateIntention(title: 'Намерение', description: null),
       ) as IntentionCommandAccepted;
 
@@ -193,10 +194,11 @@ void main() {
 
       expect(runtime.shutdown(), same(shutdown));
       expect(
-        coordinator.accept(
+        coordinator.acceptCreation(
+          IntentionCreationFormKey(),
           const CreateIntention(title: 'Другое', description: null),
         ),
-        isA<IntentionCommandCoordinatorDraining>(),
+        isA<GraphCommandCoordinatorDraining>(),
       );
       expect(
         () => ready.container.read(personalGraphRepositoryProvider),

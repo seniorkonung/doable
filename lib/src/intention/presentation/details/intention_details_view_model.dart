@@ -166,7 +166,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         unawaited(_finishUpdate(future));
       case IntentionCommandAlreadyRunning():
         state = current.copyWith(isOperationRunning: true);
-      case IntentionCommandCoordinatorDraining():
+      case GraphCommandCoordinatorDraining():
         state = current.copyWith(
           edit: edit.withOperation(
             const OperationFailed<Intention>(IntentionUnexpectedFailure()),
@@ -388,7 +388,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         unawaited(_finishStateChange(kind, future));
       case IntentionCommandAlreadyRunning():
         state = current.copyWith(isOperationRunning: true);
-      case IntentionCommandCoordinatorDraining():
+      case GraphCommandCoordinatorDraining():
         state = current.copyWith(
           stateChange: IntentionDetailsStateChange.failed(
             kind,

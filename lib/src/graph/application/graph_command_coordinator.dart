@@ -79,8 +79,7 @@ final class IntentionCommandCompletion {
     ResultSuccess(value: IntentionDeleted()) ||
     ResultFailure() => switch (target) {
       ExistingIntentionOperationTarget(:final title) => title,
-      CreatingIntentionOperationTarget() ||
-      UnlabelledIntentionOperationTarget() => null,
+      CreatingIntentionOperationTarget() => null,
     },
   };
 }
@@ -103,14 +102,6 @@ final class ExistingIntentionOperationTarget extends IntentionOperationTarget {
   final String title;
 }
 
-@Deprecated('Передавайте presentationTitle при принятии команды.')
-final class UnlabelledIntentionOperationTarget
-    extends IntentionOperationTarget {
-  const UnlabelledIntentionOperationTarget(this.intentionId);
-
-  final IntentionId intentionId;
-}
-
 sealed class IntentionCommandStart {
   const IntentionCommandStart();
 }
@@ -126,8 +117,8 @@ final class IntentionCommandAlreadyRunning extends IntentionCommandStart {
   const IntentionCommandAlreadyRunning();
 }
 
-final class IntentionCommandCoordinatorDraining extends IntentionCommandStart {
-  const IntentionCommandCoordinatorDraining();
+final class GraphCommandCoordinatorDraining extends IntentionCommandStart {
+  const GraphCommandCoordinatorDraining();
 }
 
 sealed class IntentionPresentationClaim {
@@ -154,10 +145,6 @@ final class IntentionAppPresentationClaim extends IntentionPresentationClaim {
     super._entry,
   ) : super._();
 }
-
-@Deprecated('Используйте IntentionAppPresentationClaim.')
-typedef IntentionCatalogFallbackPresentationClaim =
-    IntentionAppPresentationClaim;
 
 @Riverpod(keepAlive: true)
 final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
@@ -197,23 +184,15 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 
   IntentionCommandStart acceptExisting(
     ExistingIntentionCommand command, {
-    String? presentationTitle,
+    required String presentationTitle,
   }) => _accept(
     ExistingIntentionKey(command.id),
     command,
-    presentationTitle == null
-        ? UnlabelledIntentionOperationTarget(command.id)
-        : ExistingIntentionOperationTarget(
-            intentionId: command.id,
-            title: presentationTitle,
-          ),
+    ExistingIntentionOperationTarget(
+      intentionId: command.id,
+      title: presentationTitle,
+    ),
   );
-
-  @Deprecated('Используйте acceptCreation с ключом формы или acceptExisting.')
-  IntentionCommandStart accept(IntentionCommand command) => switch (command) {
-    CreateIntention() => acceptCreation(IntentionCreationFormKey(), command),
-    ExistingIntentionCommand() => acceptExisting(command),
-  };
 
   IntentionCommandStart _accept(
     GraphCommandKey key,
@@ -221,7 +200,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     IntentionOperationTarget target,
   ) {
     if (_isDraining) {
-      return const IntentionCommandCoordinatorDraining();
+      return const GraphCommandCoordinatorDraining();
     }
 
     final gate = _gates.putIfAbsent(
@@ -317,11 +296,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     }
     return request.future;
   }
-
-  @Deprecated('Используйте claimAppPresentation.')
-  Future<IntentionCatalogFallbackPresentationClaim?> claimCatalogFallback(
-    IntentionOperationToken token,
-  ) => claimAppPresentation(token);
 
   void releaseInitiatorPresentation(IntentionOperationToken token) {
     final entry = _entries[token];
