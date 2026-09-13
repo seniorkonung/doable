@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -18,7 +19,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 void main() {
   late AppDatabase database;
   late InMemoryDiagnosticsSink diagnostics;
-  late DriftIntentionRepository repository;
+  late DriftPersonalGraphRepository repository;
   late _SelectTrace trace;
 
   setUp(() async {
@@ -31,7 +32,7 @@ void main() {
     );
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
-    repository = DriftIntentionRepository(
+    repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
       () => DateTime.utc(2026, 9, 2),
@@ -1021,13 +1022,13 @@ void main() {
       );
       final cursor = _firstPage(await repository.getCatalogPage(query))
           .nextCursor!;
-      final sharedDatabaseRepository = DriftIntentionRepository(
+      final sharedDatabaseRepository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
         () => DateTime.utc(2026, 9, 2),
         diagnostics,
       );
-      final recreatedRepository = DriftIntentionRepository(
+      final recreatedRepository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
         () => DateTime.utc(2026, 9, 2),
@@ -1049,7 +1050,7 @@ void main() {
       );
       await foreignDatabase.open();
       addTearDown(foreignDatabase.close);
-      final foreignDatabaseRepository = DriftIntentionRepository(
+      final foreignDatabaseRepository = DriftPersonalGraphRepository(
         foreignDatabase,
         UuidV7IntentionIdGenerator(),
         () => DateTime.utc(2026, 9, 2),
@@ -1297,10 +1298,18 @@ void main() {
       final page = _continuationPage(await pageFuture);
       final commandResult = await commandFuture;
       expect(completedBeforePageRead, isFalse);
-      expect(commandResult, isA<ResultSuccess<IntentionCommandSuccess>>());
-      final mutation = (commandResult as ResultSuccess<IntentionCommandSuccess>)
-          .value
-          .catalogMutation;
+      expect(
+        commandResult,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      final mutation =
+          (commandResult
+                  as ResultSuccess<
+                    ConfirmedGraphResult<IntentionCommandSuccess>
+                  >)
+              .value
+              .value
+              .catalogMutation;
       expect(
         page.revision.compareTo(mutation.revision),
         IntentionCatalogRevisionOrder.older,
@@ -1317,7 +1326,7 @@ void main() {
     );
     final originalRevision = _firstPage(await repository.getCatalogPage(query))
         .revision;
-    final recreatedRepository = DriftIntentionRepository(
+    final recreatedRepository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
       () => DateTime.utc(2026, 9, 2),

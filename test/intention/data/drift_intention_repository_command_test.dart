@@ -1,9 +1,10 @@
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/data/drift_intention_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
@@ -20,7 +21,7 @@ void main() {
   late InMemoryDiagnosticsSink diagnostics;
   late _DeterministicIntentionIdGenerator idGenerator;
   late _DeterministicClock clock;
-  late DriftIntentionRepository repository;
+  late DriftPersonalGraphRepository repository;
   late _WriteTrace writeTrace;
 
   setUp(() async {
@@ -35,7 +36,7 @@ void main() {
     diagnostics = InMemoryDiagnosticsSink();
     idGenerator = _DeterministicIntentionIdGenerator([_id(_firstUuid)]);
     clock = _DeterministicClock([DateTime.utc(2026, 9, 3, 12)]);
-    repository = DriftIntentionRepository(
+    repository = DriftPersonalGraphRepository(
       database,
       idGenerator,
       clock.call,
@@ -45,7 +46,7 @@ void main() {
 
   tearDown(() => database.close());
 
-  group('DriftIntentionRepository.execute', () {
+  group('DriftPersonalGraphRepository.execute', () {
     test('создаёт active not-ready намерение с нормализованными данными и единым UTC-временем', () async {
       final result = await repository.execute(
         const CreateIntention(
@@ -80,7 +81,7 @@ void main() {
         DateTime.utc(2026, 9, 3, 12),
         DateTime.utc(2026, 9, 3, 13),
       ]);
-      repository = DriftIntentionRepository(
+      repository = DriftPersonalGraphRepository(
         database,
         idGenerator,
         clock.call,
@@ -109,7 +110,7 @@ void main() {
         DateTime.utc(2026, 9, 3, 12),
         DateTime.utc(2026, 9, 3, 13),
       ]);
-      repository = DriftIntentionRepository(
+      repository = DriftPersonalGraphRepository(
         database,
         idGenerator,
         clock.call,
@@ -398,7 +399,7 @@ void main() {
         DateTime.utc(2026, 9, 3, 12),
         DateTime.utc(2026, 9, 3, 13),
       ]);
-      repository = DriftIntentionRepository(
+      repository = DriftPersonalGraphRepository(
         database,
         idGenerator,
         clock.call,
@@ -461,7 +462,7 @@ void main() {
           createdAt: createdAt,
         );
         clock = _DeterministicClock([DateTime.utc(2026, 9, 3, 12)]);
-        repository = DriftIntentionRepository(
+        repository = DriftPersonalGraphRepository(
           database,
           idGenerator,
           clock.call,
@@ -503,7 +504,7 @@ void main() {
           createdAt,
           DateTime.utc(2026, 9, 3, 11),
         ]);
-        repository = DriftIntentionRepository(
+        repository = DriftPersonalGraphRepository(
           database,
           idGenerator,
           clock.call,
@@ -612,7 +613,7 @@ void main() {
 
           expect(result, _deleted(fixture.id));
           expect(
-            _watched(await repository.watchById(fixture.id).first),
+            _watched(await repository.watchIntention(fixture.id).first),
             isNull,
           );
           for (final scope in IntentionScope.values) {
@@ -776,7 +777,7 @@ void main() {
         for (var hour = 10; hour < 18; hour++) DateTime.utc(2026, 9, 3, hour),
       ];
       clock = _DeterministicClock(transitionTimes);
-      repository = DriftIntentionRepository(
+      repository = DriftPersonalGraphRepository(
         database,
         idGenerator,
         clock.call,
@@ -943,7 +944,7 @@ void main() {
           DateTime.utc(2026, 9, 3, 12),
           DateTime.utc(2026, 9, 3, 13),
         ]);
-        repository = DriftIntentionRepository(
+        repository = DriftPersonalGraphRepository(
           database,
           idGenerator,
           clock.call,
@@ -970,8 +971,10 @@ void main() {
         expect(secondRestore.id, secondId);
         expect(secondRestore.archiveState, IntentionArchiveState.active);
 
-        final first = _watched(await repository.watchById(firstId).first);
-        final second = _watched(await repository.watchById(secondId).first);
+        final first = _watched(await repository.watchIntention(firstId).first);
+        final second = _watched(
+          await repository.watchIntention(secondId).first,
+        );
         expect(first?.title, 'Первое намерение');
         expect(first?.description, 'Первое описание');
         expect(first?.readiness, IntentionReadiness.ready);
@@ -995,7 +998,7 @@ void main() {
         DateTime.utc(2026, 9, 3, 12),
         DateTime.utc(2026, 9, 3, 13),
       ]);
-      repository = DriftIntentionRepository(
+      repository = DriftPersonalGraphRepository(
         database,
         idGenerator,
         clock.call,
@@ -1040,9 +1043,10 @@ void main() {
         database.intentions,
       )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
       expect(row.titleSearchKey, 'обновлённое название');
-      final snapshot = await repository.watchById(id).first;
-      expect(snapshot, isA<ResultSuccess<Intention?>>());
-      final watched = (snapshot as ResultSuccess<Intention?>).value;
+      final snapshot = await repository.watchIntention(id).first;
+      expect(snapshot, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+      final watched =
+          (snapshot as ResultSuccess<GraphSnapshot<Intention?>>).value.value;
       expect(watched?.id, id);
       expect(watched?.title, updated.title);
       expect(watched?.description, updated.description);
@@ -1073,7 +1077,7 @@ void main() {
           ),
         );
         await database.open();
-        repository = DriftIntentionRepository(
+        repository = DriftPersonalGraphRepository(
           database,
           idGenerator,
           clock.call,
@@ -1326,17 +1330,34 @@ void main() {
 const _firstUuid = '018f0b5d-6b2e-7c80-8000-000000000401';
 const _secondUuid = '018f0b5d-6b2e-7c80-8000-000000000402';
 
-Intention _saved(Result<IntentionCommandSuccess> result) {
+Intention _saved(Result<ConfirmedGraphResult<IntentionCommandSuccess>> result) {
   final success = _commandSuccess(result);
   expect(success, isA<IntentionSaved>());
   return (success as IntentionSaved).intention;
 }
 
 IntentionCommandSuccess _commandSuccess(
-  Result<IntentionCommandSuccess> result,
+  Result<ConfirmedGraphResult<IntentionCommandSuccess>> result,
 ) {
-  expect(result, isA<ResultSuccess<IntentionCommandSuccess>>());
-  return (result as ResultSuccess<IntentionCommandSuccess>).value;
+  expect(
+    result,
+    isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+  );
+  final confirmed =
+      (result as ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>)
+          .value;
+  expect(confirmed.changes, isNotEmpty);
+  expect(
+    confirmed.changes,
+    everyElement(
+      isA<GraphChange>().having(
+        (change) => change.revision.compareTo(confirmed.revision),
+        'revision',
+        GraphRevisionOrder.same,
+      ),
+    ),
+  );
+  return confirmed.value;
 }
 
 IntentionCatalogFirstPage _firstCatalogPage(
@@ -1349,7 +1370,7 @@ IntentionCatalogFirstPage _firstCatalogPage(
 }
 
 Matcher _failure<TFailure extends IntentionFailure>() =>
-    isA<ResultFailure<IntentionCommandSuccess>>().having(
+    isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>().having(
       (result) => result.failure,
       'failure',
       isA<TFailure>(),
@@ -1358,13 +1379,14 @@ Matcher _failure<TFailure extends IntentionFailure>() =>
 Matcher _textValidationFailure({
   required IntentionTextField field,
   required IntentionTextValidationReason reason,
-}) => isA<ResultFailure<IntentionCommandSuccess>>().having(
-  (result) => result.failure,
-  'failure',
-  isA<IntentionTextInputValidationFailure>()
-      .having((failure) => failure.textFailure.field, 'field', field)
-      .having((failure) => failure.textFailure.reason, 'reason', reason),
-);
+}) =>
+    isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>().having(
+      (result) => result.failure,
+      'failure',
+      isA<IntentionTextInputValidationFailure>()
+          .having((failure) => failure.textFailure.field, 'field', field)
+          .having((failure) => failure.textFailure.reason, 'reason', reason),
+    );
 
 Matcher _successfulCommand(IntentionCommandDiagnosticsType commandType) =>
     isA<IntentionCommandDiagnosticsEvent>()
@@ -1394,14 +1416,14 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
 IntentionId _idForSequence(int value) =>
     _id('018f0b5d-6b2e-7c80-8000-${value.toRadixString(16).padLeft(12, '0')}');
 
-Intention? _watched(Result<Intention?> result) {
-  expect(result, isA<ResultSuccess<Intention?>>());
-  return (result as ResultSuccess<Intention?>).value;
+Intention? _watched(Result<GraphSnapshot<Intention?>> result) {
+  expect(result, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+  return (result as ResultSuccess<GraphSnapshot<Intention?>>).value.value;
 }
 
 Matcher _deleted(IntentionId id) =>
-    isA<ResultSuccess<IntentionCommandSuccess>>().having(
-      (result) => result.value,
+    isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>().having(
+      (result) => result.value.value,
       'value',
       isA<IntentionDeleted>().having((success) => success.id, 'id', id),
     );

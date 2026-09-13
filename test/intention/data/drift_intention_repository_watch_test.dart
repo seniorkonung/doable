@@ -78,6 +78,63 @@ void main() {
     },
   );
 
+  test(
+    'сериализует начальное чтение и команду одним исполнителем графа',
+    () async {
+      final gate = _BlockingSelectObserver();
+      await database.close();
+      database = AppDatabase(
+        observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          gate,
+        ),
+      );
+      await database.open();
+      final id = _id(_uuidV7);
+      await _insertIntention(
+        database,
+        id: id.toCanonicalString(),
+        title: 'Прочитать книгу',
+      );
+      repository = _repository(database, diagnostics);
+      gate.blockNextSelect();
+      final events = StreamIterator(repository.watchIntention(id));
+      addTearDown(events.cancel);
+
+      final initialFuture = events.moveNext();
+      await gate.selectBlocked;
+      var commandCompleted = false;
+      final commandFuture = repository
+          .execute(ArchiveIntention(id))
+          .whenComplete(() => commandCompleted = true);
+      await pumpEventQueue(times: 20);
+
+      expect(commandCompleted, isFalse);
+      gate.releaseSelect();
+      expect(await initialFuture, isTrue);
+      final initial = _graphSnapshot(events.current);
+      final result = await commandFuture;
+      final confirmed =
+          (result
+                  as ResultSuccess<
+                    ConfirmedGraphResult<IntentionCommandSuccess>
+                  >)
+              .value;
+
+      expect(
+        initial.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.older,
+      );
+      expect(await events.moveNext(), isTrue);
+      final updated = _graphSnapshot(events.current);
+      expect(updated.value?.archiveState, IntentionArchiveState.archived);
+      expect(
+        updated.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
+      );
+    },
+  );
+
   group('DriftPersonalGraphRepository.watchIntention', () {
     test('публикует начальное подтверждённое отсутствие', () async {
       final result = await repository.watchIntention(_id(_uuidV7)).first;
@@ -674,6 +731,43 @@ final class _FixedIntentionIdGenerator implements IntentionIdGenerator {
 
   @override
   IntentionId generate() => id;
+}
+
+final class _BlockingSelectObserver extends LocalDatabaseConnectionObserver {
+  Completer<void>? _started;
+  Completer<void>? _release;
+
+  void blockNextSelect() {
+    if (_started != null) {
+      throw StateError('SELECT уже заблокирован.');
+    }
+    _started = Completer<void>();
+    _release = Completer<void>();
+  }
+
+  Future<void> get selectBlocked {
+    final started = _started;
+    if (started == null) throw StateError('SELECT не был заблокирован.');
+    return started.future;
+  }
+
+  void releaseSelect() {
+    final release = _release;
+    if (release == null) throw StateError('SELECT не был заблокирован.');
+    release.complete();
+  }
+
+  @override
+  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
+    if (statement.operation != LocalDatabaseSqlOperation.select) return;
+    final started = _started;
+    if (started == null || started.isCompleted) return;
+    final release = _release!;
+    started.complete();
+    await release.future;
+    _started = null;
+    _release = null;
+  }
 }
 
 final class _SelectFailureInterceptor extends LocalDatabaseConnectionObserver {
