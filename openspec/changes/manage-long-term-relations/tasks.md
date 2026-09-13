@@ -103,7 +103,7 @@
   - **Вероятные файлы:** перенос `lib/src/intention/presentation/operation/intention_command_coordinator.dart` в новый `lib/src/graph/application/graph_command_coordinator.dart`; перенос `lib/src/intention/presentation/operation/intention_repository_provider.dart` в новый `lib/src/graph/application/personal_graph_repository_provider.dart`; `test/intention/presentation/operation/intention_command_coordinator_test.dart`; соответствующие производные файлы Riverpod.
   - **Размер:** M.
 
-- [ ] 1.11 Подключить единственный модуль графа к времени жизни приложения
+- [x] 1.11 Подключить единственный модуль графа к времени жизни приложения
   - **Критерии приёмки:**
     - `AppRuntime` создаёт один репозиторий и координатор после успешного bootstrap, предоставляет их одному контейнеру и сохраняет типизированную подстановку для проверок приложения.
     - Повторный bootstrap не создаёт дубликаты; отказ композиции закрывает неготовое хранилище. Завершение работы блокирует новую работу и дожидается команд до закрытия файла, включая пересечение с незавершённым bootstrap.
