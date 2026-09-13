@@ -183,7 +183,7 @@
   - **Вероятные файлы:** прежние `lib/src/intention/application/intention_repository.dart`, `lib/src/intention/data/drift_intention_repository.dart`, `lib/src/intention/presentation/operation/intention_repository_provider.dart`, `lib/src/intention/presentation/operation/intention_command_coordinator.dart`, `lib/src/intention/presentation/operation/operation_state.dart`; связанные производные файлы.
   - **Размер:** M.
 
-- [ ] 1.19 Подтвердить готовность первой фазы к добавлению пользовательских операций связей
+- [x] 1.19 Подтвердить готовность первой фазы к добавлению пользовательских операций связей
   - **Критерии приёмки:**
     - Выполнены все предыдущие задачи пакета: новая и обновлённая установка сохраняют намерения, миграция выдерживает прерывание, а приложение имеет одного владельца операций и согласования графа.
     - Прежний жизненный цикл намерений, локализация, доступность, безопасные ошибки, диагностика и завершение работы подтверждены вместе; замечания проверки кода, препятствующие этому результату, устранены.
