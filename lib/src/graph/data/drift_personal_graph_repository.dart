@@ -43,7 +43,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     IntentionCatalogQuery query,
   ) async {
     final stopwatch = Stopwatch()..start();
-    _diagnosticsSink.record(
+    _recordDiagnostics(
       CatalogPageReadDiagnosticsEvent(
         pageSize: query.pageSize,
         status: const DiagnosticsStarted(),
@@ -56,7 +56,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
             !cursor.isOwnedBy(_epoch) ||
             !cursor.matches(query))) {
       const failure = IntentionGenericValidationFailure();
-      _diagnosticsSink.record(
+      _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
           status: DiagnosticsFailed(
@@ -81,7 +81,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           _ => throw StateError('Недопустимый cursor каталога.'),
         },
       );
-      _diagnosticsSink.record(
+      _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
@@ -90,7 +90,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       return ResultSuccess(page);
     } on Object catch (error) {
       final failure = _classifyCatalogReadFailure(error);
-      _diagnosticsSink.record(
+      _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
           status: DiagnosticsFailed(
@@ -108,7 +108,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     IntentionId id,
   ) async* {
     final stopwatch = Stopwatch()..start();
-    _diagnosticsSink.record(
+    _recordDiagnostics(
       const IntentionDetailReadDiagnosticsEvent(status: DiagnosticsStarted()),
     );
     final invalidations = StreamController<void>();
@@ -117,7 +117,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     try {
       final initial = await _readIntentionSnapshot(id);
       var lastRevision = initial.revision;
-      _diagnosticsSink.record(
+      _recordDiagnostics(
         IntentionDetailReadDiagnosticsEvent(
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
@@ -131,7 +131,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           continue;
         }
         lastRevision = snapshot.revision;
-        _diagnosticsSink.record(
+        _recordDiagnostics(
           IntentionDetailReadDiagnosticsEvent(
             status: DiagnosticsSucceeded(stopwatch.elapsed),
           ),
@@ -140,7 +140,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       }
     } on Object catch (error) {
       final failure = _classifyDetailReadFailure(error);
-      _diagnosticsSink.record(
+      _recordDiagnostics(
         IntentionDetailReadDiagnosticsEvent(
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
@@ -232,7 +232,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         }
         return result;
       });
-      _diagnosticsSink.record(
+      _recordDiagnostics(
         IntentionCommandDiagnosticsEvent(
           commandType: commandType,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
@@ -241,7 +241,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       return ResultSuccess(success);
     } on Object catch (error) {
       final failure = _classifyCommandFailure(error, command);
-      _diagnosticsSink.record(
+      _recordDiagnostics(
         IntentionCommandDiagnosticsEvent(
           commandType: commandType,
           status: DiagnosticsFailed(
@@ -252,6 +252,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       );
       return ResultFailure(failure);
     }
+  }
+
+  void _recordDiagnostics(DiagnosticsEvent event) {
+    recordDiagnosticsSafely(_diagnosticsSink, event);
   }
 
   void _notifyIntentionWatchers(IntentionId id) {

@@ -1,6 +1,11 @@
+import 'dart:io';
+
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/schema_v1_fixture.dart';
 
 const _nextSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
@@ -82,6 +87,75 @@ void main() {
 
     expect(harness.isClosed, isTrue);
   });
+
+  group('диагностика перехода схемы 1 → 2', () {
+    test(
+      'ошибка получателя до миграции не препятствует подтверждению',
+      () async {
+        final diagnostics = _SelectivelyThrowingDiagnosticsSink(
+          (event) => event.status is DiagnosticsStarted,
+        );
+
+        final database = await _openSchema1WithDiagnostics(diagnostics);
+
+        await _expectCurrentSchema(database);
+        expect(
+          diagnostics.attemptedEvents.map((event) => event.status.runtimeType),
+          [DiagnosticsStarted, DiagnosticsSucceeded],
+        );
+      },
+    );
+
+    test('ошибка получателя после миграции не меняет её исход', () async {
+      final diagnostics = _SelectivelyThrowingDiagnosticsSink(
+        (event) => event.status is DiagnosticsSucceeded,
+      );
+
+      final database = await _openSchema1WithDiagnostics(diagnostics);
+
+      await _expectCurrentSchema(database);
+      expect(
+        diagnostics.attemptedEvents.map((event) => event.status.runtimeType),
+        [DiagnosticsStarted, DiagnosticsSucceeded],
+      );
+    });
+  });
+}
+
+Future<AppDatabase> _openSchema1WithDiagnostics(
+  DiagnosticsSink diagnostics,
+) async {
+  final temporaryDirectory = await Directory.systemTemp.createTemp(
+    'doable_diagnostics_migration_',
+  );
+  addTearDown(() async {
+    if (await temporaryDirectory.exists()) {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+  final databaseFile = File('${temporaryDirectory.path}/doable.sqlite');
+  await createSchemaV1Fixture(databaseFile);
+  final database = AppDatabase(
+    openFileBackedLocalDatabase(databaseFile),
+    diagnosticsSink: diagnostics,
+  );
+  addTearDown(database.close);
+  await database.open();
+  return database;
+}
+
+Future<void> _expectCurrentSchema(AppDatabase database) async {
+  final version = await database
+      .customSelect('PRAGMA user_version')
+      .getSingle();
+  final relationTable = await database
+      .customSelect(
+        "SELECT name FROM sqlite_schema "
+        "WHERE type = 'table' AND name = 'long_term_relations'",
+      )
+      .getSingleOrNull();
+  expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
+  expect(relationTable?.read<String>('name'), 'long_term_relations');
 }
 
 Future<void> _insertIntention(AppDatabase database) {
@@ -102,6 +176,21 @@ Future<void> _insertIntention(AppDatabase database) {
 
 final class _InjectedMigrationFailure implements Exception {
   const _InjectedMigrationFailure();
+}
+
+final class _SelectivelyThrowingDiagnosticsSink implements DiagnosticsSink {
+  _SelectivelyThrowingDiagnosticsSink(this._shouldThrow);
+
+  final bool Function(DiagnosticsEvent event) _shouldThrow;
+  final List<DiagnosticsEvent> attemptedEvents = [];
+
+  @override
+  void record(DiagnosticsEvent event) {
+    attemptedEvents.add(event);
+    if (_shouldThrow(event)) {
+      throw StateError('CANARY-diagnostics-sink-failure');
+    }
+  }
 }
 
 final class _FailedMigrationConnectionHarness {

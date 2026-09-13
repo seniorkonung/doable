@@ -49,7 +49,8 @@ final class LocalDataBootstrap {
 
   Future<LocalDataBootstrapResult> _open() async {
     final stopwatch = Stopwatch()..start();
-    _diagnosticsSink.record(
+    recordDiagnosticsSafely(
+      _diagnosticsSink,
       const BootstrapDiagnosticsEvent(
         schemaVersion: AppDatabase.currentSchemaVersion,
         status: DiagnosticsStarted(),
@@ -64,7 +65,8 @@ final class LocalDataBootstrap {
       );
       await database.open();
       _database = database;
-      _diagnosticsSink.record(
+      recordDiagnosticsSafely(
+        _diagnosticsSink,
         BootstrapDiagnosticsEvent(
           schemaVersion: AppDatabase.currentSchemaVersion,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
@@ -84,7 +86,8 @@ final class LocalDataBootstrap {
           'Классификация bootstrap не может вернуть готовое хранилище.',
         ),
       };
-      _diagnosticsSink.record(
+      recordDiagnosticsSafely(
+        _diagnosticsSink,
         BootstrapDiagnosticsEvent(
           schemaVersion: AppDatabase.currentSchemaVersion,
           status: DiagnosticsFailed(

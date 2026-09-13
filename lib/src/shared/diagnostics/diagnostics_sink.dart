@@ -3,6 +3,16 @@ abstract interface class DiagnosticsSink {
   void record(DiagnosticsEvent event);
 }
 
+/// Однократно передаёт событие получателю, не позволяя диагностике изменить
+/// исход наблюдаемой операции.
+void recordDiagnosticsSafely(DiagnosticsSink? sink, DiagnosticsEvent event) {
+  try {
+    sink?.record(event);
+  } on Object {
+    // Повторная диагностическая запись здесь изменила бы исход и семантику.
+  }
+}
+
 sealed class DiagnosticsEvent {
   const DiagnosticsEvent(this.status);
 
