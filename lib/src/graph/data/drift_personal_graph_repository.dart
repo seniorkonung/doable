@@ -30,13 +30,13 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   final IntentionIdGenerator _idGenerator;
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
-  final _CatalogCursorOwner _cursorOwner = _CatalogCursorOwner();
+  final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
   var _mutationSequence = 0;
 
   GraphRevision get _currentRevision =>
-      _DriftGraphRevision(_cursorOwner, _mutationSequence);
+      _DriftGraphRevision(_epoch, _mutationSequence);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -53,7 +53,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final cursor = query.cursor;
     if (cursor != null &&
         (cursor is! _DriftIntentionCatalogCursor ||
-            !cursor.isOwnedBy(_cursorOwner) ||
+            !cursor.isOwnedBy(_epoch) ||
             !cursor.matches(query))) {
       const failure = IntentionGenericValidationFailure();
       _diagnosticsSink.record(
@@ -628,7 +628,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     IntentionCatalogQuery query,
     IntentionSummary boundary,
   ) => _DriftIntentionCatalogCursor(
-    owner: _cursorOwner,
+    epoch: _epoch,
     scope: query.scope,
     normalizedTitleFilter: query.titleFilter?.map((value) => value),
     order: query.order,
@@ -890,7 +890,7 @@ final class _StoredIntentionColumnNames {
   final String updatedAt;
 }
 
-final class _CatalogCursorOwner {}
+final class _GraphEpoch {}
 
 final class _AsyncSequencer {
   Future<void> _tail = Future<void>.value();
@@ -903,14 +903,14 @@ final class _AsyncSequencer {
 }
 
 final class _DriftGraphRevision implements GraphRevision {
-  const _DriftGraphRevision(this._owner, this._sequence);
+  const _DriftGraphRevision(this._epoch, this._sequence);
 
-  final _CatalogCursorOwner _owner;
+  final _GraphEpoch _epoch;
   final int _sequence;
 
   @override
   GraphRevisionOrder compareTo(GraphRevision other) {
-    if (other is! _DriftGraphRevision || !identical(_owner, other._owner)) {
+    if (other is! _DriftGraphRevision || !identical(_epoch, other._epoch)) {
       return GraphRevisionOrder.differentEpoch;
     }
     final comparison = _sequence.compareTo(other._sequence);
@@ -1056,7 +1056,7 @@ final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
 
 final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   const _DriftIntentionCatalogCursor({
-    required this.owner,
+    required this.epoch,
     required this.scope,
     required this.normalizedTitleFilter,
     required this.order,
@@ -1064,14 +1064,14 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
     required this.boundaryId,
   });
 
-  final _CatalogCursorOwner owner;
+  final _GraphEpoch epoch;
   final IntentionScope scope;
   final String? normalizedTitleFilter;
   final IntentionCatalogOrder order;
   final domain.IntentionTimestamp boundaryTimestamp;
   final IntentionId boundaryId;
 
-  bool isOwnedBy(_CatalogCursorOwner candidate) => identical(owner, candidate);
+  bool isOwnedBy(_GraphEpoch candidate) => identical(epoch, candidate);
 
   bool matches(IntentionCatalogQuery query) =>
       scope == query.scope &&
