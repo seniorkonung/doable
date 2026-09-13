@@ -1,11 +1,14 @@
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/fts_integrity.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
-import 'package:doable/src/intention/data/drift_intention_repository.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -17,7 +20,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 void main() {
   late AppDatabase database;
   late InMemoryDiagnosticsSink diagnostics;
-  late DriftIntentionRepository repository;
+  late DriftPersonalGraphRepository repository;
 
   setUp(() async {
     diagnostics = InMemoryDiagnosticsSink();
@@ -28,7 +31,7 @@ void main() {
 
   tearDown(() => database.close());
 
-  group('DriftIntentionRepository.execute — физическое удаление', () {
+  group('DriftPersonalGraphRepository.execute — физическое удаление', () {
     test('преобразует blocking foreign key удаления в conflict и сохраняет строку с FTS', () async {
       final id = _id(_firstUuid);
       final createdAt = DateTime.utc(2026, 9, 2, 10);
@@ -74,7 +77,7 @@ void main() {
     });
   });
 
-  group('DriftIntentionRepository.execute — откат после DML', () {
+  group('DriftPersonalGraphRepository.execute — откат после DML', () {
     test('откатывает create вместе с основной строкой и FTS', () async {
       final interceptor = _FailAfterDmlInterceptor(_DmlOperation.insert);
       final replacement = await _replaceDatabase(
@@ -241,7 +244,7 @@ void main() {
   });
 
   group(
-    'DriftIntentionRepository.execute — безопасные unexpected failures',
+    'DriftPersonalGraphRepository.execute — безопасные неизвестные отказы',
     () {
       test(
         'не считает constraint вне утверждённых контекстов conflict',
@@ -358,9 +361,71 @@ void main() {
       );
     },
   );
+
+  group('DriftPersonalGraphRepository — независимость от диагностики', () {
+    test('завершает чтения при ошибке диагностического получателя', () async {
+      final id = _id(_firstUuid);
+      await _insertIntention(
+        database,
+        id: id,
+        title: 'Подтверждённое намерение',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      final failingDiagnostics = _ThrowingDiagnosticsSink();
+      repository = _repository(database, failingDiagnostics);
+
+      final catalogResult = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
+        ),
+      );
+      final detailResult = await repository.watchIntention(id).first;
+
+      expect(catalogResult, isA<ResultSuccess<IntentionCatalogPage>>());
+      expect(detailResult, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+      expect(
+        failingDiagnostics.attemptedEvents.map((event) => event.runtimeType),
+        [
+          CatalogPageReadDiagnosticsEvent,
+          CatalogPageReadDiagnosticsEvent,
+          IntentionDetailReadDiagnosticsEvent,
+          IntentionDetailReadDiagnosticsEvent,
+        ],
+      );
+    });
+
+    test(
+      'сохраняет подтверждённую команду один раз при ошибке диагностики',
+      () async {
+        final failingDiagnostics = _ThrowingDiagnosticsSink();
+        repository = _repository(database, failingDiagnostics);
+
+        final result = await repository.execute(
+          const CreateIntention(
+            title: 'Сохранённое намерение',
+            description: null,
+          ),
+        );
+
+        expect(
+          result,
+          isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+        );
+        final rows = await database.select(database.intentions).get();
+        expect(rows, hasLength(1));
+        expect(rows.single.title, 'Сохранённое намерение');
+        expect(failingDiagnostics.attemptedEvents, [
+          isA<IntentionCommandDiagnosticsEvent>(),
+        ]);
+      },
+    );
+  });
 }
 
-Future<({AppDatabase database, DriftIntentionRepository repository})>
+Future<({AppDatabase database, DriftPersonalGraphRepository repository})>
 _replaceDatabase(
   LocalDatabaseConnectionObserver observer,
   AppDatabase previousDatabase,
@@ -377,10 +442,10 @@ _replaceDatabase(
   return (database: database, repository: _repository(database, diagnostics));
 }
 
-DriftIntentionRepository _repository(
+DriftPersonalGraphRepository _repository(
   AppDatabase database,
-  InMemoryDiagnosticsSink diagnostics,
-) => DriftIntentionRepository(
+  DiagnosticsSink diagnostics,
+) => DriftPersonalGraphRepository(
   database,
   _DeterministicIntentionIdGenerator([_id(_secondUuid)]),
   () => DateTime.utc(2026, 9, 3, 12),
@@ -431,7 +496,7 @@ Future<void> _expectStoredIntention(
 }
 
 Future<List<IntentionId>> _matchingIds(
-  IntentionRepository repository,
+  PersonalGraphRepository repository,
   String titleFilter,
 ) async {
   final result = await repository.getCatalogPage(
@@ -449,7 +514,7 @@ Future<List<IntentionId>> _matchingIds(
 }
 
 Matcher _failure<TFailure extends IntentionFailure>() =>
-    isA<ResultFailure<IntentionCommandSuccess>>().having(
+    isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>().having(
       (result) => result.failure,
       'failure',
       isA<TFailure>(),
@@ -483,6 +548,16 @@ final class _DeterministicIntentionIdGenerator implements IntentionIdGenerator {
 
   @override
   IntentionId generate() => _ids[_next++];
+}
+
+final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
+  final List<DiagnosticsEvent> attemptedEvents = [];
+
+  @override
+  void record(DiagnosticsEvent event) {
+    attemptedEvents.add(event);
+    throw StateError('CANARY-diagnostics-sink-failure');
+  }
 }
 
 enum _DmlOperation { insert, update, delete }

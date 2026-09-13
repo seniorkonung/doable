@@ -95,6 +95,18 @@ void main() {
 
       expect(writeAttempts, _events().length);
     });
+
+    test(
+      'защитная запись подавляет ошибку произвольного получателя без повтора',
+      () {
+        final sink = _ThrowingDiagnosticsSink();
+        final event = _events().first;
+
+        expect(() => recordDiagnosticsSafely(sink, event), returnsNormally);
+
+        expect(sink.attemptedEvents, [same(event)]);
+      },
+    );
   });
 }
 
@@ -126,3 +138,13 @@ List<DiagnosticsEvent> _events() => [
     ),
   ),
 ];
+
+final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
+  final List<DiagnosticsEvent> attemptedEvents = [];
+
+  @override
+  void record(DiagnosticsEvent event) {
+    attemptedEvents.add(event);
+    throw StateError('CANARY-diagnostics-sink-failure');
+  }
+}

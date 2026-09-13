@@ -96,7 +96,8 @@ Future<void> _recordMigration(
   required MigrationOperation migrate,
 }) async {
   final stopwatch = Stopwatch()..start();
-  diagnosticsSink?.record(
+  recordDiagnosticsSafely(
+    diagnosticsSink,
     MigrationDiagnosticsEvent(
       fromSchemaVersion: fromSchemaVersion,
       toSchemaVersion: toSchemaVersion,
@@ -106,7 +107,8 @@ Future<void> _recordMigration(
 
   try {
     await migrate();
-    diagnosticsSink?.record(
+    recordDiagnosticsSafely(
+      diagnosticsSink,
       MigrationDiagnosticsEvent(
         fromSchemaVersion: fromSchemaVersion,
         toSchemaVersion: toSchemaVersion,
@@ -114,7 +116,8 @@ Future<void> _recordMigration(
       ),
     );
   } on Object catch (error) {
-    diagnosticsSink?.record(
+    recordDiagnosticsSafely(
+      diagnosticsSink,
       MigrationDiagnosticsEvent(
         fromSchemaVersion: fromSchemaVersion,
         toSchemaVersion: toSchemaVersion,
