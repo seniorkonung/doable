@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'intention_command_coordinator.dart';
+part of 'graph_command_coordinator.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,29 +9,28 @@ part of 'intention_command_coordinator.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(IntentionCommandCoordinator)
-final intentionCommandCoordinatorProvider =
-    IntentionCommandCoordinatorProvider._();
+@ProviderFor(GraphCommandCoordinator)
+final graphCommandCoordinatorProvider = GraphCommandCoordinatorProvider._();
 
-final class IntentionCommandCoordinatorProvider
-    extends $NotifierProvider<IntentionCommandCoordinator, void> {
-  IntentionCommandCoordinatorProvider._()
+final class GraphCommandCoordinatorProvider
+    extends $NotifierProvider<GraphCommandCoordinator, void> {
+  GraphCommandCoordinatorProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'intentionCommandCoordinatorProvider',
+        name: r'graphCommandCoordinatorProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$intentionCommandCoordinatorHash();
+  String debugGetCreateSourceHash() => _$graphCommandCoordinatorHash();
 
   @$internal
   @override
-  IntentionCommandCoordinator create() => IntentionCommandCoordinator();
+  GraphCommandCoordinator create() => GraphCommandCoordinator();
 
   /// {@macro riverpod.override_with_value}
   Override overrideWithValue(void value) {
@@ -42,10 +41,10 @@ final class IntentionCommandCoordinatorProvider
   }
 }
 
-String _$intentionCommandCoordinatorHash() =>
-    r'b9d9bf94e42c08de196ad811a3889461a17d680a';
+String _$graphCommandCoordinatorHash() =>
+    r'f970173f18b9be7412ef7ccfdbb7e2e6c864892b';
 
-abstract class _$IntentionCommandCoordinator extends $Notifier<void> {
+abstract class _$GraphCommandCoordinator extends $Notifier<void> {
   void build();
   @$mustCallSuper
   @override
