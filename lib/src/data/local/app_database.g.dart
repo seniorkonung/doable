@@ -497,6 +497,544 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
   }
 }
 
+class LongTermRelations extends Table
+    with TableInfo<LongTermRelations, LongTermRelation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  LongTermRelations(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
+    'creationSequence',
+  );
+  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
+    'creation_sequence',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL UNIQUE',
+  );
+  static const VerificationMeta _sourceIntentionIdMeta = const VerificationMeta(
+    'sourceIntentionId',
+  );
+  late final GeneratedColumn<String> sourceIntentionId =
+      GeneratedColumn<String>(
+        'source_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
+      );
+  static const VerificationMeta _relatedIntentionIdMeta =
+      const VerificationMeta('relatedIntentionId');
+  late final GeneratedColumn<String> relatedIntentionId =
+      GeneratedColumn<String>(
+        'related_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
+      );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(type) = \'text\' AND type IN (\'need\', \'can\'))',
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
+    'priority',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(priority) = \'integer\' AND priority BETWEEN 1 AND 4)',
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (description IS NULL OR(typeof(description) = \'text\' AND instr(CAST(description AS BLOB), X\'00\') = 0))',
+  );
+  static const VerificationMeta _isArchivedMeta = const VerificationMeta(
+    'isArchived',
+  );
+  late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
+    'is_archived',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT FALSE CHECK (typeof(is_archived) = \'integer\' AND is_archived IN (0, 1))',
+    defaultValue: const CustomExpression('FALSE'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    creationSequence,
+    id,
+    sourceIntentionId,
+    relatedIntentionId,
+    type,
+    priority,
+    description,
+    isArchived,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'long_term_relations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LongTermRelation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('creation_sequence')) {
+      context.handle(
+        _creationSequenceMeta,
+        creationSequence.isAcceptableOrUnknown(
+          data['creation_sequence']!,
+          _creationSequenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('source_intention_id')) {
+      context.handle(
+        _sourceIntentionIdMeta,
+        sourceIntentionId.isAcceptableOrUnknown(
+          data['source_intention_id']!,
+          _sourceIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIntentionIdMeta);
+    }
+    if (data.containsKey('related_intention_id')) {
+      context.handle(
+        _relatedIntentionIdMeta,
+        relatedIntentionId.isAcceptableOrUnknown(
+          data['related_intention_id']!,
+          _relatedIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_relatedIntentionIdMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_priorityMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_archived')) {
+      context.handle(
+        _isArchivedMeta,
+        isArchived.isAcceptableOrUnknown(data['is_archived']!, _isArchivedMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {creationSequence};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {sourceIntentionId, relatedIntentionId},
+  ];
+  @override
+  LongTermRelation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LongTermRelation(
+      creationSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}creation_sequence'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sourceIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_intention_id'],
+      )!,
+      relatedIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}related_intention_id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}priority'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      isArchived: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_archived'],
+      )!,
+    );
+  }
+
+  @override
+  LongTermRelations createAlias(String alias) {
+    return LongTermRelations(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'UNIQUE(source_intention_id, related_intention_id)',
+    'CHECK(source_intention_id <> related_intention_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class LongTermRelation extends DataClass
+    implements Insertable<LongTermRelation> {
+  final int creationSequence;
+  final String id;
+  final String sourceIntentionId;
+  final String relatedIntentionId;
+  final String type;
+  final int priority;
+  final String? description;
+  final bool isArchived;
+  const LongTermRelation({
+    required this.creationSequence,
+    required this.id,
+    required this.sourceIntentionId,
+    required this.relatedIntentionId,
+    required this.type,
+    required this.priority,
+    this.description,
+    required this.isArchived,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['creation_sequence'] = Variable<int>(creationSequence);
+    map['id'] = Variable<String>(id);
+    map['source_intention_id'] = Variable<String>(sourceIntentionId);
+    map['related_intention_id'] = Variable<String>(relatedIntentionId);
+    map['type'] = Variable<String>(type);
+    map['priority'] = Variable<int>(priority);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['is_archived'] = Variable<bool>(isArchived);
+    return map;
+  }
+
+  LongTermRelationsCompanion toCompanion(bool nullToAbsent) {
+    return LongTermRelationsCompanion(
+      creationSequence: Value(creationSequence),
+      id: Value(id),
+      sourceIntentionId: Value(sourceIntentionId),
+      relatedIntentionId: Value(relatedIntentionId),
+      type: Value(type),
+      priority: Value(priority),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      isArchived: Value(isArchived),
+    );
+  }
+
+  factory LongTermRelation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LongTermRelation(
+      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
+      id: serializer.fromJson<String>(json['id']),
+      sourceIntentionId: serializer.fromJson<String>(
+        json['source_intention_id'],
+      ),
+      relatedIntentionId: serializer.fromJson<String>(
+        json['related_intention_id'],
+      ),
+      type: serializer.fromJson<String>(json['type']),
+      priority: serializer.fromJson<int>(json['priority']),
+      description: serializer.fromJson<String?>(json['description']),
+      isArchived: serializer.fromJson<bool>(json['is_archived']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'creation_sequence': serializer.toJson<int>(creationSequence),
+      'id': serializer.toJson<String>(id),
+      'source_intention_id': serializer.toJson<String>(sourceIntentionId),
+      'related_intention_id': serializer.toJson<String>(relatedIntentionId),
+      'type': serializer.toJson<String>(type),
+      'priority': serializer.toJson<int>(priority),
+      'description': serializer.toJson<String?>(description),
+      'is_archived': serializer.toJson<bool>(isArchived),
+    };
+  }
+
+  LongTermRelation copyWith({
+    int? creationSequence,
+    String? id,
+    String? sourceIntentionId,
+    String? relatedIntentionId,
+    String? type,
+    int? priority,
+    Value<String?> description = const Value.absent(),
+    bool? isArchived,
+  }) => LongTermRelation(
+    creationSequence: creationSequence ?? this.creationSequence,
+    id: id ?? this.id,
+    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+    relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+    type: type ?? this.type,
+    priority: priority ?? this.priority,
+    description: description.present ? description.value : this.description,
+    isArchived: isArchived ?? this.isArchived,
+  );
+  LongTermRelation copyWithCompanion(LongTermRelationsCompanion data) {
+    return LongTermRelation(
+      creationSequence: data.creationSequence.present
+          ? data.creationSequence.value
+          : this.creationSequence,
+      id: data.id.present ? data.id.value : this.id,
+      sourceIntentionId: data.sourceIntentionId.present
+          ? data.sourceIntentionId.value
+          : this.sourceIntentionId,
+      relatedIntentionId: data.relatedIntentionId.present
+          ? data.relatedIntentionId.value
+          : this.relatedIntentionId,
+      type: data.type.present ? data.type.value : this.type,
+      priority: data.priority.present ? data.priority.value : this.priority,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      isArchived: data.isArchived.present
+          ? data.isArchived.value
+          : this.isArchived,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LongTermRelation(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('relatedIntentionId: $relatedIntentionId, ')
+          ..write('type: $type, ')
+          ..write('priority: $priority, ')
+          ..write('description: $description, ')
+          ..write('isArchived: $isArchived')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    creationSequence,
+    id,
+    sourceIntentionId,
+    relatedIntentionId,
+    type,
+    priority,
+    description,
+    isArchived,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LongTermRelation &&
+          other.creationSequence == this.creationSequence &&
+          other.id == this.id &&
+          other.sourceIntentionId == this.sourceIntentionId &&
+          other.relatedIntentionId == this.relatedIntentionId &&
+          other.type == this.type &&
+          other.priority == this.priority &&
+          other.description == this.description &&
+          other.isArchived == this.isArchived);
+}
+
+class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
+  final Value<int> creationSequence;
+  final Value<String> id;
+  final Value<String> sourceIntentionId;
+  final Value<String> relatedIntentionId;
+  final Value<String> type;
+  final Value<int> priority;
+  final Value<String?> description;
+  final Value<bool> isArchived;
+  const LongTermRelationsCompanion({
+    this.creationSequence = const Value.absent(),
+    this.id = const Value.absent(),
+    this.sourceIntentionId = const Value.absent(),
+    this.relatedIntentionId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.description = const Value.absent(),
+    this.isArchived = const Value.absent(),
+  });
+  LongTermRelationsCompanion.insert({
+    this.creationSequence = const Value.absent(),
+    required String id,
+    required String sourceIntentionId,
+    required String relatedIntentionId,
+    required String type,
+    required int priority,
+    this.description = const Value.absent(),
+    this.isArchived = const Value.absent(),
+  }) : id = Value(id),
+       sourceIntentionId = Value(sourceIntentionId),
+       relatedIntentionId = Value(relatedIntentionId),
+       type = Value(type),
+       priority = Value(priority);
+  static Insertable<LongTermRelation> custom({
+    Expression<int>? creationSequence,
+    Expression<String>? id,
+    Expression<String>? sourceIntentionId,
+    Expression<String>? relatedIntentionId,
+    Expression<String>? type,
+    Expression<int>? priority,
+    Expression<String>? description,
+    Expression<bool>? isArchived,
+  }) {
+    return RawValuesInsertable({
+      if (creationSequence != null) 'creation_sequence': creationSequence,
+      if (id != null) 'id': id,
+      if (sourceIntentionId != null) 'source_intention_id': sourceIntentionId,
+      if (relatedIntentionId != null)
+        'related_intention_id': relatedIntentionId,
+      if (type != null) 'type': type,
+      if (priority != null) 'priority': priority,
+      if (description != null) 'description': description,
+      if (isArchived != null) 'is_archived': isArchived,
+    });
+  }
+
+  LongTermRelationsCompanion copyWith({
+    Value<int>? creationSequence,
+    Value<String>? id,
+    Value<String>? sourceIntentionId,
+    Value<String>? relatedIntentionId,
+    Value<String>? type,
+    Value<int>? priority,
+    Value<String?>? description,
+    Value<bool>? isArchived,
+  }) {
+    return LongTermRelationsCompanion(
+      creationSequence: creationSequence ?? this.creationSequence,
+      id: id ?? this.id,
+      sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+      relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+      type: type ?? this.type,
+      priority: priority ?? this.priority,
+      description: description ?? this.description,
+      isArchived: isArchived ?? this.isArchived,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (creationSequence.present) {
+      map['creation_sequence'] = Variable<int>(creationSequence.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sourceIntentionId.present) {
+      map['source_intention_id'] = Variable<String>(sourceIntentionId.value);
+    }
+    if (relatedIntentionId.present) {
+      map['related_intention_id'] = Variable<String>(relatedIntentionId.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<int>(priority.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (isArchived.present) {
+      map['is_archived'] = Variable<bool>(isArchived.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LongTermRelationsCompanion(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('relatedIntentionId: $relatedIntentionId, ')
+          ..write('type: $type, ')
+          ..write('priority: $priority, ')
+          ..write('description: $description, ')
+          ..write('isArchived: $isArchived')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class IntentionTitlesFts extends Table
     with
         TableInfo<IntentionTitlesFts, IntentionTitlesFt>,
@@ -685,6 +1223,31 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final Intentions intentions = Intentions(this);
+  late final LongTermRelations longTermRelations = LongTermRelations(this);
+  late final Index longTermRelationsSourceGroupOrder = Index(
+    'long_term_relations_source_group_order',
+    'CREATE INDEX long_term_relations_source_group_order ON long_term_relations (source_intention_id, type, is_archived, priority, creation_sequence)',
+  );
+  late final Index longTermRelationsRelatedGroupOrder = Index(
+    'long_term_relations_related_group_order',
+    'CREATE INDEX long_term_relations_related_group_order ON long_term_relations (related_intention_id, type, is_archived, priority, creation_sequence)',
+  );
+  late final Trigger longTermRelationsImmutableIdentity = Trigger(
+    'CREATE TRIGGER long_term_relations_immutable_identity AFTER UPDATE OF creation_sequence, id ON long_term_relations WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'long-term relation identity is immutable\');END',
+    'long_term_relations_immutable_identity',
+  );
+  late final Trigger longTermRelationsActiveParticipantsAfterInsert = Trigger(
+    'CREATE TRIGGER long_term_relations_active_participants_after_insert AFTER INSERT ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, \'active relation requires active intentions\');END',
+    'long_term_relations_active_participants_after_insert',
+  );
+  late final Trigger longTermRelationsActiveParticipantsAfterUpdate = Trigger(
+    'CREATE TRIGGER long_term_relations_active_participants_after_update AFTER UPDATE OF source_intention_id, related_intention_id, is_archived ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, \'active relation requires active intentions\');END',
+    'long_term_relations_active_participants_after_update',
+  );
+  late final Trigger intentionsArchiveRequiresNoActiveRelations = Trigger(
+    'CREATE TRIGGER intentions_archive_requires_no_active_relations AFTER UPDATE OF is_archived ON intentions WHEN old.is_archived = 0 AND new.is_archived = 1 AND EXISTS (SELECT 1 FROM long_term_relations WHERE is_archived = 0 AND(source_intention_id = new.id OR related_intention_id = new.id)) BEGIN SELECT RAISE (ABORT, \'active relations must be archived first\');END',
+    'intentions_archive_requires_no_active_relations',
+  );
   late final IntentionTitlesFts intentionTitlesFts = IntentionTitlesFts(this);
   late final Trigger intentionsFtsAfterInsert = Trigger(
     'CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
@@ -752,6 +1315,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     intentions,
+    longTermRelations,
+    longTermRelationsSourceGroupOrder,
+    longTermRelationsRelatedGroupOrder,
+    longTermRelationsImmutableIdentity,
+    longTermRelationsActiveParticipantsAfterInsert,
+    longTermRelationsActiveParticipantsAfterUpdate,
+    intentionsArchiveRequiresNoActiveRelations,
     intentionTitlesFts,
     intentionsFtsAfterInsert,
     intentionsFtsAfterUpdateSearchContent,
@@ -771,6 +1341,34 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'intentions',
@@ -1044,6 +1642,466 @@ typedef $IntentionsProcessedTableManager =
       Intention,
       PrefetchHooks Function()
     >;
+typedef $LongTermRelationsCreateCompanionBuilder =
+    LongTermRelationsCompanion Function({
+      Value<int> creationSequence,
+      required String id,
+      required String sourceIntentionId,
+      required String relatedIntentionId,
+      required String type,
+      required int priority,
+      Value<String?> description,
+      Value<bool> isArchived,
+    });
+typedef $LongTermRelationsUpdateCompanionBuilder =
+    LongTermRelationsCompanion Function({
+      Value<int> creationSequence,
+      Value<String> id,
+      Value<String> sourceIntentionId,
+      Value<String> relatedIntentionId,
+      Value<String> type,
+      Value<int> priority,
+      Value<String?> description,
+      Value<bool> isArchived,
+    });
+
+final class $LongTermRelationsReferences
+    extends BaseReferences<_$AppDatabase, LongTermRelations, LongTermRelation> {
+  $LongTermRelationsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static Intentions _sourceIntentionIdTable(_$AppDatabase db) => db.intentions
+      .createAlias('long_term_relations__source_intention_id__intentions__id');
+
+  $IntentionsProcessedTableManager get sourceIntentionId {
+    final $_column = $_itemColumn<String>('source_intention_id')!;
+
+    final manager = $IntentionsTableManager(
+      $_db,
+      $_db.intentions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sourceIntentionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static Intentions _relatedIntentionIdTable(_$AppDatabase db) => db.intentions
+      .createAlias('long_term_relations__related_intention_id__intentions__id');
+
+  $IntentionsProcessedTableManager get relatedIntentionId {
+    final $_column = $_itemColumn<String>('related_intention_id')!;
+
+    final manager = $IntentionsTableManager(
+      $_db,
+      $_db.intentions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_relatedIntentionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $LongTermRelationsFilterComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $IntentionsFilterComposer get sourceIntentionId {
+    final $IntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsFilterComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsFilterComposer get relatedIntentionId {
+    final $IntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsFilterComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $LongTermRelationsOrderingComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $IntentionsOrderingComposer get sourceIntentionId {
+    final $IntentionsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsOrderingComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsOrderingComposer get relatedIntentionId {
+    final $IntentionsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsOrderingComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $LongTermRelationsAnnotationComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<int> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => column,
+  );
+
+  $IntentionsAnnotationComposer get sourceIntentionId {
+    final $IntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsAnnotationComposer get relatedIntentionId {
+    final $IntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $LongTermRelationsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          LongTermRelations,
+          LongTermRelation,
+          $LongTermRelationsFilterComposer,
+          $LongTermRelationsOrderingComposer,
+          $LongTermRelationsAnnotationComposer,
+          $LongTermRelationsCreateCompanionBuilder,
+          $LongTermRelationsUpdateCompanionBuilder,
+          (LongTermRelation, $LongTermRelationsReferences),
+          LongTermRelation,
+          PrefetchHooks Function({
+            bool sourceIntentionId,
+            bool relatedIntentionId,
+          })
+        > {
+  $LongTermRelationsTableManager(_$AppDatabase db, LongTermRelations table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $LongTermRelationsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $LongTermRelationsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $LongTermRelationsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> sourceIntentionId = const Value.absent(),
+                Value<String> relatedIntentionId = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<int> priority = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+              }) => LongTermRelationsCompanion(
+                creationSequence: creationSequence,
+                id: id,
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                type: type,
+                priority: priority,
+                description: description,
+                isArchived: isArchived,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                required String id,
+                required String sourceIntentionId,
+                required String relatedIntentionId,
+                required String type,
+                required int priority,
+                Value<String?> description = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+              }) => LongTermRelationsCompanion.insert(
+                creationSequence: creationSequence,
+                id: id,
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                type: type,
+                priority: priority,
+                description: description,
+                isArchived: isArchived,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $LongTermRelationsReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({sourceIntentionId = false, relatedIntentionId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (sourceIntentionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.sourceIntentionId,
+                            referencedTable: $LongTermRelationsReferences
+                                ._sourceIntentionIdTable(db),
+                            referencedColumn: $LongTermRelationsReferences
+                                ._sourceIntentionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (relatedIntentionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.relatedIntentionId,
+                            referencedTable: $LongTermRelationsReferences
+                                ._relatedIntentionIdTable(db),
+                            referencedColumn: $LongTermRelationsReferences
+                                ._relatedIntentionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $LongTermRelationsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      LongTermRelations,
+      LongTermRelation,
+      $LongTermRelationsFilterComposer,
+      $LongTermRelationsOrderingComposer,
+      $LongTermRelationsAnnotationComposer,
+      $LongTermRelationsCreateCompanionBuilder,
+      $LongTermRelationsUpdateCompanionBuilder,
+      (LongTermRelation, $LongTermRelationsReferences),
+      LongTermRelation,
+      PrefetchHooks Function({bool sourceIntentionId, bool relatedIntentionId})
+    >;
 typedef $IntentionTitlesFtsCreateCompanionBuilder =
     IntentionTitlesFtsCompanion Function({
       required String titleSearchKey,
@@ -1180,6 +2238,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $IntentionsTableManager get intentions =>
       $IntentionsTableManager(_db, _db.intentions);
+  $LongTermRelationsTableManager get longTermRelations =>
+      $LongTermRelationsTableManager(_db, _db.longTermRelations);
   $IntentionTitlesFtsTableManager get intentionTitlesFts =>
       $IntentionTitlesFtsTableManager(_db, _db.intentionTitlesFts);
 }

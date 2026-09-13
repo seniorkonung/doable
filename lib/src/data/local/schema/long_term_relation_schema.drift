@@ -1,0 +1,119 @@
+import 'intention_schema.drift';
+
+CREATE TABLE long_term_relations (
+  creation_sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
+    CHECK (creation_sequence > 0),
+  id TEXT NOT NULL UNIQUE,
+  source_intention_id TEXT NOT NULL
+    REFERENCES intentions(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  related_intention_id TEXT NOT NULL
+    REFERENCES intentions(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  type TEXT NOT NULL CHECK (
+    typeof(type) = 'text' AND
+    type IN ('need', 'can')
+  ),
+  priority INTEGER NOT NULL CHECK (
+    typeof(priority) = 'integer' AND
+    priority BETWEEN 1 AND 4
+  ),
+  description TEXT CHECK (
+    description IS NULL OR
+    (
+      typeof(description) = 'text' AND
+      instr(CAST(description AS BLOB), x'00') = 0
+    )
+  ),
+  is_archived BOOLEAN NOT NULL DEFAULT FALSE CHECK (
+    typeof(is_archived) = 'integer' AND
+    is_archived IN (0, 1)
+  ),
+  UNIQUE (source_intention_id, related_intention_id),
+  CHECK (source_intention_id <> related_intention_id)
+);
+
+CREATE INDEX long_term_relations_source_group_order
+  ON long_term_relations (
+    source_intention_id,
+    type,
+    is_archived,
+    priority,
+    creation_sequence
+  );
+
+CREATE INDEX long_term_relations_related_group_order
+  ON long_term_relations (
+    related_intention_id,
+    type,
+    is_archived,
+    priority,
+    creation_sequence
+  );
+
+CREATE TRIGGER long_term_relations_immutable_identity
+AFTER UPDATE OF creation_sequence, id ON long_term_relations
+WHEN
+  new.creation_sequence <> old.creation_sequence OR
+  new.id <> old.id
+BEGIN
+  SELECT RAISE(ABORT, 'long-term relation identity is immutable');
+END;
+
+CREATE TRIGGER long_term_relations_active_participants_after_insert
+AFTER INSERT ON long_term_relations
+WHEN
+  new.is_archived = 0 AND
+  (
+    NOT EXISTS (
+      SELECT 1
+      FROM intentions
+      WHERE id = new.source_intention_id AND is_archived = 0
+    ) OR
+    NOT EXISTS (
+      SELECT 1
+      FROM intentions
+      WHERE id = new.related_intention_id AND is_archived = 0
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'active relation requires active intentions');
+END;
+
+CREATE TRIGGER long_term_relations_active_participants_after_update
+AFTER UPDATE OF source_intention_id, related_intention_id, is_archived
+ON long_term_relations
+WHEN
+  new.is_archived = 0 AND
+  (
+    NOT EXISTS (
+      SELECT 1
+      FROM intentions
+      WHERE id = new.source_intention_id AND is_archived = 0
+    ) OR
+    NOT EXISTS (
+      SELECT 1
+      FROM intentions
+      WHERE id = new.related_intention_id AND is_archived = 0
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'active relation requires active intentions');
+END;
+
+CREATE TRIGGER intentions_archive_requires_no_active_relations
+AFTER UPDATE OF is_archived ON intentions
+WHEN
+  old.is_archived = 0 AND
+  new.is_archived = 1 AND
+  EXISTS (
+    SELECT 1
+    FROM long_term_relations
+    WHERE
+      is_archived = 0 AND
+      (
+        source_intention_id = new.id OR
+        related_intention_id = new.id
+      )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'active relations must be archived first');
+END;

@@ -58,7 +58,11 @@ MigrationStrategy localDataMigrationStrategy(
         await runAtomicMigration(
           database,
           targetSchemaVersion: to,
-          migrate: () => generated.stepByStep()(migrator, from, to),
+          migrate: () => generated.stepByStep(from1To2: _migrateFrom1To2)(
+            migrator,
+            from,
+            to,
+          ),
         );
       },
     ),
@@ -70,6 +74,19 @@ MigrationStrategy localDataMigrationStrategy(
       await database.customStatement('PRAGMA foreign_keys = ON');
     },
   );
+}
+
+Future<void> _migrateFrom1To2(
+  Migrator migrator,
+  generated.Schema2 schema,
+) async {
+  await migrator.create(schema.longTermRelations);
+  await migrator.create(schema.longTermRelationsSourceGroupOrder);
+  await migrator.create(schema.longTermRelationsRelatedGroupOrder);
+  await migrator.create(schema.longTermRelationsImmutableIdentity);
+  await migrator.create(schema.longTermRelationsActiveParticipantsAfterInsert);
+  await migrator.create(schema.longTermRelationsActiveParticipantsAfterUpdate);
+  await migrator.create(schema.intentionsArchiveRequiresNoActiveRelations);
 }
 
 Future<void> _recordMigration(
