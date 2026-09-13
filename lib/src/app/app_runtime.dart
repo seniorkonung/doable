@@ -3,16 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/local/app_database.dart';
 import '../data/local/bootstrap/local_data_bootstrap.dart';
 import '../data/local/bootstrap/local_data_bootstrap_result.dart';
-import 'routing/app_router_provider.dart';
+import '../graph/application/graph_command_coordinator.dart';
+import '../graph/application/personal_graph_repository.dart';
+import '../graph/application/personal_graph_repository_provider.dart';
+import '../graph/data/drift_personal_graph_repository.dart';
 import '../intention/application/intention_id_generator.dart';
-import '../intention/application/intention_repository.dart';
 import '../intention/data/drift_intention_repository.dart';
-import '../intention/presentation/operation/intention_command_coordinator.dart';
 import '../intention/presentation/operation/intention_repository_provider.dart';
 import '../shared/diagnostics/developer_diagnostics_sink.dart';
 import '../shared/diagnostics/diagnostics_sink.dart';
+import 'routing/app_router_provider.dart';
 
-typedef AppIntentionRepositoryFactory = IntentionRepository Function(
+typedef AppPersonalGraphRepositoryFactory = PersonalGraphRepository Function(
   AppDatabase database,
 );
 
@@ -52,11 +54,11 @@ final class AppRuntime {
   factory AppRuntime({
     required LocalDataConnectionFactory connectionFactory,
     required DiagnosticsSink diagnosticsSink,
-    AppIntentionRepositoryFactory? repositoryFactory,
+    AppPersonalGraphRepositoryFactory? repositoryFactory,
   }) {
     final resolvedRepositoryFactory =
         repositoryFactory ??
-        (database) => DriftIntentionRepository(
+        (database) => DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
           () => DateTime.now().toUtc(),
@@ -82,14 +84,14 @@ final class AppRuntime {
   AppRuntime._(this._localDataBootstrap, this._repositoryFactory);
 
   final LocalDataBootstrap _localDataBootstrap;
-  final AppIntentionRepositoryFactory _repositoryFactory;
+  final AppPersonalGraphRepositoryFactory _repositoryFactory;
   var _lifecycle = _AppRuntimeLifecycle.running;
   Future<AppRuntimeBootstrapResult>? _bootstrapping;
   AppRuntimeReady? _ready;
-  IntentionCommandCoordinator? _commandCoordinator;
+  GraphCommandCoordinator? _commandCoordinator;
   Future<void>? _shuttingDown;
 
-  IntentionCommandCoordinator get commandCoordinator {
+  GraphCommandCoordinator get commandCoordinator {
     final coordinator = _commandCoordinator;
     if (coordinator == null) {
       throw StateError('Coordinator недоступен до готовности AppRuntime.');
@@ -145,12 +147,17 @@ final class AppRuntime {
     ProviderContainer? container;
     try {
       final repository = _repositoryFactory(database);
+      final intentionRepository =
+          DriftIntentionRepository.fromPersonalGraphRepository(repository);
       container = ProviderContainer(
-        overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+          intentionRepositoryProvider.overrideWithValue(intentionRepository),
+        ],
         retry: (retryCount, error) => null,
       );
       final coordinator = container.read(
-        intentionCommandCoordinatorProvider.notifier,
+        graphCommandCoordinatorProvider.notifier,
       );
       container.read(appRouterProvider);
       _commandCoordinator = coordinator;
