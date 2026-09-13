@@ -1,9 +1,9 @@
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
-import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,7 +16,7 @@ ProviderContainer reconciliationCatalogContainer(
   int prefetchRemaining = 30,
 }) => ProviderContainer(
   overrides: [
-    intentionRepositoryProvider.overrideWithValue(repository),
+    personalGraphRepositoryProvider.overrideWithValue(repository),
     catalogPagingPolicyProvider.overrideWithValue(
       CatalogPagingPolicy(
         pageSize: pageSize,
@@ -47,11 +47,15 @@ Future<IntentionCommandCompletion> completeCatalogCommand(
   IntentionCommand command,
   IntentionCommandSuccess success,
 ) async {
-  final coordinator = container.read(
-    intentionCommandCoordinatorProvider.notifier,
-  );
+  final coordinator = container.read(graphCommandCoordinatorProvider.notifier);
   final commandIndex = repository.commands.length;
-  final start = coordinator.accept(command);
+  final start = switch (command) {
+    CreateIntention() => coordinator.acceptCreation(
+      IntentionCreationFormKey(),
+      command,
+    ),
+    ExistingIntentionCommand() => coordinator.acceptExisting(command),
+  };
   expect(start, isA<IntentionCommandAccepted>());
   final accepted = start as IntentionCommandAccepted;
   repository.completeCommand(commandIndex, ResultSuccess(success));

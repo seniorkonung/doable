@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
+import '../../../graph/application/personal_graph_repository.dart';
+import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/intention_repository.dart';
 import '../../application/intention_result.dart';
-import '../operation/intention_command_coordinator.dart';
-import '../operation/intention_repository_provider.dart';
+import '../../domain/intention_id.dart';
 import 'catalog_paging_policy.dart';
 import 'intention_catalog_state.dart';
 
@@ -25,7 +28,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   int _queryGeneration = 0;
   Object? _activePageRequest;
   bool _isLoadingFirstPage = false;
-  final _mutationsBeforeFirstPage = <IntentionCatalogMutation>[];
+  final _mutationPackagesBeforeFirstPage = <List<IntentionCatalogMutation>>[];
   IntentionSummary? _cursorBoundary;
   _PendingCatalogContinuation? _pendingContinuation;
 
@@ -52,13 +55,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   Future<IntentionCatalogState> build() {
     _invalidatePageRequest();
     _isLoadingFirstPage = false;
-    _mutationsBeforeFirstPage.clear();
+    _mutationPackagesBeforeFirstPage.clear();
     _cursorBoundary = null;
     _pendingContinuation = null;
-    final repository = ref.watch(intentionRepositoryProvider);
+    final repository = ref.watch(personalGraphRepositoryProvider);
     _policy = ref.watch(catalogPagingPolicyProvider);
     final completionSubscription = ref
-        .watch(intentionCommandCoordinatorProvider.notifier)
+        .watch(graphCommandCoordinatorProvider.notifier)
         .completions
         .listen(_handleCompletion);
     ref.onDispose(() => unawaited(completionSubscription.cancel()));
@@ -185,7 +188,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   Future<IntentionCatalogState> _loadFirstPage(
-    IntentionRepository repository,
+    PersonalGraphRepository repository,
     IntentionCatalogQuery query,
     IntentionCatalogSelection selection,
     int generation,
@@ -203,24 +206,24 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       if (mapped case final IntentionCatalogConfirmedState confirmed) {
         _cursorBoundary = _boundaryFromFirstPage(confirmed);
         var reconciled = confirmed;
-        for (final mutation in _mutationsBeforeFirstPage) {
-          final next = _applyMutation(reconciled, mutation);
+        for (final mutations in _mutationPackagesBeforeFirstPage) {
+          final next = _applyMutationPackage(reconciled, mutations);
           if (next == null) {
-            _mutationsBeforeFirstPage.clear();
+            _mutationPackagesBeforeFirstPage.clear();
             scheduleMicrotask(_restartFromFirstPage);
             return confirmed;
           }
           reconciled = next;
         }
-        _mutationsBeforeFirstPage.clear();
+        _mutationPackagesBeforeFirstPage.clear();
         return reconciled;
       }
-      _mutationsBeforeFirstPage.clear();
+      _mutationPackagesBeforeFirstPage.clear();
       return mapped;
     } on Object {
       if (_queryGeneration == generation) {
         _isLoadingFirstPage = false;
-        _mutationsBeforeFirstPage.clear();
+        _mutationPackagesBeforeFirstPage.clear();
       }
       return IntentionCatalogUnexpected(selection: selection, query: query);
     }
@@ -311,7 +314,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     );
 
     try {
-      final repository = ref.read(intentionRepositoryProvider);
+      final repository = ref.read(personalGraphRepositoryProvider);
       final query = _continuationQuery(confirmed);
       while (_ownsRequest(request, generation)) {
         final result = await repository.getCatalogPage(query);
@@ -366,7 +369,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     );
 
     try {
-      final repository = ref.read(intentionRepositoryProvider);
+      final repository = ref.read(personalGraphRepositoryProvider);
       final query = _firstPageQuery(confirmed);
       while (_ownsRequest(request, generation)) {
         final result = await repository.getCatalogPage(query);
@@ -381,7 +384,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
               if (current
                   case final IntentionCatalogConfirmedState currentConfirmed) {
                 if (page.revision.compareTo(currentConfirmed.revision) ==
-                    IntentionCatalogRevisionOrder.older) {
+                    GraphRevisionOrder.older) {
                   continue;
                 }
               }
@@ -478,12 +481,12 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
 
     switch (page.revision.compareTo(confirmed.revision)) {
-      case IntentionCatalogRevisionOrder.older:
+      case GraphRevisionOrder.older:
         return true;
-      case IntentionCatalogRevisionOrder.same:
+      case GraphRevisionOrder.same:
         state = AsyncData(_appendPage(confirmed, page));
         return false;
-      case IntentionCatalogRevisionOrder.newer:
+      case GraphRevisionOrder.newer:
         _pendingContinuation = _PendingCatalogContinuation(
           generation: generation,
           page: page,
@@ -495,7 +498,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           ),
         );
         return false;
-      case IntentionCatalogRevisionOrder.differentEpoch:
+      case GraphRevisionOrder.differentEpoch:
         _restartFromFirstPage();
         return false;
     }
@@ -576,7 +579,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   void _handleCompletion(IntentionCommandCompletion completion) {
-    final coordinator = ref.read(intentionCommandCoordinatorProvider.notifier);
+    final coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
     unawaited(
       _publishFallback(
         coordinator.claimCatalogFallback(completion.token),
@@ -584,25 +587,29 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       ),
     );
 
-    switch (completion.result) {
+    switch (completion.confirmedResult) {
       case ResultSuccess(:final value):
-        _reconcileMutation(value.catalogMutation);
+        _reconcileMutations(
+          value.changes.whereType<IntentionCatalogMutation>().toList(
+            growable: false,
+          ),
+        );
       case ResultFailure():
         return;
     }
   }
 
-  void _reconcileMutation(IntentionCatalogMutation mutation) {
-    if (!ref.mounted) {
+  void _reconcileMutations(List<IntentionCatalogMutation> mutations) {
+    if (!ref.mounted || mutations.isEmpty) {
       return;
     }
     final current = state.value;
     if (_isLoadingFirstPage || current is! IntentionCatalogConfirmedState) {
-      _mutationsBeforeFirstPage.add(mutation);
+      _mutationPackagesBeforeFirstPage.add(mutations);
       return;
     }
 
-    final reconciled = _applyMutation(current, mutation);
+    final reconciled = _applyMutationPackage(current, mutations);
     if (reconciled == null) {
       _restartFromFirstPage();
       return;
@@ -624,15 +631,15 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
 
     switch (pending.page.revision.compareTo(confirmed.revision)) {
-      case IntentionCatalogRevisionOrder.newer:
+      case GraphRevisionOrder.newer:
         return;
-      case IntentionCatalogRevisionOrder.same:
+      case GraphRevisionOrder.same:
         _pendingContinuation = null;
         state = AsyncData(_appendPage(confirmed, pending.page));
-      case IntentionCatalogRevisionOrder.older:
+      case GraphRevisionOrder.older:
         _pendingContinuation = null;
         scheduleMicrotask(_retryStalePendingContinuation);
-      case IntentionCatalogRevisionOrder.differentEpoch:
+      case GraphRevisionOrder.differentEpoch:
         _pendingContinuation = null;
         _restartFromFirstPage();
     }
@@ -659,20 +666,48 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
-  IntentionCatalogConfirmedState? _applyMutation(
+  IntentionCatalogConfirmedState? _applyMutationPackage(
     IntentionCatalogConfirmedState confirmed,
-    IntentionCatalogMutation mutation,
+    List<IntentionCatalogMutation> mutations,
   ) {
-    switch (mutation.revision.compareTo(confirmed.revision)) {
-      case IntentionCatalogRevisionOrder.older ||
-          IntentionCatalogRevisionOrder.same:
+    final revision = mutations.first.revision;
+    if (mutations.any(
+      (mutation) =>
+          mutation.revision.compareTo(revision) != GraphRevisionOrder.same,
+    )) {
+      return null;
+    }
+
+    switch (revision.compareTo(confirmed.revision)) {
+      case GraphRevisionOrder.older || GraphRevisionOrder.same:
         return confirmed;
-      case IntentionCatalogRevisionOrder.differentEpoch:
+      case GraphRevisionOrder.differentEpoch:
         return null;
-      case IntentionCatalogRevisionOrder.newer:
+      case GraphRevisionOrder.newer:
         break;
     }
 
+    var reconciled = confirmed;
+    final changedIds = <IntentionId>{};
+    for (final mutation in mutations) {
+      final changedId =
+          mutation.after?.summary.id ?? mutation.before?.summary.id;
+      if (changedId == null || !changedIds.add(changedId)) {
+        return null;
+      }
+      final next = _applyMutationContent(reconciled, mutation);
+      if (next == null) {
+        return null;
+      }
+      reconciled = next;
+    }
+    return reconciled;
+  }
+
+  IntentionCatalogConfirmedState? _applyMutationContent(
+    IntentionCatalogConfirmedState confirmed,
+    IntentionCatalogMutation mutation,
+  ) {
     final beforeMatches = mutation.before?.matches(confirmed.query) ?? false;
     final afterMatches = mutation.after?.matches(confirmed.query) ?? false;
     final totalCount =
@@ -685,10 +720,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCatalogLoaded(:final items) => [...items],
       IntentionCatalogEmpty() => <IntentionSummary>[],
     };
-    final changedId = mutation.after?.summary.id ?? mutation.before?.summary.id;
-    if (changedId == null) {
-      return null;
-    }
+    final changedId = mutation.after?.summary.id ?? mutation.before!.summary.id;
     items.removeWhere((item) => item.id == changedId);
 
     final after = mutation.after;
@@ -733,7 +765,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   Future<void> _publishFallback(
     Future<IntentionCatalogFallbackPresentationClaim?> pendingClaim,
-    IntentionCommandCoordinator coordinator,
+    GraphCommandCoordinator coordinator,
   ) async {
     final claim = await pendingClaim;
     if (claim == null) {

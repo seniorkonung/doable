@@ -1,9 +1,9 @@
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
@@ -76,9 +76,10 @@ void main() {
     addTearDown(container.dispose);
 
     final coordinator = container.read(
-      intentionCommandCoordinatorProvider.notifier,
+      graphCommandCoordinatorProvider.notifier,
     );
-    final accepted = coordinator.accept(
+    final accepted = coordinator.acceptCreation(
+      IntentionCreationFormKey(),
       const CreateIntention(title: 'Новое', description: null),
     ) as IntentionCommandAccepted;
     final created = testSummary(index: 9, title: 'Новое');
@@ -370,12 +371,14 @@ void main() {
       await container.read(intentionCatalogViewModelProvider.future);
 
       final coordinator = container.read(
-        intentionCommandCoordinatorProvider.notifier,
+        graphCommandCoordinatorProvider.notifier,
       );
-      final firstAccepted = coordinator.accept(
+      final firstAccepted = coordinator.acceptCreation(
+        IntentionCreationFormKey(),
         const CreateIntention(title: 'Новое 1', description: null),
       ) as IntentionCommandAccepted;
-      final secondAccepted = coordinator.accept(
+      final secondAccepted = coordinator.acceptCreation(
+        IntentionCreationFormKey(),
         const CreateIntention(title: 'Новое 2', description: null),
       ) as IntentionCommandAccepted;
       final notifier = container.read(

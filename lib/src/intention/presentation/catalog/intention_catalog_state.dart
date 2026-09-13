@@ -1,3 +1,4 @@
+import '../../../graph/application/graph_revision.dart';
 import '../../application/intention_repository.dart';
 
 enum IntentionCatalogCreateOutcome {
@@ -106,7 +107,7 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
   final IntentionCatalogQuery query;
   final int totalCount;
   final IntentionCatalogCursor? nextCursor;
-  final IntentionCatalogRevision revision;
+  final GraphRevision revision;
 }
 
 final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {

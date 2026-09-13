@@ -2,12 +2,12 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
-import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -445,7 +445,9 @@ Future<AppRouter> _openEditor(
   addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
       retry: (retryCount, error) => null,
       child: MaterialApp.router(
         locale: locale,

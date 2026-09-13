@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -8,7 +9,6 @@ import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
-import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -218,7 +218,7 @@ void main() {
 
 ProviderContainer _container(ControlledCatalogRepository repository) {
   final container = ProviderContainer.test(
-    overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
   );
   addTearDown(container.dispose);
   return container;

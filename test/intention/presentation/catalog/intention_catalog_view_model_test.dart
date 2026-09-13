@@ -1,13 +1,13 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
-import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -1023,14 +1023,15 @@ void main() {
       await container.read(intentionCatalogViewModelProvider.future);
 
       final coordinator = container.read(
-        intentionCommandCoordinatorProvider.notifier,
+        graphCommandCoordinatorProvider.notifier,
       );
       final observedCompletions = <IntentionCommandCompletion>[];
       final completionSubscription = coordinator.completions.listen(
         observedCompletions.add,
       );
       addTearDown(completionSubscription.cancel);
-      final start = coordinator.accept(
+      final start = coordinator.acceptCreation(
+        IntentionCreationFormKey(),
         const CreateIntention(title: 'Новое', description: null),
       );
       expect(start, isA<IntentionCommandAccepted>());
@@ -1150,9 +1151,9 @@ void main() {
 
       notifier.addPresentationListener(listener);
       final coordinator = container.read(
-        intentionCommandCoordinatorProvider.notifier,
+        graphCommandCoordinatorProvider.notifier,
       );
-      final started = coordinator.accept(
+      final started = coordinator.acceptExisting(
         UpdateIntention(
           id: intention.id,
           title: intention.title,
@@ -1186,7 +1187,7 @@ ProviderContainer _catalogContainer(
   int prefetchRemaining = 30,
 }) => ProviderContainer(
   overrides: [
-    intentionRepositoryProvider.overrideWithValue(repository),
+    personalGraphRepositoryProvider.overrideWithValue(repository),
     catalogPagingPolicyProvider.overrideWithValue(
       CatalogPagingPolicy(
         pageSize: pageSize,

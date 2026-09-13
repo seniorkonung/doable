@@ -1,16 +1,19 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 
-final class ControlledCatalogRepository implements IntentionRepository {
+final class ControlledCatalogRepository implements PersonalGraphRepository {
   final queries = <IntentionCatalogQuery>[];
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
   final commands = <IntentionCommand>[];
-  final _commandRequests = <Completer<Result<IntentionCommandSuccess>>>[];
+  final _commandRequests =
+      <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -23,7 +26,15 @@ final class ControlledCatalogRepository implements IntentionRepository {
   }
 
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
-    _commandRequests[index].complete(result);
+    _commandRequests[index].complete(switch (result) {
+      ResultSuccess(:final value) => ResultSuccess(
+        ConfirmedGraphResult(
+          revision: value.catalogMutation.revision,
+          value: value,
+        ),
+      ),
+      ResultFailure(:final failure) => ResultFailure(failure),
+    });
   }
 
   @override
@@ -37,15 +48,18 @@ final class ControlledCatalogRepository implements IntentionRepository {
   }
 
   @override
-  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command) {
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
+    IntentionCommand command,
+  ) {
     commands.add(command);
-    final request = Completer<Result<IntentionCommandSuccess>>();
+    final request =
+        Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
     _commandRequests.add(request);
     return request.future;
   }
 
   @override
-  Stream<Result<Intention?>> watchById(IntentionId id) =>
+  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
       throw UnsupportedError('Подробное чтение не используется в тесте.');
 }
 
@@ -53,21 +67,21 @@ final class TestCatalogCursor implements IntentionCatalogCursor {
   const TestCatalogCursor();
 }
 
-final class TestCatalogRevision implements IntentionCatalogRevision {
+final class TestCatalogRevision implements GraphRevision {
   const TestCatalogRevision(this.sequence, {this.epoch = 0});
 
   final int sequence;
   final int epoch;
 
   @override
-  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) {
+  GraphRevisionOrder compareTo(GraphRevision other) {
     if (other is! TestCatalogRevision || epoch != other.epoch) {
-      return IntentionCatalogRevisionOrder.differentEpoch;
+      return GraphRevisionOrder.differentEpoch;
     }
     final comparison = sequence.compareTo(other.sequence);
-    if (comparison < 0) return IntentionCatalogRevisionOrder.older;
-    if (comparison > 0) return IntentionCatalogRevisionOrder.newer;
-    return IntentionCatalogRevisionOrder.same;
+    if (comparison < 0) return GraphRevisionOrder.older;
+    if (comparison > 0) return GraphRevisionOrder.newer;
+    return GraphRevisionOrder.same;
   }
 }
 
