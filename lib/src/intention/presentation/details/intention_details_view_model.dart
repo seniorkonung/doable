@@ -7,7 +7,7 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/intention_command.dart';
-import '../../application/intention_repository.dart';
+import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';

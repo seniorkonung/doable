@@ -5,14 +5,13 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart'
     show IntentionCommandCoordinator, intentionCommandCoordinatorProvider;
-import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -142,9 +141,11 @@ void main() {
 
   group('IntentionCommandCoordinator', () {
     test('generated provider сохраняет один keep-alive coordinator', () {
-      final repository = _ControlledIntentionRepository();
+      final repository = _ControlledCompatibilityGraphRepository();
       final container = ProviderContainer.test(
-        overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
       );
       final provider = intentionCommandCoordinatorProvider;
 
@@ -157,7 +158,7 @@ void main() {
     test(
       'синхронно принимает command и сохраняет gate одного намерения',
       () async {
-        final repository = _ControlledIntentionRepository();
+        final repository = _ControlledCompatibilityGraphRepository();
         final coordinator = _coordinator(repository);
         final firstId = _id(_firstUuid);
         final secondId = _id(_secondUuid);
@@ -208,7 +209,7 @@ void main() {
     );
 
     test('не сериализует независимые формы создания общим gate', () async {
-      final repository = _ControlledIntentionRepository();
+      final repository = _ControlledCompatibilityGraphRepository();
       final coordinator = _coordinator(repository);
 
       final first = coordinator.accept(
@@ -238,7 +239,7 @@ void main() {
     test(
       'публикует один completion всем текущим data consumers без replay',
       () async {
-        final repository = _ControlledIntentionRepository();
+        final repository = _ControlledCompatibilityGraphRepository();
         final coordinator = _coordinator(repository);
         final firstConsumer = <IntentionCommandCompletion>[];
         final secondConsumer = <IntentionCommandCompletion>[];
@@ -277,7 +278,7 @@ void main() {
     );
 
     test('details consumers фильтруют success по идентификатору и игнорируют failure', () async {
-      final repository = _ControlledIntentionRepository();
+      final repository = _ControlledCompatibilityGraphRepository();
       final coordinator = _coordinator(repository);
       final firstId = _id(_firstUuid);
       final secondId = _id(_secondUuid);
@@ -326,7 +327,7 @@ void main() {
     test(
       'преобразует неожиданную ошибку repository в typed completion',
       () async {
-        final repository = _ControlledIntentionRepository()
+        final repository = _ControlledCompatibilityGraphRepository()
           ..nextError = StateError('неожиданный отказ');
         final coordinator = _coordinator(repository);
 
@@ -356,7 +357,7 @@ void main() {
     );
 
     test('инициатор имеет приоритетный взаимоисключающий claim', () async {
-      final repository = _ControlledIntentionRepository();
+      final repository = _ControlledCompatibilityGraphRepository();
       final coordinator = _coordinator(repository);
       late Future<IntentionCatalogFallbackPresentationClaim?> fallback;
       final subscription = coordinator.completions.listen((completion) {
@@ -383,7 +384,7 @@ void main() {
     });
 
     test('disposal до terminal outcome передаёт claim каталогу', () async {
-      final repository = _ControlledIntentionRepository();
+      final repository = _ControlledCompatibilityGraphRepository();
       final coordinator = _coordinator(repository);
       final intentionId = _id(_firstUuid);
       late Future<IntentionCatalogFallbackPresentationClaim?> fallback;
@@ -417,7 +418,7 @@ void main() {
     test(
       'гонка terminal outcome и disposal сохраняет fallback claim',
       () async {
-        final repository = _ControlledIntentionRepository();
+        final repository = _ControlledCompatibilityGraphRepository();
         final coordinator = _coordinator(repository);
         late Future<IntentionCatalogFallbackPresentationClaim?> fallback;
         final subscription = coordinator.completions.listen((completion) {
@@ -461,7 +462,7 @@ void main() {
         ];
 
         for (var index = 0; index < failures.length; index += 1) {
-          final repository = _ControlledIntentionRepository();
+          final repository = _ControlledCompatibilityGraphRepository();
           final coordinator = _coordinator(repository);
           final completions = <IntentionCommandCompletion>[];
           final fallbackClaims =
@@ -547,7 +548,7 @@ void main() {
     test(
       'не удаляет gate новой команды, принятой из completion-listener',
       () async {
-        final repository = _ControlledIntentionRepository();
+        final repository = _ControlledCompatibilityGraphRepository();
         final coordinator = _coordinator(repository);
         final intentionId = _id(_firstUuid);
         IntentionCommandAccepted? acceptedFromCompletion;
@@ -587,7 +588,7 @@ void main() {
     test(
       'освобождение инициатора во время публикации не опережает каталог',
       () async {
-        final repository = _ControlledIntentionRepository();
+        final repository = _ControlledCompatibilityGraphRepository();
         final coordinator = _coordinator(repository);
         final releaseSubscription = coordinator.completions.listen(
           (completion) =>
@@ -622,7 +623,7 @@ void main() {
     test(
       'shutdown синхронно запрещает новую работу и ждёт принятые operations',
       () async {
-        final repository = _ControlledIntentionRepository();
+        final repository = _ControlledCompatibilityGraphRepository();
         final coordinator = _coordinator(repository);
         final first = coordinator.accept(
           ArchiveIntention(_id(_firstUuid)),
@@ -716,35 +717,48 @@ GraphCommandCoordinator _graphCoordinator(
 }
 
 IntentionCommandCoordinator _coordinator(
-  _ControlledIntentionRepository repository,
+  _ControlledCompatibilityGraphRepository repository,
 ) {
   final container = ProviderContainer.test(
-    overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
   );
   addTearDown(container.dispose);
   return container.read(intentionCommandCoordinatorProvider.notifier);
 }
 
-final class _ControlledIntentionRepository implements IntentionRepository {
+final class _ControlledCompatibilityGraphRepository
+    implements PersonalGraphRepository {
   final commands = <IntentionCommand>[];
-  final _results = <Completer<Result<IntentionCommandSuccess>>>[];
+  final _results =
+      <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   Object? nextError;
 
   @override
-  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command) {
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
+    IntentionCommand command,
+  ) {
     commands.add(command);
     final error = nextError;
     if (error != null) {
       nextError = null;
       return Future.error(error);
     }
-    final result = Completer<Result<IntentionCommandSuccess>>();
+    final result =
+        Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
     _results.add(result);
     return result.future;
   }
 
   void complete(int index, Result<IntentionCommandSuccess> result) {
-    _results[index].complete(result);
+    _results[index].complete(switch (result) {
+      ResultSuccess(:final value) => ResultSuccess(
+        ConfirmedGraphResult(
+          revision: value.catalogMutation.revision,
+          value: value,
+        ),
+      ),
+      ResultFailure(:final failure) => ResultFailure(failure),
+    });
   }
 
   @override
@@ -753,7 +767,7 @@ final class _ControlledIntentionRepository implements IntentionRepository {
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Stream<Result<Intention?>> watchById(IntentionId id) =>
+  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
       throw UnsupportedError('Подробное чтение не используется в этих тестах.');
 }
 
@@ -810,14 +824,13 @@ final class _OrderedTestGraphRevision implements GraphRevision {
   }
 }
 
-final class _TestCatalogRevision implements IntentionCatalogRevision {
+final class _TestCatalogRevision implements GraphRevision {
   const _TestCatalogRevision();
 
   @override
-  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) =>
-      identical(this, other)
-      ? IntentionCatalogRevisionOrder.same
-      : IntentionCatalogRevisionOrder.differentEpoch;
+  GraphRevisionOrder compareTo(GraphRevision other) => identical(this, other)
+      ? GraphRevisionOrder.same
+      : GraphRevisionOrder.differentEpoch;
 }
 
 final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {

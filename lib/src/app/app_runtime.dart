@@ -8,8 +8,6 @@ import '../graph/application/personal_graph_repository.dart';
 import '../graph/application/personal_graph_repository_provider.dart';
 import '../graph/data/drift_personal_graph_repository.dart';
 import '../intention/application/intention_id_generator.dart';
-import '../intention/data/drift_intention_repository.dart';
-import '../intention/presentation/operation/intention_repository_provider.dart';
 import '../shared/diagnostics/developer_diagnostics_sink.dart';
 import '../shared/diagnostics/diagnostics_sink.dart';
 import 'routing/app_router_provider.dart';
@@ -147,12 +145,9 @@ final class AppRuntime {
     ProviderContainer? container;
     try {
       final repository = _repositoryFactory(database);
-      final intentionRepository =
-          DriftIntentionRepository.fromPersonalGraphRepository(repository);
       container = ProviderContainer(
         overrides: [
           personalGraphRepositoryProvider.overrideWithValue(repository),
-          intentionRepositoryProvider.overrideWithValue(intentionRepository),
         ],
         retry: (retryCount, error) => null,
       );

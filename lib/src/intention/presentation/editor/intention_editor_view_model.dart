@@ -4,7 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../application/intention_command.dart';
-import '../../application/intention_repository.dart';
+import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../operation/operation_state.dart';

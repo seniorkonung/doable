@@ -5,10 +5,11 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -915,12 +916,12 @@ Widget _localizedApp(Widget home, {Locale locale = const Locale('en')}) =>
       home: home,
     );
 
-final class _DetailsTestRevision implements IntentionCatalogRevision {
+final class _DetailsTestRevision implements GraphRevision {
   const _DetailsTestRevision();
 
   @override
-  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) =>
+  GraphRevisionOrder compareTo(GraphRevision other) =>
       other is _DetailsTestRevision
-      ? IntentionCatalogRevisionOrder.same
-      : IntentionCatalogRevisionOrder.differentEpoch;
+      ? GraphRevisionOrder.same
+      : GraphRevisionOrder.differentEpoch;
 }

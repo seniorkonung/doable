@@ -5,7 +5,7 @@ import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
-import '../../intention/application/intention_repository.dart';
+import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/application/title_search_key.dart';
 import '../../intention/domain/intention.dart' as domain;

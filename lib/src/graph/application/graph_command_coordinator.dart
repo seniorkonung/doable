@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../intention/application/intention_command.dart';
-import '../../intention/application/intention_repository.dart';
+import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../shared/presentation/exclusive_operation.dart';

@@ -3,7 +3,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -142,7 +142,7 @@ void main() {
 
       expect(
         initialPage.revision.compareTo(createdMutation.revision),
-        IntentionCatalogRevisionOrder.older,
+        GraphRevisionOrder.older,
       );
       expect(createdMutation.before, isNull);
       expect(createdMutation.after, same(createdMutation.entry));
@@ -164,7 +164,7 @@ void main() {
 
       expect(
         createdMutation.revision.compareTo(unchangedMutation.revision),
-        IntentionCatalogRevisionOrder.same,
+        GraphRevisionOrder.same,
       );
       expect(unchangedMutation.before, same(unchangedMutation.after));
 
@@ -182,7 +182,7 @@ void main() {
 
       expect(
         unchangedMutation.revision.compareTo(updatedMutation.revision),
-        IntentionCatalogRevisionOrder.older,
+        GraphRevisionOrder.older,
       );
       expect(updatedMutation.before.matches(milkQuery), isTrue);
       expect(updatedMutation.before.matches(doctorQuery), isFalse);
@@ -198,7 +198,7 @@ void main() {
 
       expect(
         updatedMutation.revision.compareTo(deletedMutation.revision),
-        IntentionCatalogRevisionOrder.older,
+        GraphRevisionOrder.older,
       );
       expect(deletedMutation.before, same(deletedMutation.entry));
       expect(deletedMutation.after, isNull);
@@ -213,7 +213,7 @@ void main() {
       );
       expect(
         deletedMutation.revision.compareTo(pageAfterFailure.revision),
-        IntentionCatalogRevisionOrder.same,
+        GraphRevisionOrder.same,
       );
     });
 
@@ -1225,7 +1225,7 @@ void main() {
           ).revision;
           expect(
             revisionBefore.compareTo(revisionAfter),
-            IntentionCatalogRevisionOrder.same,
+            GraphRevisionOrder.same,
           );
         }
 
@@ -1264,10 +1264,7 @@ void main() {
       final revisionAfter = _firstCatalogPage(
         await repository.getCatalogPage(query),
       ).revision;
-      expect(
-        revisionBefore.compareTo(revisionAfter),
-        IntentionCatalogRevisionOrder.same,
-      );
+      expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
     });
 
     test('откатывает update при malformed raw after snapshot', () async {
@@ -1319,10 +1316,7 @@ void main() {
       final revisionAfter = _firstCatalogPage(
         await repository.getCatalogPage(query),
       ).revision;
-      expect(
-        revisionBefore.compareTo(revisionAfter),
-        IntentionCatalogRevisionOrder.same,
-      );
+      expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
     });
   });
 }

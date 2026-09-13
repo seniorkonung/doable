@@ -1,5 +1,5 @@
 import '../../../graph/application/graph_revision.dart';
-import '../../application/intention_repository.dart';
+import '../../application/intention_catalog.dart';
 
 enum IntentionCatalogFilterValidationFailure {
   invalidUnicodeRepertoire,

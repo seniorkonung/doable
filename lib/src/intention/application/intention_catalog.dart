@@ -2,19 +2,7 @@ import '../../graph/application/graph_revision.dart';
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
-import 'intention_command.dart';
-import 'intention_result.dart';
 import 'title_search_key.dart';
-
-abstract interface class IntentionRepository {
-  Future<Result<IntentionCatalogPage>> getCatalogPage(
-    IntentionCatalogQuery query,
-  );
-
-  Stream<Result<Intention?>> watchById(IntentionId id);
-
-  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command);
-}
 
 enum IntentionScope { active, archived, all }
 
@@ -195,12 +183,6 @@ final class IntentionTitleFilter {
 }
 
 abstract interface class IntentionCatalogCursor {}
-
-@Deprecated('Используйте GraphRevisionOrder.')
-typedef IntentionCatalogRevisionOrder = GraphRevisionOrder;
-
-@Deprecated('Используйте GraphRevision.')
-typedef IntentionCatalogRevision = GraphRevision;
 
 final class IntentionSummary {
   IntentionSummary({

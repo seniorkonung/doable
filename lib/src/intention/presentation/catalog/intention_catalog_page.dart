@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
-import '../../application/intention_repository.dart';
+import '../../application/intention_catalog.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import 'intention_catalog_state.dart';
