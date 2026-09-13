@@ -142,7 +142,7 @@
   - **Вероятные файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/intention_details_state.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`, `test/intention/presentation/details/intention_details_delete_test.dart`; производный файл ViewModel.
   - **Размер:** M.
 
-- [ ] 1.15 Сохранить создание намерения через общий координатор и типизированный ключ формы
+- [x] 1.15 Сохранить создание намерения через общий координатор и типизированный ключ формы
   - **Критерии приёмки:**
     - Форма создания передаёт команду единственному координатору, повтор той же формы не создаёт вторую операцию и не ставится в очередь.
     - Ошибка сохраняет введённые поля в открытой форме, уход завершает черновик и освобождает право инициатора на сообщение, сохраняя выполнение принятой команды.
