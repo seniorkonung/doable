@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -300,7 +302,7 @@ void main() {
       () {
         final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
         const cursor = _TestCatalogCursor();
-        const revision = _TestCatalogRevision(epoch: 'первая', sequence: 0);
+        const revision = _TestGraphRevision(epoch: 'первая', sequence: 0);
         final pages = <IntentionCatalogPage>[
           IntentionCatalogFirstPage(
             items: [summary],
@@ -321,17 +323,14 @@ void main() {
     );
 
     test('сравнимая revision различает порядок и process-local эпоху', () {
-      const first = _TestCatalogRevision(epoch: 'первая', sequence: 0);
-      const second = _TestCatalogRevision(epoch: 'первая', sequence: 1);
-      const anotherEpoch = _TestCatalogRevision(epoch: 'вторая', sequence: 0);
+      const first = _TestGraphRevision(epoch: 'первая', sequence: 0);
+      const second = _TestGraphRevision(epoch: 'первая', sequence: 1);
+      const anotherEpoch = _TestGraphRevision(epoch: 'вторая', sequence: 0);
 
-      expect(first.compareTo(second), IntentionCatalogRevisionOrder.older);
-      expect(second.compareTo(first), IntentionCatalogRevisionOrder.newer);
-      expect(second.compareTo(second), IntentionCatalogRevisionOrder.same);
-      expect(
-        first.compareTo(anotherEpoch),
-        IntentionCatalogRevisionOrder.differentEpoch,
-      );
+      expect(first.compareTo(second), GraphRevisionOrder.older);
+      expect(second.compareTo(first), GraphRevisionOrder.newer);
+      expect(second.compareTo(second), GraphRevisionOrder.same);
+      expect(first.compareTo(anotherEpoch), GraphRevisionOrder.differentEpoch);
     });
 
     test('первая страница отклоняет недопустимый total count в release', () {
@@ -342,7 +341,7 @@ void main() {
           items: [summary],
           totalCount: 0,
           nextCursor: null,
-          revision: const _TestCatalogRevision(epoch: 'первая', sequence: 0),
+          revision: const _TestGraphRevision(epoch: 'первая', sequence: 0),
         ),
         throwsA(isA<IntentionCatalogPageValidationException>()),
       );
@@ -351,7 +350,7 @@ void main() {
           items: const [],
           totalCount: -1,
           nextCursor: null,
-          revision: const _TestCatalogRevision(epoch: 'первая', sequence: 0),
+          revision: const _TestGraphRevision(epoch: 'первая', sequence: 0),
         ),
         throwsA(isA<IntentionCatalogPageValidationException>()),
       );
@@ -408,7 +407,7 @@ void main() {
       final entry = _TestCatalogEntrySnapshot(
         _summary(id: intention.id.toCanonicalString()),
       );
-      const revision = _TestCatalogRevision(epoch: 'первая', sequence: 1);
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 1);
       final results = <Result<IntentionCommandSuccess>>[
         ResultSuccess(
           IntentionSaved(
@@ -467,7 +466,7 @@ void main() {
       final after = _TestCatalogEntrySnapshot(
         _summary(id: '00000000-0000-4000-8000-000000000001'),
       );
-      const revision = _TestCatalogRevision(epoch: 'первая', sequence: 1);
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 1);
       final mutations = <IntentionCatalogMutation>[
         IntentionCatalogCreated(revision: revision, entry: after),
         IntentionCatalogUpdated(
@@ -516,6 +515,117 @@ void main() {
         expect(repository.watchSubscriptions, 2);
       },
     );
+  });
+
+  group('общая граница личного графа', () {
+    test(
+      'выражает текущие чтения и команды намерений без методов связей',
+      () async {
+        final PersonalGraphRepository repository =
+            _FailingPersonalGraphRepository();
+        final id = _intentionId('00000000-0000-4000-8000-000000000001');
+
+        expect(
+          await repository.getCatalogPage(_query()),
+          isA<ResultFailure<IntentionCatalogPage>>(),
+        );
+        await expectLater(
+          repository.watchIntention(id),
+          emits(
+            isA<ResultFailure<GraphSnapshot<Intention?>>>().having(
+              (result) => result.failure,
+              'failure',
+              isA<IntentionUnavailableFailure>(),
+            ),
+          ),
+        );
+        expect(
+          await repository.execute(
+            const CreateIntention(title: 'Здоровье', description: null),
+          ),
+          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+        );
+      },
+    );
+
+    test('снимок связывает подтверждённое значение с одной ревизией', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 3);
+      final intention = _intention();
+      final snapshot = GraphSnapshot(value: intention, revision: revision);
+
+      expect(snapshot.value, same(intention));
+      expect(snapshot.revision, same(revision));
+    });
+
+    test('пакет результата неизменно объединяет снимки одной ревизии', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
+      final before = _TestCatalogEntrySnapshot(
+        _summary(id: '00000000-0000-4000-8000-000000000001'),
+      );
+      final after = _TestCatalogEntrySnapshot(
+        _summary(
+          id: '00000000-0000-4000-8000-000000000001',
+          title: 'Быть здоровым',
+        ),
+      );
+      final mutation = IntentionCatalogUpdated(
+        revision: revision,
+        before: before,
+        after: after,
+      );
+      final success = IntentionSaved(_intention(), catalogMutation: mutation);
+      final result = ConfirmedGraphResult(revision: revision, value: success);
+
+      expect(result.revision, same(revision));
+      expect(result.value, same(success));
+      expect(result.changes, hasLength(1));
+      expect(
+        () => result.changes.add(
+          IntentionCatalogUnchanged(revision: revision, entry: after),
+        ),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('пакет результата отклоняет изменение другой ревизии', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
+      const newerRevision = _TestGraphRevision(epoch: 'первая', sequence: 5);
+      final entry = _TestCatalogEntrySnapshot(
+        _summary(id: '00000000-0000-4000-8000-000000000001'),
+      );
+
+      expect(
+        () => ConfirmedGraphResult(
+          revision: revision,
+          value: IntentionSaved(
+            _intention(),
+            catalogMutation: IntentionCatalogCreated(
+              revision: newerRevision,
+              entry: entry,
+            ),
+          ),
+        ),
+        throwsA(isA<ConfirmedGraphResultValidationException>()),
+      );
+    });
+
+    test('пакет подтверждённого результата не бывает пустым', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
+
+      expect(
+        () => ConfirmedGraphResult(
+          revision: revision,
+          value: const _EmptyGraphCommandOutcome(),
+        ),
+        throwsA(
+          isA<ConfirmedGraphResultValidationException>().having(
+            (exception) => exception.failure,
+            'failure',
+            ConfirmedGraphResultValidationFailure.emptyChanges,
+          ),
+        ),
+      );
+    });
   });
 }
 
@@ -682,25 +792,48 @@ final class _FailingRepository implements IntentionRepository {
   }
 }
 
+final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
+  @override
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
+    IntentionCommand command,
+  ) async => const ResultFailure(IntentionUnavailableFailure());
+
+  @override
+  Future<Result<IntentionCatalogPage>> getCatalogPage(
+    IntentionCatalogQuery query,
+  ) async => const ResultFailure(IntentionUnavailableFailure());
+
+  @override
+  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
+      Stream.value(const ResultFailure(IntentionUnavailableFailure()));
+}
+
+final class _EmptyGraphCommandOutcome implements GraphCommandOutcome {
+  const _EmptyGraphCommandOutcome();
+
+  @override
+  Iterable<GraphChange> get changes => const [];
+}
+
 final class _TestCatalogCursor implements IntentionCatalogCursor {
   const _TestCatalogCursor();
 }
 
-final class _TestCatalogRevision implements IntentionCatalogRevision {
-  const _TestCatalogRevision({required this.epoch, required this.sequence});
+final class _TestGraphRevision implements GraphRevision {
+  const _TestGraphRevision({required this.epoch, required this.sequence});
 
   final String epoch;
   final int sequence;
 
   @override
-  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) {
-    if (other is! _TestCatalogRevision || other.epoch != epoch) {
-      return IntentionCatalogRevisionOrder.differentEpoch;
+  GraphRevisionOrder compareTo(GraphRevision other) {
+    if (other is! _TestGraphRevision || other.epoch != epoch) {
+      return GraphRevisionOrder.differentEpoch;
     }
     return switch (sequence.compareTo(other.sequence)) {
-      < 0 => IntentionCatalogRevisionOrder.older,
-      > 0 => IntentionCatalogRevisionOrder.newer,
-      _ => IntentionCatalogRevisionOrder.same,
+      < 0 => GraphRevisionOrder.older,
+      > 0 => GraphRevisionOrder.newer,
+      _ => GraphRevisionOrder.same,
     };
   }
 }

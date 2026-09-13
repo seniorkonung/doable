@@ -1,3 +1,4 @@
+import '../../graph/application/graph_revision.dart';
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
@@ -195,11 +196,11 @@ final class IntentionTitleFilter {
 
 abstract interface class IntentionCatalogCursor {}
 
-enum IntentionCatalogRevisionOrder { older, same, newer, differentEpoch }
+@Deprecated('Используйте GraphRevisionOrder.')
+typedef IntentionCatalogRevisionOrder = GraphRevisionOrder;
 
-abstract interface class IntentionCatalogRevision {
-  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other);
-}
+@Deprecated('Используйте GraphRevision.')
+typedef IntentionCatalogRevision = GraphRevision;
 
 final class IntentionSummary {
   IntentionSummary({
@@ -227,10 +228,11 @@ abstract interface class IntentionCatalogEntrySnapshot {
   bool matches(IntentionCatalogQuery query);
 }
 
-sealed class IntentionCatalogMutation {
+sealed class IntentionCatalogMutation implements GraphChange {
   const IntentionCatalogMutation({required this.revision});
 
-  final IntentionCatalogRevision revision;
+  @override
+  final GraphRevision revision;
 
   IntentionCatalogEntrySnapshot? get before;
 
@@ -290,10 +292,13 @@ final class IntentionCatalogUnchanged extends IntentionCatalogMutation {
   IntentionCatalogEntrySnapshot get after => entry;
 }
 
-sealed class IntentionCommandSuccess {
+sealed class IntentionCommandSuccess implements GraphCommandOutcome {
   const IntentionCommandSuccess({required this.catalogMutation});
 
   final IntentionCatalogMutation catalogMutation;
+
+  @override
+  Iterable<GraphChange> get changes => [catalogMutation];
 }
 
 final class IntentionSaved extends IntentionCommandSuccess {
@@ -317,7 +322,7 @@ sealed class IntentionCatalogPage {
 
   final List<IntentionSummary> items;
   final IntentionCatalogCursor? nextCursor;
-  final IntentionCatalogRevision revision;
+  final GraphRevision revision;
 }
 
 final class IntentionCatalogFirstPage extends IntentionCatalogPage {
