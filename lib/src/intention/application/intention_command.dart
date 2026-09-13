@@ -11,44 +11,39 @@ final class CreateIntention extends IntentionCommand {
   final String? description;
 }
 
-final class UpdateIntention extends IntentionCommand {
-  const UpdateIntention({
-    required this.id,
-    required this.title,
-    required this.description,
-  });
+sealed class ExistingIntentionCommand extends IntentionCommand {
+  const ExistingIntentionCommand(this.id);
 
   final IntentionId id;
+}
+
+final class UpdateIntention extends ExistingIntentionCommand {
+  const UpdateIntention({
+    required IntentionId id,
+    required this.title,
+    required this.description,
+  }) : super(id);
+
   final String title;
   final String? description;
 }
 
-final class EnableIntentionReadiness extends IntentionCommand {
-  const EnableIntentionReadiness(this.id);
-
-  final IntentionId id;
+final class EnableIntentionReadiness extends ExistingIntentionCommand {
+  const EnableIntentionReadiness(super.id);
 }
 
-final class DisableIntentionReadiness extends IntentionCommand {
-  const DisableIntentionReadiness(this.id);
-
-  final IntentionId id;
+final class DisableIntentionReadiness extends ExistingIntentionCommand {
+  const DisableIntentionReadiness(super.id);
 }
 
-final class ArchiveIntention extends IntentionCommand {
-  const ArchiveIntention(this.id);
-
-  final IntentionId id;
+final class ArchiveIntention extends ExistingIntentionCommand {
+  const ArchiveIntention(super.id);
 }
 
-final class RestoreIntention extends IntentionCommand {
-  const RestoreIntention(this.id);
-
-  final IntentionId id;
+final class RestoreIntention extends ExistingIntentionCommand {
+  const RestoreIntention(super.id);
 }
 
-final class DeleteIntention extends IntentionCommand {
-  const DeleteIntention(this.id);
-
-  final IntentionId id;
+final class DeleteIntention extends ExistingIntentionCommand {
+  const DeleteIntention(super.id);
 }

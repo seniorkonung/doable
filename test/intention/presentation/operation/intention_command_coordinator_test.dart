@@ -1,17 +1,145 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
+import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart'
+    show IntentionCommandCoordinator, intentionCommandCoordinatorProvider;
 import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('GraphCommandCoordinator', () {
+    test(
+      'типизированный ключ не принимает повтор одной формы создания',
+      () async {
+        final repository = _ControlledPersonalGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final firstForm = IntentionCreationFormKey();
+        final secondForm = IntentionCreationFormKey();
+
+        final first = coordinator.acceptCreation(
+          firstForm,
+          const CreateIntention(title: 'Первое', description: null),
+        );
+        final repeated = coordinator.acceptCreation(
+          firstForm,
+          const CreateIntention(title: 'Повтор', description: null),
+        );
+        final independent = coordinator.acceptCreation(
+          secondForm,
+          const CreateIntention(title: 'Второе', description: null),
+        );
+
+        expect(first, isA<IntentionCommandAccepted>());
+        expect(repeated, isA<IntentionCommandAlreadyRunning>());
+        expect(independent, isA<IntentionCommandAccepted>());
+        expect(repository.commands, hasLength(2));
+
+        repository.complete(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        repository.complete(
+          1,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await (first as IntentionCommandAccepted).future;
+        await (independent as IntentionCommandAccepted).future;
+        await coordinator.shutdown();
+      },
+    );
+
+    test('доставляет подтверждённые результаты в порядке ревизий', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final epoch = Object();
+      final completions = <IntentionCommandCompletion>[];
+      final subscription = coordinator.completions.listen(completions.add);
+      final firstId = _id(_firstUuid);
+      final secondId = _id(_secondUuid);
+
+      final first = coordinator.acceptExisting(
+        DeleteIntention(firstId),
+      ) as IntentionCommandAccepted;
+      final second = coordinator.acceptExisting(
+        DeleteIntention(secondId),
+      ) as IntentionCommandAccepted;
+
+      repository.complete(
+        1,
+        _confirmedDeletedResult(secondId, _OrderedTestGraphRevision(epoch, 2)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(completions, isEmpty);
+
+      repository.complete(
+        0,
+        _confirmedDeletedResult(firstId, _OrderedTestGraphRevision(epoch, 1)),
+      );
+      final firstCompletion = await first.future;
+      final secondCompletion = await second.future;
+
+      expect(completions, [same(firstCompletion), same(secondCompletion)]);
+      expect(completions.map((completion) => completion.revision), [
+        isA<_OrderedTestGraphRevision>().having(
+          (revision) => revision.value,
+          'номер',
+          1,
+        ),
+        isA<_OrderedTestGraphRevision>().having(
+          (revision) => revision.value,
+          'номер',
+          2,
+        ),
+      ]);
+
+      coordinator.releaseInitiatorPresentation(firstCompletion.token);
+      coordinator.releaseInitiatorPresentation(secondCompletion.token);
+      await subscription.cancel();
+      await coordinator.shutdown();
+    });
+
+    test(
+      'сохраняет завершение для позднего fallback до предъявления',
+      () async {
+        final repository = _ControlledPersonalGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final accepted = coordinator.acceptExisting(
+          ArchiveIntention(_id(_firstUuid)),
+        ) as IntentionCommandAccepted;
+
+        repository.complete(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final completion = await accepted.future;
+        coordinator.releaseInitiatorPresentation(completion.token);
+
+        final fallback = await coordinator.claimCatalogFallback(
+          completion.token,
+        );
+        expect(fallback, isA<IntentionCatalogFallbackPresentationClaim>());
+        expect(fallback!.completion, same(completion));
+
+        coordinator.confirmPresentation(fallback);
+        expect(
+          await coordinator.claimCatalogFallback(completion.token),
+          isNull,
+        );
+        await coordinator.shutdown();
+      },
+    );
+  });
+
   group('IntentionCommandCoordinator', () {
     test('generated provider сохраняет один keep-alive coordinator', () {
       final repository = _ControlledIntentionRepository();
@@ -561,6 +689,32 @@ Result<IntentionCommandSuccess> _deletedResult(IntentionId id) => ResultSuccess(
   ),
 );
 
+Result<ConfirmedGraphResult<IntentionCommandSuccess>> _confirmedDeletedResult(
+  IntentionId id,
+  GraphRevision revision,
+) => ResultSuccess(
+  ConfirmedGraphResult(
+    revision: revision,
+    value: IntentionDeleted(
+      id,
+      catalogMutation: IntentionCatalogDeleted(
+        revision: revision,
+        entry: _TestCatalogEntrySnapshot(id),
+      ),
+    ),
+  ),
+);
+
+GraphCommandCoordinator _graphCoordinator(
+  _ControlledPersonalGraphRepository repository,
+) {
+  final container = ProviderContainer.test(
+    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
+  );
+  addTearDown(container.dispose);
+  return container.read(graphCommandCoordinatorProvider.notifier);
+}
+
 IntentionCommandCoordinator _coordinator(
   _ControlledIntentionRepository repository,
 ) {
@@ -601,6 +755,59 @@ final class _ControlledIntentionRepository implements IntentionRepository {
   @override
   Stream<Result<Intention?>> watchById(IntentionId id) =>
       throw UnsupportedError('Подробное чтение не используется в этих тестах.');
+}
+
+final class _ControlledPersonalGraphRepository
+    implements PersonalGraphRepository {
+  final commands = <IntentionCommand>[];
+  final _results =
+      <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
+
+  @override
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
+    IntentionCommand command,
+  ) {
+    commands.add(command);
+    final result =
+        Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
+    _results.add(result);
+    return result.future;
+  }
+
+  void complete(
+    int index,
+    Result<ConfirmedGraphResult<IntentionCommandSuccess>> result,
+  ) {
+    _results[index].complete(result);
+  }
+
+  @override
+  Future<Result<IntentionCatalogPage>> getCatalogPage(
+    IntentionCatalogQuery query,
+  ) => throw UnsupportedError('Каталог не используется в этих тестах.');
+
+  @override
+  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
+      throw UnsupportedError('Подробное чтение не используется в этих тестах.');
+}
+
+final class _OrderedTestGraphRevision implements GraphRevision {
+  const _OrderedTestGraphRevision(this.epoch, this.value);
+
+  final Object epoch;
+  final int value;
+
+  @override
+  GraphRevisionOrder compareTo(GraphRevision other) {
+    if (other is! _OrderedTestGraphRevision || !identical(epoch, other.epoch)) {
+      return GraphRevisionOrder.differentEpoch;
+    }
+    return switch (value.compareTo(other.value)) {
+      < 0 => GraphRevisionOrder.older,
+      0 => GraphRevisionOrder.same,
+      _ => GraphRevisionOrder.newer,
+    };
+  }
 }
 
 final class _TestCatalogRevision implements IntentionCatalogRevision {
