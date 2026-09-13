@@ -2,6 +2,8 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const _nextSchemaVersion = AppDatabase.currentSchemaVersion + 1;
+
 void main() {
   test(
     'атомарная миграция откатывает схему, данные и маркер версии после ошибки',
@@ -10,12 +12,11 @@ void main() {
       addTearDown(database.close);
 
       await _insertIntention(database);
-      await database.customStatement('PRAGMA user_version = 1');
 
       await expectLater(
         runAtomicMigration(
           database,
-          targetSchemaVersion: 2,
+          targetSchemaVersion: _nextSchemaVersion,
           migrate: () async {
             await database.customStatement(
               'ALTER TABLE intentions ADD COLUMN migration_probe TEXT',
@@ -45,19 +46,22 @@ void main() {
         isNot(contains('migration_probe')),
       );
       expect(intention.read<String>('title'), 'Сохранённое намерение');
-      expect(version.read<int>('user_version'), 1);
+      expect(
+        version.read<int>('user_version'),
+        AppDatabase.currentSchemaVersion,
+      );
 
       await runAtomicMigration(
         database,
-        targetSchemaVersion: 2,
+        targetSchemaVersion: _nextSchemaVersion,
         migrate: () async {},
       );
 
       final retriedVersion = await database
           .customSelect('PRAGMA user_version')
           .getSingle();
-      expect(retriedVersion.read<int>('user_version'), 2);
-      expect(database.schemaVersion, 1);
+      expect(retriedVersion.read<int>('user_version'), _nextSchemaVersion);
+      expect(database.schemaVersion, AppDatabase.currentSchemaVersion);
     },
   );
 
@@ -69,7 +73,7 @@ void main() {
       harness.run(() {
         return runAtomicMigration(
           harness.database,
-          targetSchemaVersion: 2,
+          targetSchemaVersion: _nextSchemaVersion,
           migrate: () async => throw const _InjectedMigrationFailure(),
         );
       }),

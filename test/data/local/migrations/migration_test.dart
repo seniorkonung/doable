@@ -6,6 +6,10 @@ import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/doable_schema_verifier.dart';
+import '../../../support/local_database_harness.dart';
+import '../../../support/schema_v1_fixture.dart';
+
+const _nextSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
 void main() {
   late AppDatabase database;
@@ -16,8 +20,48 @@ void main() {
 
   tearDown(() => database.close());
 
-  test('схема версии 1 проходит сгенерированную валидацию', () async {
+  test('текущая схема проходит сгенерированную валидацию', () async {
     await verifyDoableDatabaseSchema(database);
+  });
+
+  test('фикстура опубликованной схемы 1 использует снимок и обязательную настройку', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+
+    await createSchemaV1Fixture(
+      harness.databaseFile,
+      seed: (rawDatabase) {
+        final version = rawDatabase.select('PRAGMA user_version').single;
+        final schemaObjects = rawDatabase.select('''
+            SELECT name
+            FROM sqlite_schema
+            WHERE type IN ('table', 'index', 'trigger', 'view')
+              AND name NOT LIKE 'sqlite_%'
+          ''');
+
+        rawDatabase.execute('''
+            INSERT INTO intentions (id, title, created_at, updated_at)
+            VALUES ('018f0b5d-6b2e-7c80-8000-000000000203', 'Straße', 1, 1)
+          ''');
+        final intention = rawDatabase.select('''
+            SELECT title_search_key
+            FROM intentions
+            WHERE id = '018f0b5d-6b2e-7c80-8000-000000000203'
+          ''').single;
+
+        expect(version['user_version'], publishedIntentionSchemaVersion);
+        expect(
+          schemaObjects.map((row) => row['name']),
+          containsAll(<String>[
+            'intentions',
+            'intention_titles_fts',
+            'intentions_fts_after_insert',
+            'intentions_all_updated_at_desc_id_asc',
+          ]),
+        );
+        expect(intention['title_search_key'], 'strasse');
+      },
+    );
   });
 
   test(
@@ -39,7 +83,7 @@ void main() {
 
     await runAtomicMigration(
       database,
-      targetSchemaVersion: 1,
+      targetSchemaVersion: AppDatabase.currentSchemaVersion,
       migrate: () async {
         final foreignKeys = await database
             .customSelect('PRAGMA foreign_keys')
@@ -62,8 +106,11 @@ void main() {
       await _insertIntention(database);
 
       await expectLater(
-        localDataMigrationStrategy(database)
-            .onUpgrade(Migrator(database), 2, 1),
+        localDataMigrationStrategy(database).onUpgrade(
+          Migrator(database),
+          _nextSchemaVersion,
+          AppDatabase.currentSchemaVersion,
+        ),
         throwsA(isA<UnsupportedError>()),
       );
 
@@ -91,12 +138,14 @@ void main() {
         'INSERT INTO migration_child (parent_id) VALUES (999)',
       );
       await database.customStatement('PRAGMA foreign_keys = ON');
-      await database.customStatement('PRAGMA user_version = 1');
+      await database.customStatement(
+        'PRAGMA user_version = ${AppDatabase.currentSchemaVersion}',
+      );
 
       await expectLater(
         runAtomicMigration(
           database,
-          targetSchemaVersion: 2,
+          targetSchemaVersion: _nextSchemaVersion,
           migrate: () async {
             await database.customStatement(
               'CREATE TABLE migration_probe (id INTEGER PRIMARY KEY)',
@@ -114,7 +163,10 @@ void main() {
       WHERE type = 'table' AND name = 'migration_probe'
     ''').get();
 
-      expect(marker.read<int>('user_version'), 1);
+      expect(
+        marker.read<int>('user_version'),
+        AppDatabase.currentSchemaVersion,
+      );
       expect(probe, isEmpty);
     },
   );
@@ -125,7 +177,7 @@ void main() {
 
     await runAtomicMigration(
       database,
-      targetSchemaVersion: 1,
+      targetSchemaVersion: AppDatabase.currentSchemaVersion,
       migrate: () async {
         await rebuildIntentionTitlesFts(database);
       },

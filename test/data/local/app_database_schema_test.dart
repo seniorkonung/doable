@@ -187,7 +187,7 @@ void main() {
               ORDER BY id ASC
             ''').get();
 
-      expect(database.schemaVersion, 1);
+      expect(database.schemaVersion, AppDatabase.currentSchemaVersion);
       expect(rows, hasLength(2));
       expect(
         rows[0].read<String>('id'),
