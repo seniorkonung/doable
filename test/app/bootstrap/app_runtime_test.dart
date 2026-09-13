@@ -4,6 +4,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
+        AppDatabase,
         ConfiguredLocalDatabaseConnection,
         LocalDatabaseConnectionObserver,
         observeConfiguredLocalDatabaseConnection,
@@ -19,6 +20,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+
+const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
 void main() {
   group('AppRuntime', () {
@@ -103,19 +106,20 @@ void main() {
             ),
             (
               connectionFactory: () => openInMemoryLocalDatabase(
-                setup: (database) =>
-                    database.execute('PRAGMA user_version = 2'),
+                setup: (database) => database.execute(
+                  'PRAGMA user_version = $_unsupportedSchemaVersion',
+                ),
               ),
               result: isA<AppRuntimeIncompatibleSchema>()
                   .having(
                     (result) => result.expectedSchemaVersion,
                     'ожидаемая версия',
-                    1,
+                    AppDatabase.currentSchemaVersion,
                   )
                   .having(
                     (result) => result.detectedSchemaVersion,
                     'обнаруженная версия',
-                    2,
+                    _unsupportedSchemaVersion,
                   ),
             ),
           ];

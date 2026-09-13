@@ -12,6 +12,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 
 const _sqliteIoerrCorruptFs = 8458;
+const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
 void main() {
   group('LocalDataBootstrap', () {
@@ -150,7 +151,7 @@ void main() {
             database
               ..execute('CREATE TABLE future_data (value TEXT NOT NULL)')
               ..execute("INSERT INTO future_data(value) VALUES ('сохранённое')")
-              ..execute('PRAGMA user_version = 2');
+              ..execute('PRAGMA user_version = $_unsupportedSchemaVersion');
             preservedBytes = databaseFile.readAsBytesSync();
           },
         );
@@ -164,12 +165,12 @@ void main() {
               .having(
                 (failure) => failure.expectedSchemaVersion,
                 'ожидаемая',
-                1,
+                AppDatabase.currentSchemaVersion,
               )
               .having(
                 (failure) => failure.detectedSchemaVersion,
                 'обнаруженная',
-                2,
+                _unsupportedSchemaVersion,
               ),
         );
         expect(await databaseFile.readAsBytes(), preservedBytes);
@@ -577,7 +578,9 @@ void main() {
       final bootstrap = LocalDataBootstrap(
         connectionFactory: () => openFileBackedLocalDatabase(
           databaseFile,
-          setup: (database) => database.execute('PRAGMA user_version = 2'),
+          setup: (database) => database.execute(
+            'PRAGMA user_version = $_unsupportedSchemaVersion',
+          ),
         ),
         diagnosticsSink: diagnosticsSink,
       );
@@ -587,8 +590,8 @@ void main() {
 
       final migrationEvent =
           diagnosticsSink.events[2] as MigrationDiagnosticsEvent;
-      expect(migrationEvent.fromSchemaVersion, 2);
-      expect(migrationEvent.toSchemaVersion, 1);
+      expect(migrationEvent.fromSchemaVersion, _unsupportedSchemaVersion);
+      expect(migrationEvent.toSchemaVersion, AppDatabase.currentSchemaVersion);
       expect(
         migrationEvent.status,
         isA<DiagnosticsFailed>().having(
