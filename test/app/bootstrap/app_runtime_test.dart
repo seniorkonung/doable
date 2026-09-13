@@ -9,13 +9,15 @@ import 'package:doable/src/data/local/app_database.dart'
         LocalDatabaseConnectionObserver,
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
-import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -26,26 +28,32 @@ const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 void main() {
   group('AppRuntime', () {
     test(
-      'создаёт один владеющий container с отключённым automatic retry',
+      'создаёт один модуль графа в одном container без automatic retry',
       () async {
-        final repository = _ControlledIntentionRepository();
+        final repository = _ControlledPersonalGraphRepository();
+        var repositoryFactoryCalls = 0;
         final runtime = AppRuntime(
           connectionFactory: openInMemoryLocalDatabase,
           diagnosticsSink: InMemoryDiagnosticsSink(),
-          repositoryFactory: (_) => repository,
+          repositoryFactory: (_) {
+            repositoryFactoryCalls += 1;
+            return repository;
+          },
         );
         addTearDown(runtime.shutdown);
 
-        final result = await runtime.bootstrap();
+        final bootstrapping = runtime.bootstrap();
+        expect(runtime.bootstrap(), same(bootstrapping));
+        final result = await bootstrapping;
 
         expect(result, isA<AppRuntimeReady>());
         final ready = result as AppRuntimeReady;
         expect(
-          ready.container.read(intentionRepositoryProvider),
+          ready.container.read(personalGraphRepositoryProvider),
           same(repository),
         );
         final coordinator = ready.container.read(
-          intentionCommandCoordinatorProvider.notifier,
+          graphCommandCoordinatorProvider.notifier,
         );
         expect(coordinator, same(runtime.commandCoordinator));
         final router = ready.container.read(appRouterProvider);
@@ -54,6 +62,7 @@ void main() {
 
         final repeated = await runtime.bootstrap();
         expect(repeated, same(ready));
+        expect(repositoryFactoryCalls, 1);
       },
     );
 
@@ -131,7 +140,7 @@ void main() {
           diagnosticsSink: InMemoryDiagnosticsSink(),
           repositoryFactory: (_) {
             repositoryFactoryCalls += 1;
-            return _ControlledIntentionRepository();
+            return _ControlledPersonalGraphRepository();
           },
         );
         addTearDown(runtime.shutdown);
@@ -163,7 +172,7 @@ void main() {
     });
 
     test('shutdown синхронно останавливает graph и закрывает базу после operations', () async {
-      final repository = _ControlledIntentionRepository();
+      final repository = _ControlledPersonalGraphRepository();
       final closeObserver = _CloseTrackingObserver();
       final runtime = AppRuntime(
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
@@ -190,7 +199,7 @@ void main() {
         isA<IntentionCommandCoordinatorDraining>(),
       );
       expect(
-        () => ready.container.read(intentionRepositoryProvider),
+        () => ready.container.read(personalGraphRepositoryProvider),
         throwsStateError,
       );
       expect(runtime.bootstrap, throwsStateError);
@@ -221,7 +230,7 @@ void main() {
           diagnosticsSink: InMemoryDiagnosticsSink(),
           repositoryFactory: (_) {
             repositoryFactoryCalls += 1;
-            return _ControlledIntentionRepository();
+            return _ControlledPersonalGraphRepository();
           },
         );
         addTearDown(() async {
@@ -248,17 +257,22 @@ void main() {
   });
 }
 
-final class _ControlledIntentionRepository implements IntentionRepository {
-  Completer<Result<IntentionCommandSuccess>>? _pendingCommand;
+final class _ControlledPersonalGraphRepository
+    implements PersonalGraphRepository {
+  Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>?
+  _pendingCommand;
 
   @override
-  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command) {
-    final pending = Completer<Result<IntentionCommandSuccess>>();
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
+    IntentionCommand command,
+  ) {
+    final pending =
+        Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
     _pendingCommand = pending;
     return pending.future;
   }
 
-  void complete(Result<IntentionCommandSuccess> result) {
+  void complete(Result<ConfirmedGraphResult<IntentionCommandSuccess>> result) {
     _pendingCommand!.complete(result);
   }
 
@@ -268,7 +282,7 @@ final class _ControlledIntentionRepository implements IntentionRepository {
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Stream<Result<Intention?>> watchById(IntentionId id) =>
+  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
       throw UnsupportedError('Подробное чтение не используется в этих тестах.');
 }
 

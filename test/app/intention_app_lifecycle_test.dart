@@ -4,6 +4,8 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -20,7 +22,7 @@ void main() {
     (tester) async {
       tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
       addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-      final repository = _DelayedIntentionRepository();
+      final repository = _DelayedPersonalGraphRepository();
       final runtime = AppRuntime(
         connectionFactory: openInMemoryLocalDatabase,
         diagnosticsSink: InMemoryDiagnosticsSink(),
@@ -266,12 +268,14 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
   fail('Условие app-level теста не выполнено.');
 }
 
-final class _DelayedIntentionRepository implements IntentionRepository {
+final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   final pageQueries = <IntentionCatalogQuery>[];
-  final detailRequests = <StreamController<Result<Intention?>>>[];
+  final detailRequests =
+      <StreamController<Result<GraphSnapshot<Intention?>>>>[];
   final commands = <IntentionCommand>[];
   final _pages = <Completer<Result<IntentionCatalogPage>>>[];
-  final _commands = <Completer<Result<IntentionCommandSuccess>>>[];
+  final _commands =
+      <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -284,16 +288,19 @@ final class _DelayedIntentionRepository implements IntentionRepository {
   }
 
   @override
-  Stream<Result<Intention?>> watchById(IntentionId id) {
-    final request = StreamController<Result<Intention?>>();
+  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) {
+    final request = StreamController<Result<GraphSnapshot<Intention?>>>();
     detailRequests.add(request);
     return request.stream;
   }
 
   @override
-  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command) {
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
+    IntentionCommand command,
+  ) {
     commands.add(command);
-    final request = Completer<Result<IntentionCommandSuccess>>();
+    final request =
+        Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
     _commands.add(request);
     return request.future;
   }
@@ -303,10 +310,17 @@ final class _DelayedIntentionRepository implements IntentionRepository {
   }
 
   void emitDetail(int index, Intention intention) {
-    detailRequests[index].add(ResultSuccess(intention));
+    detailRequests[index].add(
+      ResultSuccess(
+        GraphSnapshot(value: intention, revision: _Revision(index)),
+      ),
+    );
   }
 
-  void completeCommand(int index, Result<IntentionCommandSuccess> result) {
+  void completeCommand(
+    int index,
+    Result<ConfirmedGraphResult<IntentionCommandSuccess>> result,
+  ) {
     _commands[index].complete(result);
   }
 
@@ -365,7 +379,7 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   updatedAt: intention.updatedAt,
 );
 
-Result<IntentionCommandSuccess> _saved(
+Result<ConfirmedGraphResult<IntentionCommandSuccess>> _saved(
   Intention intention, {
   Intention? before,
   required int revision,
@@ -378,21 +392,27 @@ Result<IntentionCommandSuccess> _saved(
           before: _Snapshot(before),
           after: after,
         );
-  return ResultSuccess(IntentionSaved(intention, catalogMutation: mutation));
+  final value = IntentionSaved(intention, catalogMutation: mutation);
+  return ResultSuccess(
+    ConfirmedGraphResult(revision: _Revision(revision), value: value),
+  );
 }
 
-Result<IntentionCommandSuccess> _deleted(
+Result<ConfirmedGraphResult<IntentionCommandSuccess>> _deleted(
   Intention intention, {
   required int revision,
-}) => ResultSuccess(
-  IntentionDeleted(
+}) {
+  final value = IntentionDeleted(
     intention.id,
     catalogMutation: IntentionCatalogDeleted(
       revision: _Revision(revision),
       entry: _Snapshot(intention),
     ),
-  ),
-);
+  );
+  return ResultSuccess(
+    ConfirmedGraphResult(revision: _Revision(revision), value: value),
+  );
+}
 
 final class _Snapshot implements IntentionCatalogEntrySnapshot {
   _Snapshot(Intention intention) : summary = _summary(intention);
