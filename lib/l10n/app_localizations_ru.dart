@@ -388,4 +388,40 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get editorCreated => 'Намерение создано.';
+
+  @override
+  String get graphOperationCreate => 'Создание';
+
+  @override
+  String get graphOperationUpdate => 'Изменение';
+
+  @override
+  String get graphOperationEnableReadiness => 'Включение готовности';
+
+  @override
+  String get graphOperationDisableReadiness => 'Отключение готовности';
+
+  @override
+  String get graphOperationArchive => 'Архивирование';
+
+  @override
+  String get graphOperationRestore => 'Восстановление';
+
+  @override
+  String get graphOperationDelete => 'Удаление';
+
+  @override
+  String get graphOperationNewIntention => 'новое намерение';
+
+  @override
+  String get graphOperationIntention => 'намерение';
+
+  @override
+  String graphOperationMessage(
+    String operation,
+    String target,
+    String outcome,
+  ) {
+    return '$operation — «$target»: $outcome';
+  }
 }

@@ -385,4 +385,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editorCreated => 'Intention created.';
+
+  @override
+  String get graphOperationCreate => 'Create';
+
+  @override
+  String get graphOperationUpdate => 'Edit';
+
+  @override
+  String get graphOperationEnableReadiness => 'Mark ready';
+
+  @override
+  String get graphOperationDisableReadiness => 'Mark not ready';
+
+  @override
+  String get graphOperationArchive => 'Archive';
+
+  @override
+  String get graphOperationRestore => 'Restore';
+
+  @override
+  String get graphOperationDelete => 'Delete';
+
+  @override
+  String get graphOperationNewIntention => 'new intention';
+
+  @override
+  String get graphOperationIntention => 'intention';
+
+  @override
+  String graphOperationMessage(
+    String operation,
+    String target,
+    String outcome,
+  ) {
+    return '$operation — “$target”: $outcome';
+  }
 }

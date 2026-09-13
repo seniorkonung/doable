@@ -6,6 +6,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -20,6 +21,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'details_test_support.dart';
 
 void main() {
+  setUp(() {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+  });
+
   test('маршрут подробного просмотра хранит предметный идентификатор', () {
     final id = testDetailsIntentionId(1);
 
@@ -683,7 +690,7 @@ void main() {
   });
 
   testWidgets(
-    'оставляет уход доступным и передаёт поздний update outcome каталогу',
+    'оставляет уход доступным и передаёт поздний update outcome оболочке',
     (tester) async {
       final repository = ControlledDetailsRepository();
       final intention = testDetailsIntention(
@@ -710,6 +717,9 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             routerConfig: router.config(),
+            builder: (context, child) => GraphOperationPresenter(
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         ),
       );
@@ -746,7 +756,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('The changes couldn’t be saved. Try again.'),
+        find.text(
+          'Edit — “Изменяемое намерение”: The changes couldn’t be saved. Try again.',
+        ),
         findsOneWidget,
       );
     },
@@ -783,6 +795,8 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           routerConfig: router.config(),
+          builder: (context, child) =>
+              GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
         ),
       ),
     );
@@ -830,6 +844,8 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           routerConfig: router.config(),
+          builder: (context, child) =>
+              GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
         ),
       ),
     );

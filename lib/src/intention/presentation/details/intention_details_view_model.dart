@@ -153,6 +153,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         title: edit.title,
         description: description.isEmpty ? null : description,
       ),
+      presentationTitle: current.intention.title,
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
@@ -372,7 +373,10 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       return;
     }
 
-    final start = _coordinator.acceptExisting(_commandForStateChange(kind));
+    final start = _coordinator.acceptExisting(
+      _commandForStateChange(kind),
+      presentationTitle: current.intention.title,
+    );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
         _activeToken = token;

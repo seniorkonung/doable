@@ -769,6 +769,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Intention created.'**
   String get editorCreated;
+
+  /// Вид операции создания намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get graphOperationCreate;
+
+  /// Вид операции изменения намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get graphOperationUpdate;
+
+  /// Вид операции включения готовности в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Mark ready'**
+  String get graphOperationEnableReadiness;
+
+  /// Вид операции отключения готовности в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Mark not ready'**
+  String get graphOperationDisableReadiness;
+
+  /// Вид операции архивирования намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get graphOperationArchive;
+
+  /// Вид операции восстановления намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get graphOperationRestore;
+
+  /// Вид операции удаления намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get graphOperationDelete;
+
+  /// Безопасное обозначение создаваемого намерения до подтверждения
+  ///
+  /// In en, this message translates to:
+  /// **'new intention'**
+  String get graphOperationNewIntention;
+
+  /// Безопасное обозначение намерения без доступного названия
+  ///
+  /// In en, this message translates to:
+  /// **'intention'**
+  String get graphOperationIntention;
+
+  /// Сообщение оболочки о результате принятой операции
+  ///
+  /// In en, this message translates to:
+  /// **'{operation} — “{target}”: {outcome}'**
+  String graphOperationMessage(String operation, String target, String outcome);
 }
 
 class _AppLocalizationsDelegate

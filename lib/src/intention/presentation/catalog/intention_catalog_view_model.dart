@@ -16,8 +16,6 @@ part 'intention_catalog_view_model.g.dart';
 
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
-  final _presentationListeners =
-      <void Function(IntentionCatalogPresentationEvent)>{};
   IntentionScope _scope = IntentionCatalogSelection.initial.scope;
   String _titleFilterText = IntentionCatalogSelection.initial.titleFilterText;
   IntentionCatalogOrder _order = IntentionCatalogSelection.initial.order;
@@ -38,18 +36,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     order: _order,
     filterValidationFailure: _filterValidationFailure,
   );
-
-  void addPresentationListener(
-    void Function(IntentionCatalogPresentationEvent) listener,
-  ) {
-    _presentationListeners.add(listener);
-  }
-
-  void removePresentationListener(
-    void Function(IntentionCatalogPresentationEvent) listener,
-  ) {
-    _presentationListeners.remove(listener);
-  }
 
   @override
   Future<IntentionCatalogState> build() {
@@ -579,14 +565,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   void _handleCompletion(IntentionCommandCompletion completion) {
-    final coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
-    unawaited(
-      _publishFallback(
-        coordinator.claimCatalogFallback(completion.token),
-        coordinator,
-      ),
-    );
-
     switch (completion.confirmedResult) {
       case ResultSuccess(:final value):
         _reconcileMutations(
@@ -762,99 +740,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     final boundary = _cursorBoundary;
     return boundary != null && confirmed.query.compare(summary, boundary) <= 0;
   }
-
-  Future<void> _publishFallback(
-    Future<IntentionCatalogFallbackPresentationClaim?> pendingClaim,
-    GraphCommandCoordinator coordinator,
-  ) async {
-    final claim = await pendingClaim;
-    if (claim == null) {
-      return;
-    }
-    if (!ref.mounted) {
-      coordinator.confirmPresentation(claim);
-      return;
-    }
-
-    final event = switch (claim.completion.kind) {
-      IntentionCommandKind.create => IntentionCatalogCreatePresentationEvent(
-        _createOutcome(claim.completion.result),
-      ),
-      IntentionCommandKind.update => IntentionCatalogUpdatePresentationEvent(
-        _updateOutcome(claim.completion.result),
-      ),
-      IntentionCommandKind.enableReadiness ||
-      IntentionCommandKind.disableReadiness ||
-      IntentionCommandKind.archive ||
-      IntentionCommandKind.restore => IntentionCatalogUpdatePresentationEvent(
-        _updateOutcome(claim.completion.result),
-      ),
-      IntentionCommandKind.delete => IntentionCatalogDeletePresentationEvent(
-        _deleteOutcome(claim.completion.result),
-      ),
-    };
-    try {
-      for (final listener in _presentationListeners.toList(growable: false)) {
-        listener(event);
-      }
-    } finally {
-      coordinator.confirmPresentation(claim);
-    }
-  }
-
-  IntentionCatalogCreateOutcome _createOutcome(
-    Result<IntentionCommandSuccess> result,
-  ) => switch (result) {
-    ResultSuccess(value: IntentionSaved()) =>
-      IntentionCatalogCreateOutcome.succeeded,
-    ResultSuccess(value: IntentionDeleted()) =>
-      IntentionCatalogCreateOutcome.unexpected,
-    ResultFailure(:final failure) => switch (failure) {
-      IntentionValidationFailure() => IntentionCatalogCreateOutcome.validation,
-      IntentionConflictFailure() => IntentionCatalogCreateOutcome.conflict,
-      IntentionUnavailableFailure() =>
-        IntentionCatalogCreateOutcome.unavailable,
-      IntentionCorruptionFailure() => IntentionCatalogCreateOutcome.corruption,
-      IntentionNotFoundFailure() ||
-      IntentionUnexpectedFailure() => IntentionCatalogCreateOutcome.unexpected,
-    },
-  };
-
-  IntentionCatalogUpdateOutcome _updateOutcome(
-    Result<IntentionCommandSuccess> result,
-  ) => switch (result) {
-    ResultSuccess(value: IntentionSaved()) =>
-      IntentionCatalogUpdateOutcome.succeeded,
-    ResultSuccess(value: IntentionDeleted()) =>
-      IntentionCatalogUpdateOutcome.unexpected,
-    ResultFailure(:final failure) => switch (failure) {
-      IntentionValidationFailure() => IntentionCatalogUpdateOutcome.validation,
-      IntentionNotFoundFailure() => IntentionCatalogUpdateOutcome.notFound,
-      IntentionConflictFailure() => IntentionCatalogUpdateOutcome.conflict,
-      IntentionUnavailableFailure() =>
-        IntentionCatalogUpdateOutcome.unavailable,
-      IntentionCorruptionFailure() => IntentionCatalogUpdateOutcome.corruption,
-      IntentionUnexpectedFailure() => IntentionCatalogUpdateOutcome.unexpected,
-    },
-  };
-
-  IntentionCatalogDeleteOutcome _deleteOutcome(
-    Result<IntentionCommandSuccess> result,
-  ) => switch (result) {
-    ResultSuccess(value: IntentionDeleted()) =>
-      IntentionCatalogDeleteOutcome.succeeded,
-    ResultSuccess(value: IntentionSaved()) =>
-      IntentionCatalogDeleteOutcome.unexpected,
-    ResultFailure(:final failure) => switch (failure) {
-      IntentionValidationFailure() => IntentionCatalogDeleteOutcome.validation,
-      IntentionNotFoundFailure() => IntentionCatalogDeleteOutcome.notFound,
-      IntentionConflictFailure() => IntentionCatalogDeleteOutcome.conflict,
-      IntentionUnavailableFailure() =>
-        IntentionCatalogDeleteOutcome.unavailable,
-      IntentionCorruptionFailure() => IntentionCatalogDeleteOutcome.corruption,
-      IntentionUnexpectedFailure() => IntentionCatalogDeleteOutcome.unexpected,
-    },
-  };
 }
 
 final class _PendingCatalogContinuation {
