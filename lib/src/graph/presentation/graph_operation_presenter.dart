@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../intention/application/intention_repository.dart';
+import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../application/graph_command_coordinator.dart';
 

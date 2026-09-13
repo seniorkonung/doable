@@ -3,7 +3,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/intention/application/intention_repository.dart'
+import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';

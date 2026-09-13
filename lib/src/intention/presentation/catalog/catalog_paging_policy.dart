@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../application/intention_repository.dart';
+import '../../application/intention_catalog.dart';
 
 part 'catalog_paging_policy.g.dart';
 

@@ -55,4 +55,4 @@ final class PersonalGraphRepositoryProvider
 }
 
 String _$personalGraphRepositoryHash() =>
-    r'bc4a53af9de4d7177edf6b03bf233c8a99ac0959';
+    r'4ca897199ef8c783f1224b28cff693833789b8bc';

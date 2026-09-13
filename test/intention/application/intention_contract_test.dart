@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -493,28 +493,6 @@ void main() {
       expect(mutations[3].before, same(before));
       expect(mutations[3].after, same(before));
     });
-
-    test(
-      'watchById сигнализирует typed failure и повторяется новой подпиской',
-      () async {
-        final repository = _FailingRepository();
-        final id = _intentionId('00000000-0000-4000-8000-000000000001');
-
-        final expected = emitsInOrder(<Object?>[
-          isA<ResultFailure<Intention?>>().having(
-            (result) => result.failure,
-            'failure',
-            isA<IntentionUnavailableFailure>(),
-          ),
-          emitsDone,
-        ]);
-
-        await expectLater(repository.watchById(id), expected);
-        await expectLater(repository.watchById(id), expected);
-
-        expect(repository.watchSubscriptions, 2);
-      },
-    );
   });
 
   group('общая граница личного графа', () {
@@ -771,26 +749,6 @@ IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw StateError('Ожидался корректный UUID.'),
 };
-
-final class _FailingRepository implements IntentionRepository {
-  var watchSubscriptions = 0;
-
-  @override
-  Future<Result<IntentionCommandSuccess>> execute(
-    IntentionCommand command,
-  ) async => const ResultFailure(IntentionUnavailableFailure());
-
-  @override
-  Future<Result<IntentionCatalogPage>> getCatalogPage(
-    IntentionCatalogQuery query,
-  ) async => const ResultFailure(IntentionUnavailableFailure());
-
-  @override
-  Stream<Result<Intention?>> watchById(IntentionId id) {
-    watchSubscriptions++;
-    return Stream.value(const ResultFailure(IntentionUnavailableFailure()));
-  }
-}
 
 final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
   @override

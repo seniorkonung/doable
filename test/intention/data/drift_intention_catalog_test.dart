@@ -5,7 +5,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
@@ -1312,7 +1312,7 @@ void main() {
               .catalogMutation;
       expect(
         page.revision.compareTo(mutation.revision),
-        IntentionCatalogRevisionOrder.older,
+        GraphRevisionOrder.older,
       );
     },
   );
@@ -1338,11 +1338,11 @@ void main() {
 
     expect(
       originalRevision.compareTo(recreatedRevision),
-      IntentionCatalogRevisionOrder.differentEpoch,
+      GraphRevisionOrder.differentEpoch,
     );
     expect(
       recreatedRevision.compareTo(originalRevision),
-      IntentionCatalogRevisionOrder.differentEpoch,
+      GraphRevisionOrder.differentEpoch,
     );
   });
 

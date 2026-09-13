@@ -5,7 +5,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';

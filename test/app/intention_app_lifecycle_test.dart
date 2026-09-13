@@ -7,7 +7,7 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -631,19 +631,19 @@ final class _Snapshot implements IntentionCatalogEntrySnapshot {
   bool matches(IntentionCatalogQuery query) => query.includes(summary);
 }
 
-final class _Revision implements IntentionCatalogRevision {
+final class _Revision implements GraphRevision {
   const _Revision(this.sequence);
 
   final int sequence;
 
   @override
-  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) {
+  GraphRevisionOrder compareTo(GraphRevision other) {
     if (other is! _Revision) {
-      return IntentionCatalogRevisionOrder.differentEpoch;
+      return GraphRevisionOrder.differentEpoch;
     }
     final comparison = sequence.compareTo(other.sequence);
-    if (comparison < 0) return IntentionCatalogRevisionOrder.older;
-    if (comparison > 0) return IntentionCatalogRevisionOrder.newer;
-    return IntentionCatalogRevisionOrder.same;
+    if (comparison < 0) return GraphRevisionOrder.older;
+    if (comparison > 0) return GraphRevisionOrder.newer;
+    return GraphRevisionOrder.same;
   }
 }

@@ -1,7 +1,7 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/fts_query.dart';
-import 'package:doable/src/intention/application/intention_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 
