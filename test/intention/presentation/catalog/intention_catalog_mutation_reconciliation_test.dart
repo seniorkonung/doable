@@ -1,16 +1,76 @@
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
 void main() {
+  test('применяет пакет каталожных изменений одной ревизии целиком', () async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(repository);
+    final confirmedStates = <IntentionCatalogConfirmedState>[];
+    final subscription = container.listen(intentionCatalogViewModelProvider, (
+      _,
+      next,
+    ) {
+      if (next.value case final IntentionCatalogConfirmedState confirmed) {
+        confirmedStates.add(confirmed);
+      }
+    }, fireImmediately: true);
+    addTearDown(subscription.close);
+    addTearDown(container.dispose);
+
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await container.read(intentionCatalogViewModelProvider.future);
+    confirmedStates.clear();
+
+    final first = testSummary(index: 1, title: 'Первое');
+    final second = testSummary(index: 2, title: 'Второе');
+    await completeCatalogCommand(
+      container,
+      repository,
+      const CreateIntention(title: 'Первое', description: null),
+      IntentionSaved(
+        testIntention(index: 1, title: 'Первое'),
+        catalogMutation: IntentionCatalogCreated(
+          revision: const TestCatalogRevision(2),
+          entry: TestCatalogEntrySnapshot(first),
+        ),
+        additionalCatalogMutations: [
+          IntentionCatalogCreated(
+            revision: const TestCatalogRevision(2),
+            entry: TestCatalogEntrySnapshot(second),
+          ),
+        ],
+      ),
+    );
+
+    final current =
+        container.read(intentionCatalogViewModelProvider).requireValue
+            as IntentionCatalogLoaded;
+    expect(current.items.map((item) => item.id), [second.id, first.id]);
+    expect(current.totalCount, 2);
+    expect(current.revision, const TestCatalogRevision(2));
+    expect(confirmedStates, [same(current)]);
+    expect(repository.queries, hasLength(1));
+  });
+
   test('применяет membership transition к префиксу, count и cursor', () async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(
@@ -491,10 +551,11 @@ void main() {
       final events = <IntentionCatalogPresentationEvent>[];
       notifier.addPresentationListener(events.add);
       final coordinator = container.read(
-        intentionCommandCoordinatorProvider.notifier,
+        graphCommandCoordinatorProvider.notifier,
       );
       final created = testSummary(index: 30, title: 'Новое');
-      final create = coordinator.accept(
+      final create = coordinator.acceptCreation(
+        IntentionCreationFormKey(),
         const CreateIntention(title: 'Новое', description: null),
       ) as IntentionCommandAccepted;
       repository.completeCommand(
@@ -526,7 +587,7 @@ void main() {
         title: 'Новое',
         readiness: IntentionReadiness.ready,
       );
-      final readiness = coordinator.accept(
+      final readiness = coordinator.acceptExisting(
         EnableIntentionReadiness(created.id),
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(readiness.token);
@@ -559,7 +620,7 @@ void main() {
       ]);
 
       final beforeFailure = current;
-      final failed = coordinator.accept(
+      final failed = coordinator.acceptExisting(
         ArchiveIntention(created.id),
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(failed.token);

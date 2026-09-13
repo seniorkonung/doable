@@ -15,11 +15,11 @@ final personalGraphRepositoryProvider = PersonalGraphRepositoryProvider._();
 final class PersonalGraphRepositoryProvider
     extends
         $FunctionalProvider<
-          GraphCommandRepository,
-          GraphCommandRepository,
-          GraphCommandRepository
+          PersonalGraphRepository,
+          PersonalGraphRepository,
+          PersonalGraphRepository
         >
-    with $Provider<GraphCommandRepository> {
+    with $Provider<PersonalGraphRepository> {
   PersonalGraphRepositoryProvider._()
     : super(
         from: null,
@@ -36,23 +36,23 @@ final class PersonalGraphRepositoryProvider
 
   @$internal
   @override
-  $ProviderElement<GraphCommandRepository> $createElement(
+  $ProviderElement<PersonalGraphRepository> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  GraphCommandRepository create(Ref ref) {
+  PersonalGraphRepository create(Ref ref) {
     return personalGraphRepository(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(GraphCommandRepository value) {
+  Override overrideWithValue(PersonalGraphRepository value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<GraphCommandRepository>(value),
+      providerOverride: $SyncValueProvider<PersonalGraphRepository>(value),
     );
   }
 }
 
 String _$personalGraphRepositoryHash() =>
-    r'7bb29d8bab8332df294e975f9fb3ae1f83df5f75';
+    r'bc4a53af9de4d7177edf6b03bf233c8a99ac0959';

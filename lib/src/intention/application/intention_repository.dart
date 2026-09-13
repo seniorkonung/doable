@@ -293,22 +293,37 @@ final class IntentionCatalogUnchanged extends IntentionCatalogMutation {
 }
 
 sealed class IntentionCommandSuccess implements GraphCommandOutcome {
-  const IntentionCommandSuccess({required this.catalogMutation});
+  IntentionCommandSuccess({
+    required this.catalogMutation,
+    Iterable<IntentionCatalogMutation> additionalCatalogMutations = const [],
+  }) : catalogMutations = List.unmodifiable([
+         catalogMutation,
+         ...additionalCatalogMutations,
+       ]);
 
   final IntentionCatalogMutation catalogMutation;
+  final List<IntentionCatalogMutation> catalogMutations;
 
   @override
-  Iterable<GraphChange> get changes => [catalogMutation];
+  Iterable<GraphChange> get changes => catalogMutations;
 }
 
 final class IntentionSaved extends IntentionCommandSuccess {
-  const IntentionSaved(this.intention, {required super.catalogMutation});
+  IntentionSaved(
+    this.intention, {
+    required super.catalogMutation,
+    super.additionalCatalogMutations,
+  });
 
   final Intention intention;
 }
 
 final class IntentionDeleted extends IntentionCommandSuccess {
-  const IntentionDeleted(this.id, {required super.catalogMutation});
+  IntentionDeleted(
+    this.id, {
+    required super.catalogMutation,
+    super.additionalCatalogMutations,
+  });
 
   final IntentionId id;
 }
