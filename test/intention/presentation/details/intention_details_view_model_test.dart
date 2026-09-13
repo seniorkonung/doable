@@ -1,13 +1,13 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
-import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -228,9 +228,9 @@ void main() {
     addTearDown(container.dispose);
     final intention = testDetailsIntention(index: 50);
     final coordinator = container.read(
-      intentionCommandCoordinatorProvider.notifier,
+      graphCommandCoordinatorProvider.notifier,
     );
-    final start = coordinator.accept(DeleteIntention(intention.id));
+    final start = coordinator.acceptExisting(DeleteIntention(intention.id));
     expect(start, isA<IntentionCommandAccepted>());
 
     final subscription = container.listen(
@@ -430,7 +430,7 @@ void main() {
     await pumpEventQueue();
 
     final coordinator = container.read(
-      intentionCommandCoordinatorProvider.notifier,
+      graphCommandCoordinatorProvider.notifier,
     );
     final fallback =
         Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
@@ -505,7 +505,7 @@ void main() {
       ..saveChanges();
 
     final coordinator = container.read(
-      intentionCommandCoordinatorProvider.notifier,
+      graphCommandCoordinatorProvider.notifier,
     );
     final fallback =
         Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
@@ -569,7 +569,7 @@ void main() {
     final fallbackClaims =
         <Future<IntentionCatalogFallbackPresentationClaim?>>[];
     final coordinator = container.read(
-      intentionCommandCoordinatorProvider.notifier,
+      graphCommandCoordinatorProvider.notifier,
     );
     final coordinatorSubscription = coordinator.completions.listen((
       completion,
@@ -892,8 +892,8 @@ void main() {
       await pumpEventQueue();
 
       final start = container
-          .read(intentionCommandCoordinatorProvider.notifier)
-          .accept(
+          .read(graphCommandCoordinatorProvider.notifier)
+          .acceptExisting(
             UpdateIntention(
               id: before.id,
               title: saved.title,
@@ -941,6 +941,112 @@ void main() {
     },
   );
 
+  test(
+    'снимок старше подтверждённой ревизии не возвращает прежние поля',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final before = testDetailsIntention(index: 65, title: 'Прежнее');
+      final saved = testDetailsIntention(index: 65, title: 'Сохранённое');
+      final refreshed = testDetailsIntention(index: 65, title: 'Актуальное');
+      final provider = intentionDetailsViewModelProvider(before.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(
+        ResultSuccess(before),
+        revision: const TestDetailsRevision(1),
+      );
+      await pumpEventQueue();
+
+      container.read(provider.notifier)
+        ..beginEditing()
+        ..changeTitle(saved.title)
+        ..saveChanges();
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(
+          saved,
+          before: before,
+          revision: const TestDetailsRevision(3),
+        ),
+      );
+      await waitForDetailRequests(repository, 2);
+
+      repository.detailRequests[1].add(
+        ResultSuccess(before),
+        revision: const TestDetailsRevision(2),
+      );
+      await pumpEventQueue();
+      expect(
+        (container.read(provider) as IntentionDetailsLoaded).intention,
+        same(saved),
+      );
+
+      repository.detailRequests[1].add(
+        ResultSuccess(refreshed),
+        revision: const TestDetailsRevision(4),
+      );
+      await pumpEventQueue();
+      expect(
+        (container.read(provider) as IntentionDetailsLoaded).intention,
+        same(refreshed),
+      );
+    },
+  );
+
+  test('первый снимок нового чтения принимает новую эпоху', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final before = testDetailsIntention(index: 66, title: 'Прежнее');
+    final saved = testDetailsIntention(index: 66, title: 'Сохранённое');
+    final reopened = testDetailsIntention(index: 66, title: 'Новая эпоха');
+    final provider = intentionDetailsViewModelProvider(before.id);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(
+      ResultSuccess(before),
+      revision: const TestDetailsRevision(1),
+    );
+    await pumpEventQueue();
+
+    container.read(provider.notifier)
+      ..beginEditing()
+      ..changeTitle(saved.title)
+      ..saveChanges();
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(
+        saved,
+        before: before,
+        revision: const TestDetailsRevision(2),
+      ),
+    );
+    await waitForDetailRequests(repository, 2);
+
+    repository.detailRequests[1].add(
+      ResultSuccess(reopened),
+      revision: const TestDetailsRevision(0, epoch: 1),
+    );
+    await pumpEventQueue();
+
+    expect(
+      (container.read(provider) as IntentionDetailsLoaded).intention,
+      same(reopened),
+    );
+  });
+
   test('no-op IntentionSaved запускает новую detail generation', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
@@ -957,8 +1063,8 @@ void main() {
     await pumpEventQueue();
 
     final start = container
-        .read(intentionCommandCoordinatorProvider.notifier)
-        .accept(
+        .read(graphCommandCoordinatorProvider.notifier)
+        .acceptExisting(
           UpdateIntention(
             id: intention.id,
             title: intention.title,
@@ -988,8 +1094,8 @@ void main() {
       final before = testDetailsIntention(index: 64, title: 'Прежнее');
       final saved = testDetailsIntention(index: 64, title: 'Сохранённое');
       final start = container
-          .read(intentionCommandCoordinatorProvider.notifier)
-          .accept(
+          .read(graphCommandCoordinatorProvider.notifier)
+          .acceptExisting(
             UpdateIntention(
               id: before.id,
               title: saved.title,
@@ -997,8 +1103,8 @@ void main() {
             ),
           );
       expect(start, isA<IntentionCommandAccepted>());
-      repository.onWatchById = (id) {
-        repository.onWatchById = null;
+      repository.onWatchIntention = (id) {
+        repository.onWatchIntention = null;
         repository.completeCommand(
           0,
           testDetailsSavedResult(saved, before: before),
@@ -1042,8 +1148,8 @@ void main() {
     await pumpEventQueue();
 
     final start = container
-        .read(intentionCommandCoordinatorProvider.notifier)
-        .accept(DeleteIntention(intention.id));
+        .read(graphCommandCoordinatorProvider.notifier)
+        .acceptExisting(DeleteIntention(intention.id));
     repository.completeCommand(
       0,
       const ResultFailure(IntentionUnavailableFailure()),
@@ -1080,7 +1186,7 @@ void main() {
       await pumpEventQueue();
 
       final coordinator = container.read(
-        intentionCommandCoordinatorProvider.notifier,
+        graphCommandCoordinatorProvider.notifier,
       );
       final fallback =
           Completer<Future<IntentionCatalogFallbackPresentationClaim?>>();
@@ -1114,6 +1220,8 @@ void main() {
 
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
     ProviderContainer(
-      overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
       retry: (retryCount, error) => null,
     );

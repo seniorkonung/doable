@@ -4,6 +4,8 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -11,8 +13,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/operation/intention_command_coordinator.dart';
-import 'package:doable/src/intention/presentation/operation/intention_repository_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,7 +85,9 @@ void main() {
     );
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
         retry: (retryCount, error) => null,
         child: ValueListenableBuilder<Locale>(
           valueListenable: locale,
@@ -415,9 +417,9 @@ void main() {
     final container = _detailsContainer(repository);
     addTearDown(container.dispose);
     final coordinator = container.read(
-      intentionCommandCoordinatorProvider.notifier,
+      graphCommandCoordinatorProvider.notifier,
     );
-    final start = coordinator.accept(DeleteIntention(intention.id));
+    final start = coordinator.acceptExisting(DeleteIntention(intention.id));
     expect(start, isA<IntentionCommandAccepted>());
 
     await tester.pumpWidget(
@@ -772,7 +774,9 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
         retry: (retryCount, error) => null,
         child: MaterialApp.router(
           locale: const Locale('en'),
@@ -869,7 +873,9 @@ Future<void> _pumpDetailsPage(
 ) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
       retry: (retryCount, error) => null,
       child: _localizedApp(IntentionDetailsPage(intentionId: intentionId)),
     ),
@@ -879,7 +885,9 @@ Future<void> _pumpDetailsPage(
 
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
     ProviderContainer(
-      overrides: [intentionRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
       retry: (retryCount, error) => null,
     );
 

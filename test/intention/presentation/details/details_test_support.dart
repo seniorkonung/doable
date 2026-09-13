@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_repository.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -8,32 +10,44 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 
 final class ControlledDetailRequest {
   ControlledDetailRequest() {
-    controller = StreamController<Result<Intention?>>(
+    controller = StreamController<Result<GraphSnapshot<Intention?>>>(
       onCancel: () {
         cancellationCount += 1;
       },
     );
   }
 
-  late final StreamController<Result<Intention?>> controller;
+  late final StreamController<Result<GraphSnapshot<Intention?>>> controller;
   var cancellationCount = 0;
 
-  void add(Result<Intention?> result) {
-    controller.add(result);
+  void add(
+    Result<Intention?> result, {
+    GraphRevision revision = const TestDetailsRevision(0),
+  }) {
+    final snapshotResult = switch (result) {
+      ResultSuccess(:final value) => ResultSuccess<GraphSnapshot<Intention?>>(
+        GraphSnapshot(value: value, revision: revision),
+      ),
+      ResultFailure(:final failure) => ResultFailure<GraphSnapshot<Intention?>>(
+        failure,
+      ),
+    };
+    controller.add(snapshotResult);
   }
 
   Future<void> close() => controller.close();
 }
 
-final class ControlledDetailsRepository implements IntentionRepository {
+final class ControlledDetailsRepository implements PersonalGraphRepository {
   final detailIds = <IntentionId>[];
   final detailRequests = <ControlledDetailRequest>[];
   final catalogQueries = <IntentionCatalogQuery>[];
   final commands = <IntentionCommand>[];
-  final _commandRequests = <Completer<Result<IntentionCommandSuccess>>>[];
+  final _commandRequests =
+      <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
 
   Result<IntentionCatalogPage>? catalogResult;
-  void Function(IntentionId id)? onWatchById;
+  void Function(IntentionId id)? onWatchIntention;
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -48,24 +62,53 @@ final class ControlledDetailsRepository implements IntentionRepository {
   }
 
   @override
-  Stream<Result<Intention?>> watchById(IntentionId id) {
+  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) {
     detailIds.add(id);
     final request = ControlledDetailRequest();
     detailRequests.add(request);
-    onWatchById?.call(id);
+    onWatchIntention?.call(id);
     return request.controller.stream;
   }
 
   @override
-  Future<Result<IntentionCommandSuccess>> execute(IntentionCommand command) {
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
+    IntentionCommand command,
+  ) {
     commands.add(command);
-    final request = Completer<Result<IntentionCommandSuccess>>();
+    final request =
+        Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
     _commandRequests.add(request);
     return request.future;
   }
 
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
-    _commandRequests[index].complete(result);
+    _commandRequests[index].complete(switch (result) {
+      ResultSuccess(:final value) => ResultSuccess(
+        ConfirmedGraphResult(
+          revision: value.catalogMutation.revision,
+          value: value,
+        ),
+      ),
+      ResultFailure(:final failure) => ResultFailure(failure),
+    });
+  }
+}
+
+final class TestDetailsRevision implements GraphRevision {
+  const TestDetailsRevision(this.sequence, {this.epoch = 0});
+
+  final int sequence;
+  final int epoch;
+
+  @override
+  GraphRevisionOrder compareTo(GraphRevision other) {
+    if (other is! TestDetailsRevision || epoch != other.epoch) {
+      return GraphRevisionOrder.differentEpoch;
+    }
+    final comparison = sequence.compareTo(other.sequence);
+    if (comparison < 0) return GraphRevisionOrder.older;
+    if (comparison > 0) return GraphRevisionOrder.newer;
+    return GraphRevisionOrder.same;
   }
 }
 
@@ -126,31 +169,31 @@ Future<void> waitForDetailRequests(
 Result<IntentionCommandSuccess> testDetailsSavedResult(
   Intention intention, {
   Intention? before,
+  GraphRevision revision = const TestDetailsRevision(0),
 }) {
   final afterSnapshot = _DetailsCatalogEntrySnapshot(intention);
   final mutation = before == null
-      ? IntentionCatalogUnchanged(
-          revision: const _DetailsCatalogRevision(),
-          entry: afterSnapshot,
-        )
+      ? IntentionCatalogUnchanged(revision: revision, entry: afterSnapshot)
       : IntentionCatalogUpdated(
-          revision: const _DetailsCatalogRevision(),
+          revision: revision,
           before: _DetailsCatalogEntrySnapshot(before),
           after: afterSnapshot,
         );
   return ResultSuccess(IntentionSaved(intention, catalogMutation: mutation));
 }
 
-Result<IntentionCommandSuccess> testDetailsDeletedResult(Intention intention) =>
-    ResultSuccess(
-      IntentionDeleted(
-        intention.id,
-        catalogMutation: IntentionCatalogDeleted(
-          revision: const _DetailsCatalogRevision(),
-          entry: _DetailsCatalogEntrySnapshot(intention),
-        ),
-      ),
-    );
+Result<IntentionCommandSuccess> testDetailsDeletedResult(
+  Intention intention, {
+  GraphRevision revision = const TestDetailsRevision(0),
+}) => ResultSuccess(
+  IntentionDeleted(
+    intention.id,
+    catalogMutation: IntentionCatalogDeleted(
+      revision: revision,
+      entry: _DetailsCatalogEntrySnapshot(intention),
+    ),
+  ),
+);
 
 final class _DetailsCatalogEntrySnapshot
     implements IntentionCatalogEntrySnapshot {
@@ -162,14 +205,4 @@ final class _DetailsCatalogEntrySnapshot
 
   @override
   bool matches(IntentionCatalogQuery query) => query.includes(summary);
-}
-
-final class _DetailsCatalogRevision implements IntentionCatalogRevision {
-  const _DetailsCatalogRevision();
-
-  @override
-  IntentionCatalogRevisionOrder compareTo(IntentionCatalogRevision other) =>
-      other is _DetailsCatalogRevision
-      ? IntentionCatalogRevisionOrder.same
-      : IntentionCatalogRevisionOrder.differentEpoch;
 }

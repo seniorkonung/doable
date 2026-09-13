@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
+import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/intention_command.dart';
 import '../../application/intention_repository.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
-import '../operation/intention_command_coordinator.dart';
-import '../operation/intention_repository_provider.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 
@@ -34,21 +35,22 @@ final class _DetailObservationGeneration {
 }
 
 @riverpod
-Stream<Result<Intention?>> _intentionDetailsObservation(
+Stream<Result<GraphSnapshot<Intention?>>> _intentionDetailsObservation(
   Ref ref,
   IntentionId intentionId,
   _DetailObservationGeneration generation,
-) => ref.watch(intentionRepositoryProvider).watchById(intentionId);
+) => ref.watch(personalGraphRepositoryProvider).watchIntention(intentionId);
 
 @riverpod
 final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   late IntentionId _intentionId;
-  late IntentionCommandCoordinator _coordinator;
+  late GraphCommandCoordinator _coordinator;
   late _DetailObservationGeneration _generation;
   late StreamSubscription<IntentionCommandCompletion> _completionSubscription;
-  ProviderSubscription<AsyncValue<Result<Intention?>>>?
+  ProviderSubscription<AsyncValue<Result<GraphSnapshot<Intention?>>>>?
   _observationSubscription;
   IntentionOperationToken? _activeToken;
+  GraphRevision? _acceptedRevision;
   var _preserveAuthoritativeStateWhileLoading = false;
   var _isDeleted = false;
 
@@ -56,7 +58,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   IntentionDetailsState build(IntentionId intentionId) {
     _intentionId = intentionId;
     _generation = _DetailObservationGeneration.initial;
-    _coordinator = ref.watch(intentionCommandCoordinatorProvider.notifier);
+    _acceptedRevision = null;
+    _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     _completionSubscription = _coordinator.completions.listen(
       _handleCompletion,
     );
@@ -144,7 +147,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
 
     final description = edit.description;
-    final start = _coordinator.accept(
+    final start = _coordinator.acceptExisting(
       UpdateIntention(
         id: _intentionId,
         title: edit.title,
@@ -202,7 +205,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  AsyncValue<Result<Intention?>> _startObservation() {
+  AsyncValue<Result<GraphSnapshot<Intention?>>> _startObservation() {
     _observationSubscription?.close();
     final generation = _generation;
     final subscription = ref.listen(
@@ -215,27 +218,37 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   void _handleObservation(
     _DetailObservationGeneration generation,
-    AsyncValue<Result<Intention?>> observation,
+    AsyncValue<Result<GraphSnapshot<Intention?>>> observation,
   ) {
     if (!ref.mounted || _isDeleted || generation != _generation) {
       return;
     }
-    if (observation is AsyncLoading<Result<Intention?>> &&
+    if (observation is AsyncLoading<Result<GraphSnapshot<Intention?>>> &&
         _preserveAuthoritativeStateWhileLoading) {
       return;
     }
-    if (observation is! AsyncLoading<Result<Intention?>>) {
+    if (observation is! AsyncLoading<Result<GraphSnapshot<Intention?>>>) {
       _preserveAuthoritativeStateWhileLoading = false;
     }
     final current = state;
     final loaded = current is IntentionDetailsLoaded ? current : null;
     final hasNoConfirmedIntention = switch (observation) {
-      AsyncData(value: ResultSuccess(value: Intention())) => false,
-      AsyncLoading<Result<Intention?>>() ||
-      AsyncError<Result<Intention?>>() ||
-      AsyncData<Result<Intention?>>() => true,
+      AsyncData(
+        value: ResultSuccess(value: GraphSnapshot(value: Intention())),
+      ) =>
+        false,
+      AsyncLoading<Result<GraphSnapshot<Intention?>>>() ||
+      AsyncError<Result<GraphSnapshot<Intention?>>>() ||
+      AsyncData<Result<GraphSnapshot<Intention?>>>() => true,
     };
     if (loaded?.edit != null && hasNoConfirmedIntention) {
+      return;
+    }
+    final snapshot = switch (observation) {
+      AsyncData(value: ResultSuccess(:final value)) => value,
+      AsyncLoading() || AsyncError() || AsyncData() => null,
+    };
+    if (snapshot != null && !_acceptSnapshotRevision(snapshot.revision)) {
       return;
     }
     state = _stateFromObservation(observation, previousLoaded: loaded);
@@ -248,9 +261,17 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     if (state.isOperationRunning) {
       _scheduleGateRefresh();
     }
-    switch (completion.result) {
-      case ResultSuccess(value: IntentionSaved(:final intention))
+    switch (completion.confirmedResult) {
+      case ResultSuccess(
+            value: ConfirmedGraphResult(
+              :final revision,
+              value: IntentionSaved(:final intention),
+            ),
+          )
           when intention.id == _intentionId:
+        if (!_acceptSnapshotRevision(revision)) {
+          return;
+        }
         _advanceGeneration();
         _preserveAuthoritativeStateWhileLoading = true;
         final current = state;
@@ -265,8 +286,14 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
           event: loaded?.event,
         );
         _startObservation();
-      case ResultSuccess(value: IntentionDeleted(:final id))
+      case ResultSuccess(
+            value: ConfirmedGraphResult(
+              :final revision,
+              value: IntentionDeleted(:final id),
+            ),
+          )
           when id == _intentionId:
+        _acceptedRevision = revision;
         _advanceGeneration();
         _isDeleted = true;
         _observationSubscription?.close();
@@ -345,7 +372,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       return;
     }
 
-    final start = _coordinator.accept(_commandForStateChange(kind));
+    final start = _coordinator.acceptExisting(_commandForStateChange(kind));
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
         _activeToken = token;
@@ -429,7 +456,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  IntentionCommand _commandForStateChange(
+  ExistingIntentionCommand _commandForStateChange(
     IntentionDetailsStateChangeKind kind,
   ) => switch (kind) {
     IntentionDetailsStateChangeKind.enableReadiness => EnableIntentionReadiness(
@@ -514,10 +541,20 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     _generation = _generation.next();
   }
 
+  bool _acceptSnapshotRevision(GraphRevision revision) {
+    final accepted = _acceptedRevision;
+    if (accepted != null &&
+        revision.compareTo(accepted) == GraphRevisionOrder.older) {
+      return false;
+    }
+    _acceptedRevision = revision;
+    return true;
+  }
+
   bool get _isOperationRunning => _coordinator.isRunning(_intentionId);
 
   IntentionDetailsState _stateFromObservation(
-    AsyncValue<Result<Intention?>> observation, {
+    AsyncValue<Result<GraphSnapshot<Intention?>>> observation, {
     IntentionDetailsLoaded? previousLoaded,
   }) => observation.when(
     data: (result) => _stateFromResult(
@@ -532,20 +569,20 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   );
 
   IntentionDetailsState _stateFromResult(
-    Result<Intention?> result,
+    Result<GraphSnapshot<Intention?>> result,
     bool isOperationRunning, {
     IntentionDetailsLoaded? previousLoaded,
   }) => switch (result) {
-    ResultSuccess(value: final Intention intention) => IntentionDetailsLoaded(
-      intention: intention,
-      isOperationRunning: isOperationRunning,
-      edit: previousLoaded?.edit,
-      stateChange: previousLoaded?.stateChange,
-      event: previousLoaded?.event,
-    ),
-    ResultSuccess(value: null) => IntentionDetailsNotFound(
-      isOperationRunning: isOperationRunning,
-    ),
+    ResultSuccess(value: GraphSnapshot(value: final Intention intention)) =>
+      IntentionDetailsLoaded(
+        intention: intention,
+        isOperationRunning: isOperationRunning,
+        edit: previousLoaded?.edit,
+        stateChange: previousLoaded?.stateChange,
+        event: previousLoaded?.event,
+      ),
+    ResultSuccess(value: GraphSnapshot(value: null)) =>
+      IntentionDetailsNotFound(isOperationRunning: isOperationRunning),
     ResultFailure(failure: IntentionUnavailableFailure()) =>
       IntentionDetailsUnavailable(isOperationRunning: isOperationRunning),
     ResultFailure(failure: IntentionCorruptionFailure()) =>

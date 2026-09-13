@@ -16,13 +16,13 @@ final _intentionDetailsObservationProvider =
 final class _IntentionDetailsObservationProvider
     extends
         $FunctionalProvider<
-          AsyncValue<Result<Intention?>>,
-          Result<Intention?>,
-          Stream<Result<Intention?>>
+          AsyncValue<Result<GraphSnapshot<Intention?>>>,
+          Result<GraphSnapshot<Intention?>>,
+          Stream<Result<GraphSnapshot<Intention?>>>
         >
     with
-        $FutureModifier<Result<Intention?>>,
-        $StreamProvider<Result<Intention?>> {
+        $FutureModifier<Result<GraphSnapshot<Intention?>>>,
+        $StreamProvider<Result<GraphSnapshot<Intention?>>> {
   _IntentionDetailsObservationProvider._({
     required _IntentionDetailsObservationFamily super.from,
     required (IntentionId, _DetailObservationGeneration) super.argument,
@@ -46,12 +46,12 @@ final class _IntentionDetailsObservationProvider
 
   @$internal
   @override
-  $StreamProviderElement<Result<Intention?>> $createElement(
+  $StreamProviderElement<Result<GraphSnapshot<Intention?>>> $createElement(
     $ProviderPointer pointer,
   ) => $StreamProviderElement(pointer);
 
   @override
-  Stream<Result<Intention?>> create(Ref ref) {
+  Stream<Result<GraphSnapshot<Intention?>>> create(Ref ref) {
     final argument =
         this.argument as (IntentionId, _DetailObservationGeneration);
     return _intentionDetailsObservation(ref, argument.$1, argument.$2);
@@ -70,12 +70,12 @@ final class _IntentionDetailsObservationProvider
 }
 
 String _$_intentionDetailsObservationHash() =>
-    r'9edc1895689c3d93094b3ba534ece1ef21c5949e';
+    r'22087f4ffe121f808c473d758c1c4775eab4b46f';
 
 final class _IntentionDetailsObservationFamily extends $Family
     with
         $FunctionalFamilyOverride<
-          Stream<Result<Intention?>>,
+          Stream<Result<GraphSnapshot<Intention?>>>,
           (IntentionId, _DetailObservationGeneration)
         > {
   _IntentionDetailsObservationFamily._()
@@ -151,7 +151,7 @@ final class IntentionDetailsViewModelProvider
 }
 
 String _$intentionDetailsViewModelHash() =>
-    r'cbddd840f402191032b817d84986d0ebab0e6e63';
+    r'cf769eac2acde329405d0281af8656fd95f87b07';
 
 final class IntentionDetailsViewModelFamily extends $Family
     with
