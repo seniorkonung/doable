@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
@@ -23,7 +24,7 @@ final class IntentionEditorPage extends ConsumerStatefulWidget {
 
 final class _IntentionEditorPageState
     extends ConsumerState<IntentionEditorPage> {
-  final _session = IntentionEditorSession();
+  final _formKey = IntentionCreationFormKey();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
 
@@ -37,7 +38,7 @@ final class _IntentionEditorPageState
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final provider = intentionEditorViewModelProvider(_session);
+    final provider = intentionEditorViewModelProvider(_formKey);
     final editor = ref.watch(provider);
     final notifier = ref.read(provider.notifier);
     ref.listen(provider, (previous, next) {
