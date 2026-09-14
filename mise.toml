@@ -1,9 +1,9 @@
 [tools]
-flutter = "3.47"
-node = "26"
-"github:microsoft/apm" = "latest"
-lefthook = "2"
-"npm:@fission-ai/openspec" = "1.12"
+flutter = "3.47.1"
+node = "26.4.0"
+"github:microsoft/apm" = "0.30.0"
+lefthook = "2.1.9"
+"npm:@fission-ai/openspec" = "1.13.0"
 
 [tasks]
 prepare = "lefthook install"
