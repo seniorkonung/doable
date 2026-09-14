@@ -1,3 +1,4 @@
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
@@ -19,13 +20,11 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     required super.isOperationRunning,
     this.edit,
     this.stateChange,
-    this.event,
   });
 
   final Intention intention;
   final IntentionDetailsEdit? edit;
   final IntentionDetailsStateChange? stateChange;
-  final IntentionDetailsEvent? event;
 
   IntentionDetailsLoaded copyWith({
     Intention? intention,
@@ -34,14 +33,11 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     bool clearEdit = false,
     IntentionDetailsStateChange? stateChange,
     bool clearStateChange = false,
-    IntentionDetailsEvent? event,
-    bool clearEvent = false,
   }) => IntentionDetailsLoaded(
     intention: intention ?? this.intention,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     edit: clearEdit ? null : edit ?? this.edit,
     stateChange: clearStateChange ? null : stateChange ?? this.stateChange,
-    event: clearEvent ? null : event ?? this.event,
   );
 }
 
@@ -55,13 +51,20 @@ enum IntentionDetailsStateChangeKind {
 
 final class IntentionDetailsStateChange {
   const IntentionDetailsStateChange.running(this.kind)
-    : operation = const OperationRunning<Intention>();
+    : operation = const OperationRunning<Intention>(),
+      failurePresentation = null;
 
-  IntentionDetailsStateChange.failed(this.kind, IntentionFailure failure)
-    : operation = OperationFailed<Intention>(failure);
+  IntentionDetailsStateChange.failed(
+    this.kind,
+    IntentionFailure failure, {
+    this.failurePresentation,
+  }) : operation = OperationFailed<Intention>(failure);
 
   final IntentionDetailsStateChangeKind kind;
   final OperationState<Intention> operation;
+
+  /// Право открытого просмотра предъявить ошибку перехода по видимому кадру.
+  final IntentionInitiatorPresentationClaim? failurePresentation;
 
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
@@ -77,6 +80,7 @@ final class IntentionDetailsEdit {
     required this.title,
     required this.description,
     required this.operation,
+    this.failurePresentation,
   });
 
   factory IntentionDetailsEdit.fromIntention(Intention intention) =>
@@ -90,6 +94,9 @@ final class IntentionDetailsEdit {
   final String description;
   final OperationState<Intention> operation;
 
+  /// Право открытой формы изменения предъявить ошибку по видимому кадру.
+  final IntentionInitiatorPresentationClaim? failurePresentation;
+
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
     OperationIdle<Intention>() ||
@@ -100,24 +107,43 @@ final class IntentionDetailsEdit {
 
   bool get canSubmit => operation is OperationIdle<Intention> || canRetry;
 
-  IntentionDetailsEdit withTitle(String value) => IntentionDetailsEdit(
+  IntentionDetailsEdit withTitle(String value) => _withEditedText(
     title: value,
     description: description,
-    operation: _operationAfterEditing(IntentionTextField.title),
+    field: IntentionTextField.title,
   );
 
-  IntentionDetailsEdit withDescription(String value) => IntentionDetailsEdit(
+  IntentionDetailsEdit withDescription(String value) => _withEditedText(
     title: title,
     description: value,
-    operation: _operationAfterEditing(IntentionTextField.description),
+    field: IntentionTextField.description,
   );
 
-  IntentionDetailsEdit withOperation(OperationState<Intention> value) =>
-      IntentionDetailsEdit(
-        title: title,
-        description: description,
-        operation: value,
-      );
+  IntentionDetailsEdit withOperation(
+    OperationState<Intention> value, {
+    IntentionInitiatorPresentationClaim? failurePresentation,
+  }) => IntentionDetailsEdit(
+    title: title,
+    description: description,
+    operation: value,
+    failurePresentation: failurePresentation,
+  );
+
+  IntentionDetailsEdit _withEditedText({
+    required String title,
+    required String description,
+    required IntentionTextField field,
+  }) {
+    final nextOperation = _operationAfterEditing(field);
+    return IntentionDetailsEdit(
+      title: title,
+      description: description,
+      operation: nextOperation,
+      failurePresentation: nextOperation is OperationFailed<Intention>
+          ? failurePresentation
+          : null,
+    );
+  }
 
   OperationState<Intention> _operationAfterEditing(IntentionTextField field) {
     final current = operation;
@@ -137,30 +163,6 @@ final class IntentionDetailsEdit {
       IntentionUnexpectedFailure() => current,
     };
   }
-}
-
-sealed class IntentionDetailsEvent {
-  const IntentionDetailsEvent();
-}
-
-final class IntentionDetailsSaved extends IntentionDetailsEvent {
-  const IntentionDetailsSaved();
-}
-
-final class IntentionDetailsReadinessEnabled extends IntentionDetailsEvent {
-  const IntentionDetailsReadinessEnabled();
-}
-
-final class IntentionDetailsReadinessDisabled extends IntentionDetailsEvent {
-  const IntentionDetailsReadinessDisabled();
-}
-
-final class IntentionDetailsArchived extends IntentionDetailsEvent {
-  const IntentionDetailsArchived();
-}
-
-final class IntentionDetailsRestored extends IntentionDetailsEvent {
-  const IntentionDetailsRestored();
 }
 
 final class IntentionDetailsNotFound extends IntentionDetailsState {

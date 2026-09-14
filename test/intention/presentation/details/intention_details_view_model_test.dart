@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -435,11 +436,10 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final fallback = Completer<Future<IntentionAppPresentationClaim?>>();
+    final presenter = coordinator.registerAppPresentation();
     final completionTokens = <IntentionOperationToken>[];
     final completionSubscription = coordinator.completions.listen((event) {
       completionTokens.add(event.token);
-      fallback.complete(coordinator.claimAppPresentation(event.token));
     });
     addTearDown(completionSubscription.cancel);
 
@@ -462,14 +462,11 @@ void main() {
             'подтверждённый success',
             same(saved),
           )
-          .having((state) => state.edit, 'завершённая форма', isNull)
-          .having(
-            (state) => state.event,
-            'одноразовое подтверждение',
-            isA<IntentionDetailsSaved>(),
-          ),
+          .having((state) => state.edit, 'завершённая форма', isNull),
     );
-    expect(await (await fallback.future), isNull);
+    final successClaim = await presenter.nextClaim();
+    expect(successClaim!.token, same(completionTokens.single));
+    coordinator.confirmPresentation(successClaim);
 
     repository.detailRequests[0].add(ResultSuccess(before));
     await pumpEventQueue();
@@ -509,11 +506,7 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final fallback = Completer<Future<IntentionAppPresentationClaim?>>();
-    final completionSubscription = coordinator.completions.listen((event) {
-      fallback.complete(coordinator.claimAppPresentation(event.token));
-    });
-    addTearDown(completionSubscription.cancel);
+    final presenter = coordinator.registerAppPresentation();
     firstSubscription.close();
     await pumpEventQueue();
 
@@ -535,7 +528,7 @@ void main() {
       0,
       const ResultFailure(IntentionUnavailableFailure()),
     );
-    final claim = await (await fallback.future);
+    final claim = await presenter.nextClaim();
     expect(claim, isA<IntentionAppPresentationClaim>());
     coordinator.confirmPresentation(claim!);
     await pumpEventQueue();
@@ -567,15 +560,14 @@ void main() {
     repository.detailRequests[0].add(ResultSuccess(intention));
     await pumpEventQueue();
     final tokens = <IntentionOperationToken>[];
-    final fallbackClaims = <Future<IntentionAppPresentationClaim?>>[];
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
+    final presenter = coordinator.registerAppPresentation();
     final coordinatorSubscription = coordinator.completions.listen((
       completion,
     ) {
       tokens.add(completion.token);
-      fallbackClaims.add(coordinator.claimAppPresentation(completion.token));
     });
     addTearDown(coordinatorSubscription.cancel);
 
@@ -592,6 +584,11 @@ void main() {
       (container.read(provider) as IntentionDetailsLoaded).edit?.canRetry,
       isTrue,
     );
+    final shownFailure = (container.read(
+      provider,
+    ) as IntentionDetailsLoaded).edit!.failurePresentation;
+    expect(shownFailure, isA<IntentionInitiatorPresentationClaim>());
+    coordinator.confirmPresentation(shownFailure!);
 
     details.saveChanges();
     repository.completeCommand(
@@ -605,11 +602,13 @@ void main() {
 
     expect(tokens, hasLength(2));
     expect(identical(tokens.first, tokens.last), isFalse);
-    expect(await Future.wait(fallbackClaims), everyElement(isNull));
-    expect(
-      (container.read(provider) as IntentionDetailsLoaded).event,
-      isA<IntentionDetailsSaved>(),
-    );
+    final successClaim = await presenter.nextClaim();
+    expect(successClaim!.token, same(tokens.last));
+    coordinator.confirmPresentation(successClaim);
+    IntentionAppPresentationClaim? staleFailure;
+    unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
+    await pumpEventQueue();
+    expect(staleFailure, isNull);
   });
 
   test(
@@ -638,7 +637,6 @@ void main() {
               Matcher,
               IntentionDetailsStateChangeKind,
               Intention,
-              Matcher,
             )
           >[
             (
@@ -649,14 +647,12 @@ void main() {
                 index: 83,
                 readiness: IntentionReadiness.ready,
               ),
-              isA<IntentionDetailsReadinessEnabled>(),
             ),
             (
               details.disableReadiness,
               isA<DisableIntentionReadiness>(),
               IntentionDetailsStateChangeKind.disableReadiness,
               testDetailsIntention(index: 83),
-              isA<IntentionDetailsReadinessDisabled>(),
             ),
             (
               details.archive,
@@ -666,20 +662,17 @@ void main() {
                 index: 83,
                 archiveState: IntentionArchiveState.archived,
               ),
-              isA<IntentionDetailsArchived>(),
             ),
             (
               details.restore,
               isA<RestoreIntention>(),
               IntentionDetailsStateChangeKind.restore,
               testDetailsIntention(index: 83),
-              isA<IntentionDetailsRestored>(),
             ),
           ];
 
       for (var index = 0; index < scenarios.length; index += 1) {
-        final (start, commandMatcher, kind, saved, eventMatcher) =
-            scenarios[index];
+        final (start, commandMatcher, kind, saved) = scenarios[index];
         final before = confirmed;
         start();
         start();
@@ -725,11 +718,6 @@ void main() {
                 (state) => state.stateChange,
                 'завершённый переход',
                 isNull,
-              )
-              .having(
-                (state) => state.event,
-                'одноразовое подтверждение',
-                eventMatcher,
               ),
         );
 
@@ -742,7 +730,6 @@ void main() {
 
         repository.detailRequests[index + 1].add(ResultSuccess(saved));
         await pumpEventQueue();
-        details.consumeEvent();
         confirmed = saved;
       }
     },
@@ -1194,11 +1181,7 @@ void main() {
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
-      final fallback = Completer<Future<IntentionAppPresentationClaim?>>();
-      final completionSubscription = coordinator.completions.listen((event) {
-        fallback.complete(coordinator.claimAppPresentation(event.token));
-      });
-      addTearDown(completionSubscription.cancel);
+      final presenter = coordinator.registerAppPresentation();
 
       container
           .read(intentionDetailsViewModelProvider(intention.id).notifier)
@@ -1210,7 +1193,12 @@ void main() {
         container.read(intentionDetailsViewModelProvider(intention.id)),
         isA<IntentionDetailsDeleted>(),
       );
-      expect(await (await fallback.future), isNull);
+      final deleteClaim = await presenter.nextClaim();
+      expect(
+        deleteClaim!.completion.result,
+        isA<ResultSuccess<IntentionCommandSuccess>>(),
+      );
+      coordinator.confirmPresentation(deleteClaim);
       expect(repository.detailRequests[0].cancellationCount, 1);
 
       repository.detailRequests[0].add(ResultSuccess(intention));

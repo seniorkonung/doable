@@ -1,3 +1,4 @@
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
@@ -17,18 +18,24 @@ final class IntentionEditorState {
     required this.description,
     required this.operation,
     required this.event,
+    this.failurePresentation,
   });
 
   const IntentionEditorState.initial()
     : title = '',
       description = '',
       operation = const OperationIdle<Intention>(),
-      event = null;
+      event = null,
+      failurePresentation = null;
 
   final String title;
   final String description;
   final OperationState<Intention> operation;
   final IntentionEditorEvent? event;
+
+  /// Право открытой формы предъявить текущую ошибку; подтверждается страницей
+  /// только по кадру с видимым сообщением.
+  final IntentionInitiatorPresentationClaim? failurePresentation;
 
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
@@ -40,28 +47,28 @@ final class IntentionEditorState {
 
   bool get canSubmit => operation is OperationIdle<Intention> || canRetry;
 
-  IntentionEditorState withTitle(String value) => IntentionEditorState(
+  IntentionEditorState withTitle(String value) => _withEditedText(
     title: value,
     description: description,
-    operation: _operationAfterEditing(IntentionTextField.title),
-    event: null,
+    field: IntentionTextField.title,
   );
 
-  IntentionEditorState withDescription(String value) => IntentionEditorState(
+  IntentionEditorState withDescription(String value) => _withEditedText(
     title: title,
     description: value,
-    operation: _operationAfterEditing(IntentionTextField.description),
-    event: null,
+    field: IntentionTextField.description,
   );
 
   IntentionEditorState withOperation(
     OperationState<Intention> value, {
     IntentionEditorEvent? event,
+    IntentionInitiatorPresentationClaim? failurePresentation,
   }) => IntentionEditorState(
     title: title,
     description: description,
     operation: value,
     event: event,
+    failurePresentation: failurePresentation,
   );
 
   IntentionEditorState withoutEvent() => IntentionEditorState(
@@ -69,7 +76,25 @@ final class IntentionEditorState {
     description: description,
     operation: operation,
     event: null,
+    failurePresentation: failurePresentation,
   );
+
+  IntentionEditorState _withEditedText({
+    required String title,
+    required String description,
+    required IntentionTextField field,
+  }) {
+    final nextOperation = _operationAfterEditing(field);
+    return IntentionEditorState(
+      title: title,
+      description: description,
+      operation: nextOperation,
+      event: null,
+      failurePresentation: nextOperation is OperationFailed<Intention>
+          ? failurePresentation
+          : null,
+    );
+  }
 
   OperationState<Intention> _operationAfterEditing(IntentionTextField field) {
     final current = operation;

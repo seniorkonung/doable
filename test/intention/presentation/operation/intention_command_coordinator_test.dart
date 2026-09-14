@@ -9,7 +9,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -106,38 +105,6 @@ void main() {
       await subscription.cancel();
       await coordinator.shutdown();
     });
-
-    test(
-      'сохраняет завершение для позднего fallback до предъявления',
-      () async {
-        final repository = _ControlledPersonalGraphRepository();
-        final coordinator = _graphCoordinator(repository);
-        final accepted = coordinator.acceptExisting(
-          ArchiveIntention(_id(_firstUuid)),
-          presentationTitle: 'Намерение',
-        ) as IntentionCommandAccepted;
-
-        repository.complete(
-          0,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        final completion = await accepted.future;
-        coordinator.releaseInitiatorPresentation(completion.token);
-
-        final fallback = await coordinator.claimAppPresentation(
-          completion.token,
-        );
-        expect(fallback, isA<IntentionAppPresentationClaim>());
-        expect(fallback!.completion, same(completion));
-
-        coordinator.confirmPresentation(fallback);
-        expect(
-          await coordinator.claimAppPresentation(completion.token),
-          isNull,
-        );
-        await coordinator.shutdown();
-      },
-    );
   });
 
   group('GraphCommandCoordinator', () {
@@ -370,42 +337,265 @@ void main() {
       },
     );
 
-    test('инициатор имеет приоритетный взаимоисключающий claim', () async {
+    test(
+      'success сразу доступен оболочке и не выдаёт initiator claim',
+      () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final registration = coordinator.registerAppPresentation();
+        final id = _id(_firstUuid);
+
+        final accepted = _acceptExisting(
+          coordinator,
+          DeleteIntention(id),
+        ) as IntentionCommandAccepted;
+        repository.complete(0, _deletedResult(id));
+        final completion = await accepted.future;
+
+        expect(coordinator.claimInitiatorFailure(completion.token), isNull);
+        final claim = await registration.nextClaim();
+        expect(claim, isA<IntentionAppPresentationClaim>());
+        expect(claim!.completion, same(completion));
+
+        coordinator.confirmPresentation(claim);
+        await coordinator.shutdown();
+      },
+    );
+
+    test('failure открытой сессии принадлежит инициатору и не блокирует очередь оболочки', () async {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);
-      late Future<IntentionAppPresentationClaim?> fallback;
-      final subscription = coordinator.completions.listen((completion) {
-        fallback = coordinator.claimAppPresentation(completion.token);
-      });
+      final registration = coordinator.registerAppPresentation();
 
-      final accepted = _acceptExisting(
+      final failed = _acceptExisting(
         coordinator,
         ArchiveIntention(_id(_firstUuid)),
+      ) as IntentionCommandAccepted;
+      final succeeded = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_secondUuid)),
+      ) as IntentionCommandAccepted;
+      repository.complete(0, const ResultFailure(IntentionConflictFailure()));
+      repository.complete(1, _deletedResult(_id(_secondUuid)));
+      final failedCompletion = await failed.future;
+      final succeededCompletion = await succeeded.future;
+
+      final appClaim = await registration.nextClaim();
+      expect(appClaim!.completion, same(succeededCompletion));
+      coordinator.confirmPresentation(appClaim);
+
+      final initiatorClaim = coordinator.claimInitiatorFailure(
+        failedCompletion.token,
+      );
+      expect(initiatorClaim, isA<IntentionInitiatorPresentationClaim>());
+      expect(
+        coordinator.claimInitiatorFailure(failedCompletion.token),
+        same(initiatorClaim),
+      );
+
+      var fallbackIssued = false;
+      unawaited(registration.nextClaim().then((_) => fallbackIssued = true));
+      await Future<void>.delayed(Duration.zero);
+      expect(fallbackIssued, isFalse);
+
+      coordinator.confirmPresentation(initiatorClaim!);
+      coordinator.releaseInitiatorPresentation(failedCompletion.token);
+      await Future<void>.delayed(Duration.zero);
+      expect(fallbackIssued, isFalse);
+
+      await coordinator.shutdown();
+      expect(fallbackIssued, isTrue);
+    });
+
+    test('освобождённая до предъявления ошибка переходит оболочке в прежнем порядке', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final registration = coordinator.registerAppPresentation();
+
+      final failed = _acceptExisting(
+        coordinator,
+        ArchiveIntention(_id(_firstUuid)),
+      ) as IntentionCommandAccepted;
+      final firstSuccess = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_secondUuid)),
+      ) as IntentionCommandAccepted;
+      final secondSuccess = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_thirdUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(
         0,
         const ResultFailure(IntentionUnavailableFailure()),
       );
-      final completion = await accepted.future;
-      final claim = coordinator.claimInitiator(completion.token);
+      repository.complete(1, _deletedResult(_id(_secondUuid)));
+      repository.complete(2, _deletedResult(_id(_thirdUuid)));
+      final failedCompletion = await failed.future;
+      await firstSuccess.future;
+      await secondSuccess.future;
 
-      expect(claim, isA<IntentionInitiatorPresentationClaim>());
-      coordinator.confirmPresentation(claim!);
-      expect(await fallback, isNull);
-      expect(coordinator.claimInitiator(completion.token), isNull);
+      final staleInitiatorClaim = coordinator.claimInitiatorFailure(
+        failedCompletion.token,
+      );
+      final first = await registration.nextClaim();
+      expect(first!.token, same(firstSuccess.token));
+
+      coordinator.releaseInitiatorPresentation(failedCompletion.token);
+      coordinator.releaseInitiatorPresentation(failedCompletion.token);
+      coordinator.confirmPresentation(first);
+
+      final fallback = await registration.nextClaim();
+      expect(fallback!.token, same(failed.token));
+      expect(coordinator.claimInitiatorFailure(failed.token), isNull);
+      coordinator.confirmPresentation(staleInitiatorClaim!);
+      coordinator.confirmPresentation(fallback);
+      coordinator.confirmPresentation(fallback);
+
+      final last = await registration.nextClaim();
+      expect(last!.token, same(secondSuccess.token));
+      coordinator.confirmPresentation(last);
+      await coordinator.shutdown();
+    });
+
+    test(
+      'выдаёт следующий app claim только после подтверждения текущего',
+      () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final registration = coordinator.registerAppPresentation();
+
+        final first = _acceptExisting(
+          coordinator,
+          DeleteIntention(_id(_firstUuid)),
+        ) as IntentionCommandAccepted;
+        final second = _acceptExisting(
+          coordinator,
+          DeleteIntention(_id(_secondUuid)),
+        ) as IntentionCommandAccepted;
+        repository.complete(1, _deletedResult(_id(_secondUuid)));
+        repository.complete(0, _deletedResult(_id(_firstUuid)));
+        await second.future;
+
+        final firstClaim = await registration.nextClaim();
+        expect(firstClaim!.token, same(first.token));
+
+        IntentionAppPresentationClaim? secondClaim;
+        final pending = registration.nextClaim()
+          ..then((claim) => secondClaim = claim);
+        expect(registration.nextClaim(), same(pending));
+        await Future<void>.delayed(Duration.zero);
+        expect(secondClaim, isNull);
+
+        coordinator.confirmPresentation(firstClaim);
+        await pending;
+        expect(secondClaim!.token, same(second.token));
+        coordinator.confirmPresentation(secondClaim!);
+        await coordinator.shutdown();
+      },
+    );
+
+    test('освобождение presenter возвращает неподтверждённый claim без повторной публикации', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final completions = <IntentionCommandCompletion>[];
+      final subscription = coordinator.completions.listen(completions.add);
+      final firstPresenter = coordinator.registerAppPresentation();
+
+      final accepted = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_firstUuid)),
+      ) as IntentionCommandAccepted;
+      repository.complete(0, _deletedResult(_id(_firstUuid)));
+      await accepted.future;
+
+      final staleClaim = await firstPresenter.nextClaim();
+      firstPresenter
+        ..release()
+        ..release();
+      expect(await firstPresenter.nextClaim(), isNull);
+
+      final secondPresenter = coordinator.registerAppPresentation();
+      final reissued = await secondPresenter.nextClaim();
+      expect(reissued!.token, same(staleClaim!.token));
+      expect(identical(reissued, staleClaim), isFalse);
+
+      coordinator.confirmPresentation(staleClaim);
+      secondPresenter.release();
+      final thirdPresenter = coordinator.registerAppPresentation();
+      final afterStaleConfirmation = await thirdPresenter.nextClaim();
+      expect(afterStaleConfirmation!.token, same(accepted.token));
+
+      coordinator.confirmPresentation(reissued);
+      coordinator.confirmPresentation(afterStaleConfirmation);
+      expect(completions, hasLength(1));
+      expect(repository.commands, hasLength(1));
 
       await subscription.cancel();
       await coordinator.shutdown();
     });
 
-    test('disposal до terminal outcome передаёт claim каталогу', () async {
+    test('новый presenter получает завершения, опубликованные без подписчика и во время регистрации', () async {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);
+      final firstPresenter = coordinator.registerAppPresentation();
+      final idleRequest = firstPresenter.nextClaim();
+
+      final withoutSubscriber = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_firstUuid)),
+      ) as IntentionCommandAccepted;
+      final duringRegistration = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_secondUuid)),
+      ) as IntentionCommandAccepted;
+      firstPresenter.release();
+      expect(await idleRequest, isNull);
+
+      repository.complete(0, _deletedResult(_id(_firstUuid)));
+      await withoutSubscriber.future;
+      final secondPresenter = coordinator.registerAppPresentation();
+      final firstRequest = secondPresenter.nextClaim();
+      repository.complete(1, _deletedResult(_id(_secondUuid)));
+      await duringRegistration.future;
+
+      final first = await firstRequest;
+      expect(first!.token, same(withoutSubscriber.token));
+      coordinator.confirmPresentation(first);
+      final second = await secondPresenter.nextClaim();
+      expect(second!.token, same(duringRegistration.token));
+      coordinator.confirmPresentation(second);
+      await coordinator.shutdown();
+    });
+
+    test('следующая регистрация получает выдачу только после освобождения предыдущей', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final previous = coordinator.registerAppPresentation();
+      final next = coordinator.registerAppPresentation();
+      IntentionAppPresentationClaim? issued;
+      final request = next.nextClaim()..then((claim) => issued = claim);
+
+      final accepted = _acceptExisting(
+        coordinator,
+        DeleteIntention(_id(_firstUuid)),
+      ) as IntentionCommandAccepted;
+      repository.complete(0, _deletedResult(_id(_firstUuid)));
+      await accepted.future;
+      await Future<void>.delayed(Duration.zero);
+      expect(issued, isNull);
+
+      previous.release();
+      await request;
+      expect(issued!.token, same(accepted.token));
+      coordinator.confirmPresentation(issued!);
+      await coordinator.shutdown();
+    });
+
+    test('уход инициатора до terminal outcome передаёт failure оболочке и сохраняет gate', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final registration = coordinator.registerAppPresentation();
       final intentionId = _id(_firstUuid);
-      late Future<IntentionAppPresentationClaim?> fallback;
-      final subscription = coordinator.completions.listen((completion) {
-        fallback = coordinator.claimAppPresentation(completion.token);
-      });
 
       final accepted = _acceptExisting(
         coordinator,
@@ -419,149 +609,26 @@ void main() {
       );
       repository.complete(0, const ResultFailure(IntentionConflictFailure()));
       final completion = await accepted.future;
-      final claim = await fallback;
+      final claim = await registration.nextClaim();
 
       expect(coordinator.isRunning(intentionId), isFalse);
-      expect(claim, isA<IntentionAppPresentationClaim>());
       expect(claim!.completion, same(completion));
-      expect(coordinator.claimInitiator(completion.token), isNull);
+      expect(coordinator.claimInitiatorFailure(completion.token), isNull);
       coordinator.confirmPresentation(claim);
-
-      await subscription.cancel();
       await coordinator.shutdown();
     });
 
-    test(
-      'гонка terminal outcome и disposal сохраняет fallback claim',
-      () async {
-        final repository = _ControlledGraphRepository();
-        final coordinator = _graphCoordinator(repository);
-        late Future<IntentionAppPresentationClaim?> fallback;
-        final subscription = coordinator.completions.listen((completion) {
-          fallback = coordinator.claimAppPresentation(completion.token);
-        });
+    test('shutdown завершает ожидающий запрос presenter без claim', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final registration = coordinator.registerAppPresentation();
+      final request = registration.nextClaim();
 
-        final accepted = _acceptExisting(
-          coordinator,
-          RestoreIntention(_id(_firstUuid)),
-        ) as IntentionCommandAccepted;
-        repository.complete(
-          0,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        final completion = await accepted.future;
-        coordinator.releaseInitiatorPresentation(completion.token);
+      await coordinator.shutdown();
 
-        final claim = await fallback;
-        expect(claim, isA<IntentionAppPresentationClaim>());
-        coordinator.confirmPresentation(claim!);
-
-        await subscription.cancel();
-        await coordinator.shutdown();
-      },
-    );
-
-    test(
-      'табличная матрица failures сохраняет единственного presentation owner',
-      () async {
-        final failures = <IntentionFailure>[
-          const IntentionTextInputValidationFailure(
-            IntentionTextValidationFailure(
-              field: IntentionTextField.title,
-              reason: IntentionTextValidationReason.empty,
-            ),
-          ),
-          const IntentionNotFoundFailure(),
-          const IntentionConflictFailure(),
-          const IntentionUnavailableFailure(),
-          const IntentionCorruptionFailure(),
-          const IntentionUnexpectedFailure(),
-        ];
-
-        for (var index = 0; index < failures.length; index += 1) {
-          final repository = _ControlledGraphRepository();
-          final coordinator = _graphCoordinator(repository);
-          final completions = <IntentionCommandCompletion>[];
-          final fallbackClaims = <Future<IntentionAppPresentationClaim?>>[];
-          final subscription = coordinator.completions.listen((completion) {
-            completions.add(completion);
-            fallbackClaims.add(
-              coordinator.claimAppPresentation(completion.token),
-            );
-          });
-          final id = _id(_firstUuid);
-          final failure = failures[index];
-
-          final owned = _acceptExisting(
-            coordinator,
-            ArchiveIntention(id),
-          ) as IntentionCommandAccepted;
-          repository.complete(
-            0,
-            ResultFailure<IntentionCommandSuccess>(failure),
-          );
-          final ownedCompletion = await owned.future;
-          final initiator = coordinator.claimInitiator(owned.token);
-
-          expect(
-            ownedCompletion.result,
-            isA<ResultFailure<IntentionCommandSuccess>>().having(
-              (result) => result.failure,
-              'failure',
-              same(failure),
-            ),
-          );
-          expect(initiator, isA<IntentionInitiatorPresentationClaim>());
-          coordinator.confirmPresentation(initiator!);
-          expect(await fallbackClaims[0], isNull);
-          expect(coordinator.isRunning(id), isFalse);
-
-          final released = _acceptExisting(
-            coordinator,
-            RestoreIntention(id),
-          ) as IntentionCommandAccepted;
-          if (index.isEven) {
-            coordinator.releaseInitiatorPresentation(released.token);
-            repository.complete(
-              1,
-              ResultFailure<IntentionCommandSuccess>(failure),
-            );
-            await released.future;
-          } else {
-            repository.complete(
-              1,
-              ResultFailure<IntentionCommandSuccess>(failure),
-            );
-            await released.future;
-            coordinator.releaseInitiatorPresentation(released.token);
-          }
-
-          final fallback = await fallbackClaims[1];
-          expect(completions, hasLength(2));
-          expect(identical(owned.token, released.token), isFalse);
-          expect(fallback, isA<IntentionAppPresentationClaim>());
-          expect(
-            fallback!.completion.result,
-            isA<ResultFailure<IntentionCommandSuccess>>().having(
-              (result) => result.failure,
-              'failure',
-              same(failure),
-            ),
-          );
-          expect(coordinator.claimInitiator(released.token), isNull);
-          expect(coordinator.isRunning(id), isFalse);
-          coordinator.confirmPresentation(fallback);
-          coordinator.confirmPresentation(fallback);
-          expect(
-            await coordinator.claimAppPresentation(released.token),
-            isNull,
-          );
-
-          await subscription.cancel();
-          await coordinator.shutdown();
-        }
-      },
-    );
+      expect(await request, isNull);
+      expect(await coordinator.registerAppPresentation().nextClaim(), isNull);
+    });
 
     test(
       'не удаляет gate новой команды, принятой из completion-listener',
@@ -601,42 +668,6 @@ void main() {
         final secondCompletion = await acceptedFromCompletion!.future;
         coordinator.releaseInitiatorPresentation(firstCompletion.token);
         coordinator.releaseInitiatorPresentation(secondCompletion.token);
-        await coordinator.shutdown();
-      },
-    );
-
-    test(
-      'освобождение инициатора во время публикации не опережает каталог',
-      () async {
-        final repository = _ControlledGraphRepository();
-        final coordinator = _graphCoordinator(repository);
-        final releaseSubscription = coordinator.completions.listen(
-          (completion) =>
-              coordinator.releaseInitiatorPresentation(completion.token),
-        );
-        late Future<IntentionAppPresentationClaim?> fallback;
-        final catalogSubscription = coordinator.completions.listen((
-          completion,
-        ) {
-          fallback = coordinator.claimAppPresentation(completion.token);
-        });
-
-        final accepted = _acceptExisting(
-          coordinator,
-          ArchiveIntention(_id(_firstUuid)),
-        ) as IntentionCommandAccepted;
-        repository.complete(
-          0,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        await accepted.future;
-
-        final claim = await fallback;
-        expect(claim, isA<IntentionAppPresentationClaim>());
-        coordinator.confirmPresentation(claim!);
-
-        await releaseSubscription.cancel();
-        await catalogSubscription.cancel();
         await coordinator.shutdown();
       },
     );

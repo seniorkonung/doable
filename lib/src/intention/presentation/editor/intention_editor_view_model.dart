@@ -17,16 +17,18 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   late GraphCommandCoordinator _coordinator;
   late IntentionCreationFormKey _formKey;
   IntentionOperationToken? _activeToken;
+  IntentionOperationToken? _failureToken;
 
   @override
   IntentionEditorState build(IntentionCreationFormKey formKey) {
     _formKey = formKey;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     ref.onDispose(() {
-      final token = _activeToken;
-      if (token != null) {
-        _coordinator.releaseInitiatorPresentation(token);
+      final activeToken = _activeToken;
+      if (activeToken != null) {
+        _coordinator.releaseInitiatorPresentation(activeToken);
       }
+      _releaseFailurePresentation();
     });
     return const IntentionEditorState.initial();
   }
@@ -58,6 +60,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
+        _releaseFailurePresentation();
         _activeToken = token;
         state = state.withOperation(const OperationRunning<Intention>());
         unawaited(_finish(future));
@@ -83,28 +86,22 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         return;
       }
 
-      final claim = _coordinator.claimInitiator(completion.token);
-      if (claim == null) {
-        return;
-      }
       _activeToken = null;
-      try {
-        state = switch (completion.result) {
-          ResultSuccess(value: IntentionSaved(:final intention)) =>
-            state.withOperation(
-              OperationSucceeded<Intention>(intention),
-              event: const IntentionEditorCreated(),
-            ),
-          ResultSuccess(value: IntentionDeleted()) => state.withOperation(
-            const OperationFailed<Intention>(IntentionUnexpectedFailure()),
+      // Success предъявляет оболочка; форма получает его только для закрытия.
+      state = switch (completion.result) {
+        ResultSuccess(value: IntentionSaved(:final intention)) =>
+          state.withOperation(
+            OperationSucceeded<Intention>(intention),
+            event: const IntentionEditorCreated(),
           ),
-          ResultFailure(:final failure) => state.withOperation(
-            OperationFailed<Intention>(failure),
-          ),
-        };
-      } finally {
-        _coordinator.confirmPresentation(claim);
-      }
+        ResultSuccess(value: IntentionDeleted()) => state.withOperation(
+          const OperationFailed<Intention>(IntentionUnexpectedFailure()),
+        ),
+        ResultFailure(:final failure) => state.withOperation(
+          OperationFailed<Intention>(failure),
+          failurePresentation: _claimFailure(completion.token),
+        ),
+      };
     } on Object {
       if (!ref.mounted) {
         return;
@@ -117,6 +114,24 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       state = state.withOperation(
         const OperationFailed<Intention>(IntentionUnexpectedFailure()),
       );
+    }
+  }
+
+  IntentionInitiatorPresentationClaim? _claimFailure(
+    IntentionOperationToken token,
+  ) {
+    final claim = _coordinator.claimInitiatorFailure(token);
+    if (claim != null) {
+      _failureToken = token;
+    }
+    return claim;
+  }
+
+  void _releaseFailurePresentation() {
+    final token = _failureToken;
+    _failureToken = null;
+    if (token != null) {
+      _coordinator.releaseInitiatorPresentation(token);
     }
   }
 }

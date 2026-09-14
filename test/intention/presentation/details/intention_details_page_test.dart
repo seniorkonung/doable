@@ -206,8 +206,12 @@ void main() {
       await tester.pump();
       await waitForDetailRequests(repository, 2);
       await tester.pump();
+      await tester.pump();
 
-      expect(find.text('Marked as ready for action.'), findsOneWidget);
+      expect(
+        find.textContaining('Marked as ready for action.'),
+        findsOneWidget,
+      );
       expect(find.text('Ready for action'), findsOneWidget);
       repository.detailRequests[0].add(ResultSuccess(before));
       await tester.pump();
@@ -248,7 +252,11 @@ void main() {
       await tester.pump();
       await waitForDetailRequests(repository, 2);
       await tester.pumpAndSettle();
-      expect(find.text('Marked as not ready for action.'), findsOneWidget);
+      expect(
+        find.textContaining('Marked as not ready for action.'),
+        findsOneWidget,
+      );
+      await _closeOperationMessage(tester);
 
       final archive = find.byKey(const ValueKey('intention-details-archive'));
       await tester.ensureVisible(archive);
@@ -262,9 +270,10 @@ void main() {
       await tester.pump();
       await waitForDetailRequests(repository, 3);
       await tester.pumpAndSettle();
-      expect(find.text('Intention archived.'), findsOneWidget);
+      expect(find.textContaining('Intention archived.'), findsOneWidget);
       expect(find.text('Archived'), findsOneWidget);
       expect(find.text('Not ready for action'), findsOneWidget);
+      await _closeOperationMessage(tester);
 
       final restore = find.byKey(const ValueKey('intention-details-restore'));
       await tester.ensureVisible(restore);
@@ -278,7 +287,7 @@ void main() {
       await tester.pump();
       await waitForDetailRequests(repository, 4);
       await tester.pumpAndSettle();
-      expect(find.text('Intention restored.'), findsOneWidget);
+      expect(find.textContaining('Intention restored.'), findsOneWidget);
       expect(find.text('Active'), findsOneWidget);
     },
   );
@@ -680,8 +689,9 @@ void main() {
     await tester.pump();
     await waitForDetailRequests(repository, 2);
     await tester.pump();
+    await tester.pump();
 
-    expect(find.text('Changes saved.'), findsOneWidget);
+    expect(find.textContaining('Changes saved.'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('intention-details-edit-title')),
       findsNothing,
@@ -884,6 +894,217 @@ void main() {
     expect(router.current.name, IntentionCatalogRoute.name);
     expect(find.text(intention.title), findsNothing);
   });
+
+  testWidgets(
+    'success подробного просмотра не снимает fallback другой операции',
+    (tester) async {
+      const busyMessage =
+          'Delete — “Другое намерение”: The intention couldn’t be deleted. Try again.';
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 90, title: 'Открытое');
+      final archived = testDetailsIntention(
+        index: 90,
+        title: 'Открытое',
+        archiveState: IntentionArchiveState.archived,
+      );
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+
+      final coordinator = ProviderScope.containerOf(
+        tester.element(find.byType(IntentionDetailsPage)),
+      ).read(graphCommandCoordinatorProvider.notifier);
+      final other = testDetailsIntention(index: 91, title: 'Другое намерение');
+      final busy = coordinator.acceptExisting(
+        DeleteIntention(other.id),
+        presentationTitle: other.title,
+      ) as IntentionCommandAccepted;
+      coordinator.releaseInitiatorPresentation(busy.token);
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(busyMessage), findsOneWidget);
+
+      final archive = find.byKey(const ValueKey('intention-details-archive'));
+      await tester.ensureVisible(archive);
+      await tester.tap(archive);
+      await tester.pump();
+      repository.completeCommand(
+        1,
+        testDetailsSavedResult(archived, before: intention),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 2);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Archived'), findsOneWidget);
+      expect(find.text(busyMessage), findsOneWidget);
+      expect(find.textContaining('Intention archived.'), findsNothing);
+
+      await _closeOperationMessage(tester);
+      expect(find.text(busyMessage), findsNothing);
+      expect(
+        find.text('Archive — “Открытое”: Intention archived.'),
+        findsOneWidget,
+      );
+
+      await _closeOperationMessage(tester);
+      expect(find.textContaining('Intention archived.'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'удаление закрывает маршрут при занятой поверхности и предъявляется один раз',
+    (tester) async {
+      const busyMessage =
+          'Delete — “Другое намерение”: The intention couldn’t be deleted. Try again.';
+      final repository = ControlledDetailsRepository();
+      repository.catalogResult = ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const _DetailsTestRevision(),
+        ),
+      );
+      final intention = testDetailsIntention(index: 92, title: 'Удаляемое');
+      final router = AppRouter();
+      final container = _detailsContainer(repository);
+      addTearDown(router.dispose);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+            builder: (context, child) => GraphOperationPresenter(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final other = testDetailsIntention(index: 93, title: 'Другое намерение');
+      final busy = coordinator.acceptExisting(
+        DeleteIntention(other.id),
+        presentationTitle: other.title,
+      ) as IntentionCommandAccepted;
+      coordinator.releaseInitiatorPresentation(busy.token);
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(busyMessage), findsOneWidget);
+
+      final delete = find.byKey(const ValueKey('intention-details-delete'));
+      await tester.ensureVisible(delete);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('intention-details-confirm-delete')),
+      );
+      await tester.pump();
+      repository.completeCommand(1, testDetailsDeletedResult(intention));
+      await tester.pumpAndSettle();
+
+      expect(router.current.name, IntentionCatalogRoute.name);
+      expect(find.text(busyMessage), findsOneWidget);
+      expect(find.textContaining('Intention deleted.'), findsNothing);
+
+      await _closeOperationMessage(tester);
+      expect(
+        find.text('Delete — “Удаляемое”: Intention deleted.'),
+        findsOneWidget,
+      );
+      await _closeOperationMessage(tester);
+      expect(find.textContaining('Intention deleted.'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'ошибка перехода без фокуса передаётся оболочке при уходе до кадра',
+    (tester) async {
+      const inlineFailure =
+          'The intention state couldn’t be changed. Try again.';
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 94, title: 'Архивируемое');
+      repository.catalogResult = ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [testDetailsSummary(intention)],
+          totalCount: 1,
+          nextCursor: null,
+          revision: const _DetailsTestRevision(),
+        ),
+      );
+      final router = AppRouter();
+      final container = _detailsContainer(repository);
+      addTearDown(router.dispose);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+            builder: (context, child) => GraphOperationPresenter(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(intention.title));
+      await tester.pump();
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+
+      final archive = find.byKey(const ValueKey('intention-details-archive'));
+      await tester.ensureVisible(archive);
+      await tester.tap(archive);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(inlineFailure), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(router.current.name, IntentionCatalogRoute.name);
+      expect(find.textContaining(inlineFailure), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Archive — “Архивируемое”: $inlineFailure'),
+        findsOneWidget,
+      );
+      await _closeOperationMessage(tester);
+      expect(find.textContaining(inlineFailure), findsNothing);
+    },
+  );
 }
 
 Future<void> _pumpDetailsPage(
@@ -916,8 +1137,15 @@ Widget _localizedApp(Widget home, {Locale locale = const Locale('en')}) =>
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      builder: (context, child) =>
+          GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
       home: home,
     );
+
+Future<void> _closeOperationMessage(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+}
 
 final class _DetailsTestRevision implements GraphRevision {
   const _DetailsTestRevision();

@@ -108,9 +108,7 @@ void main() {
         ),
       ),
     );
-    final completion = await accepted.future;
-    final claim = coordinator.claimInitiator(completion.token);
-    coordinator.confirmPresentation(claim!);
+    await accepted.future;
     await Future<void>.delayed(Duration.zero);
 
     final current =
@@ -417,9 +415,7 @@ void main() {
           ),
         ),
       );
-      final firstCompletion = await firstAccepted.future;
-      final firstClaim = coordinator.claimInitiator(firstCompletion.token);
-      coordinator.confirmPresentation(firstClaim!);
+      await firstAccepted.future;
       await Future<void>.delayed(Duration.zero);
 
       final afterFirst =
@@ -446,9 +442,7 @@ void main() {
           ),
         ),
       );
-      final secondCompletion = await secondAccepted.future;
-      final secondClaim = coordinator.claimInitiator(secondCompletion.token);
-      coordinator.confirmPresentation(secondClaim!);
+      await secondAccepted.future;
       await Future<void>.delayed(Duration.zero);
 
       final current =

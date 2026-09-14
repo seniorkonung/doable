@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -185,17 +187,14 @@ void main() {
         await pumpEventQueue();
 
         final tokens = <IntentionOperationToken>[];
-        final fallbackClaims = <Future<IntentionAppPresentationClaim?>>[];
         final coordinator = container.read(
           graphCommandCoordinatorProvider.notifier,
         );
+        final presenter = coordinator.registerAppPresentation();
         final coordinatorSubscription = coordinator.completions.listen((
           completion,
         ) {
           tokens.add(completion.token);
-          fallbackClaims.add(
-            coordinator.claimAppPresentation(completion.token),
-          );
         });
 
         final details = container.read(provider.notifier)..delete();
@@ -246,6 +245,12 @@ void main() {
               ),
         );
 
+        final shownFailure = (container.read(
+          provider,
+        ) as IntentionDetailsLoaded).stateChange!.failurePresentation;
+        expect(shownFailure, isA<IntentionInitiatorPresentationClaim>());
+        coordinator.confirmPresentation(shownFailure!);
+
         details.retryStateChange();
         expect(repository.commands, hasLength(canRetry ? 2 : 1));
         if (canRetry) {
@@ -259,7 +264,15 @@ void main() {
         if (canRetry) {
           expect(identical(tokens.first, tokens.last), isFalse);
         }
-        expect(await Future.wait(fallbackClaims), everyElement(isNull));
+        if (canRetry) {
+          final successClaim = await presenter.nextClaim();
+          expect(successClaim!.token, same(tokens.last));
+          coordinator.confirmPresentation(successClaim);
+        }
+        IntentionAppPresentationClaim? staleFailure;
+        unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
+        await pumpEventQueue();
+        expect(staleFailure, isNull);
 
         await coordinatorSubscription.cancel();
         subscription.close();

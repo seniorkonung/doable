@@ -546,6 +546,7 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
+    final presenter = coordinator.registerAppPresentation();
     final created = testSummary(index: 30, title: 'Новое');
     final create = coordinator.acceptCreation(
       IntentionCreationFormKey(),
@@ -563,9 +564,7 @@ void main() {
         ),
       ),
     );
-    final createCompletion = await create.future;
-    final initiatorClaim = coordinator.claimInitiator(createCompletion.token);
-    coordinator.confirmPresentation(initiatorClaim!);
+    await create.future;
     await Future<void>.delayed(Duration.zero);
 
     var current =
@@ -573,6 +572,13 @@ void main() {
             as IntentionCatalogLoaded;
     expect(current.items.single.id, created.id);
     expect(current.totalCount, 1);
+    final createClaim = await presenter.nextClaim();
+    expect(createClaim!.token, same(create.token));
+    coordinator.confirmPresentation(createClaim);
+    expect(
+      container.read(intentionCatalogViewModelProvider).requireValue,
+      same(current),
+    );
 
     final ready = testSummary(
       index: 30,
@@ -583,7 +589,6 @@ void main() {
       EnableIntentionReadiness(created.id),
       presentationTitle: created.title,
     ) as IntentionCommandAccepted;
-    coordinator.releaseInitiatorPresentation(readiness.token);
     repository.completeCommand(
       1,
       ResultSuccess(
@@ -599,15 +604,17 @@ void main() {
     );
     await readiness.future;
     await Future<void>.delayed(Duration.zero);
-    final readinessClaim = await coordinator.claimAppPresentation(
-      readiness.token,
-    );
-    coordinator.confirmPresentation(readinessClaim!);
-
     current =
         container.read(intentionCatalogViewModelProvider).requireValue
             as IntentionCatalogLoaded;
     expect(current.items.single.readiness, IntentionReadiness.ready);
+    final readinessClaim = await presenter.nextClaim();
+    expect(readinessClaim!.token, same(readiness.token));
+    coordinator.confirmPresentation(readinessClaim);
+    expect(
+      container.read(intentionCatalogViewModelProvider).requireValue,
+      same(current),
+    );
 
     final beforeFailure = current;
     final failed = coordinator.acceptExisting(
@@ -621,8 +628,15 @@ void main() {
     );
     await failed.future;
     await Future<void>.delayed(Duration.zero);
-    final failureClaim = await coordinator.claimAppPresentation(failed.token);
-    coordinator.confirmPresentation(failureClaim!);
+    expect(
+      container.read(intentionCatalogViewModelProvider).requireValue,
+      same(beforeFailure),
+    );
+    final failureClaim = await presenter.nextClaim();
+    expect(failureClaim!.token, same(failed.token));
+    coordinator.confirmPresentation(failureClaim);
+    presenter.release();
+    await Future<void>.delayed(Duration.zero);
 
     expect(
       container.read(intentionCatalogViewModelProvider).requireValue,
