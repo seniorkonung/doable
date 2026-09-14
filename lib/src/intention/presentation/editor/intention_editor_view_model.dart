@@ -17,7 +17,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   late GraphCommandCoordinator _coordinator;
   late IntentionCreationFormKey _formKey;
   IntentionOperationToken? _activeToken;
-  IntentionOperationToken? _failureToken;
 
   @override
   IntentionEditorState build(IntentionCreationFormKey formKey) {
@@ -28,7 +27,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       if (activeToken != null) {
         _coordinator.releaseInitiatorPresentation(activeToken);
       }
-      _releaseFailurePresentation();
     });
     return const IntentionEditorState.initial();
   }
@@ -60,7 +58,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
-        _releaseFailurePresentation();
         _activeToken = token;
         state = state.withOperation(const OperationRunning<Intention>());
         unawaited(_finish(future));
@@ -119,19 +116,5 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 
   IntentionInitiatorPresentationClaim? _claimFailure(
     IntentionOperationToken token,
-  ) {
-    final claim = _coordinator.claimInitiatorFailure(token);
-    if (claim != null) {
-      _failureToken = token;
-    }
-    return claim;
-  }
-
-  void _releaseFailurePresentation() {
-    final token = _failureToken;
-    _failureToken = null;
-    if (token != null) {
-      _coordinator.releaseInitiatorPresentation(token);
-    }
-  }
+  ) => _coordinator.claimInitiatorFailure(token);
 }

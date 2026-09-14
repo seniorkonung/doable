@@ -50,7 +50,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   ProviderSubscription<AsyncValue<Result<GraphSnapshot<Intention?>>>>?
   _observationSubscription;
   IntentionOperationToken? _activeToken;
-  IntentionOperationToken? _failureToken;
   GraphRevision? _acceptedRevision;
   var _preserveAuthoritativeStateWhileLoading = false;
   var _isDeleted = false;
@@ -69,7 +68,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       if (token != null) {
         _coordinator.releaseInitiatorPresentation(token);
       }
-      _releaseFailurePresentation();
       _observationSubscription?.close();
       unawaited(_completionSubscription.cancel());
     });
@@ -155,7 +153,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
-        _releaseFailurePresentation();
         _activeToken = token;
         state = current.copyWith(
           isOperationRunning: true,
@@ -356,7 +353,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
-        _releaseFailurePresentation();
         _activeToken = token;
         state = current.copyWith(
           isOperationRunning: true,
@@ -461,21 +457,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   IntentionInitiatorPresentationClaim? _claimFailure(
     IntentionOperationToken token,
-  ) {
-    final claim = _coordinator.claimInitiatorFailure(token);
-    if (claim != null) {
-      _failureToken = token;
-    }
-    return claim;
-  }
-
-  void _releaseFailurePresentation() {
-    final token = _failureToken;
-    _failureToken = null;
-    if (token != null) {
-      _coordinator.releaseInitiatorPresentation(token);
-    }
-  }
+  ) => _coordinator.claimInitiatorFailure(token);
 
   void _failUpdateUnexpectedly() {
     final current = state;

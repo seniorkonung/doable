@@ -1,28 +1,116 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/presentation/presentation_frame_evidence.dart';
 import '../application/graph_command_coordinator.dart';
 
-/// Подтверждает initiator claim ошибки, когда её сообщение [child] фактически
-/// доступно в видимой части текущего маршрута.
-final class OperationFailurePresentation extends ConsumerWidget {
+/// Рисует локализованное сообщение ошибки и владеет её initiator claim до
+/// первого пригодного кадра либо исчезновения этого renderer.
+///
+/// Узкий интерфейс не позволяет внешнему виджету подменить собственную область
+/// сообщения при проверке фактического предъявления.
+final class OperationFailurePresentation extends ConsumerStatefulWidget {
   const OperationFailurePresentation({
     required this.claim,
-    required this.child,
+    required this.message,
+    this.messageKey,
     super.key,
   });
 
   final IntentionInitiatorPresentationClaim? claim;
-  final Widget child;
+  final String message;
+  final Key? messageKey;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      PresentationFrameEvidence<IntentionInitiatorPresentationClaim>(
-        subject: claim,
-        onPresented: ref
-            .read(graphCommandCoordinatorProvider.notifier)
-            .confirmPresentation,
-        child: child,
-      );
+  ConsumerState<OperationFailurePresentation> createState() =>
+      _OperationFailurePresentationState();
+}
+
+final class _OperationFailureRenderer {
+  const _OperationFailureRenderer(this.claim, this.message);
+
+  final IntentionInitiatorPresentationClaim? claim;
+  final String message;
+}
+
+final class _OperationFailurePresentationState
+    extends ConsumerState<OperationFailurePresentation> {
+  late final GraphCommandCoordinator _coordinator;
+  late _OperationFailureRenderer _renderer;
+  IntentionInitiatorPresentationClaim? _confirmedClaim;
+  IntentionInitiatorPresentationClaim? _releasedClaim;
+
+  @override
+  void initState() {
+    super.initState();
+    _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+    _renderer = _OperationFailureRenderer(widget.claim, widget.message);
+  }
+
+  @override
+  void didUpdateWidget(OperationFailurePresentation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.claim, widget.claim) ||
+        oldWidget.message != widget.message) {
+      _releaseIfPending(oldWidget.claim);
+      _renderer = _OperationFailureRenderer(widget.claim, widget.message);
+    }
+  }
+
+  @override
+  void dispose() {
+    _releaseIfPending(widget.claim);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final claim = widget.claim;
+    final mayConfirm =
+        claim != null &&
+        !identical(claim, _confirmedClaim) &&
+        !identical(claim, _releasedClaim);
+    return PresentationFrameEvidence<_OperationFailureRenderer>(
+      key: ObjectKey(_renderer),
+      subject: mayConfirm ? _renderer : null,
+      onPresented: _confirm,
+      child: Semantics(
+        key: widget.messageKey,
+        container: true,
+        liveRegion: true,
+        label: widget.message,
+        child: ExcludeSemantics(
+          child: Text(
+            widget.message,
+            style: DefaultTextStyle.of(context).style
+                .copyWith(color: Theme.of(context).colorScheme.error),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirm(_OperationFailureRenderer renderer) {
+    if (!identical(renderer, _renderer)) {
+      return;
+    }
+    final claim = renderer.claim;
+    if (claim == null ||
+        identical(claim, _releasedClaim) ||
+        identical(claim, _confirmedClaim)) {
+      return;
+    }
+    _confirmedClaim = claim;
+    _coordinator.confirmPresentation(claim);
+  }
+
+  void _releaseIfPending(IntentionInitiatorPresentationClaim? claim) {
+    if (claim == null ||
+        identical(claim, _confirmedClaim) ||
+        identical(claim, _releasedClaim)) {
+      return;
+    }
+    _releasedClaim = claim;
+    _coordinator.releaseInitiatorClaim(claim);
+  }
 }

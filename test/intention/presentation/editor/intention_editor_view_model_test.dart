@@ -216,7 +216,7 @@ void main() {
     },
   );
 
-  test('открытая форма удерживает claim failure, а уход до кадра передаёт его оболочке', () async {
+  test('публикует claim failure, а renderer передаёт его оболочке', () async {
     final repository = ControlledCatalogRepository();
     final container = _container(repository);
     final coordinator = container.read(
@@ -249,13 +249,14 @@ void main() {
     await _settle(container);
     expect(fallback, isNull);
 
-    subscription.close();
+    coordinator.releaseInitiatorClaim(failed.failurePresentation!);
     await _settle(container);
     await fallbackRequest;
 
     expect(fallback!.token, same(failed.failurePresentation!.token));
     coordinator.confirmPresentation(failed.failurePresentation!);
     coordinator.confirmPresentation(fallback!);
+    subscription.close();
   });
 
   test(

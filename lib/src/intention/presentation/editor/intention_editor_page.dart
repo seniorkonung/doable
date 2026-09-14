@@ -67,54 +67,47 @@ final class _IntentionEditorPageState
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            OperationFailurePresentation(
-              claim: titleFailure == null ? null : editor.failurePresentation,
-              child: TextField(
-                key: const ValueKey('intention-editor-title'),
-                controller: _titleController,
-                autofocus: true,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: localizations.editorTitleLabel,
-                  errorText: titleFailure,
-                ),
-                onChanged: notifier.changeTitle,
+            TextField(
+              key: const ValueKey('intention-editor-title'),
+              controller: _titleController,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: localizations.editorTitleLabel,
+                error: titleFailure == null
+                    ? null
+                    : OperationFailurePresentation(
+                        claim: editor.failurePresentation,
+                        message: titleFailure,
+                      ),
               ),
+              onChanged: notifier.changeTitle,
             ),
             const SizedBox(height: 16),
-            OperationFailurePresentation(
-              claim: descriptionFailure == null
-                  ? null
-                  : editor.failurePresentation,
-              child: TextField(
-                key: const ValueKey('intention-editor-description'),
-                controller: _descriptionController,
-                minLines: 4,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-                decoration: InputDecoration(
-                  labelText: localizations.editorDescriptionLabel,
-                  alignLabelWithHint: true,
-                  errorText: descriptionFailure,
-                ),
-                onChanged: notifier.changeDescription,
+            TextField(
+              key: const ValueKey('intention-editor-description'),
+              controller: _descriptionController,
+              minLines: 4,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              decoration: InputDecoration(
+                labelText: localizations.editorDescriptionLabel,
+                alignLabelWithHint: true,
+                error: descriptionFailure == null
+                    ? null
+                    : OperationFailurePresentation(
+                        claim: editor.failurePresentation,
+                        message: descriptionFailure,
+                      ),
               ),
+              onChanged: notifier.changeDescription,
             ),
             if (generalFailure != null) ...[
               const SizedBox(height: 16),
               OperationFailurePresentation(
                 claim: editor.failurePresentation,
-                child: Semantics(
-                  container: true,
-                  liveRegion: true,
-                  child: Text(
-                    generalFailure,
-                    key: const ValueKey('intention-editor-failure'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
+                message: generalFailure,
+                messageKey: const ValueKey('intention-editor-failure'),
               ),
             ],
             const SizedBox(height: 24),

@@ -331,6 +331,24 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return;
     }
 
+    _releaseInitiatorEntry(entry);
+  }
+
+  /// Освобождает право только пока [claim] остаётся действующим правом
+  /// инициатора.
+  ///
+  /// Запоздалый renderer прежнего claim не может освободить право, уже
+  /// переданное другому владельцу.
+  void releaseInitiatorClaim(IntentionInitiatorPresentationClaim claim) {
+    final entry = _entries[claim.token];
+    if (entry == null || !identical(entry.initiatorClaim, claim)) {
+      return;
+    }
+
+    _releaseInitiatorEntry(entry);
+  }
+
+  void _releaseInitiatorEntry(_PresentationEntry entry) {
     entry.initiatorReleased = true;
     entry.initiatorClaim = null;
     _dispatchAppPresentation();
