@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -271,7 +272,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(router.current.name, IntentionCatalogRoute.name);
-      expect(find.text('Intention created.'), findsOneWidget);
+      expect(find.textContaining('Intention created.'), findsOneWidget);
     },
   );
 
@@ -412,7 +413,7 @@ void main() {
     }
     await tester.pumpAndSettle();
 
-    expect(find.text('Intention created.'), findsOneWidget);
+    expect(find.textContaining('Intention created.'), findsOneWidget);
     expect(
       find.text('The intention couldn’t be created. Try again.'),
       findsNothing,
@@ -443,6 +444,107 @@ void main() {
 
     expect(find.text('Введите название.'), findsOneWidget);
   });
+
+  testWidgets(
+    'success закрывает форму при занятой поверхности и предъявляется один раз после текущего сообщения',
+    (tester) async {
+      const busyMessage =
+          'Delete — “Другое намерение”: The intention couldn’t be deleted. Try again.';
+      final repository = ControlledCatalogRepository();
+      final router = await _openEditor(tester, repository);
+      final coordinator = ProviderScope.containerOf(
+        tester.element(find.byType(IntentionEditorPage)),
+      ).read(graphCommandCoordinatorProvider.notifier);
+      final other = testIntention(index: 40, title: 'Другое намерение');
+      final busy = coordinator.acceptExisting(
+        DeleteIntention(other.id),
+        presentationTitle: other.title,
+      ) as IntentionCommandAccepted;
+      coordinator.releaseInitiatorPresentation(busy.token);
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(busyMessage), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Новое намерение',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      repository.completeCommand(1, _savedResult(title: 'Новое намерение'));
+      await tester.pump();
+      await tester.pump();
+      if (repository.queries.length > 1) {
+        repository.complete(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: const [],
+              totalCount: 0,
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+      }
+      await tester.pumpAndSettle();
+
+      expect(router.current.name, IntentionCatalogRoute.name);
+      expect(find.text(busyMessage), findsOneWidget);
+      expect(find.textContaining('Intention created.'), findsNothing);
+
+      await _closeOperationMessage(tester);
+      expect(find.text(busyMessage), findsNothing);
+      expect(find.textContaining('Intention created.'), findsOneWidget);
+
+      await _closeOperationMessage(tester);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Intention created.'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'ошибка формы без фокуса не предъявлена, а уход передаёт её оболочке один раз',
+    (tester) async {
+      const failure = 'The intention couldn’t be created. Try again.';
+      final repository = ControlledCatalogRepository();
+      final router = await _openEditor(tester, repository);
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Намерение',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await tester.pump();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(failure), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(router.current.name, IntentionCatalogRoute.name);
+      expect(find.textContaining(failure), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.textContaining(failure), findsOneWidget);
+
+      await _closeOperationMessage(tester);
+      await tester.pumpAndSettle();
+      expect(find.textContaining(failure), findsNothing);
+    },
+  );
+}
+
+Future<void> _closeOperationMessage(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
 }
 
 Future<AppRouter> _openEditor(

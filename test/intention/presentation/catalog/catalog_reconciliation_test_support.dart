@@ -63,10 +63,6 @@ Future<IntentionCommandCompletion> completeCatalogCommand(
   final accepted = start as IntentionCommandAccepted;
   repository.completeCommand(commandIndex, ResultSuccess(success));
   final completion = await accepted.future;
-  final claim = coordinator.claimInitiator(completion.token);
-  if (claim != null) {
-    coordinator.confirmPresentation(claim);
-  }
   await Future<void>.delayed(Duration.zero);
   return completion;
 }

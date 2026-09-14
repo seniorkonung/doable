@@ -1,14 +1,20 @@
 import 'dart:async';
-import 'dart:collection';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
+import '../../shared/presentation/presentation_frame_evidence.dart';
 import '../application/graph_command_coordinator.dart';
 
+/// Единственный владелец общей поверхности сообщений результатов операций.
+///
+/// Показывает в [ScaffoldMessenger] не больше одного сообщения, ждёт его
+/// закрытия и только затем запрашивает у coordinator следующий результат.
+/// Новый результат не снимает текущее сообщение.
 final class GraphOperationPresenter extends ConsumerStatefulWidget {
   const GraphOperationPresenter({required this.child, super.key});
 
@@ -20,86 +26,94 @@ final class GraphOperationPresenter extends ConsumerStatefulWidget {
 }
 
 final class _GraphOperationPresenterState
-    extends ConsumerState<GraphOperationPresenter> {
-  final _pending = Queue<IntentionAppPresentationClaim>();
+    extends ConsumerState<GraphOperationPresenter>
+    with WidgetsBindingObserver {
   late final GraphCommandCoordinator _coordinator;
-  late final StreamSubscription<IntentionCommandCompletion> _subscription;
-  late final AppLifecycleListener _lifecycleListener;
-  late bool _isVisible;
-  var _presentationScheduled = false;
+  late final GraphAppPresentationRegistration _registration;
+  _PresentationSurface? _surface;
+  var _isRequesting = false;
+  var _isDisposed = false;
 
   @override
   void initState() {
     super.initState();
     _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
-    final lifecycleState = WidgetsBinding.instance.lifecycleState;
-    _isVisible =
-        lifecycleState == null || lifecycleState == AppLifecycleState.resumed;
-    _lifecycleListener = AppLifecycleListener(
-      onStateChange: _handleLifecycleState,
-    );
-    _subscription = _coordinator.completions.listen(_handleCompletion);
+    _registration = _coordinator.registerAppPresentation();
+    WidgetsBinding.instance.addObserver(this);
+    _requestNext();
   }
 
   @override
   void dispose() {
-    _lifecycleListener.dispose();
-    unawaited(_subscription.cancel());
+    _isDisposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    final surface = _surface;
+    _surface = null;
+    final registration = _registration;
+    // Снятие сообщения меняет состояние ScaffoldMessenger, что запрещено при
+    // финализации дерева. Поэтому поверхность снимается после кадра, и только
+    // затем coordinator возвращает право следующему presenter.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      surface?.remove();
+      registration.release();
+    });
+    SchedulerBinding.instance.ensureVisualUpdate();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => widget.child;
 
-  void _handleCompletion(IntentionCommandCompletion completion) {
-    unawaited(_claimPresentation(completion));
-  }
-
-  Future<void> _claimPresentation(IntentionCommandCompletion completion) async {
-    final claim = await _coordinator.claimAppPresentation(completion.token);
-    if (!mounted || claim == null) {
+  void _requestNext() {
+    if (_isDisposed || _isRequesting || _surface != null) {
       return;
     }
-    _pending.addLast(claim);
-    _schedulePresentation();
+    _isRequesting = true;
+    unawaited(
+      _registration.nextClaim().then((claim) {
+        _isRequesting = false;
+        if (_isDisposed || claim == null) {
+          return;
+        }
+        _surface = _PresentationSurface(claim);
+        _showIfSuitable();
+      }),
+    );
   }
 
-  void _handleLifecycleState(AppLifecycleState state) {
-    _isVisible = state == AppLifecycleState.resumed;
-    if (_isVisible) {
-      _schedulePresentation();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _showIfSuitable();
     }
   }
 
-  void _schedulePresentation() {
-    if (!_isVisible || _pending.isEmpty || _presentationScheduled) {
-      return;
-    }
-    _presentationScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _presentationScheduled = false;
-      _presentPending();
-    });
-    WidgetsBinding.instance.ensureVisualUpdate();
-  }
-
-  void _presentPending() {
-    if (!mounted || !_isVisible || _pending.isEmpty) {
+  void _showIfSuitable() {
+    final surface = _surface;
+    if (_isDisposed ||
+        !mounted ||
+        surface == null ||
+        surface.controller != null ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
       return;
     }
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) {
-      _schedulePresentation();
+      SchedulerBinding.instance.addPostFrameCallback((_) => _showIfSuitable());
       return;
     }
 
-    final localizations = AppLocalizations.of(context);
-    while (_isVisible && _pending.isNotEmpty) {
-      final claim = _pending.removeFirst();
-      final message = _messageFor(localizations, claim.completion);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Semantics(
+    final message = _messageFor(
+      AppLocalizations.of(context),
+      surface.claim.completion,
+    );
+    final controller = messenger.showSnackBar(
+      SnackBar(
+        content: PresentationFrameEvidence<IntentionAppPresentationClaim>(
+          subject: surface.claim,
+          requiresCurrentRoute: false,
+          onPresented: (_) => _confirm(surface),
+          child: Semantics(
             key: const ValueKey('graph-operation-message'),
             container: true,
             liveRegion: true,
@@ -107,8 +121,57 @@ final class _GraphOperationPresenterState
             child: ExcludeSemantics(child: Text(message)),
           ),
         ),
-      );
-      _coordinator.confirmPresentation(claim);
+      ),
+    );
+    surface
+      ..messenger = messenger
+      ..controller = controller;
+    unawaited(controller.closed.then((_) => _handleClosed(surface)));
+  }
+
+  void _confirm(_PresentationSurface surface) {
+    if (_isDisposed || !identical(_surface, surface) || surface.isConfirmed) {
+      return;
+    }
+    surface.isConfirmed = true;
+    _coordinator.confirmPresentation(surface.claim);
+  }
+
+  void _handleClosed(_PresentationSurface surface) {
+    if (_isDisposed || !identical(_surface, surface)) {
+      return;
+    }
+    surface
+      ..messenger = null
+      ..controller = null;
+    if (surface.isConfirmed) {
+      _surface = null;
+      _requestNext();
+    } else {
+      // Сообщение исчезло до доступного кадра: результат ещё не предъявлен.
+      _showIfSuitable();
+    }
+  }
+}
+
+/// Текущая поверхность результата; живёт до закрытия сообщения, даже после
+/// подтверждения предъявления, и не образует журнал предъявленных tokens.
+final class _PresentationSurface {
+  _PresentationSurface(this.claim);
+
+  final IntentionAppPresentationClaim claim;
+  ScaffoldMessengerState? messenger;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller;
+  var isConfirmed = false;
+
+  void remove() {
+    final currentMessenger = messenger;
+    messenger = null;
+    controller = null;
+    if (currentMessenger != null && currentMessenger.mounted) {
+      // Presenter — единственный владелец поверхности и держит не больше одного
+      // сообщения, поэтому текущее сообщение принадлежит этой регистрации.
+      currentMessenger.removeCurrentSnackBar();
     }
   }
 }

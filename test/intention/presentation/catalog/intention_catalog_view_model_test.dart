@@ -1103,6 +1103,7 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
+    final presenter = coordinator.registerAppPresentation();
     final started = coordinator.acceptExisting(
       UpdateIntention(
         id: intention.id,
@@ -1118,9 +1119,9 @@ void main() {
     );
     await started.future;
 
-    final claim = await coordinator.claimAppPresentation(started.token);
-    expect(claim, isNotNull);
-    expect(claim!.completion.presentationTitle, intention.title);
+    final claim = await presenter.nextClaim();
+    expect(claim!.token, same(started.token));
+    expect(claim.completion.presentationTitle, intention.title);
     coordinator.confirmPresentation(claim);
 
     subscription.close();

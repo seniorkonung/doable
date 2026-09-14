@@ -216,22 +216,17 @@ void main() {
     },
   );
 
-  test('открытая форма потребляет presentation claim своего failure', () async {
+  test('открытая форма удерживает claim failure, а уход до кадра передаёт его оболочке', () async {
     final repository = ControlledCatalogRepository();
     final container = _container(repository);
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
+    final presenter = coordinator.registerAppPresentation();
     final provider = intentionEditorViewModelProvider(
       IntentionCreationFormKey(),
     );
     final subscription = container.listen(provider, (_, _) {});
-    addTearDown(subscription.close);
-    final fallback = Completer<Future<IntentionAppPresentationClaim?>>();
-    final completionSubscription = coordinator.completions.listen((completion) {
-      fallback.complete(coordinator.claimAppPresentation(completion.token));
-    });
-    addTearDown(completionSubscription.cancel);
 
     container.read(provider.notifier)
       ..changeTitle('Намерение')
@@ -242,11 +237,102 @@ void main() {
     );
     await _settle(container);
 
-    expect(await (await fallback.future), isNull);
+    final failed = container.read(provider);
+    expect(failed.operation, isA<OperationFailed<Intention>>());
     expect(
-      container.read(provider).operation,
-      isA<OperationFailed<Intention>>(),
+      failed.failurePresentation,
+      isA<IntentionInitiatorPresentationClaim>(),
     );
+    IntentionAppPresentationClaim? fallback;
+    final fallbackRequest = presenter.nextClaim()
+      ..then((claim) => fallback = claim);
+    await _settle(container);
+    expect(fallback, isNull);
+
+    subscription.close();
+    await _settle(container);
+    await fallbackRequest;
+
+    expect(fallback!.token, same(failed.failurePresentation!.token));
+    coordinator.confirmPresentation(failed.failurePresentation!);
+    coordinator.confirmPresentation(fallback!);
+  });
+
+  test(
+    'success закрывает форму без initiator claim и сразу доступен оболочке',
+    () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+
+      container.read(provider.notifier)
+        ..changeTitle('Намерение')
+        ..submit();
+      repository.completeCommand(0, _savedResult());
+      await _settle(container);
+
+      final succeeded = container.read(provider);
+      expect(succeeded.event, isA<IntentionEditorCreated>());
+      expect(succeeded.failurePresentation, isNull);
+      final claim = await presenter.nextClaim();
+      expect(
+        claim!.completion.result,
+        isA<ResultSuccess<IntentionCommandSuccess>>(),
+      );
+      coordinator.confirmPresentation(claim);
+    },
+  );
+
+  test('предъявленный failure не переходит оболочке после успешной повторной попытки', () async {
+    final repository = ControlledCatalogRepository();
+    final container = _container(repository);
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final presenter = coordinator.registerAppPresentation();
+    final tokens = <IntentionOperationToken>[];
+    final completionSubscription = coordinator.completions.listen(
+      (completion) => tokens.add(completion.token),
+    );
+    addTearDown(completionSubscription.cancel);
+    final provider = intentionEditorViewModelProvider(
+      IntentionCreationFormKey(),
+    );
+    final subscription = container.listen(provider, (_, _) {});
+    final editor = container.read(provider.notifier)
+      ..changeTitle('Намерение')
+      ..submit();
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await _settle(container);
+    coordinator.confirmPresentation(
+      container.read(provider).failurePresentation!,
+    );
+
+    editor.submit();
+    repository.completeCommand(1, _savedResult());
+    await _settle(container);
+    subscription.close();
+    await _settle(container);
+
+    final success = await presenter.nextClaim();
+    expect(tokens, hasLength(2));
+    expect(success!.token, same(tokens.last));
+    coordinator.confirmPresentation(success);
+    IntentionAppPresentationClaim? stale;
+    unawaited(presenter.nextClaim().then((claim) => stale = claim));
+    await _settle(container);
+    expect(stale, isNull);
   });
 }
 

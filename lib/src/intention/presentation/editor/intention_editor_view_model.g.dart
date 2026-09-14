@@ -60,7 +60,7 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'36dd0222d0196d02a9772e47e4f74141129cd9c1';
+    r'ee2d12a5a31c0022b9b6ff61d75fa4d203b6b762';
 
 final class IntentionEditorViewModelFamily extends $Family
     with

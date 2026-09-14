@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
@@ -44,61 +45,75 @@ final class _IntentionEditorPageState
     ref.listen(provider, (previous, next) {
       if (next.event case IntentionEditorCreated()) {
         notifier.consumeEvent();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(localizations.editorCreated)));
+        // Сообщение об успехе предъявляет общий presenter оболочки.
         unawaited(context.router.maybePop());
       }
     });
 
     final generalFailure = _generalFailure(localizations, editor.operation);
+    final titleFailure = _fieldFailure(
+      localizations,
+      editor.operation,
+      IntentionTextField.title,
+    );
+    final descriptionFailure = _fieldFailure(
+      localizations,
+      editor.operation,
+      IntentionTextField.description,
+    );
     return Scaffold(
       appBar: AppBar(title: Text(localizations.editorTitle)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            TextField(
-              key: const ValueKey('intention-editor-title'),
-              controller: _titleController,
-              autofocus: true,
-              textInputAction: TextInputAction.next,
-              decoration: InputDecoration(
-                labelText: localizations.editorTitleLabel,
-                errorText: _fieldFailure(
-                  localizations,
-                  editor.operation,
-                  IntentionTextField.title,
+            OperationFailurePresentation(
+              claim: titleFailure == null ? null : editor.failurePresentation,
+              child: TextField(
+                key: const ValueKey('intention-editor-title'),
+                controller: _titleController,
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: localizations.editorTitleLabel,
+                  errorText: titleFailure,
                 ),
+                onChanged: notifier.changeTitle,
               ),
-              onChanged: notifier.changeTitle,
             ),
             const SizedBox(height: 16),
-            TextField(
-              key: const ValueKey('intention-editor-description'),
-              controller: _descriptionController,
-              minLines: 4,
-              maxLines: null,
-              keyboardType: TextInputType.multiline,
-              decoration: InputDecoration(
-                labelText: localizations.editorDescriptionLabel,
-                alignLabelWithHint: true,
-                errorText: _fieldFailure(
-                  localizations,
-                  editor.operation,
-                  IntentionTextField.description,
+            OperationFailurePresentation(
+              claim: descriptionFailure == null
+                  ? null
+                  : editor.failurePresentation,
+              child: TextField(
+                key: const ValueKey('intention-editor-description'),
+                controller: _descriptionController,
+                minLines: 4,
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+                decoration: InputDecoration(
+                  labelText: localizations.editorDescriptionLabel,
+                  alignLabelWithHint: true,
+                  errorText: descriptionFailure,
                 ),
+                onChanged: notifier.changeDescription,
               ),
-              onChanged: notifier.changeDescription,
             ),
             if (generalFailure != null) ...[
               const SizedBox(height: 16),
-              Semantics(
-                container: true,
-                liveRegion: true,
-                child: Text(
-                  generalFailure,
-                  key: const ValueKey('intention-editor-failure'),
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+              OperationFailurePresentation(
+                claim: editor.failurePresentation,
+                child: Semantics(
+                  container: true,
+                  liveRegion: true,
+                  child: Text(
+                    generalFailure,
+                    key: const ValueKey('intention-editor-failure'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ),
               ),
             ],

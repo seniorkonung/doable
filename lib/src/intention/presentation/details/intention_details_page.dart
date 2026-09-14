@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
@@ -25,23 +26,9 @@ final class IntentionDetailsPage extends ConsumerWidget {
     final provider = intentionDetailsViewModelProvider(intentionId);
     final details = ref.watch(provider);
     ref.listen(provider, (previous, next) {
+      // Сообщения об успехе предъявляет общий presenter оболочки.
       if (next is IntentionDetailsDeleted) {
         unawaited(context.router.maybePop());
-      }
-      if (next case IntentionDetailsLoaded(event: final event?)) {
-        ref.read(provider.notifier).consumeEvent();
-        final message = switch (event) {
-          IntentionDetailsSaved() => localizations.detailsSaved,
-          IntentionDetailsReadinessEnabled() =>
-            localizations.detailsReadinessEnabled,
-          IntentionDetailsReadinessDisabled() =>
-            localizations.detailsReadinessDisabled,
-          IntentionDetailsArchived() => localizations.detailsArchivedSuccess,
-          IntentionDetailsRestored() => localizations.detailsRestoredSuccess,
-        };
-        ScaffoldMessenger.of(context)
-          ..removeCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(message)));
       }
     });
     return Scaffold(
@@ -282,13 +269,16 @@ final class _DetailsActions extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (failure != null) ...[
-          Semantics(
-            container: true,
-            liveRegion: true,
-            child: Text(
-              failure,
-              key: const ValueKey('intention-details-state-change-failure'),
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+          OperationFailurePresentation(
+            claim: state.stateChange?.failurePresentation,
+            child: Semantics(
+              container: true,
+              liveRegion: true,
+              child: Text(
+                failure,
+                key: const ValueKey('intention-details-state-change-failure'),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ),
           ),
           if (state.stateChange?.canRetry ?? false) ...[
@@ -514,53 +504,64 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
     final edit = widget.edit;
     final controlsEnabled = !widget.isOperationRunning;
     final generalFailure = _generalFailure(localizations, edit.operation);
+    final titleFailure = _fieldFailure(
+      localizations,
+      edit.operation,
+      IntentionTextField.title,
+    );
+    final descriptionFailure = _fieldFailure(
+      localizations,
+      edit.operation,
+      IntentionTextField.description,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          key: const ValueKey('intention-details-edit-title'),
-          controller: _titleController,
-          enabled: controlsEnabled,
-          autofocus: true,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: localizations.editorTitleLabel,
-            errorText: _fieldFailure(
-              localizations,
-              edit.operation,
-              IntentionTextField.title,
+        OperationFailurePresentation(
+          claim: titleFailure == null ? null : edit.failurePresentation,
+          child: TextField(
+            key: const ValueKey('intention-details-edit-title'),
+            controller: _titleController,
+            enabled: controlsEnabled,
+            autofocus: true,
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              labelText: localizations.editorTitleLabel,
+              errorText: titleFailure,
             ),
+            onChanged: widget.onTitleChanged,
           ),
-          onChanged: widget.onTitleChanged,
         ),
         const SizedBox(height: 16),
-        TextField(
-          key: const ValueKey('intention-details-edit-description'),
-          controller: _descriptionController,
-          enabled: controlsEnabled,
-          minLines: 4,
-          maxLines: null,
-          keyboardType: TextInputType.multiline,
-          decoration: InputDecoration(
-            labelText: localizations.editorDescriptionLabel,
-            alignLabelWithHint: true,
-            errorText: _fieldFailure(
-              localizations,
-              edit.operation,
-              IntentionTextField.description,
+        OperationFailurePresentation(
+          claim: descriptionFailure == null ? null : edit.failurePresentation,
+          child: TextField(
+            key: const ValueKey('intention-details-edit-description'),
+            controller: _descriptionController,
+            enabled: controlsEnabled,
+            minLines: 4,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            decoration: InputDecoration(
+              labelText: localizations.editorDescriptionLabel,
+              alignLabelWithHint: true,
+              errorText: descriptionFailure,
             ),
+            onChanged: widget.onDescriptionChanged,
           ),
-          onChanged: widget.onDescriptionChanged,
         ),
         if (generalFailure != null) ...[
           const SizedBox(height: 16),
-          Semantics(
-            container: true,
-            liveRegion: true,
-            child: Text(
-              generalFailure,
-              key: const ValueKey('intention-details-edit-failure'),
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+          OperationFailurePresentation(
+            claim: edit.failurePresentation,
+            child: Semantics(
+              container: true,
+              liveRegion: true,
+              child: Text(
+                generalFailure,
+                key: const ValueKey('intention-details-edit-failure'),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ),
           ),
         ],

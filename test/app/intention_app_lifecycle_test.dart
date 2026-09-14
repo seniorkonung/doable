@@ -166,6 +166,7 @@ void main() {
   testWidgets(
     'проходит полный app-level lifecycle через задерживаемый repository',
     (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
       addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
       final repository = _DelayedPersonalGraphRepository();
@@ -275,6 +276,11 @@ void main() {
       expect(find.text(created.title), findsNothing);
       repository.emitDetail(1, updated);
       await tester.pumpAndSettle();
+      expect(
+        find.text('Edit — “Укреплять здоровье”: Changes saved.'),
+        findsOneWidget,
+      );
+      await _closeOperationMessage(tester);
 
       await tester.ensureVisible(
         find.byKey(const ValueKey('intention-details-enable-readiness')),
@@ -298,6 +304,7 @@ void main() {
       repository.emitDetail(2, ready);
       await tester.pumpAndSettle();
       expect(find.text('Ready for action'), findsOneWidget);
+      await _closeOperationMessage(tester);
 
       await tester.ensureVisible(
         find.byKey(const ValueKey('intention-details-archive')),
@@ -317,6 +324,7 @@ void main() {
       repository.emitDetail(3, archived);
       await tester.pumpAndSettle();
       expect(find.text('Archived'), findsOneWidget);
+      await _closeOperationMessage(tester);
 
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -357,6 +365,7 @@ void main() {
       repository.emitDetail(5, restored);
       await tester.pumpAndSettle();
       expect(find.text('Active'), findsOneWidget);
+      await _closeOperationMessage(tester);
 
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -406,6 +415,11 @@ void main() {
       expect(find.text('No active intentions yet.'), findsOneWidget);
     },
   );
+}
+
+Future<void> _closeOperationMessage(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _selectScope(WidgetTester tester, String label) async {

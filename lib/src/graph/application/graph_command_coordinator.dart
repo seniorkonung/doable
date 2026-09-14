@@ -121,6 +121,10 @@ final class GraphCommandCoordinatorDraining extends IntentionCommandStart {
   const GraphCommandCoordinatorDraining();
 }
 
+/// Исключительное право конкретного владельца предъявить terminal outcome.
+///
+/// Удержание claim само по себе не означает предъявления: подтверждать его
+/// может только компонент, получивший свидетельство первого доступного кадра.
 sealed class IntentionPresentationClaim {
   const IntentionPresentationClaim._(this.token, this.completion, this._entry);
 
@@ -129,6 +133,7 @@ sealed class IntentionPresentationClaim {
   final _PresentationEntry _entry;
 }
 
+/// Право открытой экранной сессии предъявить собственную ошибку.
 final class IntentionInitiatorPresentationClaim
     extends IntentionPresentationClaim {
   const IntentionInitiatorPresentationClaim._(
@@ -138,19 +143,49 @@ final class IntentionInitiatorPresentationClaim
   ) : super._();
 }
 
+/// Право оболочки предъявить success либо fallback-ошибку.
 final class IntentionAppPresentationClaim extends IntentionPresentationClaim {
   const IntentionAppPresentationClaim._(
     super.token,
     super.completion,
     super._entry,
+    this._registration,
   ) : super._();
+
+  final GraphAppPresentationRegistration _registration;
+}
+
+/// Регистрация получателя общего app-канала предъявления.
+///
+/// Одновременно выдачу получает только самая ранняя действующая регистрация,
+/// и у неё не больше одного неподтверждённого claim. Освобождение возвращает
+/// coordinator выданный неподтверждённый claim и ожидающий запрос.
+final class GraphAppPresentationRegistration {
+  GraphAppPresentationRegistration._(this._coordinator);
+
+  final GraphCommandCoordinator _coordinator;
+  Completer<IntentionAppPresentationClaim?>? _request;
+  IntentionAppPresentationClaim? _issued;
+  var _isReleased = false;
+
+  /// Запрашивает следующий доступный app-результат в порядке публикации.
+  ///
+  /// Возвращает `null`, если регистрация освобождена или coordinator завершил
+  /// работу до выдачи.
+  Future<IntentionAppPresentationClaim?> nextClaim() =>
+      _coordinator._requestAppClaim(this);
+
+  void release() => _coordinator._releaseRegistration(this);
 }
 
 @Riverpod(keepAlive: true)
 final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   final _completionController =
       StreamController<IntentionCommandCompletion>.broadcast(sync: true);
+  // Публикация завершений последовательна в порядке принятия, поэтому порядок
+  // вставки совпадает с порядком публикации terminal outcome.
   final _entries = <IntentionOperationToken, _PresentationEntry>{};
+  final _registrations = <GraphAppPresentationRegistration>[];
   final _gates =
       <
         GraphCommandKey,
@@ -262,15 +297,20 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     );
   }
 
-  IntentionInitiatorPresentationClaim? claimInitiator(
+  /// Выдаёт открытой экранной сессии право предъявить её failure.
+  ///
+  /// Success инициатору не выдаётся: он сразу принадлежит оболочке. После
+  /// освобождения сессии или выдачи права оболочке возвращает `null`.
+  IntentionInitiatorPresentationClaim? claimInitiatorFailure(
     IntentionOperationToken token,
   ) {
     final entry = _entries[token];
     final completion = entry?.completion;
     if (entry == null ||
         completion == null ||
+        completion.result is! ResultFailure<IntentionCommandSuccess> ||
         entry.initiatorReleased ||
-        entry.fallbackClaim != null) {
+        entry.appClaim != null) {
       return null;
     }
 
@@ -281,22 +321,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     );
   }
 
-  Future<IntentionAppPresentationClaim?> claimAppPresentation(
-    IntentionOperationToken token,
-  ) {
-    final entry = _entries[token];
-    if (entry == null || entry.fallbackRequest != null) {
-      return Future.value(null);
-    }
-
-    final request = Completer<IntentionAppPresentationClaim?>();
-    entry.fallbackRequest = request;
-    if (entry.initiatorReleased && entry.completion != null) {
-      _grantFallback(entry);
-    }
-    return request.future;
-  }
-
+  /// Завершает экранную сессию инициатора.
+  ///
+  /// Неподтверждённая ошибка становится доступной оболочке в своём прежнем
+  /// порядке; прежний initiator claim больше не может её подтвердить.
   void releaseInitiatorPresentation(IntentionOperationToken token) {
     final entry = _entries[token];
     if (entry == null || entry.initiatorReleased) {
@@ -305,28 +333,43 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 
     entry.initiatorReleased = true;
     entry.initiatorClaim = null;
-    if (entry.completion != null && entry.fallbackRequest != null) {
-      _grantFallback(entry);
-    }
+    _dispatchAppPresentation();
   }
 
+  GraphAppPresentationRegistration registerAppPresentation() {
+    final registration = GraphAppPresentationRegistration._(this);
+    if (_shutdownCompleter?.isCompleted ?? false) {
+      registration._isReleased = true;
+    } else {
+      _registrations.add(registration);
+    }
+    return registration;
+  }
+
+  /// Атомарно подтверждает фактическое предъявление действующим владельцем.
+  ///
+  /// Claim освобождённого или сменившегося владельца бездействует.
   void confirmPresentation(IntentionPresentationClaim claim) {
     final entry = _entries[claim.token];
-    if (!identical(entry, claim._entry)) {
+    if (entry == null || !identical(entry, claim._entry)) {
       return;
     }
 
     switch (claim) {
       case IntentionInitiatorPresentationClaim():
-        if (!identical(entry!.initiatorClaim, claim)) {
+        if (!identical(entry.initiatorClaim, claim)) {
           return;
         }
         _discardEntry(entry);
-      case IntentionAppPresentationClaim():
-        if (!identical(entry!.fallbackClaim, claim)) {
+      case IntentionAppPresentationClaim(:final _registration):
+        if (!identical(entry.appClaim, claim)) {
           return;
         }
+        if (identical(_registration._issued, claim)) {
+          _registration._issued = null;
+        }
         _discardEntry(entry);
+        _dispatchAppPresentation();
     }
   }
 
@@ -341,6 +384,87 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     _shutdownCompleter = shutdown;
     _completeShutdownIfDrained();
     return shutdown.future;
+  }
+
+  Future<IntentionAppPresentationClaim?> _requestAppClaim(
+    GraphAppPresentationRegistration registration,
+  ) {
+    if (registration._isReleased) {
+      return Future.value(null);
+    }
+    final existing = registration._request;
+    if (existing != null) {
+      return existing.future;
+    }
+
+    final request = Completer<IntentionAppPresentationClaim?>();
+    registration._request = request;
+    _dispatchAppPresentation();
+    return request.future;
+  }
+
+  void _releaseRegistration(GraphAppPresentationRegistration registration) {
+    if (registration._isReleased) {
+      return;
+    }
+    registration._isReleased = true;
+    _registrations.remove(registration);
+
+    final issued = registration._issued;
+    registration._issued = null;
+    if (issued != null && identical(issued._entry.appClaim, issued)) {
+      issued._entry.appClaim = null;
+    }
+    final request = registration._request;
+    registration._request = null;
+    if (request != null && !request.isCompleted) {
+      request.complete(null);
+    }
+    _dispatchAppPresentation();
+  }
+
+  void _dispatchAppPresentation() {
+    if (_registrations.isEmpty) {
+      return;
+    }
+    final active = _registrations.first;
+    final request = active._request;
+    if (request == null || active._issued != null) {
+      return;
+    }
+    final entry = _nextAppPresentableEntry();
+    final completion = entry?.completion;
+    if (entry == null || completion == null) {
+      return;
+    }
+
+    final claim = IntentionAppPresentationClaim._(
+      entry.token,
+      completion,
+      entry,
+      active,
+    );
+    entry.appClaim = claim;
+    active._issued = claim;
+    active._request = null;
+    request.complete(claim);
+  }
+
+  _PresentationEntry? _nextAppPresentableEntry() {
+    for (final entry in _entries.values) {
+      final completion = entry.completion;
+      if (completion == null || entry.appClaim != null) {
+        continue;
+      }
+      final belongsToApp = switch (completion.result) {
+        ResultSuccess() => true,
+        ResultFailure() => entry.initiatorReleased,
+      };
+      if (belongsToApp) {
+        return entry;
+      }
+    }
+    return null;
   }
 
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> _execute(
@@ -368,40 +492,13 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     entry.completion = completion;
     _completionController.add(completion);
     entry.completionCompleter.complete(completion);
-
-    if (entry.initiatorReleased && entry.fallbackRequest != null) {
-      _grantFallback(entry);
-    }
-  }
-
-  void _grantFallback(_PresentationEntry entry) {
-    final completion = entry.completion;
-    final request = entry.fallbackRequest;
-    if (completion == null ||
-        request == null ||
-        request.isCompleted ||
-        entry.fallbackClaim != null) {
-      return;
-    }
-
-    final claim = IntentionAppPresentationClaim._(
-      entry.token,
-      completion,
-      entry,
-    );
-    entry.fallbackClaim = claim;
-    request.complete(claim);
+    _dispatchAppPresentation();
   }
 
   void _discardEntry(_PresentationEntry entry) {
-    if (!identical(_entries[entry.token], entry)) {
-      return;
+    if (identical(_entries[entry.token], entry)) {
+      _entries.remove(entry.token);
     }
-    final fallbackRequest = entry.fallbackRequest;
-    if (fallbackRequest != null && !fallbackRequest.isCompleted) {
-      fallbackRequest.complete(null);
-    }
-    _entries.remove(entry.token);
   }
 
   void _completeShutdownIfDrained() {
@@ -410,9 +507,17 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return;
     }
 
-    for (final entry in _entries.values.toList(growable: false)) {
-      _discardEntry(entry);
+    _entries.clear();
+    for (final registration in _registrations.toList(growable: false)) {
+      registration._isReleased = true;
+      registration._issued = null;
+      final request = registration._request;
+      registration._request = null;
+      if (request != null && !request.isCompleted) {
+        request.complete(null);
+      }
     }
+    _registrations.clear();
     _gates.clear();
     unawaited(_completionController.close());
     shutdown.complete();
@@ -434,8 +539,7 @@ final class _PresentationEntry {
   IntentionCommandCompletion? completion;
   bool initiatorReleased = false;
   IntentionInitiatorPresentationClaim? initiatorClaim;
-  Completer<IntentionAppPresentationClaim?>? fallbackRequest;
-  IntentionAppPresentationClaim? fallbackClaim;
+  IntentionAppPresentationClaim? appClaim;
 }
 
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {

@@ -881,11 +881,7 @@ Future<void> _completeCatalogWidgetCommand(
   expect(start, isA<IntentionCommandAccepted>());
   final accepted = start as IntentionCommandAccepted;
   repository.completeCommand(commandIndex, ResultSuccess(success));
-  final completion = await accepted.future;
-  final claim = coordinator.claimInitiator(completion.token);
-  if (claim != null) {
-    coordinator.confirmPresentation(claim);
-  }
+  await accepted.future;
   await tester.pump();
   await tester.pump();
 }
