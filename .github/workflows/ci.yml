@@ -17,10 +17,12 @@ concurrency:
 
 jobs:
   scope_detector:
-    name: Detect Android artifact scope
+    name: Detect CI scope
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
+      project_required: ${{ steps.scope.outputs.project_required }}
+      openspec_required: ${{ steps.scope.outputs.openspec_required }}
       android_required: ${{ steps.scope.outputs.android_required }}
 
     steps:
@@ -30,7 +32,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Detect Android artifact scope
+      - name: Detect CI scope
         id: scope
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -39,6 +41,7 @@ jobs:
   project_checks:
     name: Project checks
     needs: scope_detector
+    if: ${{ needs.scope_detector.outputs.project_required == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
 
@@ -52,6 +55,7 @@ jobs:
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.8.1
+          install_args: flutter
 
       - name: Verify generated artifacts
         run: mise run codegen-check
@@ -61,6 +65,25 @@ jobs:
 
       - name: Run full project checks
         run: mise run check
+
+  openspec_checks:
+    name: OpenSpec checks
+    needs: scope_detector
+    if: ${{ needs.scope_detector.outputs.openspec_required == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned OpenSpec toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.1
+          install_args: "node npm:@fission-ai/openspec"
 
       - name: Validate OpenSpec changes
         run: mise exec -- openspec validate --all --strict --no-interactive
@@ -92,6 +115,7 @@ jobs:
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.8.1
+          install_args: flutter
 
       - name: Install pinned Android SDK packages
         shell: bash
@@ -122,6 +146,7 @@ jobs:
     needs:
       - scope_detector
       - project_checks
+      - openspec_checks
       - android_artifact
     if: ${{ always() }}
     runs-on: ubuntu-24.04
@@ -131,33 +156,46 @@ jobs:
       - name: Enforce aggregate gate
         shell: bash
         env:
+          PROJECT_REQUIRED: ${{ needs.scope_detector.outputs.project_required }}
+          OPENSPEC_REQUIRED: ${{ needs.scope_detector.outputs.openspec_required }}
           ANDROID_REQUIRED: ${{ needs.scope_detector.outputs.android_required }}
-          ANDROID_RESULT: ${{ needs.android_artifact.result }}
           PROJECT_RESULT: ${{ needs.project_checks.result }}
+          OPENSPEC_RESULT: ${{ needs.openspec_checks.result }}
+          ANDROID_RESULT: ${{ needs.android_artifact.result }}
           SCOPE_RESULT: ${{ needs.scope_detector.result }}
         run: |
           set -euo pipefail
 
-          if [[ "$SCOPE_RESULT" != success || "$PROJECT_RESULT" != success ]]; then
-            echo "Scope detector or project checks did not succeed" >&2
+          if [[ "$SCOPE_RESULT" != success ]]; then
+            echo "CI scope detector не завершился успешно" >&2
             exit 1
           fi
 
-          case "$ANDROID_REQUIRED" in
+          require_job_result() {
+            local required="$1"
+            local result="$2"
+            local job_name="$3"
+
+            case "$required" in
             true)
-              if [[ "$ANDROID_RESULT" != success ]]; then
-                echo "Required Android artifact evidence did not succeed" >&2
+              if [[ "$result" != success ]]; then
+                echo "Обязательный job '$job_name' не завершился успешно" >&2
                 exit 1
               fi
               ;;
             false)
-              if [[ "$ANDROID_RESULT" != skipped ]]; then
-                echo "Android artifact job was not safely skipped" >&2
+              if [[ "$result" != skipped ]]; then
+                echo "Job '$job_name' не был безопасно пропущен" >&2
                 exit 1
               fi
               ;;
             *)
-              echo "Android artifact decision is missing or invalid" >&2
+              echo "Решение для job '$job_name' отсутствует или имеет неверный формат" >&2
               exit 1
               ;;
-          esac
+            esac
+          }
+
+          require_job_result "$PROJECT_REQUIRED" "$PROJECT_RESULT" "Project checks"
+          require_job_result "$OPENSPEC_REQUIRED" "$OPENSPEC_RESULT" "OpenSpec checks"
+          require_job_result "$ANDROID_REQUIRED" "$ANDROID_RESULT" "Android artifact evidence"

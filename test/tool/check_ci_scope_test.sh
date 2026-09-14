@@ -91,11 +91,12 @@ for path in \
   pubspec.lock \
   mise.toml \
   .github/workflows/ci.yml \
+  tool/check_ci_scope.sh \
   tool/check_android_privacy_manifest.dart
 do
   check_value \
-    "artifact-impacting путь $path" \
-    artifact \
+    "Android-impacting путь $path" \
+    android \
     path_classification \
     "$path"
 done
@@ -107,9 +108,6 @@ check_value \
   scripts/new_tool.sh
 
 for path in \
-  README.md \
-  docs/architecture.md \
-  openspec/changes/example/spec.md \
   lib/src/example.dart \
   test/example_test.dart \
   analysis_options.yaml \
@@ -119,11 +117,35 @@ for path in \
   drift_schemas/schema_v1.json
 do
   check_value \
-    "доказанно не влияющий путь $path" \
-    safe \
+    "проектный путь $path" \
+    project \
     path_classification \
     "$path"
 done
+
+for path in \
+  README.md \
+  AGENTS.md \
+  docs/architecture.md \
+  notes/nested/review.md
+do
+  check_value \
+    "документационный путь $path" \
+    documentation \
+    path_classification \
+    "$path"
+done
+
+check_value \
+  "OpenSpec Markdown требует OpenSpec-валидации" \
+  openspec \
+  path_classification \
+  openspec/changes/example/spec.md
+check_value \
+  "OpenSpec-конфигурация требует OpenSpec-валидации" \
+  openspec \
+  path_classification \
+  openspec/config.yaml
 
 check_boolean \
   "только документация пропускает Android artifact" \
@@ -157,6 +179,83 @@ check_boolean \
   true \
   paths_require_android \
   ../README.md
+
+check_boolean \
+  "только документация пропускает проектные проверки" \
+  false \
+  paths_require_project \
+  README.md \
+  docs/architecture.md
+check_boolean \
+  "OpenSpec-only изменение пропускает проектные проверки" \
+  false \
+  paths_require_project \
+  README.md \
+  openspec/changes/example/spec.md
+check_boolean \
+  "Dart-изменение требует проектные проверки" \
+  true \
+  paths_require_project \
+  lib/src/example.dart
+check_boolean \
+  "Android-изменение требует проектные проверки" \
+  true \
+  paths_require_project \
+  android/app/build.gradle.kts
+check_boolean \
+  "неизвестный путь требует проектные проверки" \
+  true \
+  paths_require_project \
+  scripts/new_tool.sh
+check_boolean \
+  "пустое change evidence требует проектные проверки" \
+  true \
+  paths_require_project
+
+check_boolean \
+  "только документация пропускает OpenSpec-валидацию" \
+  false \
+  paths_require_openspec \
+  README.md \
+  docs/architecture.md
+check_boolean \
+  "OpenSpec-изменение требует OpenSpec-валидацию" \
+  true \
+  paths_require_openspec \
+  README.md \
+  openspec/changes/example/spec.md
+check_boolean \
+  "Dart-изменение не требует OpenSpec-валидацию" \
+  false \
+  paths_require_openspec \
+  lib/src/example.dart
+check_boolean \
+  "неизвестный путь требует OpenSpec-валидацию fail-closed" \
+  true \
+  paths_require_openspec \
+  scripts/new_tool.sh
+check_boolean \
+  "пустое change evidence требует OpenSpec-валидацию fail-closed" \
+  true \
+  paths_require_openspec
+
+check_value \
+  "решение публикует все три независимых gate-выхода" \
+  $'project_required=false\nopenspec_required=true\nandroid_required=false\nreason=OpenSpec-only diff' \
+  write_decision \
+  false \
+  true \
+  false \
+  'OpenSpec-only diff'
+
+scheduled_decision() {
+  GITHUB_EVENT_NAME=schedule GITHUB_OUTPUT='' main
+}
+
+check_value \
+  "еженедельный запуск требует все проверки" \
+  $'project_required=true\nopenspec_required=true\nandroid_required=true\nreason=полный ручной или еженедельный запуск' \
+  scheduled_decision
 
 check_boolean \
   "успешный Full checks этого workflow считается доверенным" \
