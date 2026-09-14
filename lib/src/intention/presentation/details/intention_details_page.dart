@@ -271,14 +271,9 @@ final class _DetailsActions extends StatelessWidget {
         if (failure != null) ...[
           OperationFailurePresentation(
             claim: state.stateChange?.failurePresentation,
-            child: Semantics(
-              container: true,
-              liveRegion: true,
-              child: Text(
-                failure,
-                key: const ValueKey('intention-details-state-change-failure'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
+            message: failure,
+            messageKey: const ValueKey(
+              'intention-details-state-change-failure',
             ),
           ),
           if (state.stateChange?.canRetry ?? false) ...[
@@ -517,52 +512,49 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OperationFailurePresentation(
-          claim: titleFailure == null ? null : edit.failurePresentation,
-          child: TextField(
-            key: const ValueKey('intention-details-edit-title'),
-            controller: _titleController,
-            enabled: controlsEnabled,
-            autofocus: true,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: localizations.editorTitleLabel,
-              errorText: titleFailure,
-            ),
-            onChanged: widget.onTitleChanged,
+        TextField(
+          key: const ValueKey('intention-details-edit-title'),
+          controller: _titleController,
+          enabled: controlsEnabled,
+          autofocus: true,
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            labelText: localizations.editorTitleLabel,
+            error: titleFailure == null
+                ? null
+                : OperationFailurePresentation(
+                    claim: edit.failurePresentation,
+                    message: titleFailure,
+                  ),
           ),
+          onChanged: widget.onTitleChanged,
         ),
         const SizedBox(height: 16),
-        OperationFailurePresentation(
-          claim: descriptionFailure == null ? null : edit.failurePresentation,
-          child: TextField(
-            key: const ValueKey('intention-details-edit-description'),
-            controller: _descriptionController,
-            enabled: controlsEnabled,
-            minLines: 4,
-            maxLines: null,
-            keyboardType: TextInputType.multiline,
-            decoration: InputDecoration(
-              labelText: localizations.editorDescriptionLabel,
-              alignLabelWithHint: true,
-              errorText: descriptionFailure,
-            ),
-            onChanged: widget.onDescriptionChanged,
+        TextField(
+          key: const ValueKey('intention-details-edit-description'),
+          controller: _descriptionController,
+          enabled: controlsEnabled,
+          minLines: 4,
+          maxLines: null,
+          keyboardType: TextInputType.multiline,
+          decoration: InputDecoration(
+            labelText: localizations.editorDescriptionLabel,
+            alignLabelWithHint: true,
+            error: descriptionFailure == null
+                ? null
+                : OperationFailurePresentation(
+                    claim: edit.failurePresentation,
+                    message: descriptionFailure,
+                  ),
           ),
+          onChanged: widget.onDescriptionChanged,
         ),
         if (generalFailure != null) ...[
           const SizedBox(height: 16),
           OperationFailurePresentation(
             claim: edit.failurePresentation,
-            child: Semantics(
-              container: true,
-              liveRegion: true,
-              child: Text(
-                generalFailure,
-                key: const ValueKey('intention-details-edit-failure'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
+            message: generalFailure,
+            messageKey: const ValueKey('intention-details-edit-failure'),
           ),
         ],
         const SizedBox(height: 24),

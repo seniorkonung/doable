@@ -659,6 +659,125 @@ void main() {
     }
   });
 
+  testWidgets(
+    'отмена редактирования до пригодного кадра передаёт ошибку оболочке',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 66, title: 'Редактируемое');
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('intention-details-edit-submit')),
+      );
+      await tester.pump();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      repository.completeCommand(
+        0,
+        const ResultFailure(
+          IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(
+              field: IntentionTextField.title,
+              reason: IntentionTextValidationReason.tooLong,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Use no more than 255 characters.'), findsOneWidget);
+
+      final cancel = find.byKey(
+        const ValueKey('intention-details-edit-cancel'),
+      );
+      await tester.ensureVisible(cancel);
+      await tester.pumpAndSettle();
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(find.text('Use no more than 255 characters.'), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Edit — “Редактируемое”: Check the entered data.'),
+        findsOneWidget,
+      );
+      expect(repository.commands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'read failure или absence до кадра не оставляют claim без renderer',
+    (tester) async {
+      final scenarios = <Result<Intention?>>[
+        const ResultSuccess(null),
+        const ResultFailure(IntentionUnavailableFailure()),
+      ];
+
+      for (var index = 0; index < scenarios.length; index += 1) {
+        final repository = ControlledDetailsRepository();
+        final intention = testDetailsIntention(
+          index: 67 + index,
+          title: 'Наблюдаемое $index',
+        );
+        await _pumpDetailsPage(tester, repository, intention.id);
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests[0].add(ResultSuccess(intention));
+        await tester.pumpAndSettle();
+        final archive = find.byKey(const ValueKey('intention-details-archive'));
+        await tester.ensureVisible(archive);
+        await tester.tap(archive);
+        await tester.pump();
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('The intention state couldn’t be changed. Try again.'),
+          findsOneWidget,
+        );
+
+        repository.detailRequests[0].add(scenarios[index]);
+        await tester.pumpAndSettle();
+        expect(
+          find.text('The intention state couldn’t be changed. Try again.'),
+          findsNothing,
+        );
+        if (scenarios[index] is ResultFailure<Intention?>) {
+          await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
+          await tester.pump();
+          await waitForDetailRequests(repository, 2);
+        }
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        await tester.pump();
+        expect(
+          find.text(
+            'Archive — “Наблюдаемое $index”: '
+            'The intention state couldn’t be changed. Try again.',
+          ),
+          findsOneWidget,
+        );
+        expect(repository.commands, hasLength(1));
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    },
+  );
+
   testWidgets('показывает confirmed success только после completion', (
     tester,
   ) async {

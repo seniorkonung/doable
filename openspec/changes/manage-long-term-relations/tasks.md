@@ -244,7 +244,7 @@
   - **Вероятные файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/intention_details_state.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`, `test/intention/presentation/details/intention_details_delete_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.5 Централизовать жизненный цикл предъявления инлайн-ошибки до её кадра или передачи оболочке
+- [x] 2.5 Централизовать жизненный цикл предъявления инлайн-ошибки до её кадра или передачи оболочке
   - **Критерии приёмки:**
     - Общий модуль по ADR-0012 принимает initiator claim и конкретное локализованное сообщение, сам создаёт визуальный renderer и live-region semantics и подтверждает только завершённый пригодный кадр собственной области сообщения. Видимое поле при прозрачной, анимируемой, отсечённой или находящейся вне viewport ошибке не подтверждает результат.
     - Исчезновение или замена renderer до подтверждения освобождает прежний claim для fallback оболочки; временная невидимость при сохранённом renderer удерживает claim. После подтверждения renderer не возвращает результат, а callbacks прежнего claim бездействуют после перевыдачи. ViewModels не перечисляют переходы состояния ради ручного освобождения каждой исчезнувшей поверхности.

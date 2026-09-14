@@ -5,6 +5,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -170,6 +171,42 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets(
+    'не подтверждает field failure по кадру видимого поля до появления сообщения',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      await _openEditor(tester, repository);
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      repository.completeCommand(
+        0,
+        const ResultFailure(
+          IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(
+              field: IntentionTextField.title,
+              reason: IntentionTextValidationReason.empty,
+            ),
+          ),
+        ),
+      );
+      await tester.idle();
+      await tester.pump();
+
+      final renderer = tester.widget<OperationFailurePresentation>(
+        find.byType(OperationFailurePresentation),
+      );
+      final claim = renderer.claim!;
+      final coordinator = ProviderScope.containerOf(
+        tester.element(find.byType(IntentionEditorPage)),
+      ).read(graphCommandCoordinatorProvider.notifier);
+      expect(coordinator.claimInitiatorFailure(claim.token), same(claim));
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Enter a title.'), findsOneWidget);
+      expect(coordinator.claimInitiatorFailure(claim.token), isNull);
+    },
+  );
 
   testWidgets('показывает безопасные failures и retry только для unavailable', (
     tester,
