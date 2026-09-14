@@ -1666,7 +1666,7 @@ deployments:
   owners:
   - .
   active_owner: .
-  content_hash: sha256:54250610437234eec50fdd24be5d8a98d07cad111b97771c642b18c17778861a
+  content_hash: sha256:2fe787079b658fa1fba9f8bfbdd219858c3fd18e5997f01d43e8ddec488ca8e9
 - kind: project-relative
   target: claude
   value: .claude/rules/domain-language.md
@@ -2760,7 +2760,7 @@ local_deployed_files:
 - .claude/rules/spec-first.md
 - .claude/rules/type-safe-design.md
 local_deployed_file_hashes:
-  .claude/rules/dart-mcp.md: sha256:54250610437234eec50fdd24be5d8a98d07cad111b97771c642b18c17778861a
+  .claude/rules/dart-mcp.md: sha256:2fe787079b658fa1fba9f8bfbdd219858c3fd18e5997f01d43e8ddec488ca8e9
   .claude/rules/language-preferences.md: sha256:e500f4facb5fc936b79aa3b7eb140bbd2f456d5d497da76a269ae7d5322ca1e8
   .claude/rules/spec-first.md: sha256:9060ae7431dbb395e81d0c5b93c40a74b484ca94d3aa6535d4303244add05ec0
   .claude/rules/type-safe-design.md: sha256:91e3d48f0eb3d7f65f523e59c7734221f93208c91557d07ddc40dc2a9c8dd867
