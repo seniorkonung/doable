@@ -1,6 +1,7 @@
 name: doable
 version: 0.0.1
 targets:
+  - claude
   - codex
   - agent-skills
 dependencies:
@@ -26,18 +27,33 @@ dependencies:
         - openspec-gherkin-authoring
         - c4-diagrams
         - domain-modeling
-    - git: fission-ai/openspec
-      ref: v1.12.0
-      skills:
-        - openspec-update-change
-        - openspec-verify-change
-        - openspec-sync-specs
-        - openspec-propose
-        - openspec-new-change
-        - openspec-explore
-        - openspec-continue-change
-        - openspec-archive-change
-        - openspec-apply-change
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-update-change
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-verify-change
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-sync-specs
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-propose
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-new-change
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-explore
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-continue-change
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-archive-change
+    - git: Fission-AI/OpenSpec
+      ref: v1.13.0
+      path: skills/openspec-apply-change
   mcp:
     - name: dart
       registry: false

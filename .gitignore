@@ -52,4 +52,6 @@ app.*.map.json
 apm_modules/
 
 .codex/
+.claude/
 .agents/
+.mcp.json
