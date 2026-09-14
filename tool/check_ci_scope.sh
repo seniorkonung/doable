@@ -22,11 +22,17 @@ path_classification() {
   fi
 
   case "$path" in
-    android/*|pubspec.yaml|pubspec.lock|mise.toml|.github/workflows/*|tool/check_android_privacy_manifest.dart)
-      printf '%s\n' artifact
+    openspec/*)
+      printf '%s\n' openspec
       ;;
-    README.md|docs/*|openspec/*|lib/*|test/*|analysis_options.yaml|dart_test.yaml|l10n.yaml|build.yaml|drift_schemas/*)
-      printf '%s\n' safe
+    *.md|docs/*)
+      printf '%s\n' documentation
+      ;;
+    android/*|pubspec.yaml|pubspec.lock|mise.toml|.github/workflows/*|tool/check_ci_scope.sh|tool/check_android_privacy_manifest.dart)
+      printf '%s\n' android
+      ;;
+    lib/*|test/*|analysis_options.yaml|dart_test.yaml|l10n.yaml|build.yaml|drift_schemas/*)
+      printf '%s\n' project
       ;;
     *)
       printf '%s\n' unknown
@@ -41,9 +47,43 @@ paths_require_android() {
 
   local path
   for path in "$@"; do
-    if [[ "$(path_classification "$path")" != safe ]]; then
-      return 0
-    fi
+    case "$(path_classification "$path")" in
+      android | unknown) return 0 ;;
+      documentation | openspec | project) ;;
+      *) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+paths_require_project() {
+  if (($# == 0)); then
+    return 0
+  fi
+
+  local path
+  for path in "$@"; do
+    case "$(path_classification "$path")" in
+      project | android | unknown) return 0 ;;
+      documentation | openspec) ;;
+      *) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+paths_require_openspec() {
+  if (($# == 0)); then
+    return 0
+  fi
+
+  local path
+  for path in "$@"; do
+    case "$(path_classification "$path")" in
+      openspec | unknown) return 0 ;;
+      documentation | project | android) ;;
+      *) return 0 ;;
+    esac
   done
   return 1
 }
@@ -134,14 +174,20 @@ can_use_incremental_diff() {
 }
 
 write_decision() {
-  local android_required="$1"
-  local reason="$2"
+  local project_required="$1"
+  local openspec_required="$2"
+  local android_required="$3"
+  local reason="$4"
   local output_file="${GITHUB_OUTPUT:-}"
 
+  printf 'project_required=%s\n' "$project_required"
+  printf 'openspec_required=%s\n' "$openspec_required"
   printf 'android_required=%s\n' "$android_required"
   printf 'reason=%s\n' "$reason"
   if [[ -n "$output_file" ]]; then
-    printf 'android_required=%s\nreason=%s\n' \
+    printf 'project_required=%s\nopenspec_required=%s\nandroid_required=%s\nreason=%s\n' \
+      "$project_required" \
+      "$openspec_required" \
       "$android_required" \
       "$reason" >>"$output_file"
   fi
@@ -197,19 +243,19 @@ main() {
 
   case "$event_name" in
     schedule | workflow_dispatch)
-      write_decision true 'полный ручной или еженедельный запуск'
+      write_decision true true true 'полный ручной или еженедельный запуск'
       return
       ;;
     pull_request) ;;
     *)
-      write_decision true 'неизвестный тип запуска'
+      write_decision true true true 'неизвестный тип запуска'
       return
       ;;
   esac
 
   local event_path="${GITHUB_EVENT_PATH:-}"
   if [[ -z "$event_path" || ! -f "$event_path" ]]; then
-    write_decision true 'отсутствует pull request event evidence'
+    write_decision true true true 'отсутствует pull request event evidence'
     return
   fi
 
@@ -221,7 +267,7 @@ main() {
     ! is_valid_commit_sha "$base_sha" ||
     ! is_valid_commit_sha "$head_sha" ||
     [[ ! "$pull_request_number" =~ ^[1-9][0-9]*$ ]]; then
-    write_decision true 'pull request event evidence имеет неверный формат'
+    write_decision true true true 'pull request event evidence имеет неверный формат'
     return
   fi
 
@@ -283,7 +329,7 @@ main() {
 
   local changed_paths_file="$temp_dir/changed-paths"
   if ! changed_paths_for_range "$diff_range" "$changed_paths_file"; then
-    write_decision true 'не удалось получить полный change evidence'
+    write_decision true true true 'не удалось получить полный change evidence'
     return
   fi
 
@@ -292,11 +338,23 @@ main() {
     changed_paths+=("$path")
   done <"$changed_paths_file"
 
-  if paths_require_android "${changed_paths[@]}"; then
-    write_decision true "$diff_mode diff требует Android artifact evidence"
-    return
+  local project_required=false
+  local openspec_required=false
+  local android_required=false
+  if paths_require_project "${changed_paths[@]}"; then
+    project_required=true
   fi
-  write_decision false "$diff_mode diff доказанно не влияет на Android artifact"
+  if paths_require_openspec "${changed_paths[@]}"; then
+    openspec_required=true
+  fi
+  if paths_require_android "${changed_paths[@]}"; then
+    android_required=true
+  fi
+  write_decision \
+    "$project_required" \
+    "$openspec_required" \
+    "$android_required" \
+    "$diff_mode diff: project=$project_required, openspec=$openspec_required, android=$android_required"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
