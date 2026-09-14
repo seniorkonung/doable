@@ -1,23 +1,14 @@
 ### Dart and Flutter MCP
 
-When Dart and Flutter MCP is available, inspect the tools exposed by the client.
-Before the first `lsp` or other root-dependent call, use an exposed fallback
-`roots` tool (`command: add`) with the workspace's absolute `file://` URI;
-clients that supply MCP Roots automatically need no fallback.
+Before the first Dart MCP call in a session, call `roots` (`command: add`) with the workspace `file://` URI.
 
-Use Dart MCP first for targeted code investigation:
+Prefer Dart MCP over text search for Dart code:
 
-- use `lsp` for workspace-symbol search, hover information, and signature
-  help;
-- use `read_package_uris` and `rip_grep_packages` when investigating package
-  dependencies;
-- use `analyze_files` for targeted Dart analysis.
+- declarations: `lsp` `resolveWorkspaceSymbol` with the exact full name (matching is fuzzy and includes dependencies and the SDK);
+- types, docs, call parameters: `lsp` `hover` or `signatureHelp` (positions are zero-based);
+- pub dependency sources: `read_package_uris`, `rip_grep_packages`;
+- diagnostics for specific files: `analyze_files`.
 
-Use DTD, hot reload or restart, and runtime-error tools when validating a
-running Flutter application. Retain the repository's CLI commands for build,
-test, generation, and any verification without an applicable MCP tool.
+Use text search for usages and implementations; `lsp` cannot find them.
 
-After changing Dart or Flutter code, check DTD for an active application. If
-one is available, connect, apply the appropriate hot reload or restart, and
-inspect runtime errors. If no application is active, record that fact and run
-the repository's normal CLI verification instead.
+After changing Dart code, look for a running app via `dtd`. If one exists, hot reload or restart it and check `get_runtime_errors`; otherwise run the repository's CLI checks.
