@@ -47,7 +47,6 @@ final _unrelatedId = _intentionId(_unrelatedIdValue);
 final _firstRelationId = _relationId(_firstRelationIdValue);
 final _secondRelationId = _relationId(_secondRelationIdValue);
 final _unrelatedRelationId = _relationId(_unrelatedRelationIdValue);
-final _workerRelationId = _relationId(_workerRelationIdValue);
 
 void main() {
   test('сохраняет создание и порядок после повторного открытия при переводе часов назад', () async {
