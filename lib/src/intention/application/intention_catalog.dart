@@ -206,6 +206,22 @@ final class IntentionSummary {
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
 
+  /// Заменяет только производный счётчик активных связей.
+  ///
+  /// Остальные данные краткого представления переносятся без изменений,
+  /// поэтому соответствие фильтру, порядок и временные метки сохраняются.
+  IntentionSummary withActiveRelationCount(int activeRelationCount) =>
+      IntentionSummary(
+        id: id,
+        title: title,
+        hasDescription: hasDescription,
+        readiness: readiness,
+        archiveState: archiveState,
+        activeRelationCount: activeRelationCount,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      );
+
   static int _requireNonNegativeCount(int value) {
     if (value < 0) {
       throw ArgumentError.value(

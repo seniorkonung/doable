@@ -9,9 +9,11 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
 final class ControlledCatalogRepository implements PersonalGraphRepository {
@@ -20,6 +22,8 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
   final commands = <IntentionCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
+  final relationCommands = <LongTermRelationCommand>[];
+  final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -41,6 +45,13 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
       ),
       ResultFailure(:final failure) => ResultFailure(failure),
     });
+  }
+
+  void completeRelationCommand(
+    int index,
+    LongTermRelationCommandResult result,
+  ) {
+    _relationCommandRequests[index].complete(result);
   }
 
   @override
@@ -73,13 +84,24 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
-    if (command is! IntentionCommand) {
-      throw UnsupportedError(
-        'Команды связей не используются в тесте каталога.',
-      );
-    }
-    return await _executeIntention(command as IntentionCommand)
-        as GraphCommandResult<TSuccess, TFailure>;
+    final result = switch (command) {
+      final IntentionCommand intentionCommand => await _executeIntention(
+        intentionCommand,
+      ),
+      final LongTermRelationCommand relationCommand =>
+        await _executeLongTermRelation(relationCommand),
+      _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
+    };
+    return result as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<LongTermRelationCommandResult> _executeLongTermRelation(
+    LongTermRelationCommand command,
+  ) {
+    relationCommands.add(command);
+    final request = Completer<LongTermRelationCommandResult>();
+    _relationCommandRequests.add(request);
+    return request.future;
   }
 
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
@@ -178,5 +200,49 @@ Intention testIntention({int index = 1, String title = 'Намерение'}) {
     archiveState: summary.archiveState,
     createdAt: summary.createdAt,
     updatedAt: summary.updatedAt,
+  );
+}
+
+RelationCounts testRelationCounts({
+  int activeNeedIncoming = 0,
+  int activeNeedOutgoing = 0,
+  int activeCanIncoming = 0,
+  int activeCanOutgoing = 0,
+  int archivedNeedIncoming = 0,
+  int archivedNeedOutgoing = 0,
+  int archivedCanIncoming = 0,
+  int archivedCanOutgoing = 0,
+}) => RelationCounts(
+  activeNeedIncoming: activeNeedIncoming,
+  activeNeedOutgoing: activeNeedOutgoing,
+  activeCanIncoming: activeCanIncoming,
+  activeCanOutgoing: activeCanOutgoing,
+  archivedNeedIncoming: archivedNeedIncoming,
+  archivedNeedOutgoing: archivedNeedOutgoing,
+  archivedCanIncoming: archivedCanIncoming,
+  archivedCanOutgoing: archivedCanOutgoing,
+);
+
+LongTermRelation testRelation({
+  required IntentionId sourceIntentionId,
+  required IntentionId relatedIntentionId,
+  int index = 1,
+}) {
+  final encodedId =
+      '018f0001-0000-7000-8000-${index.toString().padLeft(12, '0')}';
+  final id = switch (LongTermRelationId.decode(encodedId)) {
+    LongTermRelationIdDecodingSuccess(:final id) => id,
+    InvalidLongTermRelationIdDecoding() => throw StateError(
+      'Некорректный fixture ID связи.',
+    ),
+  };
+  return LongTermRelation(
+    id: id,
+    sourceIntentionId: sourceIntentionId,
+    relatedIntentionId: relatedIntentionId,
+    type: LongTermRelationType.need,
+    priority: RelationPriority.p2,
+    scope: RelationScope.active,
+    creationSequence: RelationCreationSequence(index),
   );
 }

@@ -1,8 +1,11 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,3 +69,37 @@ Future<IntentionCommandCompletion> completeCatalogCommand(
   await Future<void>.delayed(Duration.zero);
   return completion;
 }
+
+/// Проводит команду связи через coordinator до опубликованного завершения.
+///
+/// Ревизия задаётся явно: пакет подтверждённого изменения связи содержит
+/// только изменения графа без каталожной мутации.
+Future<LongTermRelationCommandCompletion> completeRelationCommand(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  CreateLongTermRelation command,
+  LongTermRelationCommandResult result,
+) async {
+  final coordinator = container.read(graphCommandCoordinatorProvider.notifier);
+  final commandIndex = repository.relationCommands.length;
+  final start = coordinator.acceptRelationCreation(
+    LongTermRelationCreationFormKey(),
+    command,
+  );
+  expect(start, isA<LongTermRelationCommandAccepted>());
+  final accepted = start as LongTermRelationCommandAccepted;
+  repository.completeRelationCommand(commandIndex, result);
+  final completion = await accepted.future;
+  await Future<void>.delayed(Duration.zero);
+  return completion;
+}
+
+/// Собирает успешный результат создания связи с абсолютными количествами.
+LongTermRelationCommandResult relationCreationSuccess({
+  required GraphRevision revision,
+  required LongTermRelationCreated success,
+}) =>
+    GraphCommandSucceeded<
+      LongTermRelationCommandSuccess,
+      LongTermRelationCommandFailure
+    >(ConfirmedGraphResult(revision: revision, value: success));
