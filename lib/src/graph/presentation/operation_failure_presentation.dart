@@ -17,7 +17,7 @@ final class OperationFailurePresentation extends ConsumerStatefulWidget {
     super.key,
   });
 
-  final IntentionInitiatorPresentationClaim? claim;
+  final GraphInitiatorPresentationClaim? claim;
   final String message;
   final Key? messageKey;
 
@@ -29,7 +29,7 @@ final class OperationFailurePresentation extends ConsumerStatefulWidget {
 final class _OperationFailureRenderer {
   const _OperationFailureRenderer(this.claim, this.message);
 
-  final IntentionInitiatorPresentationClaim? claim;
+  final GraphInitiatorPresentationClaim? claim;
   final String message;
 }
 
@@ -37,8 +37,8 @@ final class _OperationFailurePresentationState
     extends ConsumerState<OperationFailurePresentation> {
   late final GraphCommandCoordinator _coordinator;
   late _OperationFailureRenderer _renderer;
-  IntentionInitiatorPresentationClaim? _confirmedClaim;
-  IntentionInitiatorPresentationClaim? _releasedClaim;
+  GraphInitiatorPresentationClaim? _confirmedClaim;
+  GraphInitiatorPresentationClaim? _releasedClaim;
 
   @override
   void initState() {
@@ -104,7 +104,7 @@ final class _OperationFailurePresentationState
     _coordinator.confirmPresentation(claim);
   }
 
-  void _releaseIfPending(IntentionInitiatorPresentationClaim? claim) {
+  void _releaseIfPending(GraphInitiatorPresentationClaim? claim) {
     if (claim == null ||
         identical(claim, _confirmedClaim) ||
         identical(claim, _releasedClaim)) {

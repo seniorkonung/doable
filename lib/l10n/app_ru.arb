@@ -121,5 +121,14 @@
   "graphOperationDelete": "Удаление",
   "graphOperationNewIntention": "новое намерение",
   "graphOperationIntention": "намерение",
-  "graphOperationMessage": "{operation} — «{target}»: {outcome}"
+  "graphOperationMessage": "{operation} — «{target}»: {outcome}",
+  "graphOperationNewRelation": "новая связь",
+  "relationEditorCreated": "Связь создана.",
+  "relationEditorCreateInvalidInput": "Проверьте выбранные намерения и данные связи.",
+  "relationEditorCreatePairOccupied": "Связь этого направления между выбранными намерениями уже есть.",
+  "relationEditorCreateParticipantNotFound": "Одно из выбранных намерений больше не существует.",
+  "relationEditorCreateParticipantArchived": "Связать можно только активные намерения.",
+  "relationEditorCreateUnavailable": "Не удалось создать связь. Повторите попытку.",
+  "relationEditorCreateCorruption": "Сохранённые данные повреждены. Связь не создана.",
+  "relationEditorCreateUnexpected": "Не удалось создать связь из-за непредвиденной ошибки."
 }

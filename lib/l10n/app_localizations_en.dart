@@ -421,4 +421,38 @@ class AppLocalizationsEn extends AppLocalizations {
   ) {
     return '$operation — “$target”: $outcome';
   }
+
+  @override
+  String get graphOperationNewRelation => 'new relation';
+
+  @override
+  String get relationEditorCreated => 'Relation created.';
+
+  @override
+  String get relationEditorCreateInvalidInput =>
+      'Check the selected intentions and relation details.';
+
+  @override
+  String get relationEditorCreatePairOccupied =>
+      'A relation with this direction already exists between the selected intentions.';
+
+  @override
+  String get relationEditorCreateParticipantNotFound =>
+      'One of the selected intentions no longer exists.';
+
+  @override
+  String get relationEditorCreateParticipantArchived =>
+      'Only active intentions can be linked.';
+
+  @override
+  String get relationEditorCreateUnavailable =>
+      'The relation couldn’t be created. Try again.';
+
+  @override
+  String get relationEditorCreateCorruption =>
+      'Stored data is damaged. The relation wasn’t created.';
+
+  @override
+  String get relationEditorCreateUnexpected =>
+      'The relation couldn’t be created because of an unexpected error.';
 }

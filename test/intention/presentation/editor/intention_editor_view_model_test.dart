@@ -239,11 +239,8 @@ void main() {
 
     final failed = container.read(provider);
     expect(failed.operation, isA<OperationFailed<Intention>>());
-    expect(
-      failed.failurePresentation,
-      isA<IntentionInitiatorPresentationClaim>(),
-    );
-    IntentionAppPresentationClaim? fallback;
+    expect(failed.failurePresentation, isA<GraphInitiatorPresentationClaim>());
+    GraphAppPresentationClaim? fallback;
     final fallbackRequest = presenter.nextClaim()
       ..then((claim) => fallback = claim);
     await _settle(container);
@@ -285,8 +282,12 @@ void main() {
       expect(succeeded.failurePresentation, isNull);
       final claim = await presenter.nextClaim();
       expect(
-        claim!.completion.result,
-        isA<ResultSuccess<IntentionCommandSuccess>>(),
+        claim!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'результат',
+          isA<ResultSuccess<IntentionCommandSuccess>>(),
+        ),
       );
       coordinator.confirmPresentation(claim);
     },
@@ -330,7 +331,7 @@ void main() {
     expect(tokens, hasLength(2));
     expect(success!.token, same(tokens.last));
     coordinator.confirmPresentation(success);
-    IntentionAppPresentationClaim? stale;
+    GraphAppPresentationClaim? stale;
     unawaited(presenter.nextClaim().then((claim) => stale = claim));
     await _settle(container);
     expect(stale, isNull);

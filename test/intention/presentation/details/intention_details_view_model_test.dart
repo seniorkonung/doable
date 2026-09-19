@@ -539,7 +539,7 @@ void main() {
       const ResultFailure(IntentionUnavailableFailure()),
     );
     final claim = await presenter.nextClaim();
-    expect(claim, isA<IntentionAppPresentationClaim>());
+    expect(claim, isA<GraphAppPresentationClaim>());
     coordinator.confirmPresentation(claim!);
     await pumpEventQueue();
 
@@ -597,7 +597,7 @@ void main() {
     final shownFailure = (container.read(
       provider,
     ) as IntentionDetailsLoaded).edit!.failurePresentation;
-    expect(shownFailure, isA<IntentionInitiatorPresentationClaim>());
+    expect(shownFailure, isA<GraphInitiatorPresentationClaim>());
     coordinator.confirmPresentation(shownFailure!);
 
     details.saveChanges();
@@ -615,7 +615,7 @@ void main() {
     final successClaim = await presenter.nextClaim();
     expect(successClaim!.token, same(tokens.last));
     coordinator.confirmPresentation(successClaim);
-    IntentionAppPresentationClaim? staleFailure;
+    GraphAppPresentationClaim? staleFailure;
     unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
     await pumpEventQueue();
     expect(staleFailure, isNull);
@@ -1213,8 +1213,12 @@ void main() {
       );
       final deleteClaim = await presenter.nextClaim();
       expect(
-        deleteClaim!.completion.result,
-        isA<ResultSuccess<IntentionCommandSuccess>>(),
+        deleteClaim!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'результат',
+          isA<ResultSuccess<IntentionCommandSuccess>>(),
+        ),
       );
       coordinator.confirmPresentation(deleteClaim);
       expect(repository.detailRequests[0].cancellationCount, 1);

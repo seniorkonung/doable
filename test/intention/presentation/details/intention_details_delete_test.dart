@@ -248,7 +248,7 @@ void main() {
         final shownFailure = (container.read(
           provider,
         ) as IntentionDetailsLoaded).stateChange!.failurePresentation;
-        expect(shownFailure, isA<IntentionInitiatorPresentationClaim>());
+        expect(shownFailure, isA<GraphInitiatorPresentationClaim>());
         coordinator.confirmPresentation(shownFailure!);
 
         details.retryStateChange();
@@ -269,7 +269,7 @@ void main() {
           expect(successClaim!.token, same(tokens.last));
           coordinator.confirmPresentation(successClaim);
         }
-        IntentionAppPresentationClaim? staleFailure;
+        GraphAppPresentationClaim? staleFailure;
         unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
         await pumpEventQueue();
         expect(staleFailure, isNull);
