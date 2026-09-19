@@ -8,6 +8,7 @@ import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/intention_command.dart';
 import '../../application/intention_catalog.dart';
+import '../../application/intention_details.dart' as application;
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
@@ -35,7 +36,8 @@ final class _DetailObservationGeneration {
 }
 
 @riverpod
-Stream<Result<GraphSnapshot<Intention?>>> _intentionDetailsObservation(
+Stream<Result<GraphSnapshot<application.IntentionDetails?>>>
+_intentionDetailsObservation(
   Ref ref,
   IntentionId intentionId,
   _DetailObservationGeneration generation,
@@ -47,7 +49,9 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   late GraphCommandCoordinator _coordinator;
   late _DetailObservationGeneration _generation;
   late StreamSubscription<IntentionCommandCompletion> _completionSubscription;
-  ProviderSubscription<AsyncValue<Result<GraphSnapshot<Intention?>>>>?
+  ProviderSubscription<
+    AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
+  >?
   _observationSubscription;
   IntentionOperationToken? _activeToken;
   GraphRevision? _acceptedRevision;
@@ -193,7 +197,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     _startStateChange(stateChange.kind);
   }
 
-  AsyncValue<Result<GraphSnapshot<Intention?>>> _startObservation() {
+  AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
+  _startObservation() {
     _observationSubscription?.close();
     final generation = _generation;
     final subscription = ref.listen(
@@ -206,28 +211,37 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   void _handleObservation(
     _DetailObservationGeneration generation,
-    AsyncValue<Result<GraphSnapshot<Intention?>>> observation,
+    AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
+    observation,
   ) {
     if (!ref.mounted || _isDeleted || generation != _generation) {
       return;
     }
-    if (observation is AsyncLoading<Result<GraphSnapshot<Intention?>>> &&
+    if (observation
+            is AsyncLoading<
+              Result<GraphSnapshot<application.IntentionDetails?>>
+            > &&
         _preserveAuthoritativeStateWhileLoading) {
       return;
     }
-    if (observation is! AsyncLoading<Result<GraphSnapshot<Intention?>>>) {
+    if (observation
+        is! AsyncLoading<
+          Result<GraphSnapshot<application.IntentionDetails?>>
+        >) {
       _preserveAuthoritativeStateWhileLoading = false;
     }
     final current = state;
     final loaded = current is IntentionDetailsLoaded ? current : null;
     final hasNoConfirmedIntention = switch (observation) {
       AsyncData(
-        value: ResultSuccess(value: GraphSnapshot(value: Intention())),
+        value: ResultSuccess(
+          value: GraphSnapshot(value: application.IntentionDetails()),
+        ),
       ) =>
         false,
-      AsyncLoading<Result<GraphSnapshot<Intention?>>>() ||
-      AsyncError<Result<GraphSnapshot<Intention?>>>() ||
-      AsyncData<Result<GraphSnapshot<Intention?>>>() => true,
+      AsyncLoading<Result<GraphSnapshot<application.IntentionDetails?>>>() ||
+      AsyncError<Result<GraphSnapshot<application.IntentionDetails?>>>() ||
+      AsyncData<Result<GraphSnapshot<application.IntentionDetails?>>>() => true,
     };
     if (loaded?.edit != null && hasNoConfirmedIntention) {
       return;
@@ -264,14 +278,16 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         _preserveAuthoritativeStateWhileLoading = true;
         final current = state;
         final loaded = current is IntentionDetailsLoaded ? current : null;
-        state = IntentionDetailsLoaded(
-          intention: intention,
-          isOperationRunning: _isOperationRunning,
-          edit: loaded?.edit,
-          stateChange: identical(_activeToken, completion.token)
-              ? loaded?.stateChange
-              : null,
-        );
+        if (loaded != null) {
+          state = loaded.copyWith(
+            intention: intention,
+            isOperationRunning: _isOperationRunning,
+            stateChange: identical(_activeToken, completion.token)
+                ? loaded.stateChange
+                : null,
+            clearStateChange: !identical(_activeToken, completion.token),
+          );
+        }
         _startObservation();
       case ResultSuccess(
             value: ConfirmedGraphResult(
@@ -513,7 +529,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   bool get _isOperationRunning => _coordinator.isRunning(_intentionId);
 
   IntentionDetailsState _stateFromObservation(
-    AsyncValue<Result<GraphSnapshot<Intention?>>> observation, {
+    AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
+    observation, {
     IntentionDetailsLoaded? previousLoaded,
   }) => observation.when(
     data: (result) => _stateFromResult(
@@ -528,13 +545,15 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   );
 
   IntentionDetailsState _stateFromResult(
-    Result<GraphSnapshot<Intention?>> result,
+    Result<GraphSnapshot<application.IntentionDetails?>> result,
     bool isOperationRunning, {
     IntentionDetailsLoaded? previousLoaded,
   }) => switch (result) {
-    ResultSuccess(value: GraphSnapshot(value: final Intention intention)) =>
+    ResultSuccess(
+      value: GraphSnapshot(value: final application.IntentionDetails details),
+    ) =>
       IntentionDetailsLoaded(
-        intention: intention,
+        details: details,
         isOperationRunning: isOperationRunning,
         edit: previousLoaded?.edit,
         stateChange: previousLoaded?.stateChange,

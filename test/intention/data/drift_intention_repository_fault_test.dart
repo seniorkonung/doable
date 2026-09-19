@@ -6,9 +6,9 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -385,7 +385,10 @@ void main() {
       final detailResult = await repository.watchIntention(id).first;
 
       expect(catalogResult, isA<ResultSuccess<IntentionCatalogPage>>());
-      expect(detailResult, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+      expect(
+        detailResult,
+        isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>(),
+      );
       expect(
         failingDiagnostics.attemptedEvents.map((event) => event.runtimeType),
         [

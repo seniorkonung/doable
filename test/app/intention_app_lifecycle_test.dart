@@ -8,9 +8,11 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -490,7 +492,7 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   final pageQueries = <IntentionCatalogQuery>[];
   final detailRequests =
-      <StreamController<Result<GraphSnapshot<Intention?>>>>[];
+      <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
   final commands = <IntentionCommand>[];
   final _pages = <Completer<Result<IntentionCatalogPage>>>[];
   final _commands =
@@ -507,8 +509,16 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   }
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) {
-    final request = StreamController<Result<GraphSnapshot<Intention?>>>();
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) {
+    final request =
+        StreamController<Result<GraphSnapshot<IntentionDetails?>>>();
     detailRequests.add(request);
     return request.stream;
   }
@@ -531,7 +541,13 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   void emitDetail(int index, Intention intention) {
     detailRequests[index].add(
       ResultSuccess(
-        GraphSnapshot(value: intention, revision: _Revision(index)),
+        GraphSnapshot(
+          value: IntentionDetails(
+            intention: intention,
+            relationCounts: _zeroRelationCounts,
+          ),
+          revision: _Revision(index),
+        ),
       ),
     );
   }
@@ -596,8 +612,20 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   hasDescription: intention.description != null,
   readiness: intention.readiness,
   archiveState: intention.archiveState,
+  activeRelationCount: 0,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
+);
+
+final _zeroRelationCounts = RelationCounts(
+  activeNeedIncoming: 0,
+  activeNeedOutgoing: 0,
+  activeCanIncoming: 0,
+  activeCanOutgoing: 0,
+  archivedNeedIncoming: 0,
+  archivedNeedOutgoing: 0,
+  archivedCanIncoming: 0,
+  archivedCanOutgoing: 0,
 );
 
 Result<ConfirmedGraphResult<IntentionCommandSuccess>> _saved(

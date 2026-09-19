@@ -6,14 +6,18 @@ import '../../data/local/sqlite_failure_classifier.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
+import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/application/title_search_key.dart';
 import '../../intention/domain/intention.dart' as domain;
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
+import '../../long_term_relation/application/relation_counts.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../application/graph_change.dart';
 import '../application/graph_revision.dart';
 import '../application/personal_graph_repository.dart';
+import 'drift_relation_count_aggregates.dart';
 
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -37,6 +41,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
+
+  DriftRelationCountAggregates get _relationCountAggregates =>
+      DriftRelationCountAggregates(_database);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -74,9 +81,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           null => await _database.transaction(
             () => _readFirstCatalogPage(query),
           ),
-          _DriftIntentionCatalogCursor() => await _readCatalogContinuationPage(
-            query,
-            cursor,
+          _DriftIntentionCatalogCursor() => await _database.transaction(
+            () => _readCatalogContinuationPage(query, cursor),
           ),
           _ => throw StateError('Недопустимый cursor каталога.'),
         },
@@ -104,7 +110,53 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   }
 
   @override
-  Stream<Result<GraphSnapshot<domain.Intention?>>> watchIntention(
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    _recordDiagnostics(
+      const RelationCountsReadDiagnosticsEvent(status: DiagnosticsStarted()),
+    );
+
+    try {
+      final snapshot = await _sequencer.run(
+        () => _database.transaction(() async {
+          final exists = await _database
+              .customSelect(
+                'SELECT 1 FROM intentions WHERE id = ?',
+                variables: [Variable<String>(intentionId.toCanonicalString())],
+                readsFrom: {_database.intentions},
+              )
+              .getSingleOrNull();
+          if (exists == null) throw const _IntentionNotFound();
+          return GraphSnapshot(
+            value: await _readVerifiedRelationCounts(intentionId),
+            revision: _currentRevision,
+          );
+        }),
+      );
+      _recordDiagnostics(
+        RelationCountsReadDiagnosticsEvent(
+          status: DiagnosticsSucceeded(stopwatch.elapsed),
+        ),
+      );
+      return ResultSuccess(snapshot);
+    } on Object catch (error) {
+      final failure = _classifyRelationCountsReadFailure(error);
+      _recordDiagnostics(
+        RelationCountsReadDiagnosticsEvent(
+          status: DiagnosticsFailed(
+            duration: stopwatch.elapsed,
+            code: _diagnosticsFailureCode(failure),
+          ),
+        ),
+      );
+      return ResultFailure(failure);
+    }
+  }
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) async* {
     final stopwatch = Stopwatch()..start();
@@ -159,7 +211,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     }
   }
 
-  Future<GraphSnapshot<domain.Intention?>> _readIntentionSnapshot(
+  Future<GraphSnapshot<IntentionDetails?>> _readIntentionSnapshot(
     IntentionId id,
   ) => _sequencer.run(
     () => _database.transaction(() async {
@@ -181,12 +233,26 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
             readsFrom: {_database.intentions},
           )
           .getSingleOrNull();
+      if (row == null) {
+        return GraphSnapshot(value: null, revision: _currentRevision);
+      }
       return GraphSnapshot(
-        value: row == null ? null : _rehydrateDetailRow(row),
+        value: IntentionDetails(
+          intention: _rehydrateDetailRow(row),
+          relationCounts: await _readVerifiedRelationCounts(id),
+        ),
         revision: _currentRevision,
       );
     }),
   );
+
+  Future<RelationCounts> _readVerifiedRelationCounts(IntentionId id) async {
+    final aggregate = (await _relationCountAggregates.read([id]))[id];
+    if (aggregate == null || aggregate.hasIntegrityViolation) {
+      throw const _StoredIntentionCorruption();
+    }
+    return aggregate.counts;
+  }
 
   @override
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
@@ -228,7 +294,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         final value = committed.toSuccess(revision);
         final result = ConfirmedGraphResult(revision: revision, value: value);
         if (committed.didMutate) {
-          _notifyIntentionWatchers(committed.intentionId);
+          _notifyIntentionWatchersFor(value.changes);
         }
         return result;
       });
@@ -266,6 +332,26 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     }
   }
 
+  void _notifyIntentionWatchersFor(Iterable<GraphChange> changes) {
+    final affected = <IntentionId>{};
+    for (final change in changes) {
+      switch (change) {
+        case IntentionRelationCountsChanged(:final intentionId):
+          affected.add(intentionId);
+        case IntentionCatalogMutation(:final before, :final after):
+          final beforeId = before?.summary.id;
+          final afterId = after?.summary.id;
+          if (beforeId != null) affected.add(beforeId);
+          if (afterId != null) affected.add(afterId);
+        case GraphChange():
+          break;
+      }
+    }
+    for (final id in affected) {
+      _notifyIntentionWatchers(id);
+    }
+  }
+
   Future<_CommittedIntentionCommand> _createIntention(
     CreateIntention command,
   ) async {
@@ -300,9 +386,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         );
     final stored = await _readCommandSnapshot(intention.id);
     if (stored == null) throw const _StoredIntentionCorruption();
+    final counts = await _readVerifiedRelationCounts(intention.id);
     return _CommittedIntentionCreated(
       intention: _rehydrateStored(stored.detail),
-      after: _catalogEntrySnapshot(stored),
+      after: _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -318,7 +405,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     if (storedBefore == null) throw const _IntentionNotFound();
 
     final existing = _rehydrateStored(storedBefore.detail);
-    final before = _catalogEntrySnapshot(storedBefore);
+    final counts = await _readVerifiedRelationCounts(command.id);
+    final before = _catalogEntrySnapshot(storedBefore, counts);
     if (existing.title == title && existing.description == description) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -346,7 +434,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored),
+      after: _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -358,7 +446,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     if (storedBefore == null) throw const _IntentionNotFound();
 
     final existing = _rehydrateStored(storedBefore.detail);
-    final before = _catalogEntrySnapshot(storedBefore);
+    final counts = await _readVerifiedRelationCounts(id);
+    final before = _catalogEntrySnapshot(storedBefore, counts);
     if (existing.readiness == readiness) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -385,7 +474,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored),
+      after: _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -397,7 +486,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     if (storedBefore == null) throw const _IntentionNotFound();
 
     final existing = _rehydrateStored(storedBefore.detail);
-    final before = _catalogEntrySnapshot(storedBefore);
+    final counts = await _readVerifiedRelationCounts(id);
+    final before = _catalogEntrySnapshot(storedBefore, counts);
     if (existing.archiveState == archiveState) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -426,14 +516,15 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored),
+      after: _catalogEntrySnapshot(stored, counts),
     );
   }
 
   Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
     final storedBefore = await _readCommandSnapshot(id);
     if (storedBefore == null) throw const _IntentionNotFound();
-    final before = _catalogEntrySnapshot(storedBefore);
+    final counts = await _readVerifiedRelationCounts(id);
+    final before = _catalogEntrySnapshot(storedBefore, counts);
     final deletedRows = await (_database.delete(
       _database.intentions,
     )..where((row) => row.id.equals(id.toCanonicalString()))).go();
@@ -493,8 +584,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       ])
       ..limit(query.pageSize + 1);
     final rows = await rowsQuery.get();
-    final summaries = [for (final row in rows) _rehydrateSummary(row)];
-    final items = summaries.take(query.pageSize).toList(growable: false);
+    final items = await _readCatalogItems(rows, query.pageSize);
     final hasNextPage = rows.length > query.pageSize;
 
     return IntentionCatalogFirstPage(
@@ -527,8 +617,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       ])
       ..limit(query.pageSize + 1);
     final rows = await rowsQuery.get();
-    final summaries = [for (final row in rows) _rehydrateSummary(row)];
-    final items = summaries.take(query.pageSize).toList(growable: false);
+    final items = await _readCatalogItems(rows, query.pageSize);
     final hasNextPage = rows.length > query.pageSize;
 
     return IntentionCatalogContinuationPage(
@@ -593,12 +682,41 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
             ));
   }
 
-  IntentionSummary _rehydrateSummary(TypedResult row) {
+  Future<List<IntentionSummary>> _readCatalogItems(
+    List<TypedResult> rows,
+    int pageSize,
+  ) async {
+    final validatedRows = [for (final row in rows) _validateCatalogRow(row)];
+    final itemRows = validatedRows.take(pageSize).toList(growable: false);
+    final intentionIds = [for (final row in itemRows) row.intentionId];
+    final aggregates = await _relationCountAggregates.read(intentionIds);
+    return [
+      for (var index = 0; index < itemRows.length; index++)
+        _rehydrateSummary(
+          itemRows[index],
+          _requireValidAggregate(aggregates[intentionIds[index]]),
+        ),
+    ];
+  }
+
+  RelationCounts _requireValidAggregate(RelationCountAggregate? aggregate) {
+    if (aggregate == null || aggregate.hasIntegrityViolation) {
+      throw const _StoredIntentionCorruption();
+    }
+    return aggregate.counts;
+  }
+
+  IntentionId _decodeStoredIntentionId(String value) =>
+      switch (IntentionId.decode(value)) {
+        IntentionIdDecodingSuccess(:final id) => id,
+        InvalidIntentionIdDecoding() =>
+          throw const _StoredIntentionCorruption(),
+      };
+
+  ({IntentionId intentionId, _StoredIntentionDetail stored})
+  _validateCatalogRow(TypedResult row) {
     final stored = _StoredIntentionDetail.fromCatalogRow(row);
-    final intentionId = switch (IntentionId.decode(stored.id)) {
-      IntentionIdDecodingSuccess(:final id) => id,
-      InvalidIntentionIdDecoding() => throw const _StoredIntentionCorruption(),
-    };
+    final intentionId = _decodeStoredIntentionId(stored.id);
 
     try {
       final normalizedTitle = IntentionText.normalizeTitle(stored.title);
@@ -609,15 +727,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           normalizedDescription != stored.description) {
         throw const _StoredIntentionCorruption();
       }
-      return IntentionSummary(
-        id: intentionId,
-        title: stored.title,
-        hasDescription: normalizedDescription != null,
-        readiness: stored.readiness,
-        archiveState: stored.archiveState,
-        createdAt: stored.createdAt,
-        updatedAt: stored.updatedAt,
-      );
+      return (intentionId: intentionId, stored: stored);
     } on Object catch (error) {
       if (error is IntentionTextValidationException ||
           error is ArgumentError ||
@@ -627,6 +737,20 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       rethrow;
     }
   }
+
+  IntentionSummary _rehydrateSummary(
+    ({IntentionId intentionId, _StoredIntentionDetail stored}) row,
+    RelationCounts relationCounts,
+  ) => IntentionSummary(
+    id: row.intentionId,
+    title: row.stored.title,
+    hasDescription: row.stored.description != null,
+    readiness: row.stored.readiness,
+    archiveState: row.stored.archiveState,
+    activeRelationCount: relationCounts.active,
+    createdAt: row.stored.createdAt,
+    updatedAt: row.stored.updatedAt,
+  );
 
   IntentionCatalogCursor _cursorAt(
     IntentionCatalogQuery query,
@@ -656,6 +780,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   IntentionCatalogEntrySnapshot _catalogEntrySnapshot(
     _StoredIntentionCommandSnapshot stored,
+    RelationCounts relationCounts,
   ) {
     final intention = _rehydrateStored(stored.detail);
     return _DriftIntentionCatalogEntrySnapshot(
@@ -665,6 +790,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         hasDescription: intention.description != null,
         readiness: intention.readiness,
         archiveState: intention.archiveState,
+        activeRelationCount: relationCounts.active,
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
       ),
@@ -1097,6 +1223,13 @@ IntentionFailure _classifyDetailReadFailure(Object error) {
 
 IntentionFailure _classifyCatalogReadFailure(Object error) =>
     _classifyDetailReadFailure(error);
+
+IntentionFailure _classifyRelationCountsReadFailure(Object error) {
+  if (error is _IntentionNotFound) {
+    return const IntentionNotFoundFailure();
+  }
+  return _classifyDetailReadFailure(error);
+}
 
 IntentionFailure _classifyCommandFailure(
   Object error,

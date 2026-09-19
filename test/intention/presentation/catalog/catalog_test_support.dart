@@ -4,9 +4,11 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 
 final class ControlledCatalogRepository implements PersonalGraphRepository {
   final queries = <IntentionCatalogQuery>[];
@@ -48,6 +50,11 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
   }
 
   @override
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) => throw UnsupportedError('Сводка не используется в тесте каталога.');
+
+  @override
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
     IntentionCommand command,
   ) {
@@ -59,8 +66,9 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
   }
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
-      throw UnsupportedError('Подробное чтение не используется в тесте.');
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) => throw UnsupportedError('Подробное чтение не используется в тесте.');
 }
 
 final class TestCatalogCursor implements IntentionCatalogCursor {
@@ -104,6 +112,7 @@ IntentionSummary testSummary({
   bool hasDescription = false,
   IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
+  int activeRelationCount = 0,
   int? createdDay,
   int? updatedDay,
 }) {
@@ -127,6 +136,7 @@ IntentionSummary testSummary({
     hasDescription: hasDescription,
     readiness: readiness,
     archiveState: archiveState,
+    activeRelationCount: activeRelationCount,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );
