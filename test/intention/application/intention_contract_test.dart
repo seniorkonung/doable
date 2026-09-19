@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -799,9 +800,17 @@ IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
 
 final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) async => const ResultFailure(IntentionUnavailableFailure());
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! IntentionCommand) {
+      throw UnsupportedError('Команды связей не используются в этих тестах.');
+    }
+    return const ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>(
+      IntentionUnavailableFailure(),
+    ) as GraphCommandResult<TSuccess, TFailure>;
+  }
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

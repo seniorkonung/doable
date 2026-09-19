@@ -4,6 +4,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -524,9 +525,19 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   }
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) {
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! IntentionCommand) {
+      throw UnsupportedError('Команды связей не используются в этих тестах.');
+    }
+    return await _executeIntention(command as IntentionCommand)
+        as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) {
     commands.add(command);
     final request =
         Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();

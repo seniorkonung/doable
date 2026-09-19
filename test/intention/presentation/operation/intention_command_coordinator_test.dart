@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -787,9 +788,19 @@ final class _ControlledGraphRepository implements PersonalGraphRepository {
   Object? nextError;
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) {
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! IntentionCommand) {
+      throw UnsupportedError('Команды связей не используются в этих тестах.');
+    }
+    return await _executeIntention(command as IntentionCommand)
+        as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) {
     commands.add(command);
     final error = nextError;
     if (error != null) {
@@ -838,9 +849,19 @@ final class _ControlledPersonalGraphRepository
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) {
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! IntentionCommand) {
+      throw UnsupportedError('Команды связей не используются в этих тестах.');
+    }
+    return await _executeIntention(command as IntentionCommand)
+        as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) {
     commands.add(command);
     final result =
         Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();

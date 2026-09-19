@@ -8,6 +8,7 @@ import '../graph/application/personal_graph_repository.dart';
 import '../graph/application/personal_graph_repository_provider.dart';
 import '../graph/data/drift_personal_graph_repository.dart';
 import '../intention/application/intention_id_generator.dart';
+import '../long_term_relation/application/long_term_relation_id_generator.dart';
 import '../shared/diagnostics/developer_diagnostics_sink.dart';
 import '../shared/diagnostics/diagnostics_sink.dart';
 import 'routing/app_router_provider.dart';
@@ -61,6 +62,7 @@ final class AppRuntime {
           UuidV7IntentionIdGenerator(),
           () => DateTime.now().toUtc(),
           diagnosticsSink,
+          relationIdGenerator: UuidV7LongTermRelationIdGenerator(),
         );
     return AppRuntime._(
       LocalDataBootstrap(

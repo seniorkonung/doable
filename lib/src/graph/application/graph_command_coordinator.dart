@@ -194,12 +194,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         >
       >{};
   final _inFlight = <Future<void>>{};
-  late GraphCommandRepository<
-    IntentionCommand,
-    IntentionCommandSuccess,
-    IntentionFailure
-  >
-  _repository;
+  late GraphCommandRepository _repository;
   Future<void> _publicationTail = Future<void>.value();
   var _isDraining = false;
   Completer<void>? _shutdownCompleter;
