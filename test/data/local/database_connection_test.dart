@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
+import 'package:doable/src/data/local/sqlite_relation_integrity_functions.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/services.dart';
@@ -83,7 +84,7 @@ void main() {
     },
   );
 
-  test('регистрирует search-key function на production, in-memory и file-backed соединениях', () async {
+  test('регистрирует обязательные функции на production, in-memory и file-backed соединениях', () async {
     final connections = <ConfiguredLocalDatabaseConnection Function()>[
       openAndroidProductionDatabaseConnection,
       openInMemoryLocalDatabase,
@@ -103,10 +104,44 @@ void main() {
             .getSingle();
 
         expect(row.read<String>('search_key'), titleSearchKey('Straße'));
+        await _expectRelationIntegrityFunctions(database);
       } finally {
         await database.close();
       }
     }
+  });
+
+  test('регистрирует функции проверки связей на isolate-соединении', () async {
+    final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
+    addTearDown(isolate.shutdownAll);
+    final database = AppDatabase(await isolate.connect());
+    addTearDown(database.close);
+
+    await _expectRelationIntegrityFunctions(database);
+  });
+
+  test('открытие соединения не запускает аудит всего графа', () async {
+    final trace = _StatementTrace();
+    final database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        trace,
+      ),
+    );
+    addTearDown(database.close);
+
+    await database.open();
+
+    expect(
+      trace.statements.where(
+        (statement) =>
+            statement.operation == LocalDatabaseSqlOperation.select &&
+            statement.statements.any(
+              (sql) => sql.contains('FROM long_term_relations'),
+            ),
+      ),
+      isEmpty,
+    );
   });
 
   test('объединяет search-key setup с fixture setup', () async {
@@ -127,10 +162,10 @@ void main() {
   });
 
   test(
-    'канонический search-key setup заменяет fixture-реализацию с тем же именем',
+    'канонический setup заменяет fixture-функции с теми же именами',
     () async {
       final database = AppDatabase(
-        openInMemoryLocalDatabase(setup: _replaceSearchKeyFunction),
+        openInMemoryLocalDatabase(setup: _replaceCanonicalFunctions),
       );
       addTearDown(database.close);
 
@@ -141,8 +176,41 @@ void main() {
           .getSingle();
 
       expect(searchKey.read<String>('search_key'), 'strasse');
+      await _expectRelationIntegrityFunctions(database);
     },
   );
+}
+
+Future<void> _expectRelationIntegrityFunctions(AppDatabase database) async {
+  final row = await database
+      .customSelect(
+        '''
+          SELECT
+            $relationIdIntegrityFunctionName(CAST(? AS BLOB)) AS relation_id,
+            $intentionIdIntegrityFunctionName(CAST(? AS BLOB)) AS intention_id,
+            $relationDescriptionIntegrityFunctionName(
+              CAST(? AS BLOB)
+            ) AS description,
+            $relationIdIntegrityFunctionName(
+              CAST('не-uuid' AS BLOB)
+            ) AS invalid_relation_id,
+            $relationDescriptionIntegrityFunctionName(
+              x'80'
+            ) AS malformed_description
+        ''',
+        variables: [
+          Variable.withString('018f0b5d-6b2e-7c80-8000-000000000001'),
+          Variable.withString('018f0b5d-6b2e-7c80-8000-000000000002'),
+          Variable.withString('Допустимое описание'),
+        ],
+      )
+      .getSingle();
+
+  expect(row.read<int>('relation_id'), 1);
+  expect(row.read<int>('intention_id'), 1);
+  expect(row.read<int>('description'), 1);
+  expect(row.read<int>('invalid_relation_id'), 0);
+  expect(row.read<int>('malformed_description'), 0);
 }
 
 void _registerFixtureFunction(sqlite.Database database) {
@@ -153,12 +221,37 @@ void _registerFixtureFunction(sqlite.Database database) {
   );
 }
 
-void _replaceSearchKeyFunction(sqlite.Database database) {
-  database.createFunction(
-    functionName: doableTitleSearchKeyFunctionName,
-    argumentCount: const sqlite.AllowedArgumentCount(1),
-    deterministic: true,
-    directOnly: false,
-    function: (_) => 'fixture-implementation',
-  );
+void _replaceCanonicalFunctions(sqlite.Database database) {
+  database
+    ..createFunction(
+      functionName: doableTitleSearchKeyFunctionName,
+      argumentCount: const sqlite.AllowedArgumentCount(1),
+      deterministic: true,
+      directOnly: false,
+      function: (_) => 'fixture-implementation',
+    )
+    ..createFunction(
+      functionName: relationIdIntegrityFunctionName,
+      argumentCount: const sqlite.AllowedArgumentCount(1),
+      function: (_) => 1,
+    )
+    ..createFunction(
+      functionName: intentionIdIntegrityFunctionName,
+      argumentCount: const sqlite.AllowedArgumentCount(1),
+      function: (_) => 1,
+    )
+    ..createFunction(
+      functionName: relationDescriptionIntegrityFunctionName,
+      argumentCount: const sqlite.AllowedArgumentCount(1),
+      function: (_) => 1,
+    );
+}
+
+final class _StatementTrace extends LocalDatabaseConnectionObserver {
+  final statements = <LocalDatabaseSqlStatement>[];
+
+  @override
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    statements.add(statement);
+  }
 }
