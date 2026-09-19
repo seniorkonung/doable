@@ -346,7 +346,7 @@ final class _StoredRelationGroupRow {
     required this.type,
     required this.priority,
     required this.scope,
-    required this.hasDescription,
+    required this.description,
   });
 
   factory _StoredRelationGroupRow.fromRawRow(QueryRow row) {
@@ -381,9 +381,11 @@ final class _StoredRelationGroupRow {
     if (description != null && description is! String) {
       throw const _StoredIntentionCorruption();
     }
+    LongTermRelationDescription? verifiedDescription;
     if (description case final String value) {
       try {
-        if (LongTermRelationDescription.fromInput(value) == null) {
+        verifiedDescription = LongTermRelationDescription.fromInput(value);
+        if (verifiedDescription == null) {
           throw const _StoredIntentionCorruption();
         }
       } on LongTermRelationTextValidationException {
@@ -399,7 +401,7 @@ final class _StoredRelationGroupRow {
       type: type,
       priority: priority,
       scope: scope,
-      hasDescription: description != null,
+      description: verifiedDescription,
     );
   }
 
@@ -410,7 +412,9 @@ final class _StoredRelationGroupRow {
   final relation_domain.LongTermRelationType type;
   final relation_domain.RelationPriority priority;
   final relation_domain.RelationScope scope;
-  final bool hasDescription;
+  final LongTermRelationDescription? description;
+
+  bool get hasDescription => description != null;
 
   relation_domain.LongTermRelation toDomain() {
     try {

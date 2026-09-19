@@ -11,6 +11,8 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
 final class ControlledCatalogRepository implements PersonalGraphRepository {
   final queries = <IntentionCatalogQuery>[];
@@ -61,6 +63,10 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
     RelationGroupQuery query,
   ) =>
       throw UnsupportedError('Группы связей не используются в тесте каталога.');
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      throw UnsupportedError('Связи не наблюдаются в тесте каталога.');
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

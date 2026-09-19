@@ -63,6 +63,10 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
       'isContinuation': isContinuation,
       'requiresNewSnapshot': requiresNewSnapshot,
     },
+  LongTermRelationDetailReadDiagnosticsEvent() => {
+    'operation': 'longTermRelationDetailRead',
+    ..._encodeStatus(event.status),
+  },
   IntentionCommandDiagnosticsEvent(:final commandType) => {
     'operation': 'intentionCommand',
     ..._encodeStatus(event.status),

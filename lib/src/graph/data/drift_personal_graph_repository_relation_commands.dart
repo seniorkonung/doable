@@ -18,7 +18,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         final revision = _currentRevision;
         final value = committed.toSuccess(revision);
         final result = ConfirmedGraphResult(revision: revision, value: value);
-        _notifyIntentionWatchersFor(value.changes);
+        _notifyGraphWatchersFor(value.changes);
         return result;
       });
       _recordDiagnostics(
