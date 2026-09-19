@@ -175,7 +175,7 @@ dependencies:
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: 04c5be5a5e9f3b5efde5d3d368c39564fbde126b
+  resolved_commit: 85d9757f4f8928a758e53898c77ec3e7f64fa7b5
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
@@ -185,7 +185,6 @@ dependencies:
   - .agents/skills/c4-diagrams/templates.md
   - .agents/skills/change-summary
   - .agents/skills/change-summary/SKILL.md
-  - .agents/skills/change-summary/agents/openai.yaml
   - .agents/skills/code-review-and-quality
   - .agents/skills/code-review-and-quality/SKILL.md
   - .agents/skills/discussion
@@ -239,9 +238,6 @@ dependencies:
   - .agents/skills/openspec-review-implementation/tests/fixtures/valid-review.json
   - .agents/skills/openspec-review-implementation/tests/fixtures/valid-review.md
   - .agents/skills/openspec-review-implementation/tests/validate-review.test.mjs
-  - .agents/skills/openspec-task-deliberation
-  - .agents/skills/openspec-task-deliberation/SKILL.md
-  - .agents/skills/openspec-task-deliberation/references/evaluation-cases.md
   - .agents/skills/phased-planning
   - .agents/skills/phased-planning/SKILL.md
   - .agents/skills/planning-and-task-breakdown
@@ -252,6 +248,8 @@ dependencies:
   - .agents/skills/shipping-and-launch/SKILL.md
   - .agents/skills/test-driven-development
   - .agents/skills/test-driven-development/SKILL.md
+  - .agents/skills/top-down-contract-development
+  - .agents/skills/top-down-contract-development/SKILL.md
   - .claude/agents/code-reviewer.md
   - .claude/agents/security-auditor.md
   - .claude/agents/test-engineer.md
@@ -263,7 +261,6 @@ dependencies:
   - .claude/skills/c4-diagrams/templates.md
   - .claude/skills/change-summary
   - .claude/skills/change-summary/SKILL.md
-  - .claude/skills/change-summary/agents/openai.yaml
   - .claude/skills/code-review-and-quality
   - .claude/skills/code-review-and-quality/SKILL.md
   - .claude/skills/discussion
@@ -317,9 +314,6 @@ dependencies:
   - .claude/skills/openspec-review-implementation/tests/fixtures/valid-review.json
   - .claude/skills/openspec-review-implementation/tests/fixtures/valid-review.md
   - .claude/skills/openspec-review-implementation/tests/validate-review.test.mjs
-  - .claude/skills/openspec-task-deliberation
-  - .claude/skills/openspec-task-deliberation/SKILL.md
-  - .claude/skills/openspec-task-deliberation/references/evaluation-cases.md
   - .claude/skills/phased-planning
   - .claude/skills/phased-planning/SKILL.md
   - .claude/skills/planning-and-task-breakdown
@@ -330,14 +324,15 @@ dependencies:
   - .claude/skills/shipping-and-launch/SKILL.md
   - .claude/skills/test-driven-development
   - .claude/skills/test-driven-development/SKILL.md
+  - .claude/skills/top-down-contract-development
+  - .claude/skills/top-down-contract-development/SKILL.md
   - .codex/agents/code-reviewer.toml
   - .codex/agents/security-auditor.toml
   - .codex/agents/test-engineer.toml
   deployed_file_hashes:
     .agents/skills/c4-diagrams/SKILL.md: sha256:1e7d597f24a015fc44cb9052fc0f8b665d136bd5c2f3a60a242adfedd98d17b4
     .agents/skills/c4-diagrams/templates.md: sha256:d5f6096cccd57d0d6b36adabd7d027c41b71961304db825dba8ea53ddbebc5a0
-    .agents/skills/change-summary/SKILL.md: sha256:cf4f96ab7bca9e995deeb88a8bff0a8e8d9cadf4fe775a451731f359445a7276
-    .agents/skills/change-summary/agents/openai.yaml: sha256:a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94
+    .agents/skills/change-summary/SKILL.md: sha256:855ac5dae361704b0af7471cf5a6c50519b338f95d49d7f83c9c1ccf1cf7cfc4
     .agents/skills/code-review-and-quality/SKILL.md: sha256:0ff65150158adfd41844534948cbe4271e6a7a3aa463700a8d99caf550e38223
     .agents/skills/discussion/SKILL.md: sha256:e9c3423b73b4d572af3d95c8820142e18bb44e226adc92f1c297905e9835ca9a
     .agents/skills/discussion/references/document-format.md: sha256:9012f228e7a7759f14176e38b1b39946a3d810693a4a96319934b93ad71e80ac
@@ -366,28 +361,27 @@ dependencies:
     .agents/skills/openspec-review-change/tests/fixtures/valid-review.json: sha256:8cc5e3b745df47c6bc605a2d6b9109bfdf22f72e174580f542b5b47e8a83cbef
     .agents/skills/openspec-review-change/tests/fixtures/valid-review.md: sha256:0c99baf7c79aafc7eb802d86986a57c85456dcec5905fe59296ed08e660f4cf6
     .agents/skills/openspec-review-change/tests/validate-review.test.mjs: sha256:bae3725fab379e1e9966b1c4a0316097d309f5c3d1b2aabdbe3c06755f7915bd
-    .agents/skills/openspec-review-implementation/SKILL.md: sha256:be7afaaec55c391ee9d7651641430f24fe1283ed951d505b40e58b3cbe197623
-    .agents/skills/openspec-review-implementation/assets/review-template.md: sha256:36e480f4f6c6cadba1f9a31ae1650719e9d721a0e793c5c1e0aa5f21682b9539
-    .agents/skills/openspec-review-implementation/references/evaluation-cases.md: sha256:cbef4f312fa4915dfb7e6c0a7c9a0cc9e633bdaf426091555bb759fa8ff79494
+    .agents/skills/openspec-review-implementation/SKILL.md: sha256:fb4c0fd59e9c58922c0e3ea03a855b16e3db8809969692462d7da9950b754f07
+    .agents/skills/openspec-review-implementation/assets/review-template.md: sha256:66bc32cb83b50f9dd8d2282b8e80d3c196dc05337e14e9ad22d0b00eb2a5c807
+    .agents/skills/openspec-review-implementation/references/evaluation-cases.md: sha256:c5fb3341215fcc7bf4ac88d335e1680fdce6bdce501fd9f22beaefdc9dea0a87
     .agents/skills/openspec-review-implementation/references/intention-brief.md: sha256:24bfca5cc6c8e67ac0deb802958a8eba69ca1aa86d2f81ac2808815b987507c0
     .agents/skills/openspec-review-implementation/references/remediation.md: sha256:d0c49ace8d3411047b5341e73540b2ca524e82a3d98dadddf782f1d0ddd23483
-    .agents/skills/openspec-review-implementation/references/review-format.md: sha256:1537852cc8c48420b2fdeb225b62312a03b1702b90eb355c17ad3824b3790458
-    .agents/skills/openspec-review-implementation/references/review-target.md: sha256:4de64a4355b681a02136356694ba86f7b032e42ea49bc9f494b1d32c38475bbb
+    .agents/skills/openspec-review-implementation/references/review-format.md: sha256:a26428cde836084c8c7e723a9ae8c550af8f756155b84e4eef4917a4d0d4d376
+    .agents/skills/openspec-review-implementation/references/review-target.md: sha256:15f4a3e00360500e593e69c259083474697d3052363bfd102231665c62780bfd
     .agents/skills/openspec-review-implementation/references/validator-interface.md: sha256:3c1eca5422f1b2b8e7dfdafbc873f68a3171c26197c380262745efb73db1ef29
-    .agents/skills/openspec-review-implementation/scripts/discover-review-target.mjs: sha256:6485f7016aa8fe9ea57028c68317d6b6a1fdeb47b1f2e47fd9447f649bf811cf
+    .agents/skills/openspec-review-implementation/scripts/discover-review-target.mjs: sha256:b8a06b3ca2a35574661ea0cd0992c8e53245e93060226f8d3aa321b71bfbbe20
     .agents/skills/openspec-review-implementation/scripts/review-format.mjs: sha256:2d2cc9175d654bb0f9cdf7bc6f867a77829250b9a7975d8070c9f780b54a3458
     .agents/skills/openspec-review-implementation/scripts/validate-review.mjs: sha256:e9f3e9b8f2160e46fab7e6dbcdbcf63623b3d66f089a91892d29b8118100a116
-    .agents/skills/openspec-review-implementation/tests/discover-review-target.test.mjs: sha256:3b5912c2fba709e8c6c38a1ca44b589cbff723bd7e3a5dc0e3d65a69853b2918
-    .agents/skills/openspec-review-implementation/tests/fixtures/valid-review.json: sha256:e260e3a9028cf9151afc28e242e5d3e60b5d194024f34fdf82c0e50152207c2b
-    .agents/skills/openspec-review-implementation/tests/fixtures/valid-review.md: sha256:95ed714cfc1989dfca6fcdfff283c2d5f421cb212cfa3311823a609b1a264aa8
+    .agents/skills/openspec-review-implementation/tests/discover-review-target.test.mjs: sha256:b776e757673ab2d322bcfa5326909a734828eb85a182312f45b1b598edc122c1
+    .agents/skills/openspec-review-implementation/tests/fixtures/valid-review.json: sha256:380c981f061ccdd5a7f03e99be3160329c325d97b4c6cf0ed1d35a089705ed86
+    .agents/skills/openspec-review-implementation/tests/fixtures/valid-review.md: sha256:0405f65b52b9b9438a02c025db22df7c46f08ccc0ce23af6fe740342e5604612
     .agents/skills/openspec-review-implementation/tests/validate-review.test.mjs: sha256:bae3725fab379e1e9966b1c4a0316097d309f5c3d1b2aabdbe3c06755f7915bd
-    .agents/skills/openspec-task-deliberation/SKILL.md: sha256:4aa67c0a37f33f48213651fec54f7c28e31eac8ed1f7c1510ca04c8b3a417552
-    .agents/skills/openspec-task-deliberation/references/evaluation-cases.md: sha256:43689993146fba677e652a44cfabb789b3e9c37c9d66dd47849fad9859cd093f
     .agents/skills/phased-planning/SKILL.md: sha256:f6e9d5c94db8837f005182bcdc5e3d4f511bb88741cdd71829ce6aeaa0badd1c
     .agents/skills/planning-and-task-breakdown/SKILL.md: sha256:3a46c9031f2d70d5333bcd418ce835a866028e7d6abd8ed7cee621f20d6dfa72
     .agents/skills/security-and-hardening/SKILL.md: sha256:7dee4d2cc8b417b90790bf6016f74a3dcd1adcddde6e42f545a391f950778ebe
     .agents/skills/shipping-and-launch/SKILL.md: sha256:ca9216f73ac6dfd1b1104ccd7de570acc5a22e11b1bf0ad4bafde1009afc4512
     .agents/skills/test-driven-development/SKILL.md: sha256:0b3eadb3e71a64d015933f8fd41d6bff678b2ee174d638b0bbe79d8f54513860
+    .agents/skills/top-down-contract-development/SKILL.md: sha256:04e83fa11298e3b59285a24c7b1f6fd996bf8db27e21e826062b65c26d349a56
     .claude/agents/code-reviewer.md: sha256:8efeec034eb299bf63eacda4b9aa7126dfaa61d122b807fbb679502151567d1f
     .claude/agents/security-auditor.md: sha256:e9d51b87b02eae4e7af55a549fcb8fcc1289dce81a39806d2739d2d5c3f867db
     .claude/agents/test-engineer.md: sha256:7fa49278ec977731a18f7ce743561a6d62945db0be15578e748945cf19ae822a
@@ -396,8 +390,7 @@ dependencies:
     .claude/rules/production-readiness.md: sha256:1f8352e4fad91fc1f1bee955d70521636e1da6453a96022fb3a8939cc6646e55
     .claude/skills/c4-diagrams/SKILL.md: sha256:1e7d597f24a015fc44cb9052fc0f8b665d136bd5c2f3a60a242adfedd98d17b4
     .claude/skills/c4-diagrams/templates.md: sha256:d5f6096cccd57d0d6b36adabd7d027c41b71961304db825dba8ea53ddbebc5a0
-    .claude/skills/change-summary/SKILL.md: sha256:cf4f96ab7bca9e995deeb88a8bff0a8e8d9cadf4fe775a451731f359445a7276
-    .claude/skills/change-summary/agents/openai.yaml: sha256:a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94
+    .claude/skills/change-summary/SKILL.md: sha256:855ac5dae361704b0af7471cf5a6c50519b338f95d49d7f83c9c1ccf1cf7cfc4
     .claude/skills/code-review-and-quality/SKILL.md: sha256:0ff65150158adfd41844534948cbe4271e6a7a3aa463700a8d99caf550e38223
     .claude/skills/discussion/SKILL.md: sha256:e9c3423b73b4d572af3d95c8820142e18bb44e226adc92f1c297905e9835ca9a
     .claude/skills/discussion/references/document-format.md: sha256:9012f228e7a7759f14176e38b1b39946a3d810693a4a96319934b93ad71e80ac
@@ -426,32 +419,31 @@ dependencies:
     .claude/skills/openspec-review-change/tests/fixtures/valid-review.json: sha256:8cc5e3b745df47c6bc605a2d6b9109bfdf22f72e174580f542b5b47e8a83cbef
     .claude/skills/openspec-review-change/tests/fixtures/valid-review.md: sha256:0c99baf7c79aafc7eb802d86986a57c85456dcec5905fe59296ed08e660f4cf6
     .claude/skills/openspec-review-change/tests/validate-review.test.mjs: sha256:bae3725fab379e1e9966b1c4a0316097d309f5c3d1b2aabdbe3c06755f7915bd
-    .claude/skills/openspec-review-implementation/SKILL.md: sha256:be7afaaec55c391ee9d7651641430f24fe1283ed951d505b40e58b3cbe197623
-    .claude/skills/openspec-review-implementation/assets/review-template.md: sha256:36e480f4f6c6cadba1f9a31ae1650719e9d721a0e793c5c1e0aa5f21682b9539
-    .claude/skills/openspec-review-implementation/references/evaluation-cases.md: sha256:cbef4f312fa4915dfb7e6c0a7c9a0cc9e633bdaf426091555bb759fa8ff79494
+    .claude/skills/openspec-review-implementation/SKILL.md: sha256:fb4c0fd59e9c58922c0e3ea03a855b16e3db8809969692462d7da9950b754f07
+    .claude/skills/openspec-review-implementation/assets/review-template.md: sha256:66bc32cb83b50f9dd8d2282b8e80d3c196dc05337e14e9ad22d0b00eb2a5c807
+    .claude/skills/openspec-review-implementation/references/evaluation-cases.md: sha256:c5fb3341215fcc7bf4ac88d335e1680fdce6bdce501fd9f22beaefdc9dea0a87
     .claude/skills/openspec-review-implementation/references/intention-brief.md: sha256:24bfca5cc6c8e67ac0deb802958a8eba69ca1aa86d2f81ac2808815b987507c0
     .claude/skills/openspec-review-implementation/references/remediation.md: sha256:d0c49ace8d3411047b5341e73540b2ca524e82a3d98dadddf782f1d0ddd23483
-    .claude/skills/openspec-review-implementation/references/review-format.md: sha256:1537852cc8c48420b2fdeb225b62312a03b1702b90eb355c17ad3824b3790458
-    .claude/skills/openspec-review-implementation/references/review-target.md: sha256:4de64a4355b681a02136356694ba86f7b032e42ea49bc9f494b1d32c38475bbb
+    .claude/skills/openspec-review-implementation/references/review-format.md: sha256:a26428cde836084c8c7e723a9ae8c550af8f756155b84e4eef4917a4d0d4d376
+    .claude/skills/openspec-review-implementation/references/review-target.md: sha256:15f4a3e00360500e593e69c259083474697d3052363bfd102231665c62780bfd
     .claude/skills/openspec-review-implementation/references/validator-interface.md: sha256:3c1eca5422f1b2b8e7dfdafbc873f68a3171c26197c380262745efb73db1ef29
-    .claude/skills/openspec-review-implementation/scripts/discover-review-target.mjs: sha256:6485f7016aa8fe9ea57028c68317d6b6a1fdeb47b1f2e47fd9447f649bf811cf
+    .claude/skills/openspec-review-implementation/scripts/discover-review-target.mjs: sha256:b8a06b3ca2a35574661ea0cd0992c8e53245e93060226f8d3aa321b71bfbbe20
     .claude/skills/openspec-review-implementation/scripts/review-format.mjs: sha256:2d2cc9175d654bb0f9cdf7bc6f867a77829250b9a7975d8070c9f780b54a3458
     .claude/skills/openspec-review-implementation/scripts/validate-review.mjs: sha256:e9f3e9b8f2160e46fab7e6dbcdbcf63623b3d66f089a91892d29b8118100a116
-    .claude/skills/openspec-review-implementation/tests/discover-review-target.test.mjs: sha256:3b5912c2fba709e8c6c38a1ca44b589cbff723bd7e3a5dc0e3d65a69853b2918
-    .claude/skills/openspec-review-implementation/tests/fixtures/valid-review.json: sha256:e260e3a9028cf9151afc28e242e5d3e60b5d194024f34fdf82c0e50152207c2b
-    .claude/skills/openspec-review-implementation/tests/fixtures/valid-review.md: sha256:95ed714cfc1989dfca6fcdfff283c2d5f421cb212cfa3311823a609b1a264aa8
+    .claude/skills/openspec-review-implementation/tests/discover-review-target.test.mjs: sha256:b776e757673ab2d322bcfa5326909a734828eb85a182312f45b1b598edc122c1
+    .claude/skills/openspec-review-implementation/tests/fixtures/valid-review.json: sha256:380c981f061ccdd5a7f03e99be3160329c325d97b4c6cf0ed1d35a089705ed86
+    .claude/skills/openspec-review-implementation/tests/fixtures/valid-review.md: sha256:0405f65b52b9b9438a02c025db22df7c46f08ccc0ce23af6fe740342e5604612
     .claude/skills/openspec-review-implementation/tests/validate-review.test.mjs: sha256:bae3725fab379e1e9966b1c4a0316097d309f5c3d1b2aabdbe3c06755f7915bd
-    .claude/skills/openspec-task-deliberation/SKILL.md: sha256:4aa67c0a37f33f48213651fec54f7c28e31eac8ed1f7c1510ca04c8b3a417552
-    .claude/skills/openspec-task-deliberation/references/evaluation-cases.md: sha256:43689993146fba677e652a44cfabb789b3e9c37c9d66dd47849fad9859cd093f
     .claude/skills/phased-planning/SKILL.md: sha256:f6e9d5c94db8837f005182bcdc5e3d4f511bb88741cdd71829ce6aeaa0badd1c
     .claude/skills/planning-and-task-breakdown/SKILL.md: sha256:3a46c9031f2d70d5333bcd418ce835a866028e7d6abd8ed7cee621f20d6dfa72
     .claude/skills/security-and-hardening/SKILL.md: sha256:7dee4d2cc8b417b90790bf6016f74a3dcd1adcddde6e42f545a391f950778ebe
     .claude/skills/shipping-and-launch/SKILL.md: sha256:ca9216f73ac6dfd1b1104ccd7de570acc5a22e11b1bf0ad4bafde1009afc4512
     .claude/skills/test-driven-development/SKILL.md: sha256:0b3eadb3e71a64d015933f8fd41d6bff678b2ee174d638b0bbe79d8f54513860
+    .claude/skills/top-down-contract-development/SKILL.md: sha256:04e83fa11298e3b59285a24c7b1f6fd996bf8db27e21e826062b65c26d349a56
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:1a305e6bfe16ec3891b2e549644c328a9064fb5f2b94e1757b5892d81f7879f8
+  content_hash: sha256:229d534954d7339becdb7212fce868d9d8a2d07cdb1191f05e1a4de9a6371b3c
   skill_subset:
   - c4-diagrams
   - change-summary
@@ -471,6 +463,7 @@ dependencies:
   - security-and-hardening
   - shipping-and-launch
   - test-driven-development
+  - top-down-contract-development
 - repo_url: addyosmani/agent-skills
   name: code-simplification
   host: github.com
@@ -493,7 +486,7 @@ dependencies:
   content_hash: sha256:7973e746e8e2ea5004d520da970c15a106824b8d6be1bcff48908aec021f3677
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-14T06:16:54+00:00'
+  resolved_at: '2026-09-19T12:21:44+00:00'
 - repo_url: addyosmani/agent-skills
   name: debugging-and-error-recovery
   host: github.com
@@ -516,7 +509,7 @@ dependencies:
   content_hash: sha256:1a119d27e8f1d27ed6317adf3115826336491346780dcb7d7a7a7f79fe3ffe10
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-14T06:16:54+00:00'
+  resolved_at: '2026-09-19T12:21:44+00:00'
 - repo_url: addyosmani/agent-skills
   name: source-driven-development
   host: github.com
@@ -539,39 +532,7 @@ dependencies:
   content_hash: sha256:c48d3c3abb2cb8a5c4a8584ab95db64f8a0261f3acfe2cdb7b8ff88ec3d90211
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-14T06:16:54+00:00'
-- repo_url: mattpocock/skills
-  name: codebase-design
-  host: github.com
-  resolved_commit: 6acc160e4e0cd062dbbbd7a1b26ae92855edf07e
-  resolved_ref: v1.2.3
-  version: unknown
-  virtual_path: skills/engineering/codebase-design
-  is_virtual: true
-  depth: 2
-  resolved_by: seniorkonung/agent-skills
-  package_type: claude_skill
-  deployed_files:
-  - .agents/skills/codebase-design
-  - .agents/skills/codebase-design/DEEPENING.md
-  - .agents/skills/codebase-design/DESIGN-IT-TWICE.md
-  - .agents/skills/codebase-design/SKILL.md
-  - .agents/skills/codebase-design/agents/openai.yaml
-  - .claude/skills/codebase-design
-  - .claude/skills/codebase-design/DEEPENING.md
-  - .claude/skills/codebase-design/DESIGN-IT-TWICE.md
-  - .claude/skills/codebase-design/SKILL.md
-  - .claude/skills/codebase-design/agents/openai.yaml
-  deployed_file_hashes:
-    .agents/skills/codebase-design/DEEPENING.md: sha256:125e6b77413ad2bc7cf7a772bc74336d580a50f9e797db2178ed133d62333d06
-    .agents/skills/codebase-design/DESIGN-IT-TWICE.md: sha256:09f9948ea7636a4d3704c5ab909762e876c0b39849eefb14d2e03a398cc9c7e7
-    .agents/skills/codebase-design/SKILL.md: sha256:a8d50abac5a4018f60e1d911d4b6f4e36454ca14d6c390c0695a578c7de65dad
-    .agents/skills/codebase-design/agents/openai.yaml: sha256:edebc9e4fcfe102114012575eaa9600b9b5fd08c311664f389c36e7bc717740f
-    .claude/skills/codebase-design/DEEPENING.md: sha256:125e6b77413ad2bc7cf7a772bc74336d580a50f9e797db2178ed133d62333d06
-    .claude/skills/codebase-design/DESIGN-IT-TWICE.md: sha256:09f9948ea7636a4d3704c5ab909762e876c0b39849eefb14d2e03a398cc9c7e7
-    .claude/skills/codebase-design/SKILL.md: sha256:a8d50abac5a4018f60e1d911d4b6f4e36454ca14d6c390c0695a578c7de65dad
-    .claude/skills/codebase-design/agents/openai.yaml: sha256:edebc9e4fcfe102114012575eaa9600b9b5fd08c311664f389c36e7bc717740f
-  content_hash: sha256:16b8ebb74b2bca32691efd69ad4e5e3bd089eecb594df104280d5ef88eee79af
+  resolved_at: '2026-09-19T12:21:44+00:00'
 - repo_url: mattpocock/skills
   name: grill-with-docs
   host: github.com
@@ -685,16 +646,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:cf4f96ab7bca9e995deeb88a8bff0a8e8d9cadf4fe775a451731f359445a7276
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/change-summary/agents/openai.yaml
-  runtime: null
-  scope: project
-  owners:
-  - seniorkonung/agent-skills
-  active_owner: seniorkonung/agent-skills
-  content_hash: sha256:a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94
+  content_hash: sha256:855ac5dae361704b0af7471cf5a6c50519b338f95d49d7f83c9c1ccf1cf7cfc4
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/code-review-and-quality
@@ -731,51 +683,6 @@ deployments:
   - addyosmani/agent-skills/skills/code-simplification
   active_owner: addyosmani/agent-skills/skills/code-simplification
   content_hash: sha256:f0c5ed754057eb0c1e027e2587f59de816651feb5e837242296c43ea21cf621d
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/codebase-design
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: null
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/codebase-design/DEEPENING.md
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: sha256:125e6b77413ad2bc7cf7a772bc74336d580a50f9e797db2178ed133d62333d06
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/codebase-design/DESIGN-IT-TWICE.md
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: sha256:09f9948ea7636a4d3704c5ab909762e876c0b39849eefb14d2e03a398cc9c7e7
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/codebase-design/SKILL.md
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: sha256:a8d50abac5a4018f60e1d911d4b6f4e36454ca14d6c390c0695a578c7de65dad
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/codebase-design/agents/openai.yaml
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: sha256:edebc9e4fcfe102114012575eaa9600b9b5fd08c311664f389c36e7bc717740f
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/debugging-and-error-recovery
@@ -1288,7 +1195,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:be7afaaec55c391ee9d7651641430f24fe1283ed951d505b40e58b3cbe197623
+  content_hash: sha256:fb4c0fd59e9c58922c0e3ea03a855b16e3db8809969692462d7da9950b754f07
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/assets/review-template.md
@@ -1297,7 +1204,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:36e480f4f6c6cadba1f9a31ae1650719e9d721a0e793c5c1e0aa5f21682b9539
+  content_hash: sha256:66bc32cb83b50f9dd8d2282b8e80d3c196dc05337e14e9ad22d0b00eb2a5c807
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/references/evaluation-cases.md
@@ -1306,7 +1213,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:cbef4f312fa4915dfb7e6c0a7c9a0cc9e633bdaf426091555bb759fa8ff79494
+  content_hash: sha256:c5fb3341215fcc7bf4ac88d335e1680fdce6bdce501fd9f22beaefdc9dea0a87
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/references/intention-brief.md
@@ -1333,7 +1240,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:1537852cc8c48420b2fdeb225b62312a03b1702b90eb355c17ad3824b3790458
+  content_hash: sha256:a26428cde836084c8c7e723a9ae8c550af8f756155b84e4eef4917a4d0d4d376
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/references/review-target.md
@@ -1342,7 +1249,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:4de64a4355b681a02136356694ba86f7b032e42ea49bc9f494b1d32c38475bbb
+  content_hash: sha256:15f4a3e00360500e593e69c259083474697d3052363bfd102231665c62780bfd
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/references/validator-interface.md
@@ -1360,7 +1267,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:6485f7016aa8fe9ea57028c68317d6b6a1fdeb47b1f2e47fd9447f649bf811cf
+  content_hash: sha256:b8a06b3ca2a35574661ea0cd0992c8e53245e93060226f8d3aa321b71bfbbe20
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/scripts/review-format.mjs
@@ -1387,7 +1294,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:3b5912c2fba709e8c6c38a1ca44b589cbff723bd7e3a5dc0e3d65a69853b2918
+  content_hash: sha256:b776e757673ab2d322bcfa5326909a734828eb85a182312f45b1b598edc122c1
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/tests/fixtures/valid-review.json
@@ -1396,7 +1303,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:e260e3a9028cf9151afc28e242e5d3e60b5d194024f34fdf82c0e50152207c2b
+  content_hash: sha256:380c981f061ccdd5a7f03e99be3160329c325d97b4c6cf0ed1d35a089705ed86
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/tests/fixtures/valid-review.md
@@ -1405,7 +1312,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:95ed714cfc1989dfca6fcdfff283c2d5f421cb212cfa3311823a609b1a264aa8
+  content_hash: sha256:0405f65b52b9b9438a02c025db22df7c46f08ccc0ce23af6fe740342e5604612
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-review-implementation/tests/validate-review.test.mjs
@@ -1433,33 +1340,6 @@ deployments:
   - fission-ai/openspec/skills/openspec-sync-specs
   active_owner: fission-ai/openspec/skills/openspec-sync-specs
   content_hash: sha256:daf0e52b188a3010e1f494427eb6807fb61a68df653403759b2be54a3aa37e74
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/openspec-task-deliberation
-  runtime: null
-  scope: project
-  owners:
-  - seniorkonung/agent-skills
-  active_owner: seniorkonung/agent-skills
-  content_hash: null
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/openspec-task-deliberation/SKILL.md
-  runtime: null
-  scope: project
-  owners:
-  - seniorkonung/agent-skills
-  active_owner: seniorkonung/agent-skills
-  content_hash: sha256:4aa67c0a37f33f48213651fec54f7c28e31eac8ed1f7c1510ca04c8b3a417552
-- kind: project-relative
-  target: agent-skills
-  value: .agents/skills/openspec-task-deliberation/references/evaluation-cases.md
-  runtime: null
-  scope: project
-  owners:
-  - seniorkonung/agent-skills
-  active_owner: seniorkonung/agent-skills
-  content_hash: sha256:43689993146fba677e652a44cfabb789b3e9c37c9d66dd47849fad9859cd093f
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/openspec-update-change
@@ -1604,6 +1484,24 @@ deployments:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
   content_hash: sha256:0b3eadb3e71a64d015933f8fd41d6bff678b2ee174d638b0bbe79d8f54513860
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/top-down-contract-development
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: agent-skills
+  value: .agents/skills/top-down-contract-development/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:04e83fa11298e3b59285a24c7b1f6fd996bf8db27e21e826062b65c26d349a56
 - kind: project-relative
   target: agent-skills
   value: .agents/skills/verification-before-completion
@@ -1756,16 +1654,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:cf4f96ab7bca9e995deeb88a8bff0a8e8d9cadf4fe775a451731f359445a7276
-- kind: project-relative
-  target: claude
-  value: .claude/skills/change-summary/agents/openai.yaml
-  runtime: null
-  scope: project
-  owners:
-  - seniorkonung/agent-skills
-  active_owner: seniorkonung/agent-skills
-  content_hash: sha256:a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94
+  content_hash: sha256:855ac5dae361704b0af7471cf5a6c50519b338f95d49d7f83c9c1ccf1cf7cfc4
 - kind: project-relative
   target: claude
   value: .claude/skills/code-review-and-quality
@@ -1802,51 +1691,6 @@ deployments:
   - addyosmani/agent-skills/skills/code-simplification
   active_owner: addyosmani/agent-skills/skills/code-simplification
   content_hash: sha256:f0c5ed754057eb0c1e027e2587f59de816651feb5e837242296c43ea21cf621d
-- kind: project-relative
-  target: claude
-  value: .claude/skills/codebase-design
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: null
-- kind: project-relative
-  target: claude
-  value: .claude/skills/codebase-design/DEEPENING.md
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: sha256:125e6b77413ad2bc7cf7a772bc74336d580a50f9e797db2178ed133d62333d06
-- kind: project-relative
-  target: claude
-  value: .claude/skills/codebase-design/DESIGN-IT-TWICE.md
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: sha256:09f9948ea7636a4d3704c5ab909762e876c0b39849eefb14d2e03a398cc9c7e7
-- kind: project-relative
-  target: claude
-  value: .claude/skills/codebase-design/SKILL.md
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: sha256:a8d50abac5a4018f60e1d911d4b6f4e36454ca14d6c390c0695a578c7de65dad
-- kind: project-relative
-  target: claude
-  value: .claude/skills/codebase-design/agents/openai.yaml
-  runtime: null
-  scope: project
-  owners:
-  - mattpocock/skills/skills/engineering/codebase-design
-  active_owner: mattpocock/skills/skills/engineering/codebase-design
-  content_hash: sha256:edebc9e4fcfe102114012575eaa9600b9b5fd08c311664f389c36e7bc717740f
 - kind: project-relative
   target: claude
   value: .claude/skills/debugging-and-error-recovery
@@ -2359,7 +2203,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:be7afaaec55c391ee9d7651641430f24fe1283ed951d505b40e58b3cbe197623
+  content_hash: sha256:fb4c0fd59e9c58922c0e3ea03a855b16e3db8809969692462d7da9950b754f07
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/assets/review-template.md
@@ -2368,7 +2212,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:36e480f4f6c6cadba1f9a31ae1650719e9d721a0e793c5c1e0aa5f21682b9539
+  content_hash: sha256:66bc32cb83b50f9dd8d2282b8e80d3c196dc05337e14e9ad22d0b00eb2a5c807
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/references/evaluation-cases.md
@@ -2377,7 +2221,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:cbef4f312fa4915dfb7e6c0a7c9a0cc9e633bdaf426091555bb759fa8ff79494
+  content_hash: sha256:c5fb3341215fcc7bf4ac88d335e1680fdce6bdce501fd9f22beaefdc9dea0a87
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/references/intention-brief.md
@@ -2404,7 +2248,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:1537852cc8c48420b2fdeb225b62312a03b1702b90eb355c17ad3824b3790458
+  content_hash: sha256:a26428cde836084c8c7e723a9ae8c550af8f756155b84e4eef4917a4d0d4d376
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/references/review-target.md
@@ -2413,7 +2257,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:4de64a4355b681a02136356694ba86f7b032e42ea49bc9f494b1d32c38475bbb
+  content_hash: sha256:15f4a3e00360500e593e69c259083474697d3052363bfd102231665c62780bfd
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/references/validator-interface.md
@@ -2431,7 +2275,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:6485f7016aa8fe9ea57028c68317d6b6a1fdeb47b1f2e47fd9447f649bf811cf
+  content_hash: sha256:b8a06b3ca2a35574661ea0cd0992c8e53245e93060226f8d3aa321b71bfbbe20
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/scripts/review-format.mjs
@@ -2458,7 +2302,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:3b5912c2fba709e8c6c38a1ca44b589cbff723bd7e3a5dc0e3d65a69853b2918
+  content_hash: sha256:b776e757673ab2d322bcfa5326909a734828eb85a182312f45b1b598edc122c1
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/tests/fixtures/valid-review.json
@@ -2467,7 +2311,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:e260e3a9028cf9151afc28e242e5d3e60b5d194024f34fdf82c0e50152207c2b
+  content_hash: sha256:380c981f061ccdd5a7f03e99be3160329c325d97b4c6cf0ed1d35a089705ed86
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/tests/fixtures/valid-review.md
@@ -2476,7 +2320,7 @@ deployments:
   owners:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
-  content_hash: sha256:95ed714cfc1989dfca6fcdfff283c2d5f421cb212cfa3311823a609b1a264aa8
+  content_hash: sha256:0405f65b52b9b9438a02c025db22df7c46f08ccc0ce23af6fe740342e5604612
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-review-implementation/tests/validate-review.test.mjs
@@ -2504,33 +2348,6 @@ deployments:
   - fission-ai/openspec/skills/openspec-sync-specs
   active_owner: fission-ai/openspec/skills/openspec-sync-specs
   content_hash: sha256:daf0e52b188a3010e1f494427eb6807fb61a68df653403759b2be54a3aa37e74
-- kind: project-relative
-  target: claude
-  value: .claude/skills/openspec-task-deliberation
-  runtime: null
-  scope: project
-  owners:
-  - seniorkonung/agent-skills
-  active_owner: seniorkonung/agent-skills
-  content_hash: null
-- kind: project-relative
-  target: claude
-  value: .claude/skills/openspec-task-deliberation/SKILL.md
-  runtime: null
-  scope: project
-  owners:
-  - seniorkonung/agent-skills
-  active_owner: seniorkonung/agent-skills
-  content_hash: sha256:4aa67c0a37f33f48213651fec54f7c28e31eac8ed1f7c1510ca04c8b3a417552
-- kind: project-relative
-  target: claude
-  value: .claude/skills/openspec-task-deliberation/references/evaluation-cases.md
-  runtime: null
-  scope: project
-  owners:
-  - seniorkonung/agent-skills
-  active_owner: seniorkonung/agent-skills
-  content_hash: sha256:43689993146fba677e652a44cfabb789b3e9c37c9d66dd47849fad9859cd093f
 - kind: project-relative
   target: claude
   value: .claude/skills/openspec-update-change
@@ -2675,6 +2492,24 @@ deployments:
   - seniorkonung/agent-skills
   active_owner: seniorkonung/agent-skills
   content_hash: sha256:0b3eadb3e71a64d015933f8fd41d6bff678b2ee174d638b0bbe79d8f54513860
+- kind: project-relative
+  target: claude
+  value: .claude/skills/top-down-contract-development
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: null
+- kind: project-relative
+  target: claude
+  value: .claude/skills/top-down-contract-development/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:04e83fa11298e3b59285a24c7b1f6fd996bf8db27e21e826062b65c26d349a56
 - kind: project-relative
   target: claude
   value: .claude/skills/verification-before-completion

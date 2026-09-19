@@ -27,6 +27,7 @@ dependencies:
         - openspec-gherkin-authoring
         - c4-diagrams
         - domain-modeling
+        - top-down-contract-development
     - git: Fission-AI/OpenSpec
       ref: v1.13.0
       path: skills/openspec-update-change
