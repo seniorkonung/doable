@@ -286,6 +286,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       selection: selection,
       query: query,
     ),
+    IntentionHasBlockingRelationsFailure() => IntentionCatalogUnexpected(
+      selection: selection,
+      query: query,
+    ),
   };
 
   Future<void> _loadNextPage(IntentionCatalogLoaded confirmed) async {
@@ -501,7 +505,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       const IntentionCatalogContinuationValidation(),
     IntentionUnexpectedFailure() ||
     IntentionNotFoundFailure() ||
-    IntentionConflictFailure() =>
+    IntentionConflictFailure() ||
+    IntentionHasBlockingRelationsFailure() =>
       const IntentionCatalogContinuationUnexpected(),
   };
 
@@ -514,7 +519,9 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     IntentionValidationFailure() ||
     IntentionUnexpectedFailure() ||
     IntentionNotFoundFailure() ||
-    IntentionConflictFailure() => const IntentionCatalogRecoveryUnexpected(),
+    IntentionConflictFailure() ||
+    IntentionHasBlockingRelationsFailure() =>
+      const IntentionCatalogRecoveryUnexpected(),
   };
 
   IntentionCatalogQuery _continuationQuery(IntentionCatalogLoaded confirmed) =>

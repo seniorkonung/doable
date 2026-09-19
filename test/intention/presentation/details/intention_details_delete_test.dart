@@ -83,29 +83,29 @@ void main() {
   testWidgets(
     'безопасно показывает отказы удаления и повторяет только недоступный',
     (tester) async {
-      final scenarios = <(IntentionFailure, String, bool)>[
+      final scenarios = <(IntentionFailure Function(IntentionId), String, bool)>[
         (
-          const IntentionNotFoundFailure(),
+          (_) => const IntentionNotFoundFailure(),
           'The intention no longer exists. It wasn’t deleted.',
           false,
         ),
         (
-          const IntentionConflictFailure(),
+          IntentionHasBlockingRelationsFailure.new,
           'The intention is still linked and can’t be deleted.',
           false,
         ),
         (
-          const IntentionUnavailableFailure(),
+          (_) => const IntentionUnavailableFailure(),
           'The intention couldn’t be deleted. Try again.',
           true,
         ),
         (
-          const IntentionCorruptionFailure(),
+          (_) => const IntentionCorruptionFailure(),
           'Stored data is damaged. The intention wasn’t deleted.',
           false,
         ),
         (
-          const IntentionUnexpectedFailure(),
+          (_) => const IntentionUnexpectedFailure(),
           'The intention couldn’t be deleted because of an unexpected error.',
           false,
         ),
@@ -128,8 +128,8 @@ void main() {
         );
         await tester.pump();
 
-        final (failure, message, canRetry) = scenarios[index];
-        repository.completeCommand(0, ResultFailure(failure));
+        final (failureFor, message, canRetry) = scenarios[index];
+        repository.completeCommand(0, ResultFailure(failureFor(intention.id)));
         await tester.pumpAndSettle();
 
         expect(find.text(message), findsOneWidget);
@@ -159,12 +159,12 @@ void main() {
   test(
     'failure сохраняет снимок, а успешный retry не оставляет прежнюю ошибку',
     () async {
-      final scenarios = <(IntentionFailure, bool)>[
-        (const IntentionNotFoundFailure(), false),
-        (const IntentionConflictFailure(), false),
-        (const IntentionUnavailableFailure(), true),
-        (const IntentionCorruptionFailure(), false),
-        (const IntentionUnexpectedFailure(), false),
+      final scenarios = <(IntentionFailure Function(IntentionId), bool)>[
+        ((_) => const IntentionNotFoundFailure(), false),
+        (IntentionHasBlockingRelationsFailure.new, false),
+        ((_) => const IntentionUnavailableFailure(), true),
+        ((_) => const IntentionCorruptionFailure(), false),
+        ((_) => const IntentionUnexpectedFailure(), false),
       ];
 
       for (var index = 0; index < scenarios.length; index += 1) {
@@ -221,8 +221,8 @@ void main() {
               ),
         );
 
-        final (failure, canRetry) = scenarios[index];
-        repository.completeCommand(0, ResultFailure(failure));
+        final (failureFor, canRetry) = scenarios[index];
+        repository.completeCommand(0, ResultFailure(failureFor(intention.id)));
         await pumpEventQueue();
 
         expect(

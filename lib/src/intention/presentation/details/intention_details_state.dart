@@ -166,6 +166,7 @@ final class IntentionDetailsEdit {
       IntentionTextInputValidationFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
+      IntentionHasBlockingRelationsFailure() ||
       IntentionUnavailableFailure() ||
       IntentionCorruptionFailure() ||
       IntentionUnexpectedFailure() => current,

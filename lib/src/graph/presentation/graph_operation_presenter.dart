@@ -264,6 +264,8 @@ String _failureFor(
   IntentionCommandKind.create => switch (failure) {
     IntentionValidationFailure() => localizations.editorInvalidInput,
     IntentionConflictFailure() => localizations.editorCreateConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.editorCreateUnexpected,
     IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
     IntentionCorruptionFailure() => localizations.editorCreateCorruption,
     IntentionNotFoundFailure() ||
@@ -273,6 +275,8 @@ String _failureFor(
     IntentionValidationFailure() => localizations.detailsUpdateInvalidInput,
     IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
     IntentionConflictFailure() => localizations.detailsUpdateConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsUpdateUnexpected,
     IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
     IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
     IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,
@@ -284,6 +288,8 @@ String _failureFor(
     IntentionValidationFailure() => localizations.detailsStateChangeInvalid,
     IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
     IntentionConflictFailure() => localizations.detailsStateChangeConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsStateChangeUnexpected,
     IntentionUnavailableFailure() =>
       localizations.detailsStateChangeUnavailable,
     IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
@@ -292,7 +298,8 @@ String _failureFor(
   IntentionCommandKind.delete => switch (failure) {
     IntentionValidationFailure() => localizations.detailsDeleteInvalid,
     IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
-    IntentionConflictFailure() => localizations.detailsDeleteConflict,
+    IntentionConflictFailure() || IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsDeleteConflict,
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,

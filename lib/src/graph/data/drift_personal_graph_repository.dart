@@ -602,6 +602,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
     final storedBefore = await _readCommandSnapshot(id);
     if (storedBefore == null) throw const _IntentionNotFound();
+    if (await _hasBlockingRelations(id)) {
+      throw _IntentionHasBlockingRelations(id);
+    }
     final counts = await _readVerifiedRelationCounts(id);
     final before = _catalogEntrySnapshot(storedBefore, counts);
     final deletedRows = await (_database.delete(
@@ -609,6 +612,28 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     )..where((row) => row.id.equals(id.toCanonicalString()))).go();
     if (deletedRows == 0) throw const _IntentionNotFound();
     return _CommittedIntentionDeleted(id: id, before: before);
+  }
+
+  Future<bool> _hasBlockingRelations(IntentionId id) async {
+    final serializedId = id.toCanonicalString();
+    final row = await _database
+        .customSelect(
+          '''
+            SELECT EXISTS (
+              SELECT 1
+              FROM long_term_relations
+              WHERE source_intention_id = ? OR related_intention_id = ?
+              LIMIT 1
+            ) AS has_blocking_relations
+          ''',
+          variables: [
+            Variable<String>(serializedId),
+            Variable<String>(serializedId),
+          ],
+          readsFrom: {_database.longTermRelations},
+        )
+        .getSingle();
+    return row.read<int>('has_blocking_relations') == 1;
   }
 
   Future<_StoredIntentionCommandSnapshot?> _readCommandSnapshot(
@@ -1330,6 +1355,9 @@ IntentionFailure _classifyCommandFailure(
   if (error is _IntentionNotFound) {
     return const IntentionNotFoundFailure();
   }
+  if (error case _IntentionHasBlockingRelations(:final intentionId)) {
+    return IntentionHasBlockingRelationsFailure(intentionId);
+  }
   if (error is _StoredIntentionCorruption) {
     return const IntentionCorruptionFailure();
   }
@@ -1339,11 +1367,6 @@ IntentionFailure _classifyCommandFailure(
         when command is CreateIntention &&
             extendedResultCode ==
                 SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY =>
-      const IntentionConflictFailure(),
-    SqliteConstraintFailure(:final extendedResultCode)
-        when command is DeleteIntention &&
-            extendedResultCode ==
-                SqlExtendedError.SQLITE_CONSTRAINT_FOREIGNKEY =>
       const IntentionConflictFailure(),
     SqliteCorruptionFailure() => const IntentionCorruptionFailure(),
     SqliteUnavailableFailure() => const IntentionUnavailableFailure(),
@@ -1387,6 +1410,7 @@ DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
       IntentionValidationFailure() => DiagnosticsFailureCode.validation,
       IntentionNotFoundFailure() => DiagnosticsFailureCode.notFound,
       IntentionConflictFailure() => DiagnosticsFailureCode.conflict,
+      IntentionHasBlockingRelationsFailure() => DiagnosticsFailureCode.conflict,
       IntentionUnavailableFailure() => DiagnosticsFailureCode.unavailable,
       IntentionCorruptionFailure() => DiagnosticsFailureCode.corruption,
       IntentionUnexpectedFailure() => DiagnosticsFailureCode.unexpected,
@@ -1398,4 +1422,10 @@ final class _StoredIntentionCorruption implements Exception {
 
 final class _IntentionNotFound implements Exception {
   const _IntentionNotFound();
+}
+
+final class _IntentionHasBlockingRelations implements Exception {
+  const _IntentionHasBlockingRelations(this.intentionId);
+
+  final IntentionId intentionId;
 }

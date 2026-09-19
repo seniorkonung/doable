@@ -109,6 +109,7 @@ final class IntentionEditorState {
       IntentionTextInputValidationFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
+      IntentionHasBlockingRelationsFailure() ||
       IntentionUnavailableFailure() ||
       IntentionCorruptionFailure() ||
       IntentionUnexpectedFailure() => current,
