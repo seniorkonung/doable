@@ -13,6 +13,8 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -842,6 +844,10 @@ final class _ControlledGraphRepository implements PersonalGraphRepository {
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
 
   @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      throw UnsupportedError('Связи не наблюдаются в этих тестах.');
+
+  @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) =>
@@ -896,6 +902,10 @@ final class _ControlledPersonalGraphRepository
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      throw UnsupportedError('Связи не наблюдаются в этих тестах.');
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(

@@ -1,3 +1,5 @@
+import '../../graph/application/graph_command_result.dart';
+import '../../graph/application/graph_revision.dart';
 import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
@@ -112,6 +114,50 @@ final class LongTermRelationDetails {
 
   bool get hasDescription => description != null;
 }
+
+sealed class LongTermRelationReadFailure implements GraphCommandFailure {
+  const LongTermRelationReadFailure();
+}
+
+final class LongTermRelationReadUnavailableFailure
+    extends LongTermRelationReadFailure {
+  const LongTermRelationReadUnavailableFailure();
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.unavailable;
+}
+
+final class LongTermRelationReadCorruptionFailure
+    extends LongTermRelationReadFailure {
+  const LongTermRelationReadCorruptionFailure();
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.corruption;
+}
+
+final class LongTermRelationReadUnexpectedFailure
+    extends LongTermRelationReadFailure {
+  const LongTermRelationReadUnexpectedFailure();
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.unexpected;
+}
+
+typedef LongTermRelationReadResult =
+    GraphResult<
+      GraphSnapshot<LongTermRelationDetails?>,
+      LongTermRelationReadFailure
+    >;
+typedef LongTermRelationReadSuccess =
+    GraphResultSuccess<
+      GraphSnapshot<LongTermRelationDetails?>,
+      LongTermRelationReadFailure
+    >;
+typedef LongTermRelationReadError =
+    GraphResultFailure<
+      GraphSnapshot<LongTermRelationDetails?>,
+      LongTermRelationReadFailure
+    >;
 
 void _ensureMatchingParticipants(
   LongTermRelation relation,

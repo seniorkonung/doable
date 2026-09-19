@@ -32,6 +32,7 @@ import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 part 'drift_personal_graph_repository_relation_commands.dart';
+part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
@@ -52,6 +53,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
+  final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
+  _relationWatchers = {};
   var _mutationSequence = 0;
 
   GraphRevision get _currentRevision =>
@@ -174,6 +177,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
   ) => _readRelationGroupPage(query);
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      _watchRelation(id);
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
@@ -345,7 +352,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         final value = committed.toSuccess(revision);
         final result = ConfirmedGraphResult(revision: revision, value: value);
         if (committed.didMutate) {
-          _notifyIntentionWatchersFor(value.changes);
+          _notifyGraphWatchersFor(value.changes);
         }
         return result;
       });
@@ -401,6 +408,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     for (final id in affected) {
       _notifyIntentionWatchers(id);
     }
+  }
+
+  void _notifyGraphWatchersFor(Iterable<GraphChange> changes) {
+    final stableChanges = List<GraphChange>.unmodifiable(changes);
+    _notifyIntentionWatchersFor(stableChanges);
+    _notifyRelationWatchersFor(stableChanges);
   }
 
   Future<_CommittedIntentionCommand> _createIntention(

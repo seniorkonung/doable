@@ -21,6 +21,8 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -305,6 +307,10 @@ final class _ControlledPersonalGraphRepository
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      throw UnsupportedError('Связи не наблюдаются в этих тестах.');
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(

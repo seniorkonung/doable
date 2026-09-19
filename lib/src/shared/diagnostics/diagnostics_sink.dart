@@ -114,6 +114,13 @@ final class RelationGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
   final bool requiresNewSnapshot;
 }
 
+final class LongTermRelationDetailReadDiagnosticsEvent
+    extends DiagnosticsEvent {
+  const LongTermRelationDetailReadDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
+}
+
 final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
   const IntentionCommandDiagnosticsEvent({
     required this.commandType,

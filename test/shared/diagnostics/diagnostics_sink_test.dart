@@ -21,6 +21,7 @@ void main() {
         CatalogPageReadDiagnosticsEvent,
         IntentionDetailReadDiagnosticsEvent,
         RelationGroupPageReadDiagnosticsEvent,
+        LongTermRelationDetailReadDiagnosticsEvent,
         IntentionCommandDiagnosticsEvent,
         LongTermRelationCommandDiagnosticsEvent,
       ]);
@@ -72,6 +73,11 @@ void main() {
           'pageSize': 50,
           'isContinuation': true,
           'requiresNewSnapshot': true,
+        },
+        {
+          'operation': 'longTermRelationDetailRead',
+          'outcome': 'succeeded',
+          'durationMicros': 6000,
         },
         {
           'operation': 'intentionCommand',
@@ -155,6 +161,9 @@ List<DiagnosticsEvent> _events() => [
       duration: Duration(milliseconds: 4),
       code: DiagnosticsFailureCode.conflict,
     ),
+  ),
+  const LongTermRelationDetailReadDiagnosticsEvent(
+    status: DiagnosticsSucceeded(Duration(milliseconds: 6)),
   ),
   const IntentionCommandDiagnosticsEvent(
     commandType: IntentionCommandDiagnosticsType.archive,
