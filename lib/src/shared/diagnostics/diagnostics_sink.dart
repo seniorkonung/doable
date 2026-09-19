@@ -101,6 +101,19 @@ final class RelationCountsReadDiagnosticsEvent extends DiagnosticsEvent {
     : super(status);
 }
 
+final class RelationGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const RelationGroupPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required this.requiresNewSnapshot,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+  final bool requiresNewSnapshot;
+}
+
 final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
   const IntentionCommandDiagnosticsEvent({
     required this.commandType,

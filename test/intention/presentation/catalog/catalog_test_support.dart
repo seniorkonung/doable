@@ -10,6 +10,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 
 final class ControlledCatalogRepository implements PersonalGraphRepository {
   final queries = <IntentionCatalogQuery>[];
@@ -54,6 +55,12 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
   Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
     IntentionId intentionId,
   ) => throw UnsupportedError('Сводка не используется в тесте каталога.');
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) =>
+      throw UnsupportedError('Группы связей не используются в тесте каталога.');
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

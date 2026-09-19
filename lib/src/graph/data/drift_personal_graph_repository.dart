@@ -14,7 +14,9 @@ import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/application/long_term_relation_id_generator.dart';
+import '../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../long_term_relation/application/relation_counts.dart';
+import '../../long_term_relation/application/relation_group_page.dart';
 import '../../long_term_relation/domain/long_term_relation.dart'
     as relation_domain;
 import '../../long_term_relation/domain/long_term_relation_description.dart';
@@ -30,6 +32,7 @@ import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 part 'drift_personal_graph_repository_relation_commands.dart';
+part 'drift_personal_graph_repository_relation_groups.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -166,6 +169,11 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       return ResultFailure(failure);
     }
   }
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) => _readRelationGroupPage(query);
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(

@@ -51,6 +51,18 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'operation': 'relationCountsRead',
     ..._encodeStatus(event.status),
   },
+  RelationGroupPageReadDiagnosticsEvent(
+    :final pageSize,
+    :final isContinuation,
+    :final requiresNewSnapshot,
+  ) =>
+    {
+      'operation': 'relationGroupPageRead',
+      ..._encodeStatus(event.status),
+      'pageSize': pageSize,
+      'isContinuation': isContinuation,
+      'requiresNewSnapshot': requiresNewSnapshot,
+    },
   IntentionCommandDiagnosticsEvent(:final commandType) => {
     'operation': 'intentionCommand',
     ..._encodeStatus(event.status),
