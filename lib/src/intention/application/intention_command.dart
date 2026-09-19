@@ -1,6 +1,10 @@
+import '../../graph/application/graph_command_result.dart';
 import '../domain/intention_id.dart';
+import 'intention_catalog.dart';
+import 'intention_result.dart';
 
-sealed class IntentionCommand {
+sealed class IntentionCommand
+    implements GraphCommand<IntentionCommandSuccess, IntentionFailure> {
   const IntentionCommand();
 }
 
