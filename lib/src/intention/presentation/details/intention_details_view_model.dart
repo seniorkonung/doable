@@ -64,7 +64,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     _generation = _DetailObservationGeneration.initial;
     _acceptedRevision = null;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
-    _completionSubscription = _coordinator.completions.listen(
+    _completionSubscription = _coordinator.intentionCompletions.listen(
       _handleCompletion,
     );
     ref.onDispose(() {

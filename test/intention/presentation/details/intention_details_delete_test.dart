@@ -191,11 +191,11 @@ void main() {
           graphCommandCoordinatorProvider.notifier,
         );
         final presenter = coordinator.registerAppPresentation();
-        final coordinatorSubscription = coordinator.completions.listen((
-          completion,
-        ) {
-          tokens.add(completion.token);
-        });
+        final coordinatorSubscription = coordinator.intentionCompletions.listen(
+          (completion) {
+            tokens.add(completion.token);
+          },
+        );
 
         final details = container.read(provider.notifier)..delete();
         details.delete();

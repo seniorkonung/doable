@@ -184,7 +184,7 @@ void main() {
       final tokens = <IntentionOperationToken>[];
       final coordinatorSubscription = container
           .read(graphCommandCoordinatorProvider.notifier)
-          .completions
+          .intentionCompletions
           .listen((completion) => tokens.add(completion.token));
       addTearDown(coordinatorSubscription.cancel);
       final editor = container.read(provider.notifier)
@@ -300,7 +300,7 @@ void main() {
     );
     final presenter = coordinator.registerAppPresentation();
     final tokens = <IntentionOperationToken>[];
-    final completionSubscription = coordinator.completions.listen(
+    final completionSubscription = coordinator.intentionCompletions.listen(
       (completion) => tokens.add(completion.token),
     );
     addTearDown(completionSubscription.cancel);

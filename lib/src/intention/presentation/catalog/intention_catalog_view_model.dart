@@ -48,7 +48,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     _policy = ref.watch(catalogPagingPolicyProvider);
     final completionSubscription = ref
         .watch(graphCommandCoordinatorProvider.notifier)
-        .completions
+        .intentionCompletions
         .listen(_handleCompletion);
     ref.onDispose(() => unawaited(completionSubscription.cancel()));
     ref.onCancel(() => _filterTimer?.cancel());

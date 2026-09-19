@@ -65,7 +65,9 @@ void main() {
       final coordinator = _graphCoordinator(repository);
       final epoch = Object();
       final completions = <IntentionCommandCompletion>[];
-      final subscription = coordinator.completions.listen(completions.add);
+      final subscription = coordinator.intentionCompletions.listen(
+        completions.add,
+      );
       final firstId = _id(_firstUuid);
       final secondId = _id(_secondUuid);
 
@@ -226,10 +228,10 @@ void main() {
         final coordinator = _graphCoordinator(repository);
         final firstConsumer = <IntentionCommandCompletion>[];
         final secondConsumer = <IntentionCommandCompletion>[];
-        final firstSubscription = coordinator.completions.listen(
+        final firstSubscription = coordinator.intentionCompletions.listen(
           firstConsumer.add,
         );
-        final secondSubscription = coordinator.completions.listen(
+        final secondSubscription = coordinator.intentionCompletions.listen(
           secondConsumer.add,
         );
 
@@ -247,7 +249,7 @@ void main() {
         expect(secondConsumer, [same(completion)]);
 
         final lateConsumer = <IntentionCommandCompletion>[];
-        final lateSubscription = coordinator.completions.listen(
+        final lateSubscription = coordinator.intentionCompletions.listen(
           lateConsumer.add,
         );
         await Future<void>.delayed(Duration.zero);
@@ -268,14 +270,14 @@ void main() {
       final secondId = _id(_secondUuid);
       final firstDetails = <IntentionCommandSuccess>[];
       final secondDetails = <IntentionCommandSuccess>[];
-      final firstSubscription = coordinator.completions.listen(
+      final firstSubscription = coordinator.intentionCompletions.listen(
         (completion) => _collectSuccessFor(
           completion,
           intentionId: firstId,
           target: firstDetails,
         ),
       );
-      final secondSubscription = coordinator.completions.listen(
+      final secondSubscription = coordinator.intentionCompletions.listen(
         (completion) => _collectSuccessFor(
           completion,
           intentionId: secondId,
@@ -504,7 +506,9 @@ void main() {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);
       final completions = <IntentionCommandCompletion>[];
-      final subscription = coordinator.completions.listen(completions.add);
+      final subscription = coordinator.intentionCompletions.listen(
+        completions.add,
+      );
       final firstPresenter = coordinator.registerAppPresentation();
 
       final accepted = _acceptExisting(
@@ -643,7 +647,9 @@ void main() {
         final coordinator = _graphCoordinator(repository);
         final intentionId = _id(_firstUuid);
         IntentionCommandAccepted? acceptedFromCompletion;
-        final subscription = coordinator.completions.listen((completion) {
+        final subscription = coordinator.intentionCompletions.listen((
+          completion,
+        ) {
           acceptedFromCompletion = _acceptExisting(
             coordinator,
             ArchiveIntention(intentionId),

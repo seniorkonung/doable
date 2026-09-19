@@ -6,7 +6,9 @@ import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/domain/intention_id.dart';
+import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../shared/presentation/exclusive_operation.dart';
+import 'graph_command_result.dart';
 import 'graph_revision.dart';
 import 'personal_graph_repository.dart';
 import 'personal_graph_repository_provider.dart';
@@ -44,14 +46,36 @@ final class ExistingIntentionKey extends GraphCommandKey {
   int get hashCode => intentionId.hashCode;
 }
 
-final class IntentionOperationToken {
+final class LongTermRelationCreationFormKey extends GraphCommandKey {
+  LongTermRelationCreationFormKey();
+}
+
+sealed class GraphOperationToken {
+  const GraphOperationToken();
+}
+
+final class IntentionOperationToken extends GraphOperationToken {
   IntentionOperationToken._();
 
   @override
   String toString() => 'IntentionOperationToken';
 }
 
-final class IntentionCommandCompletion {
+final class LongTermRelationOperationToken extends GraphOperationToken {
+  LongTermRelationOperationToken._();
+
+  @override
+  String toString() => 'LongTermRelationOperationToken';
+}
+
+sealed class GraphCommandCompletion {
+  const GraphCommandCompletion();
+
+  GraphOperationToken get token;
+  GraphRevision? get revision;
+}
+
+final class IntentionCommandCompletion extends GraphCommandCompletion {
   const IntentionCommandCompletion._({
     required this.token,
     required this.kind,
@@ -59,6 +83,7 @@ final class IntentionCommandCompletion {
     required this.confirmedResult,
   });
 
+  @override
   final IntentionOperationToken token;
   final IntentionCommandKind kind;
   final IntentionOperationTarget target;
@@ -69,6 +94,7 @@ final class IntentionCommandCompletion {
     ResultFailure(:final failure) => ResultFailure(failure),
   };
 
+  @override
   GraphRevision? get revision => switch (confirmedResult) {
     ResultSuccess(:final value) => value.revision,
     ResultFailure() => null,
@@ -81,6 +107,33 @@ final class IntentionCommandCompletion {
       ExistingIntentionOperationTarget(:final title) => title,
       CreatingIntentionOperationTarget() => null,
     },
+  };
+}
+
+enum LongTermRelationCommandKind { create }
+
+final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
+  const LongTermRelationCommandCompletion._({
+    required this.token,
+    required this.kind,
+    required this.confirmedResult,
+  });
+
+  @override
+  final LongTermRelationOperationToken token;
+  final LongTermRelationCommandKind kind;
+  final LongTermRelationCommandResult confirmedResult;
+
+  GraphResult<LongTermRelationCommandSuccess, LongTermRelationCommandFailure>
+  get result => switch (confirmedResult) {
+    GraphResultSuccess(:final value) => GraphResultSuccess(value.value),
+    GraphResultFailure(:final failure) => GraphResultFailure(failure),
+  };
+
+  @override
+  GraphRevision? get revision => switch (confirmedResult) {
+    GraphResultSuccess(:final value) => value.revision,
+    GraphResultFailure() => null,
   };
 }
 
@@ -117,7 +170,28 @@ final class IntentionCommandAlreadyRunning extends IntentionCommandStart {
   const IntentionCommandAlreadyRunning();
 }
 
-final class GraphCommandCoordinatorDraining extends IntentionCommandStart {
+sealed class LongTermRelationCommandStart {
+  const LongTermRelationCommandStart();
+}
+
+final class LongTermRelationCommandAccepted
+    extends LongTermRelationCommandStart {
+  const LongTermRelationCommandAccepted({
+    required this.token,
+    required this.future,
+  });
+
+  final LongTermRelationOperationToken token;
+  final Future<LongTermRelationCommandCompletion> future;
+}
+
+final class LongTermRelationCommandAlreadyRunning
+    extends LongTermRelationCommandStart {
+  const LongTermRelationCommandAlreadyRunning();
+}
+
+final class GraphCommandCoordinatorDraining extends IntentionCommandStart
+    implements LongTermRelationCommandStart {
   const GraphCommandCoordinatorDraining();
 }
 
@@ -181,18 +255,13 @@ final class GraphAppPresentationRegistration {
 @Riverpod(keepAlive: true)
 final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   final _completionController =
-      StreamController<IntentionCommandCompletion>.broadcast(sync: true);
+      StreamController<GraphCommandCompletion>.broadcast(sync: true);
   // Публикация завершений последовательна в порядке принятия, поэтому порядок
   // вставки совпадает с порядком публикации terminal outcome.
   final _entries = <IntentionOperationToken, _PresentationEntry>{};
   final _registrations = <GraphAppPresentationRegistration>[];
   final _gates =
-      <
-        GraphCommandKey,
-        ExclusiveOperation<
-          Result<ConfirmedGraphResult<IntentionCommandSuccess>>
-        >
-      >{};
+      <GraphCommandKey, ExclusiveOperation<GraphCommandCompletion>>{};
   final _inFlight = <Future<void>>{};
   late GraphCommandRepository _repository;
   Future<void> _publicationTail = Future<void>.value();
@@ -204,8 +273,13 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     _repository = ref.watch(personalGraphRepositoryProvider);
   }
 
-  Stream<IntentionCommandCompletion> get completions =>
+  Stream<GraphCommandCompletion> get completions =>
       _completionController.stream;
+
+  Stream<IntentionCommandCompletion> get intentionCompletions =>
+      _completionController.stream
+          .where((completion) => completion is IntentionCommandCompletion)
+          .map((completion) => completion as IntentionCommandCompletion);
 
   bool isRunning(IntentionId intentionId) =>
       isKeyRunning(ExistingIntentionKey(intentionId));
@@ -229,46 +303,101 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     ),
   );
 
+  LongTermRelationCommandStart acceptRelationCreation(
+    LongTermRelationCreationFormKey formKey,
+    CreateLongTermRelation command,
+  ) {
+    final token = LongTermRelationOperationToken._();
+    final acceptance = _acceptOperation(
+      key: formKey,
+      execute: () async {
+        final result = await _executeLongTermRelation(command);
+        return LongTermRelationCommandCompletion._(
+          token: token,
+          kind: LongTermRelationCommandKind.create,
+          confirmedResult: result,
+        );
+      },
+    );
+    return switch (acceptance) {
+      _GraphCommandAccepted(:final future) => LongTermRelationCommandAccepted(
+        token: token,
+        future: future.then(
+          (completion) => completion as LongTermRelationCommandCompletion,
+        ),
+      ),
+      _GraphCommandAlreadyRunning() =>
+        const LongTermRelationCommandAlreadyRunning(),
+      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
+    };
+  }
+
   IntentionCommandStart _accept(
     GraphCommandKey key,
     IntentionCommand command,
     IntentionOperationTarget target,
   ) {
-    if (_isDraining) {
-      return const GraphCommandCoordinatorDraining();
-    }
-
-    final gate = _gates.putIfAbsent(
-      key,
-      ExclusiveOperation<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
-          .new,
-    );
-    if (gate.isRunning) {
-      return const IntentionCommandAlreadyRunning();
-    }
-
     final token = IntentionOperationToken._();
     final entry = _PresentationEntry(
       token: token,
       kind: _kindOf(command),
       target: target,
-      completionCompleter: Completer<IntentionCommandCompletion>(),
     );
-    _entries[token] = entry;
+    final acceptance = _acceptOperation(
+      key: key,
+      onAccepted: () => _entries[token] = entry,
+      execute: () async {
+        final result = await _executeIntention(command);
+        return IntentionCommandCompletion._(
+          token: token,
+          kind: entry.kind,
+          target: target,
+          confirmedResult: result,
+        );
+      },
+      prepareForPublication: (completion) {
+        entry.completion = completion as IntentionCommandCompletion;
+      },
+      afterPublication: _dispatchAppPresentation,
+    );
+    return switch (acceptance) {
+      _GraphCommandAccepted(:final future) => IntentionCommandAccepted(
+        token: token,
+        future: future.then(
+          (completion) => completion as IntentionCommandCompletion,
+        ),
+      ),
+      _GraphCommandAlreadyRunning() => const IntentionCommandAlreadyRunning(),
+      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
+    };
+  }
 
-    final started = gate.start(() => _execute(command));
-    if (started
-        is ExclusiveOperationAlreadyRunning<
-          Result<ConfirmedGraphResult<IntentionCommandSuccess>>
-        >) {
-      _entries.remove(token);
-      return const IntentionCommandAlreadyRunning();
+  _GraphCommandAcceptance _acceptOperation({
+    required GraphCommandKey key,
+    required Future<GraphCommandCompletion> Function() execute,
+    void Function()? onAccepted,
+    void Function(GraphCommandCompletion completion)? prepareForPublication,
+    void Function()? afterPublication,
+  }) {
+    if (_isDraining) {
+      return const _GraphCommandDraining();
+    }
+
+    final gate = _gates.putIfAbsent(
+      key,
+      ExclusiveOperation<GraphCommandCompletion>.new,
+    );
+    if (gate.isRunning) {
+      return const _GraphCommandAlreadyRunning();
+    }
+
+    onAccepted?.call();
+    final started = gate.start(execute);
+    if (started is ExclusiveOperationAlreadyRunning<GraphCommandCompletion>) {
+      return const _GraphCommandAlreadyRunning();
     }
     final operation =
-        started
-            as ExclusiveOperationAccepted<
-              Result<ConfirmedGraphResult<IntentionCommandSuccess>>
-            >;
+        started as ExclusiveOperationAccepted<GraphCommandCompletion>;
     final operationFuture = operation.future;
 
     unawaited(
@@ -279,10 +408,14 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       }),
     );
 
+    final completionCompleter = Completer<GraphCommandCompletion>();
     late final Future<void> tracked;
     final publication = _publicationTail.then<void>((_) async {
-      final result = await operationFuture;
-      _publishCompletion(entry, result);
+      final completion = await operationFuture;
+      prepareForPublication?.call(completion);
+      _completionController.add(completion);
+      completionCompleter.complete(completion);
+      afterPublication?.call();
     });
     _publicationTail = publication;
     tracked = publication.whenComplete(() {
@@ -291,10 +424,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     });
     _inFlight.add(tracked);
 
-    return IntentionCommandAccepted(
-      token: token,
-      future: entry.completionCompleter.future,
-    );
+    return _GraphCommandAccepted(completionCompleter.future);
   }
 
   /// Выдаёт открытой экранной сессии право предъявить её failure.
@@ -485,9 +615,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     return null;
   }
 
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> _execute(
-    IntentionCommand command,
-  ) async {
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) async {
     try {
       return await _repository.execute(command);
     } on Object {
@@ -497,20 +626,17 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     }
   }
 
-  void _publishCompletion(
-    _PresentationEntry entry,
-    Result<ConfirmedGraphResult<IntentionCommandSuccess>> confirmedResult,
-  ) {
-    final completion = IntentionCommandCompletion._(
-      token: entry.token,
-      kind: entry.kind,
-      target: entry.target,
-      confirmedResult: confirmedResult,
-    );
-    entry.completion = completion;
-    _completionController.add(completion);
-    entry.completionCompleter.complete(completion);
-    _dispatchAppPresentation();
+  Future<LongTermRelationCommandResult> _executeLongTermRelation(
+    LongTermRelationCommand command,
+  ) async {
+    try {
+      return await _repository.execute(command);
+    } on Object {
+      return const GraphCommandFailed<
+        LongTermRelationCommandSuccess,
+        LongTermRelationCommandFailure
+      >(LongTermRelationUnexpectedFailure());
+    }
   }
 
   void _discardEntry(_PresentationEntry entry) {
@@ -547,17 +673,33 @@ final class _PresentationEntry {
     required this.token,
     required this.kind,
     required this.target,
-    required this.completionCompleter,
   });
 
   final IntentionOperationToken token;
   final IntentionCommandKind kind;
   final IntentionOperationTarget target;
-  final Completer<IntentionCommandCompletion> completionCompleter;
   IntentionCommandCompletion? completion;
   bool initiatorReleased = false;
   IntentionInitiatorPresentationClaim? initiatorClaim;
   IntentionAppPresentationClaim? appClaim;
+}
+
+sealed class _GraphCommandAcceptance {
+  const _GraphCommandAcceptance();
+}
+
+final class _GraphCommandAccepted extends _GraphCommandAcceptance {
+  const _GraphCommandAccepted(this.future);
+
+  final Future<GraphCommandCompletion> future;
+}
+
+final class _GraphCommandAlreadyRunning extends _GraphCommandAcceptance {
+  const _GraphCommandAlreadyRunning();
+}
+
+final class _GraphCommandDraining extends _GraphCommandAcceptance {
+  const _GraphCommandDraining();
 }
 
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
