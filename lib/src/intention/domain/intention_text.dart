@@ -1,5 +1,7 @@
 import 'package:characters/characters.dart';
 
+import '../../shared/domain/unicode_text.dart';
+
 enum IntentionTextField { title, description, titleFilter }
 
 enum IntentionTextValidationReason { empty, tooLong, invalidUnicodeRepertoire }
@@ -24,33 +26,16 @@ abstract final class IntentionText {
   static const int maxTitleLength = 255;
   static const int maxDescriptionLength = 4096;
 
-  static const _highSurrogateStart = 0xd800;
-  static const _highSurrogateEnd = 0xdbff;
-  static const _lowSurrogateStart = 0xdc00;
-  static const _lowSurrogateEnd = 0xdfff;
-
   static int countGraphemeClusters(String value) => value.characters.length;
 
   static void ensureValidUnicodeRepertoire(
     String value, {
     required IntentionTextField field,
   }) {
-    for (var index = 0; index < value.length; index++) {
-      final codeUnit = value.codeUnitAt(index);
-      if (codeUnit == 0) {
-        throw _invalidUnicodeRepertoire(field);
-      }
-      if (_isHighSurrogate(codeUnit)) {
-        final isFollowedByLowSurrogate =
-            index + 1 < value.length &&
-            _isLowSurrogate(value.codeUnitAt(index + 1));
-        if (!isFollowedByLowSurrogate) {
-          throw _invalidUnicodeRepertoire(field);
-        }
-        index++;
-      } else if (_isLowSurrogate(codeUnit)) {
-        throw _invalidUnicodeRepertoire(field);
-      }
+    try {
+      UnicodeText.ensureValidScalarValuesWithoutNul(value);
+    } on InvalidUnicodeTextException {
+      throw _invalidUnicodeRepertoire(field);
     }
   }
 
@@ -101,10 +86,4 @@ abstract final class IntentionText {
       reason: IntentionTextValidationReason.invalidUnicodeRepertoire,
     ),
   );
-
-  static bool _isHighSurrogate(int codeUnit) =>
-      codeUnit >= _highSurrogateStart && codeUnit <= _highSurrogateEnd;
-
-  static bool _isLowSurrogate(int codeUnit) =>
-      codeUnit >= _lowSurrogateStart && codeUnit <= _lowSurrogateEnd;
 }
