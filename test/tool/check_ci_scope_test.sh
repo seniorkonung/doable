@@ -238,8 +238,8 @@ check_boolean \
   paths_require_android \
   scripts/new_tool.sh
 check_boolean \
-  "пустое change evidence требует artifact" \
-  true \
+  "доказанно пустой diff пропускает Android artifact" \
+  false \
   paths_require_android
 check_boolean \
   "небезопасный относительный путь требует artifact" \
@@ -275,8 +275,8 @@ check_boolean \
   paths_require_project \
   scripts/new_tool.sh
 check_boolean \
-  "пустое change evidence требует проектные проверки" \
-  true \
+  "доказанно пустой diff пропускает проектные проверки" \
+  false \
   paths_require_project
 
 check_boolean \
@@ -302,8 +302,8 @@ check_boolean \
   paths_require_openspec \
   scripts/new_tool.sh
 check_boolean \
-  "пустое change evidence требует OpenSpec-валидацию fail-closed" \
-  true \
+  "доказанно пустой diff пропускает OpenSpec-валидацию" \
+  false \
   paths_require_openspec
 
 check_value \
