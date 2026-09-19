@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -564,6 +565,45 @@ void main() {
         () => result.changes.add(
           IntentionCatalogUnchanged(revision: revision, entry: after),
         ),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('пакет намерения включает неизменяемые абсолютные счётчики', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
+      final intention = _intention();
+      final entry = _TestCatalogEntrySnapshot(
+        _summary(id: intention.id.toCanonicalString()),
+      );
+      final mutation = IntentionCatalogUpdated(
+        revision: revision,
+        before: entry,
+        after: entry,
+      );
+      final countChange = IntentionRelationCountsChanged(
+        revision: revision,
+        intentionId: intention.id,
+        counts: RelationCounts(
+          activeNeedIncoming: 0,
+          activeNeedOutgoing: 0,
+          activeCanIncoming: 0,
+          activeCanOutgoing: 0,
+          archivedNeedIncoming: 1,
+          archivedNeedOutgoing: 0,
+          archivedCanIncoming: 0,
+          archivedCanOutgoing: 0,
+        ),
+      );
+      final success = IntentionSaved(
+        intention,
+        catalogMutation: mutation,
+        additionalChanges: [countChange],
+      );
+      final result = ConfirmedGraphResult(revision: revision, value: success);
+
+      expect(result.changes, [mutation, countChange]);
+      expect(
+        () => success.additionalChanges.add(mutation),
         throwsUnsupportedError,
       );
     });
