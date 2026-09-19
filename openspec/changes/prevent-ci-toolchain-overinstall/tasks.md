@@ -23,7 +23,7 @@
   - **Files likely touched:** `.github/workflows/ci.yml`
   - **Estimated scope:** S (1 файл)
 
-- [ ] 1.3 Подтвердить готовность CI-контракта к pull-request проверке
+- [x] 1.3 Подтвердить готовность CI-контракта к pull-request проверке
   - **Acceptance criteria:**
     - Focused CI contract test, строгая OpenSpec-валидация и полный проектный gate успешны.
     - Изменение прошло проверку корректности, читаемости, архитектуры, безопасности и производительности.
