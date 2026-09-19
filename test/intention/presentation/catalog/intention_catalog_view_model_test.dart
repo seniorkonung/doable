@@ -1026,7 +1026,7 @@ void main() {
         graphCommandCoordinatorProvider.notifier,
       );
       final observedCompletions = <IntentionCommandCompletion>[];
-      final completionSubscription = coordinator.completions.listen(
+      final completionSubscription = coordinator.intentionCompletions.listen(
         observedCompletions.add,
       );
       addTearDown(completionSubscription.cancel);
