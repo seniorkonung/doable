@@ -41,10 +41,6 @@ path_classification() {
 }
 
 paths_require_android() {
-  if (($# == 0)); then
-    return 0
-  fi
-
   local path
   for path in "$@"; do
     case "$(path_classification "$path")" in
@@ -57,10 +53,6 @@ paths_require_android() {
 }
 
 paths_require_project() {
-  if (($# == 0)); then
-    return 0
-  fi
-
   local path
   for path in "$@"; do
     case "$(path_classification "$path")" in
@@ -73,10 +65,6 @@ paths_require_project() {
 }
 
 paths_require_openspec() {
-  if (($# == 0)); then
-    return 0
-  fi
-
   local path
   for path in "$@"; do
     case "$(path_classification "$path")" in
