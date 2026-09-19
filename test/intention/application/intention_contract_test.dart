@@ -13,6 +13,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -821,6 +822,11 @@ final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
   Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
     IntentionId intentionId,
   ) async => const ResultFailure(IntentionUnavailableFailure());
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) async => const RelationGroupPageFailure(RelationGroupUnavailableFailure());
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(

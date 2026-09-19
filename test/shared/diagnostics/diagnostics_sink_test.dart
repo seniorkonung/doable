@@ -20,6 +20,7 @@ void main() {
         MigrationDiagnosticsEvent,
         CatalogPageReadDiagnosticsEvent,
         IntentionDetailReadDiagnosticsEvent,
+        RelationGroupPageReadDiagnosticsEvent,
         IntentionCommandDiagnosticsEvent,
         LongTermRelationCommandDiagnosticsEvent,
       ]);
@@ -62,6 +63,15 @@ void main() {
           'outcome': 'failed',
           'durationMicros': 3000,
           'failureCode': 'unavailable',
+        },
+        {
+          'operation': 'relationGroupPageRead',
+          'outcome': 'failed',
+          'durationMicros': 4000,
+          'failureCode': 'conflict',
+          'pageSize': 50,
+          'isContinuation': true,
+          'requiresNewSnapshot': true,
         },
         {
           'operation': 'intentionCommand',
@@ -135,6 +145,15 @@ List<DiagnosticsEvent> _events() => [
     status: DiagnosticsFailed(
       duration: Duration(milliseconds: 3),
       code: DiagnosticsFailureCode.unavailable,
+    ),
+  ),
+  const RelationGroupPageReadDiagnosticsEvent(
+    pageSize: 50,
+    isContinuation: true,
+    requiresNewSnapshot: true,
+    status: DiagnosticsFailed(
+      duration: Duration(milliseconds: 4),
+      code: DiagnosticsFailureCode.conflict,
     ),
   ),
   const IntentionCommandDiagnosticsEvent(

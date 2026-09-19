@@ -14,6 +14,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -513,6 +514,11 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
     IntentionId intentionId,
   ) => throw UnsupportedError('Сводка не используется в этих тестах.');
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(

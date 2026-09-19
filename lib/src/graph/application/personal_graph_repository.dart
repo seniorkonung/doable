@@ -3,6 +3,7 @@ import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/relation_counts.dart';
+import '../../long_term_relation/application/relation_group_page.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
 
@@ -21,6 +22,10 @@ abstract interface class PersonalGraphRepository
 
   Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
     IntentionId intentionId,
+  );
+
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
   );
 
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
