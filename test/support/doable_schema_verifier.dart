@@ -1,5 +1,6 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
+import 'package:doable/src/data/local/sqlite_relation_integrity_functions.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -27,6 +28,30 @@ Future<String> readDoableVerifierReferenceSearchKey(
     },
   );
   return searchKey;
+}
+
+Future<({int validId, int malformedDescription})>
+readDoableVerifierReferenceRelationValidation(AppDatabase database) async {
+  late ({int validId, int malformedDescription}) result;
+  await _verifyDoableDatabaseSchema(
+    database,
+    onReferenceConnection: (reference) {
+      final row = reference.select('''
+            SELECT
+              $relationIdIntegrityFunctionName(
+                CAST('018f0b5d-6b2e-7c80-8000-000000000001' AS BLOB)
+              ) AS valid_id,
+              $relationDescriptionIntegrityFunctionName(
+                x'80'
+              ) AS malformed_description
+          ''').single;
+      result = (
+        validId: row['valid_id']! as int,
+        malformedDescription: row['malformed_description']! as int,
+      );
+    },
+  );
+  return result;
 }
 
 Future<void> _verifyDoableDatabaseSchema(
