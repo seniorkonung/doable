@@ -247,11 +247,23 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   );
 
   Future<RelationCounts> _readVerifiedRelationCounts(IntentionId id) async {
-    final aggregate = (await _relationCountAggregates.read([id]))[id];
-    if (aggregate == null || aggregate.hasIntegrityViolation) {
-      throw const _StoredIntentionCorruption();
+    return (await _readVerifiedRelationCountsFor([id]))[id]!;
+  }
+
+  Future<Map<IntentionId, RelationCounts>> _readVerifiedRelationCountsFor(
+    Iterable<IntentionId> ids,
+  ) async {
+    final uniqueIds = ids.toSet().toList(growable: false);
+    final aggregates = await _relationCountAggregates.read(uniqueIds);
+    final counts = <IntentionId, RelationCounts>{};
+    for (final id in uniqueIds) {
+      final aggregate = aggregates[id];
+      if (aggregate == null || aggregate.hasIntegrityViolation) {
+        throw const _StoredIntentionCorruption();
+      }
+      counts[id] = aggregate.counts;
     }
-    return aggregate.counts;
+    return Map.unmodifiable(counts);
   }
 
   @override
@@ -492,6 +504,14 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
 
+    final cascadedNeighborIds =
+        archiveState == domain.IntentionArchiveState.archived
+        ? await _readActiveRelationNeighborIds(id)
+        : const <IntentionId>[];
+    if (cascadedNeighborIds.isNotEmpty) {
+      await _archiveActiveRelations(id);
+    }
+
     final updated = domain.Intention(
       id: existing.id,
       title: existing.title,
@@ -513,11 +533,70 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     );
     final stored = await _readCommandSnapshot(id);
     if (stored == null) throw const _StoredIntentionCorruption();
+    final affectedCounts = archiveState == domain.IntentionArchiveState.archived
+        ? await _readVerifiedRelationCountsFor([id, ...cascadedNeighborIds])
+        : const <IntentionId, RelationCounts>{};
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored, counts),
+      after: _catalogEntrySnapshot(stored, affectedCounts[id] ?? counts),
+      affectedCounts: affectedCounts,
     );
+  }
+
+  Future<List<IntentionId>> _readActiveRelationNeighborIds(
+    IntentionId id,
+  ) async {
+    final serializedId = id.toCanonicalString();
+    final rows = await _database
+        .customSelect(
+          '''
+            SELECT DISTINCT
+              CASE
+                WHEN source_intention_id = ? THEN related_intention_id
+                ELSE source_intention_id
+              END AS neighbor_id
+            FROM long_term_relations
+            WHERE
+              is_archived = 0 AND
+              (source_intention_id = ? OR related_intention_id = ?)
+            ORDER BY neighbor_id
+          ''',
+          variables: [
+            Variable<String>(serializedId),
+            Variable<String>(serializedId),
+            Variable<String>(serializedId),
+          ],
+          readsFrom: {_database.longTermRelations},
+        )
+        .get();
+    return [
+      for (final row in rows)
+        _decodeStoredNeighborIntentionId(row.data['neighbor_id']),
+    ];
+  }
+
+  Future<void> _archiveActiveRelations(IntentionId id) async {
+    final serializedId = id.toCanonicalString();
+    await _database.customUpdate(
+      '''
+        UPDATE long_term_relations
+        SET is_archived = 1
+        WHERE
+          is_archived = 0 AND
+          (source_intention_id = ? OR related_intention_id = ?)
+      ''',
+      variables: [
+        Variable<String>(serializedId),
+        Variable<String>(serializedId),
+      ],
+      updates: {_database.longTermRelations},
+    );
+  }
+
+  IntentionId _decodeStoredNeighborIntentionId(Object? value) {
+    if (value is! String) throw const _StoredIntentionCorruption();
+    return _decodeStoredIntentionId(value);
   }
 
   Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
@@ -1113,15 +1192,17 @@ final class _CommittedIntentionCreated extends _CommittedIntentionCommand {
 }
 
 final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
-  const _CommittedIntentionUpdated({
+  _CommittedIntentionUpdated({
     required this.intention,
     required this.before,
     required this.after,
-  });
+    Map<IntentionId, RelationCounts> affectedCounts = const {},
+  }) : affectedCounts = Map.unmodifiable(affectedCounts);
 
   final domain.Intention intention;
   final IntentionCatalogEntrySnapshot before;
   final IntentionCatalogEntrySnapshot after;
+  final Map<IntentionId, RelationCounts> affectedCounts;
 
   @override
   IntentionId get intentionId => intention.id;
@@ -1137,6 +1218,14 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
       before: before,
       after: after,
     ),
+    additionalChanges: [
+      for (final entry in affectedCounts.entries)
+        IntentionRelationCountsChanged(
+          revision: revision,
+          intentionId: entry.key,
+          counts: entry.value,
+        ),
+    ],
   );
 }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -8,6 +9,7 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -309,6 +311,267 @@ void main() {
       isEmpty,
     );
   });
+
+  test('архивирует только непосредственные активные связи и возвращает абсолютные счётчики', () async {
+    final owner = _id(_uuid(80));
+    final firstNeighbor = _id(_uuid(81));
+    final secondNeighbor = _id(_uuid(82));
+    final archivedNeighbor = _id(_uuid(83));
+    final unrelated = _id(_uuid(84));
+    for (final id in [
+      owner,
+      firstNeighbor,
+      secondNeighbor,
+      archivedNeighbor,
+      unrelated,
+    ]) {
+      await _insertIntention(
+        database,
+        id,
+        title: 'Намерение ${id.toCanonicalString()}',
+      );
+    }
+    await _insertRelation(
+      database,
+      id: _uuid(180),
+      sourceId: owner,
+      relatedId: firstNeighbor,
+      type: 'need',
+      isArchived: false,
+    );
+    await _insertRelation(
+      database,
+      id: _uuid(181),
+      sourceId: secondNeighbor,
+      relatedId: owner,
+      type: 'can',
+      isArchived: false,
+    );
+    await _insertRelation(
+      database,
+      id: _uuid(182),
+      sourceId: firstNeighbor,
+      relatedId: secondNeighbor,
+      type: 'can',
+      isArchived: false,
+    );
+    await _insertRelation(
+      database,
+      id: _uuid(183),
+      sourceId: archivedNeighbor,
+      relatedId: owner,
+      type: 'need',
+      isArchived: true,
+    );
+    await _insertRelation(
+      database,
+      id: _uuid(184),
+      sourceId: archivedNeighbor,
+      relatedId: unrelated,
+      type: 'need',
+      isArchived: false,
+    );
+
+    final result = await repository.execute(ArchiveIntention(owner));
+
+    final confirmed = _confirmedCommand(result);
+    final success = confirmed.value as IntentionSaved;
+    final catalogMutation = success.catalogMutation as IntentionCatalogUpdated;
+    expect(catalogMutation.before.summary.activeRelationCount, 2);
+    expect(catalogMutation.after.summary.activeRelationCount, 0);
+    final countChanges = {
+      for (final change
+          in confirmed.changes.whereType<IntentionRelationCountsChanged>())
+        change.intentionId: change.counts,
+    };
+    expect(
+      countChanges.keys,
+      unorderedEquals([owner, firstNeighbor, secondNeighbor]),
+    );
+    expect(countChanges[owner]?.active, 0);
+    expect(countChanges[owner]?.archived, 3);
+    expect(countChanges[firstNeighbor]?.active, 1);
+    expect(countChanges[firstNeighbor]?.archived, 1);
+    expect(countChanges[secondNeighbor]?.active, 1);
+    expect(countChanges[secondNeighbor]?.archived, 1);
+    expect(await _relationArchiveStates(database), {
+      _uuid(180): true,
+      _uuid(181): true,
+      _uuid(182): false,
+      _uuid(183): true,
+      _uuid(184): false,
+    });
+    final intentions = {
+      for (final row in await database.select(database.intentions).get())
+        row.id: row,
+    };
+    expect(intentions[owner.toCanonicalString()]?.isArchived, isTrue);
+    expect(intentions[firstNeighbor.toCanonicalString()]?.isArchived, isFalse);
+    expect(intentions[secondNeighbor.toCanonicalString()]?.isArchived, isFalse);
+    expect(
+      intentions[archivedNeighbor.toCanonicalString()]?.isArchived,
+      isFalse,
+    );
+    expect(intentions[unrelated.toCanonicalString()]?.isArchived, isFalse);
+    expect(
+      intentions[owner.toCanonicalString()]?.updatedAt,
+      DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
+    );
+    expect(
+      intentions.entries
+          .where((entry) => entry.key != owner.toCanonicalString())
+          .map((entry) => entry.value.updatedAt),
+      everyElement(1),
+    );
+
+    final restore = _confirmedCommand(
+      await repository.execute(RestoreIntention(owner)),
+    );
+
+    expect(
+      restore.changes.whereType<IntentionRelationCountsChanged>(),
+      isEmpty,
+    );
+    expect(await _relationArchiveStates(database), {
+      _uuid(180): true,
+      _uuid(181): true,
+      _uuid(182): false,
+      _uuid(183): true,
+      _uuid(184): false,
+    });
+    final restoredOwner = await (database.select(
+      database.intentions,
+    )..where((row) => row.id.equals(owner.toCanonicalString()))).getSingle();
+    expect(restoredOwner.isArchived, isFalse);
+  });
+
+  test(
+    'перечитывает после каскада только владельца и соседей изменённых связей',
+    () async {
+      await database.close();
+      final trace = _SelectTrace();
+      database = AppDatabase(
+        observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          trace,
+        ),
+      );
+      await database.open();
+      repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 19),
+        diagnostics,
+      );
+      final owner = _id(_uuid(90));
+      final activeNeighbor = _id(_uuid(91));
+      final archivedNeighbor = _id(_uuid(92));
+      final unrelated = _id(_uuid(93));
+      for (final id in [owner, activeNeighbor, archivedNeighbor, unrelated]) {
+        await _insertIntention(database, id);
+      }
+      await _insertRelation(
+        database,
+        id: _uuid(190),
+        sourceId: owner,
+        relatedId: activeNeighbor,
+        type: 'need',
+        isArchived: false,
+      );
+      await _insertRelation(
+        database,
+        id: _uuid(191),
+        sourceId: archivedNeighbor,
+        relatedId: owner,
+        type: 'can',
+        isArchived: true,
+      );
+      final ownerEvents = StreamIterator(repository.watchIntention(owner));
+      final activeNeighborEvents = StreamIterator(
+        repository.watchIntention(activeNeighbor),
+      );
+      final archivedNeighborEvents = StreamIterator(
+        repository.watchIntention(archivedNeighbor),
+      );
+      final unrelatedEvents = StreamIterator(
+        repository.watchIntention(unrelated),
+      );
+      addTearDown(ownerEvents.cancel);
+      addTearDown(activeNeighborEvents.cancel);
+      addTearDown(archivedNeighborEvents.cancel);
+      addTearDown(unrelatedEvents.cancel);
+      for (final events in [
+        ownerEvents,
+        activeNeighborEvents,
+        archivedNeighborEvents,
+        unrelatedEvents,
+      ]) {
+        expect(await events.moveNext(), isTrue);
+      }
+      trace.statements.clear();
+
+      final archived = _confirmedCommand(
+        await repository.execute(ArchiveIntention(owner)),
+      );
+
+      expect(await ownerEvents.moveNext(), isTrue);
+      expect(await activeNeighborEvents.moveNext(), isTrue);
+      final ownerSnapshot = _successfulSnapshot(ownerEvents.current);
+      final neighborSnapshot = _successfulSnapshot(
+        activeNeighborEvents.current,
+      );
+      expect(
+        ownerSnapshot.revision.compareTo(archived.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(
+        neighborSnapshot.revision.compareTo(archived.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(
+        ownerSnapshot.value?.intention.archiveState,
+        IntentionArchiveState.archived,
+      );
+      expect(ownerSnapshot.value?.relationCounts.active, 0);
+      expect(ownerSnapshot.value?.relationCounts.archived, 2);
+      expect(neighborSnapshot.value?.relationCounts.active, 0);
+      expect(neighborSnapshot.value?.relationCounts.archived, 1);
+      await pumpEventQueue();
+      expect(_detailReadStatements(trace), hasLength(2));
+
+      trace.statements.clear();
+      final restored = _confirmedCommand(
+        await repository.execute(RestoreIntention(owner)),
+      );
+      expect(await ownerEvents.moveNext(), isTrue);
+      expect(
+        _successfulSnapshot(ownerEvents.current).revision
+            .compareTo(restored.revision),
+        GraphRevisionOrder.same,
+      );
+      await pumpEventQueue();
+      expect(_detailReadStatements(trace), hasLength(1));
+
+      trace.statements.clear();
+      final archivedWithoutActiveRelations = _confirmedCommand(
+        await repository.execute(ArchiveIntention(owner)),
+      );
+      expect(await ownerEvents.moveNext(), isTrue);
+      await pumpEventQueue();
+      expect(_detailReadStatements(trace), hasLength(1));
+
+      trace.statements.clear();
+      final noOp = _confirmedCommand(
+        await repository.execute(ArchiveIntention(owner)),
+      );
+      await pumpEventQueue();
+      expect(
+        archivedWithoutActiveRelations.revision.compareTo(noOp.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(_detailReadStatements(trace), isEmpty);
+    },
+  );
 }
 
 Future<void> _insertAllGroups(
@@ -385,6 +648,43 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
 
 String _uuid(int value) =>
     '018f0b5d-6b2e-7c80-8000-${value.toString().padLeft(12, '0')}';
+
+ConfirmedGraphResult<IntentionCommandSuccess> _confirmedCommand(
+  Result<ConfirmedGraphResult<IntentionCommandSuccess>> result,
+) {
+  expect(
+    result,
+    isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+  );
+  return (result
+          as ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>)
+      .value;
+}
+
+GraphSnapshot<IntentionDetails?> _successfulSnapshot(
+  Result<GraphSnapshot<IntentionDetails?>> result,
+) {
+  expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
+  return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
+}
+
+Future<Map<String, bool>> _relationArchiveStates(AppDatabase database) async =>
+    {
+      for (final row in await database.customSelect('''
+    SELECT id, is_archived
+    FROM long_term_relations
+    ORDER BY id
+  ''').get())
+        row.read<String>('id'): row.read<int>('is_archived') == 1,
+    };
+
+Iterable<String> _detailReadStatements(_SelectTrace trace) =>
+    trace.statements.where(
+      (statement) =>
+          statement.contains('FROM intentions') &&
+          statement.contains('description') &&
+          !statement.contains('title_search_key'),
+    );
 
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final List<String> statements = [];
