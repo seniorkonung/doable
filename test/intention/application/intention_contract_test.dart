@@ -4,11 +4,13 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -496,35 +498,36 @@ void main() {
   });
 
   group('общая граница личного графа', () {
-    test(
-      'выражает текущие чтения и команды намерений без методов связей',
-      () async {
-        final PersonalGraphRepository repository =
-            _FailingPersonalGraphRepository();
-        final id = _intentionId('00000000-0000-4000-8000-000000000001');
+    test('выражает чтения намерений и их счётчиков', () async {
+      final PersonalGraphRepository repository =
+          _FailingPersonalGraphRepository();
+      final id = _intentionId('00000000-0000-4000-8000-000000000001');
 
-        expect(
-          await repository.getCatalogPage(_query()),
-          isA<ResultFailure<IntentionCatalogPage>>(),
-        );
-        await expectLater(
-          repository.watchIntention(id),
-          emits(
-            isA<ResultFailure<GraphSnapshot<Intention?>>>().having(
-              (result) => result.failure,
-              'failure',
-              isA<IntentionUnavailableFailure>(),
-            ),
+      expect(
+        await repository.getCatalogPage(_query()),
+        isA<ResultFailure<IntentionCatalogPage>>(),
+      );
+      expect(
+        await repository.getRelationCounts(id),
+        isA<ResultFailure<GraphSnapshot<RelationCounts>>>(),
+      );
+      await expectLater(
+        repository.watchIntention(id),
+        emits(
+          isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
+            (result) => result.failure,
+            'failure',
+            isA<IntentionUnavailableFailure>(),
           ),
-        );
-        expect(
-          await repository.execute(
-            const CreateIntention(title: 'Здоровье', description: null),
-          ),
-          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-        );
-      },
-    );
+        ),
+      );
+      expect(
+        await repository.execute(
+          const CreateIntention(title: 'Здоровье', description: null),
+        ),
+        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+    });
 
     test('снимок связывает подтверждённое значение с одной ревизией', () {
       const revision = _TestGraphRevision(epoch: 'первая', sequence: 3);
@@ -649,6 +652,7 @@ IntentionSummary _summary({
     hasDescription: false,
     readiness: IntentionReadiness.notReady,
     archiveState: archiveState,
+    activeRelationCount: 0,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
   );
@@ -762,8 +766,14 @@ final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
   ) async => const ResultFailure(IntentionUnavailableFailure());
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
-      Stream.value(const ResultFailure(IntentionUnavailableFailure()));
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) async => const ResultFailure(IntentionUnavailableFailure());
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) => Stream.value(const ResultFailure(IntentionUnavailableFailure()));
 }
 
 final class _EmptyGraphCommandOutcome implements GraphCommandOutcome {

@@ -4,6 +4,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -1044,9 +1045,12 @@ void main() {
       )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
       expect(row.titleSearchKey, 'обновлённое название');
       final snapshot = await repository.watchIntention(id).first;
-      expect(snapshot, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+      expect(snapshot, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
       final watched =
-          (snapshot as ResultSuccess<GraphSnapshot<Intention?>>).value.value;
+          (snapshot as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+              .value
+              .value
+              ?.intention;
       expect(watched?.id, id);
       expect(watched?.title, updated.title);
       expect(watched?.description, updated.description);
@@ -1287,7 +1291,7 @@ void main() {
         await repository.getCatalogPage(query),
       ).revision;
       writeTrace.overrideSelectAfter(
-        skippedNonEmptySelects: 1,
+        skippedNonEmptySelects: 2,
         overrides: const {'updated_at': 1.5},
       );
 
@@ -1410,9 +1414,12 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
 IntentionId _idForSequence(int value) =>
     _id('018f0b5d-6b2e-7c80-8000-${value.toRadixString(16).padLeft(12, '0')}');
 
-Intention? _watched(Result<GraphSnapshot<Intention?>> result) {
-  expect(result, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
-  return (result as ResultSuccess<GraphSnapshot<Intention?>>).value.value;
+Intention? _watched(Result<GraphSnapshot<IntentionDetails?>> result) {
+  expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
+  return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+      .value
+      .value
+      ?.intention;
 }
 
 Matcher _deleted(IntentionId id) =>

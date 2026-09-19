@@ -191,17 +191,31 @@ final class IntentionSummary {
     required this.hasDescription,
     required this.readiness,
     required this.archiveState,
+    required int activeRelationCount,
     required this.createdAt,
     required this.updatedAt,
-  }) : title = IntentionText.normalizeTitle(title);
+  }) : title = IntentionText.normalizeTitle(title),
+       activeRelationCount = _requireNonNegativeCount(activeRelationCount);
 
   final IntentionId id;
   final String title;
   final bool hasDescription;
   final IntentionReadiness readiness;
   final IntentionArchiveState archiveState;
+  final int activeRelationCount;
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
+
+  static int _requireNonNegativeCount(int value) {
+    if (value < 0) {
+      throw ArgumentError.value(
+        value,
+        'activeRelationCount',
+        'Количество активных связей не может быть отрицательным.',
+      );
+    }
+    return value;
+  }
 }
 
 abstract interface class IntentionCatalogEntrySnapshot {

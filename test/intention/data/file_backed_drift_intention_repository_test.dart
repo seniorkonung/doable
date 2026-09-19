@@ -9,6 +9,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -46,7 +47,8 @@ void main() {
       );
 
       expect(result, _unexpectedCommandFailure());
-      final firstSnapshot = Completer<Result<GraphSnapshot<Intention?>>>();
+      final firstSnapshot =
+          Completer<Result<GraphSnapshot<IntentionDetails?>>>();
       final subscription = firstRepository
           .watchIntention(id)
           .listen(firstSnapshot.complete);
@@ -169,7 +171,8 @@ void main() {
             await firstRepository.execute(scenario.failedCommand(scenario.id)),
             _unexpectedCommandFailure(),
           );
-          final firstSnapshot = Completer<Result<GraphSnapshot<Intention?>>>();
+          final firstSnapshot =
+              Completer<Result<GraphSnapshot<IntentionDetails?>>>();
           final subscription = firstRepository
               .watchIntention(scenario.id)
               .listen(firstSnapshot.complete);
@@ -591,7 +594,7 @@ Future<GraphRevision> _createFirstObjectGraph(
     _deleted(deletedId),
   );
 
-  final firstSnapshot = Completer<Result<GraphSnapshot<Intention?>>>();
+  final firstSnapshot = Completer<Result<GraphSnapshot<IntentionDetails?>>>();
   final subscription = repository
       .watchIntention(activeId)
       .listen(firstSnapshot.complete);
@@ -637,13 +640,18 @@ Intention _saved(Result<ConfirmedGraphResult<IntentionCommandSuccess>> result) {
 }
 
 GraphSnapshot<Intention?> _graphSnapshot(
-  Result<GraphSnapshot<Intention?>> result,
+  Result<GraphSnapshot<IntentionDetails?>> result,
 ) {
-  expect(result, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
-  return (result as ResultSuccess<GraphSnapshot<Intention?>>).value;
+  expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
+  final snapshot =
+      (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
+  return GraphSnapshot(
+    value: snapshot.value?.intention,
+    revision: snapshot.revision,
+  );
 }
 
-Intention? _watched(Result<GraphSnapshot<Intention?>> result) =>
+Intention? _watched(Result<GraphSnapshot<IntentionDetails?>> result) =>
     _graphSnapshot(result).value;
 
 Matcher _deleted(IntentionId id) =>

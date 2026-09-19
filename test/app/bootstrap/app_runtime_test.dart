@@ -15,9 +15,10 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -284,7 +285,14 @@ final class _ControlledPersonalGraphRepository
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) =>
       throw UnsupportedError('Подробное чтение не используется в этих тестах.');
 }
 

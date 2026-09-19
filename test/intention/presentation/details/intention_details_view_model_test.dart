@@ -38,13 +38,21 @@ void main() {
     await waitForDetailRequests(repository, 1);
     expect(repository.detailIds.single, intention.id);
 
-    repository.detailRequests.single.add(ResultSuccess(intention));
+    repository.detailRequests.single.add(
+      ResultSuccess(intention),
+      relationCounts: testRelationCounts(activeNeedOutgoing: 3),
+    );
     await pumpEventQueue();
 
     expect(
       container.read(intentionDetailsViewModelProvider(intention.id)),
       isA<IntentionDetailsLoaded>()
           .having((state) => state.intention, 'намерение', same(intention))
+          .having(
+            (state) => state.details.activeRelationCount,
+            'активные связи',
+            3,
+          )
           .having(
             (state) => state.isOperationRunning,
             'выполняющаяся операция',
@@ -1075,7 +1083,7 @@ void main() {
   });
 
   test(
-    'повторно открытый details слушает completion до первого чтения',
+    'повторно открытый details ждёт сводку после completion до первого чтения',
     () async {
       final repository = ControlledDetailsRepository();
       final container = _detailsContainer(repository);
@@ -1111,6 +1119,14 @@ void main() {
       await waitForDetailRequests(repository, 2);
 
       expect(repository.detailIds, [before.id, before.id]);
+      expect(
+        container.read(intentionDetailsViewModelProvider(before.id)),
+        isA<IntentionDetailsLoading>(),
+      );
+
+      repository.detailRequests[1].add(ResultSuccess(saved));
+      await pumpEventQueue();
+
       expect(
         container.read(intentionDetailsViewModelProvider(before.id)),
         isA<IntentionDetailsLoaded>().having(

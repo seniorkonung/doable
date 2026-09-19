@@ -4,33 +4,45 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 
 final class ControlledDetailRequest {
   ControlledDetailRequest() {
-    controller = StreamController<Result<GraphSnapshot<Intention?>>>(
+    controller = StreamController<Result<GraphSnapshot<IntentionDetails?>>>(
       onCancel: () {
         cancellationCount += 1;
       },
     );
   }
 
-  late final StreamController<Result<GraphSnapshot<Intention?>>> controller;
+  late final StreamController<Result<GraphSnapshot<IntentionDetails?>>>
+  controller;
   var cancellationCount = 0;
 
   void add(
     Result<Intention?> result, {
     GraphRevision revision = const TestDetailsRevision(0),
+    RelationCounts? relationCounts,
   }) {
     final snapshotResult = switch (result) {
-      ResultSuccess(:final value) => ResultSuccess<GraphSnapshot<Intention?>>(
-        GraphSnapshot(value: value, revision: revision),
-      ),
-      ResultFailure(:final failure) => ResultFailure<GraphSnapshot<Intention?>>(
-        failure,
-      ),
+      ResultSuccess(:final value) =>
+        ResultSuccess<GraphSnapshot<IntentionDetails?>>(
+          GraphSnapshot(
+            value: value == null
+                ? null
+                : IntentionDetails(
+                    intention: value,
+                    relationCounts: relationCounts ?? testRelationCounts(),
+                  ),
+            revision: revision,
+          ),
+        ),
+      ResultFailure(:final failure) =>
+        ResultFailure<GraphSnapshot<IntentionDetails?>>(failure),
     };
     controller.add(snapshotResult);
   }
@@ -62,7 +74,21 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   }
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) {
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) => Future.value(
+    ResultSuccess(
+      GraphSnapshot(
+        value: testRelationCounts(),
+        revision: const TestDetailsRevision(0),
+      ),
+    ),
+  );
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) {
     detailIds.add(id);
     final request = ControlledDetailRequest();
     detailRequests.add(request);
@@ -143,15 +169,31 @@ IntentionId testDetailsIntentionId(int index) {
   };
 }
 
-IntentionSummary testDetailsSummary(Intention intention) => IntentionSummary(
+IntentionSummary testDetailsSummary(
+  Intention intention, {
+  int activeRelationCount = 0,
+}) => IntentionSummary(
   id: intention.id,
   title: intention.title,
   hasDescription: intention.description != null,
   readiness: intention.readiness,
   archiveState: intention.archiveState,
+  activeRelationCount: activeRelationCount,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
 );
+
+RelationCounts testRelationCounts({int activeNeedOutgoing = 0}) =>
+    RelationCounts(
+      activeNeedIncoming: 0,
+      activeNeedOutgoing: activeNeedOutgoing,
+      activeCanIncoming: 0,
+      activeCanOutgoing: 0,
+      archivedNeedIncoming: 0,
+      archivedNeedOutgoing: 0,
+      archivedCanIncoming: 0,
+      archivedCanOutgoing: 0,
+    );
 
 Future<void> waitForDetailRequests(
   ControlledDetailsRepository repository,

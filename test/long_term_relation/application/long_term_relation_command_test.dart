@@ -374,18 +374,17 @@ _TestCatalogEntry _catalogEntry(
     hasDescription: false,
     readiness: IntentionReadiness.notReady,
     archiveState: IntentionArchiveState.active,
+    activeRelationCount: activeRelationCount,
     createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 19)),
     updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 19)),
   ),
-  activeRelationCount,
 );
 
 final class _TestCatalogEntry implements IntentionCatalogEntrySnapshot {
-  const _TestCatalogEntry(this.summary, this.activeRelationCount);
+  const _TestCatalogEntry(this.summary);
 
   @override
   final IntentionSummary summary;
-  final int activeRelationCount;
 
   @override
   bool matches(IntentionCatalogQuery query) => query.includes(summary);
