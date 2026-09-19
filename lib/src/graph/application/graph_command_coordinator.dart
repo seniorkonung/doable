@@ -73,6 +73,12 @@ sealed class GraphCommandCompletion {
 
   GraphOperationToken get token;
   GraphRevision? get revision;
+
+  /// Отличает отказ от успеха без знания конкретной предметной операции.
+  ///
+  /// Владение предъявлением одинаково для намерений и связей: успех сразу
+  /// принадлежит оболочке, а отказ — открытой экранной сессии инициатора.
+  bool get isFailure;
 }
 
 final class IntentionCommandCompletion extends GraphCommandCompletion {
@@ -98,6 +104,12 @@ final class IntentionCommandCompletion extends GraphCommandCompletion {
   GraphRevision? get revision => switch (confirmedResult) {
     ResultSuccess(:final value) => value.revision,
     ResultFailure() => null,
+  };
+
+  @override
+  bool get isFailure => switch (confirmedResult) {
+    ResultSuccess() => false,
+    ResultFailure() => true,
   };
 
   String? get presentationTitle => switch (result) {
@@ -134,6 +146,12 @@ final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   GraphRevision? get revision => switch (confirmedResult) {
     GraphResultSuccess(:final value) => value.revision,
     GraphResultFailure() => null,
+  };
+
+  @override
+  bool get isFailure => switch (confirmedResult) {
+    GraphResultSuccess() => false,
+    GraphResultFailure() => true,
   };
 }
 
@@ -199,18 +217,17 @@ final class GraphCommandCoordinatorDraining extends IntentionCommandStart
 ///
 /// Удержание claim само по себе не означает предъявления: подтверждать его
 /// может только компонент, получивший свидетельство первого доступного кадра.
-sealed class IntentionPresentationClaim {
-  const IntentionPresentationClaim._(this.token, this.completion, this._entry);
+sealed class GraphPresentationClaim {
+  const GraphPresentationClaim._(this.token, this.completion, this._entry);
 
-  final IntentionOperationToken token;
-  final IntentionCommandCompletion completion;
+  final GraphOperationToken token;
+  final GraphCommandCompletion completion;
   final _PresentationEntry _entry;
 }
 
 /// Право открытой экранной сессии предъявить собственную ошибку.
-final class IntentionInitiatorPresentationClaim
-    extends IntentionPresentationClaim {
-  const IntentionInitiatorPresentationClaim._(
+final class GraphInitiatorPresentationClaim extends GraphPresentationClaim {
+  const GraphInitiatorPresentationClaim._(
     super.token,
     super.completion,
     super._entry,
@@ -218,8 +235,8 @@ final class IntentionInitiatorPresentationClaim
 }
 
 /// Право оболочки предъявить success либо fallback-ошибку.
-final class IntentionAppPresentationClaim extends IntentionPresentationClaim {
-  const IntentionAppPresentationClaim._(
+final class GraphAppPresentationClaim extends GraphPresentationClaim {
+  const GraphAppPresentationClaim._(
     super.token,
     super.completion,
     super._entry,
@@ -238,15 +255,15 @@ final class GraphAppPresentationRegistration {
   GraphAppPresentationRegistration._(this._coordinator);
 
   final GraphCommandCoordinator _coordinator;
-  Completer<IntentionAppPresentationClaim?>? _request;
-  IntentionAppPresentationClaim? _issued;
+  Completer<GraphAppPresentationClaim?>? _request;
+  GraphAppPresentationClaim? _issued;
   var _isReleased = false;
 
   /// Запрашивает следующий доступный app-результат в порядке публикации.
   ///
   /// Возвращает `null`, если регистрация освобождена или coordinator завершил
   /// работу до выдачи.
-  Future<IntentionAppPresentationClaim?> nextClaim() =>
+  Future<GraphAppPresentationClaim?> nextClaim() =>
       _coordinator._requestAppClaim(this);
 
   void release() => _coordinator._releaseRegistration(this);
@@ -258,7 +275,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       StreamController<GraphCommandCompletion>.broadcast(sync: true);
   // Публикация завершений последовательна в порядке принятия, поэтому порядок
   // вставки совпадает с порядком публикации terminal outcome.
-  final _entries = <IntentionOperationToken, _PresentationEntry>{};
+  final _entries = <GraphOperationToken, _PresentationEntry>{};
   final _registrations = <GraphAppPresentationRegistration>[];
   final _gates =
       <GraphCommandKey, ExclusiveOperation<GraphCommandCompletion>>{};
@@ -310,6 +327,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     final token = LongTermRelationOperationToken._();
     final acceptance = _acceptOperation(
       key: formKey,
+      entry: _PresentationEntry(token),
       execute: () async {
         final result = await _executeLongTermRelation(command);
         return LongTermRelationCommandCompletion._(
@@ -338,27 +356,19 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     IntentionOperationTarget target,
   ) {
     final token = IntentionOperationToken._();
-    final entry = _PresentationEntry(
-      token: token,
-      kind: _kindOf(command),
-      target: target,
-    );
+    final kind = _kindOf(command);
     final acceptance = _acceptOperation(
       key: key,
-      onAccepted: () => _entries[token] = entry,
+      entry: _PresentationEntry(token),
       execute: () async {
         final result = await _executeIntention(command);
         return IntentionCommandCompletion._(
           token: token,
-          kind: entry.kind,
+          kind: kind,
           target: target,
           confirmedResult: result,
         );
       },
-      prepareForPublication: (completion) {
-        entry.completion = completion as IntentionCommandCompletion;
-      },
-      afterPublication: _dispatchAppPresentation,
     );
     return switch (acceptance) {
       _GraphCommandAccepted(:final future) => IntentionCommandAccepted(
@@ -374,10 +384,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 
   _GraphCommandAcceptance _acceptOperation({
     required GraphCommandKey key,
+    required _PresentationEntry entry,
     required Future<GraphCommandCompletion> Function() execute,
-    void Function()? onAccepted,
-    void Function(GraphCommandCompletion completion)? prepareForPublication,
-    void Function()? afterPublication,
   }) {
     if (_isDraining) {
       return const _GraphCommandDraining();
@@ -391,7 +399,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return const _GraphCommandAlreadyRunning();
     }
 
-    onAccepted?.call();
+    _entries[entry.token] = entry;
     final started = gate.start(execute);
     if (started is ExclusiveOperationAlreadyRunning<GraphCommandCompletion>) {
       return const _GraphCommandAlreadyRunning();
@@ -412,10 +420,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     late final Future<void> tracked;
     final publication = _publicationTail.then<void>((_) async {
       final completion = await operationFuture;
-      prepareForPublication?.call(completion);
+      entry.completion = completion;
       _completionController.add(completion);
       completionCompleter.complete(completion);
-      afterPublication?.call();
+      _dispatchAppPresentation();
     });
     _publicationTail = publication;
     tracked = publication.whenComplete(() {
@@ -431,20 +439,20 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   ///
   /// Success инициатору не выдаётся: он сразу принадлежит оболочке. После
   /// освобождения сессии или выдачи права оболочке возвращает `null`.
-  IntentionInitiatorPresentationClaim? claimInitiatorFailure(
-    IntentionOperationToken token,
+  GraphInitiatorPresentationClaim? claimInitiatorFailure(
+    GraphOperationToken token,
   ) {
     final entry = _entries[token];
     final completion = entry?.completion;
     if (entry == null ||
         completion == null ||
-        completion.result is! ResultFailure<IntentionCommandSuccess> ||
+        !completion.isFailure ||
         entry.initiatorReleased ||
         entry.appClaim != null) {
       return null;
     }
 
-    return entry.initiatorClaim ??= IntentionInitiatorPresentationClaim._(
+    return entry.initiatorClaim ??= GraphInitiatorPresentationClaim._(
       token,
       completion,
       entry,
@@ -455,7 +463,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   ///
   /// Неподтверждённая ошибка становится доступной оболочке в своём прежнем
   /// порядке; прежний initiator claim больше не может её подтвердить.
-  void releaseInitiatorPresentation(IntentionOperationToken token) {
+  void releaseInitiatorPresentation(GraphOperationToken token) {
     final entry = _entries[token];
     if (entry == null || entry.initiatorReleased) {
       return;
@@ -469,7 +477,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   ///
   /// Запоздалый renderer прежнего claim не может освободить право, уже
   /// переданное другому владельцу.
-  void releaseInitiatorClaim(IntentionInitiatorPresentationClaim claim) {
+  void releaseInitiatorClaim(GraphInitiatorPresentationClaim claim) {
     final entry = _entries[claim.token];
     if (entry == null || !identical(entry.initiatorClaim, claim)) {
       return;
@@ -497,19 +505,19 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// Атомарно подтверждает фактическое предъявление действующим владельцем.
   ///
   /// Claim освобождённого или сменившегося владельца бездействует.
-  void confirmPresentation(IntentionPresentationClaim claim) {
+  void confirmPresentation(GraphPresentationClaim claim) {
     final entry = _entries[claim.token];
     if (entry == null || !identical(entry, claim._entry)) {
       return;
     }
 
     switch (claim) {
-      case IntentionInitiatorPresentationClaim():
+      case GraphInitiatorPresentationClaim():
         if (!identical(entry.initiatorClaim, claim)) {
           return;
         }
         _discardEntry(entry);
-      case IntentionAppPresentationClaim(:final _registration):
+      case GraphAppPresentationClaim(:final _registration):
         if (!identical(entry.appClaim, claim)) {
           return;
         }
@@ -534,7 +542,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     return shutdown.future;
   }
 
-  Future<IntentionAppPresentationClaim?> _requestAppClaim(
+  Future<GraphAppPresentationClaim?> _requestAppClaim(
     GraphAppPresentationRegistration registration,
   ) {
     if (registration._isReleased) {
@@ -545,7 +553,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return existing.future;
     }
 
-    final request = Completer<IntentionAppPresentationClaim?>();
+    final request = Completer<GraphAppPresentationClaim?>();
     registration._request = request;
     _dispatchAppPresentation();
     return request.future;
@@ -586,7 +594,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return;
     }
 
-    final claim = IntentionAppPresentationClaim._(
+    final claim = GraphAppPresentationClaim._(
       entry.token,
       completion,
       entry,
@@ -604,10 +612,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       if (completion == null || entry.appClaim != null) {
         continue;
       }
-      final belongsToApp = switch (completion.result) {
-        ResultSuccess() => true,
-        ResultFailure() => entry.initiatorReleased,
-      };
+      final belongsToApp = !completion.isFailure || entry.initiatorReleased;
       if (belongsToApp) {
         return entry;
       }
@@ -669,19 +674,13 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 }
 
 final class _PresentationEntry {
-  _PresentationEntry({
-    required this.token,
-    required this.kind,
-    required this.target,
-  });
+  _PresentationEntry(this.token);
 
-  final IntentionOperationToken token;
-  final IntentionCommandKind kind;
-  final IntentionOperationTarget target;
-  IntentionCommandCompletion? completion;
+  final GraphOperationToken token;
+  GraphCommandCompletion? completion;
   bool initiatorReleased = false;
-  IntentionInitiatorPresentationClaim? initiatorClaim;
-  IntentionAppPresentationClaim? appClaim;
+  GraphInitiatorPresentationClaim? initiatorClaim;
+  GraphAppPresentationClaim? appClaim;
 }
 
 sealed class _GraphCommandAcceptance {

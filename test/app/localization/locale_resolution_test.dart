@@ -112,6 +112,73 @@ void main() {
     },
   );
 
+  test('результаты создания связи локализованы на обоих языках', () async {
+    final english = await AppLocalizations.delegate.load(const Locale('en'));
+    final russian = await AppLocalizations.delegate.load(const Locale('ru'));
+
+    expect(english.graphOperationNewRelation, 'new relation');
+    expect(russian.graphOperationNewRelation, 'новая связь');
+    expect(english.relationEditorCreated, 'Relation created.');
+    expect(russian.relationEditorCreated, 'Связь создана.');
+    expect(
+      english.relationEditorCreateInvalidInput,
+      'Check the selected intentions and relation details.',
+    );
+    expect(
+      russian.relationEditorCreateInvalidInput,
+      'Проверьте выбранные намерения и данные связи.',
+    );
+    expect(
+      english.relationEditorCreatePairOccupied,
+      'A relation with this direction already exists between the selected '
+      'intentions.',
+    );
+    expect(
+      russian.relationEditorCreatePairOccupied,
+      'Связь этого направления между выбранными намерениями уже есть.',
+    );
+    expect(
+      english.relationEditorCreateParticipantNotFound,
+      'One of the selected intentions no longer exists.',
+    );
+    expect(
+      russian.relationEditorCreateParticipantNotFound,
+      'Одно из выбранных намерений больше не существует.',
+    );
+    expect(
+      english.relationEditorCreateParticipantArchived,
+      'Only active intentions can be linked.',
+    );
+    expect(
+      russian.relationEditorCreateParticipantArchived,
+      'Связать можно только активные намерения.',
+    );
+    expect(
+      english.relationEditorCreateUnavailable,
+      'The relation couldn’t be created. Try again.',
+    );
+    expect(
+      russian.relationEditorCreateUnavailable,
+      'Не удалось создать связь. Повторите попытку.',
+    );
+    expect(
+      english.relationEditorCreateCorruption,
+      'Stored data is damaged. The relation wasn’t created.',
+    );
+    expect(
+      russian.relationEditorCreateCorruption,
+      'Сохранённые данные повреждены. Связь не создана.',
+    );
+    expect(
+      english.relationEditorCreateUnexpected,
+      'The relation couldn’t be created because of an unexpected error.',
+    );
+    expect(
+      russian.relationEditorCreateUnexpected,
+      'Не удалось создать связь из-за непредвиденной ошибки.',
+    );
+  });
+
   test('русский и английский ARB содержат один полный набор строк', () async {
     final english = jsonDecode(
       await File('lib/l10n/app_en.arb').readAsString(),

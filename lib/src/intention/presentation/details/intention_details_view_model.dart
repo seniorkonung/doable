@@ -471,7 +471,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     IntentionDetailsStateChangeKind.delete => true,
   };
 
-  IntentionInitiatorPresentationClaim? _claimFailure(
+  GraphInitiatorPresentationClaim? _claimFailure(
     IntentionOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
 

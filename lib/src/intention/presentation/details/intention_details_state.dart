@@ -72,7 +72,7 @@ final class IntentionDetailsStateChange {
   final OperationState<Intention> operation;
 
   /// Право открытого просмотра предъявить ошибку перехода по видимому кадру.
-  final IntentionInitiatorPresentationClaim? failurePresentation;
+  final GraphInitiatorPresentationClaim? failurePresentation;
 
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
@@ -103,7 +103,7 @@ final class IntentionDetailsEdit {
   final OperationState<Intention> operation;
 
   /// Право открытой формы изменения предъявить ошибку по видимому кадру.
-  final IntentionInitiatorPresentationClaim? failurePresentation;
+  final GraphInitiatorPresentationClaim? failurePresentation;
 
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
@@ -129,7 +129,7 @@ final class IntentionDetailsEdit {
 
   IntentionDetailsEdit withOperation(
     OperationState<Intention> value, {
-    IntentionInitiatorPresentationClaim? failurePresentation,
+    GraphInitiatorPresentationClaim? failurePresentation,
   }) => IntentionDetailsEdit(
     title: title,
     description: description,

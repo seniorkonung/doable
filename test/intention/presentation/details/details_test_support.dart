@@ -9,6 +9,7 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -59,8 +60,10 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   final detailRequests = <ControlledDetailRequest>[];
   final catalogQueries = <IntentionCatalogQuery>[];
   final commands = <IntentionCommand>[];
+  final relationCommands = <LongTermRelationCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
+  final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
 
   Result<IntentionCatalogPage>? catalogResult;
   void Function(IntentionId id)? onWatchIntention;
@@ -118,13 +121,23 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
-    if (command is! IntentionCommand) {
-      throw UnsupportedError(
-        'Команды связей не используются в тесте подробного просмотра.',
-      );
-    }
-    return await _executeIntention(command as IntentionCommand)
-        as GraphCommandResult<TSuccess, TFailure>;
+    final result = switch (command) {
+      final IntentionCommand intention => await _executeIntention(intention),
+      final LongTermRelationCommand relation => await _executeRelation(
+        relation,
+      ),
+      _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
+    };
+    return result as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<LongTermRelationCommandResult> _executeRelation(
+    LongTermRelationCommand command,
+  ) {
+    relationCommands.add(command);
+    final request = Completer<LongTermRelationCommandResult>();
+    _relationCommandRequests.add(request);
+    return request.future;
   }
 
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
@@ -135,6 +148,11 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
     _commandRequests.add(request);
     return request.future;
   }
+
+  void completeRelationCommand(
+    int index,
+    LongTermRelationCommandResult result,
+  ) => _relationCommandRequests[index].complete(result);
 
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
     _commandRequests[index].complete(switch (result) {

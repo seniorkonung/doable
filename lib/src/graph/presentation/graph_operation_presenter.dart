@@ -7,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
+import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../shared/presentation/presentation_frame_evidence.dart';
 import '../application/graph_command_coordinator.dart';
+import '../application/graph_command_result.dart';
 
 /// Единственный владелец общей поверхности сообщений результатов операций.
 ///
@@ -109,7 +111,7 @@ final class _GraphOperationPresenterState
     );
     final controller = messenger.showSnackBar(
       SnackBar(
-        content: PresentationFrameEvidence<IntentionAppPresentationClaim>(
+        content: PresentationFrameEvidence<GraphAppPresentationClaim>(
           subject: surface.claim,
           requiresCurrentRoute: false,
           onPresented: (_) => _confirm(surface),
@@ -159,7 +161,7 @@ final class _GraphOperationPresenterState
 final class _PresentationSurface {
   _PresentationSurface(this.claim);
 
-  final IntentionAppPresentationClaim claim;
+  final GraphAppPresentationClaim claim;
   ScaffoldMessengerState? messenger;
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller;
   var isConfirmed = false;
@@ -177,6 +179,17 @@ final class _PresentationSurface {
 }
 
 String _messageFor(
+  AppLocalizations localizations,
+  GraphCommandCompletion completion,
+) => switch (completion) {
+  IntentionCommandCompletion() => _intentionMessage(localizations, completion),
+  LongTermRelationCommandCompletion() => _relationMessage(
+    localizations,
+    completion,
+  ),
+};
+
+String _intentionMessage(
   AppLocalizations localizations,
   IntentionCommandCompletion completion,
 ) {
@@ -202,11 +215,58 @@ String _messageFor(
   return localizations.graphOperationMessage(
     operation,
     target,
-    _outcomeFor(localizations, completion),
+    _intentionOutcomeFor(localizations, completion),
   );
 }
 
-String _outcomeFor(
+/// Связь не имеет собственного пользовательского названия, поэтому сообщение
+/// опирается только на локализованное обозначение вида операции и её предмета.
+String _relationMessage(
+  AppLocalizations localizations,
+  LongTermRelationCommandCompletion completion,
+) {
+  final (operation, target) = switch (completion.kind) {
+    LongTermRelationCommandKind.create => (
+      localizations.graphOperationCreate,
+      localizations.graphOperationNewRelation,
+    ),
+  };
+  return localizations.graphOperationMessage(
+    operation,
+    target,
+    _relationOutcomeFor(localizations, completion),
+  );
+}
+
+String _relationOutcomeFor(
+  AppLocalizations localizations,
+  LongTermRelationCommandCompletion completion,
+) => switch (completion.result) {
+  GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
+    (LongTermRelationCommandKind.create, LongTermRelationCreated()) =>
+      localizations.relationEditorCreated,
+  },
+  GraphResultFailure(:final failure) => switch (completion.kind) {
+    LongTermRelationCommandKind.create => switch (failure) {
+      LongTermRelationCommandValidationFailure() =>
+        localizations.relationEditorCreateInvalidInput,
+      LongTermRelationPairOccupiedFailure() =>
+        localizations.relationEditorCreatePairOccupied,
+      LongTermRelationParticipantNotFoundFailure() =>
+        localizations.relationEditorCreateParticipantNotFound,
+      LongTermRelationParticipantArchivedFailure() =>
+        localizations.relationEditorCreateParticipantArchived,
+      LongTermRelationUnavailableFailure() =>
+        localizations.relationEditorCreateUnavailable,
+      LongTermRelationCorruptionFailure() =>
+        localizations.relationEditorCreateCorruption,
+      LongTermRelationUnexpectedFailure() =>
+        localizations.relationEditorCreateUnexpected,
+    },
+  },
+};
+
+String _intentionOutcomeFor(
   AppLocalizations localizations,
   IntentionCommandCompletion completion,
 ) => switch (completion.result) {

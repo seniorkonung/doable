@@ -1121,7 +1121,14 @@ void main() {
 
     final claim = await presenter.nextClaim();
     expect(claim!.token, same(started.token));
-    expect(claim.completion.presentationTitle, intention.title);
+    expect(
+      claim.completion,
+      isA<IntentionCommandCompletion>().having(
+        (completion) => completion.presentationTitle,
+        'название намерения',
+        intention.title,
+      ),
+    );
     coordinator.confirmPresentation(claim);
 
     subscription.close();

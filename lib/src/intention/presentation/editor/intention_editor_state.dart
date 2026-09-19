@@ -35,7 +35,7 @@ final class IntentionEditorState {
 
   /// Право открытой формы предъявить текущую ошибку; подтверждается страницей
   /// только по кадру с видимым сообщением.
-  final IntentionInitiatorPresentationClaim? failurePresentation;
+  final GraphInitiatorPresentationClaim? failurePresentation;
 
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
@@ -62,7 +62,7 @@ final class IntentionEditorState {
   IntentionEditorState withOperation(
     OperationState<Intention> value, {
     IntentionEditorEvent? event,
-    IntentionInitiatorPresentationClaim? failurePresentation,
+    GraphInitiatorPresentationClaim? failurePresentation,
   }) => IntentionEditorState(
     title: title,
     description: description,

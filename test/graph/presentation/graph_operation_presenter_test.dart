@@ -1,9 +1,15 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -290,6 +296,117 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     },
   );
+
+  testWidgets(
+    'успех создания связи ждёт сообщение намерения в той же очереди',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final intention = harness.startDelete(index: 1, title: 'Намерение');
+      final relation = harness.startRelationCreation();
+      harness.completeDeleted(intention);
+      harness.completeRelationCreated(relation);
+      await tester.pumpAndSettle();
+
+      expect(find.text(_deleted('Намерение')), findsOneWidget);
+      expect(find.text(_relationCreated), findsNothing);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text(_deleted('Намерение')), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.text(_relationCreated), findsOneWidget);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('graph-operation-message')),
+        ),
+        matchesSemantics(
+          label: _relationCreated,
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
+      );
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets('успех создания связи не предлагается инлайн-владельцу', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final relation = harness.startRelationCreation(releaseInitiator: false);
+    harness.completeRelationCreated(relation);
+    await tester.pumpAndSettle();
+
+    expect(harness.claimInitiatorFailure(relation.token), isNull);
+    expect(find.text(_relationCreated), findsOneWidget);
+
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  for (final scenario in _relationFailures) {
+    testWidgets(
+      'переданная ошибка создания связи «${scenario.name}» предъявляется безопасным текстом',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester);
+        final relation = harness.startRelationCreation();
+        harness.completeRelationFailure(relation, scenario.failure);
+        await tester.pumpAndSettle();
+
+        expect(find.text(_relationOutcome(scenario.outcome)), findsOneWidget);
+
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets('результат связи без фокуса ждёт возвращения в resumed', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    final relation = harness.startRelationCreation();
+    harness.completeRelationCreated(relation);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(SnackBar), findsNothing);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.text(_relationCreated), findsOneWidget);
+
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets(
+    'пересоздание presenter сохраняет непредъявленный результат связи',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final relation = harness.startRelationCreation();
+      harness.completeRelationCreated(relation);
+      await tester.idle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(find.text(_relationCreated), findsOneWidget);
+
+      harness.presenterGeneration.value += 1;
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text(_relationCreated), findsOneWidget);
+
+      await _closeMessage(tester);
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.relationCommands, hasLength(1));
+    },
+  );
 }
 
 const _withoutPresenter = -1;
@@ -301,6 +418,70 @@ String _notDeleted(String title) =>
 
 String _linkedNotDeleted(String title) =>
     'Delete — “$title”: The intention is still linked and can’t be deleted.';
+
+String _relationOutcome(String outcome) => 'Create — “new relation”: $outcome';
+
+final _relationCreated = _relationOutcome('Relation created.');
+
+final _relationFailures =
+    <({String name, LongTermRelationCommandFailure failure, String outcome})>[
+      (
+        name: 'validation',
+        failure: const LongTermRelationCommandValidationFailure(
+          CreateLongTermRelationValidationFailure.sameIntention,
+        ),
+        outcome: 'Check the selected intentions and relation details.',
+      ),
+      (
+        name: 'conflict',
+        failure: LongTermRelationPairOccupiedFailure(_relationId),
+        outcome:
+            'A relation with this direction already exists between the '
+            'selected intentions.',
+      ),
+      (
+        name: 'notFound',
+        failure: LongTermRelationParticipantNotFoundFailure(
+          role: RelationParticipantRole.related,
+          intentionId: testDetailsIntentionId(2),
+        ),
+        outcome: 'One of the selected intentions no longer exists.',
+      ),
+      (
+        name: 'archived',
+        failure: LongTermRelationParticipantArchivedFailure(
+          role: RelationParticipantRole.source,
+          intentionId: testDetailsIntentionId(1),
+        ),
+        outcome: 'Only active intentions can be linked.',
+      ),
+      (
+        name: 'unavailable',
+        failure: const LongTermRelationUnavailableFailure(),
+        outcome: 'The relation couldn’t be created. Try again.',
+      ),
+      (
+        name: 'corruption',
+        failure: const LongTermRelationCorruptionFailure(),
+        outcome: 'Stored data is damaged. The relation wasn’t created.',
+      ),
+      (
+        name: 'unexpected',
+        failure: const LongTermRelationUnexpectedFailure(),
+        outcome:
+            'The relation couldn’t be created because of an unexpected '
+            'error.',
+      ),
+    ];
+
+final _relationId = switch (LongTermRelationId.decode(
+  '018f47c2-6b7d-7abc-8def-0123456789ab',
+)) {
+  LongTermRelationIdDecodingSuccess(:final id) => id,
+  InvalidLongTermRelationIdDecoding() => throw StateError(
+    'Некорректный fixture связи.',
+  ),
+};
 
 Future<void> _closeMessage(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 5));
@@ -315,6 +496,7 @@ final class _PresenterHarness {
   final ValueNotifier<int> presenterGeneration;
   final _commandIndexes = <IntentionCommandAccepted, int>{};
   final _titles = <IntentionCommandAccepted, (int, String)>{};
+  final _relationIndexes = <LongTermRelationCommandAccepted, int>{};
 
   GraphCommandCoordinator get _coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
@@ -354,6 +536,70 @@ final class _PresenterHarness {
       const ResultFailure(IntentionUnavailableFailure()),
     );
   }
+
+  LongTermRelationCommandAccepted startRelationCreation({
+    bool releaseInitiator = true,
+  }) {
+    final commandIndex = repository.relationCommands.length;
+    final accepted = _coordinator.acceptRelationCreation(
+      LongTermRelationCreationFormKey(),
+      CreateLongTermRelation(
+        sourceIntentionId: testDetailsIntentionId(1),
+        relatedIntentionId: testDetailsIntentionId(2),
+        type: LongTermRelationType.need,
+        priority: RelationPriority.p2,
+        description: null,
+      ),
+    ) as LongTermRelationCommandAccepted;
+    if (releaseInitiator) {
+      _coordinator.releaseInitiatorPresentation(accepted.token);
+    }
+    _relationIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  GraphInitiatorPresentationClaim? claimInitiatorFailure(
+    GraphOperationToken token,
+  ) => _coordinator.claimInitiatorFailure(token);
+
+  void completeRelationCreated(LongTermRelationCommandAccepted accepted) {
+    const revision = TestDetailsRevision(1);
+    final relation = LongTermRelation(
+      id: _relationId,
+      sourceIntentionId: testDetailsIntentionId(1),
+      relatedIntentionId: testDetailsIntentionId(2),
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: RelationScope.active,
+      creationSequence: RelationCreationSequence(1),
+    );
+    repository.completeRelationCommand(
+      _relationIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationCreated(
+            relation: relation,
+            description: null,
+            changes: <GraphChange>[
+              LongTermRelationCreatedChange(
+                revision: revision,
+                relation: relation,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeRelationFailure(
+    LongTermRelationCommandAccepted accepted,
+    LongTermRelationCommandFailure failure,
+  ) => repository.completeRelationCommand(
+    _relationIndexes[accepted]!,
+    GraphCommandFailed(failure),
+  );
 
   void completeBlockingRelations(IntentionCommandAccepted accepted) {
     final (index, _) = _titles[accepted]!;

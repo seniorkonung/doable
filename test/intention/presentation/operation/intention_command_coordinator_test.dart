@@ -362,7 +362,7 @@ void main() {
 
         expect(coordinator.claimInitiatorFailure(completion.token), isNull);
         final claim = await registration.nextClaim();
-        expect(claim, isA<IntentionAppPresentationClaim>());
+        expect(claim, isA<GraphAppPresentationClaim>());
         expect(claim!.completion, same(completion));
 
         coordinator.confirmPresentation(claim);
@@ -395,7 +395,7 @@ void main() {
       final initiatorClaim = coordinator.claimInitiatorFailure(
         failedCompletion.token,
       );
-      expect(initiatorClaim, isA<IntentionInitiatorPresentationClaim>());
+      expect(initiatorClaim, isA<GraphInitiatorPresentationClaim>());
       expect(
         coordinator.claimInitiatorFailure(failedCompletion.token),
         same(initiatorClaim),
@@ -487,7 +487,7 @@ void main() {
         final firstClaim = await registration.nextClaim();
         expect(firstClaim!.token, same(first.token));
 
-        IntentionAppPresentationClaim? secondClaim;
+        GraphAppPresentationClaim? secondClaim;
         final pending = registration.nextClaim()
           ..then((claim) => secondClaim = claim);
         expect(registration.nextClaim(), same(pending));
@@ -582,7 +582,7 @@ void main() {
       final coordinator = _graphCoordinator(repository);
       final previous = coordinator.registerAppPresentation();
       final next = coordinator.registerAppPresentation();
-      IntentionAppPresentationClaim? issued;
+      GraphAppPresentationClaim? issued;
       final request = next.nextClaim()..then((claim) => issued = claim);
 
       final accepted = _acceptExisting(

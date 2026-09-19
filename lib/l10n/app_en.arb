@@ -503,5 +503,41 @@
         "type": "String"
       }
     }
+  },
+  "graphOperationNewRelation": "new relation",
+  "@graphOperationNewRelation": {
+    "description": "Безопасное обозначение создаваемой связи до подтверждения"
+  },
+  "relationEditorCreated": "Relation created.",
+  "@relationEditorCreated": {
+    "description": "Подтверждение успешного создания долговременной связи"
+  },
+  "relationEditorCreateInvalidInput": "Check the selected intentions and relation details.",
+  "@relationEditorCreateInvalidInput": {
+    "description": "Ошибка проверки данных создания связи"
+  },
+  "relationEditorCreatePairOccupied": "A relation with this direction already exists between the selected intentions.",
+  "@relationEditorCreatePairOccupied": {
+    "description": "Конфликт занятой направленной пары при создании связи"
+  },
+  "relationEditorCreateParticipantNotFound": "One of the selected intentions no longer exists.",
+  "@relationEditorCreateParticipantNotFound": {
+    "description": "Отсутствие участника при создании связи"
+  },
+  "relationEditorCreateParticipantArchived": "Only active intentions can be linked.",
+  "@relationEditorCreateParticipantArchived": {
+    "description": "Конфликт архивного состояния участника при создании связи"
+  },
+  "relationEditorCreateUnavailable": "The relation couldn’t be created. Try again.",
+  "@relationEditorCreateUnavailable": {
+    "description": "Устранимая недоступность создания связи"
+  },
+  "relationEditorCreateCorruption": "Stored data is damaged. The relation wasn’t created.",
+  "@relationEditorCreateCorruption": {
+    "description": "Терминальное повреждение данных при создании связи"
+  },
+  "relationEditorCreateUnexpected": "The relation couldn’t be created because of an unexpected error.",
+  "@relationEditorCreateUnexpected": {
+    "description": "Терминальная непредвиденная ошибка создания связи"
   }
 }
