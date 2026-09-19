@@ -11,7 +11,7 @@ rules:
   plan:
     - Must use phased-planning skill
   tasks:
-    - Must use planning-and-task-breakdown skill
+    - Must use planning-and-task-breakdown and top-down-contract-development skills
 operations:
   apply:
     guidance:
