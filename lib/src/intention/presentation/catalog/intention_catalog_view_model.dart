@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
@@ -26,7 +28,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   int _queryGeneration = 0;
   Object? _activePageRequest;
   bool _isLoadingFirstPage = false;
-  final _mutationPackagesBeforeFirstPage = <List<IntentionCatalogMutation>>[];
+  final _packagesBeforeFirstPage = <_CatalogChangePackage>[];
   IntentionSummary? _cursorBoundary;
   _PendingCatalogContinuation? _pendingContinuation;
 
@@ -41,14 +43,14 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   Future<IntentionCatalogState> build() {
     _invalidatePageRequest();
     _isLoadingFirstPage = false;
-    _mutationPackagesBeforeFirstPage.clear();
+    _packagesBeforeFirstPage.clear();
     _cursorBoundary = null;
     _pendingContinuation = null;
     final repository = ref.watch(personalGraphRepositoryProvider);
     _policy = ref.watch(catalogPagingPolicyProvider);
     final completionSubscription = ref
         .watch(graphCommandCoordinatorProvider.notifier)
-        .intentionCompletions
+        .completions
         .listen(_handleCompletion);
     ref.onDispose(() => unawaited(completionSubscription.cancel()));
     ref.onCancel(() => _filterTimer?.cancel());
@@ -192,24 +194,24 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       if (mapped case final IntentionCatalogConfirmedState confirmed) {
         _cursorBoundary = _boundaryFromFirstPage(confirmed);
         var reconciled = confirmed;
-        for (final mutations in _mutationPackagesBeforeFirstPage) {
-          final next = _applyMutationPackage(reconciled, mutations);
+        for (final package in _packagesBeforeFirstPage) {
+          final next = _applyPackage(reconciled, package);
           if (next == null) {
-            _mutationPackagesBeforeFirstPage.clear();
+            _packagesBeforeFirstPage.clear();
             scheduleMicrotask(_restartFromFirstPage);
             return confirmed;
           }
           reconciled = next;
         }
-        _mutationPackagesBeforeFirstPage.clear();
+        _packagesBeforeFirstPage.clear();
         return reconciled;
       }
-      _mutationPackagesBeforeFirstPage.clear();
+      _packagesBeforeFirstPage.clear();
       return mapped;
     } on Object {
       if (_queryGeneration == generation) {
         _isLoadingFirstPage = false;
-        _mutationPackagesBeforeFirstPage.clear();
+        _packagesBeforeFirstPage.clear();
       }
       return IntentionCatalogUnexpected(selection: selection, query: query);
     }
@@ -571,30 +573,43 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
-  void _handleCompletion(IntentionCommandCompletion completion) {
-    switch (completion.confirmedResult) {
-      case ResultSuccess(:final value):
-        _reconcileMutations(
-          value.changes.whereType<IntentionCatalogMutation>().toList(
-            growable: false,
-          ),
-        );
-      case ResultFailure():
-        return;
+  /// Принимает подтверждённые изменения намерений и долговременных связей.
+  ///
+  /// Отказ не согласует данные: подтверждённого пакета у него нет.
+  void _handleCompletion(GraphCommandCompletion completion) {
+    switch (completion) {
+      case IntentionCommandCompletion(:final confirmedResult):
+        switch (confirmedResult) {
+          case ResultSuccess(:final value):
+            _reconcilePackage(
+              _CatalogChangePackage(value.revision, value.changes),
+            );
+          case ResultFailure():
+            return;
+        }
+      case LongTermRelationCommandCompletion(:final confirmedResult):
+        switch (confirmedResult) {
+          case GraphResultSuccess(:final value):
+            _reconcilePackage(
+              _CatalogChangePackage(value.revision, value.changes),
+            );
+          case GraphResultFailure():
+            return;
+        }
     }
   }
 
-  void _reconcileMutations(List<IntentionCatalogMutation> mutations) {
-    if (!ref.mounted || mutations.isEmpty) {
+  void _reconcilePackage(_CatalogChangePackage package) {
+    if (!ref.mounted) {
       return;
     }
     final current = state.value;
     if (_isLoadingFirstPage || current is! IntentionCatalogConfirmedState) {
-      _mutationPackagesBeforeFirstPage.add(mutations);
+      _packagesBeforeFirstPage.add(package);
       return;
     }
 
-    final reconciled = _applyMutationPackage(current, mutations);
+    final reconciled = _applyPackage(current, package);
     if (reconciled == null) {
       _restartFromFirstPage();
       return;
@@ -651,19 +666,15 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
-  IntentionCatalogConfirmedState? _applyMutationPackage(
+  IntentionCatalogConfirmedState? _applyPackage(
     IntentionCatalogConfirmedState confirmed,
-    List<IntentionCatalogMutation> mutations,
+    _CatalogChangePackage package,
   ) {
-    final revision = mutations.first.revision;
-    if (mutations.any(
-      (mutation) =>
-          mutation.revision.compareTo(revision) != GraphRevisionOrder.same,
-    )) {
+    if (package.hasForeignRevision) {
       return null;
     }
 
-    switch (revision.compareTo(confirmed.revision)) {
+    switch (package.revision.compareTo(confirmed.revision)) {
       case GraphRevisionOrder.older || GraphRevisionOrder.same:
         return confirmed;
       case GraphRevisionOrder.differentEpoch:
@@ -673,11 +684,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
 
     var reconciled = confirmed;
-    final changedIds = <IntentionId>{};
-    for (final mutation in mutations) {
+    final mutatedIds = <IntentionId>{};
+    for (final mutation in package.mutations) {
       final changedId =
           mutation.after?.summary.id ?? mutation.before?.summary.id;
-      if (changedId == null || !changedIds.add(changedId)) {
+      if (changedId == null || !mutatedIds.add(changedId)) {
         return null;
       }
       final next = _applyMutationContent(reconciled, mutation);
@@ -686,7 +697,76 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       }
       reconciled = next;
     }
-    return reconciled;
+
+    final countedIds = <IntentionId>{};
+    for (final change in package.countChanges) {
+      if (!countedIds.add(change.intentionId)) {
+        return null;
+      }
+      reconciled = _applyCountsContent(reconciled, change);
+    }
+
+    return _withRevision(reconciled, package.revision);
+  }
+
+  /// Заменяет абсолютное количество активных связей загруженной строки.
+  ///
+  /// Состав загруженной части, число совпадений и курсор сохраняются:
+  /// у намерения вне выдачи нет строки, которую следует заменить.
+  IntentionCatalogConfirmedState _applyCountsContent(
+    IntentionCatalogConfirmedState confirmed,
+    IntentionRelationCountsChanged change,
+  ) {
+    if (confirmed is! IntentionCatalogLoaded) {
+      return confirmed;
+    }
+    final index = confirmed.items.indexWhere(
+      (item) => item.id == change.intentionId,
+    );
+    if (index < 0) {
+      return confirmed;
+    }
+
+    final items = [...confirmed.items];
+    items[index] = items[index].withActiveRelationCount(change.counts.active);
+    return IntentionCatalogLoaded(
+      selection: confirmed.selection,
+      query: confirmed.query,
+      items: items,
+      totalCount: confirmed.totalCount,
+      nextCursor: confirmed.nextCursor,
+      revision: confirmed.revision,
+      continuation: confirmed.continuation,
+    );
+  }
+
+  /// Фиксирует ревизию применённого пакета даже без затронутых строк.
+  ///
+  /// Иначе более новое продолжение ждало бы уже полученное завершение.
+  IntentionCatalogConfirmedState _withRevision(
+    IntentionCatalogConfirmedState confirmed,
+    GraphRevision revision,
+  ) {
+    if (confirmed.revision.compareTo(revision) == GraphRevisionOrder.same) {
+      return confirmed;
+    }
+    return switch (confirmed) {
+      IntentionCatalogLoaded(:final items, :final continuation) =>
+        IntentionCatalogLoaded(
+          selection: confirmed.selection,
+          query: confirmed.query,
+          items: items,
+          totalCount: confirmed.totalCount,
+          nextCursor: confirmed.nextCursor,
+          revision: revision,
+          continuation: continuation,
+        ),
+      IntentionCatalogEmpty() => IntentionCatalogEmpty(
+        selection: confirmed.selection,
+        query: confirmed.query,
+        revision: revision,
+      ),
+    };
   }
 
   IntentionCatalogConfirmedState? _applyMutationContent(
@@ -747,6 +827,31 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     final boundary = _cursorBoundary;
     return boundary != null && confirmed.query.compare(summary, boundary) <= 0;
   }
+}
+
+/// Каталожная часть подтверждённого пакета изменений графа.
+///
+/// Пакет применяется целиком и ровно один раз: каталожные мутации задают
+/// состав загруженной части, а изменения количеств заменяют абсолютные
+/// числа уже загруженных строк, не затрагивая их состав.
+final class _CatalogChangePackage {
+  _CatalogChangePackage(this.revision, Iterable<GraphChange> changes)
+    : mutations = List.unmodifiable(
+        changes.whereType<IntentionCatalogMutation>(),
+      ),
+      countChanges = List.unmodifiable(
+        changes.whereType<IntentionRelationCountsChanged>(),
+      );
+
+  final GraphRevision revision;
+  final List<IntentionCatalogMutation> mutations;
+  final List<IntentionRelationCountsChanged> countChanges;
+
+  bool get hasForeignRevision =>
+      mutations.any(_isForeign) || countChanges.any(_isForeign);
+
+  bool _isForeign(GraphChange change) =>
+      change.revision.compareTo(revision) != GraphRevisionOrder.same;
 }
 
 final class _PendingCatalogContinuation {
