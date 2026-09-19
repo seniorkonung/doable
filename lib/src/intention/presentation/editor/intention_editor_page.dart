@@ -186,6 +186,8 @@ final class _IntentionEditorPageState
       IntentionGenericValidationFailure() ||
       IntentionTextInputValidationFailure() => localizations.editorInvalidInput,
       IntentionConflictFailure() => localizations.editorCreateConflict,
+      IntentionHasBlockingRelationsFailure() =>
+        localizations.editorCreateUnexpected,
       IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
       IntentionCorruptionFailure() => localizations.editorCreateCorruption,
       IntentionNotFoundFailure() ||

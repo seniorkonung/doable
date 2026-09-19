@@ -430,7 +430,8 @@ final class _DetailsActions extends StatelessWidget {
     IntentionGenericValidationFailure() ||
     IntentionTextInputValidationFailure() => localizations.detailsDeleteInvalid,
     IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
-    IntentionConflictFailure() => localizations.detailsDeleteConflict,
+    IntentionConflictFailure() || IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsDeleteConflict,
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
@@ -445,6 +446,8 @@ final class _DetailsActions extends StatelessWidget {
       localizations.detailsStateChangeInvalid,
     IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
     IntentionConflictFailure() => localizations.detailsStateChangeConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsStateChangeUnexpected,
     IntentionUnavailableFailure() =>
       localizations.detailsStateChangeUnavailable,
     IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
@@ -649,6 +652,8 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
         localizations.detailsUpdateInvalidInput,
       IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
       IntentionConflictFailure() => localizations.detailsUpdateConflict,
+      IntentionHasBlockingRelationsFailure() =>
+        localizations.detailsUpdateUnexpected,
       IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
       IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
       IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,

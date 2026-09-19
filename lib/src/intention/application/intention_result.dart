@@ -1,4 +1,5 @@
 import '../../graph/application/graph_command_result.dart';
+import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
 
 enum IntentionFailureCode {
@@ -54,6 +55,15 @@ final class IntentionNotFoundFailure extends IntentionFailure {
 
 final class IntentionConflictFailure extends IntentionFailure {
   const IntentionConflictFailure();
+
+  @override
+  IntentionFailureCode get code => IntentionFailureCode.conflict;
+}
+
+final class IntentionHasBlockingRelationsFailure extends IntentionFailure {
+  const IntentionHasBlockingRelationsFailure(this.intentionId);
+
+  final IntentionId intentionId;
 
   @override
   IntentionFailureCode get code => IntentionFailureCode.conflict;

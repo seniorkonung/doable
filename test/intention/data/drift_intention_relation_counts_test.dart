@@ -103,6 +103,143 @@ void main() {
     );
   });
 
+  test('блокирует удаление связью любой группы и сохраняет ревизию', () async {
+    final groups = [
+      (incoming: true, type: 'need', archived: false),
+      (incoming: false, type: 'need', archived: false),
+      (incoming: true, type: 'can', archived: false),
+      (incoming: false, type: 'can', archived: false),
+      (incoming: true, type: 'need', archived: true),
+      (incoming: false, type: 'need', archived: true),
+      (incoming: true, type: 'can', archived: true),
+      (incoming: false, type: 'can', archived: true),
+    ];
+
+    for (var index = 0; index < groups.length; index++) {
+      final group = groups[index];
+      final owner = _id(_uuid(300 + index * 2));
+      final neighbor = _id(_uuid(301 + index * 2));
+      await _insertIntention(database, owner);
+      await _insertIntention(database, neighbor);
+      await _insertRelation(
+        database,
+        id: _uuid(400 + index),
+        sourceId: group.incoming ? neighbor : owner,
+        relatedId: group.incoming ? owner : neighbor,
+        type: group.type,
+        isArchived: group.archived,
+      );
+      final revisionBefore = _successfulCountsSnapshot(
+        await repository.getRelationCounts(owner),
+      ).revision;
+
+      final result = await repository.execute(DeleteIntention(owner));
+
+      expect(
+        result,
+        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+            .having(
+              (failure) => failure.failure,
+              'failure',
+              isA<IntentionHasBlockingRelationsFailure>().having(
+                (failure) => failure.intentionId,
+                'intentionId',
+                owner,
+              ),
+            ),
+      );
+      final revisionAfter = _successfulCountsSnapshot(
+        await repository.getRelationCounts(owner),
+      ).revision;
+      expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
+      expect(
+        await (database.select(database.intentions)
+              ..where((row) => row.id.equals(owner.toCanonicalString())))
+            .getSingleOrNull(),
+        isNotNull,
+      );
+    }
+
+    expect(
+      diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+      hasLength(groups.length),
+    );
+    expect(
+      diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().map(
+        (event) => event.status,
+      ),
+      everyElement(
+        isA<DiagnosticsFailed>().having(
+          (status) => status.code,
+          'code',
+          DiagnosticsFailureCode.conflict,
+        ),
+      ),
+    );
+  });
+
+  test(
+    'не доверяет прежнему нулю и блокирует удаление связями за первой порцией',
+    () async {
+      final owner = _id(_uuid(500));
+      final neighbors = [
+        for (var index = 0; index < 51; index++) _id(_uuid(501 + index)),
+      ];
+      await _insertIntention(database, owner);
+      for (final neighbor in neighbors) {
+        await _insertIntention(database, neighbor);
+      }
+      final emptySnapshot = _successfulCountsSnapshot(
+        await repository.getRelationCounts(owner),
+      );
+      expect(emptySnapshot.value.total, 0);
+      for (var index = 0; index < neighbors.length; index++) {
+        await _insertRelation(
+          database,
+          id: _uuid(600 + index),
+          sourceId: neighbors[index],
+          relatedId: owner,
+          type: 'can',
+          isArchived: true,
+        );
+      }
+
+      final result = await repository.execute(DeleteIntention(owner));
+
+      expect(
+        result,
+        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+            .having(
+              (failure) => failure.failure,
+              'failure',
+              isA<IntentionHasBlockingRelationsFailure>().having(
+                (failure) => failure.intentionId,
+                'intentionId',
+                owner,
+              ),
+            ),
+      );
+      final currentSnapshot = _successfulCountsSnapshot(
+        await repository.getRelationCounts(owner),
+      );
+      expect(currentSnapshot.value.activeNeedOutgoing, 0);
+      expect(currentSnapshot.value.archivedCanIncoming, 51);
+      expect(
+        emptySnapshot.revision.compareTo(currentSnapshot.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(
+        await database
+            .customSelect(
+              'SELECT COUNT(*) AS relation_count FROM long_term_relations',
+            )
+            .getSingle()
+            .then((row) => row.read<int>('relation_count')),
+        51,
+      );
+    },
+  );
+
   test('наблюдает подробные поля и сводку на одной ревизии', () async {
     final owner = _id(_uuid(30));
     final neighbor = _id(_uuid(31));
@@ -666,6 +803,13 @@ GraphSnapshot<IntentionDetails?> _successfulSnapshot(
 ) {
   expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
   return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
+}
+
+GraphSnapshot<RelationCounts> _successfulCountsSnapshot(
+  Result<GraphSnapshot<RelationCounts>> result,
+) {
+  expect(result, isA<ResultSuccess<GraphSnapshot<RelationCounts>>>());
+  return (result as ResultSuccess<GraphSnapshot<RelationCounts>>).value;
 }
 
 Future<Map<String, bool>> _relationArchiveStates(AppDatabase database) async =>

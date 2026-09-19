@@ -35,49 +35,58 @@ void main() {
   tearDown(() => database.close());
 
   group('DriftPersonalGraphRepository.execute — физическое удаление', () {
-    test('преобразует blocking foreign key удаления в conflict и сохраняет строку с FTS', () async {
-      final id = _id(_firstUuid);
-      final createdAt = DateTime.utc(2026, 9, 2, 10);
-      await _insertIntention(
-        database,
-        id: id,
-        title: 'Блокирующее намерение',
-        description: 'Исходное описание',
-        isActionReady: true,
-        isArchived: true,
-        createdAt: createdAt,
-      );
-      await database.customStatement('''
+    test(
+      'не выдаёт посторонний blocking foreign key за конфликт связей',
+      () async {
+        final id = _id(_firstUuid);
+        final createdAt = DateTime.utc(2026, 9, 2, 10);
+        await _insertIntention(
+          database,
+          id: id,
+          title: 'Блокирующее намерение',
+          description: 'Исходное описание',
+          isActionReady: true,
+          isArchived: true,
+          createdAt: createdAt,
+        );
+        await database.customStatement('''
         CREATE TABLE test_only_blocking_links (
           intention_id TEXT NOT NULL REFERENCES intentions(id)
         )
       ''');
-      await database.customStatement(
-        'INSERT INTO test_only_blocking_links (intention_id) VALUES (?)',
-        [id.toCanonicalString()],
-      );
+        await database.customStatement(
+          'INSERT INTO test_only_blocking_links (intention_id) VALUES (?)',
+          [id.toCanonicalString()],
+        );
 
-      final result = await repository.execute(DeleteIntention(id));
+        final result = await repository.execute(DeleteIntention(id));
 
-      expect(result, _failure<IntentionConflictFailure>());
-      await _expectStoredIntention(
-        database,
-        id: id,
-        title: 'Блокирующее намерение',
-        description: 'Исходное описание',
-        isActionReady: true,
-        isArchived: true,
-        createdAt: createdAt,
-      );
-      expect(await _matchingIds(repository, 'блокирующее'), [id]);
-      await expectLater(verifyIntentionTitlesFtsIntegrity(database), completes);
-      expect(diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(), [
-        _failedCommand(
-          IntentionCommandDiagnosticsType.delete,
-          DiagnosticsFailureCode.conflict,
-        ),
-      ]);
-    });
+        expect(result, _failure<IntentionUnexpectedFailure>());
+        await _expectStoredIntention(
+          database,
+          id: id,
+          title: 'Блокирующее намерение',
+          description: 'Исходное описание',
+          isActionReady: true,
+          isArchived: true,
+          createdAt: createdAt,
+        );
+        expect(await _matchingIds(repository, 'блокирующее'), [id]);
+        await expectLater(
+          verifyIntentionTitlesFtsIntegrity(database),
+          completes,
+        );
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+          [
+            _failedCommand(
+              IntentionCommandDiagnosticsType.delete,
+              DiagnosticsFailureCode.unexpected,
+            ),
+          ],
+        );
+      },
+    );
   });
 
   group('DriftPersonalGraphRepository.execute — откат после DML', () {

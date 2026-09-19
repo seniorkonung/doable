@@ -75,6 +75,20 @@ void main() {
     },
   );
 
+  testWidgets(
+    'показывает безопасный конфликт блокирующих связей в общей поверхности',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final operation = harness.startDelete(index: 3, title: 'Связанное');
+      harness.completeBlockingRelations(operation);
+      await tester.pumpAndSettle();
+
+      expect(find.text(_linkedNotDeleted('Связанное')), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
   for (final scenario
       in <
         ({
@@ -285,6 +299,9 @@ String _deleted(String title) => 'Delete — “$title”: Intention deleted.';
 String _notDeleted(String title) =>
     'Delete — “$title”: The intention couldn’t be deleted. Try again.';
 
+String _linkedNotDeleted(String title) =>
+    'Delete — “$title”: The intention is still linked and can’t be deleted.';
+
 Future<void> _closeMessage(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 5));
   await tester.pumpAndSettle();
@@ -335,6 +352,15 @@ final class _PresenterHarness {
     repository.completeCommand(
       _commandIndexes[accepted]!,
       const ResultFailure(IntentionUnavailableFailure()),
+    );
+  }
+
+  void completeBlockingRelations(IntentionCommandAccepted accepted) {
+    final (index, _) = _titles[accepted]!;
+    final intentionId = testDetailsIntention(index: index).id;
+    repository.completeCommand(
+      _commandIndexes[accepted]!,
+      ResultFailure(IntentionHasBlockingRelationsFailure(intentionId)),
     );
   }
 }

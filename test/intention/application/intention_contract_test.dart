@@ -433,6 +433,7 @@ void main() {
         const ResultFailure(IntentionGenericValidationFailure()),
         const ResultFailure(IntentionNotFoundFailure()),
         const ResultFailure(IntentionConflictFailure()),
+        ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
         const ResultFailure(IntentionUnavailableFailure()),
         const ResultFailure(IntentionCorruptionFailure()),
         const ResultFailure(IntentionUnexpectedFailure()),
@@ -444,7 +445,7 @@ void main() {
       );
       expect(
         results.whereType<ResultFailure<IntentionCommandSuccess>>(),
-        hasLength(6),
+        hasLength(7),
       );
       expect(_resultSuccessDescription(results[0]), 'saved');
       expect(_resultSuccessDescription(results[1]), 'deleted');
@@ -452,6 +453,7 @@ void main() {
         'validation',
         'notFound',
         'conflict',
+        'blockingRelations',
         'unavailable',
         'corruption',
         'unexpected',
@@ -744,6 +746,7 @@ String _failureDescription(IntentionFailure failure) => switch (failure) {
   IntentionValidationFailure() => 'validation',
   IntentionNotFoundFailure() => 'notFound',
   IntentionConflictFailure() => 'conflict',
+  IntentionHasBlockingRelationsFailure() => 'blockingRelations',
   IntentionUnavailableFailure() => 'unavailable',
   IntentionCorruptionFailure() => 'corruption',
   IntentionUnexpectedFailure() => 'unexpected',
