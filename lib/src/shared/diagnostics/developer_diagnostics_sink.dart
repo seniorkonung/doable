@@ -56,6 +56,11 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     ..._encodeStatus(event.status),
     'commandType': commandType.name,
   },
+  LongTermRelationCommandDiagnosticsEvent(:final commandType) => {
+    'operation': 'longTermRelationCommand',
+    ..._encodeStatus(event.status),
+    'commandType': commandType.name,
+  },
 };
 
 Map<String, Object> _encodeStatus(DiagnosticsStatus status) => switch (status) {

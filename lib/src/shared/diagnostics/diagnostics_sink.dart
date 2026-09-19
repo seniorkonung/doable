@@ -60,6 +60,8 @@ enum IntentionCommandDiagnosticsType {
   delete,
 }
 
+enum LongTermRelationCommandDiagnosticsType { create }
+
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
   const BootstrapDiagnosticsEvent({
     required DiagnosticsStatus status,
@@ -106,4 +108,13 @@ final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(status);
 
   final IntentionCommandDiagnosticsType commandType;
+}
+
+final class LongTermRelationCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const LongTermRelationCommandDiagnosticsEvent({
+    required this.commandType,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final LongTermRelationCommandDiagnosticsType commandType;
 }

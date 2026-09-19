@@ -12,9 +12,16 @@ import '../../intention/application/title_search_key.dart';
 import '../../intention/domain/intention.dart' as domain;
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
+import '../../long_term_relation/application/long_term_relation_command.dart';
+import '../../long_term_relation/application/long_term_relation_id_generator.dart';
 import '../../long_term_relation/application/relation_counts.dart';
+import '../../long_term_relation/domain/long_term_relation.dart'
+    as relation_domain;
+import '../../long_term_relation/domain/long_term_relation_description.dart';
+import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
 import '../application/graph_change.dart';
+import '../application/graph_command_result.dart';
 import '../application/graph_revision.dart';
 import '../application/personal_graph_repository.dart';
 import 'drift_relation_count_aggregates.dart';
@@ -22,18 +29,23 @@ import 'drift_relation_count_aggregates.dart';
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+part 'drift_personal_graph_repository_relation_commands.dart';
+
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
     this._database,
     this._idGenerator,
     this._now,
-    this._diagnosticsSink,
-  );
+    this._diagnosticsSink, {
+    LongTermRelationIdGenerator? relationIdGenerator,
+  }) : _relationIdGenerator =
+           relationIdGenerator ?? UuidV7LongTermRelationIdGenerator();
 
   final local.AppDatabase _database;
   final IntentionIdGenerator _idGenerator;
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
+  final LongTermRelationIdGenerator _relationIdGenerator;
   final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
@@ -267,9 +279,28 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   }
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) async {
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    final Object result = switch (command) {
+      final IntentionCommand intentionCommand => await _executeIntention(
+        intentionCommand,
+      ),
+      final LongTermRelationCommand relationCommand =>
+        await _executeLongTermRelation(relationCommand),
+      _ => throw UnsupportedError(
+        'Команда не поддерживается модулем личного графа.',
+      ),
+    };
+
+    // Dart не выражает зависимость generic-результата от конкретного sealed
+    // семейства команды. Ветка выше исчерпывающе сохраняет эту зависимость.
+    return result as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<GraphCommandResult<IntentionCommandSuccess, IntentionFailure>>
+  _executeIntention(IntentionCommand command) async {
     final stopwatch = Stopwatch()..start();
     final commandType = _commandDiagnosticsType(command);
 

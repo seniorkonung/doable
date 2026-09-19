@@ -21,6 +21,7 @@ void main() {
         CatalogPageReadDiagnosticsEvent,
         IntentionDetailReadDiagnosticsEvent,
         IntentionCommandDiagnosticsEvent,
+        LongTermRelationCommandDiagnosticsEvent,
       ]);
       expect(sink.events[0].status, isA<DiagnosticsStarted>());
       expect(sink.events[1].status, isA<DiagnosticsSucceeded>());
@@ -68,6 +69,12 @@ void main() {
           'durationMicros': 12000,
           'failureCode': 'conflict',
           'commandType': 'archive',
+        },
+        {
+          'operation': 'longTermRelationCommand',
+          'outcome': 'succeeded',
+          'durationMicros': 5000,
+          'commandType': 'create',
         },
       ]);
       for (final canary in [
@@ -136,6 +143,10 @@ List<DiagnosticsEvent> _events() => [
       duration: Duration(milliseconds: 12),
       code: DiagnosticsFailureCode.conflict,
     ),
+  ),
+  const LongTermRelationCommandDiagnosticsEvent(
+    commandType: LongTermRelationCommandDiagnosticsType.create,
+    status: DiagnosticsSucceeded(Duration(milliseconds: 5)),
   ),
 ];
 

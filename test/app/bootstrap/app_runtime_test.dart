@@ -10,6 +10,7 @@ import 'package:doable/src/data/local/app_database.dart'
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -266,9 +267,19 @@ final class _ControlledPersonalGraphRepository
   _pendingCommand;
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) {
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! IntentionCommand) {
+      throw UnsupportedError('Команды связей не используются в этих тестах.');
+    }
+    return await _executeIntention(command as IntentionCommand)
+        as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) {
     final pending =
         Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
     _pendingCommand = pending;
