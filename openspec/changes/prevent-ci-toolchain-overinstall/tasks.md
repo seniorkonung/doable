@@ -1,6 +1,6 @@
 ## Phase 1: CI toolchain ограничен setup-контрактом каждого job
 
-- [ ] 1.1 Зафиксировать regression-тестом границу между setup-шагом и рабочими командами CI
+- [x] 1.1 Зафиксировать regression-тестом границу между setup-шагом и рабочими командами CI
   - **Acceptance criteria:**
     - Тест требует отключённый workflow-level auto-install.
     - Тест отклоняет проектные `mise run` без `--skip-tools` и OpenSpec-вызов через `mise exec`.
@@ -11,7 +11,7 @@
   - **Files likely touched:** `test/tool/check_ci_scope_test.sh`
   - **Estimated scope:** XS
 
-- [ ] 1.2 Ограничить каждый CI job явно установленным и независимо кэшируемым toolchain
+- [x] 1.2 Ограничить каждый CI job явно установленным и независимо кэшируемым toolchain
   - **Acceptance criteria:**
     - Workflow запрещает поздний auto-install, а project job запускает существующие задачи с `--skip-tools`.
     - OpenSpec job вызывает экспортированный executable напрямую после установки только Node.js и OpenSpec.

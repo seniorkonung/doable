@@ -15,6 +15,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
+env:
+  # Инструменты устанавливает только setup-шаг каждого job.
+  MISE_AUTO_INSTALL: "false"
+
 jobs:
   scope_detector:
     name: Detect CI scope
@@ -56,15 +60,17 @@ jobs:
         with:
           version: 2026.8.1
           install_args: flutter
+          cache: true
+          cache_save: true
 
       - name: Verify generated artifacts
-        run: mise run codegen-check
+        run: mise run --skip-tools codegen-check
 
       - name: Verify generated-artifact detector negative paths
-        run: mise run codegen-check-test
+        run: mise run --skip-tools codegen-check-test
 
       - name: Run full project checks
-        run: mise run check
+        run: mise run --skip-tools check
 
   openspec_checks:
     name: OpenSpec checks
@@ -84,9 +90,11 @@ jobs:
         with:
           version: 2026.8.1
           install_args: "node npm:@fission-ai/openspec"
+          cache: true
+          cache_save: true
 
       - name: Validate OpenSpec changes
-        run: mise exec -- openspec validate --all --strict --no-interactive
+        run: openspec validate --all --strict --no-interactive
 
   android_artifact:
     name: Android artifact evidence
@@ -116,6 +124,8 @@ jobs:
         with:
           version: 2026.8.1
           install_args: flutter
+          cache: true
+          cache_save: true
 
       - name: Install pinned Android SDK packages
         shell: bash

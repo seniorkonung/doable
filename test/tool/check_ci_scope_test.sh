@@ -4,9 +4,15 @@ set -euo pipefail
 
 readonly project_root="$(git rev-parse --show-toplevel)"
 readonly helper="$project_root/tool/check_ci_scope.sh"
+readonly workflow="$project_root/.github/workflows/ci.yml"
 
 if [[ ! -f "$helper" ]]; then
   echo "Не найден проверяемый helper: $helper" >&2
+  exit 1
+fi
+
+if [[ ! -f "$workflow" ]]; then
+  echo "Не найден проверяемый workflow: $workflow" >&2
   exit 1
 fi
 
@@ -48,6 +54,54 @@ check_value() {
   echo "PASS: $name"
 }
 
+workflow_disables_mise_auto_install() {
+  local count
+  count="$(awk '$0 == "  MISE_AUTO_INSTALL: \"false\"" { count += 1 } END { print count + 0 }' "$workflow")"
+  [[ "$count" == 1 ]]
+}
+
+project_mise_tasks_skip_tool_installation() {
+  awk '
+    /^  project_checks:/ {
+      in_project_checks = 1
+      next
+    }
+    in_project_checks && /^  [[:alnum:]_]+:/ {
+      exit
+    }
+    in_project_checks && /run: mise run / {
+      found_task = 1
+      if ($0 !~ /run: mise run --skip-tools /) {
+        invalid_task = 1
+      }
+    }
+    END {
+      exit !(found_task && !invalid_task)
+    }
+  ' "$workflow"
+}
+
+openspec_validation_avoids_mise_exec() {
+  awk '
+    /^  openspec_checks:/ {
+      in_openspec_checks = 1
+      next
+    }
+    in_openspec_checks && /^  [[:alnum:]_]+:/ {
+      exit
+    }
+    in_openspec_checks && /run: mise exec / {
+      invalid_command = 1
+    }
+    in_openspec_checks && /run: openspec validate --all --strict --no-interactive/ {
+      found_direct_validation = 1
+    }
+    END {
+      exit !(found_direct_validation && !invalid_command)
+    }
+  ' "$workflow"
+}
+
 readonly previous_sha=1111111111111111111111111111111111111111
 readonly current_sha=2222222222222222222222222222222222222222
 readonly fixture_pull_request_number=4
@@ -84,6 +138,19 @@ check_runs() {
 
 readonly successful_workflow_runs="$(workflow_runs completed '"success"')"
 readonly successful_check_runs="$(check_runs completed '"success"')"
+
+check_boolean \
+  "workflow отключает автоматическую установку mise-инструментов" \
+  true \
+  workflow_disables_mise_auto_install
+check_boolean \
+  "проектные mise-задачи не устанавливают полный toolchain" \
+  true \
+  project_mise_tasks_skip_tool_installation
+check_boolean \
+  "OpenSpec-валидация не запускает mise exec" \
+  true \
+  openspec_validation_avoids_mise_exec
 
 for path in \
   android/app/src/main/AndroidManifest.xml \
