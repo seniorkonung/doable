@@ -532,9 +532,34 @@
   "@detailsDeleteNotFound": {
     "description": "Безопасная ошибка удаления отсутствующего намерения"
   },
-  "detailsDeleteConflict": "The intention is still linked and can’t be deleted.",
+  "detailsDeleteConflict": "The intention changed elsewhere. It wasn’t deleted.",
   "@detailsDeleteConflict": {
-    "description": "Безопасная ошибка блокирующей связи при удалении намерения"
+    "description": "Безопасная ошибка конфликта при удалении намерения"
+  },
+  "detailsDeleteBlockedByRelations": "The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.",
+  "@detailsDeleteBlockedByRelations": {
+    "description": "Объяснение блокировки удаления намерения его связями"
+  },
+  "detailsShowBlockingRelationsAction": "Show blocking relations",
+  "@detailsShowBlockingRelationsAction": {
+    "description": "Переход к актуальным группам связей, блокирующих удаление"
+  },
+  "detailsArchiveCascadeExplanation": "Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.",
+  "@detailsArchiveCascadeExplanation": {
+    "description": "Объяснение каскада непосредственных связей перед архивированием"
+  },
+  "detailsRestoreRelationsExplanation": "Restoring returns only the intention. Its relations stay archived: {count}.",
+  "@detailsRestoreRelationsExplanation": {
+    "description": "Объяснение сохранённого архива связей перед восстановлением",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "detailsShowArchivedRelationsAction": "Show archived relations",
+  "@detailsShowArchivedRelationsAction": {
+    "description": "Переход к архивным группам связей намерения"
   },
   "detailsDeleteUnavailable": "The intention couldn’t be deleted. Try again.",
   "@detailsDeleteUnavailable": {

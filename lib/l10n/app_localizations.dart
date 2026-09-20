@@ -872,11 +872,41 @@ abstract class AppLocalizations {
   /// **'The intention no longer exists. It wasn’t deleted.'**
   String get detailsDeleteNotFound;
 
-  /// Безопасная ошибка блокирующей связи при удалении намерения
+  /// Безопасная ошибка конфликта при удалении намерения
   ///
   /// In en, this message translates to:
-  /// **'The intention is still linked and can’t be deleted.'**
+  /// **'The intention changed elsewhere. It wasn’t deleted.'**
   String get detailsDeleteConflict;
+
+  /// Объяснение блокировки удаления намерения его связями
+  ///
+  /// In en, this message translates to:
+  /// **'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.'**
+  String get detailsDeleteBlockedByRelations;
+
+  /// Переход к актуальным группам связей, блокирующих удаление
+  ///
+  /// In en, this message translates to:
+  /// **'Show blocking relations'**
+  String get detailsShowBlockingRelationsAction;
+
+  /// Объяснение каскада непосредственных связей перед архивированием
+  ///
+  /// In en, this message translates to:
+  /// **'Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.'**
+  String get detailsArchiveCascadeExplanation;
+
+  /// Объяснение сохранённого архива связей перед восстановлением
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring returns only the intention. Its relations stay archived: {count}.'**
+  String detailsRestoreRelationsExplanation(int count);
+
+  /// Переход к архивным группам связей намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Show archived relations'**
+  String get detailsShowArchivedRelationsAction;
 
   /// Устранимая недоступность физического удаления намерения
   ///

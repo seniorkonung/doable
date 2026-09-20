@@ -462,7 +462,26 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsDeleteConflict =>
-      'Намерение всё ещё связано с другими данными, поэтому его нельзя удалить.';
+      'Намерение изменено в другом месте и не удалено.';
+
+  @override
+  String get detailsDeleteBlockedByRelations =>
+      'Намерение не удалено: его связи блокируют удаление. Архивные и ещё не загруженные связи тоже блокируют.';
+
+  @override
+  String get detailsShowBlockingRelationsAction => 'Показать блокирующие связи';
+
+  @override
+  String get detailsArchiveCascadeExplanation =>
+      'Архивирование также архивирует непосредственные связи намерения. Соседние намерения и их остальные связи не изменяются.';
+
+  @override
+  String detailsRestoreRelationsExplanation(int count) {
+    return 'Восстановление возвращает только само намерение. Его связи остаются в архиве: $count.';
+  }
+
+  @override
+  String get detailsShowArchivedRelationsAction => 'Показать архив связей';
 
   @override
   String get detailsDeleteUnavailable =>

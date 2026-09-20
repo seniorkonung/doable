@@ -13,6 +13,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
 final class ControlledDetailRequest {
@@ -80,6 +81,13 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   Result<IntentionCatalogPage>? catalogResult;
   void Function(IntentionId id)? onWatchIntention;
 
+  /// Запросы порций соседства в порядке их поступления.
+  final relationGroupQueries = <RelationGroupQuery>[];
+
+  /// Ответ соседства на конкретный запрос; по умолчанию группа пуста.
+  RelationGroupPageResult Function(RelationGroupQuery query)?
+  onRelationGroupPage;
+
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
@@ -107,16 +115,21 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
-  ) => Future.value(
-    GraphResultSuccess(
-      RelationGroupFirstPage(
-        items: const [],
-        counts: testRelationCounts(),
-        nextCursor: null,
-        revision: const TestDetailsRevision(0),
-      ),
-    ),
-  );
+  ) {
+    relationGroupQueries.add(query);
+    final result = onRelationGroupPage?.call(query);
+    return Future.value(
+      result ??
+          GraphResultSuccess(
+            RelationGroupFirstPage(
+              items: const [],
+              counts: testRelationCounts(),
+              nextCursor: null,
+              revision: const TestDetailsRevision(0),
+            ),
+          ),
+    );
+  }
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
@@ -253,17 +266,25 @@ IntentionSummary testDetailsSummary(
   updatedAt: intention.updatedAt,
 );
 
-RelationCounts testRelationCounts({int activeNeedOutgoing = 0}) =>
-    RelationCounts(
-      activeNeedIncoming: 0,
-      activeNeedOutgoing: activeNeedOutgoing,
-      activeCanIncoming: 0,
-      activeCanOutgoing: 0,
-      archivedNeedIncoming: 0,
-      archivedNeedOutgoing: 0,
-      archivedCanIncoming: 0,
-      archivedCanOutgoing: 0,
-    );
+RelationCounts testRelationCounts({
+  int activeNeedIncoming = 0,
+  int activeNeedOutgoing = 0,
+  int activeCanIncoming = 0,
+  int activeCanOutgoing = 0,
+  int archivedNeedIncoming = 0,
+  int archivedNeedOutgoing = 0,
+  int archivedCanIncoming = 0,
+  int archivedCanOutgoing = 0,
+}) => RelationCounts(
+  activeNeedIncoming: activeNeedIncoming,
+  activeNeedOutgoing: activeNeedOutgoing,
+  activeCanIncoming: activeCanIncoming,
+  activeCanOutgoing: activeCanOutgoing,
+  archivedNeedIncoming: archivedNeedIncoming,
+  archivedNeedOutgoing: archivedNeedOutgoing,
+  archivedCanIncoming: archivedCanIncoming,
+  archivedCanOutgoing: archivedCanOutgoing,
+);
 
 Future<void> waitForDetailRequests(
   ControlledDetailsRepository repository,
@@ -317,4 +338,53 @@ final class _DetailsCatalogEntrySnapshot
 
   @override
   bool matches(IntentionCatalogQuery query) => query.includes(summary);
+}
+
+/// Строка выбранной группы соседства намерения-владельца.
+LongTermRelationSummary testDetailsRelationRow({
+  required IntentionId ownerId,
+  required int index,
+  LongTermRelationType type = LongTermRelationType.need,
+  RelationDirection direction = RelationDirection.outgoing,
+  RelationScope scope = RelationScope.active,
+}) {
+  final neighborId = testDetailsIntentionId(900 + index);
+  final isOutgoing = direction == RelationDirection.outgoing;
+  final sourceId = isOutgoing ? ownerId : neighborId;
+  final relatedId = isOutgoing ? neighborId : ownerId;
+  return LongTermRelationSummary(
+    relation: LongTermRelation(
+      id: _testDetailsRelationId(index),
+      sourceIntentionId: sourceId,
+      relatedIntentionId: relatedId,
+      type: type,
+      priority: RelationPriority.p2,
+      scope: scope,
+      creationSequence: RelationCreationSequence(index),
+    ),
+    source: RelationParticipantSummary(
+      id: sourceId,
+      title: isOutgoing ? 'Намерение-владелец' : 'Исходное $index',
+      archiveState: IntentionArchiveState.active,
+      activeRelationCount: 0,
+    ),
+    related: RelationParticipantSummary(
+      id: relatedId,
+      title: isOutgoing ? 'Связанное $index' : 'Намерение-владелец',
+      archiveState: IntentionArchiveState.active,
+      activeRelationCount: 0,
+    ),
+    hasDescription: false,
+  );
+}
+
+LongTermRelationId _testDetailsRelationId(int index) {
+  final encoded =
+      '018f0001-0000-7000-8000-${index.toString().padLeft(12, '0')}';
+  return switch (LongTermRelationId.decode(encoded)) {
+    LongTermRelationIdDecodingSuccess(:final id) => id,
+    InvalidLongTermRelationIdDecoding() => throw StateError(
+      'Некорректный fixture ID связи.',
+    ),
+  };
 }

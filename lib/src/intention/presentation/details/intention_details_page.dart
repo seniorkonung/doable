@@ -130,6 +130,12 @@ final class _DetailsContent extends ConsumerWidget {
         onRetryStateChange: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .retryStateChange,
+        onShowBlockingRelations: ref
+            .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
+            .showBlockingRelations,
+        onShowArchivedRelations: ref
+            .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
+            .showArchivedRelations,
       ),
       IntentionDetailsNotFound() => _DetailsStatus(
         message: localizations.detailsNotFound,
@@ -168,6 +174,8 @@ final class _LoadedDetails extends StatelessWidget {
     required this.onRestore,
     required this.onDelete,
     required this.onRetryStateChange,
+    required this.onShowBlockingRelations,
+    required this.onShowArchivedRelations,
   });
 
   final IntentionDetailsLoaded state;
@@ -182,6 +190,8 @@ final class _LoadedDetails extends StatelessWidget {
   final VoidCallback onRestore;
   final VoidCallback onDelete;
   final VoidCallback onRetryStateChange;
+  final VoidCallback onShowBlockingRelations;
+  final VoidCallback onShowArchivedRelations;
 
   @override
   Widget build(BuildContext context) {
@@ -253,6 +263,8 @@ final class _LoadedDetails extends StatelessWidget {
                 onRestore: onRestore,
                 onDelete: onDelete,
                 onRetryStateChange: onRetryStateChange,
+                onShowBlockingRelations: onShowBlockingRelations,
+                onShowArchivedRelations: onShowArchivedRelations,
               ),
             },
           ),
@@ -289,6 +301,8 @@ final class _DetailsActions extends StatelessWidget {
     required this.onRestore,
     required this.onDelete,
     required this.onRetryStateChange,
+    required this.onShowBlockingRelations,
+    required this.onShowArchivedRelations,
   });
 
   final IntentionDetailsLoaded state;
@@ -299,12 +313,16 @@ final class _DetailsActions extends StatelessWidget {
   final VoidCallback onRestore;
   final VoidCallback onDelete;
   final VoidCallback onRetryStateChange;
+  final VoidCallback onShowBlockingRelations;
+  final VoidCallback onShowArchivedRelations;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final controlsEnabled = !state.isOperationRunning;
     final failure = _failureMessage(localizations);
+    final isArchived =
+        state.intention.archiveState == IntentionArchiveState.archived;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -327,8 +345,48 @@ final class _DetailsActions extends StatelessWidget {
               ),
             ),
           ],
+          // Блокирующие связи показываются в актуальном соседстве: удаление
+          // остаётся запрещённым и для архивных, и для незагруженных связей.
+          if (_isBlockedByRelations) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: OutlinedButton.icon(
+                key: const ValueKey(
+                  'intention-details-show-blocking-relations',
+                ),
+                onPressed: onShowBlockingRelations,
+                icon: const Icon(Icons.link_off_outlined),
+                label: Text(localizations.detailsShowBlockingRelationsAction),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
         ],
+        // Переход состояния объясняется до его запуска: архивирование
+        // каскадно архивирует связи, а восстановление их не возвращает.
+        if (isArchived)
+          _RelationImpactExplanation(
+            explanationKey: const ValueKey(
+              'intention-details-restore-explanation',
+            ),
+            message: localizations.detailsRestoreRelationsExplanation(
+              state.details.relationCounts.archived,
+            ),
+            actionKey: const ValueKey(
+              'intention-details-show-archived-relations',
+            ),
+            actionLabel: localizations.detailsShowArchivedRelationsAction,
+            onAction: onShowArchivedRelations,
+          )
+        else
+          _RelationImpactExplanation(
+            explanationKey: const ValueKey(
+              'intention-details-archive-explanation',
+            ),
+            message: localizations.detailsArchiveCascadeExplanation,
+          ),
+        const SizedBox(height: 16),
         Wrap(
           spacing: 12,
           runSpacing: 12,
@@ -385,6 +443,18 @@ final class _DetailsActions extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// Отказ удаления вызван связями намерения, а не иным конфликтом.
+  bool get _isBlockedByRelations {
+    final stateChange = state.stateChange;
+    if (stateChange == null ||
+        stateChange.kind != IntentionDetailsStateChangeKind.delete) {
+      return false;
+    }
+    return stateChange.operation is OperationFailed<Intention> &&
+        (stateChange.operation as OperationFailed<Intention>).failure
+            is IntentionHasBlockingRelationsFailure;
   }
 
   Future<void> _confirmReadiness(BuildContext context) async {
@@ -470,8 +540,9 @@ final class _DetailsActions extends StatelessWidget {
     IntentionGenericValidationFailure() ||
     IntentionTextInputValidationFailure() => localizations.detailsDeleteInvalid,
     IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
-    IntentionConflictFailure() || IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsDeleteConflict,
+    IntentionConflictFailure() => localizations.detailsDeleteConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsDeleteBlockedByRelations,
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
@@ -759,4 +830,46 @@ final class _DetailsStatus extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Объяснение влияния связей на переход состояния намерения.
+///
+/// Объяснение доступно до запуска операции, а переход ведёт в существующее
+/// соседство того же намерения.
+final class _RelationImpactExplanation extends StatelessWidget {
+  const _RelationImpactExplanation({
+    required this.explanationKey,
+    required this.message,
+    this.actionKey,
+    this.actionLabel,
+    this.onAction,
+  }) : assert((actionLabel == null) == (onAction == null)),
+       assert((actionKey == null) == (onAction == null));
+
+  final Key explanationKey;
+  final String message;
+  final Key? actionKey;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    key: explanationKey,
+    container: true,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(message),
+        if (onAction case final action?) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: actionKey,
+            onPressed: action,
+            icon: const Icon(Icons.inventory_2_outlined),
+            label: Text(actionLabel!),
+          ),
+        ],
+      ],
+    ),
+  );
 }
