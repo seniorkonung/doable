@@ -461,7 +461,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsDeleteConflict =>
-      'The intention is still linked and can’t be deleted.';
+      'The intention changed elsewhere. It wasn’t deleted.';
+
+  @override
+  String get detailsDeleteBlockedByRelations =>
+      'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.';
+
+  @override
+  String get detailsShowBlockingRelationsAction => 'Show blocking relations';
+
+  @override
+  String get detailsArchiveCascadeExplanation =>
+      'Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.';
+
+  @override
+  String detailsRestoreRelationsExplanation(int count) {
+    return 'Restoring returns only the intention. Its relations stay archived: $count.';
+  }
+
+  @override
+  String get detailsShowArchivedRelationsAction => 'Show archived relations';
 
   @override
   String get detailsDeleteUnavailable =>

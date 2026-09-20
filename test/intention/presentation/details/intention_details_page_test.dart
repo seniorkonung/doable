@@ -15,6 +15,9 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -356,6 +359,9 @@ void main() {
         );
         expect(retry, canRetry ? findsOneWidget : findsNothing);
         if (canRetry) {
+          await tester.ensureVisible(retry);
+          await tester.drag(find.byType(Scrollable), const Offset(0, 100));
+          await tester.pumpAndSettle();
           await tester.tap(retry);
           await tester.pump();
           expect(repository.commands, hasLength(2));
@@ -369,6 +375,201 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       }
+    },
+  );
+
+  testWidgets(
+    'объясняет каскад до архивирования и сохранённый архив после него',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      // Намерение в цикле: одна исходящая и одна входящая связь «нужно».
+      final active = testDetailsIntention(index: 26);
+      final archived = testDetailsIntention(
+        index: 26,
+        archiveState: IntentionArchiveState.archived,
+      );
+      final activeCounts = testRelationCounts(
+        activeNeedIncoming: 1,
+        activeNeedOutgoing: 1,
+      );
+      final archivedCounts = testRelationCounts(
+        archivedNeedIncoming: 1,
+        archivedNeedOutgoing: 1,
+      );
+      var counts = activeCounts;
+      repository.onRelationGroupPage = (query) => GraphResultSuccess(
+        RelationGroupFirstPage(
+          items: query.scope == RelationScope.archived
+              ? [
+                  testDetailsRelationRow(
+                    ownerId: active.id,
+                    index: 1,
+                    scope: RelationScope.archived,
+                  ),
+                ]
+              : const [],
+          counts: counts,
+          nextCursor: null,
+          revision: const TestDetailsRevision(0),
+        ),
+      );
+      await _pumpDetailsPage(tester, repository, active.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(
+        ResultSuccess(active),
+        relationCounts: activeCounts,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Archiving also archives the intention’s direct relations. '
+          'Neighbouring intentions and their other relations stay unchanged.',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('intention-details-restore-explanation')),
+        findsNothing,
+      );
+
+      final archive = find.byKey(const ValueKey('intention-details-archive'));
+      await tester.ensureVisible(archive);
+      await tester.tap(archive);
+      await tester.pump();
+      counts = archivedCounts;
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(archived, before: active),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(
+        ResultSuccess(archived),
+        revision: const TestDetailsRevision(1),
+        relationCounts: archivedCounts,
+      );
+      await tester.pumpAndSettle();
+      await _closeOperationMessage(tester);
+
+      // Восстановление не обещает обратного каскада.
+      expect(
+        find.text(
+          'Restoring returns only the intention. '
+          'Its relations stay archived: 2.',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('intention-details-archive-explanation')),
+        findsNothing,
+      );
+
+      // Архивное соседство доступно после каскада.
+      final showArchived = find.byKey(
+        const ValueKey('intention-details-show-archived-relations'),
+      );
+      await tester.ensureVisible(showArchived);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 100));
+      await tester.pumpAndSettle();
+      await tester.tap(showArchived);
+      await tester.pumpAndSettle();
+
+      expect(
+        repository.relationGroupQueries.last.scope,
+        RelationScope.archived,
+      );
+      expect(
+        find.text('Archived relations: 2', skipOffstage: false),
+        findsWidgets,
+      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'To Намерение-владелец, you need Связанное 1',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'объясняет влияние связей на обоих языках и объявляет объяснение',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledDetailsRepository();
+      final locale = ValueNotifier(const Locale('en'));
+      addTearDown(locale.dispose);
+      final archived = testDetailsIntention(
+        index: 27,
+        archiveState: IntentionArchiveState.archived,
+      );
+      final counts = testRelationCounts(archivedCanIncoming: 3);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          retry: (retryCount, error) => null,
+          child: ValueListenableBuilder<Locale>(
+            valueListenable: locale,
+            builder: (context, value, child) => _localizedApp(
+              IntentionDetailsPage(intentionId: archived.id),
+              locale: value,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(
+        ResultSuccess(archived),
+        relationCounts: counts,
+      );
+      await tester.pumpAndSettle();
+
+      const explanationKey = ValueKey('intention-details-restore-explanation');
+      expect(
+        tester.getSemantics(find.byKey(explanationKey)),
+        matchesSemantics(
+          label:
+              'Restoring returns only the intention. '
+              'Its relations stay archived: 3.',
+        ),
+      );
+      expect(
+        find.widgetWithText(
+          OutlinedButton,
+          'Show archived relations',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+
+      locale.value = const Locale('ru');
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getSemantics(find.byKey(explanationKey)),
+        matchesSemantics(
+          label:
+              'Восстановление возвращает только само намерение. '
+              'Его связи остаются в архиве: 3.',
+        ),
+      );
+      expect(
+        find.widgetWithText(
+          OutlinedButton,
+          'Показать архив связей',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      semantics.dispose();
     },
   );
 

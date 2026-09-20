@@ -417,7 +417,9 @@ String _notDeleted(String title) =>
     'Delete — “$title”: The intention couldn’t be deleted. Try again.';
 
 String _linkedNotDeleted(String title) =>
-    'Delete — “$title”: The intention is still linked and can’t be deleted.';
+    'Delete — “$title”: The intention wasn’t deleted: its relations still '
+    'block deletion. Archived relations and relations that aren’t loaded yet '
+    'block it too.';
 
 String _relationOutcome(String outcome) => 'Create — “new relation”: $outcome';
 

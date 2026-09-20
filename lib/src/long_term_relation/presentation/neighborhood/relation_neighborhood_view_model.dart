@@ -102,6 +102,21 @@ final class RelationNeighborhoodViewModel
     _restart(selection);
   }
 
+  /// Открывает актуальный просмотр связей, блокирующих удаление намерения.
+  ///
+  /// Полная сводка и первая порция читаются заново, поэтому блокирующие
+  /// группы видны на актуальной ревизии. Блокируют связи всех восьми групп,
+  /// поэтому выбор переходит к первой непустой из них, а незагруженный
+  /// остаток каждой группы остаётся учтённым в её полном количестве.
+  void showBlockingRelations() => _restart(_firstNonEmptyGroup());
+
+  /// Открывает архив связей намерения, сохранённый после каскада.
+  ///
+  /// Архивные связи остаются архивированными сами по себе, поэтому просмотр
+  /// начинается с первой непустой архивной группы.
+  void showArchivedRelations() =>
+      _restart(_firstNonEmptyGroup(scope: RelationScope.archived));
+
   /// Повторяет первое чтение выбранной группы после устранимого отказа.
   Future<void> retryFirstPage() {
     final current = state;
@@ -162,6 +177,51 @@ final class RelationNeighborhoodViewModel
     if (current is RelationGroupLoaded &&
         current.items.any((item) => item.relation.id == relationId)) {
       _visibleRelationId = relationId;
+    }
+  }
+
+  /// Выбирает группу с подтверждённым содержимым в границах охвата.
+  ///
+  /// Пока сводка не подтверждена, выбор остаётся прежним: пустая группа не
+  /// объявляет остальные группы пустыми.
+  RelationGroupSelection _firstNonEmptyGroup({RelationScope? scope}) {
+    final fallback = scope == null ? _selection : _selection.withScope(scope);
+    final current = state;
+    if (current is! RelationGroupConfirmedState) {
+      return fallback;
+    }
+    final counts = current.counts;
+    for (final candidate in _groupOrder(scope)) {
+      if (counts.forGroup(
+            scope: candidate.scope,
+            type: candidate.type,
+            direction: candidate.direction,
+          ) >
+          0) {
+        return candidate;
+      }
+    }
+    return fallback;
+  }
+
+  /// Перебирает группы в порядке полной сводки на странице намерения.
+  Iterable<RelationGroupSelection> _groupOrder(RelationScope? scope) sync* {
+    const scopeOrder = [RelationScope.active, RelationScope.archived];
+    const typeOrder = [LongTermRelationType.need, LongTermRelationType.can];
+    const directionOrder = [
+      RelationDirection.outgoing,
+      RelationDirection.incoming,
+    ];
+    for (final groupScope in scope == null ? scopeOrder : [scope]) {
+      for (final type in typeOrder) {
+        for (final direction in directionOrder) {
+          yield RelationGroupSelection(
+            type: type,
+            direction: direction,
+            scope: groupScope,
+          );
+        }
+      }
     }
   }
 

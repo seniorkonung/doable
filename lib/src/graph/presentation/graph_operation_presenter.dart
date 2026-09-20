@@ -358,8 +358,9 @@ String _failureFor(
   IntentionCommandKind.delete => switch (failure) {
     IntentionValidationFailure() => localizations.detailsDeleteInvalid,
     IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
-    IntentionConflictFailure() || IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsDeleteConflict,
+    IntentionConflictFailure() => localizations.detailsDeleteConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsDeleteBlockedByRelations,
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
