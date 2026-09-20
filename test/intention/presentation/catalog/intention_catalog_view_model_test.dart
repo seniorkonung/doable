@@ -6,6 +6,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +21,7 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = _catalogContainer(repository);
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -28,7 +29,9 @@ void main() {
       addTearDown(container.dispose);
 
       expect(
-        container.read(intentionCatalogViewModelProvider),
+        container.read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+        ),
         isA<AsyncLoading<IntentionCatalogState>>(),
       );
       final query = repository.queryAt(0);
@@ -57,7 +60,8 @@ void main() {
       );
 
       final state = await container.read(
-        intentionCatalogViewModelProvider.future,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
       );
       expect(
         state,
@@ -75,7 +79,7 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = _catalogContainer(repository);
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -97,7 +101,7 @@ void main() {
     );
 
     final state = await container.read(
-      intentionCatalogViewModelProvider.future,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
     );
     expect(
       state,
@@ -113,7 +117,7 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = _catalogContainer(repository);
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -123,15 +127,23 @@ void main() {
     repository.complete(0, const ResultFailure(IntentionUnavailableFailure()));
 
     expect(
-      await container.read(intentionCatalogViewModelProvider.future),
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      ),
       isA<IntentionCatalogUnavailable>(),
     );
 
     final retry = container
-        .read(intentionCatalogViewModelProvider.notifier)
+        .read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .notifier,
+        )
         .retry();
     expect(
-      container.read(intentionCatalogViewModelProvider),
+      container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+      ),
       isA<AsyncLoading<IntentionCatalogState>>(),
     );
     await _waitForQueries(repository, 2);
@@ -152,7 +164,11 @@ void main() {
     await retry;
 
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       isA<IntentionCatalogEmpty>(),
     );
     expect(repository.queries, hasLength(2));
@@ -164,7 +180,7 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = _catalogContainer(repository);
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -173,10 +189,16 @@ void main() {
         0,
         const ResultFailure(IntentionUnavailableFailure()),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
 
       final retry = container
-          .read(intentionCatalogViewModelProvider.notifier)
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+                .notifier,
+          )
           .retry();
       await _waitForQueries(repository, 2);
       subscription.close();
@@ -207,7 +229,7 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = _catalogContainer(repository);
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -215,10 +237,18 @@ void main() {
       repository.complete(0, ResultFailure(failure));
 
       expect(
-        await container.read(intentionCatalogViewModelProvider.future),
+        await container.read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .future,
+        ),
         expectedState,
       );
-      await container.read(intentionCatalogViewModelProvider.notifier).retry();
+      await container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+                .notifier,
+          )
+          .retry();
       expect(repository.queries, hasLength(1));
 
       subscription.close();
@@ -302,7 +332,7 @@ void main() {
       prefetchRemaining: 1,
     );
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -327,8 +357,13 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
-    final notifier = container.read(intentionCatalogViewModelProvider.notifier);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
+    final notifier = container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+          .notifier,
+    );
 
     await notifier.loadNextPageIfNeeded(visibleIndex: 0);
     expect(repository.queries, hasLength(1));
@@ -337,7 +372,11 @@ void main() {
     await _waitForQueries(repository, 2);
     expect(repository.queryAt(1).cursor, same(firstCursor));
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       isA<IntentionCatalogLoaded>().having(
         (state) => state.continuation,
         'состояние продолжения',
@@ -360,7 +399,13 @@ void main() {
     await firstLoad;
 
     final afterSecondPage =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(afterSecondPage.items.map((item) => item.id), hasLength(4));
     expect(afterSecondPage.totalCount, 5);
@@ -377,7 +422,13 @@ void main() {
     await secondLoad;
 
     final failedAfterSeveralPages =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(failedAfterSeveralPages.items, hasLength(4));
     expect(failedAfterSeveralPages.totalCount, 5);
@@ -403,7 +454,13 @@ void main() {
     await finalLoad;
 
     final complete =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(complete.items.map((item) => item.id).toSet(), hasLength(5));
     expect(complete.totalCount, 5);
@@ -421,7 +478,7 @@ void main() {
       prefetchRemaining: 1,
     );
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -441,8 +498,13 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
-    final notifier = container.read(intentionCatalogViewModelProvider.notifier);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
+    final notifier = container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+          .notifier,
+    );
 
     final load = notifier.loadNextPageIfNeeded(visibleIndex: 0);
     await _waitForQueries(repository, 2);
@@ -450,7 +512,13 @@ void main() {
     await load;
 
     final failed =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(failed.items, hasLength(2));
     expect(failed.totalCount, 3);
@@ -476,7 +544,13 @@ void main() {
     await retry;
 
     final recovered =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(recovered.items, hasLength(3));
     expect(recovered.totalCount, 3);
@@ -494,7 +568,7 @@ void main() {
         prefetchRemaining: 1,
       );
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -513,9 +587,13 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
       final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
       );
 
       final load = notifier.loadNextPageIfNeeded(visibleIndex: 0);
@@ -526,7 +604,13 @@ void main() {
       );
       await load;
       expect(
-        (container.read(intentionCatalogViewModelProvider).requireValue
+        (container
+                    .read(
+                      intentionCatalogViewModelProvider(
+                        const BrowseIntentionCatalog(),
+                      ),
+                    )
+                    .requireValue
                 as IntentionCatalogLoaded)
             .continuation,
         isA<IntentionCatalogContinuationValidation>(),
@@ -538,7 +622,13 @@ void main() {
       expect(recoveryQuery.cursor, isNull);
       expect(recoveryQuery.scope, IntentionScope.active);
       final duringRecovery =
-          container.read(intentionCatalogViewModelProvider).requireValue
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
               as IntentionCatalogLoaded;
       expect(duringRecovery.items, hasLength(2));
       expect(
@@ -561,7 +651,13 @@ void main() {
       await recovery;
 
       final recovered =
-          container.read(intentionCatalogViewModelProvider).requireValue
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
               as IntentionCatalogLoaded;
       expect(recovered.items.single.id, testSummary(index: 7).id);
       expect(recovered.totalCount, 6);
@@ -580,7 +676,7 @@ void main() {
         prefetchRemaining: 1,
       );
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -599,9 +695,13 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
       final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
       );
 
       final load = notifier.loadNextPageIfNeeded(visibleIndex: 0);
@@ -621,7 +721,13 @@ void main() {
       await recovery;
 
       final unavailable =
-          container.read(intentionCatalogViewModelProvider).requireValue
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
               as IntentionCatalogLoaded;
       expect(unavailable.items, hasLength(2));
       expect(unavailable.totalCount, 3);
@@ -648,7 +754,13 @@ void main() {
       await retry;
 
       final recovered =
-          container.read(intentionCatalogViewModelProvider).requireValue
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
               as IntentionCatalogLoaded;
       expect(recovered.items.single.id, testSummary(index: 4).id);
       expect(recovered.totalCount, 1);
@@ -663,7 +775,7 @@ void main() {
       prefetchRemaining: 1,
     );
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -681,8 +793,13 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
-    final notifier = container.read(intentionCatalogViewModelProvider.notifier);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
+    final notifier = container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+          .notifier,
+    );
     final load = notifier.loadNextPageIfNeeded(visibleIndex: 0);
     await _waitForQueries(repository, 2);
     repository.complete(
@@ -707,7 +824,7 @@ void main() {
       ),
     );
     final current = await container.read(
-      intentionCatalogViewModelProvider.future,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
     );
 
     repository.complete(
@@ -724,7 +841,11 @@ void main() {
     await oldRecovery;
 
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       same(current),
     );
   });
@@ -738,7 +859,7 @@ void main() {
         filterDebounce: Duration.zero,
       );
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -756,10 +877,14 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
 
       final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
       );
       notifier.changeTitleFilter('  МОЛ  ');
       await _waitForQueries(repository, 2);
@@ -774,7 +899,10 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
 
       notifier.changeOrder(IntentionCatalogOrder.updatedAtAscending);
       await _waitForQueries(repository, 3);
@@ -789,7 +917,10 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
 
       notifier.changeScope(IntentionScope.archived);
       await _waitForQueries(repository, 4);
@@ -820,7 +951,7 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = _catalogContainer(repository);
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -829,7 +960,10 @@ void main() {
     repository.queryAt(0);
 
     container
-        .read(intentionCatalogViewModelProvider.notifier)
+        .read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .notifier,
+        )
         .changeTitleFilter('молоко');
     await Future<void>.delayed(const Duration(milliseconds: 240));
     expect(repository.queries, hasLength(1));
@@ -857,14 +991,15 @@ void main() {
         filterDebounce: Duration.zero,
       );
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
       repository.queryAt(0);
 
       final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
       );
       notifier.changeTitleFilter(filter);
       final state = await _waitForState<IntentionCatalogInvalidFilter>(
@@ -884,7 +1019,7 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = _catalogContainer(repository);
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -893,7 +1028,10 @@ void main() {
     repository.queryAt(0);
 
     container
-        .read(intentionCatalogViewModelProvider.notifier)
+        .read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .notifier,
+        )
         .changeScope(IntentionScope.archived);
     await _waitForQueries(repository, 2);
     final currentSummary = testSummary(index: 2, title: 'Текущий результат');
@@ -909,7 +1047,7 @@ void main() {
       ),
     );
     final currentState = await container.read(
-      intentionCatalogViewModelProvider.future,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
     );
     expect(
       currentState,
@@ -934,7 +1072,11 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       same(currentState),
     );
   });
@@ -946,7 +1088,7 @@ void main() {
       filterDebounce: Duration.zero,
     );
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -954,7 +1096,10 @@ void main() {
     addTearDown(container.dispose);
     repository.queryAt(0);
 
-    final notifier = container.read(intentionCatalogViewModelProvider.notifier);
+    final notifier = container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+          .notifier,
+    );
     notifier.changeTitleFilter('прежний');
     await _waitForQueries(repository, 2);
     notifier.changeTitleFilter('новый');
@@ -972,7 +1117,7 @@ void main() {
       ),
     );
     final currentState = await container.read(
-      intentionCatalogViewModelProvider.future,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
     );
 
     repository.complete(
@@ -989,7 +1134,11 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       same(currentState),
     );
   });
@@ -1003,7 +1152,7 @@ void main() {
         filterDebounce: Duration.zero,
       );
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -1020,7 +1169,10 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
 
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
@@ -1039,7 +1191,8 @@ void main() {
       expect(repository.commands, hasLength(1));
 
       final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
       );
       notifier.changeTitleFilter('архив');
       await _waitForQueries(repository, 2);
@@ -1077,7 +1230,8 @@ void main() {
         ),
       );
       final reconciled = await container.read(
-        intentionCatalogViewModelProvider.future,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
       );
       expect(
         reconciled,
@@ -1096,7 +1250,7 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = _catalogContainer(repository);
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -1173,12 +1327,16 @@ Future<T> _waitForState<T extends IntentionCatalogState>(
 ) {
   final completer = Completer<T>();
   late final ProviderSubscription<AsyncValue<IntentionCatalogState>> listener;
-  listener = container.listen(intentionCatalogViewModelProvider, (_, next) {
-    final value = next.value;
-    if (!completer.isCompleted && value is T) {
-      completer.complete(value);
-      listener.close();
-    }
-  }, fireImmediately: true);
+  listener = container.listen(
+    intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+    (_, next) {
+      final value = next.value;
+      if (!completer.isCompleted && value is T) {
+        completer.complete(value);
+        listener.close();
+      }
+    },
+    fireImmediately: true,
+  );
   return completer.future;
 }

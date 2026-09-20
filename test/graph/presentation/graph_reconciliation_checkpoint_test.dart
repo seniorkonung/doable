@@ -13,6 +13,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
@@ -334,7 +335,7 @@ final class _CheckpointHarness {
       retry: (retryCount, error) => null,
     );
     _catalogSubscription = _container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, next) {
         if (next.value case final IntentionCatalogConfirmedState confirmed) {
           confirmedCatalogStates.add(confirmed);
@@ -368,7 +369,13 @@ final class _CheckpointHarness {
       _container.read(graphCommandCoordinatorProvider.notifier);
 
   IntentionCatalogLoaded get catalog =>
-      _container.read(intentionCatalogViewModelProvider).requireValue
+      _container
+              .read(
+                intentionCatalogViewModelProvider(
+                  const BrowseIntentionCatalog(),
+                ),
+              )
+              .requireValue
           as IntentionCatalogLoaded;
 
   Map<IntentionId, int> get catalogCounts => {
@@ -424,7 +431,9 @@ final class _CheckpointHarness {
         ),
       ),
     );
-    await _container.read(intentionCatalogViewModelProvider.future);
+    await _container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     repository.emitIntention(
       ownerId,

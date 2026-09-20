@@ -664,4 +664,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationDetailsOpenParticipant =>
       'Opens the intention and its own relations';
+
+  @override
+  String get participantPickerTitle => 'Select a participant';
+
+  @override
+  String get participantPickerCancel => 'Cancel the selection';
+
+  @override
+  String get participantPickerEmpty =>
+      'No other intentions are available to select.';
+
+  @override
+  String get participantPickerSelectHint =>
+      'Selects this intention as a relation participant';
+
+  @override
+  String get participantPickerOpenDetails => 'Open intention details';
 }

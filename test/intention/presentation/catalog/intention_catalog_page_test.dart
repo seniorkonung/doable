@@ -10,6 +10,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -562,7 +563,13 @@ void main() {
     await tester.pumpAndSettle();
     final beforePosition = _catalogScrollPosition(tester).pixels;
     final beforeState =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(beforeState.items, hasLength(30));
     expect(beforePosition, greaterThan(0));
@@ -576,7 +583,13 @@ void main() {
     await tester.pumpAndSettle();
 
     final afterState =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(router.current.name, IntentionCatalogRoute.name);
     expect(repository.queries, hasLength(3));

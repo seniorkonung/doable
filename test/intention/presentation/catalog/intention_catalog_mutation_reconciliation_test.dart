@@ -3,6 +3,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,14 +16,15 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     final confirmedStates = <IntentionCatalogConfirmedState>[];
-    final subscription = container.listen(intentionCatalogViewModelProvider, (
-      _,
-      next,
-    ) {
-      if (next.value case final IntentionCatalogConfirmedState confirmed) {
-        confirmedStates.add(confirmed);
-      }
-    }, fireImmediately: true);
+    final subscription = container.listen(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+      (_, next) {
+        if (next.value case final IntentionCatalogConfirmedState confirmed) {
+          confirmedStates.add(confirmed);
+        }
+      },
+      fireImmediately: true,
+    );
     addTearDown(subscription.close);
     addTearDown(container.dispose);
 
@@ -37,7 +39,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
     confirmedStates.clear();
 
     final first = testSummary(index: 1, title: 'Первое');
@@ -62,7 +66,13 @@ void main() {
     );
 
     final current =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(current.items.map((item) => item.id), [second.id, first.id]);
     expect(current.totalCount, 2);
@@ -79,7 +89,7 @@ void main() {
       prefetchRemaining: 1,
     );
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -100,7 +110,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     final movedAfterBoundary = testSummary(index: 4, createdDay: 1);
     await completeCatalogCommand(
@@ -177,7 +189,13 @@ void main() {
     );
 
     final current =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(current.items.map((item) => item.id), [third.id]);
     expect(current.totalCount, 4);
@@ -192,7 +210,7 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -200,7 +218,8 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
       );
       notifier.changeOrder(IntentionCatalogOrder.updatedAtAscending);
       await waitForCatalogQueries(repository, 2);
@@ -218,7 +237,10 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
 
       final moved = testSummary(index: 1, updatedDay: 4);
       await completeCatalogCommand(
@@ -236,7 +258,13 @@ void main() {
       );
 
       final current =
-          container.read(intentionCatalogViewModelProvider).requireValue
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
               as IntentionCatalogLoaded;
       expect(current.items.map((item) => item.id), [
         second.id,
@@ -316,12 +344,13 @@ void main() {
           prefetchRemaining: 1,
         );
         final subscription = container.listen(
-          intentionCatalogViewModelProvider,
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
           (_, _) {},
           fireImmediately: true,
         );
         final notifier = container.read(
-          intentionCatalogViewModelProvider.notifier,
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .notifier,
         );
         if (scenario.order != IntentionCatalogOrder.createdAtDescending) {
           notifier.changeOrder(scenario.order);
@@ -357,7 +386,10 @@ void main() {
             ),
           ),
         );
-        await container.read(intentionCatalogViewModelProvider.future);
+        await container.read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .future,
+        );
 
         await completeCatalogCommand(
           container,
@@ -418,7 +450,13 @@ void main() {
         );
 
         final beforeContinuation =
-            container.read(intentionCatalogViewModelProvider).requireValue
+            container
+                    .read(
+                      intentionCatalogViewModelProvider(
+                        const BrowseIntentionCatalog(),
+                      ),
+                    )
+                    .requireValue
                 as IntentionCatalogLoaded;
         expect(beforeContinuation.items.map((item) => item.id), [
           movedInside.id,
@@ -445,7 +483,13 @@ void main() {
         await load;
 
         final completed =
-            container.read(intentionCatalogViewModelProvider).requireValue
+            container
+                    .read(
+                      intentionCatalogViewModelProvider(
+                        const BrowseIntentionCatalog(),
+                      ),
+                    )
+                    .requireValue
                 as IntentionCatalogLoaded;
         expect(completed.items.map((item) => item.id), [
           movedInside.id,
@@ -472,7 +516,7 @@ void main() {
         filterDebounce: Duration.zero,
       );
       final subscription = container.listen(
-        intentionCatalogViewModelProvider,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
         (_, _) {},
         fireImmediately: true,
       );
@@ -480,7 +524,8 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(
-        intentionCatalogViewModelProvider.notifier,
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
       );
       notifier.changeTitleFilter('исторический');
       await waitForCatalogQueries(repository, 2);
@@ -495,7 +540,10 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
 
       final summary = testSummary(index: 6, title: 'Новая проекция');
       await completeCatalogCommand(
@@ -512,7 +560,13 @@ void main() {
       );
 
       final current =
-          container.read(intentionCatalogViewModelProvider).requireValue
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
               as IntentionCatalogLoaded;
       expect(current.items.single.id, summary.id);
       expect(current.totalCount, 1);
@@ -524,7 +578,7 @@ void main() {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -541,7 +595,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
@@ -568,7 +624,13 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     var current =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(current.items.single.id, created.id);
     expect(current.totalCount, 1);
@@ -576,7 +638,11 @@ void main() {
     expect(createClaim!.token, same(create.token));
     coordinator.confirmPresentation(createClaim);
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       same(current),
     );
 
@@ -605,14 +671,24 @@ void main() {
     await readiness.future;
     await Future<void>.delayed(Duration.zero);
     current =
-        container.read(intentionCatalogViewModelProvider).requireValue
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
             as IntentionCatalogLoaded;
     expect(current.items.single.readiness, IntentionReadiness.ready);
     final readinessClaim = await presenter.nextClaim();
     expect(readinessClaim!.token, same(readiness.token));
     coordinator.confirmPresentation(readinessClaim);
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       same(current),
     );
 
@@ -629,7 +705,11 @@ void main() {
     await failed.future;
     await Future<void>.delayed(Duration.zero);
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       same(beforeFailure),
     );
     final failureClaim = await presenter.nextClaim();
@@ -639,7 +719,11 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(
-      container.read(intentionCatalogViewModelProvider).requireValue,
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+          )
+          .requireValue,
       same(beforeFailure),
     );
     expect(repository.queries, hasLength(1));

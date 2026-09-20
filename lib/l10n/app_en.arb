@@ -774,5 +774,25 @@
   "relationDetailsOpenParticipant": "Opens the intention and its own relations",
   "@relationDetailsOpenParticipant": {
     "description": "Назначение перехода к участнику связи"
+  },
+  "participantPickerTitle": "Select a participant",
+  "@participantPickerTitle": {
+    "description": "Заголовок выбора участника долговременной связи"
+  },
+  "participantPickerCancel": "Cancel the selection",
+  "@participantPickerCancel": {
+    "description": "Назначение отмены выбора участника"
+  },
+  "participantPickerEmpty": "No other intentions are available to select.",
+  "@participantPickerEmpty": {
+    "description": "Отсутствие намерений, доступных для выбора участником"
+  },
+  "participantPickerSelectHint": "Selects this intention as a relation participant",
+  "@participantPickerSelectHint": {
+    "description": "Назначение выбора строки участником связи"
+  },
+  "participantPickerOpenDetails": "Open intention details",
+  "@participantPickerOpenDetails": {
+    "description": "Назначение перехода к подробным данным намерения из выбора"
   }
 }

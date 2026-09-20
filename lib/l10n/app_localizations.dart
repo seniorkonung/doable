@@ -1219,6 +1219,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opens the intention and its own relations'**
   String get relationDetailsOpenParticipant;
+
+  /// Заголовок выбора участника долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Select a participant'**
+  String get participantPickerTitle;
+
+  /// Назначение отмены выбора участника
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel the selection'**
+  String get participantPickerCancel;
+
+  /// Отсутствие намерений, доступных для выбора участником
+  ///
+  /// In en, this message translates to:
+  /// **'No other intentions are available to select.'**
+  String get participantPickerEmpty;
+
+  /// Назначение выбора строки участником связи
+  ///
+  /// In en, this message translates to:
+  /// **'Selects this intention as a relation participant'**
+  String get participantPickerSelectHint;
+
+  /// Назначение перехода к подробным данным намерения из выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Open intention details'**
+  String get participantPickerOpenDetails;
 }
 
 class _AppLocalizationsDelegate

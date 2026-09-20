@@ -10,8 +10,8 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'package:auto_route/auto_route.dart' as _i5;
-import 'package:doable/src/intention/domain/intention_id.dart' as _i6;
+import 'package:auto_route/auto_route.dart' as _i6;
+import 'package:doable/src/intention/domain/intention_id.dart' as _i7;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as _i1;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart'
@@ -19,20 +19,22 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
     as _i3;
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
-    as _i8;
+    as _i9;
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart'
     as _i4;
-import 'package:flutter/material.dart' as _i7;
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
+    as _i5;
+import 'package:flutter/material.dart' as _i8;
 
 /// generated route for
 /// [_i1.IntentionCatalogPage]
-class IntentionCatalogRoute extends _i5.PageRouteInfo<void> {
-  const IntentionCatalogRoute({List<_i5.PageRouteInfo>? children})
+class IntentionCatalogRoute extends _i6.PageRouteInfo<void> {
+  const IntentionCatalogRoute({List<_i6.PageRouteInfo>? children})
     : super(IntentionCatalogRoute.name, initialChildren: children);
 
   static const String name = 'IntentionCatalogRoute';
 
-  static _i5.PageInfo page = _i5.PageInfo(
+  static _i6.PageInfo page = _i6.PageInfo(
     name,
     builder: (data) {
       return const _i1.IntentionCatalogPage();
@@ -43,11 +45,11 @@ class IntentionCatalogRoute extends _i5.PageRouteInfo<void> {
 /// generated route for
 /// [_i2.IntentionDetailsPage]
 class IntentionDetailsRoute
-    extends _i5.PageRouteInfo<IntentionDetailsRouteArgs> {
+    extends _i6.PageRouteInfo<IntentionDetailsRouteArgs> {
   IntentionDetailsRoute({
-    required _i6.IntentionId intentionId,
-    _i7.Key? key,
-    List<_i5.PageRouteInfo>? children,
+    required _i7.IntentionId intentionId,
+    _i8.Key? key,
+    List<_i6.PageRouteInfo>? children,
   }) : super(
          IntentionDetailsRoute.name,
          args: IntentionDetailsRouteArgs(intentionId: intentionId, key: key),
@@ -56,7 +58,7 @@ class IntentionDetailsRoute
 
   static const String name = 'IntentionDetailsRoute';
 
-  static _i5.PageInfo page = _i5.PageInfo(
+  static _i6.PageInfo page = _i6.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<IntentionDetailsRouteArgs>();
@@ -71,9 +73,9 @@ class IntentionDetailsRoute
 class IntentionDetailsRouteArgs {
   const IntentionDetailsRouteArgs({required this.intentionId, this.key});
 
-  final _i6.IntentionId intentionId;
+  final _i7.IntentionId intentionId;
 
-  final _i7.Key? key;
+  final _i8.Key? key;
 
   @override
   String toString() {
@@ -93,13 +95,13 @@ class IntentionDetailsRouteArgs {
 
 /// generated route for
 /// [_i3.IntentionEditorPage]
-class IntentionEditorRoute extends _i5.PageRouteInfo<void> {
-  const IntentionEditorRoute({List<_i5.PageRouteInfo>? children})
+class IntentionEditorRoute extends _i6.PageRouteInfo<void> {
+  const IntentionEditorRoute({List<_i6.PageRouteInfo>? children})
     : super(IntentionEditorRoute.name, initialChildren: children);
 
   static const String name = 'IntentionEditorRoute';
 
-  static _i5.PageInfo page = _i5.PageInfo(
+  static _i6.PageInfo page = _i6.PageInfo(
     name,
     builder: (data) {
       return const _i3.IntentionEditorPage();
@@ -109,11 +111,11 @@ class IntentionEditorRoute extends _i5.PageRouteInfo<void> {
 
 /// generated route for
 /// [_i4.RelationDetailsPage]
-class RelationDetailsRoute extends _i5.PageRouteInfo<RelationDetailsRouteArgs> {
+class RelationDetailsRoute extends _i6.PageRouteInfo<RelationDetailsRouteArgs> {
   RelationDetailsRoute({
-    required _i8.LongTermRelationId relationId,
-    _i7.Key? key,
-    List<_i5.PageRouteInfo>? children,
+    required _i9.LongTermRelationId relationId,
+    _i8.Key? key,
+    List<_i6.PageRouteInfo>? children,
   }) : super(
          RelationDetailsRoute.name,
          args: RelationDetailsRouteArgs(relationId: relationId, key: key),
@@ -122,7 +124,7 @@ class RelationDetailsRoute extends _i5.PageRouteInfo<RelationDetailsRouteArgs> {
 
   static const String name = 'RelationDetailsRoute';
 
-  static _i5.PageInfo page = _i5.PageInfo(
+  static _i6.PageInfo page = _i6.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<RelationDetailsRouteArgs>();
@@ -137,9 +139,9 @@ class RelationDetailsRoute extends _i5.PageRouteInfo<RelationDetailsRouteArgs> {
 class RelationDetailsRouteArgs {
   const RelationDetailsRouteArgs({required this.relationId, this.key});
 
-  final _i8.LongTermRelationId relationId;
+  final _i9.LongTermRelationId relationId;
 
-  final _i7.Key? key;
+  final _i8.Key? key;
 
   @override
   String toString() {
@@ -155,4 +157,61 @@ class RelationDetailsRouteArgs {
 
   @override
   int get hashCode => relationId.hashCode ^ key.hashCode;
+}
+
+/// generated route for
+/// [_i5.RelationParticipantPickerPage]
+class RelationParticipantPickerRoute
+    extends _i6.PageRouteInfo<RelationParticipantPickerRouteArgs> {
+  RelationParticipantPickerRoute({
+    required _i7.IntentionId excludedIntentionId,
+    _i8.Key? key,
+    List<_i6.PageRouteInfo>? children,
+  }) : super(
+         RelationParticipantPickerRoute.name,
+         args: RelationParticipantPickerRouteArgs(
+           excludedIntentionId: excludedIntentionId,
+           key: key,
+         ),
+         initialChildren: children,
+       );
+
+  static const String name = 'RelationParticipantPickerRoute';
+
+  static _i6.PageInfo page = _i6.PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<RelationParticipantPickerRouteArgs>();
+      return _i5.RelationParticipantPickerPage(
+        excludedIntentionId: args.excludedIntentionId,
+        key: args.key,
+      );
+    },
+  );
+}
+
+class RelationParticipantPickerRouteArgs {
+  const RelationParticipantPickerRouteArgs({
+    required this.excludedIntentionId,
+    this.key,
+  });
+
+  final _i7.IntentionId excludedIntentionId;
+
+  final _i8.Key? key;
+
+  @override
+  String toString() {
+    return 'RelationParticipantPickerRouteArgs{excludedIntentionId: $excludedIntentionId, key: $key}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! RelationParticipantPickerRouteArgs) return false;
+    return excludedIntentionId == other.excludedIntentionId && key == other.key;
+  }
+
+  @override
+  int get hashCode => excludedIntentionId.hashCode ^ key.hashCode;
 }
