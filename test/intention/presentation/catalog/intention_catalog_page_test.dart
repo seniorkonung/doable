@@ -12,6 +12,7 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -635,11 +636,7 @@ void main() {
     await _pumpUntilQueries(tester, repository, 2);
     await tester.pump();
     expect(repository.queryAt(1).cursor, same(cursor));
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-      const Offset(0, -300),
-    );
-    await tester.pump();
+    await _scrollCatalogToEnd(tester);
     expect(find.text('Loading more intentions…'), findsOneWidget);
 
     repository.complete(1, const ResultFailure(IntentionUnavailableFailure()));
@@ -765,6 +762,50 @@ void main() {
     expect(find.text('Прежнее первое'), findsNothing);
     expect(find.text('Total intentions: 1'), findsOneWidget);
   });
+
+  testWidgets(
+    'показывает количество активных связей в каждой строке каталога',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledCatalogRepository();
+      await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [
+              testSummary(
+                index: 1,
+                title: 'Быть здоровым',
+                activeRelationCount: 3,
+              ),
+              testSummary(index: 2, title: 'Выбрать страховку'),
+            ],
+            totalCount: 2,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Быть здоровым'), findsOneWidget);
+      expect(find.text('Активных связей: 3'), findsOneWidget);
+      expect(find.text('Активных связей: 0'), findsOneWidget);
+
+      final row = tester.getSemantics(
+        find.ancestor(
+          of: find.text('Быть здоровым'),
+          matching: find.byType(IntentionSummaryView),
+        ),
+      );
+      expect(row.label, contains('Быть здоровым'));
+      expect(row.label, contains('Не готово к действию'));
+      expect(row.label, contains('Активных связей: 3'));
+
+      semantics.dispose();
+    },
+  );
 }
 
 ScrollPosition _catalogScrollPosition(WidgetTester tester) => tester
@@ -775,6 +816,17 @@ ScrollPosition _catalogScrollPosition(WidgetTester tester) => tester
       ),
     )
     .position;
+
+Future<void> _scrollCatalogToEnd(WidgetTester tester) async {
+  for (var attempt = 0; attempt < 5; attempt++) {
+    final position = _catalogScrollPosition(tester);
+    if (position.pixels >= position.maxScrollExtent) {
+      return;
+    }
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pump();
+  }
+}
 
 Widget _testApp(
   ControlledCatalogRepository repository, {

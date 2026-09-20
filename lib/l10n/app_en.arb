@@ -181,6 +181,27 @@
   "@catalogNoDescription": {
     "description": "Признак отсутствия описания намерения"
   },
+  "intentionActiveRelationCount": "Active relations: {count}",
+  "@intentionActiveRelationCount": {
+    "description": "Количество активных связей намерения в его представлении",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "intentionActiveRelationCountRefreshFailed": "The active relation count couldn’t be refreshed.",
+  "@intentionActiveRelationCountRefreshFailed": {
+    "description": "Ошибка обновления количества активных связей при сохранённом прежнем числе"
+  },
+  "intentionActiveRelationCountLoading": "Loading the active relation count…",
+  "@intentionActiveRelationCountLoading": {
+    "description": "Количество активных связей ещё не получено"
+  },
+  "intentionActiveRelationCountUnknown": "The active relation count is unknown.",
+  "@intentionActiveRelationCountUnknown": {
+    "description": "Количество активных связей неизвестно из-за ошибки получения"
+  },
   "detailsTitle": "Intention details",
   "@detailsTitle": {
     "description": "Заголовок подробного просмотра намерения"

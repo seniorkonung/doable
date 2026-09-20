@@ -10,6 +10,7 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../application/intention_catalog.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
+import '../intention_summary_view.dart';
 import 'intention_catalog_state.dart';
 import 'intention_catalog_view_model.dart';
 
@@ -573,21 +574,15 @@ final class _IntentionSummaryTile extends StatelessWidget {
     final description = summary.hasDescription
         ? localizations.catalogHasDescription
         : localizations.catalogNoDescription;
-    final archiveState = switch (summary.archiveState) {
-      IntentionArchiveState.active => localizations.detailsActive,
-      IntentionArchiveState.archived => localizations.detailsArchived,
-    };
-    return ListTile(
-      onTap: onTap,
-      title: Text(summary.title),
-      subtitle: Wrap(
-        spacing: 12,
-        children: [
-          Text(readiness),
-          Text(description),
-          if (showArchiveState) Text(archiveState),
-        ],
+    return IntentionSummaryView(
+      title: summary.title,
+      archiveState: summary.archiveState,
+      showArchiveState: showArchiveState,
+      traits: [readiness, description],
+      activeRelationCount: ConfirmedActiveRelationCount(
+        summary.activeRelationCount,
       ),
+      onTap: onTap,
     );
   }
 }

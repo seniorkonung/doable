@@ -362,6 +362,30 @@ abstract class AppLocalizations {
   /// **'No description'**
   String get catalogNoDescription;
 
+  /// Количество активных связей намерения в его представлении
+  ///
+  /// In en, this message translates to:
+  /// **'Active relations: {count}'**
+  String intentionActiveRelationCount(int count);
+
+  /// Ошибка обновления количества активных связей при сохранённом прежнем числе
+  ///
+  /// In en, this message translates to:
+  /// **'The active relation count couldn’t be refreshed.'**
+  String get intentionActiveRelationCountRefreshFailed;
+
+  /// Количество активных связей ещё не получено
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the active relation count…'**
+  String get intentionActiveRelationCountLoading;
+
+  /// Количество активных связей неизвестно из-за ошибки получения
+  ///
+  /// In en, this message translates to:
+  /// **'The active relation count is unknown.'**
+  String get intentionActiveRelationCountUnknown;
+
   /// Заголовок подробного просмотра намерения
   ///
   /// In en, this message translates to:
