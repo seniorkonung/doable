@@ -4,6 +4,7 @@ import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_counts.dart';
 import '../../application/relation_group_page.dart';
 import '../../domain/long_term_relation.dart';
+import '../../domain/long_term_relation_id.dart';
 
 /// Выбранная пользователем группа связей одного намерения.
 ///
@@ -80,6 +81,29 @@ final class RelationGroupInitialFailure extends RelationNeighborhoodState {
   bool get canRetry => failure is RelationGroupUnavailableFailure;
 }
 
+/// Намерение-владелец подтверждённо отсутствует, его соседство завершено.
+final class RelationNeighborhoodIntentionNotFound
+    extends RelationNeighborhoodState {
+  const RelationNeighborhoodIntentionNotFound({
+    required super.intentionId,
+    required super.selection,
+  });
+}
+
+/// Строка, к которой представление возвращает viewport после замены списка.
+///
+/// Идентификатор служит стабильным ключом строки, а индекс позволяет выбрать
+/// ближайшую сохранившуюся позицию, если прежняя видимая связь исчезла.
+final class RelationGroupScrollAnchor {
+  const RelationGroupScrollAnchor({
+    required this.relationId,
+    required this.index,
+  });
+
+  final LongTermRelationId relationId;
+  final int index;
+}
+
 /// Подтверждённое состояние выбранной группы на одной ревизии графа.
 sealed class RelationGroupConfirmedState extends RelationNeighborhoodState {
   const RelationGroupConfirmedState({
@@ -92,6 +116,8 @@ sealed class RelationGroupConfirmedState extends RelationNeighborhoodState {
   /// Полная сводка восьми групп, полученная вместе с первой порцией.
   final RelationCounts counts;
   final GraphRevision revision;
+  RelationGroupProgress get progress;
+  RelationGroupScrollAnchor? get scrollAnchor;
 
   /// Полное количество связей выбранной группы.
   int get totalCount => counts.forGroup(
@@ -108,7 +134,25 @@ final class RelationGroupEmpty extends RelationGroupConfirmedState {
     required super.selection,
     required super.counts,
     required super.revision,
+    this.progress = const RelationGroupIdle(),
+    this.scrollAnchor,
   });
+
+  @override
+  final RelationGroupProgress progress;
+
+  @override
+  final RelationGroupScrollAnchor? scrollAnchor;
+
+  RelationGroupEmpty withProgress(RelationGroupProgress value) =>
+      RelationGroupEmpty(
+        intentionId: intentionId,
+        selection: selection,
+        counts: counts,
+        revision: revision,
+        progress: value,
+        scrollAnchor: scrollAnchor,
+      );
 }
 
 final class RelationGroupLoaded extends RelationGroupConfirmedState {
@@ -120,13 +164,17 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
     required List<LongTermRelationSummary> items,
     required this.nextCursor,
     this.progress = const RelationGroupIdle(),
+    this.scrollAnchor,
   }) : items = List.unmodifiable(items);
 
   /// Последовательная загруженная часть группы в порядке приоритета и
   /// последовательности создания.
   final List<LongTermRelationSummary> items;
   final RelationGroupCursor? nextCursor;
+  @override
   final RelationGroupProgress progress;
+  @override
+  final RelationGroupScrollAnchor? scrollAnchor;
 
   /// Подтверждённый конец списка: продолжения больше нет.
   ///
@@ -142,6 +190,7 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
         items: items,
         nextCursor: nextCursor,
         progress: value,
+        scrollAnchor: scrollAnchor,
       );
 }
 
