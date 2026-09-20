@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -19,6 +21,16 @@ final class ControlledNeighborhoodRepository
     implements PersonalGraphRepository {
   final queries = <RelationGroupQuery>[];
   final _requests = <Completer<RelationGroupPageResult>>[];
+  final intentionIds = <IntentionId>[];
+  final intentionCommands = <IntentionCommand>[];
+  final relationCommands = <LongTermRelationCommand>[];
+  final _intentionController =
+      StreamController<Result<GraphSnapshot<IntentionDetails?>>>.broadcast(
+        sync: true,
+      );
+  final _commandRequests =
+      <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
+  final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
 
   int get requestCount => queries.length;
 
@@ -38,6 +50,49 @@ final class ControlledNeighborhoodRepository
 
   void throwOnRead(int index, Object error) {
     _requests[index].completeError(error);
+  }
+
+  void emitIntention(
+    Intention intention, {
+    required RelationCounts counts,
+    required GraphRevision revision,
+  }) {
+    _intentionController.add(
+      ResultSuccess(
+        GraphSnapshot(
+          value: IntentionDetails(intention: intention, relationCounts: counts),
+          revision: revision,
+        ),
+      ),
+    );
+  }
+
+  void emitIntentionNotFound({required GraphRevision revision}) {
+    _intentionController.add(
+      ResultSuccess(GraphSnapshot(value: null, revision: revision)),
+    );
+  }
+
+  void completeIntentionCommand(
+    int index,
+    Result<IntentionCommandSuccess> result,
+  ) {
+    _commandRequests[index].complete(switch (result) {
+      ResultSuccess(:final value) => ResultSuccess(
+        ConfirmedGraphResult(
+          revision: value.catalogMutation.revision,
+          value: value,
+        ),
+      ),
+      ResultFailure(:final failure) => ResultFailure(failure),
+    });
+  }
+
+  void completeRelationCommand(
+    int index,
+    LongTermRelationCommandResult result,
+  ) {
+    _relationCommandRequests[index].complete(result);
   }
 
   @override
@@ -67,14 +122,46 @@ final class ControlledNeighborhoodRepository
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
-  ) => throw UnsupportedError('Намерение не наблюдается в тесте соседства.');
+  ) {
+    intentionIds.add(id);
+    return _intentionController.stream;
+  }
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
-  >(GraphCommand<TSuccess, TFailure> command) =>
-      throw UnsupportedError('Команды графа не выполняются в тесте соседства.');
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    final result = switch (command) {
+      final IntentionCommand intentionCommand => await _executeIntention(
+        intentionCommand,
+      ),
+      final LongTermRelationCommand relationCommand =>
+        await _executeLongTermRelation(relationCommand),
+      _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
+    };
+    return result as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) {
+    intentionCommands.add(command);
+    final request =
+        Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
+    _commandRequests.add(request);
+    return request.future;
+  }
+
+  Future<LongTermRelationCommandResult> _executeLongTermRelation(
+    LongTermRelationCommand command,
+  ) {
+    relationCommands.add(command);
+    final request = Completer<LongTermRelationCommandResult>();
+    _relationCommandRequests.add(request);
+    return request.future;
+  }
+
+  Future<void> dispose() => _intentionController.close();
 }
 
 final class TestGraphRevision implements GraphRevision {
@@ -143,6 +230,8 @@ LongTermRelationSummary testGroupRow({
   RelationDirection direction = RelationDirection.outgoing,
   RelationScope scope = RelationScope.active,
   RelationPriority priority = RelationPriority.p2,
+  String? neighborTitle,
+  int neighborActiveRelationCount = 0,
 }) {
   final neighborId = testIntentionId(1000 + index);
   final isOutgoing = direction == RelationDirection.outgoing;
@@ -158,8 +247,20 @@ LongTermRelationSummary testGroupRow({
       scope: scope,
       creationSequence: RelationCreationSequence(index),
     ),
-    source: testParticipant(sourceId, title: 'Исходное $index'),
-    related: testParticipant(relatedId, title: 'Связанное $index'),
+    source: testParticipant(
+      sourceId,
+      title: isOutgoing
+          ? 'Намерение-владелец'
+          : neighborTitle ?? 'Исходное $index',
+      activeRelationCount: isOutgoing ? 0 : neighborActiveRelationCount,
+    ),
+    related: testParticipant(
+      relatedId,
+      title: isOutgoing
+          ? neighborTitle ?? 'Связанное $index'
+          : 'Намерение-владелец',
+      activeRelationCount: isOutgoing ? neighborActiveRelationCount : 0,
+    ),
     hasDescription: false,
   );
 }
@@ -171,6 +272,8 @@ List<LongTermRelationSummary> testGroupRows({
   LongTermRelationType type = LongTermRelationType.need,
   RelationDirection direction = RelationDirection.outgoing,
   RelationScope scope = RelationScope.active,
+  Map<int, String> neighborTitles = const {},
+  Map<int, int> neighborActiveRelationCounts = const {},
 }) => [
   for (var offset = 0; offset < count; offset += 1)
     testGroupRow(
@@ -179,8 +282,66 @@ List<LongTermRelationSummary> testGroupRows({
       type: type,
       direction: direction,
       scope: scope,
+      neighborTitle: neighborTitles[from + offset],
+      neighborActiveRelationCount:
+          neighborActiveRelationCounts[from + offset] ?? 0,
     ),
 ];
+
+Intention testNeighborhoodIntention({
+  required IntentionId id,
+  String title = 'Намерение',
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
+}) {
+  final timestamp = IntentionTimestamp(DateTime.utc(2026, 9, 20));
+  return Intention(
+    id: id,
+    title: title,
+    description: null,
+    readiness: IntentionReadiness.notReady,
+    archiveState: archiveState,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  );
+}
+
+Result<IntentionCommandSuccess> testNeighborhoodSavedResult({
+  required Intention before,
+  required Intention after,
+  required GraphRevision revision,
+  Iterable<GraphChange> additionalChanges = const [],
+}) => ResultSuccess(
+  IntentionSaved(
+    after,
+    catalogMutation: IntentionCatalogUpdated(
+      revision: revision,
+      before: _NeighborhoodCatalogEntrySnapshot(before),
+      after: _NeighborhoodCatalogEntrySnapshot(after),
+    ),
+    additionalChanges: additionalChanges,
+  ),
+);
+
+final class _NeighborhoodCatalogEntrySnapshot
+    implements IntentionCatalogEntrySnapshot {
+  _NeighborhoodCatalogEntrySnapshot(Intention intention)
+    : summary = IntentionSummary(
+        id: intention.id,
+        title: intention.title,
+        hasDescription: intention.description != null,
+        readiness: intention.readiness,
+        archiveState: intention.archiveState,
+        activeRelationCount: 0,
+        createdAt: intention.createdAt,
+        updatedAt: intention.updatedAt,
+      );
+
+  @override
+  final IntentionSummary summary;
+
+  @override
+  bool matches(IntentionCatalogQuery query) => query.includes(summary);
+}
 
 RelationCounts testRelationCounts({
   int activeNeedIncoming = 0,
