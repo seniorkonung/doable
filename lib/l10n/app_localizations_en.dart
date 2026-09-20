@@ -172,6 +172,155 @@ class AppLocalizationsEn extends AppLocalizations {
       'The active relation count is unknown.';
 
   @override
+  String get relationNeighborhoodTitle => 'Relations';
+
+  @override
+  String get relationNeighborhoodSummaryLoading =>
+      'Loading relations and summary…';
+
+  @override
+  String get relationNeighborhoodSummaryUnavailable =>
+      'The relation summary couldn’t be loaded.';
+
+  @override
+  String relationNeighborhoodTotal(int count) {
+    return 'Total relations: $count';
+  }
+
+  @override
+  String relationNeighborhoodActiveTotal(int count) {
+    return 'Active relations: $count';
+  }
+
+  @override
+  String relationNeighborhoodArchivedTotal(int count) {
+    return 'Archived relations: $count';
+  }
+
+  @override
+  String relationNeighborhoodNeedTotal(int count) {
+    return 'Need: $count';
+  }
+
+  @override
+  String relationNeighborhoodCanTotal(int count) {
+    return 'Can: $count';
+  }
+
+  @override
+  String get relationNeighborhoodScopeLabel => 'Relation state';
+
+  @override
+  String get relationNeighborhoodScopeActive => 'Active relations';
+
+  @override
+  String get relationNeighborhoodScopeArchived => 'Archived relations';
+
+  @override
+  String get relationNeighborhoodTypeLabel => 'Relation type';
+
+  @override
+  String get relationNeighborhoodTypeNeed => 'Need';
+
+  @override
+  String get relationNeighborhoodTypeCan => 'Can';
+
+  @override
+  String get relationNeighborhoodDirectionLabel => 'Direction';
+
+  @override
+  String get relationNeighborhoodDirectionIncoming => 'Incoming';
+
+  @override
+  String get relationNeighborhoodDirectionOutgoing => 'Outgoing';
+
+  @override
+  String relationNeighborhoodSelectedGroupCount(int count) {
+    return 'In the whole selected group: $count';
+  }
+
+  @override
+  String get relationNeighborhoodInitialUnavailable =>
+      'The relations and summary couldn’t be loaded. Try again.';
+
+  @override
+  String get relationNeighborhoodInitialCorruption =>
+      'Stored relation data is damaged and can’t be shown.';
+
+  @override
+  String get relationNeighborhoodInitialUnexpected =>
+      'The relations couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get relationNeighborhoodInitialInvalid =>
+      'The selected relation group can no longer be opened.';
+
+  @override
+  String get relationNeighborhoodIntentionNotFound =>
+      'The intention whose relations were being viewed no longer exists.';
+
+  @override
+  String get relationNeighborhoodEmpty =>
+      'There are no relations in this group.';
+
+  @override
+  String get relationNeighborhoodLoadingMore => 'Loading more relations…';
+
+  @override
+  String get relationNeighborhoodLoadMoreUnavailable =>
+      'The next relations couldn’t be loaded.';
+
+  @override
+  String get relationNeighborhoodLoadMoreCorruption =>
+      'Stored data is damaged; the next relations can’t be shown.';
+
+  @override
+  String get relationNeighborhoodLoadMoreUnexpected =>
+      'The next relations couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get relationNeighborhoodLoadMoreInvalid =>
+      'The continuation for this group is no longer valid.';
+
+  @override
+  String get relationNeighborhoodRefreshing => 'Refreshing relations…';
+
+  @override
+  String get relationNeighborhoodRefreshFailed =>
+      'The relations couldn’t be refreshed. Previously loaded data is still shown.';
+
+  @override
+  String get relationNeighborhoodConfirmedEnd =>
+      'All relations in this group are loaded.';
+
+  @override
+  String get relationNeighborhoodRelationActive => 'Active relation';
+
+  @override
+  String get relationNeighborhoodRelationArchived => 'Archived relation';
+
+  @override
+  String relationNeighborhoodPriority(String priority) {
+    return 'Priority $priority';
+  }
+
+  @override
+  String get relationNeighborhoodSourceParticipant => 'Source intention';
+
+  @override
+  String get relationNeighborhoodRelatedParticipant => 'Related intention';
+
+  @override
+  String relationNeighborhoodNeedPhrase(String source, String related) {
+    return 'To $source, you need $related';
+  }
+
+  @override
+  String relationNeighborhoodCanPhrase(String source, String related) {
+    return 'To $source, you can $related';
+  }
+
+  @override
   String get detailsTitle => 'Intention details';
 
   @override

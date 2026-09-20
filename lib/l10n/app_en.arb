@@ -202,6 +202,168 @@
   "@intentionActiveRelationCountUnknown": {
     "description": "Количество активных связей неизвестно из-за ошибки получения"
   },
+  "relationNeighborhoodTitle": "Relations",
+  "relationNeighborhoodSummaryLoading": "Loading relations and summary…",
+  "relationNeighborhoodSummaryUnavailable": "The relation summary couldn’t be loaded.",
+  "relationNeighborhoodTotal": "Total relations: {count}",
+  "@relationNeighborhoodTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodActiveTotal": "Active relations: {count}",
+  "@relationNeighborhoodActiveTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodArchivedTotal": "Archived relations: {count}",
+  "@relationNeighborhoodArchivedTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodNeedTotal": "Need: {count}",
+  "@relationNeighborhoodNeedTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodCanTotal": "Can: {count}",
+  "@relationNeighborhoodCanTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodScopeLabel": "Relation state",
+  "relationNeighborhoodScopeActive": "Active relations",
+  "relationNeighborhoodScopeArchived": "Archived relations",
+  "relationNeighborhoodTypeLabel": "Relation type",
+  "relationNeighborhoodTypeNeed": "Need",
+  "relationNeighborhoodTypeCan": "Can",
+  "relationNeighborhoodDirectionLabel": "Direction",
+  "relationNeighborhoodDirectionIncoming": "Incoming",
+  "relationNeighborhoodDirectionOutgoing": "Outgoing",
+  "relationNeighborhoodSelectedGroupCount": "In the whole selected group: {count}",
+  "@relationNeighborhoodSelectedGroupCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodInitialUnavailable": "The relations and summary couldn’t be loaded. Try again.",
+  "relationNeighborhoodInitialCorruption": "Stored relation data is damaged and can’t be shown.",
+  "relationNeighborhoodInitialUnexpected": "The relations couldn’t be loaded because of an unexpected error.",
+  "relationNeighborhoodInitialInvalid": "The selected relation group can no longer be opened.",
+  "relationNeighborhoodIntentionNotFound": "The intention whose relations were being viewed no longer exists.",
+  "relationNeighborhoodEmpty": "There are no relations in this group.",
+  "relationNeighborhoodLoadingMore": "Loading more relations…",
+  "relationNeighborhoodLoadMoreUnavailable": "The next relations couldn’t be loaded.",
+  "relationNeighborhoodLoadMoreCorruption": "Stored data is damaged; the next relations can’t be shown.",
+  "relationNeighborhoodLoadMoreUnexpected": "The next relations couldn’t be loaded because of an unexpected error.",
+  "relationNeighborhoodLoadMoreInvalid": "The continuation for this group is no longer valid.",
+  "relationNeighborhoodRefreshing": "Refreshing relations…",
+  "relationNeighborhoodRefreshFailed": "The relations couldn’t be refreshed. Previously loaded data is still shown.",
+  "relationNeighborhoodConfirmedEnd": "All relations in this group are loaded.",
+  "relationNeighborhoodRelationActive": "Active relation",
+  "relationNeighborhoodRelationArchived": "Archived relation",
+  "relationNeighborhoodPriority": "Priority {priority}",
+  "@relationNeighborhoodPriority": {
+    "placeholders": {"priority": {"type": "String"}}
+  },
+  "relationNeighborhoodSourceParticipant": "Source intention",
+  "relationNeighborhoodRelatedParticipant": "Related intention",
+  "relationNeighborhoodNeedPhrase": "To {source}, you need {related}",
+  "@relationNeighborhoodNeedPhrase": {
+    "placeholders": {
+      "source": {"type": "String"},
+      "related": {"type": "String"}
+    }
+  },
+  "relationNeighborhoodCanPhrase": "To {source}, you can {related}",
+  "@relationNeighborhoodCanPhrase": {
+    "placeholders": {
+      "source": {"type": "String"},
+      "related": {"type": "String"}
+    }
+  },
+  "@relationNeighborhoodTitle": {
+    "description": "Заголовок соседства намерения"
+  },
+  "@relationNeighborhoodSummaryLoading": {
+    "description": "Первоначальная загрузка соседства и полной сводки"
+  },
+  "@relationNeighborhoodSummaryUnavailable": {
+    "description": "Полная сводка ещё не подтверждена из-за ошибки"
+  },
+  "@relationNeighborhoodScopeLabel": {
+    "description": "Подпись выбора активных или архивных связей"
+  },
+  "@relationNeighborhoodScopeActive": {
+    "description": "Активный охват соседства"
+  },
+  "@relationNeighborhoodScopeArchived": {
+    "description": "Архивный охват соседства"
+  },
+  "@relationNeighborhoodTypeLabel": {
+    "description": "Подпись выбора типа долговременной связи"
+  },
+  "@relationNeighborhoodTypeNeed": {
+    "description": "Тип долговременной связи нужно"
+  },
+  "@relationNeighborhoodTypeCan": {
+    "description": "Тип долговременной связи можно"
+  },
+  "@relationNeighborhoodDirectionLabel": {
+    "description": "Подпись выбора направления связи"
+  },
+  "@relationNeighborhoodDirectionIncoming": {
+    "description": "Входящее направление относительно намерения"
+  },
+  "@relationNeighborhoodDirectionOutgoing": {
+    "description": "Исходящее направление относительно намерения"
+  },
+  "@relationNeighborhoodInitialUnavailable": {
+    "description": "Устранимая ошибка начального чтения группы"
+  },
+  "@relationNeighborhoodInitialCorruption": {
+    "description": "Повреждение при начальном чтении группы"
+  },
+  "@relationNeighborhoodInitialUnexpected": {
+    "description": "Непредвиденная ошибка начального чтения группы"
+  },
+  "@relationNeighborhoodInitialInvalid": {
+    "description": "Недействительный запрос начальной группы"
+  },
+  "@relationNeighborhoodIntentionNotFound": {
+    "description": "Владелец соседства подтверждённо отсутствует"
+  },
+  "@relationNeighborhoodEmpty": {
+    "description": "Подтверждённо пустая выбранная группа"
+  },
+  "@relationNeighborhoodLoadingMore": {
+    "description": "Подгрузка следующей порции выбранной группы"
+  },
+  "@relationNeighborhoodLoadMoreUnavailable": {
+    "description": "Устранимая ошибка подгрузки"
+  },
+  "@relationNeighborhoodLoadMoreCorruption": {
+    "description": "Повреждение при подгрузке"
+  },
+  "@relationNeighborhoodLoadMoreUnexpected": {
+    "description": "Непредвиденная ошибка подгрузки"
+  },
+  "@relationNeighborhoodLoadMoreInvalid": {
+    "description": "Недействительное продолжение группы"
+  },
+  "@relationNeighborhoodRefreshing": {
+    "description": "Согласованное обновление сводки и выбранной группы"
+  },
+  "@relationNeighborhoodRefreshFailed": {
+    "description": "Ошибка обновления при сохранённых прежних данных"
+  },
+  "@relationNeighborhoodConfirmedEnd": {
+    "description": "Подтверждённый конец выбранной группы"
+  },
+  "@relationNeighborhoodRelationActive": {
+    "description": "Активное состояние строки связи"
+  },
+  "@relationNeighborhoodRelationArchived": {
+    "description": "Архивное состояние строки связи"
+  },
+  "@relationNeighborhoodSourceParticipant": {
+    "description": "Подпись исходного участника связи"
+  },
+  "@relationNeighborhoodRelatedParticipant": {
+    "description": "Подпись связанного участника связи"
+  },
   "detailsTitle": "Intention details",
   "@detailsTitle": {
     "description": "Заголовок подробного просмотра намерения"

@@ -173,6 +173,153 @@ class AppLocalizationsRu extends AppLocalizations {
       'Количество активных связей неизвестно.';
 
   @override
+  String get relationNeighborhoodTitle => 'Связи';
+
+  @override
+  String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
+
+  @override
+  String get relationNeighborhoodSummaryUnavailable =>
+      'Не удалось загрузить сводку связей.';
+
+  @override
+  String relationNeighborhoodTotal(int count) {
+    return 'Всего связей: $count';
+  }
+
+  @override
+  String relationNeighborhoodActiveTotal(int count) {
+    return 'Активных связей: $count';
+  }
+
+  @override
+  String relationNeighborhoodArchivedTotal(int count) {
+    return 'Архивных связей: $count';
+  }
+
+  @override
+  String relationNeighborhoodNeedTotal(int count) {
+    return 'Нужно: $count';
+  }
+
+  @override
+  String relationNeighborhoodCanTotal(int count) {
+    return 'Можно: $count';
+  }
+
+  @override
+  String get relationNeighborhoodScopeLabel => 'Состояние связей';
+
+  @override
+  String get relationNeighborhoodScopeActive => 'Активные связи';
+
+  @override
+  String get relationNeighborhoodScopeArchived => 'Архивные связи';
+
+  @override
+  String get relationNeighborhoodTypeLabel => 'Тип связи';
+
+  @override
+  String get relationNeighborhoodTypeNeed => 'Нужно';
+
+  @override
+  String get relationNeighborhoodTypeCan => 'Можно';
+
+  @override
+  String get relationNeighborhoodDirectionLabel => 'Направление';
+
+  @override
+  String get relationNeighborhoodDirectionIncoming => 'Входящие';
+
+  @override
+  String get relationNeighborhoodDirectionOutgoing => 'Исходящие';
+
+  @override
+  String relationNeighborhoodSelectedGroupCount(int count) {
+    return 'Во всей выбранной группе: $count';
+  }
+
+  @override
+  String get relationNeighborhoodInitialUnavailable =>
+      'Не удалось загрузить связи и сводку. Повторите попытку.';
+
+  @override
+  String get relationNeighborhoodInitialCorruption =>
+      'Сохранённые данные связей повреждены и не могут быть показаны.';
+
+  @override
+  String get relationNeighborhoodInitialUnexpected =>
+      'Не удалось загрузить связи из-за непредвиденной ошибки.';
+
+  @override
+  String get relationNeighborhoodInitialInvalid =>
+      'Выбранную группу связей больше нельзя открыть.';
+
+  @override
+  String get relationNeighborhoodIntentionNotFound =>
+      'Намерение для просмотра связей больше не существует.';
+
+  @override
+  String get relationNeighborhoodEmpty => 'В этой группе связей нет.';
+
+  @override
+  String get relationNeighborhoodLoadingMore => 'Загружаем ещё связи…';
+
+  @override
+  String get relationNeighborhoodLoadMoreUnavailable =>
+      'Не удалось загрузить следующие связи.';
+
+  @override
+  String get relationNeighborhoodLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующие связи нельзя показать.';
+
+  @override
+  String get relationNeighborhoodLoadMoreUnexpected =>
+      'Не удалось загрузить следующие связи из-за непредвиденной ошибки.';
+
+  @override
+  String get relationNeighborhoodLoadMoreInvalid =>
+      'Продолжение этой группы больше недействительно.';
+
+  @override
+  String get relationNeighborhoodRefreshing => 'Обновляем связи…';
+
+  @override
+  String get relationNeighborhoodRefreshFailed =>
+      'Не удалось обновить связи. Ранее загруженные данные по-прежнему показаны.';
+
+  @override
+  String get relationNeighborhoodConfirmedEnd =>
+      'Все связи этой группы загружены.';
+
+  @override
+  String get relationNeighborhoodRelationActive => 'Активная связь';
+
+  @override
+  String get relationNeighborhoodRelationArchived => 'Связь в архиве';
+
+  @override
+  String relationNeighborhoodPriority(String priority) {
+    return 'Приоритет $priority';
+  }
+
+  @override
+  String get relationNeighborhoodSourceParticipant => 'Исходное намерение';
+
+  @override
+  String get relationNeighborhoodRelatedParticipant => 'Связанное намерение';
+
+  @override
+  String relationNeighborhoodNeedPhrase(String source, String related) {
+    return 'Чтобы $source, нужно $related';
+  }
+
+  @override
+  String relationNeighborhoodCanPhrase(String source, String related) {
+    return 'Чтобы $source, можно $related';
+  }
+
+  @override
   String get detailsTitle => 'Подробности намерения';
 
   @override

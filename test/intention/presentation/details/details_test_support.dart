@@ -16,12 +16,18 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
 final class ControlledDetailRequest {
-  ControlledDetailRequest() {
-    controller = StreamController<Result<GraphSnapshot<IntentionDetails?>>>(
-      onCancel: () {
-        cancellationCount += 1;
-      },
-    );
+  ControlledDetailRequest({bool broadcast = false}) {
+    controller = broadcast
+        ? StreamController<Result<GraphSnapshot<IntentionDetails?>>>.broadcast(
+            onCancel: () {
+              cancellationCount += 1;
+            },
+          )
+        : StreamController<Result<GraphSnapshot<IntentionDetails?>>>(
+            onCancel: () {
+              cancellationCount += 1;
+            },
+          );
   }
 
   late final StreamController<Result<GraphSnapshot<IntentionDetails?>>>
@@ -56,6 +62,11 @@ final class ControlledDetailRequest {
 }
 
 final class ControlledDetailsRepository implements PersonalGraphRepository {
+  ControlledDetailsRepository({this.shareSecondWatch = true});
+
+  /// Страница подробностей и соседство наблюдают одно намерение параллельно.
+  bool shareSecondWatch;
+
   final detailIds = <IntentionId>[];
   final detailRequests = <ControlledDetailRequest>[];
   final catalogQueries = <IntentionCatalogQuery>[];
@@ -64,6 +75,7 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
+  var _watchCallCount = 0;
 
   Result<IntentionCatalogPage>? catalogResult;
   void Function(IntentionId id)? onWatchIntention;
@@ -95,8 +107,15 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
-  ) => throw UnsupportedError(
-    'Группы связей не используются в тесте подробного просмотра.',
+  ) => Future.value(
+    GraphResultSuccess(
+      RelationGroupFirstPage(
+        items: const [],
+        counts: testRelationCounts(),
+        nextCursor: null,
+        revision: const TestDetailsRevision(0),
+      ),
+    ),
   );
 
   @override
@@ -110,7 +129,11 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
     IntentionId id,
   ) {
     detailIds.add(id);
-    final request = ControlledDetailRequest();
+    _watchCallCount += 1;
+    if (shareSecondWatch && _watchCallCount == 2 && detailRequests.isNotEmpty) {
+      return detailRequests.first.controller.stream;
+    }
+    final request = ControlledDetailRequest(broadcast: shareSecondWatch);
     detailRequests.add(request);
     onWatchIntention?.call(id);
     return request.controller.stream;

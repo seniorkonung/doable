@@ -1233,10 +1233,10 @@ void main() {
   );
 }
 
-ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
-    ProviderContainer(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWithValue(repository),
-      ],
-      retry: (retryCount, error) => null,
-    );
+ProviderContainer _detailsContainer(ControlledDetailsRepository repository) {
+  repository.shareSecondWatch = false;
+  return ProviderContainer(
+    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
+    retry: (retryCount, error) => null,
+  );
+}

@@ -94,6 +94,14 @@ final class RelationNeighborhoodViewModel
     _restart(_selection.withScope(scope));
   }
 
+  /// Открывает один из восьми точных переходов полной сводки.
+  void selectGroup(RelationGroupSelection selection) {
+    if (_selection == selection) {
+      return;
+    }
+    _restart(selection);
+  }
+
   /// Повторяет первое чтение выбранной группы после устранимого отказа.
   Future<void> retryFirstPage() {
     final current = state;
