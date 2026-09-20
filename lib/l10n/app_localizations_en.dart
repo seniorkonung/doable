@@ -155,6 +155,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogNoDescription => 'No description';
 
   @override
+  String intentionActiveRelationCount(int count) {
+    return 'Active relations: $count';
+  }
+
+  @override
+  String get intentionActiveRelationCountRefreshFailed =>
+      'The active relation count couldn’t be refreshed.';
+
+  @override
+  String get intentionActiveRelationCountLoading =>
+      'Loading the active relation count…';
+
+  @override
+  String get intentionActiveRelationCountUnknown =>
+      'The active relation count is unknown.';
+
+  @override
   String get detailsTitle => 'Intention details';
 
   @override

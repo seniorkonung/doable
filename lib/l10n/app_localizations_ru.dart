@@ -156,6 +156,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogNoDescription => 'Нет описания';
 
   @override
+  String intentionActiveRelationCount(int count) {
+    return 'Активных связей: $count';
+  }
+
+  @override
+  String get intentionActiveRelationCountRefreshFailed =>
+      'Не удалось обновить количество активных связей.';
+
+  @override
+  String get intentionActiveRelationCountLoading =>
+      'Загружаем количество активных связей…';
+
+  @override
+  String get intentionActiveRelationCountUnknown =>
+      'Количество активных связей неизвестно.';
+
+  @override
   String get detailsTitle => 'Подробности намерения';
 
   @override
