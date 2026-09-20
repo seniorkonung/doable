@@ -186,5 +186,10 @@
   "relationDetailsScopeLabel": "Состояние связи",
   "relationDetailsDescriptionLabel": "Описание",
   "relationDetailsNoDescription": "Описания нет",
-  "relationDetailsOpenParticipant": "Открывает намерение и его собственные связи"
+  "relationDetailsOpenParticipant": "Открывает намерение и его собственные связи",
+  "participantPickerTitle": "Выбор участника",
+  "participantPickerCancel": "Отменить выбор",
+  "participantPickerEmpty": "Других намерений для выбора нет.",
+  "participantPickerSelectHint": "Выбирает это намерение участником связи",
+  "participantPickerOpenDetails": "Открыть подробные данные намерения"
 }

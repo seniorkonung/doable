@@ -12,10 +12,15 @@ import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention_id.dart';
 import 'catalog_paging_policy.dart';
+import 'intention_catalog_purpose.dart';
 import 'intention_catalog_state.dart';
 
 part 'intention_catalog_view_model.g.dart';
 
+/// Ограниченный каталог намерений для одного назначения.
+///
+/// Назначение задаёт отдельное состояние просмотра: выбор участника связи и
+/// открытый каталог намерений не разделяют охват, фильтр и загруженную часть.
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionScope _scope = IntentionCatalogSelection.initial.scope;
@@ -40,7 +45,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   );
 
   @override
-  Future<IntentionCatalogState> build() {
+  Future<IntentionCatalogState> build(IntentionCatalogPurpose purpose) {
     _invalidatePageRequest();
     _isLoadingFirstPage = false;
     _packagesBeforeFirstPage.clear();

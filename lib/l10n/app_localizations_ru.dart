@@ -666,4 +666,21 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationDetailsOpenParticipant =>
       'Открывает намерение и его собственные связи';
+
+  @override
+  String get participantPickerTitle => 'Выбор участника';
+
+  @override
+  String get participantPickerCancel => 'Отменить выбор';
+
+  @override
+  String get participantPickerEmpty => 'Других намерений для выбора нет.';
+
+  @override
+  String get participantPickerSelectHint =>
+      'Выбирает это намерение участником связи';
+
+  @override
+  String get participantPickerOpenDetails =>
+      'Открыть подробные данные намерения';
 }

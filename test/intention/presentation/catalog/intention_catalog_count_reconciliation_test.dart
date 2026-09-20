@@ -8,6 +8,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,7 +38,10 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
       confirmedStates.clear();
 
       await completeRelationCommand(
@@ -99,7 +103,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
     confirmedStates.clear();
 
     final unloaded = testSummary(index: 1);
@@ -135,7 +141,7 @@ void main() {
       filterDebounce: Duration.zero,
     );
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -153,10 +159,15 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     container
-        .read(intentionCatalogViewModelProvider.notifier)
+        .read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .notifier,
+        )
         .changeTitleFilter('Альфа');
     await waitForCatalogQueries(repository, 2);
     final matching = testSummary(index: 1, title: 'Альфа');
@@ -172,7 +183,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     await completeRelationCommand(
       container,
@@ -217,7 +230,10 @@ void main() {
           ),
         ),
       );
-      await container.read(intentionCatalogViewModelProvider.future);
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
       confirmedStates.clear();
 
       final archived = testSummary(
@@ -287,7 +303,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     final current = _loaded(container);
     expect(current.items.map((item) => item.activeRelationCount), [1, 1]);
@@ -330,7 +348,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     final current = _loaded(container);
     expect(current.items.map((item) => item.id), [second.id, first.id]);
@@ -349,7 +369,7 @@ void main() {
       prefetchRemaining: 1,
     );
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -370,7 +390,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     unawaitedLoad(container, visibleIndex: 1);
     await waitForCatalogQueries(repository, 2);
@@ -440,7 +462,7 @@ void main() {
       prefetchRemaining: 1,
     );
     final subscription = container.listen(
-      intentionCatalogViewModelProvider,
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
       (_, _) {},
       fireImmediately: true,
     );
@@ -463,7 +485,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
 
     unawaitedLoad(container, visibleIndex: 1);
     await waitForCatalogQueries(repository, 2);
@@ -526,7 +550,9 @@ void main() {
         ),
       ),
     );
-    await container.read(intentionCatalogViewModelProvider.future);
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
     final loadedBefore = _loaded(container);
     confirmedStates.clear();
 
@@ -552,26 +578,34 @@ List<IntentionCatalogConfirmedState> _observeConfirmedStates(
   ProviderContainer container,
 ) {
   final confirmedStates = <IntentionCatalogConfirmedState>[];
-  final subscription = container.listen(intentionCatalogViewModelProvider, (
-    _,
-    next,
-  ) {
-    if (next.value case final IntentionCatalogConfirmedState confirmed) {
-      confirmedStates.add(confirmed);
-    }
-  }, fireImmediately: true);
+  final subscription = container.listen(
+    intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+    (_, next) {
+      if (next.value case final IntentionCatalogConfirmedState confirmed) {
+        confirmedStates.add(confirmed);
+      }
+    },
+    fireImmediately: true,
+  );
   addTearDown(subscription.close);
   addTearDown(container.dispose);
   return confirmedStates;
 }
 
 IntentionCatalogLoaded _loaded(ProviderContainer container) =>
-    container.read(intentionCatalogViewModelProvider).requireValue
+    container
+            .read(
+              intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+            )
+            .requireValue
         as IntentionCatalogLoaded;
 
 void unawaitedLoad(ProviderContainer container, {required int visibleIndex}) {
   container
-      .read(intentionCatalogViewModelProvider.notifier)
+      .read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
+      )
       .loadNextPageIfNeeded(visibleIndex: visibleIndex)
       .ignore();
 }

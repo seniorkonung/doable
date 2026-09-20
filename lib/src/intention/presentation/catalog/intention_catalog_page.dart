@@ -11,8 +11,16 @@ import '../../application/intention_catalog.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../intention_summary_view.dart';
+import 'intention_catalog_purpose.dart';
 import 'intention_catalog_state.dart';
+import 'intention_catalog_status_views.dart';
 import 'intention_catalog_view_model.dart';
+
+/// Назначение общего просмотра каталога намерений.
+///
+/// Выбор участника связи ведёт отдельное состояние того же каталога: их
+/// охваты, фильтры и загруженные части не смешиваются.
+const _purpose = BrowseIntentionCatalog();
 
 @RoutePage()
 final class IntentionCatalogPage extends ConsumerStatefulWidget {
@@ -41,9 +49,14 @@ final class _IntentionCatalogPageState
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final catalog = ref.watch(intentionCatalogViewModelProvider);
-    ref.listen(intentionCatalogViewModelProvider, _handleCatalogStateChanged);
-    final notifier = ref.read(intentionCatalogViewModelProvider.notifier);
+    final catalog = ref.watch(intentionCatalogViewModelProvider(_purpose));
+    ref.listen(
+      intentionCatalogViewModelProvider(_purpose),
+      _handleCatalogStateChanged,
+    );
+    final notifier = ref.read(
+      intentionCatalogViewModelProvider(_purpose).notifier,
+    );
     final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
       appBar: AppBar(title: Text(localizations.catalogTitle)),
@@ -82,10 +95,10 @@ final class _IntentionCatalogPageState
                 scrollController: _scrollController,
                 itemKeyFor: _itemKeyFor,
               ),
-              error: (_, _) => _CatalogStatus(
+              error: (_, _) => IntentionCatalogStatusView(
                 message: localizations.catalogUnexpectedFailure,
               ),
-              loading: () => _CatalogStatus(
+              loading: () => IntentionCatalogStatusView(
                 message: localizations.catalogLoading,
                 progressIndicator: true,
               ),
@@ -214,7 +227,7 @@ final class _IntentionCatalogPageState
   }
 
   void _pruneItemKeys() {
-    final state = ref.read(intentionCatalogViewModelProvider).value;
+    final state = ref.read(intentionCatalogViewModelProvider(_purpose)).value;
     if (state is! IntentionCatalogLoaded) {
       return;
     }
@@ -364,7 +377,7 @@ final class _CatalogContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final localizations = AppLocalizations.of(context);
     return switch (state) {
-      IntentionCatalogDebouncing() => _CatalogStatus(
+      IntentionCatalogDebouncing() => IntentionCatalogStatusView(
         message: localizations.catalogLoading,
         progressIndicator: true,
       ),
@@ -374,20 +387,22 @@ final class _CatalogContent extends ConsumerWidget {
         scrollController: scrollController,
         itemKeyFor: itemKeyFor,
       ),
-      IntentionCatalogEmpty empty => _CatalogStatus(
+      IntentionCatalogEmpty empty => IntentionCatalogStatusView(
         message: _emptyMessage(localizations, empty.scope),
       ),
-      IntentionCatalogUnavailable() => _CatalogStatus(
+      IntentionCatalogUnavailable() => IntentionCatalogStatusView(
         message: localizations.catalogUnavailable,
         retryLabel: localizations.commonRetry,
         onRetry: () {
-          ref.read(intentionCatalogViewModelProvider.notifier).retry();
+          ref
+              .read(intentionCatalogViewModelProvider(_purpose).notifier)
+              .retry();
         },
       ),
-      IntentionCatalogCorruption() => _CatalogStatus(
+      IntentionCatalogCorruption() => IntentionCatalogStatusView(
         message: localizations.catalogCorruption,
       ),
-      IntentionCatalogUnexpected() => _CatalogStatus(
+      IntentionCatalogUnexpected() => IntentionCatalogStatusView(
         message: localizations.catalogUnexpectedFailure,
       ),
     };
@@ -434,7 +449,8 @@ final class _LoadedCatalog extends ConsumerWidget {
             itemCount: state.items.length + (hasContinuationStatus ? 1 : 0),
             itemBuilder: (context, index) {
               if (index == state.items.length) {
-                return _CatalogContinuationStatus(
+                return IntentionCatalogContinuationStatusView(
+                  purpose: _purpose,
                   continuation: state.continuation,
                 );
               }
@@ -464,91 +480,10 @@ final class _LoadedCatalog extends ConsumerWidget {
       }
       unawaited(
         ref
-            .read(intentionCatalogViewModelProvider.notifier)
+            .read(intentionCatalogViewModelProvider(_purpose).notifier)
             .loadNextPageIfNeeded(visibleIndex: visibleIndex),
       );
     });
-  }
-}
-
-final class _CatalogContinuationStatus extends ConsumerWidget {
-  const _CatalogContinuationStatus({required this.continuation});
-
-  final IntentionCatalogContinuationState continuation;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final localizations = AppLocalizations.of(context);
-    final notifier = ref.read(intentionCatalogViewModelProvider.notifier);
-    return switch (continuation) {
-      IntentionCatalogContinuationIdle() => const SizedBox.shrink(),
-      IntentionCatalogContinuationLoading() => _CatalogInlineStatus(
-        message: localizations.catalogLoadingMore,
-      ),
-      IntentionCatalogContinuationUnavailable() => _CatalogInlineStatus(
-        message: localizations.catalogLoadMoreUnavailable,
-        actionLabel: localizations.commonRetry,
-        onAction: notifier.retryNextPage,
-      ),
-      IntentionCatalogContinuationCorruption() => _CatalogInlineStatus(
-        message: localizations.catalogLoadMoreCorruption,
-      ),
-      IntentionCatalogContinuationUnexpected() => _CatalogInlineStatus(
-        message: localizations.catalogLoadMoreUnexpected,
-      ),
-      IntentionCatalogContinuationValidation() => _CatalogInlineStatus(
-        message: localizations.catalogLoadMoreValidation,
-        actionLabel: localizations.catalogReload,
-        onAction: notifier.recoverFromInvalidCursor,
-      ),
-      IntentionCatalogContinuationRecovering() => _CatalogInlineStatus(
-        message: localizations.catalogReloading,
-      ),
-      IntentionCatalogRecoveryUnavailable() => _CatalogInlineStatus(
-        message: localizations.catalogUnavailable,
-        actionLabel: localizations.commonRetry,
-        onAction: notifier.retryRecovery,
-      ),
-      IntentionCatalogRecoveryCorruption() => _CatalogInlineStatus(
-        message: localizations.catalogCorruption,
-      ),
-      IntentionCatalogRecoveryUnexpected() => _CatalogInlineStatus(
-        message: localizations.catalogUnexpectedFailure,
-      ),
-    };
-  }
-}
-
-final class _CatalogInlineStatus extends StatelessWidget {
-  const _CatalogInlineStatus({
-    required this.message,
-    this.actionLabel,
-    this.onAction,
-  }) : assert((actionLabel == null) == (onAction == null));
-
-  final String message;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      liveRegion: true,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            if (onAction case final action?) ...[
-              const SizedBox(height: 12),
-              FilledButton(onPressed: action, child: Text(actionLabel!)),
-            ],
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -595,45 +530,4 @@ final class _CatalogVisualAnchor {
 
   final List<IntentionId> candidateIds;
   final double offsetWithinItem;
-}
-
-final class _CatalogStatus extends StatelessWidget {
-  const _CatalogStatus({
-    required this.message,
-    this.progressIndicator = false,
-    this.retryLabel,
-    this.onRetry,
-  }) : assert((retryLabel == null) == (onRetry == null));
-
-  final String message;
-  final bool progressIndicator;
-  final String? retryLabel;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Semantics(
-          container: true,
-          liveRegion: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (progressIndicator) ...[
-                const CircularProgressIndicator(),
-                const SizedBox(height: 24),
-              ],
-              Text(message, textAlign: TextAlign.center),
-              if (onRetry case final retry?) ...[
-                const SizedBox(height: 24),
-                FilledButton(onPressed: retry, child: Text(retryLabel!)),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
