@@ -16,6 +16,8 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -210,6 +212,94 @@ void main() {
     // Повторный вход в уже открытое намерение не разворачивает граф заново.
     expect(repository.groupQueries, hasLength(2));
   });
+
+  testWidgets(
+    'создание из группы соседства открывает форму с контекстом направления',
+    (tester) async {
+      final repository = ControlledRelationDetailsRepository();
+      addTearDown(repository.dispose);
+      final router = AppRouter();
+      addTearDown(router.dispose);
+      final ownerId = testIntentionId(1);
+      final neighborId = testIntentionId(2);
+
+      await _pumpRouter(tester, repository, router);
+      unawaited(router.push(IntentionDetailsRoute(intentionId: ownerId)));
+      await _settleNeighborhood(
+        tester,
+        repository,
+        expectedWatches: 2,
+        expectedQueries: 1,
+      );
+      _serveNeighborhood(
+        repository,
+        intentionId: ownerId,
+        title: 'А',
+        queryIndex: 0,
+        row: _row(
+          relationId: testRelationId(1),
+          sourceId: ownerId,
+          relatedId: neighborId,
+          sourceTitle: 'А',
+          relatedTitle: 'Б',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(router.current.name, RelationEditorRoute.name);
+      expect(
+        tester
+            .widget<RelationEditorPage>(find.byType(RelationEditorPage))
+            .creationContext,
+        RelationCreationContext(
+          intentionId: ownerId,
+          direction: RelationDirection.outgoing,
+        ),
+      );
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('relation-neighborhood-direction-incoming')),
+      );
+      await _settleNeighborhood(
+        tester,
+        repository,
+        expectedWatches: 2,
+        expectedQueries: 2,
+      );
+      repository.completeGroupPage(
+        1,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(activeNeedOutgoing: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<RelationEditorPage>(find.byType(RelationEditorPage))
+            .creationContext,
+        RelationCreationContext(
+          intentionId: ownerId,
+          direction: RelationDirection.incoming,
+        ),
+      );
+    },
+  );
 }
 
 Future<void> _pumpRouter(

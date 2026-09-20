@@ -794,5 +794,122 @@
   "participantPickerOpenDetails": "Open intention details",
   "@participantPickerOpenDetails": {
     "description": "Назначение перехода к подробным данным намерения из выбора"
+  },
+  "relationEditorTitle": "New relation",
+  "@relationEditorTitle": {
+    "description": "Заголовок формы создания долговременной связи"
+  },
+  "relationEditorSourceLabel": "Source intention",
+  "@relationEditorSourceLabel": {
+    "description": "Подпись исходного участника в форме создания связи"
+  },
+  "relationEditorRelatedLabel": "Related intention",
+  "@relationEditorRelatedLabel": {
+    "description": "Подпись связанного участника в форме создания связи"
+  },
+  "relationEditorParticipantSelected": "Selected",
+  "@relationEditorParticipantSelected": {
+    "description": "Состояние выбранного участника связи"
+  },
+  "relationEditorParticipantNotSelected": "Not selected",
+  "@relationEditorParticipantNotSelected": {
+    "description": "Состояние невыбранного участника связи"
+  },
+  "relationEditorSelectSourceAction": "Select the source intention",
+  "@relationEditorSelectSourceAction": {
+    "description": "Переход к выбору исходного участника"
+  },
+  "relationEditorChangeSourceAction": "Change the source intention",
+  "@relationEditorChangeSourceAction": {
+    "description": "Замена выбранного исходного участника"
+  },
+  "relationEditorSelectRelatedAction": "Select the related intention",
+  "@relationEditorSelectRelatedAction": {
+    "description": "Переход к выбору связанного участника"
+  },
+  "relationEditorChangeRelatedAction": "Change the related intention",
+  "@relationEditorChangeRelatedAction": {
+    "description": "Замена выбранного связанного участника"
+  },
+  "relationEditorTypeLabel": "Relation type",
+  "@relationEditorTypeLabel": {
+    "description": "Подпись выбора типа связи в форме создания"
+  },
+  "relationEditorTypeNeed": "Need",
+  "@relationEditorTypeNeed": {
+    "description": "Тип связи «нужно» в форме создания"
+  },
+  "relationEditorTypeCan": "Can",
+  "@relationEditorTypeCan": {
+    "description": "Тип связи «можно» в форме создания"
+  },
+  "relationEditorPriorityLabel": "Priority",
+  "@relationEditorPriorityLabel": {
+    "description": "Подпись выбора приоритета связи"
+  },
+  "relationEditorDescriptionLabel": "Description (optional)",
+  "@relationEditorDescriptionLabel": {
+    "description": "Подпись описания создаваемой связи"
+  },
+  "relationEditorDescriptionTooLong": "Use no more than 4096 characters.",
+  "@relationEditorDescriptionTooLong": {
+    "description": "Превышение предела описания связи"
+  },
+  "relationEditorDescriptionInvalidUnicode": "Enter valid Unicode text without NUL.",
+  "@relationEditorDescriptionInvalidUnicode": {
+    "description": "Недопустимый Unicode в описании связи"
+  },
+  "relationEditorCreateSameParticipants": "An intention can’t be related to itself.",
+  "@relationEditorCreateSameParticipants": {
+    "description": "Отказ создания связи намерения с самим собой"
+  },
+  "relationEditorMissingTitle": "To create the relation, provide:",
+  "@relationEditorMissingTitle": {
+    "description": "Объяснение недостающего обязательного выбора"
+  },
+  "relationEditorMissingSource": "the source intention",
+  "@relationEditorMissingSource": {
+    "description": "Недостающий исходный участник связи"
+  },
+  "relationEditorMissingRelated": "the related intention",
+  "@relationEditorMissingRelated": {
+    "description": "Недостающий связанный участник связи"
+  },
+  "relationEditorMissingType": "the relation type",
+  "@relationEditorMissingType": {
+    "description": "Недостающий тип связи"
+  },
+  "relationEditorMissingPriority": "a priority from P1 to P4",
+  "@relationEditorMissingPriority": {
+    "description": "Недостающий приоритет связи"
+  },
+  "relationEditorOpenExistingRelation": "Open the existing relation",
+  "@relationEditorOpenExistingRelation": {
+    "description": "Переход к связи, занявшей направленную пару"
+  },
+  "relationEditorSubmitAction": "Create relation",
+  "@relationEditorSubmitAction": {
+    "description": "Команда создания долговременной связи"
+  },
+  "relationEditorCreating": "Creating…",
+  "@relationEditorCreating": {
+    "description": "Выполняемое создание долговременной связи"
+  },
+  "relationNeighborhoodCreateOutgoingAction": "Create an outgoing relation",
+  "@relationNeighborhoodCreateOutgoingAction": {
+    "description": "Создание связи из исходящей группы соседства"
+  },
+  "relationNeighborhoodCreateIncomingAction": "Create an incoming relation",
+  "@relationNeighborhoodCreateIncomingAction": {
+    "description": "Создание связи из входящей группы соседства"
+  },
+  "relationEditorPriorityOption": "Priority {priority}",
+  "@relationEditorPriorityOption": {
+    "description": "Вариант приоритета P1–P4 в форме создания связи",
+    "placeholders": {
+      "priority": {
+        "type": "String"
+      }
+    }
   }
 }

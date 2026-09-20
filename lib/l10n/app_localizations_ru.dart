@@ -683,4 +683,96 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get participantPickerOpenDetails =>
       'Открыть подробные данные намерения';
+
+  @override
+  String get relationEditorTitle => 'Новая связь';
+
+  @override
+  String get relationEditorSourceLabel => 'Исходное намерение';
+
+  @override
+  String get relationEditorRelatedLabel => 'Связанное намерение';
+
+  @override
+  String get relationEditorParticipantSelected => 'Выбрано';
+
+  @override
+  String get relationEditorParticipantNotSelected => 'Не выбрано';
+
+  @override
+  String get relationEditorSelectSourceAction => 'Выбрать исходное намерение';
+
+  @override
+  String get relationEditorChangeSourceAction => 'Изменить исходное намерение';
+
+  @override
+  String get relationEditorSelectRelatedAction => 'Выбрать связанное намерение';
+
+  @override
+  String get relationEditorChangeRelatedAction =>
+      'Изменить связанное намерение';
+
+  @override
+  String get relationEditorTypeLabel => 'Тип связи';
+
+  @override
+  String get relationEditorTypeNeed => 'Нужно';
+
+  @override
+  String get relationEditorTypeCan => 'Можно';
+
+  @override
+  String get relationEditorPriorityLabel => 'Приоритет';
+
+  @override
+  String get relationEditorDescriptionLabel => 'Описание (необязательно)';
+
+  @override
+  String get relationEditorDescriptionTooLong =>
+      'Используйте не более 4096 символов.';
+
+  @override
+  String get relationEditorDescriptionInvalidUnicode =>
+      'Введите корректный Unicode-текст без NUL.';
+
+  @override
+  String get relationEditorCreateSameParticipants =>
+      'Намерение нельзя связать с самим собой.';
+
+  @override
+  String get relationEditorMissingTitle => 'Чтобы создать связь, укажите:';
+
+  @override
+  String get relationEditorMissingSource => 'исходное намерение';
+
+  @override
+  String get relationEditorMissingRelated => 'связанное намерение';
+
+  @override
+  String get relationEditorMissingType => 'тип связи';
+
+  @override
+  String get relationEditorMissingPriority => 'приоритет от P1 до P4';
+
+  @override
+  String get relationEditorOpenExistingRelation => 'Открыть существующую связь';
+
+  @override
+  String get relationEditorSubmitAction => 'Создать связь';
+
+  @override
+  String get relationEditorCreating => 'Создаём…';
+
+  @override
+  String get relationNeighborhoodCreateOutgoingAction =>
+      'Создать исходящую связь';
+
+  @override
+  String get relationNeighborhoodCreateIncomingAction =>
+      'Создать входящую связь';
+
+  @override
+  String relationEditorPriorityOption(String priority) {
+    return 'Приоритет $priority';
+  }
 }
