@@ -1,0 +1,197 @@
+import 'dart:async';
+
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_command_result.dart';
+import '../../../intention/domain/intention_id.dart';
+import '../../application/long_term_relation_command.dart';
+import '../../domain/long_term_relation.dart';
+import '../../domain/long_term_relation_description.dart';
+import 'relation_editor_state.dart';
+
+part 'relation_editor_view_model.g.dart';
+
+/// Черновик одной формы создания долговременной связи.
+///
+/// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
+/// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
+/// отправка выполняется, вторая команда той же формы не принимается, а уход с
+/// экрана завершает только экранную сессию — выполнение продолжается до
+/// различимого результата.
+@riverpod
+final class RelationEditorViewModel extends _$RelationEditorViewModel {
+  late GraphCommandCoordinator _coordinator;
+  late LongTermRelationCreationFormKey _formKey;
+  LongTermRelationOperationToken? _activeToken;
+
+  @override
+  RelationEditorState build(
+    LongTermRelationCreationFormKey formKey,
+    RelationCreationContext context,
+  ) {
+    _formKey = formKey;
+    _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    ref.onDispose(() {
+      final activeToken = _activeToken;
+      if (activeToken != null) {
+        _coordinator.releaseInitiatorPresentation(activeToken);
+      }
+    });
+    return RelationEditorState.initial(context);
+  }
+
+  void selectParticipant(RelationParticipantRole role, IntentionId id) {
+    final current = switch (role) {
+      RelationParticipantRole.source => state.sourceIntentionId,
+      RelationParticipantRole.related => state.relatedIntentionId,
+    };
+    if (current != id) {
+      state = state.withParticipant(role, id);
+    }
+  }
+
+  void selectType(LongTermRelationType value) {
+    if (state.type != value) {
+      state = state.withType(value);
+    }
+  }
+
+  void selectPriority(RelationPriority value) {
+    if (state.priority != value) {
+      state = state.withPriority(value);
+    }
+  }
+
+  void changeDescription(String value) {
+    if (state.description != value) {
+      state = state.withDescription(value);
+    }
+  }
+
+  void submit() {
+    if (!state.canSubmit) {
+      return;
+    }
+    final draft = state.completeness;
+    if (draft is! RelationDraftComplete) {
+      return;
+    }
+
+    final LongTermRelationDescription? description;
+    try {
+      description = LongTermRelationDescription.fromInput(state.description);
+    } on LongTermRelationTextValidationException catch (exception) {
+      state = state.withOperation(
+        RelationEditorFailed(
+          RelationEditorDescriptionInvalid(exception.failure),
+        ),
+      );
+      return;
+    }
+
+    final CreateLongTermRelation command;
+    try {
+      command = CreateLongTermRelation(
+        sourceIntentionId: draft.sourceIntentionId,
+        relatedIntentionId: draft.relatedIntentionId,
+        type: draft.type,
+        priority: draft.priority,
+        description: description,
+      );
+    } on CreateLongTermRelationValidationException {
+      state = state.withOperation(
+        const RelationEditorFailed(RelationEditorSameParticipants()),
+      );
+      return;
+    }
+
+    switch (_coordinator.acceptRelationCreation(_formKey, command)) {
+      case LongTermRelationCommandAccepted(:final token, :final future):
+        _activeToken = token;
+        state = state.withOperation(const RelationEditorSubmitting());
+        unawaited(_finish(future));
+      case LongTermRelationCommandAlreadyRunning():
+        return;
+      case GraphCommandCoordinatorDraining():
+        state = state.withOperation(
+          const RelationEditorFailed(RelationEditorUnexpected()),
+        );
+    }
+  }
+
+  void consumeEvent() {
+    if (state.event != null) {
+      state = state.withoutEvent();
+    }
+  }
+
+  Future<void> _finish(Future<LongTermRelationCommandCompletion> future) async {
+    try {
+      final completion = await future;
+      if (!ref.mounted || !identical(_activeToken, completion.token)) {
+        return;
+      }
+
+      _activeToken = null;
+      // Success предъявляет оболочка; форма получает его только для закрытия.
+      state = switch (completion.result) {
+        GraphResultSuccess(value: LongTermRelationCreated(:final relation)) =>
+          state.withOperation(
+            RelationEditorSucceeded(relation),
+            event: RelationEditorCreated(relation.id),
+          ),
+        GraphResultFailure(:final failure) => state.withOperation(
+          RelationEditorFailed(_editorFailure(failure)),
+          failurePresentation: _coordinator.claimInitiatorFailure(
+            completion.token,
+          ),
+        ),
+      };
+    } on Object {
+      if (!ref.mounted) {
+        return;
+      }
+      final token = _activeToken;
+      _activeToken = null;
+      if (token != null) {
+        _coordinator.releaseInitiatorPresentation(token);
+      }
+      state = state.withOperation(
+        const RelationEditorFailed(RelationEditorUnexpected()),
+      );
+    }
+  }
+
+  static RelationEditorFailure _editorFailure(
+    LongTermRelationCommandFailure failure,
+  ) => switch (failure) {
+    LongTermRelationCommandValidationFailure(
+      reason: CreateLongTermRelationValidationFailure.sameIntention,
+    ) =>
+      const RelationEditorSameParticipants(),
+    LongTermRelationPairOccupiedFailure(:final existingRelationId) =>
+      RelationEditorPairOccupied(existingRelationId),
+    LongTermRelationParticipantNotFoundFailure(
+      :final role,
+      :final intentionId,
+    ) =>
+      RelationEditorParticipantRejected(
+        role: role,
+        intentionId: intentionId,
+        rejection: RelationParticipantRejection.missing,
+      ),
+    LongTermRelationParticipantArchivedFailure(
+      :final role,
+      :final intentionId,
+    ) =>
+      RelationEditorParticipantRejected(
+        role: role,
+        intentionId: intentionId,
+        rejection: RelationParticipantRejection.archived,
+      ),
+    LongTermRelationUnavailableFailure() => const RelationEditorUnavailable(),
+    LongTermRelationCorruptionFailure() => const RelationEditorCorruption(),
+    LongTermRelationUnexpectedFailure() => const RelationEditorUnexpected(),
+  };
+}
