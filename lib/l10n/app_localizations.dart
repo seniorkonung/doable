@@ -1141,6 +1141,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The relation couldn’t be created because of an unexpected error.'**
   String get relationEditorCreateUnexpected;
+
+  /// Назначение перехода из строки соседства в подробный просмотр связи
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the relation details'**
+  String get relationNeighborhoodOpenRelation;
+
+  /// Заголовок подробного просмотра связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation'**
+  String get relationDetailsTitle;
+
+  /// Первое чтение подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the relation…'**
+  String get relationDetailsLoading;
+
+  /// Подтверждённое отсутствие связи в подробном просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationDetailsNotFound;
+
+  /// Устранимая недоступность чтения подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be loaded. Try again.'**
+  String get relationDetailsUnavailable;
+
+  /// Повреждение сохранённых данных связи в подробном просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Stored relation data is damaged and can’t be shown.'**
+  String get relationDetailsCorruption;
+
+  /// Безопасный непредвиденный отказ чтения подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be loaded because of an unexpected error.'**
+  String get relationDetailsUnexpected;
+
+  /// Подпись типа связи в подробном просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Relation type'**
+  String get relationDetailsTypeLabel;
+
+  /// Подпись приоритета связи в подробном просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get relationDetailsPriorityLabel;
+
+  /// Подпись собственного архивного состояния связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation state'**
+  String get relationDetailsScopeLabel;
+
+  /// Подпись полного описания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get relationDetailsDescriptionLabel;
+
+  /// Отсутствие описания у связи
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get relationDetailsNoDescription;
+
+  /// Назначение перехода к участнику связи
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the intention and its own relations'**
+  String get relationDetailsOpenParticipant;
 }
 
 class _AppLocalizationsDelegate

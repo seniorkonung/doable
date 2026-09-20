@@ -621,4 +621,47 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorCreateUnexpected =>
       'The relation couldn’t be created because of an unexpected error.';
+
+  @override
+  String get relationNeighborhoodOpenRelation => 'Opens the relation details';
+
+  @override
+  String get relationDetailsTitle => 'Relation';
+
+  @override
+  String get relationDetailsLoading => 'Loading the relation…';
+
+  @override
+  String get relationDetailsNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationDetailsUnavailable =>
+      'The relation couldn’t be loaded. Try again.';
+
+  @override
+  String get relationDetailsCorruption =>
+      'Stored relation data is damaged and can’t be shown.';
+
+  @override
+  String get relationDetailsUnexpected =>
+      'The relation couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get relationDetailsTypeLabel => 'Relation type';
+
+  @override
+  String get relationDetailsPriorityLabel => 'Priority';
+
+  @override
+  String get relationDetailsScopeLabel => 'Relation state';
+
+  @override
+  String get relationDetailsDescriptionLabel => 'Description';
+
+  @override
+  String get relationDetailsNoDescription => 'No description';
+
+  @override
+  String get relationDetailsOpenParticipant =>
+      'Opens the intention and its own relations';
 }
