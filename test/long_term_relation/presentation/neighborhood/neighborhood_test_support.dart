@@ -230,6 +230,7 @@ LongTermRelationSummary testGroupRow({
   RelationDirection direction = RelationDirection.outgoing,
   RelationScope scope = RelationScope.active,
   RelationPriority priority = RelationPriority.p2,
+  String ownerTitle = 'Намерение-владелец',
   String? neighborTitle,
   int neighborActiveRelationCount = 0,
 }) {
@@ -249,16 +250,12 @@ LongTermRelationSummary testGroupRow({
     ),
     source: testParticipant(
       sourceId,
-      title: isOutgoing
-          ? 'Намерение-владелец'
-          : neighborTitle ?? 'Исходное $index',
+      title: isOutgoing ? ownerTitle : neighborTitle ?? 'Исходное $index',
       activeRelationCount: isOutgoing ? 0 : neighborActiveRelationCount,
     ),
     related: testParticipant(
       relatedId,
-      title: isOutgoing
-          ? neighborTitle ?? 'Связанное $index'
-          : 'Намерение-владелец',
+      title: isOutgoing ? neighborTitle ?? 'Связанное $index' : ownerTitle,
       activeRelationCount: isOutgoing ? neighborActiveRelationCount : 0,
     ),
     hasDescription: false,
@@ -272,6 +269,7 @@ List<LongTermRelationSummary> testGroupRows({
   LongTermRelationType type = LongTermRelationType.need,
   RelationDirection direction = RelationDirection.outgoing,
   RelationScope scope = RelationScope.active,
+  String ownerTitle = 'Намерение-владелец',
   Map<int, String> neighborTitles = const {},
   Map<int, int> neighborActiveRelationCounts = const {},
 }) => [
@@ -282,6 +280,7 @@ List<LongTermRelationSummary> testGroupRows({
       type: type,
       direction: direction,
       scope: scope,
+      ownerTitle: ownerTitle,
       neighborTitle: neighborTitles[from + offset],
       neighborActiveRelationCount:
           neighborActiveRelationCounts[from + offset] ?? 0,

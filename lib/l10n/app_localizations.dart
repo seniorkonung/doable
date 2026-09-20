@@ -386,6 +386,240 @@ abstract class AppLocalizations {
   /// **'The active relation count is unknown.'**
   String get intentionActiveRelationCountUnknown;
 
+  /// Заголовок соседства намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Relations'**
+  String get relationNeighborhoodTitle;
+
+  /// Первоначальная загрузка соседства и полной сводки
+  ///
+  /// In en, this message translates to:
+  /// **'Loading relations and summary…'**
+  String get relationNeighborhoodSummaryLoading;
+
+  /// Полная сводка ещё не подтверждена из-за ошибки
+  ///
+  /// In en, this message translates to:
+  /// **'The relation summary couldn’t be loaded.'**
+  String get relationNeighborhoodSummaryUnavailable;
+
+  /// No description provided for @relationNeighborhoodTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total relations: {count}'**
+  String relationNeighborhoodTotal(int count);
+
+  /// No description provided for @relationNeighborhoodActiveTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Active relations: {count}'**
+  String relationNeighborhoodActiveTotal(int count);
+
+  /// No description provided for @relationNeighborhoodArchivedTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relations: {count}'**
+  String relationNeighborhoodArchivedTotal(int count);
+
+  /// No description provided for @relationNeighborhoodNeedTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Need: {count}'**
+  String relationNeighborhoodNeedTotal(int count);
+
+  /// No description provided for @relationNeighborhoodCanTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Can: {count}'**
+  String relationNeighborhoodCanTotal(int count);
+
+  /// Подпись выбора активных или архивных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Relation state'**
+  String get relationNeighborhoodScopeLabel;
+
+  /// Активный охват соседства
+  ///
+  /// In en, this message translates to:
+  /// **'Active relations'**
+  String get relationNeighborhoodScopeActive;
+
+  /// Архивный охват соседства
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relations'**
+  String get relationNeighborhoodScopeArchived;
+
+  /// Подпись выбора типа долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation type'**
+  String get relationNeighborhoodTypeLabel;
+
+  /// Тип долговременной связи нужно
+  ///
+  /// In en, this message translates to:
+  /// **'Need'**
+  String get relationNeighborhoodTypeNeed;
+
+  /// Тип долговременной связи можно
+  ///
+  /// In en, this message translates to:
+  /// **'Can'**
+  String get relationNeighborhoodTypeCan;
+
+  /// Подпись выбора направления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get relationNeighborhoodDirectionLabel;
+
+  /// Входящее направление относительно намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming'**
+  String get relationNeighborhoodDirectionIncoming;
+
+  /// Исходящее направление относительно намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Outgoing'**
+  String get relationNeighborhoodDirectionOutgoing;
+
+  /// No description provided for @relationNeighborhoodSelectedGroupCount.
+  ///
+  /// In en, this message translates to:
+  /// **'In the whole selected group: {count}'**
+  String relationNeighborhoodSelectedGroupCount(int count);
+
+  /// Устранимая ошибка начального чтения группы
+  ///
+  /// In en, this message translates to:
+  /// **'The relations and summary couldn’t be loaded. Try again.'**
+  String get relationNeighborhoodInitialUnavailable;
+
+  /// Повреждение при начальном чтении группы
+  ///
+  /// In en, this message translates to:
+  /// **'Stored relation data is damaged and can’t be shown.'**
+  String get relationNeighborhoodInitialCorruption;
+
+  /// Непредвиденная ошибка начального чтения группы
+  ///
+  /// In en, this message translates to:
+  /// **'The relations couldn’t be loaded because of an unexpected error.'**
+  String get relationNeighborhoodInitialUnexpected;
+
+  /// Недействительный запрос начальной группы
+  ///
+  /// In en, this message translates to:
+  /// **'The selected relation group can no longer be opened.'**
+  String get relationNeighborhoodInitialInvalid;
+
+  /// Владелец соседства подтверждённо отсутствует
+  ///
+  /// In en, this message translates to:
+  /// **'The intention whose relations were being viewed no longer exists.'**
+  String get relationNeighborhoodIntentionNotFound;
+
+  /// Подтверждённо пустая выбранная группа
+  ///
+  /// In en, this message translates to:
+  /// **'There are no relations in this group.'**
+  String get relationNeighborhoodEmpty;
+
+  /// Подгрузка следующей порции выбранной группы
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more relations…'**
+  String get relationNeighborhoodLoadingMore;
+
+  /// Устранимая ошибка подгрузки
+  ///
+  /// In en, this message translates to:
+  /// **'The next relations couldn’t be loaded.'**
+  String get relationNeighborhoodLoadMoreUnavailable;
+
+  /// Повреждение при подгрузке
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged; the next relations can’t be shown.'**
+  String get relationNeighborhoodLoadMoreCorruption;
+
+  /// Непредвиденная ошибка подгрузки
+  ///
+  /// In en, this message translates to:
+  /// **'The next relations couldn’t be loaded because of an unexpected error.'**
+  String get relationNeighborhoodLoadMoreUnexpected;
+
+  /// Недействительное продолжение группы
+  ///
+  /// In en, this message translates to:
+  /// **'The continuation for this group is no longer valid.'**
+  String get relationNeighborhoodLoadMoreInvalid;
+
+  /// Согласованное обновление сводки и выбранной группы
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing relations…'**
+  String get relationNeighborhoodRefreshing;
+
+  /// Ошибка обновления при сохранённых прежних данных
+  ///
+  /// In en, this message translates to:
+  /// **'The relations couldn’t be refreshed. Previously loaded data is still shown.'**
+  String get relationNeighborhoodRefreshFailed;
+
+  /// Подтверждённый конец выбранной группы
+  ///
+  /// In en, this message translates to:
+  /// **'All relations in this group are loaded.'**
+  String get relationNeighborhoodConfirmedEnd;
+
+  /// Активное состояние строки связи
+  ///
+  /// In en, this message translates to:
+  /// **'Active relation'**
+  String get relationNeighborhoodRelationActive;
+
+  /// Архивное состояние строки связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relation'**
+  String get relationNeighborhoodRelationArchived;
+
+  /// No description provided for @relationNeighborhoodPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}'**
+  String relationNeighborhoodPriority(String priority);
+
+  /// Подпись исходного участника связи
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get relationNeighborhoodSourceParticipant;
+
+  /// Подпись связанного участника связи
+  ///
+  /// In en, this message translates to:
+  /// **'Related intention'**
+  String get relationNeighborhoodRelatedParticipant;
+
+  /// No description provided for @relationNeighborhoodNeedPhrase.
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, you need {related}'**
+  String relationNeighborhoodNeedPhrase(String source, String related);
+
+  /// No description provided for @relationNeighborhoodCanPhrase.
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, you can {related}'**
+  String relationNeighborhoodCanPhrase(String source, String related);
+
   /// Заголовок подробного просмотра намерения
   ///
   /// In en, this message translates to:

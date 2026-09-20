@@ -238,7 +238,7 @@ void main() {
       );
 
       await tester.tap(find.text(created.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 1);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 2);
       repository.emitDetail(0, created);
       await tester.pumpAndSettle();
       expect(find.text(created.description!), findsOneWidget);
@@ -274,11 +274,11 @@ void main() {
         1,
         _saved(updated, before: created, revision: 2),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 2);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 3);
 
       repository.emitDetail(0, created);
       await tester.pump();
-      expect(find.text(updated.title), findsOneWidget);
+      expect(find.text(updated.title, skipOffstage: false), findsOneWidget);
       expect(find.text(created.title), findsNothing);
       repository.emitDetail(1, updated);
       await tester.pumpAndSettle();
@@ -288,12 +288,15 @@ void main() {
       );
       await _closeOperationMessage(tester);
 
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-enable-readiness')),
+      final enableReadiness = find.byKey(
+        const ValueKey('intention-details-enable-readiness'),
       );
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-enable-readiness')),
+      await Scrollable.ensureVisible(
+        tester.element(enableReadiness),
+        alignment: 0.5,
       );
+      await tester.pumpAndSettle();
+      await tester.tap(enableReadiness);
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Mark as ready'));
       await tester.pump();
@@ -306,9 +309,10 @@ void main() {
         2,
         _saved(ready, before: updated, revision: 3),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 3);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 4);
       repository.emitDetail(2, ready);
       await tester.pumpAndSettle();
+      await _scrollCurrentPageToTop(tester);
       expect(find.text('Ready for action'), findsOneWidget);
       await _closeOperationMessage(tester);
 
@@ -326,9 +330,10 @@ void main() {
         3,
         _saved(archived, before: ready, revision: 4),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 4);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 5);
       repository.emitDetail(3, archived);
       await tester.pumpAndSettle();
+      await _scrollCurrentPageToTop(tester);
       expect(find.text('Archived'), findsOneWidget);
       await _closeOperationMessage(tester);
 
@@ -350,7 +355,7 @@ void main() {
       expect(find.text(archived.title), findsOneWidget);
 
       await tester.tap(find.text(archived.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 5);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 7);
       repository.emitDetail(4, archived);
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -367,9 +372,10 @@ void main() {
         4,
         _saved(restored, before: archived, revision: 5),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 6);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 8);
       repository.emitDetail(5, restored);
       await tester.pumpAndSettle();
+      await _scrollCurrentPageToTop(tester);
       expect(find.text('Active'), findsOneWidget);
       await _closeOperationMessage(tester);
 
@@ -390,7 +396,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text(restored.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 7);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 10);
       repository.emitDetail(6, restored);
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -440,6 +446,12 @@ Future<void> _goBack(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _scrollCurrentPageToTop(WidgetTester tester) async {
+  final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+  scrollable.position.jumpTo(scrollable.position.minScrollExtent);
+  await tester.pump();
+}
+
 Future<void> _pumpCatalog(
   WidgetTester tester,
   _DelayedPersonalGraphRepository repository,
@@ -479,7 +491,7 @@ Future<void> _openDetails(
   await tester.tap(find.text(intention.title));
   await _pumpUntil(
     tester,
-    () => repository.detailRequests.length > requestIndex,
+    () => repository.detailIds.where((id) => id == intention.id).length >= 2,
   );
   repository.emitDetail(requestIndex, intention);
   await tester.pumpAndSettle();
@@ -495,12 +507,14 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 
 final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   final pageQueries = <IntentionCatalogQuery>[];
+  final detailIds = <IntentionId>[];
   final detailRequests =
       <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
   final commands = <IntentionCommand>[];
   final _pages = <Completer<Result<IntentionCatalogPage>>>[];
   final _commands =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
+  final _revisions = <IntentionId, int>{};
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -520,7 +534,16 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
-  ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
+  ) => Future.value(
+    GraphResultSuccess(
+      RelationGroupFirstPage(
+        items: const [],
+        counts: _zeroRelationCounts,
+        nextCursor: null,
+        revision: _Revision(_revisions[query.intentionId] ?? 0),
+      ),
+    ),
+  );
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
@@ -532,6 +555,7 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   ) {
     final request =
         StreamController<Result<GraphSnapshot<IntentionDetails?>>>();
+    detailIds.add(id);
     detailRequests.add(request);
     return request.stream;
   }
@@ -562,17 +586,26 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   }
 
   void emitDetail(int index, Intention intention) {
-    detailRequests[index].add(
-      ResultSuccess(
-        GraphSnapshot(
-          value: IntentionDetails(
-            intention: intention,
-            relationCounts: _zeroRelationCounts,
+    _revisions[intention.id] = index;
+    for (
+      var requestIndex = 0;
+      requestIndex < detailRequests.length;
+      requestIndex += 1
+    ) {
+      if (detailIds[requestIndex] == intention.id) {
+        detailRequests[requestIndex].add(
+          ResultSuccess(
+            GraphSnapshot(
+              value: IntentionDetails(
+                intention: intention,
+                relationCounts: _zeroRelationCounts,
+              ),
+              revision: _Revision(index),
+            ),
           ),
-          revision: _Revision(index),
-        ),
-      ),
-    );
+        );
+      }
+    }
   }
 
   void completeCommand(

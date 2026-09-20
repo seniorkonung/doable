@@ -10,6 +10,8 @@ import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
+import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
+import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
@@ -25,6 +27,10 @@ final class IntentionDetailsPage extends ConsumerWidget {
     final localizations = AppLocalizations.of(context);
     final provider = intentionDetailsViewModelProvider(intentionId);
     final details = ref.watch(provider);
+    // Открытие страницы одновременно начинает только начальную группу
+    // соседства; сам sliver переиспользует это состояние после загрузки
+    // подробных данных намерения.
+    ref.watch(relationNeighborhoodViewModelProvider(intentionId));
     ref.listen(provider, (previous, next) {
       // Сообщения об успехе предъявляет общий presenter оболочки.
       if (next is IntentionDetailsDeleted) {
@@ -187,53 +193,70 @@ final class _LoadedDetails extends StatelessWidget {
       IntentionArchiveState.active => localizations.detailsActive,
       IntentionArchiveState.archived => localizations.detailsArchived,
     };
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Semantics(
-          header: true,
-          child: Text(
-            intention.title,
-            key: const ValueKey('intention-details-title'),
-            style: Theme.of(context).textTheme.headlineSmall,
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    intention.title,
+                    key: const ValueKey('intention-details-title'),
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _DetailsField(
+                  label: localizations.detailsDescriptionLabel,
+                  value:
+                      intention.description ??
+                      localizations.detailsNoDescription,
+                ),
+                const SizedBox(height: 16),
+                _DetailsField(
+                  label: localizations.detailsReadinessLabel,
+                  value: readiness,
+                ),
+                const SizedBox(height: 16),
+                _DetailsField(
+                  label: localizations.detailsArchiveStateLabel,
+                  value: archiveState,
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 24),
-        _DetailsField(
-          label: localizations.detailsDescriptionLabel,
-          value: intention.description ?? localizations.detailsNoDescription,
-        ),
-        const SizedBox(height: 16),
-        _DetailsField(
-          label: localizations.detailsReadinessLabel,
-          value: readiness,
-        ),
-        const SizedBox(height: 16),
-        _DetailsField(
-          label: localizations.detailsArchiveStateLabel,
-          value: archiveState,
-        ),
-        const SizedBox(height: 24),
-        if (state.edit case final edit?)
-          _DetailsEditForm(
-            edit: edit,
-            isOperationRunning: state.isOperationRunning,
-            onCancel: onCancelEditing,
-            onTitleChanged: onTitleChanged,
-            onDescriptionChanged: onDescriptionChanged,
-            onSave: onSave,
-          )
-        else
-          _DetailsActions(
-            state: state,
-            onBeginEditing: onBeginEditing,
-            onEnableReadiness: onEnableReadiness,
-            onDisableReadiness: onDisableReadiness,
-            onArchive: onArchive,
-            onRestore: onRestore,
-            onDelete: onDelete,
-            onRetryStateChange: onRetryStateChange,
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+          sliver: SliverToBoxAdapter(
+            child: switch (state.edit) {
+              final edit? => _DetailsEditForm(
+                edit: edit,
+                isOperationRunning: state.isOperationRunning,
+                onCancel: onCancelEditing,
+                onTitleChanged: onTitleChanged,
+                onDescriptionChanged: onDescriptionChanged,
+                onSave: onSave,
+              ),
+              null => _DetailsActions(
+                state: state,
+                onBeginEditing: onBeginEditing,
+                onEnableReadiness: onEnableReadiness,
+                onDisableReadiness: onDisableReadiness,
+                onArchive: onArchive,
+                onRestore: onRestore,
+                onDelete: onDelete,
+                onRetryStateChange: onRetryStateChange,
+              ),
+            },
           ),
+        ),
+        RelationNeighborhoodSliver(intentionId: intention.id),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
   }

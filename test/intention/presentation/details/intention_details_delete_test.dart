@@ -66,7 +66,7 @@ void main() {
         await tester.pump();
 
         expect(repository.commands.single, isA<DeleteIntention>());
-        expect(find.text(intention.title), findsOneWidget);
+        expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
         expect(find.text('Saving changes…'), findsOneWidget);
 
         repository.completeCommand(
@@ -133,12 +133,15 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text(message), findsOneWidget);
-        expect(find.text(intention.title), findsOneWidget);
+        expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
         final retry = find.byKey(
           const ValueKey('intention-details-state-change-retry'),
         );
         expect(retry, canRetry ? findsOneWidget : findsNothing);
         if (canRetry) {
+          await tester.ensureVisible(retry);
+          await tester.drag(find.byType(Scrollable), const Offset(0, 100));
+          await tester.pumpAndSettle();
           await tester.tap(retry);
           await tester.pump();
           expect(repository.commands, hasLength(2));

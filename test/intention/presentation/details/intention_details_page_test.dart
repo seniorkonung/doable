@@ -188,7 +188,10 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
       await tester.pumpAndSettle();
       expect(repository.commands, isEmpty);
-      expect(find.text('Not ready for action'), findsOneWidget);
+      expect(
+        find.text('Not ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
 
       await tester.tap(enableReadiness);
       await tester.pumpAndSettle();
@@ -196,7 +199,10 @@ void main() {
       await tester.pump();
 
       expect(repository.commands.single, isA<EnableIntentionReadiness>());
-      expect(find.text('Not ready for action'), findsOneWidget);
+      expect(
+        find.text('Not ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
       expect(find.text('Saving changes…'), findsOneWidget);
 
       repository.completeCommand(
@@ -212,10 +218,16 @@ void main() {
         find.textContaining('Marked as ready for action.'),
         findsOneWidget,
       );
-      expect(find.text('Ready for action'), findsOneWidget);
+      expect(
+        find.text('Ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
       repository.detailRequests[0].add(ResultSuccess(before));
       await tester.pump();
-      expect(find.text('Ready for action'), findsOneWidget);
+      expect(
+        find.text('Ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
     },
   );
 
@@ -271,8 +283,11 @@ void main() {
       await waitForDetailRequests(repository, 3);
       await tester.pumpAndSettle();
       expect(find.textContaining('Intention archived.'), findsOneWidget);
-      expect(find.text('Archived'), findsOneWidget);
-      expect(find.text('Not ready for action'), findsOneWidget);
+      expect(find.text('Archived', skipOffstage: false), findsOneWidget);
+      expect(
+        find.text('Not ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
       await _closeOperationMessage(tester);
 
       final restore = find.byKey(const ValueKey('intention-details-restore'));
@@ -288,7 +303,7 @@ void main() {
       await waitForDetailRequests(repository, 4);
       await tester.pumpAndSettle();
       expect(find.textContaining('Intention restored.'), findsOneWidget);
-      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('Active', skipOffstage: false), findsOneWidget);
     },
   );
 
@@ -335,7 +350,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text(message), findsOneWidget);
-        expect(find.text('Active'), findsOneWidget);
+        expect(find.text('Active', skipOffstage: false), findsOneWidget);
         final retry = find.byKey(
           const ValueKey('intention-details-state-change-retry'),
         );
@@ -948,7 +963,8 @@ void main() {
 
     expect(router.current.name, IntentionDetailsRoute.name);
     expect(find.byType(IntentionDetailsPage), findsOneWidget);
-    expect(repository.detailIds.single, intention.id);
+    expect(repository.detailIds, hasLength(2));
+    expect(repository.detailIds, everyElement(intention.id));
   });
 
   testWidgets('IntentionDeleted завершает открытый details route', (
@@ -1059,7 +1075,7 @@ void main() {
       await waitForDetailRequests(repository, 2);
       await tester.pumpAndSettle();
 
-      expect(find.text('Archived'), findsOneWidget);
+      expect(find.text('Archived', skipOffstage: false), findsOneWidget);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.textContaining('Intention archived.'), findsNothing);
 
