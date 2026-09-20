@@ -57,6 +57,7 @@ final class IntentionSummaryView extends StatelessWidget {
     required this.showArchiveState,
     this.traits = const <String>[],
     this.onTap,
+    this.tapHint,
     super.key,
   });
 
@@ -74,28 +75,35 @@ final class IntentionSummaryView extends StatelessWidget {
 
   final VoidCallback? onTap;
 
+  /// Назначение перехода для экранного диктора; звучит вместе с названием,
+  /// архивным состоянием и количеством активных связей.
+  final String? tapHint;
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return MergeSemantics(
-      child: ListTile(
-        onTap: onTap,
-        isThreeLine: true,
-        title: Text(title),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Wrap(
-              spacing: 12,
-              children: [
-                for (final trait in traits) Text(trait),
-                if (showArchiveState) Text(_archiveStateLabel(localizations)),
-              ],
-            ),
-            ..._activeRelationCountLines(localizations, theme),
-          ],
+      child: Semantics(
+        hint: tapHint,
+        child: ListTile(
+          onTap: onTap,
+          isThreeLine: true,
+          title: Text(title),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Wrap(
+                spacing: 12,
+                children: [
+                  for (final trait in traits) Text(trait),
+                  if (showArchiveState) Text(_archiveStateLabel(localizations)),
+                ],
+              ),
+              ..._activeRelationCountLines(localizations, theme),
+            ],
+          ),
         ),
       ),
     );

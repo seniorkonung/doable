@@ -20,9 +20,16 @@ import 'relation_neighborhood_view_model.dart';
 /// Единственный sliver сохраняет ленивое построение строк внутри общего
 /// scrollable страницы. Содержимое невыбранных групп не запрашивается.
 final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
-  const RelationNeighborhoodSliver({required this.intentionId, super.key});
+  const RelationNeighborhoodSliver({
+    required this.intentionId,
+    required this.onOpenRelation,
+    super.key,
+  });
 
   final IntentionId intentionId;
+
+  /// Открывает подробные данные выбранной связи; маршрут выбирает страница.
+  final ValueChanged<LongTermRelationId> onOpenRelation;
 
   @override
   ConsumerState<RelationNeighborhoodSliver> createState() =>
@@ -151,6 +158,7 @@ final class _RelationNeighborhoodSliverState
           'relation-neighborhood-row-${item.relation.id.toCanonicalString()}',
         ),
         item: item,
+        onOpen: widget.onOpenRelation,
       ),
     );
   }
@@ -666,9 +674,10 @@ final class _ChoiceGroup<T> extends StatelessWidget {
 }
 
 final class _RelationRow extends StatelessWidget {
-  const _RelationRow({required this.item, super.key});
+  const _RelationRow({required this.item, required this.onOpen, super.key});
 
   final LongTermRelationSummary item;
+  final ValueChanged<LongTermRelationId> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -694,40 +703,58 @@ final class _RelationRow extends StatelessWidget {
         : localizations.relationNeighborhoodRelationArchived;
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      // Строка объявляется одним узлом: экранный диктор получает формулировку,
+      // приоритет, состояние и обоих участников вместе с назначением перехода.
+      child: MergeSemantics(
+        child: Semantics(
+          hint: localizations.relationNeighborhoodOpenRelation,
+          child: InkWell(
+            onTap: () => onOpen(relation.id),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(phrase, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 4,
-                    children: [
-                      Text(
-                        localizations.relationNeighborhoodPriority(priority),
-                      ),
-                      Text(relationState),
-                    ],
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          phrase,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              localizations.relationNeighborhoodPriority(
+                                priority,
+                              ),
+                            ),
+                            Text(relationState),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  _Participant(
+                    label: localizations.relationNeighborhoodSourceParticipant,
+                    participant: item.source,
+                  ),
+                  _Participant(
+                    label: localizations.relationNeighborhoodRelatedParticipant,
+                    participant: item.related,
                   ),
                 ],
               ),
             ),
-            _Participant(
-              label: localizations.relationNeighborhoodSourceParticipant,
-              participant: item.source,
-            ),
-            _Participant(
-              label: localizations.relationNeighborhoodRelatedParticipant,
-              participant: item.related,
-            ),
-          ],
+          ),
         ),
       ),
     );

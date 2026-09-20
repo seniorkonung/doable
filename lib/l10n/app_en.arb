@@ -722,5 +722,57 @@
   "relationEditorCreateUnexpected": "The relation couldn’t be created because of an unexpected error.",
   "@relationEditorCreateUnexpected": {
     "description": "Терминальная непредвиденная ошибка создания связи"
+  },
+  "relationNeighborhoodOpenRelation": "Opens the relation details",
+  "@relationNeighborhoodOpenRelation": {
+    "description": "Назначение перехода из строки соседства в подробный просмотр связи"
+  },
+  "relationDetailsTitle": "Relation",
+  "@relationDetailsTitle": {
+    "description": "Заголовок подробного просмотра связи"
+  },
+  "relationDetailsLoading": "Loading the relation…",
+  "@relationDetailsLoading": {
+    "description": "Первое чтение подробных данных связи"
+  },
+  "relationDetailsNotFound": "This relation no longer exists.",
+  "@relationDetailsNotFound": {
+    "description": "Подтверждённое отсутствие связи в подробном просмотре"
+  },
+  "relationDetailsUnavailable": "The relation couldn’t be loaded. Try again.",
+  "@relationDetailsUnavailable": {
+    "description": "Устранимая недоступность чтения подробных данных связи"
+  },
+  "relationDetailsCorruption": "Stored relation data is damaged and can’t be shown.",
+  "@relationDetailsCorruption": {
+    "description": "Повреждение сохранённых данных связи в подробном просмотре"
+  },
+  "relationDetailsUnexpected": "The relation couldn’t be loaded because of an unexpected error.",
+  "@relationDetailsUnexpected": {
+    "description": "Безопасный непредвиденный отказ чтения подробных данных связи"
+  },
+  "relationDetailsTypeLabel": "Relation type",
+  "@relationDetailsTypeLabel": {
+    "description": "Подпись типа связи в подробном просмотре"
+  },
+  "relationDetailsPriorityLabel": "Priority",
+  "@relationDetailsPriorityLabel": {
+    "description": "Подпись приоритета связи в подробном просмотре"
+  },
+  "relationDetailsScopeLabel": "Relation state",
+  "@relationDetailsScopeLabel": {
+    "description": "Подпись собственного архивного состояния связи"
+  },
+  "relationDetailsDescriptionLabel": "Description",
+  "@relationDetailsDescriptionLabel": {
+    "description": "Подпись полного описания связи"
+  },
+  "relationDetailsNoDescription": "No description",
+  "@relationDetailsNoDescription": {
+    "description": "Отсутствие описания у связи"
+  },
+  "relationDetailsOpenParticipant": "Opens the intention and its own relations",
+  "@relationDetailsOpenParticipant": {
+    "description": "Назначение перехода к участнику связи"
   }
 }

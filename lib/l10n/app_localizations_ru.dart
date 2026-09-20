@@ -622,4 +622,48 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorCreateUnexpected =>
       'Не удалось создать связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationNeighborhoodOpenRelation =>
+      'Открывает подробные данные связи';
+
+  @override
+  String get relationDetailsTitle => 'Связь';
+
+  @override
+  String get relationDetailsLoading => 'Загружаем связь…';
+
+  @override
+  String get relationDetailsNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationDetailsUnavailable =>
+      'Не удалось загрузить связь. Повторите попытку.';
+
+  @override
+  String get relationDetailsCorruption =>
+      'Сохранённые данные связи повреждены и не могут быть показаны.';
+
+  @override
+  String get relationDetailsUnexpected =>
+      'Не удалось загрузить связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationDetailsTypeLabel => 'Тип связи';
+
+  @override
+  String get relationDetailsPriorityLabel => 'Приоритет';
+
+  @override
+  String get relationDetailsScopeLabel => 'Состояние связи';
+
+  @override
+  String get relationDetailsDescriptionLabel => 'Описание';
+
+  @override
+  String get relationDetailsNoDescription => 'Описания нет';
+
+  @override
+  String get relationDetailsOpenParticipant =>
+      'Открывает намерение и его собственные связи';
 }

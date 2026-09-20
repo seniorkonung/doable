@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
@@ -255,7 +256,12 @@ final class _LoadedDetails extends StatelessWidget {
             },
           ),
         ),
-        RelationNeighborhoodSliver(intentionId: intention.id),
+        RelationNeighborhoodSliver(
+          intentionId: intention.id,
+          onOpenRelation: (relationId) => unawaited(
+            context.router.push(RelationDetailsRoute(relationId: relationId)),
+          ),
+        ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );

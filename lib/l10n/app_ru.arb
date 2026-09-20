@@ -173,5 +173,18 @@
   "relationEditorCreateParticipantArchived": "Связать можно только активные намерения.",
   "relationEditorCreateUnavailable": "Не удалось создать связь. Повторите попытку.",
   "relationEditorCreateCorruption": "Сохранённые данные повреждены. Связь не создана.",
-  "relationEditorCreateUnexpected": "Не удалось создать связь из-за непредвиденной ошибки."
+  "relationEditorCreateUnexpected": "Не удалось создать связь из-за непредвиденной ошибки.",
+  "relationNeighborhoodOpenRelation": "Открывает подробные данные связи",
+  "relationDetailsTitle": "Связь",
+  "relationDetailsLoading": "Загружаем связь…",
+  "relationDetailsNotFound": "Эта связь больше не существует.",
+  "relationDetailsUnavailable": "Не удалось загрузить связь. Повторите попытку.",
+  "relationDetailsCorruption": "Сохранённые данные связи повреждены и не могут быть показаны.",
+  "relationDetailsUnexpected": "Не удалось загрузить связь из-за непредвиденной ошибки.",
+  "relationDetailsTypeLabel": "Тип связи",
+  "relationDetailsPriorityLabel": "Приоритет",
+  "relationDetailsScopeLabel": "Состояние связи",
+  "relationDetailsDescriptionLabel": "Описание",
+  "relationDetailsNoDescription": "Описания нет",
+  "relationDetailsOpenParticipant": "Открывает намерение и его собственные связи"
 }
