@@ -1249,6 +1249,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open intention details'**
   String get participantPickerOpenDetails;
+
+  /// Заголовок формы создания долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation'**
+  String get relationEditorTitle;
+
+  /// Подпись исходного участника в форме создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get relationEditorSourceLabel;
+
+  /// Подпись связанного участника в форме создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Related intention'**
+  String get relationEditorRelatedLabel;
+
+  /// Состояние выбранного участника связи
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get relationEditorParticipantSelected;
+
+  /// Состояние невыбранного участника связи
+  ///
+  /// In en, this message translates to:
+  /// **'Not selected'**
+  String get relationEditorParticipantNotSelected;
+
+  /// Переход к выбору исходного участника
+  ///
+  /// In en, this message translates to:
+  /// **'Select the source intention'**
+  String get relationEditorSelectSourceAction;
+
+  /// Замена выбранного исходного участника
+  ///
+  /// In en, this message translates to:
+  /// **'Change the source intention'**
+  String get relationEditorChangeSourceAction;
+
+  /// Переход к выбору связанного участника
+  ///
+  /// In en, this message translates to:
+  /// **'Select the related intention'**
+  String get relationEditorSelectRelatedAction;
+
+  /// Замена выбранного связанного участника
+  ///
+  /// In en, this message translates to:
+  /// **'Change the related intention'**
+  String get relationEditorChangeRelatedAction;
+
+  /// Подпись выбора типа связи в форме создания
+  ///
+  /// In en, this message translates to:
+  /// **'Relation type'**
+  String get relationEditorTypeLabel;
+
+  /// Тип связи «нужно» в форме создания
+  ///
+  /// In en, this message translates to:
+  /// **'Need'**
+  String get relationEditorTypeNeed;
+
+  /// Тип связи «можно» в форме создания
+  ///
+  /// In en, this message translates to:
+  /// **'Can'**
+  String get relationEditorTypeCan;
+
+  /// Подпись выбора приоритета связи
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get relationEditorPriorityLabel;
+
+  /// Подпись описания создаваемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'Description (optional)'**
+  String get relationEditorDescriptionLabel;
+
+  /// Превышение предела описания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Use no more than 4096 characters.'**
+  String get relationEditorDescriptionTooLong;
+
+  /// Недопустимый Unicode в описании связи
+  ///
+  /// In en, this message translates to:
+  /// **'Enter valid Unicode text without NUL.'**
+  String get relationEditorDescriptionInvalidUnicode;
+
+  /// Отказ создания связи намерения с самим собой
+  ///
+  /// In en, this message translates to:
+  /// **'An intention can’t be related to itself.'**
+  String get relationEditorCreateSameParticipants;
+
+  /// Объяснение недостающего обязательного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'To create the relation, provide:'**
+  String get relationEditorMissingTitle;
+
+  /// Недостающий исходный участник связи
+  ///
+  /// In en, this message translates to:
+  /// **'the source intention'**
+  String get relationEditorMissingSource;
+
+  /// Недостающий связанный участник связи
+  ///
+  /// In en, this message translates to:
+  /// **'the related intention'**
+  String get relationEditorMissingRelated;
+
+  /// Недостающий тип связи
+  ///
+  /// In en, this message translates to:
+  /// **'the relation type'**
+  String get relationEditorMissingType;
+
+  /// Недостающий приоритет связи
+  ///
+  /// In en, this message translates to:
+  /// **'a priority from P1 to P4'**
+  String get relationEditorMissingPriority;
+
+  /// Переход к связи, занявшей направленную пару
+  ///
+  /// In en, this message translates to:
+  /// **'Open the existing relation'**
+  String get relationEditorOpenExistingRelation;
+
+  /// Команда создания долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Create relation'**
+  String get relationEditorSubmitAction;
+
+  /// Выполняемое создание долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Creating…'**
+  String get relationEditorCreating;
+
+  /// Создание связи из исходящей группы соседства
+  ///
+  /// In en, this message translates to:
+  /// **'Create an outgoing relation'**
+  String get relationNeighborhoodCreateOutgoingAction;
+
+  /// Создание связи из входящей группы соседства
+  ///
+  /// In en, this message translates to:
+  /// **'Create an incoming relation'**
+  String get relationNeighborhoodCreateIncomingAction;
+
+  /// Вариант приоритета P1–P4 в форме создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}'**
+  String relationEditorPriorityOption(String priority);
 }
 
 class _AppLocalizationsDelegate

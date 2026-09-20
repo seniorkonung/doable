@@ -11,6 +11,7 @@ import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
+import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import '../operation/operation_state.dart';
@@ -260,6 +261,16 @@ final class _LoadedDetails extends StatelessWidget {
           intentionId: intention.id,
           onOpenRelation: (relationId) => unawaited(
             context.router.push(RelationDetailsRoute(relationId: relationId)),
+          ),
+          onCreateRelation: (direction) => unawaited(
+            context.router.push(
+              RelationEditorRoute(
+                creationContext: RelationCreationContext(
+                  intentionId: intention.id,
+                  direction: direction,
+                ),
+              ),
+            ),
           ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),

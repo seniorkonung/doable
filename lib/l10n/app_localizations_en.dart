@@ -681,4 +681,97 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get participantPickerOpenDetails => 'Open intention details';
+
+  @override
+  String get relationEditorTitle => 'New relation';
+
+  @override
+  String get relationEditorSourceLabel => 'Source intention';
+
+  @override
+  String get relationEditorRelatedLabel => 'Related intention';
+
+  @override
+  String get relationEditorParticipantSelected => 'Selected';
+
+  @override
+  String get relationEditorParticipantNotSelected => 'Not selected';
+
+  @override
+  String get relationEditorSelectSourceAction => 'Select the source intention';
+
+  @override
+  String get relationEditorChangeSourceAction => 'Change the source intention';
+
+  @override
+  String get relationEditorSelectRelatedAction =>
+      'Select the related intention';
+
+  @override
+  String get relationEditorChangeRelatedAction =>
+      'Change the related intention';
+
+  @override
+  String get relationEditorTypeLabel => 'Relation type';
+
+  @override
+  String get relationEditorTypeNeed => 'Need';
+
+  @override
+  String get relationEditorTypeCan => 'Can';
+
+  @override
+  String get relationEditorPriorityLabel => 'Priority';
+
+  @override
+  String get relationEditorDescriptionLabel => 'Description (optional)';
+
+  @override
+  String get relationEditorDescriptionTooLong =>
+      'Use no more than 4096 characters.';
+
+  @override
+  String get relationEditorDescriptionInvalidUnicode =>
+      'Enter valid Unicode text without NUL.';
+
+  @override
+  String get relationEditorCreateSameParticipants =>
+      'An intention can’t be related to itself.';
+
+  @override
+  String get relationEditorMissingTitle => 'To create the relation, provide:';
+
+  @override
+  String get relationEditorMissingSource => 'the source intention';
+
+  @override
+  String get relationEditorMissingRelated => 'the related intention';
+
+  @override
+  String get relationEditorMissingType => 'the relation type';
+
+  @override
+  String get relationEditorMissingPriority => 'a priority from P1 to P4';
+
+  @override
+  String get relationEditorOpenExistingRelation => 'Open the existing relation';
+
+  @override
+  String get relationEditorSubmitAction => 'Create relation';
+
+  @override
+  String get relationEditorCreating => 'Creating…';
+
+  @override
+  String get relationNeighborhoodCreateOutgoingAction =>
+      'Create an outgoing relation';
+
+  @override
+  String get relationNeighborhoodCreateIncomingAction =>
+      'Create an incoming relation';
+
+  @override
+  String relationEditorPriorityOption(String priority) {
+    return 'Priority $priority';
+  }
 }

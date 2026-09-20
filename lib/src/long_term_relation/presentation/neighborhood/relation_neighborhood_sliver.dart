@@ -23,6 +23,7 @@ final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
   const RelationNeighborhoodSliver({
     required this.intentionId,
     required this.onOpenRelation,
+    required this.onCreateRelation,
     super.key,
   });
 
@@ -30,6 +31,9 @@ final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
 
   /// Открывает подробные данные выбранной связи; маршрут выбирает страница.
   final ValueChanged<LongTermRelationId> onOpenRelation;
+
+  /// Открывает создание связи в направлении выбранной группы соседства.
+  final ValueChanged<RelationDirection> onCreateRelation;
 
   @override
   ConsumerState<RelationNeighborhoodSliver> createState() =>
@@ -87,6 +91,7 @@ final class _RelationNeighborhoodSliverState
             onSelectScope: viewModel.selectScope,
             onSelectType: viewModel.selectType,
             onSelectDirection: viewModel.selectDirection,
+            onCreateRelation: widget.onCreateRelation,
           );
         }
         return _buildBodyChild(context, state, index - 1, viewModel);
@@ -282,6 +287,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
     required this.onSelectScope,
     required this.onSelectType,
     required this.onSelectDirection,
+    required this.onCreateRelation,
   });
 
   final RelationNeighborhoodState state;
@@ -289,6 +295,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
   final ValueChanged<RelationScope> onSelectScope;
   final ValueChanged<LongTermRelationType> onSelectType;
   final ValueChanged<RelationDirection> onSelectDirection;
+  final ValueChanged<RelationDirection> onCreateRelation;
 
   @override
   Widget build(BuildContext context) {
@@ -331,6 +338,21 @@ final class _NeighborhoodHeader extends StatelessWidget {
             onSelectScope: onSelectScope,
             onSelectType: onSelectType,
             onSelectDirection: onSelectDirection,
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilledButton.icon(
+              key: const ValueKey('relation-neighborhood-create-relation'),
+              onPressed: () => onCreateRelation(state.selection.direction),
+              icon: const Icon(Icons.add_link),
+              label: Text(switch (state.selection.direction) {
+                RelationDirection.outgoing =>
+                  localizations.relationNeighborhoodCreateOutgoingAction,
+                RelationDirection.incoming =>
+                  localizations.relationNeighborhoodCreateIncomingAction,
+              }),
+            ),
           ),
         ],
       ),
