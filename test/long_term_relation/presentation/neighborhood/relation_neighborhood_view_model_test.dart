@@ -300,6 +300,7 @@ void main() {
     expect(loaded.items.length, 2);
     expect(loaded.totalCount, 5);
     expect(loaded.hasConfirmedEnd, isFalse);
+    expect(loaded.summaryFreshness, RelationSummaryFreshness.current);
     expect(
       loaded.progress,
       isA<RelationGroupLoadMoreFailure>()
@@ -779,6 +780,7 @@ void main() {
     expect(loaded.items.length, 2);
     expect(loaded.totalCount, 5);
     expect(loaded.hasConfirmedEnd, isFalse);
+    expect(loaded.summaryFreshness, RelationSummaryFreshness.stale);
     expect(
       loaded.progress,
       isA<RelationGroupRefreshFailure>().having(
@@ -791,6 +793,23 @@ void main() {
     harness.retryRefresh();
     expect(repository.requestCount, 4);
     expect(repository.queryAt(3).cursor, isNull);
+    expect(
+      harness.loaded.summaryFreshness,
+      RelationSummaryFreshness.refreshing,
+    );
+
+    harness.completeFirstPage(
+      index: 3,
+      from: 1,
+      count: 2,
+      totalCount: 4,
+      nextCursor: const TestRelationGroupCursor(2),
+      revision: const TestGraphRevision(9),
+    );
+    await pumpEventQueue();
+
+    expect(harness.loaded.totalCount, 4);
+    expect(harness.loaded.summaryFreshness, RelationSummaryFreshness.current);
   });
 
   test('изменение графа во время сборки не даёт смешанный список', () async {

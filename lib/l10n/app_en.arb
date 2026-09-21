@@ -205,6 +205,14 @@
   "relationNeighborhoodTitle": "Relations",
   "relationNeighborhoodSummaryLoading": "Loading relations and summary…",
   "relationNeighborhoodSummaryUnavailable": "The relation summary couldn’t be loaded.",
+  "relationNeighborhoodSavedSummaryRefreshing": "Updating saved relation numbers…",
+  "@relationNeighborhoodSavedSummaryRefreshing": {
+    "description": "Состояние обновления сохранённой согласованной сводки рядом с её числами"
+  },
+  "relationNeighborhoodSavedSummaryStale": "Saved relation numbers are out of date because the refresh failed.",
+  "@relationNeighborhoodSavedSummaryStale": {
+    "description": "Состояние устаревшей сохранённой сводки рядом с её числами"
+  },
   "relationNeighborhoodTotal": "Total relations: {count}",
   "@relationNeighborhoodTotal": {
     "placeholders": {"count": {"type": "int"}}

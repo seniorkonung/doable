@@ -183,6 +183,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить сводку связей.';
 
   @override
+  String get relationNeighborhoodSavedSummaryRefreshing =>
+      'Обновляем сохранённые числа связей…';
+
+  @override
+  String get relationNeighborhoodSavedSummaryStale =>
+      'Сохранённые числа связей устарели: обновить данные не удалось.';
+
+  @override
   String relationNeighborhoodTotal(int count) {
     return 'Всего связей: $count';
   }

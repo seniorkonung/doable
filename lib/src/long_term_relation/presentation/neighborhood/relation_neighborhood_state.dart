@@ -58,6 +58,18 @@ sealed class RelationNeighborhoodState {
   final RelationGroupSelection selection;
 }
 
+/// Актуальность сохранённой сводки, предъявляемой вместе с её числами.
+enum RelationSummaryFreshness {
+  /// Числа относятся к опубликованной согласованной паре и не обновляются.
+  current,
+
+  /// Прежняя согласованная пара показана, пока собирается её замена.
+  refreshing,
+
+  /// Обновление не удалось, поэтому сохранённые числа устарели.
+  stale,
+}
+
 /// Первое чтение выбранной группы: подтверждённых строк ещё нет.
 final class RelationGroupInitialLoad extends RelationNeighborhoodState {
   const RelationGroupInitialLoad({
@@ -118,6 +130,15 @@ sealed class RelationGroupConfirmedState extends RelationNeighborhoodState {
   final GraphRevision revision;
   RelationGroupProgress get progress;
   RelationGroupScrollAnchor? get scrollAnchor;
+
+  /// Подгрузка продолжения не меняет актуальность полной сводки.
+  RelationSummaryFreshness get summaryFreshness => switch (progress) {
+    RelationGroupRefreshing() => RelationSummaryFreshness.refreshing,
+    RelationGroupRefreshFailure() => RelationSummaryFreshness.stale,
+    RelationGroupIdle() ||
+    RelationGroupLoadingMore() ||
+    RelationGroupLoadMoreFailure() => RelationSummaryFreshness.current,
+  };
 
   /// Полное количество связей выбранной группы.
   int get totalCount => counts.forGroup(

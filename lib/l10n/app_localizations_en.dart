@@ -183,6 +183,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation summary couldn’t be loaded.';
 
   @override
+  String get relationNeighborhoodSavedSummaryRefreshing =>
+      'Updating saved relation numbers…';
+
+  @override
+  String get relationNeighborhoodSavedSummaryStale =>
+      'Saved relation numbers are out of date because the refresh failed.';
+
+  @override
   String relationNeighborhoodTotal(int count) {
     return 'Total relations: $count';
   }

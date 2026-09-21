@@ -77,6 +77,14 @@ final class _RelationNeighborhoodSliverState
     final provider = relationNeighborhoodViewModelProvider(widget.intentionId);
     final state = ref.watch(provider);
     final viewModel = ref.read(provider.notifier);
+    final refreshProgress = state is RelationGroupConfirmedState
+        ? state.progress
+        : null;
+    final onRetryRefresh =
+        refreshProgress is RelationGroupRefreshFailure &&
+            refreshProgress.canRetry
+        ? viewModel.retryRefresh
+        : null;
     _retainRowKeys(state);
     _scheduleAnchorRestoration(state);
     _scheduleVisibleRelationCapture();
@@ -92,6 +100,7 @@ final class _RelationNeighborhoodSliverState
             onSelectType: viewModel.selectType,
             onSelectDirection: viewModel.selectDirection,
             onCreateRelation: widget.onCreateRelation,
+            onRetryRefresh: onRetryRefresh,
           );
         }
         return _buildBodyChild(context, state, index - 1, viewModel);
@@ -288,6 +297,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
     required this.onSelectType,
     required this.onSelectDirection,
     required this.onCreateRelation,
+    required this.onRetryRefresh,
   });
 
   final RelationNeighborhoodState state;
@@ -296,6 +306,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
   final ValueChanged<LongTermRelationType> onSelectType;
   final ValueChanged<RelationDirection> onSelectDirection;
   final ValueChanged<RelationDirection> onCreateRelation;
+  final Future<void> Function()? onRetryRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +332,9 @@ final class _NeighborhoodHeader extends StatelessWidget {
             _RelationSummary(
               counts: value.counts,
               selection: state.selection,
+              freshness: value.summaryFreshness,
               onSelectGroup: onSelectGroup,
+              onRetryRefresh: onRetryRefresh,
             )
           else
             _NeighborhoodStatus(
@@ -364,30 +377,82 @@ final class _RelationSummary extends StatelessWidget {
   const _RelationSummary({
     required this.counts,
     required this.selection,
+    required this.freshness,
     required this.onSelectGroup,
+    required this.onRetryRefresh,
   });
 
   final RelationCounts counts;
   final RelationGroupSelection selection;
+  final RelationSummaryFreshness freshness;
   final ValueChanged<RelationGroupSelection> onSelectGroup;
+  final Future<void> Function()? onRetryRefresh;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
+    final totalLabel = localizations.relationNeighborhoodTotal(counts.total);
+    final activeLabel = localizations.relationNeighborhoodActiveTotal(
+      counts.active,
+    );
+    final archivedLabel = localizations.relationNeighborhoodArchivedTotal(
+      counts.archived,
+    );
+    final freshnessMessage = switch (freshness) {
+      RelationSummaryFreshness.current => null,
+      RelationSummaryFreshness.refreshing =>
+        localizations.relationNeighborhoodSavedSummaryRefreshing,
+      RelationSummaryFreshness.stale =>
+        localizations.relationNeighborhoodSavedSummaryStale,
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            Text(localizations.relationNeighborhoodTotal(counts.total)),
-            Text(localizations.relationNeighborhoodActiveTotal(counts.active)),
-            Text(
-              localizations.relationNeighborhoodArchivedTotal(counts.archived),
+        Semantics(
+          key: const ValueKey('relation-neighborhood-summary-numbers'),
+          container: true,
+          liveRegion: freshness != RelationSummaryFreshness.current,
+          label: [
+            totalLabel,
+            activeLabel,
+            archivedLabel,
+            ?freshnessMessage,
+          ].join('. '),
+          child: ExcludeSemantics(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    Text(totalLabel),
+                    Text(activeLabel),
+                    Text(archivedLabel),
+                  ],
+                ),
+                if (freshnessMessage != null) ...[
+                  const SizedBox(height: 8),
+                  _SummaryFreshnessStatus(
+                    freshness: freshness,
+                    message: freshnessMessage,
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ),
+        if (freshness == RelationSummaryFreshness.stale &&
+            onRetryRefresh != null) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilledButton(
+              onPressed: () => unawaited(onRetryRefresh!()),
+              child: Text(localizations.commonRetry),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         _ScopeSummary(
           scope: RelationScope.active,
@@ -405,6 +470,36 @@ final class _RelationSummary extends StatelessWidget {
       ],
     );
   }
+}
+
+final class _SummaryFreshnessStatus extends StatelessWidget {
+  const _SummaryFreshnessStatus({
+    required this.freshness,
+    required this.message,
+  });
+
+  final RelationSummaryFreshness freshness;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (freshness == RelationSummaryFreshness.refreshing)
+        const SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )
+      else
+        Icon(
+          Icons.warning_amber_rounded,
+          size: 20,
+          color: Theme.of(context).colorScheme.error,
+        ),
+      const SizedBox(width: 12),
+      Expanded(child: Text(message)),
+    ],
+  );
 }
 
 final class _ScopeSummary extends StatelessWidget {
