@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** В диапазоне остаётся один активный finding: F4 — смена локализованного текста передаёт тот же claim второму владельцу. Все три обязательных прохода и проверка полного диапазона завершены.
+**Summary:** Активных findings не осталось: обязательная коррекция владения claim при смене локализованного текста закреплена незавершённой задачей 3.35. Все три обязательных прохода и проверка полного диапазона завершены.
 
 ## Review target
 
@@ -34,20 +34,13 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Два свежих изолированных reviewer без planning/history/report проверили на ad2ba531c4373a88e892ff35b17c86646c49e84e две overlap-группы, вместе охватывающие все 128 delivery/test paths U1: предметные типы, SQLite, repository и агрегаты; coordinator, согласование, UI, маршрутизацию, локализацию и доступность. Предложение сохранить прежние внутренние сигнатуры отклонено после независимой сверки: design и правило перехода Phase 3 требуют синхронно перевести всех production/test consumers без временного adapter между завершёнными задачами; полный переход и единственный production repository подтверждены поиском. Остающийся F4 подтверждён кодом, тестами и обязательным требованием единственного владельца terminal outcome. |
-| OpenSpec conformance | Complete | Proposal, две delta-спецификации, design, ADR, plan и задачи 3.1–3.31 сопоставлены с неизменяемым снимком ad2ba531c4373a88e892ff35b17c86646c49e84e. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `instructions apply --json`, `validate manage-long-term-relations --json` и `validate manage-long-term-relations --strict --no-interactive` подтвердили schema `intent-driven`, 56 выполненных задач исходного review target и валидный change. Текущий planning handoff сохраняет отдельную незавершённую работу 3.32–3.34; F4 продолжает противоречить требованию единственного владельца terminal outcome. |
+| Independent decision review | Complete | Два свежих изолированных reviewer без planning/history/report проверили на ad2ba531c4373a88e892ff35b17c86646c49e84e две overlap-группы, вместе охватывающие все 128 delivery/test paths U1: предметные типы, SQLite, repository и агрегаты; coordinator, согласование, UI, маршрутизацию, локализацию и доступность. Предложение сохранить прежние внутренние сигнатуры отклонено после независимой сверки: design и правило перехода Phase 3 требуют синхронно перевести всех production/test consumers без временного adapter между завершёнными задачами; полный переход и единственный production repository подтверждены поиском. |
+| OpenSpec conformance | Complete | Proposal, две delta-спецификации, design, ADR, plan и задачи 3.1–3.31 сопоставлены с неизменяемым снимком ad2ba531c4373a88e892ff35b17c86646c49e84e. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `instructions apply --json`, `validate manage-long-term-relations --json` и `validate manage-long-term-relations --strict --no-interactive` подтвердили schema `intent-driven`, 56 выполненных задач исходного review target и валидный change. Текущий planning handoff сохраняет отдельную незавершённую работу 3.32–3.35; задача 3.35 владеет обязательной коррекцией единственного владельца terminal outcome. |
 | Code quality | Complete | Проверены корректность, читаемость, архитектура, безопасность и производительность всех reviewable delivery/test paths: домен и Unicode, транзакции и integrity-функции, агрегаты и keyset paging, repository и coordinator, ревизионное согласование, каталог/details/neighborhood/editor/picker, localization/semantics, diagnostics и generated-код. Dart MCP analysis: ошибок нет. `mise run codegen-check`, `mise run check` (179 файлов без format-изменений, analyze без замечаний, 687 тестов), `git diff --check`, release APK (60,4 MB) и packaged Android privacy-manifest gate прошли на ad2ba531c4373a88e892ff35b17c86646c49e84e. DTD-сеанса и Android device/emulator не было, поэтому согласно task 3.30 использовано полное CLI-evidence без утверждения о ручном прогоне. |
 
 ## Findings
 
-### F4 · Medium — Смена локализованного текста передаёт тот же claim оболочке
-
-- **Evidence:** `OperationFailurePresentation.didUpdateWidget` в `lib/src/graph/presentation/operation_failure_presentation.dart:51-57` вызывает `_releaseIfPending(oldWidget.claim)` не только при смене claim, но и при одном изменении `message`. Для прежнего claim release помечается локально (`:69-75, 96-105`) и передаёт terminal outcome общей поверхности; новый renderer продолжает отображать то же локальное сообщение, но подтвердить его уже не может. Новые ошибки формы связи используют этот общий renderer, а RU/EN message зависит от системной локали; существующие tests проверяют замену claim вместе с message, но не смену message при том же claim.
-- **Evidence revisions:** ["ad2ba531c4373a88e892ff35b17c86646c49e84e"]
-- **Impact:** Если системная локаль меняется до пригодного кадра, тот же failure становится ожидающим у оболочки, пока его инлайн-представление остаётся в форме. После возвращения фокуса пользователь может получить глобальный `SnackBar` и сохранённое локальное сообщение для одного terminal outcome, что нарушает единственного владельца и однократное предъявление.
-- **Required outcome:** Перерисовка локализованного текста при неизменном claim должна сохранять того же владельца и возможность подтвердить его актуальным renderer; передача оболочке допустима только при фактическом исчезновении/замене владельца либо смене идентичности claim.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/graph/presentation/operation_failure_presentation.dart","test/graph/presentation/operation_failure_presentation_test.dart","lib/src/long_term_relation/presentation/editor/relation_editor_page.dart","test/app/localization/locale_resolution_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
