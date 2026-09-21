@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** В диапазоне остаются три активных finding: F2 — устаревшая сводка соседства выглядит точной вне удалённого footer; F3 — форма не показывает идентичность выбранных участников; F4 — смена локализованного текста передаёт тот же claim второму владельцу. Все три обязательных прохода и проверка полного диапазона завершены.
+**Summary:** В диапазоне остаются два активных finding: F3 — форма не показывает идентичность выбранных участников; F4 — смена локализованного текста передаёт тот же claim второму владельцу. Все три обязательных прохода и проверка полного диапазона завершены.
 
 ## Review target
 
@@ -34,20 +34,11 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Два свежих изолированных reviewer без planning/history/report проверили на ad2ba531c4373a88e892ff35b17c86646c49e84e две overlap-группы, вместе охватывающие все 128 delivery/test paths U1: предметные типы, SQLite, repository и агрегаты; coordinator, согласование, UI, маршрутизацию, локализацию и доступность. Предложение сохранить прежние внутренние сигнатуры отклонено после независимой сверки: design и правило перехода Phase 3 требуют синхронно перевести всех production/test consumers без временного adapter между завершёнными задачами; полный переход и единственный production repository подтверждены поиском. Три остающихся finding UI-прохода подтверждены кодом, тестами и обязательными требованиями. |
-| OpenSpec conformance | Complete | Proposal, две delta-спецификации, design, ADR, plan и задачи 3.1–3.31 сопоставлены с неизменяемым снимком ad2ba531c4373a88e892ff35b17c86646c49e84e. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `instructions apply --json`, `validate manage-long-term-relations --json` и `validate manage-long-term-relations --strict --no-interactive` подтвердили schema `intent-driven`, 56/56 выполненных задач и валидный change. F2–F4 противоречат требованиям явного состояния устаревания, доступной идентичности участников и единственного владельца terminal outcome. |
+| Independent decision review | Complete | Два свежих изолированных reviewer без planning/history/report проверили на ad2ba531c4373a88e892ff35b17c86646c49e84e две overlap-группы, вместе охватывающие все 128 delivery/test paths U1: предметные типы, SQLite, repository и агрегаты; coordinator, согласование, UI, маршрутизацию, локализацию и доступность. Предложение сохранить прежние внутренние сигнатуры отклонено после независимой сверки: design и правило перехода Phase 3 требуют синхронно перевести всех production/test consumers без временного adapter между завершёнными задачами; полный переход и единственный production repository подтверждены поиском. Два остающихся finding UI-прохода подтверждены кодом, тестами и обязательными требованиями. |
+| OpenSpec conformance | Complete | Proposal, две delta-спецификации, design, ADR, plan и задачи 3.1–3.31 сопоставлены с неизменяемым снимком ad2ba531c4373a88e892ff35b17c86646c49e84e. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `instructions apply --json`, `validate manage-long-term-relations --json` и `validate manage-long-term-relations --strict --no-interactive` подтвердили schema `intent-driven`, 56/56 выполненных задач и валидный change. F3–F4 противоречат требованиям доступной идентичности участников и единственного владельца terminal outcome. |
 | Code quality | Complete | Проверены корректность, читаемость, архитектура, безопасность и производительность всех reviewable delivery/test paths: домен и Unicode, транзакции и integrity-функции, агрегаты и keyset paging, repository и coordinator, ревизионное согласование, каталог/details/neighborhood/editor/picker, localization/semantics, diagnostics и generated-код. Dart MCP analysis: ошибок нет. `mise run codegen-check`, `mise run check` (179 файлов без format-изменений, analyze без замечаний, 687 тестов), `git diff --check`, release APK (60,4 MB) и packaged Android privacy-manifest gate прошли на ad2ba531c4373a88e892ff35b17c86646c49e84e. DTD-сеанса и Android device/emulator не было, поэтому согласно task 3.30 использовано полное CLI-evidence без утверждения о ручном прогоне. |
 
 ## Findings
-
-### F2 · Medium — Устаревшая сводка соседства выглядит актуальной у самих чисел
-
-- **Evidence:** `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart:315-369` намеренно сохраняет прежние строки и counts во время refresh и после его отказа. Header в `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart:300-341` безусловно рисует эти counts как обычную сводку, тогда как единственный признак refresh/failure для непустой группы находится в footer после всех строк (`:855-892`). `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart:232-250` закрепляет состояние, где после уведомления о новой ревизии и неудачного refresh прежнее `Total relations: 0` остаётся точным на вид; в большой группе footer может ещё не быть построен ленивым sliver.
-- **Evidence revisions:** ["ad2ba531c4373a88e892ff35b17c86646c49e84e"]
-- **Impact:** Пользователь и экранный диктор у заголовка воспринимают заведомо устаревшие числа как актуальные, а объяснение может находиться за сотнями строк. Разрешённое сохранение прежних данных превращается в вводящее в заблуждение представление точной сводки.
-- **Required outcome:** Пока сохранённая сводка не относится к актуальной подтверждённой ревизии, её состояние обновления или устаревания должно быть явно и доступно непосредственно при предъявлении чисел, включая отказ обновления.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart","test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart"]
 
 ### F3 · Medium — Форма не сохраняет проверяемую пользователем идентичность участников
 
