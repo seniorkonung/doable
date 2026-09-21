@@ -6,6 +6,7 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import 'package:flutter/material.dart';
@@ -241,13 +242,129 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          'The relations couldn’t be refreshed. Previously loaded data is still shown.',
+          'Saved relation numbers are out of date because the refresh failed.',
         ),
         findsOneWidget,
       );
       expect(find.text('Total relations: 0'), findsOneWidget);
       await _scrollTo(tester, find.text('Try again'));
       expect(find.text('Try again'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'показывает состояние сохранённых чисел без построения footer списка',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledNeighborhoodRepository();
+      addTearDown(repository.dispose);
+      final ownerId = testIntentionId(1);
+      final counts = testRelationCounts(activeNeedOutgoing: 100);
+
+      await _pumpDetailsPage(tester, repository, ownerId);
+      repository.emitIntention(
+        testNeighborhoodIntention(id: ownerId),
+        counts: counts,
+        revision: revision,
+      );
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: ownerId, from: 1, count: 50),
+          counts: counts,
+          nextCursor: const TestRelationGroupCursor(50),
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollUntilBuiltAndVisible(tester, _rowFinder(49), settle: false);
+      await _pumpUntilRequestCount(tester, repository, 2);
+      repository.failRead(1, const RelationGroupUnavailableFailure());
+      await tester.pump();
+      await tester.fling(
+        find.byType(Scrollable),
+        const Offset(0, 10000),
+        10000,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('The next relations couldn’t be loaded.'), findsNothing);
+      expect(find.text('Updating saved relation numbers…'), findsNothing);
+      expect(
+        find.text(
+          'Saved relation numbers are out of date because the refresh failed.',
+        ),
+        findsNothing,
+      );
+
+      final refreshedCounts = testRelationCounts(activeNeedOutgoing: 99);
+      repository.emitIntention(
+        testNeighborhoodIntention(id: ownerId),
+        counts: refreshedCounts,
+        revision: const TestGraphRevision(2),
+      );
+      await _pumpUntilRequestCount(tester, repository, 3);
+
+      expect(find.text('Total relations: 100'), findsOneWidget);
+      expect(find.text('Updating saved relation numbers…'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          RegExp(
+            'Total relations: 100.*Updating saved relation numbers',
+            dotAll: true,
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      repository.failRead(2, const RelationGroupUnavailableFailure());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Total relations: 100'), findsOneWidget);
+      expect(
+        find.text(
+          'Saved relation numbers are out of date because the refresh failed.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(
+          RegExp(
+            'Total relations: 100.*Saved relation numbers are out of date',
+            dotAll: true,
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      await _scrollTo(tester, find.text('Try again'));
+      await tester.tap(find.text('Try again'));
+      await tester.pump();
+      expect(find.text('Total relations: 100'), findsOneWidget);
+      expect(find.text('Updating saved relation numbers…'), findsOneWidget);
+
+      repository.completePage(
+        3,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: ownerId, from: 1, count: 50),
+          counts: refreshedCounts,
+          nextCursor: const TestRelationGroupCursor(50),
+          revision: const TestGraphRevision(2),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Total relations: 99'), findsOneWidget);
+      expect(find.text('Total relations: 100'), findsNothing);
+      expect(find.text('Updating saved relation numbers…'), findsNothing);
+      expect(
+        find.text(
+          'Saved relation numbers are out of date because the refresh failed.',
+        ),
+        findsNothing,
+      );
+      semantics.dispose();
     },
   );
 
@@ -346,6 +463,70 @@ void main() {
   );
 
   testWidgets(
+    'связывает русское состояние обновления с числами при масштабе 200%',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(
+        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+      );
+      final repository = ControlledNeighborhoodRepository();
+      addTearDown(repository.dispose);
+      final ownerId = testIntentionId(1);
+      final counts = testRelationCounts(activeNeedOutgoing: 1);
+
+      await _pumpNeighborhoodSliver(
+        tester,
+        repository,
+        ownerId,
+        locale: const Locale('ru'),
+      );
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final refreshRequestIndex = repository.requestCount;
+      repository.emitIntention(
+        testNeighborhoodIntention(id: ownerId),
+        counts: testRelationCounts(activeNeedOutgoing: 2),
+        revision: const TestGraphRevision(2),
+      );
+      await _pumpUntilRequestCount(tester, repository, refreshRequestIndex + 1);
+      await tester.pump();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(RelationNeighborhoodSliver)),
+      );
+      expect(
+        (container.read(
+          relationNeighborhoodViewModelProvider(ownerId),
+        ) as RelationGroupConfirmedState).summaryFreshness,
+        RelationSummaryFreshness.refreshing,
+      );
+
+      expect(find.text('Обновляем сохранённые числа связей…'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          RegExp(
+            'Всего связей: 1.*Обновляем сохранённые числа связей',
+            dotAll: true,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
     'сохраняет пользовательский текст и доступность при русской локали и масштабе 200%',
     (tester) async {
       final semantics = tester.ensureSemantics();
@@ -407,6 +588,40 @@ void main() {
   );
 }
 
+Future<void> _pumpNeighborhoodSliver(
+  WidgetTester tester,
+  ControlledNeighborhoodRepository repository,
+  IntentionId ownerId, {
+  Locale locale = const Locale('en'),
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
+      retry: (retryCount, error) => null,
+      child: MaterialApp(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              RelationNeighborhoodSliver(
+                intentionId: ownerId,
+                onOpenRelation: (_) {},
+                onCreateRelation: (_) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  await _pumpUntilRequestCount(tester, repository, 1);
+}
+
 Future<void> _scrollTo(
   WidgetTester tester,
   Finder finder, {
@@ -422,6 +637,22 @@ Future<void> _scrollTo(
   } else {
     await tester.pump();
   }
+}
+
+Future<void> _scrollUntilBuiltAndVisible(
+  WidgetTester tester,
+  Finder finder, {
+  bool settle = true,
+}) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (finder.evaluate().isNotEmpty) {
+      await _scrollTo(tester, finder, settle: settle);
+      return;
+    }
+    await tester.drag(find.byType(Scrollable), const Offset(0, -400));
+    await tester.pump();
+  }
+  throw StateError('Строка соседства не была построена при прокрутке.');
 }
 
 Future<void> _pumpUntilRequestCount(

@@ -404,6 +404,18 @@ abstract class AppLocalizations {
   /// **'The relation summary couldn’t be loaded.'**
   String get relationNeighborhoodSummaryUnavailable;
 
+  /// Состояние обновления сохранённой согласованной сводки рядом с её числами
+  ///
+  /// In en, this message translates to:
+  /// **'Updating saved relation numbers…'**
+  String get relationNeighborhoodSavedSummaryRefreshing;
+
+  /// Состояние устаревшей сохранённой сводки рядом с её числами
+  ///
+  /// In en, this message translates to:
+  /// **'Saved relation numbers are out of date because the refresh failed.'**
+  String get relationNeighborhoodSavedSummaryStale;
+
   /// No description provided for @relationNeighborhoodTotal.
   ///
   /// In en, this message translates to:

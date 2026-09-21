@@ -51,6 +51,8 @@
   "relationNeighborhoodTitle": "Связи",
   "relationNeighborhoodSummaryLoading": "Загружаем связи и сводку…",
   "relationNeighborhoodSummaryUnavailable": "Не удалось загрузить сводку связей.",
+  "relationNeighborhoodSavedSummaryRefreshing": "Обновляем сохранённые числа связей…",
+  "relationNeighborhoodSavedSummaryStale": "Сохранённые числа связей устарели: обновить данные не удалось.",
   "relationNeighborhoodTotal": "Всего связей: {count}",
   "relationNeighborhoodActiveTotal": "Активных связей: {count}",
   "relationNeighborhoodArchivedTotal": "Архивных связей: {count}",
