@@ -4,8 +4,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
-import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
+import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import 'relation_editor_state.dart';
@@ -41,14 +41,31 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     return RelationEditorState.initial(context);
   }
 
-  void selectParticipant(RelationParticipantRole role, IntentionId id) {
+  void selectParticipant(
+    RelationParticipantRole role,
+    RelationParticipantSummary participant,
+  ) {
     final current = switch (role) {
       RelationParticipantRole.source => state.sourceIntentionId,
       RelationParticipantRole.related => state.relatedIntentionId,
     };
-    if (current != id) {
-      state = state.withParticipant(role, id);
+    if (current != participant.id ||
+        !_sameParticipantSnapshot(role, participant)) {
+      state = state.withParticipant(role, participant);
     }
+  }
+
+  bool _sameParticipantSnapshot(
+    RelationParticipantRole role,
+    RelationParticipantSummary participant,
+  ) {
+    final current = switch (role) {
+      RelationParticipantRole.source => state.sourceParticipant,
+      RelationParticipantRole.related => state.relatedParticipant,
+    };
+    return current?.title == participant.title &&
+        current?.archiveState == participant.archiveState &&
+        current?.activeRelationCount == participant.activeRelationCount;
   }
 
   void selectType(LongTermRelationType value) {

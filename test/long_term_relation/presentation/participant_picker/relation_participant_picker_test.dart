@@ -11,6 +11,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -135,10 +136,12 @@ void main() {
     await tester.tap(find.text('Позвонить').first);
     await tester.pumpAndSettle();
 
-    expect(await selection, _testIntentionId(1));
+    final selected = await selection;
+    expect(selected?.id, _testIntentionId(1));
+    expect(selected?.title, 'Позвонить');
   });
 
-  testWidgets('возвращает типизированный идентификатор после явного выбора', (
+  testWidgets('возвращает идентичность и снимок после явного выбора', (
     tester,
   ) async {
     final repository = ControlledParticipantPickerRepository();
@@ -150,14 +153,20 @@ void main() {
     await _settleRoute(tester);
     _completePage(repository, 1, [
       testSummary(index: 1, title: 'Быть здоровым'),
-      testSummary(index: 2, title: 'Много ходить'),
+      testSummary(index: 2, title: 'Много ходить', activeRelationCount: 7),
     ]);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Много ходить'));
     await tester.pumpAndSettle();
 
-    expect(await selection, _testIntentionId(2));
+    expect(
+      await selection,
+      isA<RelationParticipantSummary>()
+          .having((value) => value.id, 'идентификатор', _testIntentionId(2))
+          .having((value) => value.title, 'название снимка', 'Много ходить')
+          .having((value) => value.activeRelationCount, 'количество снимка', 7),
+    );
   });
 
   testWidgets('отмена возвращает пустой результат', (tester) async {
@@ -296,7 +305,7 @@ void main() {
     await tester.tap(find.text('Доступное намерение'));
     await tester.pumpAndSettle();
 
-    expect(await selection, _testIntentionId(2));
+    expect((await selection)?.id, _testIntentionId(2));
   });
 
   testWidgets('поздний ответ прежнего фильтра не изменяет список выбора', (
@@ -391,7 +400,7 @@ void main() {
     await tester.tap(find.text('Ходить'));
     await tester.pumpAndSettle();
 
-    expect(await selection, _testIntentionId(1));
+    expect((await selection)?.id, _testIntentionId(1));
   });
 
   testWidgets('сообщает экранному диктору назначение выбора и перехода', (
@@ -470,10 +479,10 @@ Future<void> _settleRoute(WidgetTester tester) async {
 
 IntentionId _testIntentionId(int index) => testSummary(index: index).id;
 
-Future<IntentionId?> _pushPicker(
+Future<RelationParticipantSummary?> _pushPicker(
   AppRouter router, {
   required int excludedIndex,
-}) => router.push<IntentionId>(
+}) => router.push<RelationParticipantSummary>(
   RelationParticipantPickerRoute(
     excludedIntentionId: _testIntentionId(excludedIndex),
   ),

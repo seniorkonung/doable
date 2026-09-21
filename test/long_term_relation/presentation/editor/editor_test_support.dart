@@ -7,6 +7,7 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -153,6 +154,18 @@ IntentionId testEditorIntentionId(int index) {
     ),
   };
 }
+
+RelationParticipantSummary testEditorParticipant(
+  int index, {
+  String? title,
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
+  int activeRelationCount = 0,
+}) => RelationParticipantSummary(
+  id: testEditorIntentionId(index),
+  title: title ?? 'Намерение $index',
+  archiveState: archiveState,
+  activeRelationCount: activeRelationCount,
+);
 
 LongTermRelationId testRelationId(int index) {
   final encoded =

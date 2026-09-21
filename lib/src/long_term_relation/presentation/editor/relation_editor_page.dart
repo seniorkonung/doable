@@ -8,8 +8,8 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
-import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
+import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -72,19 +72,37 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
           children: [
             _ParticipantSlot(
               role: RelationParticipantRole.source,
-              intentionId: editor.sourceIntentionId,
+              participant: editor.sourceParticipant,
               enabled: !isSubmitting,
               onSelect: () =>
                   unawaited(_selectParticipant(RelationParticipantRole.source)),
+              onOpenDetails: editor.sourceParticipant == null
+                  ? null
+                  : () => unawaited(
+                      context.router.push(
+                        IntentionDetailsRoute(
+                          intentionId: editor.sourceParticipant!.id,
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(height: 16),
             _ParticipantSlot(
               role: RelationParticipantRole.related,
-              intentionId: editor.relatedIntentionId,
+              participant: editor.relatedParticipant,
               enabled: !isSubmitting,
               onSelect: () => unawaited(
                 _selectParticipant(RelationParticipantRole.related),
               ),
+              onOpenDetails: editor.relatedParticipant == null
+                  ? null
+                  : () => unawaited(
+                      context.router.push(
+                        IntentionDetailsRoute(
+                          intentionId: editor.relatedParticipant!.id,
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(height: 24),
             _TypeChoice(
@@ -178,7 +196,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     if (excluded == null) {
       return;
     }
-    final selected = await context.router.push<IntentionId>(
+    final selected = await context.router.push<RelationParticipantSummary>(
       RelationParticipantPickerRoute(excludedIntentionId: excluded),
     );
     if (!mounted || selected == null) {
@@ -262,20 +280,22 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
 final class _ParticipantSlot extends StatelessWidget {
   const _ParticipantSlot({
     required this.role,
-    required this.intentionId,
+    required this.participant,
     required this.enabled,
     required this.onSelect,
+    required this.onOpenDetails,
   });
 
   final RelationParticipantRole role;
-  final IntentionId? intentionId;
+  final RelationParticipantSummary? participant;
   final bool enabled;
   final VoidCallback onSelect;
+  final VoidCallback? onOpenDetails;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final isSelected = intentionId != null;
+    final isSelected = participant != null;
     final label = switch (role) {
       RelationParticipantRole.source => localizations.relationEditorSourceLabel,
       RelationParticipantRole.related =>
@@ -305,26 +325,57 @@ final class _ParticipantSlot extends StatelessWidget {
         'relation-editor-change-related',
       ),
     };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 4),
-        Text(
-          isSelected
-              ? localizations.relationEditorParticipantSelected
-              : localizations.relationEditorParticipantNotSelected,
-        ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton(
-            key: actionKey,
-            onPressed: enabled ? onSelect : null,
-            child: Text(action),
+    final detailsKey = switch (role) {
+      RelationParticipantRole.source => const ValueKey(
+        'relation-editor-open-source-details',
+      ),
+      RelationParticipantRole.related => const ValueKey(
+        'relation-editor-open-related-details',
+      ),
+    };
+    return Semantics(
+      key: ValueKey('relation-editor-participant-${role.name}'),
+      container: true,
+      label: isSelected ? '$label: ${participant!.title}' : label,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 4),
+          if (participant case final selected?) ...[
+            Text(
+              selected.title,
+              key: ValueKey('relation-editor-participant-title-${role.name}'),
+            ),
+            const SizedBox(height: 4),
+          ],
+          Text(
+            isSelected
+                ? localizations.relationEditorParticipantSelected
+                : localizations.relationEditorParticipantNotSelected,
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton(
+                key: actionKey,
+                onPressed: enabled ? onSelect : null,
+                child: Text(action),
+              ),
+              if (isSelected)
+                IconButton(
+                  key: detailsKey,
+                  icon: const Icon(Icons.info_outline),
+                  tooltip: localizations.participantPickerOpenDetails,
+                  onPressed: onOpenDetails,
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
