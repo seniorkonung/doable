@@ -30,19 +30,13 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
 
   IntentionDetailsLoaded copyWith({
     application.IntentionDetails? details,
-    Intention? intention,
     bool? isOperationRunning,
     IntentionDetailsEdit? edit,
     bool clearEdit = false,
     IntentionDetailsStateChange? stateChange,
     bool clearStateChange = false,
   }) => IntentionDetailsLoaded(
-    details:
-        details ??
-        application.IntentionDetails(
-          intention: intention ?? this.intention,
-          relationCounts: this.details.relationCounts,
-        ),
+    details: details ?? this.details,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     edit: clearEdit ? null : edit ?? this.edit,
     stateChange: clearStateChange ? null : stateChange ?? this.stateChange,

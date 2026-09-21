@@ -214,6 +214,7 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(ResultSuccess(saved));
       await tester.pump();
       await tester.pump();
 
@@ -266,6 +267,7 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(ResultSuccess(notReady));
       await tester.pumpAndSettle();
       expect(
         find.textContaining('Marked as not ready for action.'),
@@ -284,6 +286,7 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 3);
+      repository.detailRequests[2].add(ResultSuccess(archived));
       await tester.pumpAndSettle();
       expect(find.textContaining('Intention archived.'), findsOneWidget);
       expect(find.text('Archived', skipOffstage: false), findsOneWidget);
@@ -304,6 +307,7 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 4);
+      repository.detailRequests[3].add(ResultSuccess(restored));
       await tester.pumpAndSettle();
       expect(find.textContaining('Intention restored.'), findsOneWidget);
       expect(find.text('Active', skipOffstage: false), findsOneWidget);
@@ -1023,6 +1027,7 @@ void main() {
     );
     await tester.pump();
     await waitForDetailRequests(repository, 2);
+    repository.detailRequests[1].add(ResultSuccess(saved));
     await tester.pump();
     await tester.pump();
 
@@ -1274,6 +1279,7 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(ResultSuccess(archived));
       await tester.pumpAndSettle();
 
       expect(find.text('Archived', skipOffstage: false), findsOneWidget);

@@ -276,18 +276,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         }
         _advanceGeneration();
         _preserveAuthoritativeStateWhileLoading = true;
-        final current = state;
-        final loaded = current is IntentionDetailsLoaded ? current : null;
-        if (loaded != null) {
-          state = loaded.copyWith(
-            intention: intention,
-            isOperationRunning: _isOperationRunning,
-            stateChange: identical(_activeToken, completion.token)
-                ? loaded.stateChange
-                : null,
-            clearStateChange: !identical(_activeToken, completion.token),
-          );
-        }
+        // Завершение задаёт только барьер ревизии. Намерение и сводка
+        // публикуются вместе из полного снимка нового наблюдения.
         _startObservation();
       case ResultSuccess(
             value: ConfirmedGraphResult(
