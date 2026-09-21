@@ -590,7 +590,7 @@ Phase 1 не включает получение соседства и его с
   - **Вероятные файлы:** `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, generated localization outputs, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.34 Сохранять и предъявлять идентичность выбранных участников в форме
+- [x] 3.34 Сохранять и предъявлять идентичность выбранных участников в форме
   - **Критерии приёмки:**
     - Явный выбор возвращает типизированную ссылку с `IntentionId` и отображаемым снимком уже загруженного намерения. Черновик хранит отдельные ссылки исходной и связанной ролей, а проверенная команда использует только их типизированные идентификаторы.
     - Форма показывает для каждой роли буквальное название выбранного намерения и доступный переход к подробным данным по тому же идентификатору. Два одноимённых намерения не объединяются и не подменяют друг друга; системные подписи меняются с локалью, а пользовательское название не переводится и не преобразуется.

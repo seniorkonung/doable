@@ -11,6 +11,7 @@ import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
+import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
@@ -278,7 +279,12 @@ final class _LoadedDetails extends StatelessWidget {
             context.router.push(
               RelationEditorRoute(
                 creationContext: RelationCreationContext(
-                  intentionId: intention.id,
+                  participant: RelationParticipantSummary(
+                    id: intention.id,
+                    title: intention.title,
+                    archiveState: intention.archiveState,
+                    activeRelationCount: state.details.activeRelationCount,
+                  ),
                   direction: direction,
                 ),
               ),

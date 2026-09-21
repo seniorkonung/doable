@@ -13,6 +13,7 @@ import '../../../intention/presentation/catalog/intention_catalog_state.dart';
 import '../../../intention/presentation/catalog/intention_catalog_status_views.dart';
 import '../../../intention/presentation/catalog/intention_catalog_view_model.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
+import '../../application/long_term_relation_projection.dart';
 
 /// Выбор существующего намерения участником долговременной связи.
 ///
@@ -20,8 +21,8 @@ import '../../../intention/presentation/intention_summary_view.dart';
 /// каталог намерений ограниченными порциями с буквальным фильтром названия.
 /// Второе намерение пары исключается по идентификатору, а одноимённые
 /// намерения остаются отдельными строками с доступом к подробным данным.
-/// Выбор возвращает типизированный идентификатор только по явному действию
-/// пользователя; отмена не возвращает ничего и не создаёт намерений.
+/// Выбор возвращает типизированную ссылку с идентификатором и снимком
+/// уже загруженной строки. Отмена не возвращает ничего и не создаёт намерений.
 @RoutePage()
 final class RelationParticipantPickerPage extends ConsumerStatefulWidget {
   const RelationParticipantPickerPage({
@@ -123,8 +124,8 @@ final class _RelationParticipantPickerPageState
     unawaited(context.router.maybePop());
   }
 
-  void _select(IntentionId id) {
-    unawaited(context.router.maybePop(id));
+  void _select(RelationParticipantSummary participant) {
+    unawaited(context.router.maybePop(participant));
   }
 
   String? _filterError(
@@ -150,7 +151,7 @@ final class _PickerContent extends ConsumerWidget {
   final SelectRelationParticipant purpose;
   final IntentionCatalogState state;
   final ScrollController scrollController;
-  final ValueChanged<IntentionId> onSelected;
+  final ValueChanged<RelationParticipantSummary> onSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -206,7 +207,7 @@ final class _PickerOptions extends ConsumerWidget {
   final SelectRelationParticipant purpose;
   final IntentionCatalogLoaded state;
   final ScrollController scrollController;
-  final ValueChanged<IntentionId> onSelected;
+  final ValueChanged<RelationParticipantSummary> onSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -292,7 +293,7 @@ final class _ParticipantOptionTile extends StatelessWidget {
   });
 
   final IntentionSummary summary;
-  final ValueChanged<IntentionId> onSelected;
+  final ValueChanged<RelationParticipantSummary> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -308,7 +309,14 @@ final class _ParticipantOptionTile extends StatelessWidget {
             activeRelationCount: ConfirmedActiveRelationCount(
               summary.activeRelationCount,
             ),
-            onTap: () => onSelected(summary.id),
+            onTap: () => onSelected(
+              RelationParticipantSummary(
+                id: summary.id,
+                title: summary.title,
+                archiveState: summary.archiveState,
+                activeRelationCount: summary.activeRelationCount,
+              ),
+            ),
             tapHint: localizations.participantPickerSelectHint,
           ),
         ),

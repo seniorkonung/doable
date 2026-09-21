@@ -28,6 +28,8 @@ final class ControlledRelationFormRepository
   final catalogQueries = <IntentionCatalogQuery>[];
   final relationCommands = <CreateLongTermRelation>[];
   final relationWatches = <ControlledRelationWatch>[];
+  final _intentionStreams =
+      <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
   final _catalogRequests = <Completer<Result<IntentionCatalogPage>>>[];
   final _relationRequests = <Completer<LongTermRelationCommandResult>>[];
 
@@ -119,16 +121,24 @@ final class ControlledRelationFormRepository
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
-  ) => throw UnsupportedError('Группы связей не читаются формой создания.');
+  ) => Completer<RelationGroupPageResult>().future;
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
-  ) => throw UnsupportedError('Намерение не наблюдается формой создания.');
+  ) {
+    final controller =
+        StreamController<Result<GraphSnapshot<IntentionDetails?>>>.broadcast();
+    _intentionStreams.add(controller);
+    return controller.stream;
+  }
 
   Future<void> dispose() async {
     for (final watch in relationWatches) {
       await watch.close();
+    }
+    for (final controller in _intentionStreams) {
+      await controller.close();
     }
   }
 

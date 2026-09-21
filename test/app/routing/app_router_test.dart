@@ -257,7 +257,11 @@ void main() {
             .widget<RelationEditorPage>(find.byType(RelationEditorPage))
             .creationContext,
         RelationCreationContext(
-          intentionId: ownerId,
+          participant: testParticipant(
+            ownerId,
+            title: 'А',
+            activeRelationCount: 1,
+          ),
           direction: RelationDirection.outgoing,
         ),
       );
@@ -294,7 +298,11 @@ void main() {
             .widget<RelationEditorPage>(find.byType(RelationEditorPage))
             .creationContext,
         RelationCreationContext(
-          intentionId: ownerId,
+          participant: testParticipant(
+            ownerId,
+            title: 'А',
+            activeRelationCount: 1,
+          ),
           direction: RelationDirection.incoming,
         ),
       );

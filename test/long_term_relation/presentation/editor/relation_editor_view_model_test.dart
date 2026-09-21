@@ -16,6 +16,7 @@ void main() {
       final harness = _EditorHarness.outgoing();
 
       expect(harness.state.sourceIntentionId, testEditorIntentionId(1));
+      expect(harness.state.sourceParticipant?.title, 'Намерение 1');
       expect(harness.state.relatedIntentionId, isNull);
       expect(
         harness.state.completeness,
@@ -53,15 +54,17 @@ void main() {
       harness.viewModel
         ..selectParticipant(
           RelationParticipantRole.related,
-          testEditorIntentionId(2),
+          testEditorParticipant(2),
         )
         ..selectParticipant(
           RelationParticipantRole.source,
-          testEditorIntentionId(3),
+          testEditorParticipant(3),
         );
 
       expect(harness.state.sourceIntentionId, testEditorIntentionId(3));
       expect(harness.state.relatedIntentionId, testEditorIntentionId(2));
+      expect(harness.state.sourceParticipant?.title, 'Намерение 3');
+      expect(harness.state.relatedParticipant?.title, 'Намерение 2');
     });
 
     test('отсутствие явного приоритета не даёт готовой команды', () {
@@ -70,7 +73,7 @@ void main() {
       harness.viewModel
         ..selectParticipant(
           RelationParticipantRole.related,
-          testEditorIntentionId(2),
+          testEditorParticipant(2),
         )
         ..selectType(LongTermRelationType.need);
 
@@ -186,6 +189,8 @@ void main() {
       expect(harness.state.type, LongTermRelationType.need);
       expect(harness.state.priority, RelationPriority.p2);
       expect(harness.state.relatedIntentionId, testEditorIntentionId(2));
+      expect(harness.state.sourceParticipant?.title, 'Намерение 1');
+      expect(harness.state.relatedParticipant?.title, 'Намерение 2');
       expect(
         harness.state.failurePresentation,
         isA<GraphInitiatorPresentationClaim>(),
@@ -277,7 +282,7 @@ void main() {
 
       harness.viewModel.selectParticipant(
         RelationParticipantRole.related,
-        testEditorIntentionId(5),
+        testEditorParticipant(5),
       );
       expect(harness.state.operation, isA<RelationEditorIdle>());
       expect(harness.state.failurePresentation, isNull);
@@ -316,17 +321,18 @@ void main() {
         ),
       );
       expect(harness.state.description, 'Описание');
+      expect(harness.state.relatedParticipant?.title, 'Намерение 2');
 
       // Исправляет только замена отклонённого участника.
       harness.viewModel.selectParticipant(
         RelationParticipantRole.source,
-        testEditorIntentionId(4),
+        testEditorParticipant(4),
       );
       expect(harness.state.operation, isA<RelationEditorFailed>());
 
       harness.viewModel.selectParticipant(
         RelationParticipantRole.related,
-        testEditorIntentionId(5),
+        testEditorParticipant(5),
       );
       expect(harness.state.operation, isA<RelationEditorIdle>());
     });
@@ -356,6 +362,8 @@ void main() {
           ),
         ),
       );
+      expect(harness.state.sourceParticipant?.id, testEditorIntentionId(1));
+      expect(harness.state.sourceParticipant?.title, 'Намерение 1');
     });
 
     test('исправленная повторная отправка получает новый token', () async {
@@ -433,14 +441,14 @@ final class _EditorHarness {
 
   factory _EditorHarness.outgoing() => _EditorHarness(
     RelationCreationContext(
-      intentionId: testEditorIntentionId(1),
+      participant: testEditorParticipant(1),
       direction: RelationDirection.outgoing,
     ),
   );
 
   factory _EditorHarness.incoming() => _EditorHarness(
     RelationCreationContext(
-      intentionId: testEditorIntentionId(1),
+      participant: testEditorParticipant(1),
       direction: RelationDirection.incoming,
     ),
   );
@@ -461,7 +469,7 @@ final class _EditorHarness {
     viewModel
       ..selectParticipant(
         RelationParticipantRole.related,
-        testEditorIntentionId(2),
+        testEditorParticipant(2),
       )
       ..selectType(LongTermRelationType.need)
       ..selectPriority(RelationPriority.p2)

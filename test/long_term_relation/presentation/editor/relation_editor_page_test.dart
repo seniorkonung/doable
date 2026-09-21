@@ -10,7 +10,9 @@ import 'package:doable/src/graph/presentation/operation_failure_presentation.dar
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
@@ -38,6 +40,7 @@ void main() {
       addTearDown(repository.dispose);
       await _openForm(tester, repository, RelationDirection.outgoing);
 
+      expect(find.text('Текущее намерение'), findsOneWidget);
       await _selectParticipant(
         tester,
         repository,
@@ -46,6 +49,7 @@ void main() {
         title: 'Много ходить',
         index: 2,
       );
+      expect(find.text('Много ходить'), findsOneWidget);
       await _selectType(tester, 'need');
       await _selectPriority(tester, 'p1');
       await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
@@ -58,6 +62,48 @@ void main() {
       expect(command.type, LongTermRelationType.need);
       expect(command.priority, RelationPriority.p1);
       expect(command.description, isNull);
+    },
+  );
+
+  testWidgets(
+    'открывает подробные данные по идентификатору выбранного участника',
+    (tester) async {
+      final repository = ControlledRelationFormRepository();
+      addTearDown(repository.dispose);
+      final router = await _openForm(
+        tester,
+        repository,
+        RelationDirection.outgoing,
+      );
+      await _selectParticipant(
+        tester,
+        repository,
+        actionKey: 'relation-editor-select-related',
+        catalogIndex: 1,
+        title: 'Одинаковое название',
+        index: 2,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('relation-editor-open-related-details')),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(
+        tester
+            .widget<IntentionDetailsPage>(find.byType(IntentionDetailsPage))
+            .intentionId,
+        testSummary(index: 2).id,
+      );
+
+      await router.maybePop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(router.current.name, RelationEditorRoute.name);
+      expect(find.text('Одинаковое название'), findsOneWidget);
     },
   );
 
@@ -244,6 +290,8 @@ void main() {
       expect(_isChipSelected(tester, 'relation-editor-type-need'), isTrue);
       expect(_isChipSelected(tester, 'relation-editor-priority-p1'), isTrue);
       expect(find.text('Selected'), findsNWidgets(2));
+      expect(find.text('Текущее намерение'), findsOneWidget);
+      expect(find.text('Много ходить'), findsOneWidget);
     },
   );
 
@@ -311,6 +359,8 @@ void main() {
 
       expect(find.byType(OperationFailurePresentation), findsOneWidget);
       expect(find.text(message), findsOneWidget);
+      expect(find.text('Текущее намерение'), findsOneWidget);
+      expect(find.text('Много ходить'), findsOneWidget);
 
       // Исправление участника удаляет renderer ошибки, не уходя с маршрута.
       await _selectParticipant(
@@ -403,6 +453,7 @@ void main() {
     expect(find.text('Создать связь'), findsWidgets);
     expect(find.text('Чтобы создать связь, укажите:'), findsOneWidget);
     expect(find.text('связанное намерение'), findsOneWidget);
+    expect(find.text('Текущее намерение'), findsOneWidget);
   });
 
   testWidgets('форма проходит accessibility guidelines при масштабе 200%', (
@@ -416,6 +467,15 @@ void main() {
     final repository = ControlledRelationFormRepository();
     addTearDown(repository.dispose);
     await _openForm(tester, repository, RelationDirection.outgoing);
+    final sourceSemantics = tester.getSemantics(
+      find.byKey(const ValueKey('relation-editor-participant-source')),
+    );
+    expect(sourceSemantics.label, contains('Source intention'));
+    expect(sourceSemantics.label, contains('Текущее намерение'));
+    final detailsSemantics = tester.getSemantics(
+      find.byKey(const ValueKey('relation-editor-open-source-details')),
+    );
+    expect(detailsSemantics.tooltip, 'Open intention details');
     await tester.ensureVisible(
       find.byKey(const ValueKey('relation-editor-submit')),
     );
@@ -429,6 +489,27 @@ void main() {
 }
 
 IntentionId get _contextIntentionId => testSummary(index: 1).id;
+
+RelationParticipantSummary get _contextParticipant =>
+    _participantSummary(index: 1, title: 'Текущее намерение');
+
+RelationParticipantSummary _participantSummary({
+  required int index,
+  required String title,
+  int activeRelationCount = 0,
+}) {
+  final summary = testSummary(
+    index: index,
+    title: title,
+    activeRelationCount: activeRelationCount,
+  );
+  return RelationParticipantSummary(
+    id: summary.id,
+    title: summary.title,
+    archiveState: summary.archiveState,
+    activeRelationCount: summary.activeRelationCount,
+  );
+}
 
 Future<AppRouter> _openForm(
   WidgetTester tester,
@@ -465,7 +546,7 @@ Future<AppRouter> _openForm(
     router.push(
       RelationEditorRoute(
         creationContext: RelationCreationContext(
-          intentionId: _contextIntentionId,
+          participant: _contextParticipant,
           direction: direction,
         ),
       ),

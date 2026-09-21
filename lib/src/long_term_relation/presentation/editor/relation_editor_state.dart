@@ -1,6 +1,7 @@
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
+import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -13,31 +14,44 @@ import '../../domain/long_term_relation_id.dart';
 /// черновика, а не окончательную пару.
 final class RelationCreationContext {
   const RelationCreationContext({
-    required this.intentionId,
+    required this.participant,
     required this.direction,
   });
 
-  final IntentionId intentionId;
+  /// Снимок текущего намерения, уже загруженный подробным просмотром.
+  final RelationParticipantSummary participant;
   final RelationDirection direction;
 
-  IntentionId? get initialSourceIntentionId => switch (direction) {
-    RelationDirection.outgoing => intentionId,
-    RelationDirection.incoming => null,
-  };
+  RelationParticipantSummary? get initialSourceParticipant =>
+      switch (direction) {
+        RelationDirection.outgoing => participant,
+        RelationDirection.incoming => null,
+      };
 
-  IntentionId? get initialRelatedIntentionId => switch (direction) {
-    RelationDirection.outgoing => null,
-    RelationDirection.incoming => intentionId,
-  };
+  RelationParticipantSummary? get initialRelatedParticipant =>
+      switch (direction) {
+        RelationDirection.outgoing => null,
+        RelationDirection.incoming => participant,
+      };
 
   @override
   bool operator ==(Object other) =>
       other is RelationCreationContext &&
-      other.intentionId == intentionId &&
+      other.participant.id == participant.id &&
+      other.participant.title == participant.title &&
+      other.participant.archiveState == participant.archiveState &&
+      other.participant.activeRelationCount ==
+          participant.activeRelationCount &&
       other.direction == direction;
 
   @override
-  int get hashCode => Object.hash(intentionId, direction);
+  int get hashCode => Object.hash(
+    participant.id,
+    participant.title,
+    participant.archiveState,
+    participant.activeRelationCount,
+    direction,
+  );
 }
 
 /// Выбор, без которого команда создания связи не может быть составлена.
@@ -190,8 +204,8 @@ final class RelationEditorCreated extends RelationEditorEvent {
 /// состоянием операции и событием навигации.
 final class RelationEditorState {
   const RelationEditorState({
-    required this.sourceIntentionId,
-    required this.relatedIntentionId,
+    required this.sourceParticipant,
+    required this.relatedParticipant,
     required this.type,
     required this.priority,
     required this.description,
@@ -201,8 +215,8 @@ final class RelationEditorState {
   });
 
   RelationEditorState.initial(RelationCreationContext context)
-    : sourceIntentionId = context.initialSourceIntentionId,
-      relatedIntentionId = context.initialRelatedIntentionId,
+    : sourceParticipant = context.initialSourceParticipant,
+      relatedParticipant = context.initialRelatedParticipant,
       type = null,
       priority = null,
       description = '',
@@ -210,8 +224,11 @@ final class RelationEditorState {
       event = null,
       failurePresentation = null;
 
-  final IntentionId? sourceIntentionId;
-  final IntentionId? relatedIntentionId;
+  final RelationParticipantSummary? sourceParticipant;
+  final RelationParticipantSummary? relatedParticipant;
+
+  IntentionId? get sourceIntentionId => sourceParticipant?.id;
+  IntentionId? get relatedIntentionId => relatedParticipant?.id;
   final LongTermRelationType? type;
   final RelationPriority? priority;
   final String description;
@@ -260,19 +277,19 @@ final class RelationEditorState {
 
   RelationEditorState withParticipant(
     RelationParticipantRole role,
-    IntentionId intentionId,
+    RelationParticipantSummary participant,
   ) {
     final nextOperation = _operationAfter(
       (failure) => _isCorrectedByParticipant(role, failure),
     );
     return _copyWith(
-      sourceIntentionId: switch (role) {
-        RelationParticipantRole.source => intentionId,
-        RelationParticipantRole.related => sourceIntentionId,
+      sourceParticipant: switch (role) {
+        RelationParticipantRole.source => participant,
+        RelationParticipantRole.related => sourceParticipant,
       },
-      relatedIntentionId: switch (role) {
-        RelationParticipantRole.source => relatedIntentionId,
-        RelationParticipantRole.related => intentionId,
+      relatedParticipant: switch (role) {
+        RelationParticipantRole.source => relatedParticipant,
+        RelationParticipantRole.related => participant,
       },
       operation: nextOperation,
     );
@@ -294,8 +311,8 @@ final class RelationEditorState {
     RelationEditorEvent? event,
     GraphInitiatorPresentationClaim? failurePresentation,
   }) => RelationEditorState(
-    sourceIntentionId: sourceIntentionId,
-    relatedIntentionId: relatedIntentionId,
+    sourceParticipant: sourceParticipant,
+    relatedParticipant: relatedParticipant,
     type: type,
     priority: priority,
     description: description,
@@ -305,8 +322,8 @@ final class RelationEditorState {
   );
 
   RelationEditorState withoutEvent() => RelationEditorState(
-    sourceIntentionId: sourceIntentionId,
-    relatedIntentionId: relatedIntentionId,
+    sourceParticipant: sourceParticipant,
+    relatedParticipant: relatedParticipant,
     type: type,
     priority: priority,
     description: description,
@@ -317,14 +334,14 @@ final class RelationEditorState {
 
   RelationEditorState _copyWith({
     required RelationEditorOperation operation,
-    IntentionId? sourceIntentionId,
-    IntentionId? relatedIntentionId,
+    RelationParticipantSummary? sourceParticipant,
+    RelationParticipantSummary? relatedParticipant,
     LongTermRelationType? type,
     RelationPriority? priority,
     String? description,
   }) => RelationEditorState(
-    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
-    relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+    sourceParticipant: sourceParticipant ?? this.sourceParticipant,
+    relatedParticipant: relatedParticipant ?? this.relatedParticipant,
     type: type ?? this.type,
     priority: priority ?? this.priority,
     description: description ?? this.description,
