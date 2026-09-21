@@ -278,9 +278,15 @@ void main() {
 
       repository.emitDetail(0, created);
       await tester.pump();
-      expect(find.text(updated.title, skipOffstage: false), findsOneWidget);
-      expect(find.text(created.title), findsNothing);
-      repository.emitDetail(1, updated);
+      await _scrollCurrentPageToTop(tester);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
+            .data,
+        created.title,
+      );
+      expect(find.text(updated.title), findsNothing);
+      repository.emitDetail(2, updated);
       await tester.pumpAndSettle();
       expect(
         find.text('Edit — “Укреплять здоровье”: Changes saved.'),
@@ -310,7 +316,7 @@ void main() {
         _saved(ready, before: updated, revision: 3),
       );
       await _pumpUntil(tester, () => repository.detailRequests.length == 4);
-      repository.emitDetail(2, ready);
+      repository.emitDetail(3, ready);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
       expect(find.text('Ready for action'), findsOneWidget);
@@ -331,7 +337,7 @@ void main() {
         _saved(archived, before: ready, revision: 4),
       );
       await _pumpUntil(tester, () => repository.detailRequests.length == 5);
-      repository.emitDetail(3, archived);
+      repository.emitDetail(4, archived);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
       expect(find.text('Archived'), findsOneWidget);

@@ -255,6 +255,88 @@ void main() {
     },
   );
 
+  test('каскад заменяет намерение и сводку только цельным снимком', () async {
+    final repository = _CheckpointGraphRepository();
+    final harness = _CheckpointHarness(repository);
+    addTearDown(harness.dispose);
+    await harness.loadInitialSurfaces();
+    final detailsBefore = harness.details.details;
+    final intentionBefore = detailsBefore.intention;
+    final intentionAfter = testNeighborhoodIntention(
+      id: harness.ownerId,
+      title: intentionBefore.title,
+      archiveState: IntentionArchiveState.archived,
+    );
+    final countsAfter = testRelationCounts(archivedNeedOutgoing: 1);
+    const revision = TestGraphRevision(9);
+    final presentation = harness.coordinator.registerAppPresentation();
+    addTearDown(presentation.release);
+
+    harness.archiveOwner();
+    expect(repository.intentionCommands, [isA<ArchiveIntention>()]);
+    repository.completeIntentionCommand(
+      0,
+      testNeighborhoodSavedResult(
+        before: intentionBefore,
+        after: intentionAfter,
+        revision: revision,
+        additionalChanges: [
+          IntentionRelationCountsChanged(
+            revision: revision,
+            intentionId: harness.ownerId,
+            counts: countsAfter,
+          ),
+        ],
+      ),
+    );
+    await pumpEventQueue();
+
+    expect(harness.details.details, same(detailsBefore));
+    expect(
+      harness.details.intention.archiveState,
+      IntentionArchiveState.active,
+    );
+    expect(harness.detailsCounts.activeNeedOutgoing, 1);
+    expect(harness.detailsCounts.archivedNeedOutgoing, 0);
+    expect(repository.observationsOf(harness.ownerId), 3);
+
+    final claim = await presentation.nextClaim();
+    expect(claim, isNotNull);
+    harness.coordinator.confirmPresentation(claim!);
+
+    repository.emitIntention(
+      harness.ownerId,
+      intentionAfter,
+      counts: countsAfter,
+      revision: revision,
+    );
+    repository.completeGroupPage(
+      1,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: countsAfter,
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await pumpEventQueue();
+
+    expect(harness.details.intention, same(intentionAfter));
+    expect(harness.detailsCounts.activeNeedOutgoing, 0);
+    expect(harness.detailsCounts.archivedNeedOutgoing, 1);
+    expect(repository.intentionCommands, hasLength(1));
+    expect(repository.groupQueries, hasLength(2));
+
+    var receivedRepeatedPresentation = false;
+    unawaited(
+      presentation.nextClaim().then((_) {
+        receivedRepeatedPresentation = true;
+      }),
+    );
+    await pumpEventQueue();
+    expect(receivedRepeatedPresentation, isFalse);
+  });
+
   test('согласование данных не зависит от предъявления сообщения', () async {
     final repository = _CheckpointGraphRepository();
     final harness = _CheckpointHarness(repository);
@@ -389,6 +471,10 @@ final class _CheckpointHarness {
   IntentionDetailsLoaded get details =>
       _container.read(intentionDetailsViewModelProvider(ownerId))
           as IntentionDetailsLoaded;
+
+  void archiveOwner() => _container
+      .read(intentionDetailsViewModelProvider(ownerId).notifier)
+      .archive();
 
   RelationCounts get detailsCounts => details.details.relationCounts;
 
