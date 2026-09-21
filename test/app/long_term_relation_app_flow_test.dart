@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -262,7 +263,8 @@ void main() {
       expect(
         tester
             .getSemantics(find.byKey(const ValueKey('relation-editor-failure')))
-            .hasFlag(SemanticsFlag.isLiveRegion),
+            .flagsCollection
+            .isLiveRegion,
         isTrue,
       );
       semantics.dispose();
@@ -503,7 +505,7 @@ Future<void> _createNeedRelation(
   if (verifyFormSemantics) {
     final typeSemantics = tester.getSemantics(type);
     expect(typeSemantics.label, contains('Need'));
-    expect(typeSemantics.hasFlag(SemanticsFlag.isSelected), isTrue);
+    expect(typeSemantics.flagsCollection.isSelected, Tristate.isTrue);
   }
   final priority = find.byKey(const ValueKey('relation-editor-priority-p2'));
   await _ensureVisible(tester, priority);
