@@ -600,3 +600,13 @@ Phase 1 не включает получение соседства и его с
   - **Зависимости:** 3.26, 3.27, 3.28, 3.30, 3.31.
   - **Вероятные файлы:** `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, обе `lib/l10n/app_*.arb`, generated localization outputs и профильные тесты выбора/формы.
   - **Размер:** M.
+
+- [ ] 3.35 Сохранять владельца инлайн-ошибки при смене локализованного сообщения
+  - **Критерии приёмки:**
+    - Перерисовка локализованного сообщения при неизменном initiator claim сохраняет исключительное право того же инлайн-renderer и не освобождает terminal outcome оболочке. Актуальный renderer может подтвердить тот же claim после первого пригодного кадра с новым текстом.
+    - Освобождение до подтверждения по-прежнему происходит при смене идентичности claim, фактическом удалении или замене renderer либо завершении экранной сессии. Временная потеря фокуса, смена RU/EN и обычная перестройка сохраняющегося renderer не создают второго владельца.
+    - После восстановления пригодного контекста пользователь видит одно актуальное локализованное сообщение для terminal outcome: без дополнительного `SnackBar`, повторного выполнения команды или повторного согласования данных. Запоздалые callbacks прежнего текста не подтверждают и не освобождают чужой либо уже предъявленный claim.
+  - **Проверка:** Дополнить и выполнить `flutter test test/graph/presentation/operation_failure_presentation_test.dart test/app/localization/locale_resolution_test.dart test/long_term_relation/presentation/editor/relation_editor_page_test.dart`; проверить смену RU ↔ EN до первого пригодного кадра при неизменном claim, восстановление фокуса, смену claim вместе с сообщением, удаление renderer до кадра и отсутствие повторного предъявления после подтверждения. Затем выполнить `mise run codegen-check`, `mise run check`, `mise exec --no-deps -- openspec validate manage-long-term-relations --strict --no-interactive` и `git diff --check`; после изменений Dart/Flutter проверить DTD по правилу AGENTS.md.
+  - **Зависимости:** 3.28, 3.30, 3.31.
+  - **Вероятные файлы:** `lib/src/graph/presentation/operation_failure_presentation.dart`, `test/graph/presentation/operation_failure_presentation_test.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `test/app/localization/locale_resolution_test.dart`.
+  - **Размер:** S.
