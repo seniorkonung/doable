@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** В диапазоне подтверждены четыре активных finding: F1 — подробности намерения временно смешивают сущность и счётчики разных ревизий; F2 — устаревшая сводка соседства выглядит точной вне удалённого footer; F3 — форма не показывает идентичность выбранных участников; F4 — смена локализованного текста передаёт тот же claim второму владельцу. Все три обязательных прохода и проверка полного диапазона завершены.
+**Summary:** В диапазоне остаются три активных finding: F2 — устаревшая сводка соседства выглядит точной вне удалённого footer; F3 — форма не показывает идентичность выбранных участников; F4 — смена локализованного текста передаёт тот же claim второму владельцу. Все три обязательных прохода и проверка полного диапазона завершены.
 
 ## Review target
 
@@ -34,20 +34,11 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Два свежих изолированных reviewer без planning/history/report проверили на ad2ba531c4373a88e892ff35b17c86646c49e84e две overlap-группы, вместе охватывающие все 128 delivery/test paths U1: предметные типы, SQLite, repository и агрегаты; coordinator, согласование, UI, маршрутизацию, локализацию и доступность. Предложение сохранить прежние внутренние сигнатуры отклонено после независимой сверки: design и правило перехода Phase 3 требуют синхронно перевести всех production/test consumers без временного adapter между завершёнными задачами; полный переход и единственный production repository подтверждены поиском. Четыре finding UI-прохода подтверждены кодом, тестами и обязательными требованиями. |
-| OpenSpec conformance | Complete | Proposal, две delta-спецификации, design, ADR, plan и задачи 3.1–3.31 сопоставлены с неизменяемым снимком ad2ba531c4373a88e892ff35b17c86646c49e84e. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `instructions apply --json`, `validate manage-long-term-relations --json` и `validate manage-long-term-relations --strict --no-interactive` подтвердили schema `intent-driven`, 56/56 выполненных задач и валидный change. F1–F4 противоречат требованиям одной ревизии, явного состояния устаревания, доступной идентичности участников и единственного владельца terminal outcome. |
+| Independent decision review | Complete | Два свежих изолированных reviewer без planning/history/report проверили на ad2ba531c4373a88e892ff35b17c86646c49e84e две overlap-группы, вместе охватывающие все 128 delivery/test paths U1: предметные типы, SQLite, repository и агрегаты; coordinator, согласование, UI, маршрутизацию, локализацию и доступность. Предложение сохранить прежние внутренние сигнатуры отклонено после независимой сверки: design и правило перехода Phase 3 требуют синхронно перевести всех production/test consumers без временного adapter между завершёнными задачами; полный переход и единственный production repository подтверждены поиском. Три остающихся finding UI-прохода подтверждены кодом, тестами и обязательными требованиями. |
+| OpenSpec conformance | Complete | Proposal, две delta-спецификации, design, ADR, plan и задачи 3.1–3.31 сопоставлены с неизменяемым снимком ad2ba531c4373a88e892ff35b17c86646c49e84e. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `instructions apply --json`, `validate manage-long-term-relations --json` и `validate manage-long-term-relations --strict --no-interactive` подтвердили schema `intent-driven`, 56/56 выполненных задач и валидный change. F2–F4 противоречат требованиям явного состояния устаревания, доступной идентичности участников и единственного владельца terminal outcome. |
 | Code quality | Complete | Проверены корректность, читаемость, архитектура, безопасность и производительность всех reviewable delivery/test paths: домен и Unicode, транзакции и integrity-функции, агрегаты и keyset paging, repository и coordinator, ревизионное согласование, каталог/details/neighborhood/editor/picker, localization/semantics, diagnostics и generated-код. Dart MCP analysis: ошибок нет. `mise run codegen-check`, `mise run check` (179 файлов без format-изменений, analyze без замечаний, 687 тестов), `git diff --check`, release APK (60,4 MB) и packaged Android privacy-manifest gate прошли на ad2ba531c4373a88e892ff35b17c86646c49e84e. DTD-сеанса и Android device/emulator не было, поэтому согласно task 3.30 использовано полное CLI-evidence без утверждения о ручном прогоне. |
 
 ## Findings
-
-### F1 · High — Подробности намерения публикуют сущность и счётчики разных ревизий
-
-- **Evidence:** В `lib/src/intention/presentation/details/intention_details_state.dart:31-45` ветка `copyWith(intention: ...)` строит новые `IntentionDetails` из нового намерения и прежних `relationCounts`. `lib/src/intention/presentation/details/intention_details_view_model.dart:267-291` принимает подтверждённую ревизию команды, немедленно публикует такое смешанное состояние и только затем запускает новое наблюдение. При каскадном архивировании само намерение уже отображается архивированным, а количества до каскада остаются видимыми до отдельного успешного чтения; при задержке это временно, при повторяющемся отказе — неопределённо долго.
-- **Evidence revisions:** ["ad2ba531c4373a88e892ff35b17c86646c49e84e"]
-- **Impact:** Пользователь получает внутренне противоречивое подтверждённое представление и может принять решение по числам, которые не относятся к показанному состоянию намерения. Это нарушает центральный контракт точных счётчиков и одной ревизии, несмотря на атомарность данных в хранилище.
-- **Required outcome:** Подробности намерения и полная сводка должны публиковаться как один снимок одной подтверждённой ревизии; до него UI не должен представлять старые числа как относящиеся к уже опубликованному новому намерению.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/intention/presentation/details/intention_details_state.dart","lib/src/intention/presentation/details/intention_details_view_model.dart","test/intention/presentation/details/intention_details_view_model_test.dart","test/graph/presentation/graph_reconciliation_checkpoint_test.dart"]
 
 ### F2 · Medium — Устаревшая сводка соседства выглядит актуальной у самих чисел
 
