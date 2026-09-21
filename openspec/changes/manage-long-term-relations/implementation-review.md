@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** В диапазоне остаются два активных finding: F3 — форма не показывает идентичность выбранных участников; F4 — смена локализованного текста передаёт тот же claim второму владельцу. Все три обязательных прохода и проверка полного диапазона завершены.
+**Summary:** В диапазоне остаётся один активный finding: F4 — смена локализованного текста передаёт тот же claim второму владельцу. Все три обязательных прохода и проверка полного диапазона завершены.
 
 ## Review target
 
@@ -34,20 +34,11 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Два свежих изолированных reviewer без planning/history/report проверили на ad2ba531c4373a88e892ff35b17c86646c49e84e две overlap-группы, вместе охватывающие все 128 delivery/test paths U1: предметные типы, SQLite, repository и агрегаты; coordinator, согласование, UI, маршрутизацию, локализацию и доступность. Предложение сохранить прежние внутренние сигнатуры отклонено после независимой сверки: design и правило перехода Phase 3 требуют синхронно перевести всех production/test consumers без временного adapter между завершёнными задачами; полный переход и единственный production repository подтверждены поиском. Два остающихся finding UI-прохода подтверждены кодом, тестами и обязательными требованиями. |
-| OpenSpec conformance | Complete | Proposal, две delta-спецификации, design, ADR, plan и задачи 3.1–3.31 сопоставлены с неизменяемым снимком ad2ba531c4373a88e892ff35b17c86646c49e84e. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `instructions apply --json`, `validate manage-long-term-relations --json` и `validate manage-long-term-relations --strict --no-interactive` подтвердили schema `intent-driven`, 56/56 выполненных задач и валидный change. F3–F4 противоречат требованиям доступной идентичности участников и единственного владельца terminal outcome. |
+| Independent decision review | Complete | Два свежих изолированных reviewer без planning/history/report проверили на ad2ba531c4373a88e892ff35b17c86646c49e84e две overlap-группы, вместе охватывающие все 128 delivery/test paths U1: предметные типы, SQLite, repository и агрегаты; coordinator, согласование, UI, маршрутизацию, локализацию и доступность. Предложение сохранить прежние внутренние сигнатуры отклонено после независимой сверки: design и правило перехода Phase 3 требуют синхронно перевести всех production/test consumers без временного adapter между завершёнными задачами; полный переход и единственный production repository подтверждены поиском. Остающийся F4 подтверждён кодом, тестами и обязательным требованием единственного владельца terminal outcome. |
+| OpenSpec conformance | Complete | Proposal, две delta-спецификации, design, ADR, plan и задачи 3.1–3.31 сопоставлены с неизменяемым снимком ad2ba531c4373a88e892ff35b17c86646c49e84e. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `instructions apply --json`, `validate manage-long-term-relations --json` и `validate manage-long-term-relations --strict --no-interactive` подтвердили schema `intent-driven`, 56 выполненных задач исходного review target и валидный change. Текущий planning handoff сохраняет отдельную незавершённую работу 3.32–3.34; F4 продолжает противоречить требованию единственного владельца terminal outcome. |
 | Code quality | Complete | Проверены корректность, читаемость, архитектура, безопасность и производительность всех reviewable delivery/test paths: домен и Unicode, транзакции и integrity-функции, агрегаты и keyset paging, repository и coordinator, ревизионное согласование, каталог/details/neighborhood/editor/picker, localization/semantics, diagnostics и generated-код. Dart MCP analysis: ошибок нет. `mise run codegen-check`, `mise run check` (179 файлов без format-изменений, analyze без замечаний, 687 тестов), `git diff --check`, release APK (60,4 MB) и packaged Android privacy-manifest gate прошли на ad2ba531c4373a88e892ff35b17c86646c49e84e. DTD-сеанса и Android device/emulator не было, поэтому согласно task 3.30 использовано полное CLI-evidence без утверждения о ручном прогоне. |
 
 ## Findings
-
-### F3 · Medium — Форма не сохраняет проверяемую пользователем идентичность участников
-
-- **Evidence:** Picker возвращает только `IntentionId` (`lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart:126-128`), а черновик хранит только два nullable ID (`lib/src/long_term_relation/presentation/editor/relation_editor_state.dart:191-218`). `_ParticipantSlot` в `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart:261-329` выводит для любого выбранного исходного или связанного намерения одну строку «Selected/Выбрано» без названия или иного человекочитаемого различителя; `test/long_term_relation/presentation/editor/relation_editor_page_test.dart:235-246` прямо ожидает две одинаковые строки после возврата из подробностей существующей связи.
-- **Evidence revisions:** ["ad2ba531c4373a88e892ff35b17c86646c49e84e"]
-- **Impact:** Перед созданием направленной постоянной связи, после навигации либо после отказа пользователь, включая пользователя экранного диктора, не может проверить, какие именно намерения назначены двум предметно различным ролям, и способен подтвердить неверную пару.
-- **Required outcome:** Каждая выбранная роль должна сохранять и предъявлять доступную человекочитаемую идентичность конкретного намерения до отправки и после отказа, не теряя типизированный ID и буквальный пользовательский текст.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart","lib/src/long_term_relation/presentation/editor/relation_editor_state.dart","lib/src/long_term_relation/presentation/editor/relation_editor_page.dart","test/long_term_relation/presentation/editor/relation_editor_page_test.dart"]
 
 ### F4 · Medium — Смена локализованного текста передаёт тот же claim оболочке
 
