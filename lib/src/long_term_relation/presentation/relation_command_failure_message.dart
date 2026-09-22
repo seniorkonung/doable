@@ -82,4 +82,18 @@ String longTermRelationCommandFailureMessage(
     LongTermRelationUnexpectedFailure() =>
       localizations.relationRestoreUnexpected,
   },
+  LongTermRelationCommandKind.delete => switch (failure) {
+    LongTermRelationNotFoundFailure() => localizations.relationDeleteNotFound,
+    LongTermRelationUnavailableFailure() =>
+      localizations.relationDeleteUnavailable,
+    LongTermRelationCorruptionFailure() =>
+      localizations.relationDeleteCorruption,
+    LongTermRelationCommandValidationFailure() ||
+    LongTermRelationPairOccupiedFailure() ||
+    LongTermRelationParticipantNotFoundFailure() ||
+    LongTermRelationParticipantArchivedFailure() =>
+      localizations.relationDeleteConflict,
+    LongTermRelationUnexpectedFailure() =>
+      localizations.relationDeleteUnexpected,
+  },
 };

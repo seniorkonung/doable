@@ -231,6 +231,7 @@ String _relationMessage(
     LongTermRelationCommandKind.update => localizations.graphOperationUpdate,
     LongTermRelationCommandKind.archive => localizations.graphOperationArchive,
     LongTermRelationCommandKind.restore => localizations.graphOperationRestore,
+    LongTermRelationCommandKind.delete => localizations.graphOperationDelete,
   };
   final target = switch (completion.target) {
     CreatingLongTermRelationOperationTarget() =>
@@ -274,6 +275,13 @@ String _relationOutcomeFor(
       localizations.relationRestoreUnexpected,
     (LongTermRelationCommandKind.restore, LongTermRelationDeleted()) =>
       localizations.relationRestoreUnexpected,
+    (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
+      localizations.relationDeleted,
+    (LongTermRelationCommandKind.delete, LongTermRelationCreated()) ||
+    (
+      LongTermRelationCommandKind.delete,
+      LongTermRelationUpdated(),
+    ) => localizations.relationDeleteUnexpected,
   },
   GraphResultFailure(:final failure) => longTermRelationCommandFailureMessage(
     localizations,

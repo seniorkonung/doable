@@ -1340,6 +1340,42 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be restored because of an unexpected error.'**
   String get relationRestoreUnexpected;
 
+  /// Подтверждение успешного физического удаления долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation deleted.'**
+  String get relationDeleted;
+
+  /// Отсутствие удаляемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationDeleteNotFound;
+
+  /// Конфликт актуального состояния при удалении связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be deleted because its current state conflicts with the operation.'**
+  String get relationDeleteConflict;
+
+  /// Устранимая недоступность удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be deleted. Try again.'**
+  String get relationDeleteUnavailable;
+
+  /// Терминальное повреждение данных при удалении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t deleted.'**
+  String get relationDeleteCorruption;
+
+  /// Терминальная непредвиденная ошибка удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be deleted because of an unexpected error.'**
+  String get relationDeleteUnexpected;
+
   /// Назначение перехода из строки соседства в подробный просмотр связи
   ///
   /// In en, this message translates to:

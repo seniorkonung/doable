@@ -860,6 +860,30 @@
   "@relationRestoreUnexpected": {
     "description": "Терминальная непредвиденная ошибка восстановления связи"
   },
+  "relationDeleted": "Relation deleted.",
+  "@relationDeleted": {
+    "description": "Подтверждение успешного физического удаления долговременной связи"
+  },
+  "relationDeleteNotFound": "This relation no longer exists.",
+  "@relationDeleteNotFound": {
+    "description": "Отсутствие удаляемой связи"
+  },
+  "relationDeleteConflict": "The relation couldn’t be deleted because its current state conflicts with the operation.",
+  "@relationDeleteConflict": {
+    "description": "Конфликт актуального состояния при удалении связи"
+  },
+  "relationDeleteUnavailable": "The relation couldn’t be deleted. Try again.",
+  "@relationDeleteUnavailable": {
+    "description": "Устранимая недоступность удаления связи"
+  },
+  "relationDeleteCorruption": "Stored data is damaged. The relation wasn’t deleted.",
+  "@relationDeleteCorruption": {
+    "description": "Терминальное повреждение данных при удалении связи"
+  },
+  "relationDeleteUnexpected": "The relation couldn’t be deleted because of an unexpected error.",
+  "@relationDeleteUnexpected": {
+    "description": "Терминальная непредвиденная ошибка удаления связи"
+  },
   "relationNeighborhoodOpenRelation": "Opens the relation details",
   "@relationNeighborhoodOpenRelation": {
     "description": "Назначение перехода из строки соседства в подробный просмотр связи"

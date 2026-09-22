@@ -136,7 +136,7 @@ final class IntentionCommandCompletion extends GraphCommandCompletion {
   };
 }
 
-enum LongTermRelationCommandKind { create, update, archive, restore }
+enum LongTermRelationCommandKind { create, update, archive, restore, delete }
 
 final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   const LongTermRelationCommandCompletion._({
@@ -389,6 +389,15 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     key: ExistingLongTermRelationKey(command.relationId),
     command: command,
     kind: LongTermRelationCommandKind.restore,
+    target: ExistingLongTermRelationOperationTarget(command.relationId),
+  );
+
+  LongTermRelationCommandStart acceptRelationDelete(
+    DeleteLongTermRelation command,
+  ) => _acceptRelation(
+    key: ExistingLongTermRelationKey(command.relationId),
+    command: command,
+    kind: LongTermRelationCommandKind.delete,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
   );
 

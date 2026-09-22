@@ -748,6 +748,28 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось восстановить связь из-за непредвиденной ошибки.';
 
   @override
+  String get relationDeleted => 'Связь удалена.';
+
+  @override
+  String get relationDeleteNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationDeleteConflict =>
+      'Связь не удалось удалить из-за конфликта актуального состояния.';
+
+  @override
+  String get relationDeleteUnavailable =>
+      'Не удалось удалить связь. Повторите попытку.';
+
+  @override
+  String get relationDeleteCorruption =>
+      'Сохранённые данные повреждены. Связь не удалена.';
+
+  @override
+  String get relationDeleteUnexpected =>
+      'Не удалось удалить связь из-за непредвиденной ошибки.';
+
+  @override
   String get relationNeighborhoodOpenRelation =>
       'Открывает подробные данные связи';
 
