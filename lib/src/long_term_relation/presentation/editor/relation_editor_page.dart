@@ -8,20 +8,23 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/domain/intention.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
+import '../details/relation_details_state.dart';
+import '../details/relation_details_view_model.dart';
 import 'relation_editor_state.dart';
 import 'relation_editor_view_model.dart';
 
 /// Форма создания или изменения долговременной связи.
 ///
-/// Типизированный контекст задаёт исходный черновик. Страница не читает граф
-/// самостоятельно: черновик и результат принадлежат ViewModel, а сообщение об
-/// успехе предъявляет общий presenter оболочки.
+/// Типизированный контекст задаёт исходный черновик. Подтверждённые данные
+/// участников поступают через наблюдение подробного просмотра; черновик и
+/// результат принадлежат ViewModel, а успех предъявляет presenter оболочки.
 @RoutePage()
 final class RelationEditorPage extends ConsumerStatefulWidget {
   const RelationEditorPage({required this.editorContext, super.key});
@@ -46,6 +49,30 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
           details.description?.value ?? '',
       },
     );
+    if (widget.editorContext case RelationEditingContext(:final details)) {
+      final editorProvider = relationEditorViewModelProvider(
+        _formKey,
+        widget.editorContext,
+      );
+      void refresh(RelationDetailsState next) {
+        if (next case RelationDetailsLoaded(
+          refreshStatus: RelationDetailsFresh(),
+          :final details,
+        )) {
+          ref.read(editorProvider.notifier).refreshConfirmedDetails(details);
+        }
+      }
+
+      final subscription = ref.listenManual(
+        relationDetailsViewModelProvider(details.relation.id),
+        (previous, next) => refresh(next),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          refresh(subscription.read());
+        }
+      });
+    }
   }
 
   @override
@@ -375,6 +402,10 @@ final class _ParticipantSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final isSelected = participant != null;
+    final archiveStateLabel =
+        participant?.archiveState == IntentionArchiveState.archived
+        ? localizations.detailsArchived
+        : localizations.detailsActive;
     final label = switch (role) {
       RelationParticipantRole.source => localizations.relationEditorSourceLabel,
       RelationParticipantRole.related =>
@@ -415,7 +446,9 @@ final class _ParticipantSlot extends StatelessWidget {
     return Semantics(
       key: ValueKey('relation-editor-participant-${role.name}'),
       container: true,
-      label: isSelected ? '$label: ${participant!.title}' : label,
+      label: isSelected
+          ? '$label: ${participant!.title}, $archiveStateLabel'
+          : label,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -425,6 +458,13 @@ final class _ParticipantSlot extends StatelessWidget {
             Text(
               selected.title,
               key: ValueKey('relation-editor-participant-title-${role.name}'),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              archiveStateLabel,
+              key: ValueKey(
+                'relation-editor-participant-archive-state-${role.name}',
+              ),
             ),
             const SizedBox(height: 4),
           ],
