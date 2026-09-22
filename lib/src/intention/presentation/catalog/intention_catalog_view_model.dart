@@ -23,6 +23,7 @@ part 'intention_catalog_view_model.g.dart';
 /// открытый каталог намерений не разделяют охват, фильтр и загруженную часть.
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
+  late IntentionCatalogPurpose _purpose;
   IntentionScope _scope = IntentionCatalogSelection.initial.scope;
   String _titleFilterText = IntentionCatalogSelection.initial.titleFilterText;
   IntentionCatalogOrder _order = IntentionCatalogSelection.initial.order;
@@ -38,7 +39,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   _PendingCatalogContinuation? _pendingContinuation;
 
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
-    scope: _scope,
+    scope: switch (_purpose) {
+      BrowseIntentionCatalog() => _scope,
+      SelectRelationParticipant(:final scope) => scope,
+    },
     titleFilterText: _titleFilterText,
     order: _order,
     filterValidationFailure: _filterValidationFailure,
@@ -46,6 +50,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   @override
   Future<IntentionCatalogState> build(IntentionCatalogPurpose purpose) {
+    _purpose = purpose;
     _invalidatePageRequest();
     _isLoadingFirstPage = false;
     _packagesBeforeFirstPage.clear();
@@ -64,10 +69,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return Future.value(IntentionCatalogDebouncing(selection: selection));
     }
 
+    final catalogScope = selection.scope;
     late final IntentionCatalogQuery query;
     try {
       query = IntentionCatalogQuery(
-        scope: _scope,
+        scope: catalogScope,
         titleFilter: _titleFilterText,
         order: _order,
         pageSize: _policy.pageSize,
@@ -96,7 +102,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   void changeScope(IntentionScope scope) {
-    if (_scope == scope) {
+    if (_purpose is SelectRelationParticipant || _scope == scope) {
       return;
     }
     _scope = scope;
