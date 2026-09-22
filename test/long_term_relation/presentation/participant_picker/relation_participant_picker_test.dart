@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
@@ -75,10 +76,14 @@ void main() {
 
       expect(
         await selection,
-        isA<RelationParticipantSummary>()
-            .having((value) => value.id, 'идентификатор', _testIntentionId(2))
+        isA<GraphSnapshot<RelationParticipantSummary>>()
             .having(
-              (value) => value.archiveState,
+              (snapshot) => snapshot.value.id,
+              'идентификатор',
+              _testIntentionId(2),
+            )
+            .having(
+              (snapshot) => snapshot.value.archiveState,
               'архивное состояние',
               IntentionArchiveState.archived,
             ),
@@ -213,8 +218,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final selected = await selection;
-    expect(selected?.id, _testIntentionId(1));
-    expect(selected?.title, 'Позвонить');
+    expect(selected?.value.id, _testIntentionId(1));
+    expect(selected?.value.title, 'Позвонить');
   });
 
   testWidgets('возвращает идентичность и снимок после явного выбора', (
@@ -238,10 +243,28 @@ void main() {
 
     expect(
       await selection,
-      isA<RelationParticipantSummary>()
-          .having((value) => value.id, 'идентификатор', _testIntentionId(2))
-          .having((value) => value.title, 'название снимка', 'Много ходить')
-          .having((value) => value.activeRelationCount, 'количество снимка', 7),
+      isA<GraphSnapshot<RelationParticipantSummary>>()
+          .having(
+            (snapshot) =>
+                snapshot.revision.compareTo(const TestPickerRevision(1)),
+            'ревизия каталога',
+            GraphRevisionOrder.same,
+          )
+          .having(
+            (snapshot) => snapshot.value.id,
+            'идентификатор',
+            _testIntentionId(2),
+          )
+          .having(
+            (snapshot) => snapshot.value.title,
+            'название снимка',
+            'Много ходить',
+          )
+          .having(
+            (snapshot) => snapshot.value.activeRelationCount,
+            'количество снимка',
+            7,
+          ),
     );
   });
 
@@ -397,7 +420,7 @@ void main() {
     await tester.tap(find.text('Доступное намерение'));
     await tester.pumpAndSettle();
 
-    expect((await selection)?.id, _testIntentionId(2));
+    expect((await selection)?.value.id, _testIntentionId(2));
   });
 
   testWidgets('поздний ответ прежнего фильтра не изменяет список выбора', (
@@ -492,7 +515,7 @@ void main() {
     await tester.tap(find.text('Ходить'));
     await tester.pumpAndSettle();
 
-    expect((await selection)?.id, _testIntentionId(1));
+    expect((await selection)?.value.id, _testIntentionId(1));
   });
 
   testWidgets('сообщает экранному диктору назначение выбора и перехода', (
@@ -571,12 +594,12 @@ Future<void> _settleRoute(WidgetTester tester) async {
 
 IntentionId _testIntentionId(int index) => testSummary(index: index).id;
 
-Future<RelationParticipantSummary?> _pushPicker(
+Future<GraphSnapshot<RelationParticipantSummary>?> _pushPicker(
   AppRouter router, {
   required int excludedIndex,
   RelationParticipantSelectionContext selectionContext =
       RelationParticipantSelectionContext.activeRelation,
-}) => router.push<RelationParticipantSummary>(
+}) => router.push<GraphSnapshot<RelationParticipantSummary>>(
   RelationParticipantPickerRoute(
     excludedIntentionId: _testIntentionId(excludedIndex),
     selectionContext: selectionContext,

@@ -201,6 +201,22 @@ RelationParticipantSummary testEditorParticipant(
   activeRelationCount: activeRelationCount,
 );
 
+GraphSnapshot<RelationParticipantSummary> testEditorSelection(
+  int index, {
+  String? title,
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
+  int activeRelationCount = 0,
+  int revision = 1,
+}) => GraphSnapshot(
+  value: testEditorParticipant(
+    index,
+    title: title,
+    archiveState: archiveState,
+    activeRelationCount: activeRelationCount,
+  ),
+  revision: TestRelationEditorRevision(revision),
+);
+
 LongTermRelationDetails testEditorRelationDetails({
   LongTermRelationType type = LongTermRelationType.need,
   RelationPriority priority = RelationPriority.p2,

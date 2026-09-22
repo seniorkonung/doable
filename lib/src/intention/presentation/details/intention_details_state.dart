@@ -1,4 +1,5 @@
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
 import '../../application/intention_details.dart' as application;
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
@@ -18,18 +19,21 @@ final class IntentionDetailsLoading extends IntentionDetailsState {
 final class IntentionDetailsLoaded extends IntentionDetailsState {
   const IntentionDetailsLoaded({
     required this.details,
+    required this.revision,
     required super.isOperationRunning,
     this.edit,
     this.stateChange,
   });
 
   final application.IntentionDetails details;
+  final GraphRevision revision;
   Intention get intention => details.intention;
   final IntentionDetailsEdit? edit;
   final IntentionDetailsStateChange? stateChange;
 
   IntentionDetailsLoaded copyWith({
     application.IntentionDetails? details,
+    GraphRevision? revision,
     bool? isOperationRunning,
     IntentionDetailsEdit? edit,
     bool clearEdit = false,
@@ -37,6 +41,7 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     bool clearStateChange = false,
   }) => IntentionDetailsLoaded(
     details: details ?? this.details,
+    revision: revision ?? this.revision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     edit: clearEdit ? null : edit ?? this.edit,
     stateChange: clearStateChange ? null : stateChange ?? this.stateChange,

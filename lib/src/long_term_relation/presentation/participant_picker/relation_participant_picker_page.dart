@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../graph/application/graph_revision.dart';
 import '../../../intention/application/intention_catalog.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
@@ -129,7 +130,7 @@ final class _RelationParticipantPickerPageState
     unawaited(context.router.maybePop());
   }
 
-  void _select(RelationParticipantSummary participant) {
+  void _select(GraphSnapshot<RelationParticipantSummary> participant) {
     unawaited(context.router.maybePop(participant));
   }
 
@@ -156,7 +157,7 @@ final class _PickerContent extends ConsumerWidget {
   final SelectRelationParticipant purpose;
   final IntentionCatalogState state;
   final ScrollController scrollController;
-  final ValueChanged<RelationParticipantSummary> onSelected;
+  final ValueChanged<GraphSnapshot<RelationParticipantSummary>> onSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -212,7 +213,7 @@ final class _PickerOptions extends ConsumerWidget {
   final SelectRelationParticipant purpose;
   final IntentionCatalogLoaded state;
   final ScrollController scrollController;
-  final ValueChanged<RelationParticipantSummary> onSelected;
+  final ValueChanged<GraphSnapshot<RelationParticipantSummary>> onSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -258,6 +259,7 @@ final class _PickerOptions extends ConsumerWidget {
         _requestNextPage(context, ref, option.catalogIndex);
         return _ParticipantOptionTile(
           summary: option.summary,
+          revision: state.revision,
           onSelected: onSelected,
         );
       },
@@ -294,11 +296,13 @@ final class _ParticipantOption {
 final class _ParticipantOptionTile extends StatelessWidget {
   const _ParticipantOptionTile({
     required this.summary,
+    required this.revision,
     required this.onSelected,
   });
 
   final IntentionSummary summary;
-  final ValueChanged<RelationParticipantSummary> onSelected;
+  final GraphRevision revision;
+  final ValueChanged<GraphSnapshot<RelationParticipantSummary>> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -315,11 +319,14 @@ final class _ParticipantOptionTile extends StatelessWidget {
               summary.activeRelationCount,
             ),
             onTap: () => onSelected(
-              RelationParticipantSummary(
-                id: summary.id,
-                title: summary.title,
-                archiveState: summary.archiveState,
-                activeRelationCount: summary.activeRelationCount,
+              GraphSnapshot(
+                revision: revision,
+                value: RelationParticipantSummary(
+                  id: summary.id,
+                  title: summary.title,
+                  archiveState: summary.archiveState,
+                  activeRelationCount: summary.activeRelationCount,
+                ),
               ),
             ),
             tapHint: localizations.participantPickerSelectHint,

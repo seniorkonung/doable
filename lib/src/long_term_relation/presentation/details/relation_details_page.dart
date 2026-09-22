@@ -71,6 +71,7 @@ final class RelationDetailsPage extends ConsumerWidget {
                             RelationEditorRoute(
                               editorContext: RelationEditingContext(
                                 loaded.details,
+                                revision: loaded.revision,
                               ),
                             ),
                           ),

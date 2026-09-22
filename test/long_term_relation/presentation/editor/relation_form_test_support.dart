@@ -61,17 +61,20 @@ final class ControlledRelationFormRepository
   );
 
   /// Отдаёт очередную порцию каталога выбора участника.
-  void completeCatalogPage(int index, List<IntentionSummary> items) =>
-      _catalogRequests[index].complete(
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: items,
-            totalCount: items.length,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
-        ),
-      );
+  void completeCatalogPage(
+    int index,
+    List<IntentionSummary> items, {
+    GraphRevision revision = const TestCatalogRevision(1),
+  }) => _catalogRequests[index].complete(
+    ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: items,
+        totalCount: items.length,
+        nextCursor: null,
+        revision: revision,
+      ),
+    ),
+  );
 
   void failRelationCommand(int index, LongTermRelationCommandFailure failure) =>
       _relationRequests[index].complete(GraphCommandFailed(failure));

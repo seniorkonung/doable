@@ -1,4 +1,5 @@
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -64,9 +65,11 @@ final class RelationCreationContext extends RelationEditorContext {
 /// Основа остаётся неизменной в течение экранной сессии и позволяет отличить
 /// явные правки от полей, которые форма не должна перезаписывать.
 final class RelationEditingContext extends RelationEditorContext {
-  const RelationEditingContext(this.details) : super();
+  const RelationEditingContext(this.details, {required this.revision})
+    : super();
 
   final LongTermRelationDetails details;
+  final GraphRevision revision;
 
   /// Строит частичную правку только из значений, отличающихся от основы.
   LongTermRelationPatch patchFor(
@@ -270,6 +273,8 @@ final class RelationEditorState {
     required this.context,
     required this.sourceParticipant,
     required this.relatedParticipant,
+    required this.sourceRevision,
+    required this.relatedRevision,
     required this.type,
     required this.priority,
     required this.description,
@@ -284,6 +289,8 @@ final class RelationEditorState {
           context: context,
           sourceParticipant: creation.initialSourceParticipant,
           relatedParticipant: creation.initialRelatedParticipant,
+          sourceRevision: null,
+          relatedRevision: null,
           type: null,
           priority: null,
           description: '',
@@ -294,6 +301,8 @@ final class RelationEditorState {
           context: context,
           sourceParticipant: editing.details.source,
           relatedParticipant: editing.details.related,
+          sourceRevision: editing.revision,
+          relatedRevision: editing.revision,
           type: editing.details.relation.type,
           priority: editing.details.relation.priority,
           description: editing.details.description?.value ?? '',
@@ -311,6 +320,29 @@ final class RelationEditorState {
 
   final RelationParticipantSummary? sourceParticipant;
   final RelationParticipantSummary? relatedParticipant;
+  final GraphRevision? sourceRevision;
+  final GraphRevision? relatedRevision;
+
+  GraphRevision? revisionFor(RelationParticipantRole role) => switch (role) {
+    RelationParticipantRole.source => sourceRevision,
+    RelationParticipantRole.related => relatedRevision,
+  };
+
+  bool needsNewBasis(
+    RelationParticipantRole role,
+    IntentionId id,
+    GraphRevision revision,
+  ) {
+    final current = switch (role) {
+      RelationParticipantRole.source => sourceParticipant,
+      RelationParticipantRole.related => relatedParticipant,
+    };
+    final currentRevision = revisionFor(role);
+    return current?.id == id &&
+        currentRevision != null &&
+        revision.compareTo(currentRevision) ==
+            GraphRevisionOrder.differentEpoch;
+  }
 
   IntentionId? get sourceIntentionId => sourceParticipant?.id;
   IntentionId? get relatedIntentionId => relatedParticipant?.id;
@@ -382,13 +414,17 @@ final class RelationEditorState {
 
   RelationEditorState withParticipant(
     RelationParticipantRole role,
-    RelationParticipantSummary participant,
+    GraphSnapshot<RelationParticipantSummary> selected,
   ) {
+    final participant = selected.value;
     final currentParticipant = switch (role) {
       RelationParticipantRole.source => sourceParticipant,
       RelationParticipantRole.related => relatedParticipant,
     };
     final identityChanged = currentParticipant?.id != participant.id;
+    if (!identityChanged && !_isNewer(role, selected.revision)) {
+      return this;
+    }
     final nextOperation = _operationAfter(
       (failure) => _isCorrectedByParticipant(role, identityChanged, failure),
     );
@@ -401,6 +437,12 @@ final class RelationEditorState {
         RelationParticipantRole.source => relatedParticipant,
         RelationParticipantRole.related => participant,
       },
+      sourceRevision: role == RelationParticipantRole.source
+          ? selected.revision
+          : sourceRevision,
+      relatedRevision: role == RelationParticipantRole.related
+          ? selected.revision
+          : relatedRevision,
       operation: nextOperation,
     );
   }
@@ -421,25 +463,22 @@ final class RelationEditorState {
   /// Исходная основа, введённые поля, выбранные идентификаторы и ошибка
   /// остаются прежними. Поэтому фоновое чтение не превращается в неявную
   /// правку и не снимает ошибку занятой пары.
-  RelationEditorState withConfirmedDetails(LongTermRelationDetails details) {
+  RelationEditorState withConfirmedDetails(
+    LongTermRelationDetails details,
+    GraphRevision revision,
+  ) {
     final basis = editingBasis;
     if (basis == null || details.relation.id != basis.relation.id) {
       return this;
     }
-    return RelationEditorState(
-      context: context,
-      sourceParticipant: sourceIntentionId == details.source.id
-          ? details.source
-          : sourceParticipant,
-      relatedParticipant: relatedIntentionId == details.related.id
-          ? details.related
-          : relatedParticipant,
-      type: type,
-      priority: priority,
-      description: description,
-      operation: operation,
-      event: event,
-      failurePresentation: failurePresentation,
+    return withConfirmedParticipant(
+      RelationParticipantRole.source,
+      details.source,
+      revision,
+    ).withConfirmedParticipant(
+      RelationParticipantRole.related,
+      details.related,
+      revision,
     );
   }
 
@@ -447,15 +486,13 @@ final class RelationEditorState {
   RelationEditorState withConfirmedParticipant(
     RelationParticipantRole role,
     RelationParticipantSummary participant,
+    GraphRevision revision,
   ) {
     final current = switch (role) {
       RelationParticipantRole.source => sourceParticipant,
       RelationParticipantRole.related => relatedParticipant,
     };
-    if (current?.id != participant.id ||
-        (current!.title == participant.title &&
-            current.archiveState == participant.archiveState &&
-            current.activeRelationCount == participant.activeRelationCount)) {
+    if (current?.id != participant.id || !_isNewer(role, revision)) {
       return this;
     }
     return RelationEditorState(
@@ -466,6 +503,12 @@ final class RelationEditorState {
       relatedParticipant: role == RelationParticipantRole.related
           ? participant
           : relatedParticipant,
+      sourceRevision: role == RelationParticipantRole.source
+          ? revision
+          : sourceRevision,
+      relatedRevision: role == RelationParticipantRole.related
+          ? revision
+          : relatedRevision,
       type: type,
       priority: priority,
       description: description,
@@ -473,6 +516,56 @@ final class RelationEditorState {
       event: event,
       failurePresentation: failurePresentation,
     );
+  }
+
+  /// Новое чтение, запущенное после обнаружения другой эпохи, задаёт основу.
+  RelationEditorState withNewBasis(
+    RelationParticipantRole role,
+    GraphSnapshot<RelationParticipantSummary> snapshot,
+    GraphRevision expectedRevision,
+  ) {
+    final currentId = switch (role) {
+      RelationParticipantRole.source => sourceIntentionId,
+      RelationParticipantRole.related => relatedIntentionId,
+    };
+    final currentRevision = revisionFor(role);
+    if (currentId != snapshot.value.id ||
+        currentRevision == null ||
+        currentRevision.compareTo(expectedRevision) !=
+            GraphRevisionOrder.same) {
+      return this;
+    }
+    final order = snapshot.revision.compareTo(currentRevision);
+    if (order == GraphRevisionOrder.older || order == GraphRevisionOrder.same) {
+      return this;
+    }
+    return RelationEditorState(
+      context: context,
+      sourceParticipant: role == RelationParticipantRole.source
+          ? snapshot.value
+          : sourceParticipant,
+      relatedParticipant: role == RelationParticipantRole.related
+          ? snapshot.value
+          : relatedParticipant,
+      sourceRevision: role == RelationParticipantRole.source
+          ? snapshot.revision
+          : sourceRevision,
+      relatedRevision: role == RelationParticipantRole.related
+          ? snapshot.revision
+          : relatedRevision,
+      type: type,
+      priority: priority,
+      description: description,
+      operation: operation,
+      event: event,
+      failurePresentation: failurePresentation,
+    );
+  }
+
+  bool _isNewer(RelationParticipantRole role, GraphRevision revision) {
+    final current = revisionFor(role);
+    return current == null ||
+        revision.compareTo(current) == GraphRevisionOrder.newer;
   }
 
   RelationEditorState withOperation(
@@ -483,6 +576,8 @@ final class RelationEditorState {
     context: context,
     sourceParticipant: sourceParticipant,
     relatedParticipant: relatedParticipant,
+    sourceRevision: sourceRevision,
+    relatedRevision: relatedRevision,
     type: type,
     priority: priority,
     description: description,
@@ -495,6 +590,8 @@ final class RelationEditorState {
     context: context,
     sourceParticipant: sourceParticipant,
     relatedParticipant: relatedParticipant,
+    sourceRevision: sourceRevision,
+    relatedRevision: relatedRevision,
     type: type,
     priority: priority,
     description: description,
@@ -507,6 +604,8 @@ final class RelationEditorState {
     required RelationEditorOperation operation,
     RelationParticipantSummary? sourceParticipant,
     RelationParticipantSummary? relatedParticipant,
+    GraphRevision? sourceRevision,
+    GraphRevision? relatedRevision,
     LongTermRelationType? type,
     RelationPriority? priority,
     String? description,
@@ -514,6 +613,8 @@ final class RelationEditorState {
     context: context,
     sourceParticipant: sourceParticipant ?? this.sourceParticipant,
     relatedParticipant: relatedParticipant ?? this.relatedParticipant,
+    sourceRevision: sourceRevision ?? this.sourceRevision,
+    relatedRevision: relatedRevision ?? this.relatedRevision,
     type: type ?? this.type,
     priority: priority ?? this.priority,
     description: description ?? this.description,
