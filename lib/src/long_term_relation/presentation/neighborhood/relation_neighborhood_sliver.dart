@@ -77,12 +77,11 @@ final class _RelationNeighborhoodSliverState
     final provider = relationNeighborhoodViewModelProvider(widget.intentionId);
     final state = ref.watch(provider);
     final viewModel = ref.read(provider.notifier);
-    final refreshProgress = state is RelationGroupConfirmedState
-        ? state.progress
+    final summaryStatus = state is RelationGroupConfirmedState
+        ? state.summaryStatus
         : null;
     final onRetryRefresh =
-        refreshProgress is RelationGroupRefreshFailure &&
-            refreshProgress.canRetry
+        summaryStatus is RelationSummaryRefreshFailure && summaryStatus.canRetry
         ? viewModel.retryRefresh
         : null;
     _retainRowKeys(state);
@@ -134,8 +133,8 @@ final class _RelationNeighborhoodSliverState
     final RelationGroupEmpty empty => _EmptyGroup(
       state: empty,
       onRetryRefresh:
-          empty.progress is RelationGroupRefreshFailure &&
-              (empty.progress as RelationGroupRefreshFailure).canRetry
+          empty.summaryStatus is RelationSummaryRefreshFailure &&
+              (empty.summaryStatus as RelationSummaryRefreshFailure).canRetry
           ? viewModel.retryRefresh
           : null,
     ),
@@ -145,12 +144,13 @@ final class _RelationNeighborhoodSliverState
       state: loaded,
       onRetryLoadMore:
           loaded.progress is RelationGroupLoadMoreFailure &&
-              (loaded.progress as RelationGroupLoadMoreFailure).canRetry
+              (loaded.progress as RelationGroupLoadMoreFailure).canRetry &&
+              loaded.summaryFreshness == RelationSummaryFreshness.current
           ? viewModel.retryLoadMore
           : null,
       onRetryRefresh:
-          loaded.progress is RelationGroupRefreshFailure &&
-              (loaded.progress as RelationGroupRefreshFailure).canRetry
+          loaded.summaryStatus is RelationSummaryRefreshFailure &&
+              (loaded.summaryStatus as RelationSummaryRefreshFailure).canRetry
           ? viewModel.retryRefresh
           : null,
     ),
@@ -932,12 +932,12 @@ final class _EmptyGroup extends StatelessWidget {
     return Column(
       children: [
         _NeighborhoodStatus(message: localizations.relationNeighborhoodEmpty),
-        if (state.progress is RelationGroupRefreshing)
+        if (state.summaryStatus is RelationSummaryRefreshing)
           _NeighborhoodStatus(
             message: localizations.relationNeighborhoodRefreshing,
             progressIndicator: true,
           ),
-        if (state.progress is RelationGroupRefreshFailure)
+        if (state.summaryStatus is RelationSummaryRefreshFailure)
           _NeighborhoodStatus(
             message: localizations.relationNeighborhoodRefreshFailed,
             retry: onRetryRefresh,
@@ -961,29 +961,35 @@ final class _LoadedGroupFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    return switch (state.progress) {
-      RelationGroupIdle() =>
-        state.hasConfirmedEnd
-            ? _NeighborhoodStatus(
-                message: localizations.relationNeighborhoodConfirmedEnd,
-              )
-            : const SizedBox(height: 16),
+    final paginationStatus = switch (state.progress) {
+      RelationGroupIdle() => null,
       RelationGroupLoadingMore() => _NeighborhoodStatus(
         message: localizations.relationNeighborhoodLoadingMore,
-        progressIndicator: true,
-      ),
-      RelationGroupRefreshing() => _NeighborhoodStatus(
-        message: localizations.relationNeighborhoodRefreshing,
         progressIndicator: true,
       ),
       final RelationGroupLoadMoreFailure failure => _NeighborhoodStatus(
         message: _loadMoreFailureMessage(localizations, failure.failure),
         retry: onRetryLoadMore,
       ),
-      RelationGroupRefreshFailure() => _NeighborhoodStatus(
+    };
+    if (paginationStatus != null) {
+      return paginationStatus;
+    }
+    return switch (state.summaryStatus) {
+      RelationSummaryRefreshing() => _NeighborhoodStatus(
+        message: localizations.relationNeighborhoodRefreshing,
+        progressIndicator: true,
+      ),
+      RelationSummaryRefreshFailure() => _NeighborhoodStatus(
         message: localizations.relationNeighborhoodRefreshFailed,
         retry: onRetryRefresh,
       ),
+      RelationSummaryCurrent() =>
+        state.hasConfirmedEnd
+            ? _NeighborhoodStatus(
+                message: localizations.relationNeighborhoodConfirmedEnd,
+              )
+            : const SizedBox(height: 16),
     };
   }
 }
