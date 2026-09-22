@@ -1448,6 +1448,30 @@ abstract class AppLocalizations {
   /// **'Edit relation'**
   String get relationDetailsEditAction;
 
+  /// Действие самостоятельного архивирования связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archive relation'**
+  String get relationDetailsArchiveAction;
+
+  /// Действие самостоятельного восстановления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Restore relation'**
+  String get relationDetailsRestoreAction;
+
+  /// Переход к архивному исходному участнику, блокирующему восстановление связи
+  ///
+  /// In en, this message translates to:
+  /// **'Open source intention'**
+  String get relationDetailsOpenSourceParticipantAction;
+
+  /// Переход к архивному связанному участнику, блокирующему восстановление связи
+  ///
+  /// In en, this message translates to:
+  /// **'Open related intention'**
+  String get relationDetailsOpenRelatedParticipantAction;
+
   /// Заголовок выбора участника долговременной связи
   ///
   /// In en, this message translates to:

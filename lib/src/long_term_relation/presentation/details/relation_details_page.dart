@@ -6,11 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/domain/intention.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
+import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
 import '../editor/relation_editor_state.dart';
+import '../relation_command_failure_message.dart';
 import 'relation_details_state.dart';
 import 'relation_details_view_model.dart';
 
@@ -48,6 +53,9 @@ final class RelationDetailsPage extends ConsumerWidget {
                 final RelationDetailsLoaded loaded => _LoadedRelation(
                   state: loaded,
                   onRetry: viewModel.retry,
+                  onArchive: viewModel.archive,
+                  onRestore: viewModel.restore,
+                  onRetryLifecycleChange: viewModel.retryLifecycleChange,
                   onEdit: loaded.isOperationRunning
                       ? null
                       : () => unawaited(
@@ -87,17 +95,46 @@ final class _LoadedRelation extends StatelessWidget {
     required this.state,
     required this.onRetry,
     required this.onEdit,
+    required this.onArchive,
+    required this.onRestore,
+    required this.onRetryLifecycleChange,
   });
 
   final RelationDetailsLoaded state;
   final VoidCallback onRetry;
   final VoidCallback? onEdit;
+  final VoidCallback onArchive;
+  final VoidCallback onRestore;
+  final VoidCallback onRetryLifecycleChange;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final details = state.details;
     final relation = details.relation;
+    final lifecycleFailure = switch (state.lifecycleChange) {
+      final RelationDetailsLifecycleFailed failure => failure,
+      RelationDetailsLifecycleRunning() || null => null,
+    };
+    final sourceFailureBlocksRestore = _isArchivedParticipantFailure(
+      lifecycleFailure?.failure,
+      RelationParticipantRole.source,
+    );
+    final relatedFailureBlocksRestore = _isArchivedParticipantFailure(
+      lifecycleFailure?.failure,
+      RelationParticipantRole.related,
+    );
+    final sourceBlocksRestore =
+        relation.scope == RelationScope.archived &&
+        (details.source.archiveState == IntentionArchiveState.archived ||
+            sourceFailureBlocksRestore);
+    final relatedBlocksRestore =
+        relation.scope == RelationScope.archived &&
+        (details.related.archiveState == IntentionArchiveState.archived ||
+            relatedFailureBlocksRestore);
+    final hasKnownRestoreBlocker = sourceBlocksRestore || relatedBlocksRestore;
+    final lifecycleActionEnabled =
+        !state.isOperationRunning && lifecycleFailure == null;
     final phrase = relation.type == LongTermRelationType.need
         ? localizations.relationNeighborhoodNeedPhrase(
             details.source.title,
@@ -133,6 +170,68 @@ final class _LoadedRelation extends StatelessWidget {
             label: Text(localizations.relationDetailsEditAction),
           ),
         ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: relation.scope == RelationScope.active
+              ? FilledButton.tonalIcon(
+                  key: const ValueKey('relation-details-archive-relation'),
+                  onPressed: lifecycleActionEnabled ? onArchive : null,
+                  icon: const Icon(Icons.archive_outlined),
+                  label: Text(localizations.relationDetailsArchiveAction),
+                )
+              : FilledButton.tonalIcon(
+                  key: const ValueKey('relation-details-restore-relation'),
+                  onPressed: lifecycleActionEnabled && !hasKnownRestoreBlocker
+                      ? onRestore
+                      : null,
+                  icon: const Icon(Icons.unarchive_outlined),
+                  label: Text(localizations.relationDetailsRestoreAction),
+                ),
+        ),
+        if (lifecycleFailure != null &&
+            lifecycleFailure.failure
+                is! LongTermRelationParticipantArchivedFailure) ...[
+          const SizedBox(height: 16),
+          OperationFailurePresentation(
+            claim: lifecycleFailure.failurePresentation,
+            message: _lifecycleFailureMessage(localizations, lifecycleFailure),
+            messageKey: const ValueKey('relation-details-lifecycle-failure'),
+          ),
+          if (lifecycleFailure.canRetry) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton(
+                key: const ValueKey('relation-details-lifecycle-retry'),
+                onPressed: state.isOperationRunning
+                    ? null
+                    : onRetryLifecycleChange,
+                child: Text(localizations.commonRetry),
+              ),
+            ),
+          ],
+        ],
+        if (sourceBlocksRestore) ...[
+          const SizedBox(height: 16),
+          _ArchivedParticipantObstacle(
+            role: RelationParticipantRole.source,
+            participant: details.source,
+            failurePresentation: sourceFailureBlocksRestore
+                ? lifecycleFailure?.failurePresentation
+                : null,
+          ),
+        ],
+        if (relatedBlocksRestore) ...[
+          const SizedBox(height: 16),
+          _ArchivedParticipantObstacle(
+            role: RelationParticipantRole.related,
+            participant: details.related,
+            failurePresentation: relatedFailureBlocksRestore
+                ? lifecycleFailure?.failurePresentation
+                : null,
+          ),
+        ],
         const SizedBox(height: 24),
         _RelationField(
           label: localizations.relationDetailsTypeLabel,
@@ -185,6 +284,85 @@ final class _LoadedRelation extends StatelessWidget {
     RelationPriority.p3 => 'P3',
     RelationPriority.p4 => 'P4',
   };
+
+  bool _isArchivedParticipantFailure(
+    LongTermRelationCommandFailure? failure,
+    RelationParticipantRole role,
+  ) => switch (failure) {
+    LongTermRelationParticipantArchivedFailure(role: final failedRole) =>
+      failedRole == role,
+    _ => false,
+  };
+
+  String _lifecycleFailureMessage(
+    AppLocalizations localizations,
+    RelationDetailsLifecycleFailed change,
+  ) => longTermRelationCommandFailureMessage(localizations, switch (change
+      .kind) {
+    RelationDetailsLifecycleKind.archive => LongTermRelationCommandKind.archive,
+    RelationDetailsLifecycleKind.restore => LongTermRelationCommandKind.restore,
+  }, change.failure);
+}
+
+final class _ArchivedParticipantObstacle extends StatelessWidget {
+  const _ArchivedParticipantObstacle({
+    required this.role,
+    required this.participant,
+    this.failurePresentation,
+  });
+
+  final RelationParticipantRole role;
+  final RelationParticipantSummary participant;
+  final GraphInitiatorPresentationClaim? failurePresentation;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final isSource = role == RelationParticipantRole.source;
+    final message = isSource
+        ? localizations.relationRestoreSourceArchived
+        : localizations.relationRestoreRelatedArchived;
+    final messageKey = ValueKey(
+      isSource
+          ? 'relation-details-restore-source-obstacle'
+          : 'relation-details-restore-related-obstacle',
+    );
+    return Semantics(
+      container: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (failurePresentation != null)
+            OperationFailurePresentation(
+              claim: failurePresentation,
+              message: message,
+              messageKey: messageKey,
+            )
+          else
+            Text(message, key: messageKey),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: ValueKey(
+              isSource
+                  ? 'relation-details-open-archived-source-participant'
+                  : 'relation-details-open-archived-related-participant',
+            ),
+            onPressed: () => unawaited(
+              context.router.push(
+                IntentionDetailsRoute(intentionId: participant.id),
+              ),
+            ),
+            icon: const Icon(Icons.open_in_new),
+            label: Text(
+              isSource
+                  ? localizations.relationDetailsOpenSourceParticipantAction
+                  : localizations.relationDetailsOpenRelatedParticipantAction,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 final class _RelationOperationRunningStatus extends StatelessWidget {

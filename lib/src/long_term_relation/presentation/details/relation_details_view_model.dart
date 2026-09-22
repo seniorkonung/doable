@@ -7,7 +7,10 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../intention/domain/intention.dart';
+import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
 import 'relation_details_state.dart';
 
@@ -53,6 +56,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   ProviderSubscription<AsyncValue<LongTermRelationReadResult>>?
   _observationSubscription;
   GraphRevision? _acceptedRevision;
+  LongTermRelationOperationToken? _activeLifecycleToken;
   var _isTerminated = false;
 
   @override
@@ -66,6 +70,10 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       _handleCompletion,
     );
     ref.onDispose(() {
+      final activeLifecycleToken = _activeLifecycleToken;
+      if (activeLifecycleToken != null) {
+        _coordinator.releaseInitiatorPresentation(activeLifecycleToken);
+      }
       _observationSubscription?.close();
       unawaited(_completionSubscription.cancel());
     });
@@ -89,6 +97,143 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     }
     state = _stateFromObservation(_startObservation());
   }
+
+  /// Архивирует активную связь независимо от состояния её участников.
+  void archive() => _startLifecycleChange(RelationDetailsLifecycleKind.archive);
+
+  /// Восстанавливает архивную связь, только если оба участника активны.
+  void restore() => _startLifecycleChange(RelationDetailsLifecycleKind.restore);
+
+  /// Повторяет доказанно устранимый отказ той же операции.
+  void retryLifecycleChange() {
+    final current = state;
+    final change = current is RelationDetailsLoaded
+        ? current.lifecycleChange
+        : null;
+    if (change is RelationDetailsLifecycleFailed && change.canRetry) {
+      _startLifecycleChange(change.kind);
+    }
+  }
+
+  void _startLifecycleChange(RelationDetailsLifecycleKind kind) {
+    final current = state;
+    if (current is! RelationDetailsLoaded ||
+        _isOperationRunning ||
+        !_isLifecycleChangeApplicable(current.details, kind)) {
+      return;
+    }
+
+    final start = switch (kind) {
+      RelationDetailsLifecycleKind.archive =>
+        _coordinator.acceptRelationArchive(
+          ArchiveLongTermRelation(_relationId),
+        ),
+      RelationDetailsLifecycleKind.restore =>
+        _coordinator.acceptRelationRestore(
+          RestoreLongTermRelation(_relationId),
+        ),
+    };
+    switch (start) {
+      case LongTermRelationCommandAccepted(:final token, :final future):
+        _activeLifecycleToken = token;
+        state = current.copyWith(
+          isOperationRunning: true,
+          lifecycleChange: RelationDetailsLifecycleRunning(kind),
+        );
+        unawaited(_finishLifecycleChange(kind, future));
+      case LongTermRelationCommandAlreadyRunning():
+        state = current.copyWith(isOperationRunning: true);
+      case GraphCommandCoordinatorDraining():
+        state = current.copyWith(
+          lifecycleChange: RelationDetailsLifecycleFailed(
+            kind,
+            const LongTermRelationUnexpectedFailure(),
+          ),
+        );
+    }
+  }
+
+  bool _isLifecycleChangeApplicable(
+    LongTermRelationDetails details,
+    RelationDetailsLifecycleKind kind,
+  ) => switch (kind) {
+    RelationDetailsLifecycleKind.archive =>
+      details.relation.scope == RelationScope.active,
+    RelationDetailsLifecycleKind.restore =>
+      details.relation.scope == RelationScope.archived &&
+          details.source.archiveState == IntentionArchiveState.active &&
+          details.related.archiveState == IntentionArchiveState.active,
+  };
+
+  Future<void> _finishLifecycleChange(
+    RelationDetailsLifecycleKind kind,
+    Future<LongTermRelationCommandCompletion> future,
+  ) async {
+    try {
+      final completion = await future;
+      if (!ref.mounted || !identical(_activeLifecycleToken, completion.token)) {
+        return;
+      }
+
+      _activeLifecycleToken = null;
+      final current = state;
+      if (current is! RelationDetailsLoaded) {
+        if (completion.isFailure) {
+          _coordinator.releaseInitiatorPresentation(completion.token);
+        }
+        return;
+      }
+      state = switch (completion.result) {
+        GraphResultSuccess(value: LongTermRelationUpdated(:final relation))
+            when relation.id == _relationId &&
+                _scopeMatchesLifecycleKind(relation.scope, kind) =>
+          current.copyWith(clearLifecycleChange: true),
+        GraphResultSuccess() => current.copyWith(
+          lifecycleChange: RelationDetailsLifecycleFailed(
+            kind,
+            const LongTermRelationUnexpectedFailure(),
+          ),
+        ),
+        GraphResultFailure(:final failure) => current.copyWith(
+          lifecycleChange: RelationDetailsLifecycleFailed(
+            kind,
+            failure,
+            failurePresentation: _coordinator.claimInitiatorFailure(
+              completion.token,
+            ),
+          ),
+        ),
+      };
+      _scheduleGateRefresh();
+    } on Object {
+      if (!ref.mounted) {
+        return;
+      }
+      final token = _activeLifecycleToken;
+      _activeLifecycleToken = null;
+      if (token != null) {
+        _coordinator.releaseInitiatorPresentation(token);
+      }
+      final current = state;
+      if (current is RelationDetailsLoaded) {
+        state = current.copyWith(
+          lifecycleChange: RelationDetailsLifecycleFailed(
+            kind,
+            const LongTermRelationUnexpectedFailure(),
+          ),
+        );
+      }
+      _scheduleGateRefresh();
+    }
+  }
+
+  bool _scopeMatchesLifecycleKind(
+    RelationScope scope,
+    RelationDetailsLifecycleKind kind,
+  ) => switch (kind) {
+    RelationDetailsLifecycleKind.archive => scope == RelationScope.archived,
+    RelationDetailsLifecycleKind.restore => scope == RelationScope.active,
+  };
 
   AsyncValue<LongTermRelationReadResult> _startObservation() {
     _observationSubscription?.close();

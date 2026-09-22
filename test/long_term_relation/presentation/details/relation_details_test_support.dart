@@ -115,6 +115,9 @@ final class ControlledRelationDetailsRepository
     ),
   );
 
+  void failRelationCommand(int index, LongTermRelationCommandFailure failure) =>
+      _relationCommandRequests[index].complete(GraphCommandFailed(failure));
+
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
     final watch = ControlledRelationWatch(id);

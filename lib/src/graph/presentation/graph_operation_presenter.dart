@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
+import '../../long_term_relation/presentation/relation_command_failure_message.dart';
 import '../../shared/presentation/presentation_frame_evidence.dart';
 import '../application/graph_command_coordinator.dart';
 import '../application/graph_command_result.dart';
@@ -266,84 +267,11 @@ String _relationOutcomeFor(
     (LongTermRelationCommandKind.restore, LongTermRelationCreated()) =>
       localizations.relationRestoreUnexpected,
   },
-  GraphResultFailure(:final failure) => switch (completion.kind) {
-    LongTermRelationCommandKind.create => switch (failure) {
-      LongTermRelationCommandValidationFailure() =>
-        localizations.relationEditorCreateInvalidInput,
-      LongTermRelationPairOccupiedFailure() =>
-        localizations.relationEditorCreatePairOccupied,
-      LongTermRelationNotFoundFailure() =>
-        localizations.relationEditorCreateUnexpected,
-      LongTermRelationParticipantNotFoundFailure() =>
-        localizations.relationEditorCreateParticipantNotFound,
-      LongTermRelationParticipantArchivedFailure() =>
-        localizations.relationEditorCreateParticipantArchived,
-      LongTermRelationUnavailableFailure() =>
-        localizations.relationEditorCreateUnavailable,
-      LongTermRelationCorruptionFailure() =>
-        localizations.relationEditorCreateCorruption,
-      LongTermRelationUnexpectedFailure() =>
-        localizations.relationEditorCreateUnexpected,
-    },
-    LongTermRelationCommandKind.update => switch (failure) {
-      LongTermRelationCommandValidationFailure() =>
-        localizations.relationEditorUpdateInvalidInput,
-      LongTermRelationPairOccupiedFailure() =>
-        localizations.relationEditorUpdatePairOccupied,
-      LongTermRelationNotFoundFailure() =>
-        localizations.relationEditorUpdateNotFound,
-      LongTermRelationParticipantNotFoundFailure() =>
-        localizations.relationEditorUpdateParticipantNotFound,
-      LongTermRelationParticipantArchivedFailure() =>
-        localizations.relationEditorUpdateParticipantArchived,
-      LongTermRelationUnavailableFailure() =>
-        localizations.relationEditorUpdateUnavailable,
-      LongTermRelationCorruptionFailure() =>
-        localizations.relationEditorUpdateCorruption,
-      LongTermRelationUnexpectedFailure() =>
-        localizations.relationEditorUpdateUnexpected,
-    },
-    LongTermRelationCommandKind.archive => switch (failure) {
-      LongTermRelationNotFoundFailure() =>
-        localizations.relationArchiveNotFound,
-      LongTermRelationUnavailableFailure() =>
-        localizations.relationArchiveUnavailable,
-      LongTermRelationCorruptionFailure() =>
-        localizations.relationArchiveCorruption,
-      LongTermRelationCommandValidationFailure() ||
-      LongTermRelationPairOccupiedFailure() ||
-      LongTermRelationParticipantNotFoundFailure() ||
-      LongTermRelationParticipantArchivedFailure() =>
-        localizations.relationArchiveConflict,
-      LongTermRelationUnexpectedFailure() =>
-        localizations.relationArchiveUnexpected,
-    },
-    LongTermRelationCommandKind.restore => switch (failure) {
-      LongTermRelationNotFoundFailure() =>
-        localizations.relationRestoreNotFound,
-      LongTermRelationParticipantNotFoundFailure(:final role) => switch (role) {
-        RelationParticipantRole.source =>
-          localizations.relationRestoreSourceNotFound,
-        RelationParticipantRole.related =>
-          localizations.relationRestoreRelatedNotFound,
-      },
-      LongTermRelationParticipantArchivedFailure(:final role) => switch (role) {
-        RelationParticipantRole.source =>
-          localizations.relationRestoreSourceArchived,
-        RelationParticipantRole.related =>
-          localizations.relationRestoreRelatedArchived,
-      },
-      LongTermRelationUnavailableFailure() =>
-        localizations.relationRestoreUnavailable,
-      LongTermRelationCorruptionFailure() =>
-        localizations.relationRestoreCorruption,
-      LongTermRelationCommandValidationFailure() ||
-      LongTermRelationPairOccupiedFailure() =>
-        localizations.relationRestoreConflict,
-      LongTermRelationUnexpectedFailure() =>
-        localizations.relationRestoreUnexpected,
-    },
-  },
+  GraphResultFailure(:final failure) => longTermRelationCommandFailureMessage(
+    localizations,
+    completion.kind,
+    failure,
+  ),
 };
 
 String _intentionOutcomeFor(

@@ -808,6 +808,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationDetailsEditAction => 'Edit relation';
 
   @override
+  String get relationDetailsArchiveAction => 'Archive relation';
+
+  @override
+  String get relationDetailsRestoreAction => 'Restore relation';
+
+  @override
+  String get relationDetailsOpenSourceParticipantAction =>
+      'Open source intention';
+
+  @override
+  String get relationDetailsOpenRelatedParticipantAction =>
+      'Open related intention';
+
+  @override
   String get participantPickerTitle => 'Select a participant';
 
   @override
