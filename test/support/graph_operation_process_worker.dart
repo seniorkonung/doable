@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -15,6 +16,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_descript
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'large_blocking_relations_fixture.dart';
 
 const _operationEnvironment = 'DOABLE_GRAPH_OPERATION';
 const _stopPointEnvironment = 'DOABLE_GRAPH_STOP_POINT';
@@ -107,6 +110,12 @@ void main() {
           _GraphOperation.delete => await repository.execute(
             DeleteLongTermRelation(_relationId(_workerRelationIdValue)),
           ),
+          _GraphOperation.bulkDelete => await repository.execute(
+            DeleteBlockingRelations(
+              intentionId: _intentionId(_sourceIdValue),
+              relationIds: LargeBlockingRelationsFixture.selectedIds,
+            ),
+          ),
         };
         final succeeded = switch (operation) {
           _GraphOperation.create ||
@@ -114,6 +123,7 @@ void main() {
           _GraphOperation.archive ||
           _GraphOperation.restore ||
           _GraphOperation.delete => result is GraphCommandSucceeded,
+          _GraphOperation.bulkDelete => result is GraphCommandSucceeded,
           _GraphOperation.cascade => result is ResultSuccess,
         };
         if (!succeeded) {
@@ -140,7 +150,21 @@ final class _GraphOperationStopObserver
   final _GraphStopPoint stopPoint;
 
   @override
+  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
+    if (operation == _GraphOperation.bulkDelete &&
+        stopPoint == _GraphStopPoint.beforeDelete &&
+        _isBulkDelete(statement)) {
+      await _reportReadyAndWait();
+    }
+  }
+
+  @override
   Future<void> afterStatement(LocalDatabaseSqlStatement statement) async {
+    if (operation == _GraphOperation.bulkDelete &&
+        stopPoint == _GraphStopPoint.duringDelete &&
+        _isBulkDelete(statement)) {
+      await _reportReadyAndWait();
+    }
     if (stopPoint != _GraphStopPoint.beforeCommit) return;
     final matches = switch (operation) {
       _GraphOperation.create =>
@@ -165,10 +189,17 @@ final class _GraphOperationStopObserver
             statement.statements.any(
               (sql) => sql.contains('long_term_relations'),
             ),
+      _GraphOperation.bulkDelete => false,
     };
     if (matches) await _reportReadyAndWait();
   }
 }
+
+bool _isBulkDelete(LocalDatabaseSqlStatement statement) =>
+    statement.operation == LocalDatabaseSqlOperation.update &&
+    statement.statements.any(
+      (sql) => sql.startsWith('DELETE FROM long_term_relations WHERE id IN'),
+    );
 
 Future<Never> _reportReadyAndWait() async {
   stdout.writeln('$_readyMarker:$pid');
@@ -183,7 +214,8 @@ enum _GraphOperation {
   update,
   archive,
   restore,
-  delete;
+  delete,
+  bulkDelete;
 
   static _GraphOperation parse(String? value) => switch (value) {
     'create' => create,
@@ -192,16 +224,21 @@ enum _GraphOperation {
     'archive' => archive,
     'restore' => restore,
     'delete' => delete,
+    'bulk_delete' => bulkDelete,
     _ => throw StateError('Неизвестная операция графа: $value.'),
   };
 }
 
 enum _GraphStopPoint {
   beforeCommit,
+  beforeDelete,
+  duringDelete,
   afterCommit;
 
   static _GraphStopPoint parse(String? value) => switch (value) {
     'before_commit' => beforeCommit,
+    'before_delete' => beforeDelete,
+    'during_delete' => duringDelete,
     'after_commit' => afterCommit,
     _ => throw StateError('Неизвестная точка остановки операции: $value.'),
   };

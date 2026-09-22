@@ -20,6 +20,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/large_blocking_relations_fixture.dart';
 
 void main() {
   late AppDatabase database;
@@ -27,9 +28,16 @@ void main() {
   late DriftPersonalGraphRepository repository;
   late List<IntentionId> intentions;
   late _RelationIds relationIds;
+  late _BulkDeleteObserver deleteObserver;
 
   setUp(() async {
-    database = AppDatabase(openInMemoryLocalDatabase());
+    deleteObserver = _BulkDeleteObserver();
+    database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        deleteObserver,
+      ),
+    );
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
     intentions = [for (var i = 1; i <= 12; i++) _intentionId(i)];
@@ -591,6 +599,122 @@ void main() {
       expect((await _relation(database, remaining))?['is_archived'], 1);
     },
   );
+
+  test('набор за границей SQL-порции удаляется одним результатом', () async {
+    final owner = intentions.first;
+    await LargeBlockingRelationsFixture.seed(database, owner);
+    final selected = LargeBlockingRelationsFixture.selectedIds;
+    final beforeIntentions = await _rows(database, 'intentions');
+    final unselected = await _relation(
+      database,
+      LargeBlockingRelationsFixture.unselected,
+    );
+    final unrelated = await _relation(
+      database,
+      LargeBlockingRelationsFixture.unrelated,
+    );
+    final previousRevision = await _revision(repository, owner);
+    deleteObserver.clear();
+
+    final confirmed = _success(
+      await repository.execute(
+        DeleteBlockingRelations(intentionId: owner, relationIds: selected),
+      ),
+    );
+
+    expect(deleteObserver.batchSizes, [400, 1]);
+    expect(
+      confirmed.revision.compareTo(previousRevision),
+      GraphRevisionOrder.newer,
+    );
+    expect(
+      confirmed.value.deletedRelations.map((relation) => relation.id),
+      selected,
+    );
+    expect(confirmed.value.changes.map((change) => change.revision).toSet(), {
+      confirmed.revision,
+    });
+    expect(
+      confirmed.value.changes
+          .whereType<IntentionRelationCountsChanged>()
+          .singleWhere((change) => change.intentionId == owner)
+          .counts
+          .activeNeedOutgoing,
+      1,
+    );
+    expect((await _rows(database, 'long_term_relations')).length, 2);
+    expect(
+      await _relation(database, LargeBlockingRelationsFixture.unselected),
+      unselected,
+    );
+    expect(
+      await _relation(database, LargeBlockingRelationsFixture.unrelated),
+      unrelated,
+    );
+    expect(await _rows(database, 'intentions'), beforeIntentions);
+  });
+
+  test('конфликт в поздней SQL-порции сохраняет весь набор', () async {
+    final owner = intentions.first;
+    await LargeBlockingRelationsFixture.seed(database, owner);
+    final selected = LargeBlockingRelationsFixture.selectedIds;
+    await database.customStatement(
+      'DELETE FROM long_term_relations WHERE id = ?',
+      [selected.last.toCanonicalString()],
+    );
+    final before = await _rows(database, 'long_term_relations');
+    final revision = await _revision(repository, owner);
+    deleteObserver.clear();
+
+    final failure = _failure(
+      await repository.execute(
+        DeleteBlockingRelations(intentionId: owner, relationIds: selected),
+      ),
+    );
+
+    expect(
+      failure,
+      isA<DeleteBlockingRelationsSelectionConflictFailure>().having(
+        (failure) => failure.relationId,
+        'связь поздней порции',
+        selected.last,
+      ),
+    );
+    expect(deleteObserver.batchSizes, isEmpty);
+    expect(await _rows(database, 'long_term_relations'), before);
+    expect(
+      (await _revision(repository, owner)).compareTo(revision),
+      GraphRevisionOrder.same,
+    );
+  });
+
+  test('отказ после первой SQL-порции откатывает все удаления', () async {
+    final owner = intentions.first;
+    await LargeBlockingRelationsFixture.seed(database, owner);
+    final beforeRelations = await _rows(database, 'long_term_relations');
+    final beforeIntentions = await _rows(database, 'intentions');
+    final revision = await _revision(repository, owner);
+    deleteObserver.clear();
+    deleteObserver.failAfterFirstBatch = true;
+
+    final failure = _failure(
+      await repository.execute(
+        DeleteBlockingRelations(
+          intentionId: owner,
+          relationIds: LargeBlockingRelationsFixture.selectedIds,
+        ),
+      ),
+    );
+
+    expect(failure, isA<DeleteBlockingRelationsUnexpectedFailure>());
+    expect(deleteObserver.batchSizes, [400]);
+    expect(await _rows(database, 'long_term_relations'), beforeRelations);
+    expect(await _rows(database, 'intentions'), beforeIntentions);
+    expect(
+      (await _revision(repository, owner)).compareTo(revision),
+      GraphRevisionOrder.same,
+    );
+  });
 }
 
 DriftPersonalGraphRepository _repository(
@@ -707,5 +831,27 @@ final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
   void record(DiagnosticsEvent event) {
     events.add(event as BlockingRelationsDeleteDiagnosticsEvent);
     throw StateError('Отказ диагностики');
+  }
+}
+
+final class _BulkDeleteObserver extends LocalDatabaseConnectionObserver {
+  final batchSizes = <int>[];
+  var failAfterFirstBatch = false;
+
+  void clear() => batchSizes.clear();
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation != LocalDatabaseSqlOperation.update ||
+        !statement.statements.any(
+          (sql) =>
+              sql.startsWith('DELETE FROM long_term_relations WHERE id IN'),
+        )) {
+      return;
+    }
+    batchSizes.add(statement.arguments.length);
+    if (failAfterFirstBatch && batchSizes.length == 1) {
+      throw StateError('Контрольный отказ после первой порции удаления.');
+    }
   }
 }
