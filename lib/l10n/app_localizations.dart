@@ -1496,6 +1496,35 @@ abstract class AppLocalizations {
   /// **'Restore relation'**
   String get relationDetailsRestoreAction;
 
+  /// Действие начала физического удаления конкретной долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete relation permanently'**
+  String get relationDetailsDeleteAction;
+
+  /// Заголовок подтверждения необратимого удаления конкретной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete relation permanently?'**
+  String get relationDetailsDeleteConfirmationTitle;
+
+  /// Контекст и объяснение необратимости удаления конкретной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. Both intentions and all other relations will remain.'**
+  String relationDetailsDeleteConfirmationMessage(
+    String phrase,
+    String sourceTitle,
+    String relatedTitle,
+    String scope,
+  );
+
+  /// Явное подтверждение физического удаления конкретной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete permanently'**
+  String get relationDetailsConfirmDeleteAction;
+
   /// Переход к архивному исходному участнику, блокирующему восстановление связи
   ///
   /// In en, this message translates to:

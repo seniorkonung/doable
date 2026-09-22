@@ -37,6 +37,13 @@ final class RelationDetailsPage extends ConsumerWidget {
     final provider = relationDetailsViewModelProvider(relationId);
     final state = ref.watch(provider);
     final viewModel = ref.read(provider.notifier);
+    ref.listen(provider, (previous, next) {
+      // Успех предъявляет общий presenter, а удалённый контекст закрывается
+      // независимо от занятости общей поверхности сообщения.
+      if (next is RelationDetailsDeleted) {
+        unawaited(Navigator.of(context).maybePop());
+      }
+    });
     return Scaffold(
       appBar: AppBar(title: Text(localizations.relationDetailsTitle)),
       body: SafeArea(
@@ -55,6 +62,7 @@ final class RelationDetailsPage extends ConsumerWidget {
                   onRetry: viewModel.retry,
                   onArchive: viewModel.archive,
                   onRestore: viewModel.restore,
+                  onDelete: viewModel.delete,
                   onRetryLifecycleChange: viewModel.retryLifecycleChange,
                   onEdit: loaded.isOperationRunning
                       ? null
@@ -69,6 +77,9 @@ final class RelationDetailsPage extends ConsumerWidget {
                         ),
                 ),
                 RelationDetailsNotFound() => _RelationDetailsStatus(
+                  message: localizations.relationDetailsNotFound,
+                ),
+                RelationDetailsDeleted() => _RelationDetailsStatus(
                   message: localizations.relationDetailsNotFound,
                 ),
                 RelationDetailsUnavailable() => _RelationDetailsStatus(
@@ -97,6 +108,7 @@ final class _LoadedRelation extends StatelessWidget {
     required this.onEdit,
     required this.onArchive,
     required this.onRestore,
+    required this.onDelete,
     required this.onRetryLifecycleChange,
   });
 
@@ -105,6 +117,7 @@ final class _LoadedRelation extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback onArchive;
   final VoidCallback onRestore;
+  final VoidCallback onDelete;
   final VoidCallback onRetryLifecycleChange;
 
   @override
@@ -188,6 +201,18 @@ final class _LoadedRelation extends StatelessWidget {
                   icon: const Icon(Icons.unarchive_outlined),
                   label: Text(localizations.relationDetailsRestoreAction),
                 ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const ValueKey('relation-details-delete-relation'),
+            onPressed: lifecycleActionEnabled
+                ? () => unawaited(_confirmDeletion(context, details, phrase))
+                : null,
+            icon: const Icon(Icons.delete_forever_outlined),
+            label: Text(localizations.relationDetailsDeleteAction),
+          ),
         ),
         if (lifecycleFailure != null &&
             lifecycleFailure.failure
@@ -285,6 +310,53 @@ final class _LoadedRelation extends StatelessWidget {
     RelationPriority.p4 => 'P4',
   };
 
+  Future<void> _confirmDeletion(
+    BuildContext context,
+    LongTermRelationDetails details,
+    String phrase,
+  ) async {
+    final localizations = AppLocalizations.of(context);
+    final scope = details.relation.scope == RelationScope.active
+        ? localizations.relationNeighborhoodRelationActive
+        : localizations.relationNeighborhoodRelationArchived;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        scrollable: true,
+        title: Text(localizations.relationDetailsDeleteConfirmationTitle),
+        content: Semantics(
+          container: true,
+          child: Text(
+            localizations.relationDetailsDeleteConfirmationMessage(
+              phrase,
+              details.source.title,
+              details.related.title,
+              scope,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(localizations.detailsCancelEditAction),
+          ),
+          FilledButton(
+            key: const ValueKey('relation-details-confirm-delete'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            child: Text(localizations.relationDetailsConfirmDeleteAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) {
+      onDelete();
+    }
+  }
+
   bool _isArchivedParticipantFailure(
     LongTermRelationCommandFailure? failure,
     RelationParticipantRole role,
@@ -301,6 +373,7 @@ final class _LoadedRelation extends StatelessWidget {
       .kind) {
     RelationDetailsLifecycleKind.archive => LongTermRelationCommandKind.archive,
     RelationDetailsLifecycleKind.restore => LongTermRelationCommandKind.restore,
+    RelationDetailsLifecycleKind.delete => LongTermRelationCommandKind.delete,
   }, change.failure);
 }
 

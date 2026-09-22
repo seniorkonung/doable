@@ -115,6 +115,27 @@ final class ControlledRelationDetailsRepository
     ),
   );
 
+  void completeRelationDelete(
+    int index, {
+    required LongTermRelation relation,
+    required GraphRevision revision,
+  }) => _relationCommandRequests[index].complete(
+    GraphCommandSucceeded(
+      ConfirmedGraphResult(
+        revision: revision,
+        value: LongTermRelationDeleted(
+          relation: relation,
+          changes: <GraphChange>[
+            LongTermRelationDeletedChange(
+              revision: revision,
+              relation: relation,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   void failRelationCommand(int index, LongTermRelationCommandFailure failure) =>
       _relationCommandRequests[index].complete(GraphCommandFailed(failure));
 

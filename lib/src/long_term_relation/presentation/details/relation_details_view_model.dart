@@ -104,6 +104,9 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   /// Восстанавливает архивную связь, только если оба участника активны.
   void restore() => _startLifecycleChange(RelationDetailsLifecycleKind.restore);
 
+  /// Физически удаляет конкретную активную или архивную связь.
+  void delete() => _startLifecycleChange(RelationDetailsLifecycleKind.delete);
+
   /// Повторяет доказанно устранимый отказ той же операции.
   void retryLifecycleChange() {
     final current = state;
@@ -132,6 +135,9 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
         _coordinator.acceptRelationRestore(
           RestoreLongTermRelation(_relationId),
         ),
+      RelationDetailsLifecycleKind.delete => _coordinator.acceptRelationDelete(
+        DeleteLongTermRelation(_relationId),
+      ),
     };
     switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
@@ -163,6 +169,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       details.relation.scope == RelationScope.archived &&
           details.source.archiveState == IntentionArchiveState.active &&
           details.related.archiveState == IntentionArchiveState.active,
+    RelationDetailsLifecycleKind.delete => true,
   };
 
   Future<void> _finishLifecycleChange(
@@ -188,6 +195,10 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
             when relation.id == _relationId &&
                 _scopeMatchesLifecycleKind(relation.scope, kind) =>
           current.copyWith(clearLifecycleChange: true),
+        GraphResultSuccess(value: LongTermRelationDeleted(:final relation))
+            when relation.id == _relationId &&
+                kind == RelationDetailsLifecycleKind.delete =>
+          _terminateAsDeleted(),
         GraphResultSuccess() => current.copyWith(
           lifecycleChange: RelationDetailsLifecycleFailed(
             kind,
@@ -233,6 +244,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   ) => switch (kind) {
     RelationDetailsLifecycleKind.archive => scope == RelationScope.archived,
     RelationDetailsLifecycleKind.restore => scope == RelationScope.active,
+    RelationDetailsLifecycleKind.delete => false,
   };
 
   AsyncValue<LongTermRelationReadResult> _startObservation() {
@@ -277,6 +289,11 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       _scheduleGateRefresh();
       if (completion.confirmedResult case GraphResultSuccess(:final value)) {
         if (!_advanceRevisionBarrier(value.revision)) {
+          return;
+        }
+        if (value.value case LongTermRelationDeleted(relation: final relation)
+            when relation.id == _relationId) {
+          state = _terminateAsDeleted();
           return;
         }
         _generation = _generation.next();
@@ -395,6 +412,14 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     return RelationDetailsNotFound(isOperationRunning: _isOperationRunning);
   }
 
+  RelationDetailsDeleted _terminateAsDeleted() {
+    _isTerminated = true;
+    _observationSubscription?.close();
+    _observationSubscription = null;
+    unawaited(_completionSubscription.cancel());
+    return const RelationDetailsDeleted();
+  }
+
   bool get _isOperationRunning => _coordinator.isRelationRunning(_relationId);
 
   RelationDetailsState _withOperationRunning(
@@ -408,6 +433,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       isOperationRunning: isOperationRunning,
     ),
     RelationDetailsNotFound() => current,
+    RelationDetailsDeleted() => current,
     RelationDetailsUnavailable() => RelationDetailsUnavailable(
       isOperationRunning: isOperationRunning,
     ),
