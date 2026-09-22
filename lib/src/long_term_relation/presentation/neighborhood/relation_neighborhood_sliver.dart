@@ -12,6 +12,7 @@ import '../../application/relation_counts.dart';
 import '../../application/relation_group_page.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
+import 'blocking_relations_confirmation.dart';
 import 'blocking_relations_selection_state.dart';
 import 'blocking_relations_selection_view_model.dart';
 import 'relation_neighborhood_state.dart';
@@ -24,6 +25,7 @@ import 'relation_neighborhood_view_model.dart';
 final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
   const RelationNeighborhoodSliver({
     required this.intentionId,
+    required this.intentionTitle,
     required this.onOpenRelation,
     required this.onCreateRelation,
     this.selectionMode = false,
@@ -31,6 +33,7 @@ final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
   });
 
   final IntentionId intentionId;
+  final String intentionTitle;
 
   /// Открывает подробные данные выбранной связи; маршрут выбирает страница.
   final ValueChanged<LongTermRelationId> onOpenRelation;
@@ -105,13 +108,17 @@ final class _RelationNeighborhoodSliverState
         if (index == 0) {
           return _NeighborhoodHeader(
             state: state,
+            intentionId: widget.intentionId,
+            intentionTitle: widget.intentionTitle,
             onSelectGroup: viewModel.selectGroup,
             onSelectScope: viewModel.selectScope,
             onSelectType: viewModel.selectType,
             onSelectDirection: viewModel.selectDirection,
             onCreateRelation: widget.onCreateRelation,
             onRetryRefresh: onRetryRefresh,
-            selectedCount: selection?.selected.length,
+            selectedCount: selection is BlockingRelationsSelectionSucceeded
+                ? null
+                : selection?.selected.length,
           );
         }
         return _buildBodyChild(context, state, index - 1, viewModel, selection);
@@ -188,7 +195,9 @@ final class _RelationNeighborhoodSliverState
         item: item,
         onOpen: widget.onOpenRelation,
         direction: state.selection.direction,
-        isSelected: selection?.selected.containsKey(item.relation.id),
+        isSelected: selection is BlockingRelationsSelectionSucceeded
+            ? null
+            : selection?.selected.containsKey(item.relation.id),
         onToggleSelection: selection is BlockingRelationsSelectionEditing
             ? () {
                 final editor = ref.read(
@@ -322,6 +331,8 @@ final class _RelationNeighborhoodSliverState
 final class _NeighborhoodHeader extends StatelessWidget {
   const _NeighborhoodHeader({
     required this.state,
+    required this.intentionId,
+    required this.intentionTitle,
     required this.onSelectGroup,
     required this.onSelectScope,
     required this.onSelectType,
@@ -332,6 +343,8 @@ final class _NeighborhoodHeader extends StatelessWidget {
   });
 
   final RelationNeighborhoodState state;
+  final IntentionId intentionId;
+  final String intentionTitle;
   final ValueChanged<RelationGroupSelection> onSelectGroup;
   final ValueChanged<RelationScope> onSelectScope;
   final ValueChanged<LongTermRelationType> onSelectType;
@@ -369,6 +382,11 @@ final class _NeighborhoodHeader extends StatelessWidget {
                 key: const ValueKey('relation-neighborhood-selected-count'),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+            ),
+            const SizedBox(height: 12),
+            BlockingRelationsConfirmationAction(
+              intentionId: intentionId,
+              intentionTitle: intentionTitle,
             ),
             const SizedBox(height: 12),
           ],

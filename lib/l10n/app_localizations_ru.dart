@@ -187,6 +187,41 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationNeighborhoodRemoveFromSelection => 'Убрать из выбора';
 
   @override
+  String get blockingRelationsReviewAction => 'Просмотреть выбранные связи';
+
+  @override
+  String get blockingRelationsConfirmationTitle =>
+      'Удалить выбранные связи навсегда?';
+
+  @override
+  String get blockingRelationsConfirmationWarning =>
+      'Проверьте каждую выбранную связь. Удаление нельзя отменить. Само намерение останется; для его удаления понадобится отдельное подтверждение.';
+
+  @override
+  String blockingRelationsConfirmationCount(int count) {
+    return 'К удалению: $count';
+  }
+
+  @override
+  String blockingRelationsParticipantId(String id) {
+    return 'Идентификатор: $id';
+  }
+
+  @override
+  String get blockingRelationsDeleting => 'Удаляем выбранные связи…';
+
+  @override
+  String get blockingRelationsBusy =>
+      'Другое изменение этих связей или намерения уже выполняется.';
+
+  @override
+  String get blockingRelationsDraining =>
+      'Приложение завершает работу. Изменение не принято.';
+
+  @override
+  String get blockingRelationsEditSelectionAction => 'Вернуться к выбору';
+
+  @override
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
 
   @override

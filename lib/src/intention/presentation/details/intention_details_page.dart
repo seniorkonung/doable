@@ -328,6 +328,7 @@ final class _LoadedDetails extends StatelessWidget {
         RelationNeighborhoodSliver(
           key: neighborhoodKey,
           intentionId: intention.id,
+          intentionTitle: intention.title,
           selectionMode: selectionMode,
           onOpenRelation: (relationId) => unawaited(
             context.router.push(RelationDetailsRoute(relationId: relationId)),

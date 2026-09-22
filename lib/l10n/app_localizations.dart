@@ -410,6 +410,60 @@ abstract class AppLocalizations {
   /// **'Remove from selection'**
   String get relationNeighborhoodRemoveFromSelection;
 
+  /// Открыть полный набор выбранных связей для подтверждения
+  ///
+  /// In en, this message translates to:
+  /// **'Review selected relations'**
+  String get blockingRelationsReviewAction;
+
+  /// Заголовок подтверждения массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected relations permanently?'**
+  String get blockingRelationsConfirmationTitle;
+
+  /// Необратимость удаления связей и сохранность намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.'**
+  String get blockingRelationsConfirmationWarning;
+
+  /// Число связей в подтверждённом наборе
+  ///
+  /// In en, this message translates to:
+  /// **'To delete: {count}'**
+  String blockingRelationsConfirmationCount(int count);
+
+  /// Идентификатор участника для различения одноимённых намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Identifier: {id}'**
+  String blockingRelationsParticipantId(String id);
+
+  /// Состояние принятого массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting selected relations…'**
+  String get blockingRelationsDeleting;
+
+  /// Отказ при занятом намерении или выбранной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Another change to these relations or the intention is already running.'**
+  String get blockingRelationsBusy;
+
+  /// Отказ при завершении работы приложения
+  ///
+  /// In en, this message translates to:
+  /// **'The app is closing. The change was not accepted.'**
+  String get blockingRelationsDraining;
+
+  /// Вернуться к сохранённому выбору после ошибки
+  ///
+  /// In en, this message translates to:
+  /// **'Return to selection'**
+  String get blockingRelationsEditSelectionAction;
+
   /// Первоначальная загрузка соседства и полной сводки
   ///
   /// In en, this message translates to:
