@@ -90,6 +90,27 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
   LongTermRelationId get id => after.id;
 }
 
+final class LongTermRelationUnchangedChange extends LongTermRelationChange {
+  const LongTermRelationUnchangedChange({
+    required this.revision,
+    required this.relation,
+  });
+
+  @override
+  final GraphRevision revision;
+
+  final LongTermRelation relation;
+
+  @override
+  LongTermRelationId get id => relation.id;
+
+  @override
+  LongTermRelation get before => relation;
+
+  @override
+  LongTermRelation get after => relation;
+}
+
 final class LongTermRelationDeletedChange extends LongTermRelationChange {
   const LongTermRelationDeletedChange({
     required this.revision,

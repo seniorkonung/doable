@@ -121,6 +121,13 @@ final class LongTermRelationPatch {
   final LongTermRelationDescriptionPatch description;
 }
 
+final class UpdateLongTermRelation extends LongTermRelationCommand {
+  const UpdateLongTermRelation({required this.relationId, required this.patch});
+
+  final LongTermRelationId relationId;
+  final LongTermRelationPatch patch;
+}
+
 enum RelationParticipantRole { source, related }
 
 sealed class LongTermRelationCommandFailure implements GraphCommandFailure {
@@ -145,6 +152,16 @@ final class LongTermRelationPairOccupiedFailure
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.conflict;
+}
+
+final class LongTermRelationNotFoundFailure
+    extends LongTermRelationCommandFailure {
+  const LongTermRelationNotFoundFailure(this.relationId);
+
+  final LongTermRelationId relationId;
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.notFound;
 }
 
 final class LongTermRelationParticipantNotFoundFailure
@@ -214,6 +231,19 @@ final class LongTermRelationCreated extends LongTermRelationCommandSuccess {
     required super.changes,
   });
 
+  final LongTermRelation relation;
+  final LongTermRelationDescription? description;
+}
+
+final class LongTermRelationUpdated extends LongTermRelationCommandSuccess {
+  LongTermRelationUpdated({
+    required this.before,
+    required this.relation,
+    required this.description,
+    required super.changes,
+  });
+
+  final LongTermRelation before;
   final LongTermRelation relation;
   final LongTermRelationDescription? description;
 }

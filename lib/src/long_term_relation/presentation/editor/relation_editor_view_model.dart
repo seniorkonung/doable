@@ -158,6 +158,10 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
             RelationEditorSucceeded(relation),
             event: RelationEditorCreated(relation.id),
           ),
+        GraphResultSuccess(value: LongTermRelationUpdated()) =>
+          state.withOperation(
+            const RelationEditorFailed(RelationEditorUnexpected()),
+          ),
         GraphResultFailure(:final failure) => state.withOperation(
           RelationEditorFailed(_editorFailure(failure)),
           failurePresentation: _coordinator.claimInitiatorFailure(
@@ -189,6 +193,7 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
       const RelationEditorSameParticipants(),
     LongTermRelationPairOccupiedFailure(:final existingRelationId) =>
       RelationEditorPairOccupied(existingRelationId),
+    LongTermRelationNotFoundFailure() => const RelationEditorUnexpected(),
     LongTermRelationParticipantNotFoundFailure(
       :final role,
       :final intentionId,
