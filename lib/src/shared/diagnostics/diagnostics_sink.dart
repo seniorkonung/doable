@@ -144,3 +144,9 @@ final class LongTermRelationCommandDiagnosticsEvent extends DiagnosticsEvent {
 
   final LongTermRelationCommandDiagnosticsType commandType;
 }
+
+final class BlockingRelationsDeleteDiagnosticsEvent extends DiagnosticsEvent {
+  const BlockingRelationsDeleteDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
+}

@@ -24,6 +24,7 @@ void main() {
         LongTermRelationDetailReadDiagnosticsEvent,
         IntentionCommandDiagnosticsEvent,
         LongTermRelationCommandDiagnosticsEvent,
+        BlockingRelationsDeleteDiagnosticsEvent,
       ]);
       expect(sink.events[0].status, isA<DiagnosticsStarted>());
       expect(sink.events[1].status, isA<DiagnosticsSucceeded>());
@@ -91,6 +92,12 @@ void main() {
           'outcome': 'succeeded',
           'durationMicros': 5000,
           'commandType': 'create',
+        },
+        {
+          'operation': 'blockingRelationsDelete',
+          'outcome': 'failed',
+          'durationMicros': 7000,
+          'failureCode': 'conflict',
         },
       ]);
       for (final canary in [
@@ -175,6 +182,12 @@ List<DiagnosticsEvent> _events() => [
   const LongTermRelationCommandDiagnosticsEvent(
     commandType: LongTermRelationCommandDiagnosticsType.create,
     status: DiagnosticsSucceeded(Duration(milliseconds: 5)),
+  ),
+  const BlockingRelationsDeleteDiagnosticsEvent(
+    status: DiagnosticsFailed(
+      duration: Duration(milliseconds: 7),
+      code: DiagnosticsFailureCode.conflict,
+    ),
   ),
 ];
 
