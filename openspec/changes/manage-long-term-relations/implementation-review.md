@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** F1: поздний ответ подгрузки может ошибочно объявить устаревшую сводку актуальной. F2: обновление снимка того же участника ошибочно снимает ошибку занятой или совпадающей пары.
+**Summary:** F2: обновление снимка того же участника ошибочно снимает ошибку занятой или совпадающей пары.
 
 ## Review target
 
@@ -59,19 +59,10 @@
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Complete | Три свежих изолированных reviewer без planning/history/report проверили на `6683ec26221d45632656460331ccfae83e73a608` U1, U2 и overlap-группу U3/U4. Вместе они охватили все delivery/test paths, все четыре task-коммита и границы snapshot/revision, freshness/paging, participant identity/error correction и presentation ownership. U1 и U4 не дали замечаний; U2 и U3 дали F1 и F2. |
-| OpenSpec conformance | Complete | Proposal, design, delta-спецификации и задачи 3.32–3.35 сопоставлены с неизменяемым снимком `6683ec26221d45632656460331ccfae83e73a608`. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `mise exec --no-deps -- openspec instructions apply --change manage-long-term-relations --json` и `mise exec --no-deps -- openspec validate manage-long-term-relations --strict --no-interactive --json` подтвердили schema `intent-driven`, 60/60 отмеченных задач и валидный change. Отмеченные F1 и F2 показывают расхождение фактического поведения с критериями уже завершённых задач, поэтому состояние задач не изменялось. |
+| OpenSpec conformance | Complete | Proposal, design, delta-спецификации и задачи 3.32–3.35 сопоставлены с неизменяемым снимком `6683ec26221d45632656460331ccfae83e73a608`. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `mise exec --no-deps -- openspec instructions apply --change manage-long-term-relations --json` и `mise exec --no-deps -- openspec validate manage-long-term-relations --strict --no-interactive --json` подтвердили schema `intent-driven`, 60/60 отмеченных задач и валидный change на reviewed head. F1 передан в новую корректирующую фазу и задачи 4.1–4.2 без переоткрытия завершённой 3.33; F2 остаётся расхождением фактического поведения с завершёнными критериями. |
 | Code quality | Complete | Проверены корректность, читаемость, архитектура, безопасность и производительность всех 30 delivery/test paths диапазона: ревизионные барьеры, неизменяемые состояния, paging races, локализация/semantics, типизированные ID, коррекция ошибок и владение claim. Dart MCP analysis не нашёл ошибок; task-focused `flutter test` выполнил 165 тестов; `mise run codegen-check`, `mise run check` (format без изменений, analyze без замечаний, 693 теста) и `git diff --check 755b3f97cc5a7377cf4a3b1d81c03d7c36ad429a 6683ec26221d45632656460331ccfae83e73a608` прошли. Запущенного DTD-сеанса не было, поэтому runtime hot reload не выполнялся. |
 
 ## Findings
-
-### F1 · Medium — Поздняя подгрузка ошибочно снимает признак устаревшей сводки
-
-- **Evidence:** В `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart:134-141` актуальность сводки полностью выводится из единственного `RelationGroupProgress`: только `RelationGroupRefreshFailure` означает `stale`, а `Idle`, `LoadingMore` и `LoadMoreFailure` означают `current`. Подгрузка, начатая в `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart:270-310`, остаётся активной, когда ошибка наблюдения переводит текущий подтверждённый state в `RelationGroupRefreshFailure` на строках 546-579. Поздний успех подгрузки создаёт `RelationGroupLoaded` с progress по умолчанию на строках 481-514, а поздний отказ устанавливает `RelationGroupLoadMoreFailure`; оба результата объявляют прежние counts/revision актуальными без успешной согласованной замены первой порции. Изменённые тесты проверяют refresh failure и load-more по отдельности, но не их пересечение.
-- **Evidence revisions:** ["6683ec26221d45632656460331ccfae83e73a608"]
-- **Impact:** После ошибки обновления пользователь может увидеть сохранённые числа без обязательной пометки об устаревании; это нарушает критерий 3.33, по которому признак снимается только согласованной заменой.
-- **Required outcome:** Ответ продолжения, включая запоздалый успех или отказ, не должен снимать или подменять состояние устаревшей сводки; актуальность подтверждает только успешная согласованная замена первой порции.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart","test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart"]
 
 ### F2 · Medium — Обновление снимка того же участника ошибочно считается исправлением пары
 
@@ -84,4 +75,4 @@
 
 ## Review coverage
 
-Проверен точный диапазон `755b3f97cc5a7377cf4a3b1d81c03d7c36ad429a..6683ec26221d45632656460331ccfae83e73a608`: четыре target-коммита и задачи 3.32–3.35 сопоставлены соответственно с U1–U4. Все 31 reviewable path учтены: `tasks.md` служит planning evidence, остальные 30 входят в implementation target хотя бы одного review unit; unmapped paths нет. Отдельно исследованы гонки команд, наблюдений, первой порции и continuation; сохранение целостных snapshot; RU/EN и semantics при масштабе текста; идентичность одноимённых участников и переходы ошибок; смена локали, renderer и сессии для presentation claim. Существующий отчёт прочитан только после независимых проходов: активных findings и принятых residual risks для переноса в нём не было; прежний review target заменён текущим неизменяемым диапазоном.
+Проверен точный диапазон `755b3f97cc5a7377cf4a3b1d81c03d7c36ad429a..6683ec26221d45632656460331ccfae83e73a608`: четыре target-коммита и задачи 3.32–3.35 сопоставлены соответственно с U1–U4. Все 31 reviewable path учтены: `tasks.md` служит planning evidence, остальные 30 входят в implementation target хотя бы одного review unit; unmapped paths нет. Отдельно исследованы гонки команд, наблюдений, первой порции и continuation; сохранение целостных snapshot; RU/EN и semantics при масштабе текста; идентичность одноимённых участников и переходы ошибок; смена локали, renderer и сессии для presentation claim. F1 удалён из Findings после явно согласованной передачи его required outcome в новую корректирующую фазу и незавершённые задачи 4.1–4.2; реализация остаётся отдельной будущей работой. F2 остаётся единственным активным finding; принятых residual risks нет.

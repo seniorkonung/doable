@@ -610,3 +610,25 @@ Phase 1 не включает получение соседства и его с
   - **Зависимости:** 3.28, 3.30, 3.31.
   - **Вероятные файлы:** `lib/src/graph/presentation/operation_failure_presentation.dart`, `test/graph/presentation/operation_failure_presentation_test.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `test/app/localization/locale_resolution_test.dart`.
   - **Размер:** S.
+
+## Phase 4: Сводка соседства сохраняет достоверность при пересечении чтений
+
+- [ ] 4.1 Сохранить состояние устаревшей сводки при запоздалом завершении подгрузки
+  - **Критерии приёмки:**
+    - Подтверждённое состояние группы различает актуальность сводки и ход подгрузки так, чтобы ошибка обновления оставляла прежние числа устаревшими после запоздалых успеха и отказа ранее начатого продолжения.
+    - Запоздалый ответ продолжения обрабатывается по прежним правилам поколения, cursor и ревизии, но не объявляет сводку актуальной, не подменяет ошибку обновления и не объявляет ложный конец списка. Признак устаревания снимает только успешная согласованная замена первой порции.
+    - Управляемые проверки перестановки ответов покрывают ошибку обновления с последующими успехом и отказом подгрузки, а также успешную согласованную замену; вне этого пересечения сохраняются прежние состояния обычной подгрузки и доступная семантика сводки.
+  - **Проверка:** Дополнить и выполнить `flutter test test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`.
+  - **Зависимости:** 3.31, 3.33.
+  - **Вероятные файлы:** `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`, при необходимости `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.2 Подтвердить готовность достоверной сводки к расширению жизненного цикла связи
+  - **Критерии приёмки:**
+    - Свидетельства 4.1 подтверждают все три границы: запоздалые успех и отказ подгрузки не снимают устаревание, а согласованная замена снимает его атомарно вместе с заменой сводки и списка.
+    - Профильные и полные проверки не выявляют регрессий в первой загрузке, обычной подгрузке, обновлении, RU/EN, увеличенном тексте и семантике экранного диктора; границы порций и скрытого чтения остаются прежними.
+    - Изменения Dart/Flutter проверены по правилу DTD из `AGENTS.md`; при отсутствии работающего приложения это ограничение зафиксировано и выполнены CLI-проверки.
+  - **Проверка:** Выполнить `flutter test test/long_term_relation/presentation/neighborhood`, `mise run codegen-check`, `mise run check`, `mise exec --no-deps -- openspec validate manage-long-term-relations --strict --no-interactive` и `git diff --check`; проверить DTD/runtime по правилу `AGENTS.md`.
+  - **Зависимости:** 4.1.
+  - **Вероятные файлы:** Нет — итоговая контрольная точка.
+  - **Размер:** XS.
