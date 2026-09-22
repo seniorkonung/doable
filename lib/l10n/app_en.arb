@@ -796,6 +796,70 @@
   "@relationEditorUpdateUnexpected": {
     "description": "Терминальная непредвиденная ошибка изменения связи"
   },
+  "relationArchived": "Relation archived.",
+  "@relationArchived": {
+    "description": "Подтверждение успешного архивирования долговременной связи"
+  },
+  "relationArchiveNotFound": "This relation no longer exists.",
+  "@relationArchiveNotFound": {
+    "description": "Отсутствие архивируемой связи"
+  },
+  "relationArchiveConflict": "The relation couldn’t be archived because its current state conflicts with the operation.",
+  "@relationArchiveConflict": {
+    "description": "Конфликт актуального состояния при архивировании связи"
+  },
+  "relationArchiveUnavailable": "The relation couldn’t be archived. Try again.",
+  "@relationArchiveUnavailable": {
+    "description": "Устранимая недоступность архивирования связи"
+  },
+  "relationArchiveCorruption": "Stored data is damaged. The relation wasn’t archived.",
+  "@relationArchiveCorruption": {
+    "description": "Терминальное повреждение данных при архивировании связи"
+  },
+  "relationArchiveUnexpected": "The relation couldn’t be archived because of an unexpected error.",
+  "@relationArchiveUnexpected": {
+    "description": "Терминальная непредвиденная ошибка архивирования связи"
+  },
+  "relationRestored": "Relation restored.",
+  "@relationRestored": {
+    "description": "Подтверждение успешного восстановления долговременной связи"
+  },
+  "relationRestoreNotFound": "This relation no longer exists.",
+  "@relationRestoreNotFound": {
+    "description": "Отсутствие восстанавливаемой связи"
+  },
+  "relationRestoreConflict": "The relation couldn’t be restored because its current state conflicts with the operation.",
+  "@relationRestoreConflict": {
+    "description": "Конфликт актуального состояния при восстановлении связи"
+  },
+  "relationRestoreSourceNotFound": "The source intention no longer exists. The relation wasn’t restored.",
+  "@relationRestoreSourceNotFound": {
+    "description": "Отсутствие исходного участника при восстановлении связи"
+  },
+  "relationRestoreRelatedNotFound": "The related intention no longer exists. The relation wasn’t restored.",
+  "@relationRestoreRelatedNotFound": {
+    "description": "Отсутствие связанного участника при восстановлении связи"
+  },
+  "relationRestoreSourceArchived": "Restore the source intention before restoring this relation.",
+  "@relationRestoreSourceArchived": {
+    "description": "Архивное состояние исходного участника при восстановлении связи"
+  },
+  "relationRestoreRelatedArchived": "Restore the related intention before restoring this relation.",
+  "@relationRestoreRelatedArchived": {
+    "description": "Архивное состояние связанного участника при восстановлении связи"
+  },
+  "relationRestoreUnavailable": "The relation couldn’t be restored. Try again.",
+  "@relationRestoreUnavailable": {
+    "description": "Устранимая недоступность восстановления связи"
+  },
+  "relationRestoreCorruption": "Stored data is damaged. The relation wasn’t restored.",
+  "@relationRestoreCorruption": {
+    "description": "Терминальное повреждение данных при восстановлении связи"
+  },
+  "relationRestoreUnexpected": "The relation couldn’t be restored because of an unexpected error.",
+  "@relationRestoreUnexpected": {
+    "description": "Терминальная непредвиденная ошибка восстановления связи"
+  },
   "relationNeighborhoodOpenRelation": "Opens the relation details",
   "@relationNeighborhoodOpenRelation": {
     "description": "Назначение перехода из строки соседства в подробный просмотр связи"

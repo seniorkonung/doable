@@ -687,6 +687,66 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be updated because of an unexpected error.';
 
   @override
+  String get relationArchived => 'Relation archived.';
+
+  @override
+  String get relationArchiveNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationArchiveConflict =>
+      'The relation couldn’t be archived because its current state conflicts with the operation.';
+
+  @override
+  String get relationArchiveUnavailable =>
+      'The relation couldn’t be archived. Try again.';
+
+  @override
+  String get relationArchiveCorruption =>
+      'Stored data is damaged. The relation wasn’t archived.';
+
+  @override
+  String get relationArchiveUnexpected =>
+      'The relation couldn’t be archived because of an unexpected error.';
+
+  @override
+  String get relationRestored => 'Relation restored.';
+
+  @override
+  String get relationRestoreNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationRestoreConflict =>
+      'The relation couldn’t be restored because its current state conflicts with the operation.';
+
+  @override
+  String get relationRestoreSourceNotFound =>
+      'The source intention no longer exists. The relation wasn’t restored.';
+
+  @override
+  String get relationRestoreRelatedNotFound =>
+      'The related intention no longer exists. The relation wasn’t restored.';
+
+  @override
+  String get relationRestoreSourceArchived =>
+      'Restore the source intention before restoring this relation.';
+
+  @override
+  String get relationRestoreRelatedArchived =>
+      'Restore the related intention before restoring this relation.';
+
+  @override
+  String get relationRestoreUnavailable =>
+      'The relation couldn’t be restored. Try again.';
+
+  @override
+  String get relationRestoreCorruption =>
+      'Stored data is damaged. The relation wasn’t restored.';
+
+  @override
+  String get relationRestoreUnexpected =>
+      'The relation couldn’t be restored because of an unexpected error.';
+
+  @override
   String get relationNeighborhoodOpenRelation => 'Opens the relation details';
 
   @override

@@ -351,6 +351,94 @@ void main() {
     },
   );
 
+  testWidgets(
+    'архивирование и восстановление связи используют общую очередь результатов',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final intention = harness.startDelete(index: 1, title: 'Намерение');
+      final archive = harness.startRelationArchive();
+      harness.completeDeleted(intention);
+      harness.completeRelationArchived(archive);
+      await archive.future;
+
+      final restore = harness.startRelationRestore();
+      harness.completeRelationRestored(restore);
+      await tester.pumpAndSettle();
+
+      expect(find.text(_deleted('Намерение')), findsOneWidget);
+      expect(find.text(_relationArchived), findsNothing);
+      expect(find.text(_relationRestored), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_relationArchived), findsOneWidget);
+      expect(find.text(_relationRestored), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_relationRestored), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  for (final scenario in <({RelationParticipantRole role, String outcome})>[
+    (
+      role: RelationParticipantRole.source,
+      outcome: 'Restore the source intention before restoring this relation.',
+    ),
+    (
+      role: RelationParticipantRole.related,
+      outcome: 'Restore the related intention before restoring this relation.',
+    ),
+  ]) {
+    testWidgets(
+      'восстановление объясняет архивного участника ${scenario.role.name}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester);
+        final restore = harness.startRelationRestore();
+        harness.completeRelationFailure(
+          restore,
+          LongTermRelationParticipantArchivedFailure(
+            role: scenario.role,
+            intentionId: testDetailsIntentionId(1),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(_relationRestoreOutcome(scenario.outcome)),
+          findsOneWidget,
+        );
+
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets('восстановление связи предъявляется на русском языке', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final restore = harness.startRelationRestore();
+    harness.completeRelationFailure(
+      restore,
+      LongTermRelationParticipantArchivedFailure(
+        role: RelationParticipantRole.related,
+        intentionId: testDetailsIntentionId(2),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Восстановление — «связь»: Сначала восстановите связанное намерение, '
+        'затем восстановите эту связь.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('успех создания связи не предлагается инлайн-владельцу', (
     tester,
   ) async {
@@ -440,6 +528,26 @@ void main() {
   });
 
   testWidgets(
+    'результат восстановления без фокуса ждёт возвращения в resumed',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      final restore = harness.startRelationRestore();
+      harness.completeRelationRestored(restore);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(SnackBar), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text(_relationRestored), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
     'пересоздание presenter сохраняет непредъявленный результат связи',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
@@ -485,6 +593,16 @@ final _relationCreated = _relationOutcome('Relation created.');
 String _relationUpdateOutcome(String outcome) => 'Edit — “relation”: $outcome';
 
 final _relationUpdated = _relationUpdateOutcome('Relation updated.');
+
+String _relationArchiveOutcome(String outcome) =>
+    'Archive — “relation”: $outcome';
+
+final _relationArchived = _relationArchiveOutcome('Relation archived.');
+
+String _relationRestoreOutcome(String outcome) =>
+    'Restore — “relation”: $outcome';
+
+final _relationRestored = _relationRestoreOutcome('Relation restored.');
 
 final _relationFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
@@ -705,6 +823,37 @@ final class _PresenterHarness {
     return accepted;
   }
 
+  LongTermRelationCommandAccepted startRelationArchive({
+    bool releaseInitiator = true,
+  }) => _startExistingRelationCommand(
+    ArchiveLongTermRelation(_relationId),
+    releaseInitiator: releaseInitiator,
+  );
+
+  LongTermRelationCommandAccepted startRelationRestore({
+    bool releaseInitiator = true,
+  }) => _startExistingRelationCommand(
+    RestoreLongTermRelation(_relationId),
+    releaseInitiator: releaseInitiator,
+  );
+
+  LongTermRelationCommandAccepted _startExistingRelationCommand(
+    LongTermRelationCommand command, {
+    required bool releaseInitiator,
+  }) {
+    final commandIndex = repository.relationCommands.length;
+    final accepted = switch (command) {
+      ArchiveLongTermRelation() => _coordinator.acceptRelationArchive(command),
+      RestoreLongTermRelation() => _coordinator.acceptRelationRestore(command),
+      _ => throw ArgumentError.value(command, 'command'),
+    } as LongTermRelationCommandAccepted;
+    if (releaseInitiator) {
+      _coordinator.releaseInitiatorPresentation(accepted.token);
+    }
+    _relationIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
     GraphOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
@@ -772,6 +921,69 @@ final class _PresenterHarness {
             changes: <GraphChange>[
               LongTermRelationUpdatedChange(
                 revision: revision,
+                before: before,
+                after: after,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeRelationArchived(LongTermRelationCommandAccepted accepted) =>
+      _completeRelationScopeChanged(
+        accepted,
+        beforeScope: RelationScope.active,
+        afterScope: RelationScope.archived,
+        revision: 3,
+      );
+
+  void completeRelationRestored(LongTermRelationCommandAccepted accepted) =>
+      _completeRelationScopeChanged(
+        accepted,
+        beforeScope: RelationScope.archived,
+        afterScope: RelationScope.active,
+        revision: 4,
+      );
+
+  void _completeRelationScopeChanged(
+    LongTermRelationCommandAccepted accepted, {
+    required RelationScope beforeScope,
+    required RelationScope afterScope,
+    required int revision,
+  }) {
+    final graphRevision = TestDetailsRevision(revision);
+    final before = LongTermRelation(
+      id: _relationId,
+      sourceIntentionId: testDetailsIntentionId(1),
+      relatedIntentionId: testDetailsIntentionId(2),
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: beforeScope,
+      creationSequence: RelationCreationSequence(1),
+    );
+    final after = LongTermRelation(
+      id: _relationId,
+      sourceIntentionId: testDetailsIntentionId(1),
+      relatedIntentionId: testDetailsIntentionId(2),
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: afterScope,
+      creationSequence: RelationCreationSequence(1),
+    );
+    repository.completeRelationCommand(
+      _relationIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: graphRevision,
+          value: LongTermRelationUpdated(
+            before: before,
+            relation: after,
+            description: null,
+            changes: <GraphChange>[
+              LongTermRelationUpdatedChange(
+                revision: graphRevision,
                 before: before,
                 after: after,
               ),
