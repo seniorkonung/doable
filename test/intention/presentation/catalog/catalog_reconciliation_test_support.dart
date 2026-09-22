@@ -77,15 +77,21 @@ Future<IntentionCommandCompletion> completeCatalogCommand(
 Future<LongTermRelationCommandCompletion> completeRelationCommand(
   ProviderContainer container,
   ControlledCatalogRepository repository,
-  CreateLongTermRelation command,
+  LongTermRelationCommand command,
   LongTermRelationCommandResult result,
 ) async {
   final coordinator = container.read(graphCommandCoordinatorProvider.notifier);
   final commandIndex = repository.relationCommands.length;
-  final start = coordinator.acceptRelationCreation(
-    LongTermRelationCreationFormKey(),
-    command,
-  );
+  final start = switch (command) {
+    CreateLongTermRelation() => coordinator.acceptRelationCreation(
+      LongTermRelationCreationFormKey(),
+      command,
+    ),
+    UpdateLongTermRelation() => coordinator.acceptRelationUpdate(command),
+    ArchiveLongTermRelation() => coordinator.acceptRelationArchive(command),
+    RestoreLongTermRelation() => coordinator.acceptRelationRestore(command),
+    DeleteLongTermRelation() => coordinator.acceptRelationDelete(command),
+  };
   expect(start, isA<LongTermRelationCommandAccepted>());
   final accepted = start as LongTermRelationCommandAccepted;
   repository.completeRelationCommand(commandIndex, result);

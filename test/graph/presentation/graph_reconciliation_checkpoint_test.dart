@@ -95,6 +95,9 @@ void main() {
       expect(repository.catalogQueries, hasLength(1));
       expect(catalogBefore, isNot(same(harness.catalog)));
       expect(detailsBefore, isNot(same(harness.details)));
+      final ownerObservationsAfterCreation = repository.observationsOf(
+        harness.ownerId,
+      );
 
       // Переименование уже загруженного участника той же выдачи.
       await harness.completeParticipantRename(
@@ -133,7 +136,10 @@ void main() {
 
       // Чужое переименование не перечитывает каталог и подробные данные.
       expect(repository.catalogQueries, hasLength(1));
-      expect(repository.observationsOf(harness.ownerId), 2);
+      expect(
+        repository.observationsOf(harness.ownerId),
+        ownerObservationsAfterCreation,
+      );
       expect(repository.groupQueries, hasLength(3));
       expect(harness.confirmedCatalogStates, hasLength(2));
     },
@@ -255,6 +261,257 @@ void main() {
       );
       expect(repository.catalogQueries, hasLength(1));
       expect(repository.observationsOf(harness.ownerId), 2);
+    },
+  );
+
+  test(
+    'перемещение связи согласует каталог и подробные данные всех участников',
+    () async {
+      final repository = _CheckpointGraphRepository();
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+          catalogPagingPolicyProvider.overrideWithValue(
+            CatalogPagingPolicy(
+              pageSize: 4,
+              prefetchRemaining: 0,
+              filterDebounce: Duration.zero,
+            ),
+          ),
+        ],
+        retry: (retryCount, error) => null,
+      );
+      final participantIds = [
+        testIntentionId(1),
+        testIntentionId(2),
+        testIntentionId(3),
+        testIntentionId(4),
+      ];
+      final catalogSubscription = container.listen(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      final detailSubscriptions = [
+        for (final id in participantIds)
+          container.listen(
+            intentionDetailsViewModelProvider(id),
+            (_, _) {},
+            fireImmediately: true,
+          ),
+      ];
+      addTearDown(() async {
+        catalogSubscription.close();
+        for (final subscription in detailSubscriptions) {
+          subscription.close();
+        }
+        container.dispose();
+        await repository.dispose();
+      });
+
+      final summaries = [
+        catalog_support.testSummary(
+          index: 4,
+          title: 'Участник Г',
+          activeRelationCount: 0,
+        ),
+        catalog_support.testSummary(
+          index: 3,
+          title: 'Участник В',
+          activeRelationCount: 0,
+        ),
+        catalog_support.testSummary(
+          index: 2,
+          title: 'Участник Б',
+          activeRelationCount: 1,
+        ),
+        catalog_support.testSummary(
+          index: 1,
+          title: 'Участник А',
+          activeRelationCount: 1,
+        ),
+      ];
+      repository.completeCatalogPage(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: summaries,
+            totalCount: summaries.length,
+            nextCursor: null,
+            revision: const TestGraphRevision(4),
+          ),
+        ),
+      );
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
+      for (var index = 0; index < participantIds.length; index++) {
+        repository.emitIntention(
+          participantIds[index],
+          testNeighborhoodIntention(
+            id: participantIds[index],
+            title: 'Участник ${String.fromCharCode(1040 + index)}',
+          ),
+          counts: switch (index) {
+            0 => testRelationCounts(activeNeedOutgoing: 1),
+            1 => testRelationCounts(activeNeedIncoming: 1),
+            _ => testRelationCounts(),
+          },
+          revision: const TestGraphRevision(4),
+        );
+      }
+      await pumpEventQueue();
+
+      final relationBefore = catalog_support.testRelation(
+        sourceIntentionId: participantIds[0],
+        relatedIntentionId: participantIds[1],
+        index: 41,
+      );
+      final relationAfter = LongTermRelation(
+        id: relationBefore.id,
+        sourceIntentionId: participantIds[2],
+        relatedIntentionId: participantIds[3],
+        type: relationBefore.type,
+        priority: relationBefore.priority,
+        scope: relationBefore.scope,
+        creationSequence: relationBefore.creationSequence,
+      );
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final accepted = coordinator.acceptRelationUpdate(
+        UpdateLongTermRelation(
+          relationId: relationBefore.id,
+          patch: LongTermRelationPatch(
+            sourceIntentionId: LongTermRelationFieldSet(participantIds[2]),
+            relatedIntentionId: LongTermRelationFieldSet(participantIds[3]),
+          ),
+        ),
+      );
+      expect(accepted, isA<LongTermRelationCommandAccepted>());
+      repository.completeRelationCommand(
+        0,
+        GraphCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: const TestGraphRevision(9),
+            value: LongTermRelationUpdated(
+              before: relationBefore,
+              relation: relationAfter,
+              description: null,
+              changes: [
+                IntentionRelationCountsChanged(
+                  revision: const TestGraphRevision(9),
+                  intentionId: participantIds[0],
+                  counts: testRelationCounts(),
+                ),
+                IntentionRelationCountsChanged(
+                  revision: const TestGraphRevision(9),
+                  intentionId: participantIds[1],
+                  counts: testRelationCounts(),
+                ),
+                IntentionRelationCountsChanged(
+                  revision: const TestGraphRevision(9),
+                  intentionId: participantIds[2],
+                  counts: testRelationCounts(activeNeedOutgoing: 1),
+                ),
+                IntentionRelationCountsChanged(
+                  revision: const TestGraphRevision(9),
+                  intentionId: participantIds[3],
+                  counts: testRelationCounts(activeNeedIncoming: 1),
+                ),
+                LongTermRelationUpdatedChange(
+                  revision: const TestGraphRevision(9),
+                  before: relationBefore,
+                  after: relationAfter,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await (accepted as LongTermRelationCommandAccepted).future;
+      await pumpEventQueue();
+
+      IntentionCatalogLoaded catalog() =>
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
+              as IntentionCatalogLoaded;
+      int activeCount(IntentionId id) => (container.read(
+        intentionDetailsViewModelProvider(id),
+      ) as IntentionDetailsLoaded).details.relationCounts.active;
+      String title(IntentionId id) => (container.read(
+        intentionDetailsViewModelProvider(id),
+      ) as IntentionDetailsLoaded).details.intention.title;
+
+      expect(
+        {for (final item in catalog().items) item.id: item.activeRelationCount},
+        {
+          participantIds[3]: 1,
+          participantIds[2]: 1,
+          participantIds[1]: 0,
+          participantIds[0]: 0,
+        },
+      );
+      expect(
+        catalog().items.map((item) => item.id),
+        summaries.map((item) => item.id),
+      );
+      expect(catalog().totalCount, 4);
+      expect(catalog().revision, const TestGraphRevision(9));
+
+      for (var index = 0; index < participantIds.length; index++) {
+        repository.emitIntention(
+          participantIds[index],
+          testNeighborhoodIntention(
+            id: participantIds[index],
+            title: 'Устаревший участник',
+          ),
+          counts: index < 2
+              ? testRelationCounts()
+              : testRelationCounts(activeNeedOutgoing: 1),
+          revision: const TestGraphRevision(7),
+        );
+      }
+      await pumpEventQueue();
+      expect([for (final id in participantIds) activeCount(id)], [1, 1, 0, 0]);
+      expect(
+        [for (final id in participantIds) title(id)],
+        ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
+      );
+
+      for (var index = 0; index < participantIds.length; index++) {
+        repository.emitIntention(
+          participantIds[index],
+          testNeighborhoodIntention(
+            id: participantIds[index],
+            title: 'Участник ${String.fromCharCode(1040 + index)}',
+          ),
+          counts: switch (index) {
+            0 || 1 => testRelationCounts(),
+            2 => testRelationCounts(activeNeedOutgoing: 1),
+            3 => testRelationCounts(activeNeedIncoming: 1),
+            _ => throw StateError('Неизвестный участник.'),
+          },
+          revision: const TestGraphRevision(9),
+        );
+      }
+      await pumpEventQueue();
+
+      expect([for (final id in participantIds) activeCount(id)], [0, 0, 1, 1]);
+      expect(
+        [for (final id in participantIds) title(id)],
+        ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
+      );
+      expect(repository.catalogQueries, hasLength(1));
+      expect([
+        for (final id in participantIds) repository.observationsOf(id),
+      ], everyElement(greaterThanOrEqualTo(2)));
     },
   );
 
