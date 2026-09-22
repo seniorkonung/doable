@@ -12,7 +12,7 @@ import 'relation_editor_state.dart';
 
 part 'relation_editor_view_model.g.dart';
 
-/// Черновик одной формы создания долговременной связи.
+/// Черновик одной формы создания или изменения долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -23,14 +23,16 @@ part 'relation_editor_view_model.g.dart';
 final class RelationEditorViewModel extends _$RelationEditorViewModel {
   late GraphCommandCoordinator _coordinator;
   late LongTermRelationCreationFormKey _formKey;
+  late RelationEditorContext _context;
   LongTermRelationOperationToken? _activeToken;
 
   @override
   RelationEditorState build(
     LongTermRelationCreationFormKey formKey,
-    RelationCreationContext context,
+    RelationEditorContext context,
   ) {
     _formKey = formKey;
+    _context = context;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     ref.onDispose(() {
       final activeToken = _activeToken;
@@ -86,6 +88,14 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     }
   }
 
+  /// Принимает более новый подтверждённый снимок без перезаписи черновика.
+  void refreshConfirmedDetails(LongTermRelationDetails details) {
+    final refreshed = state.withConfirmedDetails(details);
+    if (!identical(refreshed, state)) {
+      state = refreshed;
+    }
+  }
+
   void submit() {
     if (!state.canSubmit) {
       return;
@@ -107,23 +117,33 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
       return;
     }
 
-    final CreateLongTermRelation command;
-    try {
-      command = CreateLongTermRelation(
-        sourceIntentionId: draft.sourceIntentionId,
-        relatedIntentionId: draft.relatedIntentionId,
-        type: draft.type,
-        priority: draft.priority,
-        description: description,
-      );
-    } on CreateLongTermRelationValidationException {
+    if (draft.sourceIntentionId == draft.relatedIntentionId) {
       state = state.withOperation(
         const RelationEditorFailed(RelationEditorSameParticipants()),
       );
       return;
     }
 
-    switch (_coordinator.acceptRelationCreation(_formKey, command)) {
+    final start = switch (_context) {
+      RelationCreationContext() => _coordinator.acceptRelationCreation(
+        _formKey,
+        CreateLongTermRelation(
+          sourceIntentionId: draft.sourceIntentionId,
+          relatedIntentionId: draft.relatedIntentionId,
+          type: draft.type,
+          priority: draft.priority,
+          description: description,
+        ),
+      ),
+      final RelationEditingContext editing => _coordinator.acceptRelationUpdate(
+        UpdateLongTermRelation(
+          relationId: editing.details.relation.id,
+          patch: editing.patchFor(draft, description),
+        ),
+      ),
+    };
+
+    switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
         _activeToken = token;
         state = state.withOperation(const RelationEditorSubmitting());
@@ -153,15 +173,21 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
       _activeToken = null;
       // Success предъявляет оболочка; форма получает его только для закрытия.
       state = switch (completion.result) {
-        GraphResultSuccess(value: LongTermRelationCreated(:final relation)) =>
+        GraphResultSuccess(value: LongTermRelationCreated(:final relation))
+            when _context is RelationCreationContext =>
           state.withOperation(
             RelationEditorSucceeded(relation),
             event: RelationEditorCreated(relation.id),
           ),
-        GraphResultSuccess(value: LongTermRelationUpdated()) =>
+        GraphResultSuccess(value: LongTermRelationUpdated(:final relation))
+            when _context is RelationEditingContext =>
           state.withOperation(
-            const RelationEditorFailed(RelationEditorUnexpected()),
+            RelationEditorSucceeded(relation),
+            event: RelationEditorUpdated(relation.id),
           ),
+        GraphResultSuccess() => state.withOperation(
+          const RelationEditorFailed(RelationEditorUnexpected()),
+        ),
         GraphResultFailure(:final failure) => state.withOperation(
           RelationEditorFailed(_editorFailure(failure)),
           failurePresentation: _coordinator.claimInitiatorFailure(
@@ -193,7 +219,7 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
       const RelationEditorSameParticipants(),
     LongTermRelationPairOccupiedFailure(:final existingRelationId) =>
       RelationEditorPairOccupied(existingRelationId),
-    LongTermRelationNotFoundFailure() => const RelationEditorUnexpected(),
+    LongTermRelationNotFoundFailure() => const RelationEditorRelationNotFound(),
     LongTermRelationParticipantNotFoundFailure(
       :final role,
       :final intentionId,
