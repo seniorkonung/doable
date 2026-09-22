@@ -13,6 +13,14 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
           () => switch (command) {
             CreateLongTermRelation() => _createLongTermRelation(command),
             UpdateLongTermRelation() => _updateLongTermRelation(command),
+            ArchiveLongTermRelation() => _setLongTermRelationScope(
+              relationId: command.relationId,
+              scope: relation_domain.RelationScope.archived,
+            ),
+            RestoreLongTermRelation() => _setLongTermRelationScope(
+              relationId: command.relationId,
+              scope: relation_domain.RelationScope.active,
+            ),
           },
         );
         if (committed.didMutate) {
@@ -257,6 +265,84 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     );
   }
 
+  Future<_CommittedLongTermRelationUpdate> _setLongTermRelationScope({
+    required LongTermRelationId relationId,
+    required relation_domain.RelationScope scope,
+  }) async {
+    final storedBefore = await _readStoredRelation(relationId);
+    if (storedBefore == null) {
+      throw _LongTermRelationNotFound(relationId);
+    }
+    final before = storedBefore.toDomain();
+
+    if (scope == relation_domain.RelationScope.active) {
+      await _requireRelationParticipant(
+        before.sourceIntentionId,
+        RelationParticipantRole.source,
+        mustBeActive: true,
+      );
+      await _requireRelationParticipant(
+        before.relatedIntentionId,
+        RelationParticipantRole.related,
+        mustBeActive: true,
+      );
+    }
+
+    final after = relation_domain.LongTermRelation(
+      id: before.id,
+      sourceIntentionId: before.sourceIntentionId,
+      relatedIntentionId: before.relatedIntentionId,
+      type: before.type,
+      priority: before.priority,
+      scope: scope,
+      creationSequence: before.creationSequence,
+    );
+    if (before.scope == scope) {
+      return _CommittedLongTermRelationUpdate(
+        before: before,
+        relation: after,
+        description: storedBefore.description,
+        affectedCounts: const {},
+        didMutate: false,
+      );
+    }
+
+    final updatedRows =
+        await (_database.update(
+          _database.longTermRelations,
+        )..where((row) => row.id.equals(relationId.toCanonicalString()))).write(
+          local.LongTermRelationsCompanion(
+            isArchived: Value(scope == relation_domain.RelationScope.archived),
+          ),
+        );
+    if (updatedRows != 1) {
+      throw _LongTermRelationNotFound(relationId);
+    }
+
+    final storedAfter = await _readStoredRelation(relationId);
+    if (storedAfter == null) throw const _StoredIntentionCorruption();
+    final verifiedAfter = storedAfter.toDomain();
+    if (!_sameStoredRelation(
+      before: after,
+      beforeDescription: storedBefore.description,
+      after: verifiedAfter,
+      afterDescription: storedAfter.description,
+    )) {
+      throw const _StoredIntentionCorruption();
+    }
+    final affectedCounts = await _readVerifiedRelationCountsFor({
+      before.sourceIntentionId,
+      before.relatedIntentionId,
+    });
+    return _CommittedLongTermRelationUpdate(
+      before: before,
+      relation: verifiedAfter,
+      description: storedAfter.description,
+      affectedCounts: affectedCounts,
+      didMutate: true,
+    );
+  }
+
   Future<_StoredRelationGroupRow?> _readStoredRelation(
     LongTermRelationId id,
   ) async {
@@ -468,6 +554,8 @@ LongTermRelationCommandDiagnosticsType _longTermRelationCommandDiagnosticsType(
 ) => switch (command) {
   CreateLongTermRelation() => LongTermRelationCommandDiagnosticsType.create,
   UpdateLongTermRelation() => LongTermRelationCommandDiagnosticsType.update,
+  ArchiveLongTermRelation() => LongTermRelationCommandDiagnosticsType.archive,
+  RestoreLongTermRelation() => LongTermRelationCommandDiagnosticsType.restore,
 };
 
 DiagnosticsFailureCode _longTermRelationDiagnosticsFailureCode(

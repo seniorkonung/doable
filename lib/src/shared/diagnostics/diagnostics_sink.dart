@@ -60,7 +60,7 @@ enum IntentionCommandDiagnosticsType {
   delete,
 }
 
-enum LongTermRelationCommandDiagnosticsType { create, update }
+enum LongTermRelationCommandDiagnosticsType { create, update, archive, restore }
 
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
   const BootstrapDiagnosticsEvent({
