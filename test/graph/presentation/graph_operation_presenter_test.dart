@@ -466,6 +466,129 @@ void main() {
   });
 
   testWidgets(
+    'массовый успех ждёт занятую поверхность и предъявляется одним кадром',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final intention = harness.startDelete(index: 2, title: 'Другое');
+      final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
+      harness.completeDeleted(intention);
+      harness.completeBlockingRelationsDeleted(deletion);
+      await tester.pumpAndSettle();
+
+      const message =
+          'Delete selected relations — “Связанное”: Selected relations deleted.';
+      expect(find.text(_deleted('Другое')), findsOneWidget);
+      expect(find.text(message), findsNothing);
+      expect(harness.repository.blockingRelationsCommands, hasLength(1));
+
+      await _closeMessage(tester);
+      expect(find.text(message), findsOneWidget);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('graph-operation-message')),
+        ),
+        matchesSemantics(
+          label: message,
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
+      );
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.blockingRelationsCommands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'массовый token переживает потерю фокуса и пересоздание presenter до кадра',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
+      harness.completeBlockingRelationsDeleted(deletion);
+      await tester.idle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+
+      const message =
+          'Delete selected relations — “Связанное”: Selected relations deleted.';
+      expect(find.text(message), findsOneWidget);
+      harness.presenterGeneration.value += 1;
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      await _closeMessage(tester);
+      harness.presenterGeneration.value += 1;
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.blockingRelationsCommands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'ошибка массовой операции остаётся у открытого инициатора до его ухода',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final deletion = harness.startBlockingRelationsDelete(
+        title: 'Связанное',
+        releaseInitiator: false,
+      );
+      harness.completeBlockingRelationsFailure(
+        deletion,
+        const DeleteBlockingRelationsUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+      final claim = harness.claimInitiatorFailure(deletion.token);
+      expect(claim, isNotNull);
+      harness.releaseInitiatorClaim(claim!);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Delete selected relations — “Связанное”: Selected relations couldn’t be deleted. Try again.',
+        ),
+        findsOneWidget,
+      );
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.blockingRelationsCommands, hasLength(1));
+    },
+  );
+
+  for (final scenario in <({Locale locale, String message})>[
+    (
+      locale: const Locale('ru'),
+      message:
+          'Удаление выбранных связей — «Связанное»: Выбранные связи удалены.',
+    ),
+    (
+      locale: const Locale('fr'),
+      message: 'Delete selected relations — “Связанное”: Selected relations deleted.',
+    ),
+  ]) {
+    testWidgets(
+      'массовый успех локализуется для ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: scenario.locale,
+        );
+        final deletion = harness.startBlockingRelationsDelete(
+          title: 'Связанное',
+        );
+        harness.completeBlockingRelationsDeleted(deletion);
+        await tester.pumpAndSettle();
+        expect(find.text(scenario.message), findsOneWidget);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets(
     'массовый конфликт на русском не раскрывает идентификатор связи',
     (tester) async {
       final harness = await _pumpPresenterApp(
@@ -1122,6 +1245,9 @@ final class _PresenterHarness {
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
     GraphOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
+
+  void releaseInitiatorClaim(GraphInitiatorPresentationClaim claim) =>
+      _coordinator.releaseInitiatorClaim(claim);
 
   void completeRelationCreated(LongTermRelationCommandAccepted accepted) {
     const revision = TestDetailsRevision(1);
