@@ -794,7 +794,7 @@ Phase 1 не включает получение соседства и его с
   - **Вероятные файлы:** `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_page.dart`, `lib/src/intention/presentation/details/intention_details_page.dart` при уточнении перехода, `test/long_term_relation/presentation/details/relation_details_widget_test.dart`, `test/intention/presentation/details/intention_details_delete_test.dart`; RU/EN-строки из 5.14 при уточнении подтверждения.
   - **Размер:** M.
 
-- [ ] 5.16 Подтвердить самостоятельный жизненный цикл связи перед общей проверкой согласования
+- [x] 5.16 Подтвердить самостоятельный жизненный цикл связи перед общей проверкой согласования
   - **Критерии приёмки:**
     - Доступны редактирование, архивирование, восстановление и отдельно подтверждённое удаление активной/архивной связи; во всех случаях сохраняются незапрошенные данные и соседние намерения.
     - Конфликты, отмена и отказ не оставляют частичных изменений; удалённая связь не возвращается. Ключ существующей связи и общий протокол предъявления действуют для всех новых команд.
