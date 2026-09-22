@@ -22,6 +22,7 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
 import '../application/graph_command_result.dart';
 import '../application/graph_revision.dart';
@@ -32,6 +33,7 @@ import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 part 'drift_personal_graph_repository_relation_commands.dart';
+part 'drift_personal_graph_repository_blocking_relations.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
 
@@ -304,6 +306,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
+      final DeleteBlockingRelations deleteCommand =>
+        await _executeDeleteBlockingRelations(deleteCommand),
       _ => throw UnsupportedError(
         'Команда не поддерживается модулем личного графа.',
       ),

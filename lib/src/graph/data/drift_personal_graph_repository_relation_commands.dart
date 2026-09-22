@@ -51,7 +51,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
           commandType: commandType,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
-            code: _longTermRelationDiagnosticsFailureCode(failure),
+            code: _graphCommandDiagnosticsFailureCode(failure),
           ),
         ),
       );
@@ -617,8 +617,8 @@ LongTermRelationCommandDiagnosticsType _longTermRelationCommandDiagnosticsType(
   DeleteLongTermRelation() => LongTermRelationCommandDiagnosticsType.delete,
 };
 
-DiagnosticsFailureCode _longTermRelationDiagnosticsFailureCode(
-  LongTermRelationCommandFailure failure,
+DiagnosticsFailureCode _graphCommandDiagnosticsFailureCode(
+  GraphCommandFailure failure,
 ) => switch (failure.category) {
   GraphFailureCategory.validation => DiagnosticsFailureCode.validation,
   GraphFailureCategory.notFound => DiagnosticsFailureCode.notFound,
