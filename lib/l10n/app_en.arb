@@ -697,6 +697,34 @@
   "@graphOperationDelete": {
     "description": "Вид операции удаления намерения в сообщении оболочки"
   },
+  "graphOperationDeleteBlockingRelations": "Delete selected relations",
+  "@graphOperationDeleteBlockingRelations": {
+    "description": "Вид массовой операции в сообщении оболочки"
+  },
+  "blockingRelationsDeleted": "Selected relations deleted.",
+  "@blockingRelationsDeleted": {
+    "description": "Успешное массовое удаление выбранных связей"
+  },
+  "blockingRelationsDeleteIntentionNotFound": "This intention no longer exists. Relations weren’t deleted.",
+  "@blockingRelationsDeleteIntentionNotFound": {
+    "description": "Намерение исчезло до массового удаления"
+  },
+  "blockingRelationsDeleteConflict": "The selected relations changed. Refresh the selection and confirm again.",
+  "@blockingRelationsDeleteConflict": {
+    "description": "Устаревший набор массового удаления"
+  },
+  "blockingRelationsDeleteUnavailable": "Selected relations couldn’t be deleted. Try again.",
+  "@blockingRelationsDeleteUnavailable": {
+    "description": "Временная недоступность массового удаления"
+  },
+  "blockingRelationsDeleteCorruption": "Stored data is damaged. Selected relations weren’t deleted.",
+  "@blockingRelationsDeleteCorruption": {
+    "description": "Повреждение данных при массовом удалении"
+  },
+  "blockingRelationsDeleteUnexpected": "Selected relations couldn’t be deleted because of an unexpected error.",
+  "@blockingRelationsDeleteUnexpected": {
+    "description": "Непредвиденная ошибка массового удаления"
+  },
   "graphOperationNewIntention": "new intention",
   "@graphOperationNewIntention": {
     "description": "Безопасное обозначение создаваемого намерения до подтверждения"

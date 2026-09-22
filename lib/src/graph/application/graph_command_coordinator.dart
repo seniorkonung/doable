@@ -9,6 +9,7 @@ import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/presentation/exclusive_operation.dart';
+import 'delete_blocking_relations.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
 import 'personal_graph_repository.dart';
@@ -80,6 +81,13 @@ final class LongTermRelationOperationToken extends GraphOperationToken {
 
   @override
   String toString() => 'LongTermRelationOperationToken';
+}
+
+final class BlockingRelationsDeleteOperationToken extends GraphOperationToken {
+  BlockingRelationsDeleteOperationToken._();
+
+  @override
+  String toString() => 'BlockingRelationsDeleteOperationToken';
 }
 
 sealed class GraphCommandCompletion {
@@ -173,6 +181,33 @@ final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   };
 }
 
+final class BlockingRelationsDeleteCompletion extends GraphCommandCompletion {
+  const BlockingRelationsDeleteCompletion._({
+    required this.token,
+    required this.intentionId,
+    required this.presentationTitle,
+    required this.result,
+  });
+
+  @override
+  final BlockingRelationsDeleteOperationToken token;
+  final IntentionId intentionId;
+  final String presentationTitle;
+  final DeleteBlockingRelationsResult result;
+
+  @override
+  ConfirmedGraphChangePackage? get confirmedChange => switch (result) {
+    GraphResultSuccess(:final value) => value,
+    GraphResultFailure() => null,
+  };
+
+  @override
+  bool get isFailure => switch (result) {
+    GraphResultSuccess() => false,
+    GraphResultFailure() => true,
+  };
+}
+
 sealed class IntentionOperationTarget {
   const IntentionOperationTarget();
 }
@@ -242,8 +277,28 @@ final class LongTermRelationCommandAlreadyRunning
   const LongTermRelationCommandAlreadyRunning();
 }
 
+sealed class BlockingRelationsDeleteStart {
+  const BlockingRelationsDeleteStart();
+}
+
+final class BlockingRelationsDeleteAccepted
+    extends BlockingRelationsDeleteStart {
+  const BlockingRelationsDeleteAccepted({
+    required this.token,
+    required this.future,
+  });
+
+  final BlockingRelationsDeleteOperationToken token;
+  final Future<BlockingRelationsDeleteCompletion> future;
+}
+
+final class BlockingRelationsDeleteAlreadyRunning
+    extends BlockingRelationsDeleteStart {
+  const BlockingRelationsDeleteAlreadyRunning();
+}
+
 final class GraphCommandCoordinatorDraining extends IntentionCommandStart
-    implements LongTermRelationCommandStart {
+    implements LongTermRelationCommandStart, BlockingRelationsDeleteStart {
   const GraphCommandCoordinatorDraining();
 }
 
@@ -403,6 +458,38 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     target: ExistingLongTermRelationOperationTarget(command.relationId),
   );
 
+  BlockingRelationsDeleteStart acceptBlockingRelationsDelete(
+    DeleteBlockingRelations command, {
+    required String presentationTitle,
+  }) {
+    final token = BlockingRelationsDeleteOperationToken._();
+    final acceptance = _acceptOperation(
+      keys: {
+        ExistingIntentionKey(command.intentionId),
+        for (final relationId in command.relationIds)
+          ExistingLongTermRelationKey(relationId),
+      },
+      entry: _PresentationEntry(token),
+      execute: () async => BlockingRelationsDeleteCompletion._(
+        token: token,
+        intentionId: command.intentionId,
+        presentationTitle: presentationTitle,
+        result: await _executeBlockingRelationsDelete(command),
+      ),
+    );
+    return switch (acceptance) {
+      _GraphCommandAccepted(:final future) => BlockingRelationsDeleteAccepted(
+        token: token,
+        future: future.then(
+          (completion) => completion as BlockingRelationsDeleteCompletion,
+        ),
+      ),
+      _GraphCommandAlreadyRunning() =>
+        const BlockingRelationsDeleteAlreadyRunning(),
+      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
+    };
+  }
+
   LongTermRelationCommandStart _acceptRelation({
     required GraphCommandKey key,
     required LongTermRelationCommand command,
@@ -411,7 +498,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   }) {
     final token = LongTermRelationOperationToken._();
     final acceptance = _acceptOperation(
-      key: key,
+      keys: {key},
       entry: _PresentationEntry(token),
       execute: () async {
         final result = await _executeLongTermRelation(command);
@@ -444,7 +531,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     final token = IntentionOperationToken._();
     final kind = _kindOf(command);
     final acceptance = _acceptOperation(
-      key: key,
+      keys: {key},
       entry: _PresentationEntry(token),
       execute: () async {
         final result = await _executeIntention(command);
@@ -469,7 +556,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   }
 
   _GraphCommandAcceptance _acceptOperation({
-    required GraphCommandKey key,
+    required Set<GraphCommandKey> keys,
     required _PresentationEntry entry,
     required Future<GraphCommandCompletion> Function() execute,
   }) {
@@ -477,27 +564,26 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return const _GraphCommandDraining();
     }
 
-    final gate = _gates.putIfAbsent(
-      key,
-      ExclusiveOperation<GraphCommandCompletion>.new,
-    );
-    if (gate.isRunning) {
+    if (keys.any((key) => _gates[key]?.isRunning ?? false)) {
       return const _GraphCommandAlreadyRunning();
     }
 
+    final gate = ExclusiveOperation<GraphCommandCompletion>();
+    for (final key in keys) {
+      _gates[key] = gate;
+    }
     _entries[entry.token] = entry;
     final started = gate.start(execute);
-    if (started is ExclusiveOperationAlreadyRunning<GraphCommandCompletion>) {
-      return const _GraphCommandAlreadyRunning();
-    }
     final operation =
         started as ExclusiveOperationAccepted<GraphCommandCompletion>;
     final operationFuture = operation.future;
 
     unawaited(
       operationFuture.whenComplete(() {
-        if (identical(_gates[key], gate) && !gate.isRunning) {
-          _gates.remove(key);
+        for (final key in keys) {
+          if (identical(_gates[key], gate) && !gate.isRunning) {
+            _gates.remove(key);
+          }
         }
       }),
     );
@@ -727,6 +813,19 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         LongTermRelationCommandSuccess,
         LongTermRelationCommandFailure
       >(LongTermRelationUnexpectedFailure());
+    }
+  }
+
+  Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
+    DeleteBlockingRelations command,
+  ) async {
+    try {
+      return await _repository.execute(command);
+    } on Object {
+      return const GraphCommandFailed<
+        BlockingRelationsDeleted,
+        DeleteBlockingRelationsFailure
+      >(DeleteBlockingRelationsUnexpectedFailure());
     }
   }
 

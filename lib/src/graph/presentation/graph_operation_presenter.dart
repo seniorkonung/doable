@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../application/delete_blocking_relations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
@@ -188,7 +189,34 @@ String _messageFor(
     localizations,
     completion,
   ),
+  BlockingRelationsDeleteCompletion() => _blockingRelationsDeleteMessage(
+    localizations,
+    completion,
+  ),
 };
+
+String _blockingRelationsDeleteMessage(
+  AppLocalizations localizations,
+  BlockingRelationsDeleteCompletion completion,
+) => localizations.graphOperationMessage(
+  localizations.graphOperationDeleteBlockingRelations,
+  completion.presentationTitle,
+  switch (completion.result) {
+    GraphResultSuccess() => localizations.blockingRelationsDeleted,
+    GraphResultFailure(:final failure) => switch (failure) {
+      DeleteBlockingRelationsIntentionNotFoundFailure() =>
+        localizations.blockingRelationsDeleteIntentionNotFound,
+      DeleteBlockingRelationsSelectionConflictFailure() =>
+        localizations.blockingRelationsDeleteConflict,
+      DeleteBlockingRelationsUnavailableFailure() =>
+        localizations.blockingRelationsDeleteUnavailable,
+      DeleteBlockingRelationsCorruptionFailure() =>
+        localizations.blockingRelationsDeleteCorruption,
+      DeleteBlockingRelationsUnexpectedFailure() =>
+        localizations.blockingRelationsDeleteUnexpected,
+    },
+  },
+);
 
 String _intentionMessage(
   AppLocalizations localizations,

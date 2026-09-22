@@ -602,6 +602,33 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationDelete => 'Удаление';
 
   @override
+  String get graphOperationDeleteBlockingRelations =>
+      'Удаление выбранных связей';
+
+  @override
+  String get blockingRelationsDeleted => 'Выбранные связи удалены.';
+
+  @override
+  String get blockingRelationsDeleteIntentionNotFound =>
+      'Это намерение больше не существует. Связи не удалены.';
+
+  @override
+  String get blockingRelationsDeleteConflict =>
+      'Выбранный набор устарел. Обновите выбор и подтвердите его снова.';
+
+  @override
+  String get blockingRelationsDeleteUnavailable =>
+      'Не удалось удалить выбранные связи. Повторите попытку.';
+
+  @override
+  String get blockingRelationsDeleteCorruption =>
+      'Сохранённые данные повреждены. Выбранные связи не удалены.';
+
+  @override
+  String get blockingRelationsDeleteUnexpected =>
+      'Не удалось удалить выбранные связи из-за непредвиденной ошибки.';
+
+  @override
   String get graphOperationNewIntention => 'новое намерение';
 
   @override

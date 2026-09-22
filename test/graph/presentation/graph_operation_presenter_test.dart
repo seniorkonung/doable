@@ -1,4 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -446,6 +447,96 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
+  testWidgets('массовый успех на английском называет операцию и намерение', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
+    harness.completeBlockingRelationsDeleted(deletion);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Delete selected relations — “Связанное”: Selected relations deleted.',
+      ),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets(
+    'массовый конфликт на русском не раскрывает идентификатор связи',
+    (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
+      harness.completeBlockingRelationsFailure(
+        deletion,
+        DeleteBlockingRelationsSelectionConflictFailure(
+          relationId: _relationId,
+          reason: BlockingRelationConflictReason.relationMissing,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Удаление выбранных связей — «Связанное»: Выбранный набор устарел. Обновите выбор и подтвердите его снова.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('018f47c2'), findsNothing);
+      await _closeMessage(tester);
+    },
+  );
+
+  for (final scenario
+      in <({DeleteBlockingRelationsFailure failure, String outcome})>[
+        (
+          failure: DeleteBlockingRelationsIntentionNotFoundFailure(
+            testDetailsIntentionId(1),
+          ),
+          outcome:
+              'This intention no longer exists. Relations weren’t deleted.',
+        ),
+        (
+          failure: const DeleteBlockingRelationsUnavailableFailure(),
+          outcome: 'Selected relations couldn’t be deleted. Try again.',
+        ),
+        (
+          failure: const DeleteBlockingRelationsCorruptionFailure(),
+          outcome:
+              'Stored data is damaged. Selected relations weren’t deleted.',
+        ),
+        (
+          failure: const DeleteBlockingRelationsUnexpectedFailure(),
+          outcome: 'Selected relations couldn’t be deleted because of an unexpected error.',
+        ),
+      ]) {
+    testWidgets(
+      'массовый отказ ${scenario.failure.runtimeType} безопасен на английском',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester);
+        final deletion = harness.startBlockingRelationsDelete(
+          title: 'Связанное',
+        );
+        harness.completeBlockingRelationsFailure(deletion, scenario.failure);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(
+            'Delete selected relations — “Связанное”: ${scenario.outcome}',
+          ),
+          findsOneWidget,
+        );
+        await _closeMessage(tester);
+      },
+    );
+  }
+
   for (final scenario in <({RelationParticipantRole role, String outcome})>[
     (
       role: RelationParticipantRole.source,
@@ -847,9 +938,71 @@ final class _PresenterHarness {
   final _commandIndexes = <IntentionCommandAccepted, int>{};
   final _titles = <IntentionCommandAccepted, (int, String)>{};
   final _relationIndexes = <LongTermRelationCommandAccepted, int>{};
+  final _blockingIndexes = <BlockingRelationsDeleteAccepted, int>{};
 
   GraphCommandCoordinator get _coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
+
+  BlockingRelationsDeleteAccepted startBlockingRelationsDelete({
+    required String title,
+    bool releaseInitiator = true,
+  }) {
+    final commandIndex = repository.blockingRelationsCommands.length;
+    final accepted = _coordinator.acceptBlockingRelationsDelete(
+      DeleteBlockingRelations(
+        intentionId: testDetailsIntentionId(1),
+        relationIds: {_relationId},
+      ),
+      presentationTitle: title,
+    ) as BlockingRelationsDeleteAccepted;
+    if (releaseInitiator) {
+      _coordinator.releaseInitiatorPresentation(accepted.token);
+    }
+    _blockingIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  void completeBlockingRelationsDeleted(
+    BlockingRelationsDeleteAccepted accepted,
+  ) {
+    const revision = TestDetailsRevision(6);
+    final relation = LongTermRelation(
+      id: _relationId,
+      sourceIntentionId: testDetailsIntentionId(1),
+      relatedIntentionId: testDetailsIntentionId(2),
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: RelationScope.active,
+      creationSequence: RelationCreationSequence(1),
+    );
+    final command =
+        repository.blockingRelationsCommands[_blockingIndexes[accepted]!];
+    repository.completeBlockingRelationsCommand(
+      _blockingIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: BlockingRelationsDeleted(
+            command: command,
+            revision: revision,
+            deletedRelations: [relation],
+            counts: {
+              testDetailsIntentionId(1): testRelationCounts(),
+              testDetailsIntentionId(2): testRelationCounts(),
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeBlockingRelationsFailure(
+    BlockingRelationsDeleteAccepted accepted,
+    DeleteBlockingRelationsFailure failure,
+  ) => repository.completeBlockingRelationsCommand(
+    _blockingIndexes[accepted]!,
+    GraphCommandFailed(failure),
+  );
 
   IntentionCommandAccepted startDelete({
     required int index,

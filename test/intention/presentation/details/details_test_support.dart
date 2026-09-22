@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -73,9 +74,12 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   final catalogQueries = <IntentionCatalogQuery>[];
   final commands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
+  final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
+  final _blockingRelationsCommandRequests =
+      <Completer<DeleteBlockingRelationsResult>>[];
   var _watchCallCount = 0;
 
   Result<IntentionCatalogPage>? catalogResult;
@@ -162,6 +166,8 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
       final LongTermRelationCommand relation => await _executeRelation(
         relation,
       ),
+      final DeleteBlockingRelations deletion =>
+        await _executeBlockingRelationsDelete(deletion),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -175,6 +181,20 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
     _relationCommandRequests.add(request);
     return request.future;
   }
+
+  Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
+    DeleteBlockingRelations command,
+  ) {
+    blockingRelationsCommands.add(command);
+    final request = Completer<DeleteBlockingRelationsResult>();
+    _blockingRelationsCommandRequests.add(request);
+    return request.future;
+  }
+
+  void completeBlockingRelationsCommand(
+    int index,
+    DeleteBlockingRelationsResult result,
+  ) => _blockingRelationsCommandRequests[index].complete(result);
 
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
   _executeIntention(IntentionCommand command) {
