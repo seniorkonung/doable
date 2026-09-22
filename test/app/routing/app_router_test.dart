@@ -255,7 +255,7 @@ void main() {
       expect(
         tester
             .widget<RelationEditorPage>(find.byType(RelationEditorPage))
-            .creationContext,
+            .editorContext,
         RelationCreationContext(
           participant: testParticipant(
             ownerId,
@@ -296,7 +296,7 @@ void main() {
       expect(
         tester
             .widget<RelationEditorPage>(find.byType(RelationEditorPage))
-            .creationContext,
+            .editorContext,
         RelationCreationContext(
           participant: testParticipant(
             ownerId,

@@ -747,6 +747,9 @@ class AppLocalizationsRu extends AppLocalizations {
       'Открывает намерение и его собственные связи';
 
   @override
+  String get relationDetailsEditAction => 'Редактировать связь';
+
+  @override
   String get participantPickerTitle => 'Выбор участника';
 
   @override
@@ -765,6 +768,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationEditorTitle => 'Новая связь';
+
+  @override
+  String get relationEditorEditTitle => 'Редактирование связи';
+
+  @override
+  String get relationEditorPhraseLabel => 'Формулировка связи';
 
   @override
   String get relationEditorSourceLabel => 'Исходное намерение';
@@ -841,6 +850,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationEditorCreating => 'Создаём…';
+
+  @override
+  String get relationEditorSaveAction => 'Сохранить изменения';
+
+  @override
+  String get relationEditorSaving => 'Сохраняем…';
 
   @override
   String get relationNeighborhoodCreateOutgoingAction =>

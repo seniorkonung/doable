@@ -488,6 +488,323 @@ void main() {
     },
   );
 
+  testWidgets('из подробного просмотра редактирует все поля архивной связи', (
+    tester,
+  ) async {
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final details = testRelationDetails(
+      relationId: testFormRelationId(90),
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+      sourceTitle: 'Исходное',
+      relatedTitle: 'Связанное',
+      type: LongTermRelationType.can,
+      priority: RelationPriority.p2,
+      scope: RelationScope.archived,
+      description: 'Прежнее описание',
+    );
+    final router = await _openDetailsForEditing(tester, repository, details);
+
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(router.current.name, RelationEditorRoute.name);
+    expect(find.text('Edit relation'), findsOneWidget);
+    expect(find.text('Исходное'), findsOneWidget);
+    expect(find.text('Связанное'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('relation-editor-description')),
+          )
+          .controller
+          ?.text,
+      'Прежнее описание',
+    );
+    expect(_isChipSelected(tester, 'relation-editor-type-can'), isTrue);
+    expect(_isChipSelected(tester, 'relation-editor-priority-p2'), isTrue);
+    expect(find.text('To Исходное, you can Связанное'), findsOneWidget);
+
+    await _selectParticipant(
+      tester,
+      repository,
+      actionKey: 'relation-editor-change-source',
+      catalogIndex: 1,
+      title: 'Новое исходное',
+      index: 3,
+    );
+    expect(repository.catalogQueries[1].scope, IntentionScope.all);
+    await _selectParticipant(
+      tester,
+      repository,
+      actionKey: 'relation-editor-change-related',
+      catalogIndex: 2,
+      title: 'Новое связанное',
+      index: 4,
+    );
+    await _selectType(tester, 'need');
+    await _selectPriority(tester, 'p4');
+    await tester.enterText(
+      find.byKey(const ValueKey('relation-editor-description')),
+      'Новое описание',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('To Новое исходное, you need Новое связанное'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+    await tester.pump();
+
+    expect(repository.relationUpdateCommands, hasLength(1));
+    final command = repository.updateCommandAt(0);
+    expect(command.relationId, details.relation.id);
+    expect(
+      command.patch.sourceIntentionId,
+      isA<LongTermRelationFieldSet<IntentionId>>().having(
+        (field) => field.value,
+        'исходный участник',
+        testSummary(index: 3).id,
+      ),
+    );
+    expect(
+      command.patch.relatedIntentionId,
+      isA<LongTermRelationFieldSet<IntentionId>>().having(
+        (field) => field.value,
+        'связанный участник',
+        testSummary(index: 4).id,
+      ),
+    );
+    expect(
+      command.patch.type,
+      isA<LongTermRelationFieldSet<LongTermRelationType>>().having(
+        (field) => field.value,
+        'тип',
+        LongTermRelationType.need,
+      ),
+    );
+    expect(
+      command.patch.priority,
+      isA<LongTermRelationFieldSet<RelationPriority>>().having(
+        (field) => field.value,
+        'приоритет',
+        RelationPriority.p4,
+      ),
+    );
+    expect(
+      command.patch.description,
+      isA<LongTermRelationDescriptionReplaced>().having(
+        (field) => field.value.value,
+        'описание',
+        'Новое описание',
+      ),
+    );
+
+    final updated = LongTermRelation(
+      id: details.relation.id,
+      sourceIntentionId: testSummary(index: 3).id,
+      relatedIntentionId: testSummary(index: 4).id,
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p4,
+      scope: RelationScope.archived,
+      creationSequence: details.relation.creationSequence,
+    );
+    repository.completeRelationUpdated(
+      0,
+      before: details.relation,
+      after: updated,
+      description: LongTermRelationDescription.fromInput('Новое описание'),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(router.current.name, RelationDetailsRoute.name);
+    expect(repository.relationWatches, hasLength(2));
+    repository
+        .watchAt(1)
+        .emitDetails(
+          testRelationDetails(
+            relationId: updated.id,
+            sourceId: updated.sourceIntentionId,
+            relatedId: updated.relatedIntentionId,
+            sourceTitle: 'Новое исходное',
+            relatedTitle: 'Новое связанное',
+            type: updated.type,
+            priority: updated.priority,
+            scope: updated.scope,
+            creationSequence: updated.creationSequence.value,
+            description: 'Новое описание',
+          ),
+          revision: const TestCatalogRevision(1),
+        );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('To Новое исходное, you need Новое связанное'),
+      findsOneWidget,
+    );
+    expect(find.text('Новое описание'), findsOneWidget);
+  });
+
+  testWidgets('отмена редактирования не отправляет команду', (tester) async {
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final details = testRelationDetails(
+      relationId: testFormRelationId(91),
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+      description: 'Прежнее описание',
+    );
+    final router = await _openDetailsForEditing(tester, repository, details);
+
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('relation-editor-description')),
+      'Неподтверждённый черновик',
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(router.current.name, RelationDetailsRoute.name);
+    expect(repository.relationUpdateCommands, isEmpty);
+    expect(find.text('Прежнее описание'), findsOneWidget);
+  });
+
+  testWidgets('ошибка изменения сохраняет исправляемый черновик', (
+    tester,
+  ) async {
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final details = testRelationDetails(
+      relationId: testFormRelationId(92),
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+      description: 'Прежнее описание',
+    );
+    await _openDetailsForEditing(tester, repository, details);
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('relation-editor-description')),
+      'Исправляемый черновик',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('relation-editor-submit')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+    await tester.pump();
+    expect(repository.relationUpdateCommands, hasLength(1));
+
+    repository.failRelationCommand(
+      0,
+      const LongTermRelationUnavailableFailure(),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('The relation couldn’t be updated. Try again.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('relation-editor-description')),
+          )
+          .controller
+          ?.text,
+      'Исправляемый черновик',
+    );
+  });
+
+  testWidgets(
+    'русская форма изменения доступно показывает текущую формулировку',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(
+        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+      );
+      final repository = ControlledRelationFormRepository();
+      addTearDown(repository.dispose);
+      final details = testRelationDetails(
+        relationId: testFormRelationId(93),
+        sourceId: testSummary(index: 1).id,
+        relatedId: testSummary(index: 2).id,
+        sourceTitle: 'быть здоровым',
+        relatedTitle: 'много ходить',
+        description: 'Описание',
+      );
+      await _openDetailsForEditing(
+        tester,
+        repository,
+        details,
+        locale: const Locale('ru'),
+      );
+
+      expect(find.text('Редактировать связь'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-edit-relation')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Редактирование связи'), findsOneWidget);
+      expect(
+        find.text('Чтобы быть здоровым, нужно много ходить'),
+        findsOneWidget,
+      );
+      expect(find.text('Сохранить изменения'), findsOneWidget);
+      final phraseSemantics = tester.getSemantics(
+        find.byKey(const ValueKey('relation-editor-phrase')),
+      );
+      expect(phraseSemantics.label, contains('Формулировка связи'));
+      expect(phraseSemantics.label, contains('быть здоровым'));
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets('неподдерживаемая локаль использует английский fallback', (
+    tester,
+  ) async {
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final details = testRelationDetails(
+      relationId: testFormRelationId(94),
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+    );
+    await _openDetailsForEditing(
+      tester,
+      repository,
+      details,
+      locale: const Locale('de'),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit relation'), findsOneWidget);
+    expect(find.text('Save changes'), findsOneWidget);
+  });
+
   testWidgets('локализует форму создания связи на русском', (tester) async {
     final repository = ControlledRelationFormRepository();
     addTearDown(repository.dispose);
@@ -600,13 +917,54 @@ Future<AppRouter> _openForm(
   unawaited(
     router.push(
       RelationEditorRoute(
-        creationContext: RelationCreationContext(
+        editorContext: RelationCreationContext(
           participant: _contextParticipant,
           direction: direction,
         ),
       ),
     ),
   );
+  await tester.pumpAndSettle();
+  return router;
+}
+
+Future<AppRouter> _openDetailsForEditing(
+  WidgetTester tester,
+  ControlledRelationFormRepository repository,
+  LongTermRelationDetails details, {
+  Locale locale = const Locale('en'),
+}) async {
+  tester.view.physicalSize = const Size(1200, 4000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final router = AppRouter();
+  addTearDown(router.dispose);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
+      retry: (retryCount, error) => null,
+      child: MaterialApp.router(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localeListResolutionCallback: resolveAppLocale,
+        routerConfig: router.config(),
+        builder: (context, child) =>
+            GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
+      ),
+    ),
+  );
+  await tester.pump();
+  repository.completeCatalogPage(0, const []);
+  await tester.pumpAndSettle();
+  unawaited(router.push(RelationDetailsRoute(relationId: details.relation.id)));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  repository
+      .watchAt(0)
+      .emitDetails(details, revision: const TestCatalogRevision(0));
   await tester.pumpAndSettle();
   return router;
 }

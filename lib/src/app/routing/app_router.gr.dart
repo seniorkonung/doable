@@ -169,15 +169,12 @@ class RelationDetailsRouteArgs {
 /// [_i5.RelationEditorPage]
 class RelationEditorRoute extends _i7.PageRouteInfo<RelationEditorRouteArgs> {
   RelationEditorRoute({
-    required _i11.RelationCreationContext creationContext,
+    required _i11.RelationEditorContext editorContext,
     _i9.Key? key,
     List<_i7.PageRouteInfo>? children,
   }) : super(
          RelationEditorRoute.name,
-         args: RelationEditorRouteArgs(
-           creationContext: creationContext,
-           key: key,
-         ),
+         args: RelationEditorRouteArgs(editorContext: editorContext, key: key),
          initialChildren: children,
        );
 
@@ -188,7 +185,7 @@ class RelationEditorRoute extends _i7.PageRouteInfo<RelationEditorRouteArgs> {
     builder: (data) {
       final args = data.argsAs<RelationEditorRouteArgs>();
       return _i5.RelationEditorPage(
-        creationContext: args.creationContext,
+        editorContext: args.editorContext,
         key: args.key,
       );
     },
@@ -196,26 +193,26 @@ class RelationEditorRoute extends _i7.PageRouteInfo<RelationEditorRouteArgs> {
 }
 
 class RelationEditorRouteArgs {
-  const RelationEditorRouteArgs({required this.creationContext, this.key});
+  const RelationEditorRouteArgs({required this.editorContext, this.key});
 
-  final _i11.RelationCreationContext creationContext;
+  final _i11.RelationEditorContext editorContext;
 
   final _i9.Key? key;
 
   @override
   String toString() {
-    return 'RelationEditorRouteArgs{creationContext: $creationContext, key: $key}';
+    return 'RelationEditorRouteArgs{editorContext: $editorContext, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! RelationEditorRouteArgs) return false;
-    return creationContext == other.creationContext && key == other.key;
+    return editorContext == other.editorContext && key == other.key;
   }
 
   @override
-  int get hashCode => creationContext.hashCode ^ key.hashCode;
+  int get hashCode => editorContext.hashCode ^ key.hashCode;
 }
 
 /// generated route for

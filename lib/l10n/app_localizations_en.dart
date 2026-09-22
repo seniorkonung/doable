@@ -745,6 +745,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Opens the intention and its own relations';
 
   @override
+  String get relationDetailsEditAction => 'Edit relation';
+
+  @override
   String get participantPickerTitle => 'Select a participant';
 
   @override
@@ -763,6 +766,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationEditorTitle => 'New relation';
+
+  @override
+  String get relationEditorEditTitle => 'Edit relation';
+
+  @override
+  String get relationEditorPhraseLabel => 'Relation phrase';
 
   @override
   String get relationEditorSourceLabel => 'Source intention';
@@ -840,6 +849,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationEditorCreating => 'Creating…';
+
+  @override
+  String get relationEditorSaveAction => 'Save changes';
+
+  @override
+  String get relationEditorSaving => 'Saving…';
 
   @override
   String get relationNeighborhoodCreateOutgoingAction =>
