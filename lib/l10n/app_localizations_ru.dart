@@ -620,6 +620,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationNewRelation => 'новая связь';
 
   @override
+  String get graphOperationRelation => 'связь';
+
+  @override
   String get relationEditorCreated => 'Связь создана.';
 
   @override
@@ -649,6 +652,40 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorCreateUnexpected =>
       'Не удалось создать связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationEditorUpdated => 'Связь изменена.';
+
+  @override
+  String get relationEditorUpdateInvalidInput =>
+      'Проверьте выбранные намерения и изменения связи.';
+
+  @override
+  String get relationEditorUpdatePairOccupied =>
+      'Связь этого направления между выбранными намерениями уже есть.';
+
+  @override
+  String get relationEditorUpdateNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationEditorUpdateParticipantNotFound =>
+      'Одно из выбранных намерений больше не существует.';
+
+  @override
+  String get relationEditorUpdateParticipantArchived =>
+      'Активная связь может соединять только активные намерения.';
+
+  @override
+  String get relationEditorUpdateUnavailable =>
+      'Не удалось изменить связь. Повторите попытку.';
+
+  @override
+  String get relationEditorUpdateCorruption =>
+      'Сохранённые данные повреждены. Связь не изменена.';
+
+  @override
+  String get relationEditorUpdateUnexpected =>
+      'Не удалось изменить связь из-за непредвиденной ошибки.';
 
   @override
   String get relationNeighborhoodOpenRelation =>

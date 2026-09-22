@@ -7,6 +7,7 @@ import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
+import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/presentation/exclusive_operation.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
@@ -48,6 +49,19 @@ final class ExistingIntentionKey extends GraphCommandKey {
 
 final class LongTermRelationCreationFormKey extends GraphCommandKey {
   LongTermRelationCreationFormKey();
+}
+
+final class ExistingLongTermRelationKey extends GraphCommandKey {
+  const ExistingLongTermRelationKey(this.relationId);
+
+  final LongTermRelationId relationId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ExistingLongTermRelationKey && other.relationId == relationId;
+
+  @override
+  int get hashCode => relationId.hashCode;
 }
 
 sealed class GraphOperationToken {
@@ -122,18 +136,20 @@ final class IntentionCommandCompletion extends GraphCommandCompletion {
   };
 }
 
-enum LongTermRelationCommandKind { create }
+enum LongTermRelationCommandKind { create, update }
 
 final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   const LongTermRelationCommandCompletion._({
     required this.token,
     required this.kind,
+    required this.target,
     required this.confirmedResult,
   });
 
   @override
   final LongTermRelationOperationToken token;
   final LongTermRelationCommandKind kind;
+  final LongTermRelationOperationTarget target;
   final LongTermRelationCommandResult confirmedResult;
 
   GraphResult<LongTermRelationCommandSuccess, LongTermRelationCommandFailure>
@@ -171,6 +187,22 @@ final class ExistingIntentionOperationTarget extends IntentionOperationTarget {
 
   final IntentionId intentionId;
   final String title;
+}
+
+sealed class LongTermRelationOperationTarget {
+  const LongTermRelationOperationTarget();
+}
+
+final class CreatingLongTermRelationOperationTarget
+    extends LongTermRelationOperationTarget {
+  const CreatingLongTermRelationOperationTarget();
+}
+
+final class ExistingLongTermRelationOperationTarget
+    extends LongTermRelationOperationTarget {
+  const ExistingLongTermRelationOperationTarget(this.relationId);
+
+  final LongTermRelationId relationId;
 }
 
 sealed class IntentionCommandStart {
@@ -301,6 +333,9 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   bool isRunning(IntentionId intentionId) =>
       isKeyRunning(ExistingIntentionKey(intentionId));
 
+  bool isRelationRunning(LongTermRelationId relationId) =>
+      isKeyRunning(ExistingLongTermRelationKey(relationId));
+
   bool isKeyRunning(GraphCommandKey key) => _gates[key]?.isRunning ?? false;
 
   IntentionCommandStart acceptCreation(
@@ -323,16 +358,38 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   LongTermRelationCommandStart acceptRelationCreation(
     LongTermRelationCreationFormKey formKey,
     CreateLongTermRelation command,
-  ) {
+  ) => _acceptRelation(
+    key: formKey,
+    command: command,
+    kind: LongTermRelationCommandKind.create,
+    target: const CreatingLongTermRelationOperationTarget(),
+  );
+
+  LongTermRelationCommandStart acceptRelationUpdate(
+    UpdateLongTermRelation command,
+  ) => _acceptRelation(
+    key: ExistingLongTermRelationKey(command.relationId),
+    command: command,
+    kind: LongTermRelationCommandKind.update,
+    target: ExistingLongTermRelationOperationTarget(command.relationId),
+  );
+
+  LongTermRelationCommandStart _acceptRelation({
+    required GraphCommandKey key,
+    required LongTermRelationCommand command,
+    required LongTermRelationCommandKind kind,
+    required LongTermRelationOperationTarget target,
+  }) {
     final token = LongTermRelationOperationToken._();
     final acceptance = _acceptOperation(
-      key: formKey,
+      key: key,
       entry: _PresentationEntry(token),
       execute: () async {
         final result = await _executeLongTermRelation(command);
         return LongTermRelationCommandCompletion._(
           token: token,
-          kind: LongTermRelationCommandKind.create,
+          kind: kind,
+          target: target,
           confirmedResult: result,
         );
       },

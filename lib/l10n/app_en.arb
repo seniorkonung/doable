@@ -724,6 +724,10 @@
   "@graphOperationNewRelation": {
     "description": "Безопасное обозначение создаваемой связи до подтверждения"
   },
+  "graphOperationRelation": "relation",
+  "@graphOperationRelation": {
+    "description": "Безопасное обозначение существующей связи"
+  },
   "relationEditorCreated": "Relation created.",
   "@relationEditorCreated": {
     "description": "Подтверждение успешного создания долговременной связи"
@@ -755,6 +759,42 @@
   "relationEditorCreateUnexpected": "The relation couldn’t be created because of an unexpected error.",
   "@relationEditorCreateUnexpected": {
     "description": "Терминальная непредвиденная ошибка создания связи"
+  },
+  "relationEditorUpdated": "Relation updated.",
+  "@relationEditorUpdated": {
+    "description": "Подтверждение успешного изменения долговременной связи"
+  },
+  "relationEditorUpdateInvalidInput": "Check the selected intentions and relation changes.",
+  "@relationEditorUpdateInvalidInput": {
+    "description": "Ошибка проверки данных изменения связи"
+  },
+  "relationEditorUpdatePairOccupied": "A relation with this direction already exists between the selected intentions.",
+  "@relationEditorUpdatePairOccupied": {
+    "description": "Конфликт занятой направленной пары при изменении связи"
+  },
+  "relationEditorUpdateNotFound": "This relation no longer exists.",
+  "@relationEditorUpdateNotFound": {
+    "description": "Отсутствие изменяемой связи"
+  },
+  "relationEditorUpdateParticipantNotFound": "One of the selected intentions no longer exists.",
+  "@relationEditorUpdateParticipantNotFound": {
+    "description": "Отсутствие участника при изменении связи"
+  },
+  "relationEditorUpdateParticipantArchived": "An active relation can only link active intentions.",
+  "@relationEditorUpdateParticipantArchived": {
+    "description": "Конфликт архивного состояния участника при изменении активной связи"
+  },
+  "relationEditorUpdateUnavailable": "The relation couldn’t be updated. Try again.",
+  "@relationEditorUpdateUnavailable": {
+    "description": "Устранимая недоступность изменения связи"
+  },
+  "relationEditorUpdateCorruption": "Stored data is damaged. The relation wasn’t updated.",
+  "@relationEditorUpdateCorruption": {
+    "description": "Терминальное повреждение данных при изменении связи"
+  },
+  "relationEditorUpdateUnexpected": "The relation couldn’t be updated because of an unexpected error.",
+  "@relationEditorUpdateUnexpected": {
+    "description": "Терминальная непредвиденная ошибка изменения связи"
   },
   "relationNeighborhoodOpenRelation": "Opens the relation details",
   "@relationNeighborhoodOpenRelation": {
