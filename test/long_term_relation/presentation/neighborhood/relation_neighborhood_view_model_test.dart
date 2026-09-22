@@ -10,6 +10,8 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -1195,6 +1197,600 @@ void main() {
     },
   );
 
+  test(
+    'приоритет непросматриваемой группы откладывает замену до подгрузки',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository, pageSize: 2);
+      addTearDown(harness.dispose);
+
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.intentionId, from: 1, count: 2),
+          counts: testRelationCounts(
+            activeNeedOutgoing: 4,
+            activeCanOutgoing: 1,
+          ),
+          nextCursor: const TestRelationGroupCursor(2),
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      await pumpEventQueue();
+
+      final participantId = testIntentionId(3000);
+      final before = LongTermRelation(
+        id: testRelationId(99),
+        sourceIntentionId: harness.intentionId,
+        relatedIntentionId: participantId,
+        type: LongTermRelationType.can,
+        priority: RelationPriority.p3,
+        scope: RelationScope.active,
+        creationSequence: RelationCreationSequence(99),
+      );
+      final after = LongTermRelation(
+        id: before.id,
+        sourceIntentionId: before.sourceIntentionId,
+        relatedIntentionId: before.relatedIntentionId,
+        type: before.type,
+        priority: RelationPriority.p1,
+        scope: before.scope,
+        creationSequence: before.creationSequence,
+      );
+      const revision = TestGraphRevision(9);
+      final start = harness.coordinator.acceptRelationUpdate(
+        UpdateLongTermRelation(
+          relationId: before.id,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
+          ),
+        ),
+      );
+      repository.completeRelationCommand(
+        0,
+        GraphResultSuccess(
+          ConfirmedGraphResult(
+            revision: revision,
+            value: LongTermRelationUpdated(
+              before: before,
+              relation: after,
+              description: null,
+              changes: [
+                IntentionRelationCountsChanged(
+                  revision: revision,
+                  intentionId: harness.intentionId,
+                  counts: testRelationCounts(
+                    activeNeedOutgoing: 4,
+                    activeCanOutgoing: 1,
+                  ),
+                ),
+                IntentionRelationCountsChanged(
+                  revision: revision,
+                  intentionId: participantId,
+                  counts: testRelationCounts(activeCanIncoming: 1),
+                ),
+                LongTermRelationUpdatedChange(
+                  revision: revision,
+                  before: before,
+                  after: after,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await (start as LongTermRelationCommandAccepted).future;
+      await pumpEventQueue();
+
+      expect(repository.requestCount, 1);
+      expect(harness.loaded.summaryStatus, isA<RelationSummaryCurrent>());
+      expect(harness.loaded.revision, const TestGraphRevision(4));
+
+      harness.scrollTo(1);
+      expect(repository.requestCount, 2);
+      expect(repository.queryAt(1).cursor, const TestRelationGroupCursor(2));
+      repository.failRead(1, const RelationGroupSnapshotExpired());
+      await pumpEventQueue();
+
+      expect(repository.requestCount, 3);
+      expect(repository.queryAt(2).cursor, isNull);
+      expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
+    },
+  );
+
+  test(
+    'смена типа и обеих ролей согласует пустую и полностью загруженную группу',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository, pageSize: 4);
+      addTearDown(harness.dispose);
+
+      final ownerId = harness.intentionId;
+      final first = testGroupRow(ownerId: ownerId, index: 1).relation;
+      final second = testGroupRow(ownerId: ownerId, index: 2).relation;
+      final canRelation = LongTermRelation(
+        id: testRelationId(99),
+        sourceIntentionId: ownerId,
+        relatedIntentionId: testIntentionId(3000),
+        type: LongTermRelationType.can,
+        priority: RelationPriority.p3,
+        scope: RelationScope.active,
+        creationSequence: RelationCreationSequence(99),
+      );
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: [_summaryForRelation(first), _summaryForRelation(second)],
+          counts: testRelationCounts(
+            activeNeedOutgoing: 2,
+            activeCanOutgoing: 1,
+          ),
+          nextCursor: null,
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      await pumpEventQueue();
+
+      final movedRelated = _copyRelation(
+        first,
+        relatedIntentionId: testIntentionId(4000),
+      );
+      await _completeRelationCommand(
+        harness,
+        repository,
+        UpdateLongTermRelation(
+          relationId: first.id,
+          patch: LongTermRelationPatch(
+            relatedIntentionId: LongTermRelationFieldSet(
+              movedRelated.relatedIntentionId,
+            ),
+          ),
+        ),
+        _relationUpdateSuccess(
+          revision: const TestGraphRevision(9),
+          before: first,
+          after: movedRelated,
+          counts: {
+            ownerId: testRelationCounts(
+              activeNeedOutgoing: 2,
+              activeCanOutgoing: 1,
+            ),
+            first.relatedIntentionId: testRelationCounts(),
+            movedRelated.relatedIntentionId: testRelationCounts(
+              activeNeedIncoming: 1,
+            ),
+          },
+        ),
+      );
+
+      expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
+      expect(
+        harness.loaded.items.first.relation.relatedIntentionId,
+        first.relatedIntentionId,
+      );
+      repository.completePage(
+        1,
+        RelationGroupFirstPage(
+          items: [
+            _summaryForRelation(movedRelated),
+            _summaryForRelation(second),
+          ],
+          counts: testRelationCounts(
+            activeNeedOutgoing: 2,
+            activeCanOutgoing: 1,
+          ),
+          nextCursor: null,
+          revision: const TestGraphRevision(9),
+        ),
+      );
+      await pumpEventQueue();
+      expect(
+        harness.loaded.items.first.relation.relatedIntentionId,
+        movedRelated.relatedIntentionId,
+      );
+
+      final movedSource = _copyRelation(
+        movedRelated,
+        sourceIntentionId: testIntentionId(5000),
+      );
+      await _completeRelationCommand(
+        harness,
+        repository,
+        UpdateLongTermRelation(
+          relationId: movedRelated.id,
+          patch: LongTermRelationPatch(
+            sourceIntentionId: LongTermRelationFieldSet(
+              movedSource.sourceIntentionId,
+            ),
+          ),
+        ),
+        _relationUpdateSuccess(
+          revision: const TestGraphRevision(11),
+          before: movedRelated,
+          after: movedSource,
+          counts: {
+            ownerId: testRelationCounts(
+              activeNeedOutgoing: 1,
+              activeCanOutgoing: 1,
+            ),
+          },
+        ),
+      );
+      repository.completePage(
+        2,
+        RelationGroupFirstPage(
+          items: [_summaryForRelation(second)],
+          counts: testRelationCounts(
+            activeNeedOutgoing: 1,
+            activeCanOutgoing: 1,
+          ),
+          nextCursor: null,
+          revision: const TestGraphRevision(11),
+        ),
+      );
+      await pumpEventQueue();
+      expect(harness.relationIds, [second.id]);
+
+      final secondMovedSource = _copyRelation(
+        second,
+        sourceIntentionId: testIntentionId(6000),
+      );
+      await _completeRelationCommand(
+        harness,
+        repository,
+        UpdateLongTermRelation(
+          relationId: second.id,
+          patch: LongTermRelationPatch(
+            sourceIntentionId: LongTermRelationFieldSet(
+              secondMovedSource.sourceIntentionId,
+            ),
+          ),
+        ),
+        _relationUpdateSuccess(
+          revision: const TestGraphRevision(12),
+          before: second,
+          after: secondMovedSource,
+          counts: {ownerId: testRelationCounts(activeCanOutgoing: 1)},
+        ),
+      );
+      repository.completePage(
+        3,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(activeCanOutgoing: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(12),
+        ),
+      );
+      await pumpEventQueue();
+      expect(harness.state, isA<RelationGroupEmpty>());
+
+      final movedType = _copyRelation(
+        canRelation,
+        type: LongTermRelationType.need,
+      );
+      await _completeRelationCommand(
+        harness,
+        repository,
+        UpdateLongTermRelation(
+          relationId: canRelation.id,
+          patch: const LongTermRelationPatch(
+            type: LongTermRelationFieldSet(LongTermRelationType.need),
+          ),
+        ),
+        _relationUpdateSuccess(
+          revision: const TestGraphRevision(13),
+          before: canRelation,
+          after: movedType,
+          counts: {ownerId: testRelationCounts(activeNeedOutgoing: 1)},
+        ),
+      );
+      repository.completePage(
+        4,
+        RelationGroupFirstPage(
+          items: [_summaryForRelation(movedType)],
+          counts: testRelationCounts(activeNeedOutgoing: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(13),
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(harness.relationIds, [movedType.id]);
+      expect(harness.loaded.counts.activeCanOutgoing, 0);
+      expect(harness.loaded.hasConfirmedEnd, isTrue);
+      expect(
+        repository.queries,
+        everyElement(
+          isA<RelationGroupQuery>()
+              .having((query) => query.type, 'тип', LongTermRelationType.need)
+              .having(
+                (query) => query.direction,
+                'направление',
+                RelationDirection.outgoing,
+              )
+              .having((query) => query.scope, 'охват', RelationScope.active),
+        ),
+      );
+    },
+  );
+
+  test(
+    'приоритет и исчезновение связи пересобирают только загруженный предел',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository, pageSize: 2);
+      addTearDown(harness.dispose);
+
+      harness.completeFirstPage(
+        index: 0,
+        from: 1,
+        count: 2,
+        totalCount: 6,
+        nextCursor: const TestRelationGroupCursor(2),
+      );
+      await pumpEventQueue();
+      harness.scrollTo(1);
+      repository.completePage(
+        1,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.intentionId, from: 3, count: 2),
+          nextCursor: const TestRelationGroupCursor(4),
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      await pumpEventQueue();
+
+      final fifth = testGroupRow(
+        ownerId: harness.intentionId,
+        index: 5,
+      ).relation;
+      final prioritized = _copyRelation(fifth, priority: RelationPriority.p1);
+      await _completeRelationCommand(
+        harness,
+        repository,
+        UpdateLongTermRelation(
+          relationId: fifth.id,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
+          ),
+        ),
+        _relationUpdateSuccess(
+          revision: const TestGraphRevision(9),
+          before: fifth,
+          after: prioritized,
+          counts: {
+            harness.intentionId: testRelationCounts(activeNeedOutgoing: 6),
+          },
+        ),
+      );
+
+      repository.completePage(
+        2,
+        RelationGroupFirstPage(
+          items: [
+            _summaryForRelation(prioritized),
+            testGroupRow(ownerId: harness.intentionId, index: 1),
+          ],
+          counts: testRelationCounts(activeNeedOutgoing: 6),
+          nextCursor: const TestRelationGroupCursor(2),
+          revision: const TestGraphRevision(9),
+        ),
+      );
+      await pumpEventQueue();
+      repository.completePage(
+        3,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.intentionId, from: 2, count: 2),
+          nextCursor: const TestRelationGroupCursor(4),
+          revision: const TestGraphRevision(9),
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(harness.relationIds, [
+        prioritized.id,
+        testRelationId(1),
+        testRelationId(2),
+        testRelationId(3),
+      ]);
+      expect(harness.loaded.nextCursor, const TestRelationGroupCursor(4));
+      expect(repository.requestCount, 4);
+
+      harness.scrollTo(3);
+      expect(repository.requestCount, 5);
+      final deleted = testGroupRow(
+        ownerId: harness.intentionId,
+        index: 2,
+      ).relation;
+      await _completeRelationCommand(
+        harness,
+        repository,
+        DeleteLongTermRelation(deleted.id),
+        _relationDeleteSuccess(
+          revision: const TestGraphRevision(11),
+          relation: deleted,
+          counts: {
+            harness.intentionId: testRelationCounts(activeNeedOutgoing: 5),
+          },
+        ),
+      );
+
+      repository.completePage(
+        4,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.intentionId, from: 4, count: 2),
+          nextCursor: null,
+          revision: const TestGraphRevision(9),
+        ),
+      );
+      await pumpEventQueue();
+      expect(repository.requestCount, 6);
+      expect(repository.queryAt(5).cursor, isNull);
+
+      repository.completePage(
+        5,
+        RelationGroupFirstPage(
+          items: [
+            _summaryForRelation(prioritized),
+            testGroupRow(ownerId: harness.intentionId, index: 1),
+          ],
+          counts: testRelationCounts(activeNeedOutgoing: 5),
+          nextCursor: const TestRelationGroupCursor(2),
+          revision: const TestGraphRevision(11),
+        ),
+      );
+      await pumpEventQueue();
+      repository.completePage(
+        6,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.intentionId, from: 3, count: 2),
+          nextCursor: const TestRelationGroupCursor(4),
+          revision: const TestGraphRevision(11),
+        ),
+      );
+      await pumpEventQueue();
+      repository.completePage(
+        7,
+        RelationGroupContinuationPage(
+          items: [testGroupRow(ownerId: harness.intentionId, index: 6)],
+          nextCursor: null,
+          revision: const TestGraphRevision(11),
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(harness.relationIds, [
+        prioritized.id,
+        testRelationId(1),
+        testRelationId(3),
+        testRelationId(4),
+        testRelationId(6),
+      ]);
+      expect(harness.relationIds.toSet(), hasLength(5));
+      expect(harness.loaded.hasConfirmedEnd, isTrue);
+      expect(repository.requestCount, 8);
+
+      final third = testGroupRow(
+        ownerId: harness.intentionId,
+        index: 3,
+      ).relation;
+      final archived = _copyRelation(third, scope: RelationScope.archived);
+      await _completeRelationCommand(
+        harness,
+        repository,
+        ArchiveLongTermRelation(third.id),
+        _relationUpdateSuccess(
+          revision: const TestGraphRevision(13),
+          before: third,
+          after: archived,
+          counts: {
+            harness.intentionId: testRelationCounts(
+              activeNeedOutgoing: 4,
+              archivedNeedOutgoing: 1,
+            ),
+          },
+        ),
+      );
+      repository.completePage(
+        8,
+        RelationGroupFirstPage(
+          items: [
+            _summaryForRelation(prioritized),
+            testGroupRow(ownerId: harness.intentionId, index: 1),
+          ],
+          counts: testRelationCounts(
+            activeNeedOutgoing: 4,
+            archivedNeedOutgoing: 1,
+          ),
+          nextCursor: const TestRelationGroupCursor(2),
+          revision: const TestGraphRevision(13),
+        ),
+      );
+      await pumpEventQueue();
+      repository.completePage(
+        9,
+        RelationGroupContinuationPage(
+          items: [
+            testGroupRow(ownerId: harness.intentionId, index: 4),
+            testGroupRow(ownerId: harness.intentionId, index: 6),
+          ],
+          nextCursor: null,
+          revision: const TestGraphRevision(13),
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(harness.relationIds, [
+        prioritized.id,
+        testRelationId(1),
+        testRelationId(4),
+        testRelationId(6),
+      ]);
+      expect(harness.loaded.counts.archivedNeedOutgoing, 1);
+      expect(harness.loaded.hasConfirmedEnd, isTrue);
+
+      await _completeRelationCommand(
+        harness,
+        repository,
+        RestoreLongTermRelation(third.id),
+        _relationUpdateSuccess(
+          revision: const TestGraphRevision(15),
+          before: archived,
+          after: third,
+          counts: {
+            harness.intentionId: testRelationCounts(activeNeedOutgoing: 5),
+          },
+        ),
+      );
+      repository.completePage(
+        10,
+        RelationGroupFirstPage(
+          items: [
+            _summaryForRelation(prioritized),
+            testGroupRow(ownerId: harness.intentionId, index: 1),
+          ],
+          counts: testRelationCounts(activeNeedOutgoing: 5),
+          nextCursor: const TestRelationGroupCursor(2),
+          revision: const TestGraphRevision(15),
+        ),
+      );
+      await pumpEventQueue();
+      repository.completePage(
+        11,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.intentionId, from: 3, count: 2),
+          nextCursor: const TestRelationGroupCursor(4),
+          revision: const TestGraphRevision(15),
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(harness.relationIds, [
+        prioritized.id,
+        testRelationId(1),
+        testRelationId(3),
+        testRelationId(4),
+      ]);
+      expect(harness.loaded.totalCount, 5);
+      expect(harness.loaded.hasConfirmedEnd, isFalse);
+      expect(repository.requestCount, 12);
+      expect(
+        repository.queries,
+        everyElement(
+          isA<RelationGroupQuery>()
+              .having((query) => query.type, 'тип', LongTermRelationType.need)
+              .having(
+                (query) => query.direction,
+                'направление',
+                RelationDirection.outgoing,
+              )
+              .having((query) => query.scope, 'охват', RelationScope.active),
+        ),
+      );
+    },
+  );
+
   test('каскад вне выбранной группы атомарно обновляет общую сводку', () async {
     final repository = ControlledNeighborhoodRepository();
     final harness = _NeighborhoodHarness(repository);
@@ -1442,6 +2038,113 @@ void main() {
     },
   );
 }
+
+Future<void> _completeRelationCommand(
+  _NeighborhoodHarness harness,
+  ControlledNeighborhoodRepository repository,
+  LongTermRelationCommand command,
+  LongTermRelationCommandResult result,
+) async {
+  final commandIndex = repository.relationCommands.length;
+  final start = switch (command) {
+    CreateLongTermRelation() => harness.coordinator.acceptRelationCreation(
+      LongTermRelationCreationFormKey(),
+      command,
+    ),
+    UpdateLongTermRelation() => harness.coordinator.acceptRelationUpdate(
+      command,
+    ),
+    ArchiveLongTermRelation() => harness.coordinator.acceptRelationArchive(
+      command,
+    ),
+    RestoreLongTermRelation() => harness.coordinator.acceptRelationRestore(
+      command,
+    ),
+    DeleteLongTermRelation() => harness.coordinator.acceptRelationDelete(
+      command,
+    ),
+  };
+  expect(start, isA<LongTermRelationCommandAccepted>());
+  repository.completeRelationCommand(commandIndex, result);
+  await (start as LongTermRelationCommandAccepted).future;
+  await pumpEventQueue();
+}
+
+LongTermRelationCommandResult _relationUpdateSuccess({
+  required GraphRevision revision,
+  required LongTermRelation before,
+  required LongTermRelation after,
+  required Map<IntentionId, RelationCounts> counts,
+}) => GraphResultSuccess(
+  ConfirmedGraphResult(
+    revision: revision,
+    value: LongTermRelationUpdated(
+      before: before,
+      relation: after,
+      description: null,
+      changes: [
+        for (final entry in counts.entries)
+          IntentionRelationCountsChanged(
+            revision: revision,
+            intentionId: entry.key,
+            counts: entry.value,
+          ),
+        LongTermRelationUpdatedChange(
+          revision: revision,
+          before: before,
+          after: after,
+        ),
+      ],
+    ),
+  ),
+);
+
+LongTermRelationCommandResult _relationDeleteSuccess({
+  required GraphRevision revision,
+  required LongTermRelation relation,
+  required Map<IntentionId, RelationCounts> counts,
+}) => GraphResultSuccess(
+  ConfirmedGraphResult(
+    revision: revision,
+    value: LongTermRelationDeleted(
+      relation: relation,
+      changes: [
+        for (final entry in counts.entries)
+          IntentionRelationCountsChanged(
+            revision: revision,
+            intentionId: entry.key,
+            counts: entry.value,
+          ),
+        LongTermRelationDeletedChange(revision: revision, relation: relation),
+      ],
+    ),
+  ),
+);
+
+LongTermRelation _copyRelation(
+  LongTermRelation relation, {
+  IntentionId? sourceIntentionId,
+  IntentionId? relatedIntentionId,
+  LongTermRelationType? type,
+  RelationPriority? priority,
+  RelationScope? scope,
+}) => LongTermRelation(
+  id: relation.id,
+  sourceIntentionId: sourceIntentionId ?? relation.sourceIntentionId,
+  relatedIntentionId: relatedIntentionId ?? relation.relatedIntentionId,
+  type: type ?? relation.type,
+  priority: priority ?? relation.priority,
+  scope: scope ?? relation.scope,
+  creationSequence: relation.creationSequence,
+);
+
+LongTermRelationSummary _summaryForRelation(LongTermRelation relation) =>
+    LongTermRelationSummary(
+      relation: relation,
+      source: testParticipant(relation.sourceIntentionId),
+      related: testParticipant(relation.relatedIntentionId),
+      hasDescription: false,
+    );
 
 final class _NeighborhoodHarness {
   _NeighborhoodHarness(
