@@ -8,7 +8,7 @@ part of 'relation_editor_view_model.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Черновик одной формы создания долговременной связи.
+/// Черновик одной формы создания или изменения долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -19,7 +19,7 @@ part of 'relation_editor_view_model.dart';
 @ProviderFor(RelationEditorViewModel)
 final relationEditorViewModelProvider = RelationEditorViewModelFamily._();
 
-/// Черновик одной формы создания долговременной связи.
+/// Черновик одной формы создания или изменения долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -28,7 +28,7 @@ final relationEditorViewModelProvider = RelationEditorViewModelFamily._();
 /// различимого результата.
 final class RelationEditorViewModelProvider
     extends $NotifierProvider<RelationEditorViewModel, RelationEditorState> {
-  /// Черновик одной формы создания долговременной связи.
+  /// Черновик одной формы создания или изменения долговременной связи.
   ///
   /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
   /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -37,7 +37,7 @@ final class RelationEditorViewModelProvider
   /// различимого результата.
   RelationEditorViewModelProvider._({
     required RelationEditorViewModelFamily super.from,
-    required (LongTermRelationCreationFormKey, RelationCreationContext)
+    required (LongTermRelationCreationFormKey, RelationEditorContext)
     super.argument,
   }) : super(
          retry: null,
@@ -82,9 +82,9 @@ final class RelationEditorViewModelProvider
 }
 
 String _$relationEditorViewModelHash() =>
-    r'5269fba762b04aa6a471f396c1c8289c09878168';
+    r'3fafbae8831b92273482d36d77766b56f52aef11';
 
-/// Черновик одной формы создания долговременной связи.
+/// Черновик одной формы создания или изменения долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -99,7 +99,7 @@ final class RelationEditorViewModelFamily extends $Family
           RelationEditorState,
           RelationEditorState,
           RelationEditorState,
-          (LongTermRelationCreationFormKey, RelationCreationContext)
+          (LongTermRelationCreationFormKey, RelationEditorContext)
         > {
   RelationEditorViewModelFamily._()
     : super(
@@ -110,7 +110,7 @@ final class RelationEditorViewModelFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Черновик одной формы создания долговременной связи.
+  /// Черновик одной формы создания или изменения долговременной связи.
   ///
   /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
   /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -120,7 +120,7 @@ final class RelationEditorViewModelFamily extends $Family
 
   RelationEditorViewModelProvider call(
     LongTermRelationCreationFormKey formKey,
-    RelationCreationContext context,
+    RelationEditorContext context,
   ) => RelationEditorViewModelProvider._(
     argument: (formKey, context),
     from: this,
@@ -130,7 +130,7 @@ final class RelationEditorViewModelFamily extends $Family
   String toString() => r'relationEditorViewModelProvider';
 }
 
-/// Черновик одной формы создания долговременной связи.
+/// Черновик одной формы создания или изменения долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -141,13 +141,13 @@ final class RelationEditorViewModelFamily extends $Family
 abstract class _$RelationEditorViewModel
     extends $Notifier<RelationEditorState> {
   late final _$args =
-      ref.$arg as (LongTermRelationCreationFormKey, RelationCreationContext);
+      ref.$arg as (LongTermRelationCreationFormKey, RelationEditorContext);
   LongTermRelationCreationFormKey get formKey => _$args.$1;
-  RelationCreationContext get context => _$args.$2;
+  RelationEditorContext get context => _$args.$2;
 
   RelationEditorState build(
     LongTermRelationCreationFormKey formKey,
-    RelationCreationContext context,
+    RelationEditorContext context,
   );
   @$mustCallSuper
   @override

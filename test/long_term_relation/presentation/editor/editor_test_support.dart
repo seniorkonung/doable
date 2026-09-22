@@ -14,9 +14,10 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
-/// Граф, в котором тест сам решает исход каждой команды создания связи.
+/// Граф, в котором тест сам решает исход каждой команды сохранения связи.
 ///
 /// Чтения здесь недоступны намеренно: черновик формы не должен заводить
 /// собственного источника данных графа.
@@ -29,6 +30,9 @@ final class ControlledRelationEditorRepository
 
   CreateLongTermRelation createCommandAt(int index) =>
       relationCommands[index] as CreateLongTermRelation;
+
+  UpdateLongTermRelation updateCommandAt(int index) =>
+      relationCommands[index] as UpdateLongTermRelation;
 
   void completeRelationCommand(
     int index,
@@ -77,6 +81,36 @@ final class ControlledRelationEditorRepository
       ),
     );
     return relation;
+  }
+
+  void completeRelationUpdated(
+    int index, {
+    required LongTermRelation before,
+    required LongTermRelation after,
+    LongTermRelationDescription? description,
+    int revision = 1,
+  }) {
+    final graphRevision = TestRelationEditorRevision(revision);
+    completeRelationCommand(
+      index,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: graphRevision,
+          value: LongTermRelationUpdated(
+            before: before,
+            relation: after,
+            description: description,
+            changes: <GraphChange>[
+              LongTermRelationUpdatedChange(
+                revision: graphRevision,
+                before: before,
+                after: after,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -166,6 +200,31 @@ RelationParticipantSummary testEditorParticipant(
   archiveState: archiveState,
   activeRelationCount: activeRelationCount,
 );
+
+LongTermRelationDetails testEditorRelationDetails({
+  LongTermRelationType type = LongTermRelationType.need,
+  RelationPriority priority = RelationPriority.p2,
+  RelationScope scope = RelationScope.active,
+  String? description = 'Исходное описание',
+}) {
+  final relation = LongTermRelation(
+    id: testRelationId(1),
+    sourceIntentionId: testEditorIntentionId(1),
+    relatedIntentionId: testEditorIntentionId(2),
+    type: type,
+    priority: priority,
+    scope: scope,
+    creationSequence: RelationCreationSequence(1),
+  );
+  return LongTermRelationDetails(
+    relation: relation,
+    source: testEditorParticipant(1),
+    related: testEditorParticipant(2),
+    description: description == null
+        ? null
+        : LongTermRelationDescription.fromInput(description),
+  );
+}
 
 LongTermRelationId testRelationId(int index) {
   final encoded =

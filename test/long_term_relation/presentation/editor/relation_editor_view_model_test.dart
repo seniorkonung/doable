@@ -1,7 +1,9 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
@@ -196,6 +198,346 @@ void main() {
         harness.state.failurePresentation,
         isA<GraphInitiatorPresentationClaim>(),
       );
+    });
+  });
+
+  group('Черновик изменения связи', () {
+    test('начинается с подтверждённой основы и требует явной правки', () {
+      final details = testEditorRelationDetails();
+      final harness = _EditorHarness.editing(details);
+
+      expect(harness.state.context, isA<RelationEditingContext>());
+      expect(harness.state.editingBasis, same(details));
+      expect(harness.state.sourceParticipant, same(details.source));
+      expect(harness.state.relatedParticipant, same(details.related));
+      expect(harness.state.type, details.relation.type);
+      expect(harness.state.priority, details.relation.priority);
+      expect(harness.state.description, details.description?.value);
+      expect(harness.state.hasChanges, isFalse);
+      expect(harness.state.canSubmit, isFalse);
+    });
+
+    test('отправляет только изменённое описание через ключ связи', () async {
+      final details = testEditorRelationDetails();
+      final harness = _EditorHarness.editing(details);
+
+      harness.viewModel
+        ..changeDescription('Новое описание')
+        ..submit();
+
+      expect(harness.repository.commandCount, 1);
+      final command = harness.repository.updateCommandAt(0);
+      expect(command.relationId, details.relation.id);
+      expect(command.patch.type, isA<LongTermRelationFieldUnchanged>());
+      expect(command.patch.priority, isA<LongTermRelationFieldUnchanged>());
+      expect(
+        command.patch.sourceIntentionId,
+        isA<LongTermRelationFieldUnchanged>(),
+      );
+      expect(
+        command.patch.relatedIntentionId,
+        isA<LongTermRelationFieldUnchanged>(),
+      );
+      expect(
+        command.patch.description,
+        isA<LongTermRelationDescriptionReplaced>().having(
+          (value) => value.value.value,
+          'текст',
+          'Новое описание',
+        ),
+      );
+
+      final after = LongTermRelation(
+        id: details.relation.id,
+        sourceIntentionId: details.relation.sourceIntentionId,
+        relatedIntentionId: details.relation.relatedIntentionId,
+        type: details.relation.type,
+        priority: details.relation.priority,
+        scope: RelationScope.archived,
+        creationSequence: details.relation.creationSequence,
+      );
+      harness.repository.completeRelationUpdated(
+        0,
+        before: details.relation,
+        after: after,
+        description: LongTermRelationDescription.fromInput('Новое описание'),
+      );
+      await harness.settle();
+
+      expect(
+        harness.state.operation,
+        isA<RelationEditorSucceeded>().having(
+          (value) => value.relation.scope,
+          'параллельный архив',
+          RelationScope.archived,
+        ),
+      );
+      expect(harness.state.event, isA<RelationEditorUpdated>());
+    });
+
+    test('очистка описания выражается отдельно от неизменённого поля', () {
+      final harness = _EditorHarness.editing(testEditorRelationDetails());
+
+      harness.viewModel
+        ..changeDescription('   ')
+        ..submit();
+
+      final command = harness.repository.updateCommandAt(0);
+      expect(
+        command.patch.description,
+        isA<LongTermRelationDescriptionCleared>(),
+      );
+      expect(command.patch.type, isA<LongTermRelationFieldUnchanged>());
+    });
+
+    test('пробельный ввод не меняет уже отсутствующее описание', () {
+      final harness = _EditorHarness.editing(
+        testEditorRelationDetails(description: null),
+      );
+
+      harness.viewModel.changeDescription('  \n ');
+
+      expect(harness.state.hasChanges, isFalse);
+      expect(harness.state.canSubmit, isFalse);
+      harness.viewModel.submit();
+      expect(harness.repository.commandCount, isZero);
+    });
+
+    test('возврат поля к исходному значению удаляет явную правку', () {
+      final harness = _EditorHarness.editing(testEditorRelationDetails());
+
+      harness.viewModel
+        ..selectPriority(RelationPriority.p4)
+        ..selectPriority(RelationPriority.p2);
+
+      expect(harness.state.hasChanges, isFalse);
+      expect(harness.state.canSubmit, isFalse);
+      harness.viewModel.submit();
+      expect(harness.repository.commandCount, isZero);
+    });
+
+    test(
+      'фоновый снимок обновляет отображение, но не черновик и ошибку пары',
+      () async {
+        final details = testEditorRelationDetails();
+        final harness = _EditorHarness.editing(details);
+        harness.viewModel
+          ..changeDescription('Введённый текст')
+          ..submit();
+        harness.repository.failRelationCommand(
+          0,
+          LongTermRelationPairOccupiedFailure(testRelationId(7)),
+        );
+        await harness.settle();
+        final presentation = harness.state.failurePresentation;
+
+        final refreshed = testEditorRelationDetails(
+          type: LongTermRelationType.can,
+          priority: RelationPriority.p4,
+          description: 'Чужое изменение',
+        );
+        harness.viewModel.refreshConfirmedDetails(
+          LongTermRelationDetails(
+            relation: refreshed.relation,
+            source: testEditorParticipant(1, title: 'Новое исходное название'),
+            related: testEditorParticipant(
+              2,
+              title: 'Новое связанное название',
+            ),
+            description: refreshed.description,
+          ),
+        );
+
+        expect(harness.state.description, 'Введённый текст');
+        expect(harness.state.type, LongTermRelationType.need);
+        expect(harness.state.priority, RelationPriority.p2);
+        expect(harness.state.sourceIntentionId, testEditorIntentionId(1));
+        expect(harness.state.relatedIntentionId, testEditorIntentionId(2));
+        expect(
+          harness.state.sourceParticipant?.title,
+          'Новое исходное название',
+        );
+        expect(
+          harness.state.relatedParticipant?.title,
+          'Новое связанное название',
+        );
+        expect(
+          harness.state.operation,
+          isA<RelationEditorFailed>().having(
+            (value) => value.failure,
+            'ошибка',
+            isA<RelationEditorPairOccupied>(),
+          ),
+        );
+        expect(harness.state.failurePresentation, same(presentation));
+      },
+    );
+
+    test('чужое изменение незапрошенного поля не входит в patch', () {
+      final harness = _EditorHarness.editing(testEditorRelationDetails());
+
+      harness.viewModel
+        ..selectType(LongTermRelationType.can)
+        ..refreshConfirmedDetails(
+          testEditorRelationDetails(
+            priority: RelationPriority.p4,
+            description: 'Чужое описание',
+          ),
+        )
+        ..submit();
+
+      final patch = harness.repository.updateCommandAt(0).patch;
+      expect(
+        patch.type,
+        isA<LongTermRelationFieldSet<LongTermRelationType>>().having(
+          (value) => value.value,
+          'тип',
+          LongTermRelationType.can,
+        ),
+      );
+      expect(patch.priority, isA<LongTermRelationFieldUnchanged>());
+      expect(patch.description, isA<LongTermRelationDescriptionUnchanged>());
+    });
+
+    test('явно заменённые участник и приоритет входят в patch', () {
+      final harness = _EditorHarness.editing(testEditorRelationDetails());
+
+      harness.viewModel
+        ..selectParticipant(
+          RelationParticipantRole.related,
+          testEditorParticipant(3),
+        )
+        ..selectPriority(RelationPriority.p4)
+        ..submit();
+
+      final patch = harness.repository.updateCommandAt(0).patch;
+      expect(
+        patch.relatedIntentionId,
+        isA<LongTermRelationFieldSet<IntentionId>>().having(
+          (value) => value.value,
+          'участник',
+          testEditorIntentionId(3),
+        ),
+      );
+      expect(
+        patch.priority,
+        isA<LongTermRelationFieldSet<RelationPriority>>().having(
+          (value) => value.value,
+          'приоритет',
+          RelationPriority.p4,
+        ),
+      );
+      expect(patch.type, isA<LongTermRelationFieldUnchanged>());
+      expect(patch.description, isA<LongTermRelationDescriptionUnchanged>());
+    });
+
+    test('отказ сохраняет обе ссылки, а исправленная отправка получает новый token', () async {
+      final harness = _EditorHarness.editing(testEditorRelationDetails());
+      final tokens = <LongTermRelationOperationToken>[];
+      final subscription = harness.coordinator.completions.listen((completion) {
+        if (completion is LongTermRelationCommandCompletion) {
+          tokens.add(completion.token);
+        }
+      });
+      addTearDown(subscription.cancel);
+
+      harness.viewModel
+        ..selectParticipant(
+          RelationParticipantRole.related,
+          testEditorParticipant(3),
+        )
+        ..submit();
+      harness.repository.failRelationCommand(
+        0,
+        LongTermRelationParticipantArchivedFailure(
+          role: RelationParticipantRole.related,
+          intentionId: testEditorIntentionId(3),
+        ),
+      );
+      await harness.settle();
+
+      expect(harness.state.sourceParticipant?.id, testEditorIntentionId(1));
+      expect(harness.state.relatedParticipant?.id, testEditorIntentionId(3));
+
+      harness.viewModel
+        ..selectParticipant(
+          RelationParticipantRole.related,
+          testEditorParticipant(4),
+        )
+        ..submit();
+      expect(harness.repository.commandCount, 2);
+      expect(tokens, hasLength(1));
+
+      harness.repository.failRelationCommand(
+        1,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await harness.settle();
+
+      expect(tokens, hasLength(2));
+      expect(identical(tokens.first, tokens.last), isFalse);
+      expect(harness.state.relatedParticipant?.id, testEditorIntentionId(4));
+    });
+
+    test(
+      'отсутствующая связь сохраняет черновик и блокирует тот же контекст',
+      () async {
+        final harness = _EditorHarness.editing(testEditorRelationDetails());
+        harness.viewModel
+          ..selectPriority(RelationPriority.p3)
+          ..submit();
+        harness.repository.failRelationCommand(
+          0,
+          LongTermRelationNotFoundFailure(testRelationId(1)),
+        );
+        await harness.settle();
+
+        expect(harness.state.priority, RelationPriority.p3);
+        expect(
+          harness.state.operation,
+          isA<RelationEditorFailed>().having(
+            (value) => value.failure,
+            'ошибка',
+            isA<RelationEditorRelationNotFound>(),
+          ),
+        );
+        expect(harness.state.canSubmit, isFalse);
+        harness.viewModel.submit();
+        expect(harness.repository.commandCount, 1);
+      },
+    );
+
+    test('уход не сохраняет отменённый черновик', () async {
+      final harness = _EditorHarness.editing(testEditorRelationDetails());
+      harness.viewModel.changeDescription('Отменённая правка');
+
+      harness.leaveForm();
+      await harness.settle();
+
+      expect(harness.repository.commandCount, isZero);
+    });
+
+    test('принятое изменение продолжается после ухода', () async {
+      final details = testEditorRelationDetails();
+      final harness = _EditorHarness.editing(details);
+      final presenter = harness.coordinator.registerAppPresentation();
+      harness.viewModel
+        ..selectPriority(RelationPriority.p3)
+        ..submit();
+
+      harness.leaveForm();
+      await harness.settle();
+      harness.repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await harness.settle();
+
+      final claim = await presenter.nextClaim();
+      expect(claim, isNotNull);
+      expect(claim!.completion.isFailure, isTrue);
+      expect(harness.repository.commandCount, 1);
+      harness.coordinator.confirmPresentation(claim);
     });
   });
 
@@ -517,9 +859,9 @@ void main() {
   });
 }
 
-/// Одна открытая форма создания связи поверх управляемого графа.
+/// Одна открытая форма связи поверх управляемого графа.
 final class _EditorHarness {
-  _EditorHarness(RelationCreationContext context)
+  _EditorHarness(RelationEditorContext context)
     : provider = relationEditorViewModelProvider(
         LongTermRelationCreationFormKey(),
         context,
@@ -547,6 +889,9 @@ final class _EditorHarness {
       direction: RelationDirection.incoming,
     ),
   );
+
+  factory _EditorHarness.editing(LongTermRelationDetails details) =>
+      _EditorHarness(RelationEditingContext(details));
 
   final RelationEditorViewModelProvider provider;
   final repository = ControlledRelationEditorRepository();

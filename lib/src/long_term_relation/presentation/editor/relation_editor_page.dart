@@ -254,6 +254,8 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
         localizations.relationEditorCreatePairOccupied,
       RelationEditorSameParticipants() =>
         localizations.relationEditorCreateSameParticipants,
+      RelationEditorRelationNotFound() =>
+        localizations.relationEditorUpdateNotFound,
       RelationEditorUnavailable() =>
         localizations.relationEditorCreateUnavailable,
       RelationEditorCorruption() =>
