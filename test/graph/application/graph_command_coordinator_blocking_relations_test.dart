@@ -115,6 +115,44 @@ void main() {
     },
   );
 
+  test('уход и возврат не снимают блокировки принятого набора и не повторяют запись', () async {
+    final repository = _ControlledRepository();
+    final coordinator = _coordinator(repository);
+    final command = _delete(_intentionA, {_relationA, _relationB});
+    final accepted = coordinator.acceptBlockingRelationsDelete(
+      command,
+      presentationTitle: 'Первое',
+    ) as BlockingRelationsDeleteAccepted;
+
+    coordinator.releaseInitiatorPresentation(accepted.token);
+    final registration = coordinator.registerAppPresentation();
+    final appClaimFuture = registration.nextClaim();
+    expect(coordinator.isRunning(_intentionA), isTrue);
+    expect(coordinator.isRelationRunning(_relationA), isTrue);
+    expect(coordinator.isRelationRunning(_relationB), isTrue);
+    expect(
+      coordinator.acceptBlockingRelationsDelete(
+        command,
+        presentationTitle: 'Первое',
+      ),
+      isA<BlockingRelationsDeleteAlreadyRunning>(),
+    );
+    expect(repository.commands, [same(command)]);
+
+    repository.completeFailure(0);
+    final completion = await accepted.future;
+    final claim = await appClaimFuture;
+    expect(claim?.token, same(accepted.token));
+    expect(claim?.completion, same(completion));
+    expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+    expect(coordinator.isRunning(_intentionA), isFalse);
+    expect(coordinator.isRelationRunning(_relationA), isFalse);
+    expect(coordinator.isRelationRunning(_relationB), isFalse);
+    coordinator.confirmPresentation(claim!);
+    registration.release();
+    await coordinator.shutdown();
+  });
+
   test(
     'успех отдаёт один token и пакет, освобождает ключи и принадлежит оболочке',
     () async {

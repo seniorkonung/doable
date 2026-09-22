@@ -12,6 +12,7 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -279,6 +280,63 @@ void main() {
     );
 
     test(
+      'shutdown дожидается массового удаления и освобождает весь набор',
+      () async {
+        final repository = _ControlledPersonalGraphRepository();
+        final closeObserver = _CloseTrackingObserver();
+        final runtime = AppRuntime(
+          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+            openInMemoryLocalDatabase(),
+            closeObserver,
+          ),
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+          repositoryFactory: (_) => repository,
+        );
+        addTearDown(runtime.shutdown);
+        await runtime.bootstrap();
+        final coordinator = runtime.commandCoordinator;
+        final intentionId = _intentionId(_relationSourceUuid);
+        final relationId = _relationId(_relationRelatedUuid);
+        final accepted = coordinator.acceptBlockingRelationsDelete(
+          DeleteBlockingRelations(
+            intentionId: intentionId,
+            relationIds: {relationId},
+          ),
+          presentationTitle: 'Намерение',
+        ) as BlockingRelationsDeleteAccepted;
+        coordinator.releaseInitiatorPresentation(accepted.token);
+
+        final shutdown = runtime.shutdown();
+        expect(coordinator.isRunning(intentionId), isTrue);
+        expect(coordinator.isRelationRunning(relationId), isTrue);
+        expect(closeObserver.closeCalls, 0);
+        expect(
+          coordinator.acceptBlockingRelationsDelete(
+            DeleteBlockingRelations(
+              intentionId: _intentionId(_relationRelatedUuid),
+              relationIds: {_relationId(_relationSourceUuid)},
+            ),
+            presentationTitle: 'Другое',
+          ),
+          isA<GraphCommandCoordinatorDraining>(),
+        );
+
+        repository.complete(
+          const GraphCommandFailed<
+            BlockingRelationsDeleted,
+            DeleteBlockingRelationsFailure
+          >(DeleteBlockingRelationsUnavailableFailure()),
+        );
+        final completion = await accepted.future;
+        expect(completion.token, same(accepted.token));
+        expect(coordinator.isRunning(intentionId), isFalse);
+        expect(coordinator.isRelationRunning(relationId), isFalse);
+        await shutdown;
+        expect(closeObserver.closeCalls, 1);
+      },
+    );
+
+    test(
       'shutdown ждёт in-flight bootstrap и не создаёт provider graph',
       () async {
         final openingStarted = Completer<void>();
@@ -373,6 +431,14 @@ IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
     'Некорректный UUID fixture.',
   ),
 };
+
+LongTermRelationId _relationId(String value) =>
+    switch (LongTermRelationId.decode(value)) {
+      LongTermRelationIdDecodingSuccess(:final id) => id,
+      InvalidLongTermRelationIdDecoding() => throw StateError(
+        'Некорректный UUID fixture связи.',
+      ),
+    };
 
 const _relationSourceUuid = '018f47c2-6b7d-7abc-8def-0123456789ab';
 const _relationRelatedUuid = '018f47c2-6b7d-7abc-8def-0123456789ac';

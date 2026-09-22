@@ -4,6 +4,8 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -88,6 +90,83 @@ void main() {
       expect(find.text('B'), findsOneWidget);
       expect(find.text('Total intentions: 1'), findsOneWidget);
       expect(find.text(message), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'массовый отказ после ухода предъявляется оболочкой над другим намерением один раз',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      final repository = _DelayedPersonalGraphRepository();
+      final intentionA = _intention(
+        uuid: '018f0000-0000-7000-8000-000000000001',
+        title: 'A',
+        description: null,
+      );
+      final intentionB = _intention(
+        uuid: '018f0000-0000-7000-8000-000000000002',
+        title: 'B',
+        description: null,
+      );
+      final runtime = await _pumpCatalog(tester, repository, [
+        intentionA,
+        intentionB,
+      ]);
+      await _openDetails(tester, repository, intentionA, requestIndex: 0);
+
+      final accepted = runtime.commandCoordinator.acceptBlockingRelationsDelete(
+        DeleteBlockingRelations(
+          intentionId: intentionA.id,
+          relationIds: {_relationId},
+        ),
+        presentationTitle: intentionA.title,
+      ) as BlockingRelationsDeleteAccepted;
+      expect(repository.blockingRelationsCommands, hasLength(1));
+      await _goBack(tester);
+      runtime.commandCoordinator.releaseInitiatorPresentation(accepted.token);
+      await _openDetails(tester, repository, intentionB, requestIndex: 1);
+      expect(runtime.commandCoordinator.isRunning(intentionA.id), isTrue);
+      expect(runtime.commandCoordinator.isRelationRunning(_relationId), isTrue);
+
+      repository.completeBlockingRelationsCommand(
+        0,
+        const GraphCommandFailed<
+          BlockingRelationsDeleted,
+          DeleteBlockingRelationsFailure
+        >(DeleteBlockingRelationsUnavailableFailure()),
+      );
+      final completion = await accepted.future;
+      await tester.pumpAndSettle();
+
+      const message =
+          'Delete selected relations — “A”: Selected relations couldn’t be deleted. Try again.';
+      expect(completion.token, same(accepted.token));
+      expect(runtime.commandCoordinator.isRunning(intentionA.id), isFalse);
+      expect(
+        runtime.commandCoordinator.isRelationRunning(_relationId),
+        isFalse,
+      );
+      expect(find.text(message), findsOneWidget);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('graph-operation-message')),
+        ),
+        matchesSemantics(
+          label: message,
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
+      );
+      semantics.dispose();
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      await _goBack(tester);
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsNothing);
+      expect(repository.blockingRelationsCommands, hasLength(1));
     },
   );
 
@@ -458,7 +537,7 @@ Future<void> _scrollCurrentPageToTop(WidgetTester tester) async {
   await tester.pump();
 }
 
-Future<void> _pumpCatalog(
+Future<AppRuntime> _pumpCatalog(
   WidgetTester tester,
   _DelayedPersonalGraphRepository repository,
   List<Intention> intentions,
@@ -486,6 +565,7 @@ Future<void> _pumpCatalog(
     ),
   );
   await tester.pumpAndSettle();
+  return runtime;
 }
 
 Future<void> _openDetails(
@@ -517,9 +597,12 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   final detailRequests =
       <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
   final commands = <IntentionCommand>[];
+  final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final _pages = <Completer<Result<IntentionCatalogPage>>>[];
   final _commands =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
+  final _blockingRelationsRequests =
+      <Completer<DeleteBlockingRelationsResult>>[];
   final _revisions = <IntentionId, int>{};
 
   @override
@@ -571,6 +654,12 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is DeleteBlockingRelations) {
+      blockingRelationsCommands.add(command as DeleteBlockingRelations);
+      final request = Completer<DeleteBlockingRelationsResult>();
+      _blockingRelationsRequests.add(request);
+      return await request.future as GraphCommandResult<TSuccess, TFailure>;
+    }
     if (command is! IntentionCommand) {
       throw UnsupportedError('Команды связей не используются в этих тестах.');
     }
@@ -620,6 +709,11 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   ) {
     _commands[index].complete(result);
   }
+
+  void completeBlockingRelationsCommand(
+    int index,
+    DeleteBlockingRelationsResult result,
+  ) => _blockingRelationsRequests[index].complete(result);
 
   Future<void> close() async {
     for (final request in detailRequests) {
@@ -689,6 +783,15 @@ final _zeroRelationCounts = RelationCounts(
   archivedCanIncoming: 0,
   archivedCanOutgoing: 0,
 );
+
+final _relationId = switch (LongTermRelationId.decode(
+  '018f0000-0000-7000-8000-000000000003',
+)) {
+  LongTermRelationIdDecodingSuccess(:final id) => id,
+  InvalidLongTermRelationIdDecoding() => throw StateError(
+    'Некорректный fixture связи.',
+  ),
+};
 
 Result<ConfirmedGraphResult<IntentionCommandSuccess>> _saved(
   Intention intention, {

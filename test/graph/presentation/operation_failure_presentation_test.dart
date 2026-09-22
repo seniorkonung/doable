@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -8,6 +9,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -405,6 +407,75 @@ void main() {
       );
     },
   );
+
+  testWidgets('массовый отказ подтверждается кадром инлайн-renderer', (
+    tester,
+  ) async {
+    final harness = _FailureHarness();
+    addTearDown(harness.dispose);
+    final claim = await harness.createBlockingRelationsClaim();
+
+    await tester.pumpWidget(
+      harness.app(
+        OperationFailurePresentation(
+          claim: claim,
+          message: 'Выбранные связи не удалены',
+          messageKey: const ValueKey('blocking-relations-failure-message'),
+        ),
+      ),
+    );
+
+    expect(
+      tester.getSemantics(
+        find.byKey(const ValueKey('blocking-relations-failure-message')),
+      ),
+      matchesSemantics(
+        label: 'Выбранные связи не удалены',
+        isLiveRegion: true,
+        textDirection: TextDirection.ltr,
+      ),
+    );
+    expect(harness.claimAgain(claim), isNull);
+  });
+
+  testWidgets(
+    'исчезновение массовой инлайн-ошибки до кадра передаёт тот же token оболочке',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createBlockingRelationsClaim();
+      final showError = ValueNotifier(true);
+      addTearDown(showError.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<bool>(
+            valueListenable: showError,
+            builder: (context, visible, _) => visible
+                ? OperationFailurePresentation(
+                    claim: claim,
+                    message: 'Выбранные связи не удалены',
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(harness.claimAgain(claim), same(claim));
+      expect(fallback, isNull);
+
+      showError.value = false;
+      await tester.pump();
+      await tester.pump();
+      expect(fallback?.token, same(claim.token));
+      expect(fallback?.completion, isA<BlockingRelationsDeleteCompletion>());
+    },
+  );
 }
 
 final class _FailureHarness {
@@ -465,6 +536,33 @@ final class _FailureHarness {
         LongTermRelationCommandSuccess,
         LongTermRelationCommandFailure
       >(LongTermRelationUnavailableFailure()),
+    );
+    await accepted.future;
+    return coordinator.claimInitiatorFailure(accepted.token)!;
+  }
+
+  Future<GraphInitiatorPresentationClaim> createBlockingRelationsClaim() async {
+    final relationId = switch (LongTermRelationId.decode(
+      '018f47c2-6b7d-7abc-8def-0123456789ab',
+    )) {
+      LongTermRelationIdDecodingSuccess(:final id) => id,
+      InvalidLongTermRelationIdDecoding() => throw StateError(
+        'Некорректный fixture связи.',
+      ),
+    };
+    final accepted = coordinator.acceptBlockingRelationsDelete(
+      DeleteBlockingRelations(
+        intentionId: testDetailsIntentionId(1),
+        relationIds: {relationId},
+      ),
+      presentationTitle: 'Намерение',
+    ) as BlockingRelationsDeleteAccepted;
+    repository.completeBlockingRelationsCommand(
+      repository.blockingRelationsCommands.length - 1,
+      const GraphCommandFailed<
+        BlockingRelationsDeleted,
+        DeleteBlockingRelationsFailure
+      >(DeleteBlockingRelationsUnavailableFailure()),
     );
     await accepted.future;
     return coordinator.claimInitiatorFailure(accepted.token)!;
