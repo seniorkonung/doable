@@ -611,7 +611,7 @@ Phase 1 не включает получение соседства и его с
   - **Вероятные файлы:** `lib/src/graph/presentation/operation_failure_presentation.dart`, `test/graph/presentation/operation_failure_presentation_test.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `test/app/localization/locale_resolution_test.dart`.
   - **Размер:** S.
 
-## Phase 4: Сводка соседства сохраняет достоверность при пересечении чтений
+## Phase 4: Создание связи и соседство сохраняют достоверность при исправлении ошибок
 
 - [ ] 4.1 Сохранить состояние устаревшей сводки при запоздалом завершении подгрузки
   - **Критерии приёмки:**
@@ -623,12 +623,23 @@ Phase 1 не включает получение соседства и его с
   - **Вероятные файлы:** `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`, при необходимости `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.2 Подтвердить готовность достоверной сводки к расширению жизненного цикла связи
+- [ ] 4.2 Снимать ошибку пары только после изменения идентичности участника
+  - **Критерии приёмки:**
+    - Обновление названия, архивного состояния или активного счётчика выбранного участника при прежнем `IntentionId` обновляет его отображаемый снимок, но сохраняет `RelationEditorPairOccupied` и `RelationEditorSameParticipants`, их предъявление и блокировку неизменённой пары.
+    - Явный выбор другого `IntentionId` в соответствующей роли снимает зависящую от пары ошибку, сохраняет новый снимок и разрешает отправку только при полном допустимом черновике; команда использует новую типизированную пару идентификаторов.
+    - Управляемые проверки покрывают обе роли и оба вида ошибки: сначала новый снимок того же участника не разрешает повторную отправку прежней пары, затем выбор другого участника исправляет причину без изменения поведения остальных категорий отказа.
+  - **Проверка:** Дополнить и выполнить `flutter test test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart test/long_term_relation/presentation/editor/relation_editor_page_test.dart`.
+  - **Зависимости:** 3.27, 3.28, 3.34.
+  - **Вероятные файлы:** `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`, при необходимости `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.3 Подтвердить готовность достоверного создания и сводки к расширению жизненного цикла связи
   - **Критерии приёмки:**
     - Свидетельства 4.1 подтверждают все три границы: запоздалые успех и отказ подгрузки не снимают устаревание, а согласованная замена снимает его атомарно вместе с заменой сводки и списка.
-    - Профильные и полные проверки не выявляют регрессий в первой загрузке, обычной подгрузке, обновлении, RU/EN, увеличенном тексте и семантике экранного диктора; границы порций и скрытого чтения остаются прежними.
+    - Свидетельства 4.2 подтверждают, что обновление снимка прежнего участника не скрывает конфликт неизменённой пары, а выбор нового идентификатора исправляет ошибку без регрессий остальных переходов формы.
+    - Профильные и полные проверки не выявляют регрессий в первой загрузке, обычной подгрузке, обновлении, создании связи, RU/EN, увеличенном тексте и семантике экранного диктора; границы порций и скрытого чтения остаются прежними.
     - Изменения Dart/Flutter проверены по правилу DTD из `AGENTS.md`; при отсутствии работающего приложения это ограничение зафиксировано и выполнены CLI-проверки.
-  - **Проверка:** Выполнить `flutter test test/long_term_relation/presentation/neighborhood`, `mise run codegen-check`, `mise run check`, `mise exec --no-deps -- openspec validate manage-long-term-relations --strict --no-interactive` и `git diff --check`; проверить DTD/runtime по правилу `AGENTS.md`.
-  - **Зависимости:** 4.1.
+  - **Проверка:** Выполнить `flutter test test/long_term_relation/presentation/editor test/long_term_relation/presentation/neighborhood`, `mise run codegen-check`, `mise run check`, `mise exec --no-deps -- openspec validate manage-long-term-relations --strict --no-interactive` и `git diff --check`; проверить DTD/runtime по правилу `AGENTS.md`.
+  - **Зависимости:** 4.1, 4.2.
   - **Вероятные файлы:** Нет — итоговая контрольная точка.
   - **Размер:** XS.
