@@ -443,6 +443,38 @@ final class RelationEditorState {
     );
   }
 
+  /// Освежает выбранного участника только пока его идентичность не изменилась.
+  RelationEditorState withConfirmedParticipant(
+    RelationParticipantRole role,
+    RelationParticipantSummary participant,
+  ) {
+    final current = switch (role) {
+      RelationParticipantRole.source => sourceParticipant,
+      RelationParticipantRole.related => relatedParticipant,
+    };
+    if (current?.id != participant.id ||
+        (current!.title == participant.title &&
+            current.archiveState == participant.archiveState &&
+            current.activeRelationCount == participant.activeRelationCount)) {
+      return this;
+    }
+    return RelationEditorState(
+      context: context,
+      sourceParticipant: role == RelationParticipantRole.source
+          ? participant
+          : sourceParticipant,
+      relatedParticipant: role == RelationParticipantRole.related
+          ? participant
+          : relatedParticipant,
+      type: type,
+      priority: priority,
+      description: description,
+      operation: operation,
+      event: event,
+      failurePresentation: failurePresentation,
+    );
+  }
+
   RelationEditorState withOperation(
     RelationEditorOperation value, {
     RelationEditorEvent? event,

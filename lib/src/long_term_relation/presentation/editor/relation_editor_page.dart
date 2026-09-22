@@ -9,7 +9,10 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention.dart';
+import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
+import '../../../intention/presentation/details/intention_details_state.dart';
+import '../../../intention/presentation/details/intention_details_view_model.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
@@ -23,8 +26,9 @@ import 'relation_editor_view_model.dart';
 /// Форма создания или изменения долговременной связи.
 ///
 /// Типизированный контекст задаёт исходный черновик. Подтверждённые данные
-/// участников поступают через наблюдение подробного просмотра; черновик и
-/// результат принадлежат ViewModel, а успех предъявляет presenter оболочки.
+/// участников поступают через наблюдение подробного просмотра связи и
+/// выбранных на замену намерений; черновик и результат принадлежат ViewModel,
+/// а успех предъявляет presenter оболочки.
 @RoutePage()
 final class RelationEditorPage extends ConsumerStatefulWidget {
   const RelationEditorPage({required this.editorContext, super.key});
@@ -37,6 +41,8 @@ final class RelationEditorPage extends ConsumerStatefulWidget {
 
 final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
   final _formKey = LongTermRelationCreationFormKey();
+  final _replacementSubscriptions =
+      <RelationParticipantRole, ProviderSubscription<IntentionDetailsState>>{};
   late final TextEditingController _descriptionController;
 
   @override
@@ -77,6 +83,9 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
 
   @override
   void dispose() {
+    for (final subscription in _replacementSubscriptions.values) {
+      subscription.close();
+    }
     _descriptionController.dispose();
     super.dispose();
   }
@@ -268,6 +277,52 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
       return;
     }
     notifier.selectParticipant(role, selected);
+    _watchReplacement(role, selected.id);
+  }
+
+  void _watchReplacement(RelationParticipantRole role, IntentionId id) {
+    _replacementSubscriptions.remove(role)?.close();
+    final editing = widget.editorContext;
+    if (editing is! RelationEditingContext) {
+      return;
+    }
+    final originalId = switch (role) {
+      RelationParticipantRole.source =>
+        editing.details.relation.sourceIntentionId,
+      RelationParticipantRole.related =>
+        editing.details.relation.relatedIntentionId,
+    };
+    if (id == originalId) {
+      return;
+    }
+    final editorProvider = relationEditorViewModelProvider(
+      _formKey,
+      widget.editorContext,
+    );
+    void refresh(IntentionDetailsState next) {
+      if (!mounted || next is! IntentionDetailsLoaded) {
+        return;
+      }
+      final intention = next.intention;
+      ref
+          .read(editorProvider.notifier)
+          .refreshConfirmedParticipant(
+            role,
+            RelationParticipantSummary(
+              id: intention.id,
+              title: intention.title,
+              archiveState: intention.archiveState,
+              activeRelationCount: next.details.activeRelationCount,
+            ),
+          );
+    }
+
+    final subscription = ref.listenManual(
+      intentionDetailsViewModelProvider(id),
+      (previous, next) => refresh(next),
+    );
+    _replacementSubscriptions[role] = subscription;
+    refresh(subscription.read());
   }
 
   String _submitLabel(
