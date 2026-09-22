@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../intention/application/intention_catalog.dart';
 import '../../../intention/domain/intention.dart';
+import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
@@ -287,27 +290,50 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
         )
         when relationId == _relationId) {
       _scheduleGateRefresh();
-      if (completion.confirmedResult case GraphResultSuccess(:final value)) {
-        if (!_advanceRevisionBarrier(value.revision)) {
-          return;
-        }
-        if (value.value case LongTermRelationDeleted(relation: final relation)
-            when relation.id == _relationId) {
-          state = _terminateAsDeleted();
-          return;
-        }
-        _generation = _generation.next();
-        final current = state;
-        state = switch (current) {
-          RelationDetailsLoaded() => current.copyWith(
-            isOperationRunning: _isOperationRunning,
-            refreshStatus: const RelationDetailsRefreshing(),
-          ),
-          _ => RelationDetailsLoading(isOperationRunning: _isOperationRunning),
-        };
-        _startObservation();
-      }
     }
+    final confirmedChange = completion.confirmedChange;
+    if (confirmedChange == null) {
+      return;
+    }
+    final changes = confirmedChange.changes;
+    final deleted = changes.whereType<LongTermRelationDeletedChange>().any(
+      (change) => change.id == _relationId,
+    );
+    final relationChanged = changes.whereType<LongTermRelationChange>().any(
+      (change) => change.id == _relationId,
+    );
+    final current = state;
+    final participantIds = current is RelationDetailsLoaded
+        ? <IntentionId>{current.details.source.id, current.details.related.id}
+        : <IntentionId>{};
+    final participantChanged = changes.any(
+      (change) => switch (change) {
+        IntentionRelationCountsChanged(:final intentionId) =>
+          participantIds.contains(intentionId),
+        IntentionCatalogMutation(:final before, :final after) =>
+          participantIds.contains(before?.summary.id) ||
+              participantIds.contains(after?.summary.id),
+        LongTermRelationChange() => false,
+        GraphChange() => false,
+      },
+    );
+    if ((!relationChanged && !participantChanged) ||
+        !_advanceRevisionBarrier(confirmedChange.revision)) {
+      return;
+    }
+    if (deleted) {
+      state = _terminateAsDeleted();
+      return;
+    }
+    _generation = _generation.next();
+    state = switch (current) {
+      RelationDetailsLoaded() => current.copyWith(
+        isOperationRunning: _isOperationRunning,
+        refreshStatus: const RelationDetailsRefreshing(),
+      ),
+      _ => RelationDetailsLoading(isOperationRunning: _isOperationRunning),
+    };
+    _startObservation();
   }
 
   bool _advanceRevisionBarrier(GraphRevision revision) {

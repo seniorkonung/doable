@@ -95,6 +95,7 @@ final class ControlledRelationDetailsRepository
     required LongTermRelation after,
     required GraphRevision revision,
     LongTermRelationDescription? description,
+    Iterable<GraphChange> additionalChanges = const [],
   }) => _relationCommandRequests[index].complete(
     GraphCommandSucceeded(
       ConfirmedGraphResult(
@@ -109,6 +110,7 @@ final class ControlledRelationDetailsRepository
               before: before,
               after: after,
             ),
+            ...additionalChanges,
           ],
         ),
       ),

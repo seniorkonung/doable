@@ -1,3 +1,4 @@
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -448,6 +449,139 @@ void main() {
               isA<RelationDetailsFresh>(),
             ),
       );
+    },
+  );
+
+  test(
+    'счётчики участников из общего пакета обновляют подробные данные',
+    () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      final sourceId = testIntentionId(1);
+      final relatedId = testIntentionId(2);
+      final initial = testRelationDetails(
+        relationId: harness.relationId,
+        sourceId: sourceId,
+        relatedId: relatedId,
+      );
+      harness.repository
+          .watchAt(0)
+          .emitDetails(initial, revision: const TestGraphRevision(1));
+      await pumpEventQueue();
+
+      final unrelated = testRelationDetails(
+        relationId: testRelationId(9),
+        sourceId: testIntentionId(3),
+        relatedId: testIntentionId(4),
+      ).relation;
+      final start = harness.coordinator.acceptRelationUpdate(
+        UpdateLongTermRelation(
+          relationId: unrelated.id,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
+          ),
+        ),
+      );
+      const revision = TestGraphRevision(5);
+      harness.repository.completeRelationUpdate(
+        0,
+        before: unrelated,
+        after: unrelated.copyWithForTest(priority: RelationPriority.p1),
+        revision: revision,
+        additionalChanges: [
+          IntentionRelationCountsChanged(
+            revision: revision,
+            intentionId: sourceId,
+            counts: testRelationCounts(activeNeedOutgoing: 2),
+          ),
+          IntentionRelationCountsChanged(
+            revision: revision,
+            intentionId: relatedId,
+            counts: testRelationCounts(activeNeedIncoming: 3),
+          ),
+        ],
+      );
+      await (start as LongTermRelationCommandAccepted).future;
+      await pumpEventQueue();
+
+      expect(harness.repository.relationWatches, hasLength(2));
+      expect(
+        harness.state,
+        isA<RelationDetailsLoaded>().having(
+          (value) => value.refreshStatus,
+          'ожидание цельного снимка',
+          isA<RelationDetailsRefreshing>(),
+        ),
+      );
+      harness.repository
+          .watchAt(1)
+          .emitDetails(
+            testRelationDetails(
+              relationId: harness.relationId,
+              sourceId: sourceId,
+              relatedId: relatedId,
+              sourceActiveRelationCount: 2,
+              relatedActiveRelationCount: 3,
+            ),
+            revision: revision,
+          );
+      await pumpEventQueue();
+      final details = (harness.state as RelationDetailsLoaded).details;
+      expect(details.source.activeRelationCount, 2);
+      expect(details.related.activeRelationCount, 3);
+    },
+  );
+
+  test(
+    'удаление связи в составном пакете завершает открытый просмотр',
+    () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      final initial = testRelationDetails(
+        relationId: harness.relationId,
+        sourceId: testIntentionId(1),
+        relatedId: testIntentionId(2),
+      );
+      harness.repository
+          .watchAt(0)
+          .emitDetails(initial, revision: const TestGraphRevision(1));
+      await pumpEventQueue();
+
+      final unrelated = testRelationDetails(
+        relationId: testRelationId(9),
+        sourceId: testIntentionId(3),
+        relatedId: testIntentionId(4),
+      ).relation;
+      final start = harness.coordinator.acceptRelationUpdate(
+        UpdateLongTermRelation(
+          relationId: unrelated.id,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
+          ),
+        ),
+      );
+      const revision = TestGraphRevision(5);
+      harness.repository.completeRelationUpdate(
+        0,
+        before: unrelated,
+        after: unrelated.copyWithForTest(priority: RelationPriority.p1),
+        revision: revision,
+        additionalChanges: [
+          LongTermRelationDeletedChange(
+            revision: revision,
+            relation: initial.relation,
+          ),
+        ],
+      );
+      await (start as LongTermRelationCommandAccepted).future;
+      await pumpEventQueue();
+
+      expect(harness.state, isA<RelationDetailsDeleted>());
+      harness.repository
+          .watchAt(0)
+          .emitDetails(initial, revision: const TestGraphRevision(1));
+      await pumpEventQueue();
+      expect(harness.state, isA<RelationDetailsDeleted>());
     },
   );
 
