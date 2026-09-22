@@ -1,3 +1,5 @@
+import '../../../graph/application/graph_command_coordinator.dart';
+import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 
 /// Состояние подробного просмотра одной долговременной связи.
@@ -26,10 +28,12 @@ final class RelationDetailsLoaded extends RelationDetailsState {
     required this.details,
     required super.isOperationRunning,
     this.refreshStatus = const RelationDetailsFresh(),
+    this.lifecycleChange,
   });
 
   final LongTermRelationDetails details;
   final RelationDetailsRefreshStatus refreshStatus;
+  final RelationDetailsLifecycleChange? lifecycleChange;
 
   @override
   bool get canRetry => refreshStatus.canRetry;
@@ -38,11 +42,49 @@ final class RelationDetailsLoaded extends RelationDetailsState {
     LongTermRelationDetails? details,
     bool? isOperationRunning,
     RelationDetailsRefreshStatus? refreshStatus,
+    RelationDetailsLifecycleChange? lifecycleChange,
+    bool clearLifecycleChange = false,
   }) => RelationDetailsLoaded(
     details: details ?? this.details,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     refreshStatus: refreshStatus ?? this.refreshStatus,
+    lifecycleChange: clearLifecycleChange
+        ? null
+        : lifecycleChange ?? this.lifecycleChange,
   );
+}
+
+/// Самостоятельное изменение архивного состояния связи.
+enum RelationDetailsLifecycleKind { archive, restore }
+
+/// Состояние команды архивирования или восстановления в этом просмотре.
+sealed class RelationDetailsLifecycleChange {
+  const RelationDetailsLifecycleChange(this.kind);
+
+  final RelationDetailsLifecycleKind kind;
+}
+
+/// Команда принята общим координатором и ещё выполняется.
+final class RelationDetailsLifecycleRunning
+    extends RelationDetailsLifecycleChange {
+  const RelationDetailsLifecycleRunning(super.kind);
+}
+
+/// Команда завершилась безопасно классифицированным отказом.
+final class RelationDetailsLifecycleFailed
+    extends RelationDetailsLifecycleChange {
+  const RelationDetailsLifecycleFailed(
+    super.kind,
+    this.failure, {
+    this.failurePresentation,
+  });
+
+  final LongTermRelationCommandFailure failure;
+
+  /// Право открытого просмотра предъявить ошибку по видимому кадру.
+  final GraphInitiatorPresentationClaim? failurePresentation;
+
+  bool get canRetry => failure is LongTermRelationUnavailableFailure;
 }
 
 /// Чтение подтвердило, что связи больше нет.

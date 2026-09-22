@@ -810,6 +810,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationDetailsEditAction => 'Редактировать связь';
 
   @override
+  String get relationDetailsArchiveAction => 'Архивировать связь';
+
+  @override
+  String get relationDetailsRestoreAction => 'Восстановить связь';
+
+  @override
+  String get relationDetailsOpenSourceParticipantAction =>
+      'Открыть исходное намерение';
+
+  @override
+  String get relationDetailsOpenRelatedParticipantAction =>
+      'Открыть связанное намерение';
+
+  @override
   String get participantPickerTitle => 'Выбор участника';
 
   @override

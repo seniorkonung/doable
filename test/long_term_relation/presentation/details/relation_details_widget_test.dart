@@ -460,6 +460,140 @@ void main() {
       );
     },
   );
+
+  testWidgets('активная связь архивируется из подробного просмотра', (
+    tester,
+  ) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(12);
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+    );
+
+    await _pumpRelationDetails(tester, repository, relationId);
+    repository
+        .watchAt(0)
+        .emitDetails(details, revision: const TestGraphRevision(1));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Archive relation'), findsOneWidget);
+    expect(find.text('Restore relation'), findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-archive-relation')),
+    );
+    await tester.pump();
+
+    expect(repository.relationCommands.single, isA<ArchiveLongTermRelation>());
+    expect(
+      find.byKey(const ValueKey('relation-details-operation-running')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'архивный участник объясняет препятствие и остаётся отдельным переходом',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledRelationDetailsRepository();
+      addTearDown(repository.dispose);
+      final relationId = testRelationId(13);
+
+      await _pumpRelationDetails(
+        tester,
+        repository,
+        relationId,
+        locale: const Locale('ru'),
+        textScaler: const TextScaler.linear(3),
+      );
+      repository
+          .watchAt(0)
+          .emitDetails(
+            testRelationDetails(
+              relationId: relationId,
+              sourceId: testIntentionId(1),
+              relatedId: testIntentionId(2),
+              sourceArchiveState: IntentionArchiveState.archived,
+              scope: RelationScope.archived,
+            ),
+            revision: const TestGraphRevision(1),
+          );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Сначала восстановите исходное намерение, затем восстановите эту связь.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('relation-details-open-archived-source-participant'),
+        ),
+        findsOneWidget,
+      );
+      final restore = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('relation-details-restore-relation')),
+      );
+      expect(restore.onPressed, isNull);
+      expect(tester.takeException(), isNull);
+
+      semantics.dispose();
+    },
+  );
+
+  testWidgets('отказ восстановления предъявляется инлайн и сохраняет данные', (
+    tester,
+  ) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(14);
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      scope: RelationScope.archived,
+      description: 'Подтверждённое описание',
+    );
+
+    await _pumpRelationDetails(tester, repository, relationId);
+    repository
+        .watchAt(0)
+        .emitDetails(details, revision: const TestGraphRevision(1));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-restore-relation')),
+    );
+    await tester.pump();
+    repository.failRelationCommand(
+      0,
+      LongTermRelationParticipantArchivedFailure(
+        role: RelationParticipantRole.related,
+        intentionId: details.related.id,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      _textOf(tester, 'relation-details-description'),
+      'Подтверждённое описание',
+    );
+    expect(
+      find.text(
+        'Restore the related intention before restoring this relation.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const ValueKey('relation-details-open-archived-related-participant'),
+      ),
+      findsOneWidget,
+    );
+  });
 }
 
 String _textOf(WidgetTester tester, String key) =>

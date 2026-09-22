@@ -932,6 +932,22 @@
   "@relationDetailsEditAction": {
     "description": "Переход из подробного просмотра к изменению связи"
   },
+  "relationDetailsArchiveAction": "Archive relation",
+  "@relationDetailsArchiveAction": {
+    "description": "Действие самостоятельного архивирования связи"
+  },
+  "relationDetailsRestoreAction": "Restore relation",
+  "@relationDetailsRestoreAction": {
+    "description": "Действие самостоятельного восстановления связи"
+  },
+  "relationDetailsOpenSourceParticipantAction": "Open source intention",
+  "@relationDetailsOpenSourceParticipantAction": {
+    "description": "Переход к архивному исходному участнику, блокирующему восстановление связи"
+  },
+  "relationDetailsOpenRelatedParticipantAction": "Open related intention",
+  "@relationDetailsOpenRelatedParticipantAction": {
+    "description": "Переход к архивному связанному участнику, блокирующему восстановление связи"
+  },
   "participantPickerTitle": "Select a participant",
   "@participantPickerTitle": {
     "description": "Заголовок выбора участника долговременной связи"
