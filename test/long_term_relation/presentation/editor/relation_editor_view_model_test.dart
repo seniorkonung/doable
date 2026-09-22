@@ -1,5 +1,6 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
@@ -251,42 +252,136 @@ void main() {
       );
     });
 
-    test('занятая пара называет существующую связь', () async {
-      final harness = _EditorHarness.outgoing()..fillDraft();
-      final existingRelationId = testRelationId(7);
-
-      harness.viewModel.submit();
-      harness.repository.failRelationCommand(
-        0,
-        LongTermRelationPairOccupiedFailure(existingRelationId),
-      );
-      await harness.settle();
-
-      expect(
-        harness.state.operation,
-        isA<RelationEditorFailed>().having(
-          (value) => value.failure,
-          'причина',
-          isA<RelationEditorPairOccupied>().having(
-            (value) => value.existingRelationId,
-            'существующая связь',
-            existingRelationId,
+    final pairFailureCases =
+        <
+          ({
+            String name,
+            LongTermRelationCommandFailure repositoryFailure,
+            Matcher editorFailure,
+          })
+        >[
+          (
+            name: 'занятая пара',
+            repositoryFailure: LongTermRelationPairOccupiedFailure(
+              testRelationId(7),
+            ),
+            editorFailure: isA<RelationEditorPairOccupied>().having(
+              (value) => value.existingRelationId,
+              'существующая связь',
+              testRelationId(7),
+            ),
           ),
-        ),
-      );
-      expect(harness.state.canRetry, isFalse);
+          (
+            name: 'совпадающие участники',
+            repositoryFailure: const LongTermRelationCommandValidationFailure(
+              CreateLongTermRelationValidationFailure.sameIntention,
+            ),
+            editorFailure: isA<RelationEditorSameParticipants>(),
+          ),
+        ];
 
-      // Занятость пары освобождает замена участника, но не смена типа.
-      harness.viewModel.selectType(LongTermRelationType.can);
-      expect(harness.state.operation, isA<RelationEditorFailed>());
+    for (final failureCase in pairFailureCases) {
+      for (final role in RelationParticipantRole.values) {
+        final roleName = switch (role) {
+          RelationParticipantRole.source => 'исходного участника',
+          RelationParticipantRole.related => 'связанного участника',
+        };
 
-      harness.viewModel.selectParticipant(
-        RelationParticipantRole.related,
-        testEditorParticipant(5),
-      );
-      expect(harness.state.operation, isA<RelationEditorIdle>());
-      expect(harness.state.failurePresentation, isNull);
-    });
+        test(
+          '${failureCase.name}: снимок $roleName не исправляет прежнюю пару',
+          () async {
+            final harness = _EditorHarness.outgoing()..fillDraft();
+
+            harness.viewModel.submit();
+            harness.repository.failRelationCommand(
+              0,
+              failureCase.repositoryFailure,
+            );
+            await harness.settle();
+
+            final presentation = harness.state.failurePresentation;
+            expect(presentation, isNotNull);
+            expect(
+              harness.state.operation,
+              isA<RelationEditorFailed>().having(
+                (value) => value.failure,
+                'причина',
+                failureCase.editorFailure,
+              ),
+            );
+
+            final currentIndex = switch (role) {
+              RelationParticipantRole.source => 1,
+              RelationParticipantRole.related => 2,
+            };
+            harness.viewModel.selectParticipant(
+              role,
+              testEditorParticipant(
+                currentIndex,
+                title: 'Обновлённое намерение $currentIndex',
+                archiveState: IntentionArchiveState.archived,
+                activeRelationCount: 7,
+              ),
+            );
+
+            final updatedParticipant = switch (role) {
+              RelationParticipantRole.source => harness.state.sourceParticipant,
+              RelationParticipantRole.related =>
+                harness.state.relatedParticipant,
+            };
+            expect(
+              updatedParticipant?.title,
+              'Обновлённое намерение $currentIndex',
+            );
+            expect(
+              updatedParticipant?.archiveState,
+              IntentionArchiveState.archived,
+            );
+            expect(updatedParticipant?.activeRelationCount, 7);
+            expect(
+              harness.state.operation,
+              isA<RelationEditorFailed>().having(
+                (value) => value.failure,
+                'причина',
+                failureCase.editorFailure,
+              ),
+            );
+            expect(harness.state.failurePresentation, same(presentation));
+            expect(harness.state.canSubmit, isFalse);
+
+            harness.viewModel.submit();
+            expect(harness.repository.commandCount, 1);
+
+            harness.viewModel.selectParticipant(role, testEditorParticipant(5));
+
+            expect(harness.state.operation, isA<RelationEditorIdle>());
+            expect(harness.state.failurePresentation, isNull);
+            expect(harness.state.canSubmit, isTrue);
+
+            harness.viewModel.submit();
+            expect(harness.repository.commandCount, 2);
+            final corrected = harness.repository.createCommandAt(1);
+            expect(switch (role) {
+              RelationParticipantRole.source => corrected.sourceIntentionId,
+              RelationParticipantRole.related => corrected.relatedIntentionId,
+            }, testEditorIntentionId(5));
+            expect(
+              switch (role) {
+                RelationParticipantRole.source => corrected.relatedIntentionId,
+                RelationParticipantRole.related => corrected.sourceIntentionId,
+              },
+              switch (role) {
+                RelationParticipantRole.source => testEditorIntentionId(2),
+                RelationParticipantRole.related => testEditorIntentionId(1),
+              },
+            );
+
+            harness.repository.completeRelationCreated(1, revision: 2);
+            await harness.settle();
+          },
+        );
+      }
+    }
 
     test('архивированный участник называет свою роль', () async {
       final harness = _EditorHarness.outgoing()

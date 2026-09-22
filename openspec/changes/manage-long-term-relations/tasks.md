@@ -623,7 +623,7 @@ Phase 1 не включает получение соседства и его с
   - **Вероятные файлы:** `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`, при необходимости `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.2 Снимать ошибку пары только после изменения идентичности участника
+- [x] 4.2 Снимать ошибку пары только после изменения идентичности участника
   - **Критерии приёмки:**
     - Обновление названия, архивного состояния или активного счётчика выбранного участника при прежнем `IntentionId` обновляет его отображаемый снимок, но сохраняет `RelationEditorPairOccupied` и `RelationEditorSameParticipants`, их предъявление и блокировку неизменённой пары.
     - Явный выбор другого `IntentionId` в соответствующей роли снимает зависящую от пары ошибку, сохраняет новый снимок и разрешает отправку только при полном допустимом черновике; команда использует новую типизированную пару идентификаторов.
