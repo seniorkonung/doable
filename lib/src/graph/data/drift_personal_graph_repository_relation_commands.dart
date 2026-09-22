@@ -21,6 +21,9 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
               relationId: command.relationId,
               scope: relation_domain.RelationScope.active,
             ),
+            DeleteLongTermRelation() => _deleteLongTermRelation(
+              command.relationId,
+            ),
           },
         );
         if (committed.didMutate) {
@@ -343,6 +346,32 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     );
   }
 
+  Future<_CommittedLongTermRelationDeletion> _deleteLongTermRelation(
+    LongTermRelationId relationId,
+  ) async {
+    final stored = await _readStoredRelation(relationId);
+    if (stored == null) {
+      throw _LongTermRelationNotFound(relationId);
+    }
+    final relation = stored.toDomain();
+
+    final deletedRows = await (_database.delete(
+      _database.longTermRelations,
+    )..where((row) => row.id.equals(relationId.toCanonicalString()))).go();
+    if (deletedRows != 1) {
+      throw _LongTermRelationNotFound(relationId);
+    }
+
+    final affectedCounts = await _readVerifiedRelationCountsFor({
+      relation.sourceIntentionId,
+      relation.relatedIntentionId,
+    });
+    return _CommittedLongTermRelationDeletion(
+      relation: relation,
+      affectedCounts: affectedCounts,
+    );
+  }
+
   Future<_StoredRelationGroupRow?> _readStoredRelation(
     LongTermRelationId id,
   ) async {
@@ -511,6 +540,35 @@ final class _CommittedLongTermRelationUpdate
       );
 }
 
+final class _CommittedLongTermRelationDeletion
+    extends _CommittedLongTermRelationCommand {
+  _CommittedLongTermRelationDeletion({
+    required this.relation,
+    required Map<IntentionId, RelationCounts> affectedCounts,
+  }) : affectedCounts = Map.unmodifiable(affectedCounts);
+
+  final relation_domain.LongTermRelation relation;
+  final Map<IntentionId, RelationCounts> affectedCounts;
+
+  @override
+  bool get didMutate => true;
+
+  @override
+  LongTermRelationDeleted toSuccess(GraphRevision revision) =>
+      LongTermRelationDeleted(
+        relation: relation,
+        changes: [
+          for (final entry in affectedCounts.entries)
+            IntentionRelationCountsChanged(
+              revision: revision,
+              intentionId: entry.key,
+              counts: entry.value,
+            ),
+          LongTermRelationDeletedChange(revision: revision, relation: relation),
+        ],
+      );
+}
+
 LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
   Object error,
 ) {
@@ -556,6 +614,7 @@ LongTermRelationCommandDiagnosticsType _longTermRelationCommandDiagnosticsType(
   UpdateLongTermRelation() => LongTermRelationCommandDiagnosticsType.update,
   ArchiveLongTermRelation() => LongTermRelationCommandDiagnosticsType.archive,
   RestoreLongTermRelation() => LongTermRelationCommandDiagnosticsType.restore,
+  DeleteLongTermRelation() => LongTermRelationCommandDiagnosticsType.delete,
 };
 
 DiagnosticsFailureCode _longTermRelationDiagnosticsFailureCode(

@@ -254,17 +254,25 @@ String _relationOutcomeFor(
       localizations.relationEditorCreated,
     (LongTermRelationCommandKind.create, LongTermRelationUpdated()) =>
       localizations.relationEditorCreateUnexpected,
+    (LongTermRelationCommandKind.create, LongTermRelationDeleted()) =>
+      localizations.relationEditorCreateUnexpected,
     (LongTermRelationCommandKind.update, LongTermRelationUpdated()) =>
       localizations.relationEditorUpdated,
     (LongTermRelationCommandKind.update, LongTermRelationCreated()) =>
+      localizations.relationEditorUpdateUnexpected,
+    (LongTermRelationCommandKind.update, LongTermRelationDeleted()) =>
       localizations.relationEditorUpdateUnexpected,
     (LongTermRelationCommandKind.archive, LongTermRelationUpdated()) =>
       localizations.relationArchived,
     (LongTermRelationCommandKind.archive, LongTermRelationCreated()) =>
       localizations.relationArchiveUnexpected,
+    (LongTermRelationCommandKind.archive, LongTermRelationDeleted()) =>
+      localizations.relationArchiveUnexpected,
     (LongTermRelationCommandKind.restore, LongTermRelationUpdated()) =>
       localizations.relationRestored,
     (LongTermRelationCommandKind.restore, LongTermRelationCreated()) =>
+      localizations.relationRestoreUnexpected,
+    (LongTermRelationCommandKind.restore, LongTermRelationDeleted()) =>
       localizations.relationRestoreUnexpected,
   },
   GraphResultFailure(:final failure) => longTermRelationCommandFailureMessage(
