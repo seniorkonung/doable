@@ -1244,6 +1244,102 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be updated because of an unexpected error.'**
   String get relationEditorUpdateUnexpected;
 
+  /// Подтверждение успешного архивирования долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation archived.'**
+  String get relationArchived;
+
+  /// Отсутствие архивируемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationArchiveNotFound;
+
+  /// Конфликт актуального состояния при архивировании связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be archived because its current state conflicts with the operation.'**
+  String get relationArchiveConflict;
+
+  /// Устранимая недоступность архивирования связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be archived. Try again.'**
+  String get relationArchiveUnavailable;
+
+  /// Терминальное повреждение данных при архивировании связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t archived.'**
+  String get relationArchiveCorruption;
+
+  /// Терминальная непредвиденная ошибка архивирования связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be archived because of an unexpected error.'**
+  String get relationArchiveUnexpected;
+
+  /// Подтверждение успешного восстановления долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation restored.'**
+  String get relationRestored;
+
+  /// Отсутствие восстанавливаемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationRestoreNotFound;
+
+  /// Конфликт актуального состояния при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be restored because its current state conflicts with the operation.'**
+  String get relationRestoreConflict;
+
+  /// Отсутствие исходного участника при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'The source intention no longer exists. The relation wasn’t restored.'**
+  String get relationRestoreSourceNotFound;
+
+  /// Отсутствие связанного участника при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'The related intention no longer exists. The relation wasn’t restored.'**
+  String get relationRestoreRelatedNotFound;
+
+  /// Архивное состояние исходного участника при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the source intention before restoring this relation.'**
+  String get relationRestoreSourceArchived;
+
+  /// Архивное состояние связанного участника при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the related intention before restoring this relation.'**
+  String get relationRestoreRelatedArchived;
+
+  /// Устранимая недоступность восстановления связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be restored. Try again.'**
+  String get relationRestoreUnavailable;
+
+  /// Терминальное повреждение данных при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t restored.'**
+  String get relationRestoreCorruption;
+
+  /// Терминальная непредвиденная ошибка восстановления связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be restored because of an unexpected error.'**
+  String get relationRestoreUnexpected;
+
   /// Назначение перехода из строки соседства в подробный просмотр связи
   ///
   /// In en, this message translates to:

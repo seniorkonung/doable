@@ -74,6 +74,71 @@ void main() {
       },
     );
 
+    test('архивирование, восстановление и редактирование используют общий ключ связи', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final coordinator = _coordinator(repository);
+
+      final archive = coordinator.acceptRelationArchive(
+        ArchiveLongTermRelation(_relationId),
+      );
+      final competingUpdate = coordinator.acceptRelationUpdate(
+        _updateRelation(_relationId),
+      );
+      final competingRestore = coordinator.acceptRelationRestore(
+        RestoreLongTermRelation(_relationId),
+      );
+      final independentRestore = coordinator.acceptRelationRestore(
+        RestoreLongTermRelation(_otherRelationId),
+      );
+
+      expect(archive, isA<LongTermRelationCommandAccepted>());
+      expect(competingUpdate, isA<LongTermRelationCommandAlreadyRunning>());
+      expect(competingRestore, isA<LongTermRelationCommandAlreadyRunning>());
+      expect(independentRestore, isA<LongTermRelationCommandAccepted>());
+      expect(repository.commands, [
+        isA<ArchiveLongTermRelation>(),
+        isA<RestoreLongTermRelation>(),
+      ]);
+
+      repository
+        ..completeRelationScopeChanged(
+          0,
+          _relationId,
+          beforeScope: RelationScope.active,
+          afterScope: RelationScope.archived,
+          revision: 1,
+        )
+        ..completeRelationScopeChanged(
+          1,
+          _otherRelationId,
+          beforeScope: RelationScope.archived,
+          afterScope: RelationScope.active,
+          revision: 2,
+        );
+      final archiveCompletion =
+          await (archive as LongTermRelationCommandAccepted).future;
+      final restoreCompletion =
+          await (independentRestore as LongTermRelationCommandAccepted).future;
+
+      expect(archiveCompletion.kind, LongTermRelationCommandKind.archive);
+      expect(restoreCompletion.kind, LongTermRelationCommandKind.restore);
+      expect(coordinator.isRelationRunning(_relationId), isFalse);
+
+      final restoreAfterArchive = coordinator.acceptRelationRestore(
+        RestoreLongTermRelation(_relationId),
+      );
+      expect(restoreAfterArchive, isA<LongTermRelationCommandAccepted>());
+      repository.completeRelationScopeChanged(
+        2,
+        _relationId,
+        beforeScope: RelationScope.archived,
+        afterScope: RelationScope.active,
+        revision: 3,
+      );
+      await (restoreAfterArchive as LongTermRelationCommandAccepted).future;
+      await coordinator.shutdown();
+    });
+
     test(
       'публикует изменение в общем порядке с видом и контекстом связи',
       () async {
@@ -157,29 +222,61 @@ void main() {
       },
     );
 
-    test('shutdown ждёт изменение связи и запрещает новую работу', () async {
+    test('подтверждённый no-op архивирования предъявляется один раз', () async {
       final repository = _ControlledPersonalGraphRepository();
       final coordinator = _coordinator(repository);
-      final accepted = coordinator.acceptRelationUpdate(
-        _updateRelation(_relationId),
+      final registration = coordinator.registerAppPresentation();
+
+      final accepted = coordinator.acceptRelationArchive(
+        ArchiveLongTermRelation(_relationId),
       ) as LongTermRelationCommandAccepted;
-
-      final shutdown = coordinator.shutdown();
-      var shutdownCompleted = false;
-      unawaited(shutdown.then((_) => shutdownCompleted = true));
-
-      expect(
-        coordinator.acceptRelationUpdate(_updateRelation(_otherRelationId)),
-        isA<GraphCommandCoordinatorDraining>(),
+      final appClaimFuture = registration.nextClaim();
+      repository.completeRelationScopeUnchanged(
+        0,
+        _relationId,
+        scope: RelationScope.archived,
       );
-      await Future<void>.delayed(Duration.zero);
-      expect(shutdownCompleted, isFalse);
 
-      repository.completeRelationFailure(0);
-      await accepted.future;
-      await shutdown;
-      expect(shutdownCompleted, isTrue);
+      final completion = await accepted.future;
+      final appClaim = await appClaimFuture;
+      expect(completion.revision, const _TestRevision(0));
+      expect(appClaim, isNotNull);
+      expect(appClaim!.completion, same(completion));
+      expect(coordinator.claimInitiatorFailure(completion.token), isNull);
+
+      coordinator.confirmPresentation(appClaim);
+      registration.release();
+      await coordinator.shutdown();
     });
+
+    test(
+      'shutdown ждёт архивирование связи и запрещает новую работу',
+      () async {
+        final repository = _ControlledPersonalGraphRepository();
+        final coordinator = _coordinator(repository);
+        final accepted = coordinator.acceptRelationArchive(
+          ArchiveLongTermRelation(_relationId),
+        ) as LongTermRelationCommandAccepted;
+
+        final shutdown = coordinator.shutdown();
+        var shutdownCompleted = false;
+        unawaited(shutdown.then((_) => shutdownCompleted = true));
+
+        expect(
+          coordinator.acceptRelationRestore(
+            RestoreLongTermRelation(_otherRelationId),
+          ),
+          isA<GraphCommandCoordinatorDraining>(),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(shutdownCompleted, isFalse);
+
+        repository.completeRelationFailure(0);
+        await accepted.future;
+        await shutdown;
+        expect(shutdownCompleted, isTrue);
+      },
+    );
   });
 }
 
@@ -207,16 +304,19 @@ CreateLongTermRelation _createRelation() => CreateLongTermRelation(
   description: null,
 );
 
-LongTermRelation _relation(LongTermRelationId id, RelationPriority priority) =>
-    LongTermRelation(
-      id: id,
-      sourceIntentionId: _intentionId(_sourceUuid),
-      relatedIntentionId: _intentionId(_relatedUuid),
-      type: LongTermRelationType.need,
-      priority: priority,
-      scope: RelationScope.active,
-      creationSequence: RelationCreationSequence(1),
-    );
+LongTermRelation _relation(
+  LongTermRelationId id,
+  RelationPriority priority, {
+  RelationScope scope = RelationScope.active,
+}) => LongTermRelation(
+  id: id,
+  sourceIntentionId: _intentionId(_sourceUuid),
+  relatedIntentionId: _intentionId(_relatedUuid),
+  type: LongTermRelationType.need,
+  priority: priority,
+  scope: scope,
+  creationSequence: RelationCreationSequence(1),
+);
 
 final class _ControlledPersonalGraphRepository
     implements PersonalGraphRepository {
@@ -267,6 +367,70 @@ final class _ControlledPersonalGraphRepository
                 revision: revision,
                 before: before,
                 after: after,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeRelationScopeChanged(
+    int index,
+    LongTermRelationId id, {
+    required RelationScope beforeScope,
+    required RelationScope afterScope,
+    required int revision,
+  }) {
+    final graphRevision = _TestRevision(revision);
+    final before = _relation(id, RelationPriority.p2, scope: beforeScope);
+    final after = _relation(id, RelationPriority.p2, scope: afterScope);
+    _results[index].complete(
+      GraphCommandSucceeded<
+        LongTermRelationCommandSuccess,
+        LongTermRelationCommandFailure
+      >(
+        ConfirmedGraphResult(
+          revision: graphRevision,
+          value: LongTermRelationUpdated(
+            before: before,
+            relation: after,
+            description: null,
+            changes: [
+              LongTermRelationUpdatedChange(
+                revision: graphRevision,
+                before: before,
+                after: after,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeRelationScopeUnchanged(
+    int index,
+    LongTermRelationId id, {
+    required RelationScope scope,
+  }) {
+    const revision = _TestRevision(0);
+    final relation = _relation(id, RelationPriority.p2, scope: scope);
+    _results[index].complete(
+      GraphCommandSucceeded<
+        LongTermRelationCommandSuccess,
+        LongTermRelationCommandFailure
+      >(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationUpdated(
+            before: relation,
+            relation: relation,
+            description: null,
+            changes: [
+              LongTermRelationUnchangedChange(
+                revision: revision,
+                relation: relation,
               ),
             ],
           ),

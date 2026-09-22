@@ -688,6 +688,66 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось изменить связь из-за непредвиденной ошибки.';
 
   @override
+  String get relationArchived => 'Связь архивирована.';
+
+  @override
+  String get relationArchiveNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationArchiveConflict =>
+      'Связь не удалось архивировать из-за конфликта актуального состояния.';
+
+  @override
+  String get relationArchiveUnavailable =>
+      'Не удалось архивировать связь. Повторите попытку.';
+
+  @override
+  String get relationArchiveCorruption =>
+      'Сохранённые данные повреждены. Связь не архивирована.';
+
+  @override
+  String get relationArchiveUnexpected =>
+      'Не удалось архивировать связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationRestored => 'Связь восстановлена.';
+
+  @override
+  String get relationRestoreNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationRestoreConflict =>
+      'Связь не удалось восстановить из-за конфликта актуального состояния.';
+
+  @override
+  String get relationRestoreSourceNotFound =>
+      'Исходное намерение больше не существует. Связь не восстановлена.';
+
+  @override
+  String get relationRestoreRelatedNotFound =>
+      'Связанное намерение больше не существует. Связь не восстановлена.';
+
+  @override
+  String get relationRestoreSourceArchived =>
+      'Сначала восстановите исходное намерение, затем восстановите эту связь.';
+
+  @override
+  String get relationRestoreRelatedArchived =>
+      'Сначала восстановите связанное намерение, затем восстановите эту связь.';
+
+  @override
+  String get relationRestoreUnavailable =>
+      'Не удалось восстановить связь. Повторите попытку.';
+
+  @override
+  String get relationRestoreCorruption =>
+      'Сохранённые данные повреждены. Связь не восстановлена.';
+
+  @override
+  String get relationRestoreUnexpected =>
+      'Не удалось восстановить связь из-за непредвиденной ошибки.';
+
+  @override
   String get relationNeighborhoodOpenRelation =>
       'Открывает подробные данные связи';
 
