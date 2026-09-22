@@ -713,6 +713,21 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить связь из-за непредвиденной ошибки.';
 
   @override
+  String get relationDetailsRefreshing => 'Обновляем подробные данные связи…';
+
+  @override
+  String get relationDetailsRefreshUnavailable =>
+      'Не удалось обновить подробные данные связи. Ранее подтверждённые данные по-прежнему показаны.';
+
+  @override
+  String get relationDetailsRefreshCorruption =>
+      'Сохранённые данные повреждены. Ранее подтверждённые подробные данные связи по-прежнему показаны.';
+
+  @override
+  String get relationDetailsRefreshUnexpected =>
+      'Не удалось обновить подробные данные связи из-за непредвиденной ошибки. Ранее подтверждённые данные по-прежнему показаны.';
+
+  @override
   String get relationDetailsTypeLabel => 'Тип связи';
 
   @override

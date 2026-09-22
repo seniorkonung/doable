@@ -1,6 +1,8 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -320,29 +322,182 @@ void main() {
 
     semantics.dispose();
   });
+
+  testWidgets('повторно открытый просмотр показывает выполняющееся изменение', (
+    tester,
+  ) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(10);
+
+    await _pumpRelationDetails(
+      tester,
+      repository,
+      relationId,
+      startUpdateBeforeOpening: true,
+    );
+    repository
+        .watchAt(0)
+        .emitDetails(
+          testRelationDetails(
+            relationId: relationId,
+            sourceId: testIntentionId(1),
+            relatedId: testIntentionId(2),
+          ),
+          revision: revision,
+        );
+    await tester.pump();
+
+    expect(
+      _textOf(tester, 'relation-details-operation-running'),
+      'Saving changes…',
+    );
+  });
+
+  testWidgets(
+    'ошибка согласования оставляет данные и предлагает уместный повтор',
+    (tester) async {
+      final repository = ControlledRelationDetailsRepository();
+      addTearDown(repository.dispose);
+      final relationId = testRelationId(11);
+      final container = await _pumpRelationDetails(
+        tester,
+        repository,
+        relationId,
+      );
+      final initial = testRelationDetails(
+        relationId: relationId,
+        sourceId: testIntentionId(1),
+        relatedId: testIntentionId(2),
+        description: 'Прежнее подтверждённое описание',
+      );
+      repository
+          .watchAt(0)
+          .emitDetails(initial, revision: const TestGraphRevision(1));
+      await tester.pumpAndSettle();
+
+      container
+          .read(graphCommandCoordinatorProvider.notifier)
+          .acceptRelationUpdate(
+            UpdateLongTermRelation(
+              relationId: relationId,
+              patch: const LongTermRelationPatch(
+                priority: LongTermRelationFieldSet(RelationPriority.p1),
+              ),
+            ),
+          );
+      repository.completeRelationUpdate(
+        0,
+        before: initial.relation,
+        after: LongTermRelation(
+          id: initial.relation.id,
+          sourceIntentionId: initial.relation.sourceIntentionId,
+          relatedIntentionId: initial.relation.relatedIntentionId,
+          type: initial.relation.type,
+          priority: RelationPriority.p1,
+          scope: initial.relation.scope,
+          creationSequence: initial.relation.creationSequence,
+        ),
+        revision: const TestGraphRevision(5),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        _textOf(tester, 'relation-details-description'),
+        'Прежнее подтверждённое описание',
+      );
+      expect(
+        _textOf(tester, 'relation-details-refresh-status'),
+        'Refreshing relation details…',
+      );
+
+      repository
+          .watchAt(1)
+          .fail(const LongTermRelationReadUnavailableFailure());
+      await tester.pumpAndSettle();
+
+      expect(
+        _textOf(tester, 'relation-details-description'),
+        'Прежнее подтверждённое описание',
+      );
+      expect(
+        _textOf(tester, 'relation-details-refresh-status'),
+        'The relation details couldn’t be refreshed. Previously confirmed data is still shown.',
+      );
+      expect(
+        find.byKey(const ValueKey('relation-details-refresh-retry')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-refresh-retry')),
+      );
+      await tester.pump();
+      expect(repository.relationWatches, hasLength(3));
+
+      repository
+          .watchAt(2)
+          .emitDetails(
+            testRelationDetails(
+              relationId: relationId,
+              sourceId: testIntentionId(1),
+              relatedId: testIntentionId(2),
+              priority: RelationPriority.p1,
+              description: 'Новое подтверждённое описание',
+            ),
+            revision: const TestGraphRevision(5),
+          );
+      await tester.pumpAndSettle();
+
+      expect(
+        _textOf(tester, 'relation-details-description'),
+        'Новое подтверждённое описание',
+      );
+      expect(
+        find.byKey(const ValueKey('relation-details-refresh-status')),
+        findsNothing,
+      );
+    },
+  );
 }
 
 String _textOf(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
-Future<void> _pumpRelationDetails(
+Future<ProviderContainer> _pumpRelationDetails(
   WidgetTester tester,
   ControlledRelationDetailsRepository repository,
   LongTermRelationId relationId, {
   Locale locale = const Locale('en'),
   TextScaler textScaler = TextScaler.noScaling,
+  bool startUpdateBeforeOpening = false,
 }) async {
   // Просмотр проверяется целиком: высокая поверхность исключает влияние
   // прокрутки на поиск данных и переходов.
   tester.view.physicalSize = const Size(1200, 6000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  final container = ProviderContainer(
+    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
+    retry: (retryCount, error) => null,
+  );
+  addTearDown(container.dispose);
+  if (startUpdateBeforeOpening) {
+    container
+        .read(graphCommandCoordinatorProvider.notifier)
+        .acceptRelationUpdate(
+          UpdateLongTermRelation(
+            relationId: relationId,
+            patch: const LongTermRelationPatch(
+              priority: LongTermRelationFieldSet(RelationPriority.p1),
+            ),
+          ),
+        );
+  }
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWithValue(repository),
-      ],
-      retry: (retryCount, error) => null,
+    UncontrolledProviderScope(
+      container: container,
       child: MaterialApp(
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -357,4 +512,5 @@ Future<void> _pumpRelationDetails(
     ),
   );
   await tester.pump();
+  return container;
 }

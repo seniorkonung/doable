@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -8,6 +9,7 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -62,6 +64,8 @@ final class ControlledRelationDetailsRepository
         StreamController<Result<GraphSnapshot<IntentionDetails?>>>
       >{};
   final _groupRequests = <Completer<RelationGroupPageResult>>[];
+  final relationCommands = <LongTermRelationCommand>[];
+  final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
 
   ControlledRelationWatch watchAt(int index) => relationWatches[index];
 
@@ -84,6 +88,32 @@ final class ControlledRelationDetailsRepository
 
   void completeGroupPage(int index, RelationGroupPage page) =>
       _groupRequests[index].complete(GraphResultSuccess(page));
+
+  void completeRelationUpdate(
+    int index, {
+    required LongTermRelation before,
+    required LongTermRelation after,
+    required GraphRevision revision,
+    LongTermRelationDescription? description,
+  }) => _relationCommandRequests[index].complete(
+    GraphCommandSucceeded(
+      ConfirmedGraphResult(
+        revision: revision,
+        value: LongTermRelationUpdated(
+          before: before,
+          relation: after,
+          description: description,
+          changes: <GraphChange>[
+            LongTermRelationUpdatedChange(
+              revision: revision,
+              before: before,
+              after: after,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
@@ -124,8 +154,14 @@ final class ControlledRelationDetailsRepository
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
-  >(GraphCommand<TSuccess, TFailure> command) =>
-      throw UnsupportedError('Изменяющие команды вне границы этого теста.');
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    final result = switch (command) {
+      final LongTermRelationCommand relationCommand =>
+        await _executeRelationCommand(relationCommand),
+      _ => throw UnsupportedError('Команда вне границы этого теста.'),
+    };
+    return result as GraphCommandResult<TSuccess, TFailure>;
+  }
 
   Future<void> dispose() async {
     for (final watch in relationWatches) {
@@ -143,6 +179,15 @@ final class ControlledRelationDetailsRepository
       sync: true,
     ),
   );
+
+  Future<LongTermRelationCommandResult> _executeRelationCommand(
+    LongTermRelationCommand command,
+  ) {
+    relationCommands.add(command);
+    final request = Completer<LongTermRelationCommandResult>();
+    _relationCommandRequests.add(request);
+    return request.future;
+  }
 }
 
 /// Подробные данные связи между двумя намерениями.

@@ -711,6 +711,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be loaded because of an unexpected error.';
 
   @override
+  String get relationDetailsRefreshing => 'Refreshing relation details…';
+
+  @override
+  String get relationDetailsRefreshUnavailable =>
+      'The relation details couldn’t be refreshed. Previously confirmed data is still shown.';
+
+  @override
+  String get relationDetailsRefreshCorruption =>
+      'Stored data is damaged. Previously confirmed relation details are still shown.';
+
+  @override
+  String get relationDetailsRefreshUnexpected =>
+      'The relation details couldn’t be refreshed because of an unexpected error. Previously confirmed data is still shown.';
+
+  @override
   String get relationDetailsTypeLabel => 'Relation type';
 
   @override

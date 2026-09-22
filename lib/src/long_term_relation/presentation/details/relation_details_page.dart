@@ -28,47 +28,58 @@ final class RelationDetailsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final localizations = AppLocalizations.of(context);
-    final state = ref.watch(relationDetailsViewModelProvider(relationId));
+    final provider = relationDetailsViewModelProvider(relationId);
+    final state = ref.watch(provider);
+    final viewModel = ref.read(provider.notifier);
     return Scaffold(
       appBar: AppBar(title: Text(localizations.relationDetailsTitle)),
       body: SafeArea(
-        child: switch (state) {
-          RelationDetailsLoading() => _RelationDetailsStatus(
-            message: localizations.relationDetailsLoading,
-            progressIndicator: true,
-          ),
-          final RelationDetailsLoaded loaded => _LoadedRelation(
-            details: loaded.details,
-          ),
-          RelationDetailsNotFound() => _RelationDetailsStatus(
-            message: localizations.relationDetailsNotFound,
-          ),
-          RelationDetailsUnavailable() => _RelationDetailsStatus(
-            message: localizations.relationDetailsUnavailable,
-            onRetry: ref
-                .read(relationDetailsViewModelProvider(relationId).notifier)
-                .retry,
-          ),
-          RelationDetailsCorruption() => _RelationDetailsStatus(
-            message: localizations.relationDetailsCorruption,
-          ),
-          RelationDetailsUnexpected() => _RelationDetailsStatus(
-            message: localizations.relationDetailsUnexpected,
-          ),
-        },
+        child: Column(
+          children: [
+            if (state.isOperationRunning)
+              const _RelationOperationRunningStatus(),
+            Expanded(
+              child: switch (state) {
+                RelationDetailsLoading() => _RelationDetailsStatus(
+                  message: localizations.relationDetailsLoading,
+                  progressIndicator: true,
+                ),
+                final RelationDetailsLoaded loaded => _LoadedRelation(
+                  state: loaded,
+                  onRetry: viewModel.retry,
+                ),
+                RelationDetailsNotFound() => _RelationDetailsStatus(
+                  message: localizations.relationDetailsNotFound,
+                ),
+                RelationDetailsUnavailable() => _RelationDetailsStatus(
+                  message: localizations.relationDetailsUnavailable,
+                  onRetry: viewModel.retry,
+                ),
+                RelationDetailsCorruption() => _RelationDetailsStatus(
+                  message: localizations.relationDetailsCorruption,
+                ),
+                RelationDetailsUnexpected() => _RelationDetailsStatus(
+                  message: localizations.relationDetailsUnexpected,
+                ),
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 final class _LoadedRelation extends StatelessWidget {
-  const _LoadedRelation({required this.details});
+  const _LoadedRelation({required this.state, required this.onRetry});
 
-  final LongTermRelationDetails details;
+  final RelationDetailsLoaded state;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
+    final details = state.details;
     final relation = details.relation;
     final phrase = relation.type == LongTermRelationType.need
         ? localizations.relationNeighborhoodNeedPhrase(
@@ -82,6 +93,11 @@ final class _LoadedRelation extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
+        if (state.refreshStatus case final status
+            when status is! RelationDetailsFresh) ...[
+          _RelationRefreshStatus(status: status, onRetry: onRetry),
+          const SizedBox(height: 24),
+        ],
         Semantics(
           header: true,
           child: Text(
@@ -142,6 +158,93 @@ final class _LoadedRelation extends StatelessWidget {
     RelationPriority.p3 => 'P3',
     RelationPriority.p4 => 'P4',
   };
+}
+
+final class _RelationOperationRunningStatus extends StatelessWidget {
+  const _RelationOperationRunningStatus();
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    liveRegion: true,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          const SizedBox.square(
+            dimension: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              AppLocalizations.of(context).detailsOperationRunning,
+              key: const ValueKey('relation-details-operation-running'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+final class _RelationRefreshStatus extends StatelessWidget {
+  const _RelationRefreshStatus({required this.status, required this.onRetry});
+
+  final RelationDetailsRefreshStatus status;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final message = switch (status) {
+      RelationDetailsRefreshing() => localizations.relationDetailsRefreshing,
+      RelationDetailsRefreshUnavailable() =>
+        localizations.relationDetailsRefreshUnavailable,
+      RelationDetailsRefreshCorruption() =>
+        localizations.relationDetailsRefreshCorruption,
+      RelationDetailsRefreshUnexpected() =>
+        localizations.relationDetailsRefreshUnexpected,
+      RelationDetailsFresh() => throw StateError(
+        'Актуальный снимок не требует статуса обновления.',
+      ),
+    };
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (status is RelationDetailsRefreshing) ...[
+            const SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  key: const ValueKey('relation-details-refresh-status'),
+                ),
+                if (status.canRetry) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.tonal(
+                    key: const ValueKey('relation-details-refresh-retry'),
+                    onPressed: onRetry,
+                    child: Text(localizations.commonRetry),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Переход к участнику связи с его текущими данными и активным количеством.

@@ -824,6 +824,22 @@
   "@relationDetailsUnexpected": {
     "description": "Безопасный непредвиденный отказ чтения подробных данных связи"
   },
+  "relationDetailsRefreshing": "Refreshing relation details…",
+  "@relationDetailsRefreshing": {
+    "description": "Согласование сохранённого подробного просмотра связи с новой ревизией"
+  },
+  "relationDetailsRefreshUnavailable": "The relation details couldn’t be refreshed. Previously confirmed data is still shown.",
+  "@relationDetailsRefreshUnavailable": {
+    "description": "Устранимая ошибка обновления при сохранённых подробных данных связи"
+  },
+  "relationDetailsRefreshCorruption": "Stored data is damaged. Previously confirmed relation details are still shown.",
+  "@relationDetailsRefreshCorruption": {
+    "description": "Повреждение при обновлении с сохранением прежних подробных данных связи"
+  },
+  "relationDetailsRefreshUnexpected": "The relation details couldn’t be refreshed because of an unexpected error. Previously confirmed data is still shown.",
+  "@relationDetailsRefreshUnexpected": {
+    "description": "Непредвиденная ошибка обновления с сохранением прежних подробных данных связи"
+  },
   "relationDetailsTypeLabel": "Relation type",
   "@relationDetailsTypeLabel": {
     "description": "Подпись типа связи в подробном просмотре"
