@@ -140,6 +140,12 @@ final class RestoreLongTermRelation extends LongTermRelationCommand {
   final LongTermRelationId relationId;
 }
 
+final class DeleteLongTermRelation extends LongTermRelationCommand {
+  const DeleteLongTermRelation(this.relationId);
+
+  final LongTermRelationId relationId;
+}
+
 enum RelationParticipantRole { source, related }
 
 sealed class LongTermRelationCommandFailure implements GraphCommandFailure {
@@ -258,6 +264,12 @@ final class LongTermRelationUpdated extends LongTermRelationCommandSuccess {
   final LongTermRelation before;
   final LongTermRelation relation;
   final LongTermRelationDescription? description;
+}
+
+final class LongTermRelationDeleted extends LongTermRelationCommandSuccess {
+  LongTermRelationDeleted({required this.relation, required super.changes});
+
+  final LongTermRelation relation;
 }
 
 typedef LongTermRelationCommandResult =
