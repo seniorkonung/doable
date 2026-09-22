@@ -73,6 +73,10 @@ final class ControlledNeighborhoodRepository
     );
   }
 
+  void failIntentionRead(IntentionFailure failure) {
+    _intentionController.add(ResultFailure(failure));
+  }
+
   void completeIntentionCommand(
     int index,
     Result<IntentionCommandSuccess> result,

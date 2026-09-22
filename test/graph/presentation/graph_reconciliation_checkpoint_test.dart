@@ -184,7 +184,10 @@ void main() {
 
       expect(harness.neighborhood.items, hasLength(4));
       expect(harness.neighborhood.counts.activeCanIncoming, 0);
-      expect(harness.neighborhood.progress, isA<RelationGroupRefreshFailure>());
+      expect(
+        harness.neighborhood.summaryStatus,
+        isA<RelationSummaryRefreshFailure>(),
+      );
       expect(repository.groupQueries, hasLength(3));
 
       // Повторное инвалидирование запускает ровно одну новую замену.

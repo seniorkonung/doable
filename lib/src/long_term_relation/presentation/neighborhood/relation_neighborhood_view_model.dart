@@ -138,6 +138,7 @@ final class RelationNeighborhoodViewModel
     final current = state;
     if (current is! RelationGroupLoaded ||
         current.nextCursor == null ||
+        current.summaryFreshness != RelationSummaryFreshness.current ||
         current.progress is! RelationGroupIdle ||
         visibleIndex < 0 ||
         current.items.length - visibleIndex - 1 > _policy.prefetchRemaining) {
@@ -149,6 +150,9 @@ final class RelationNeighborhoodViewModel
   Future<void> retryLoadMore() {
     final current = state;
     if (current is! RelationGroupLoaded) {
+      return Future.value();
+    }
+    if (current.summaryFreshness != RelationSummaryFreshness.current) {
       return Future.value();
     }
     final progress = current.progress;
@@ -163,8 +167,9 @@ final class RelationNeighborhoodViewModel
     if (current is! RelationGroupConfirmedState) {
       return Future.value();
     }
-    final progress = current.progress;
-    if (progress is! RelationGroupRefreshFailure || !progress.canRetry) {
+    final summaryStatus = current.summaryStatus;
+    if (summaryStatus is! RelationSummaryRefreshFailure ||
+        !summaryStatus.canRetry) {
       return Future.value();
     }
     return _refresh(current, includeRequestedPage: false);
@@ -323,14 +328,15 @@ final class RelationNeighborhoodViewModel
     }
     final request = Object();
     final generation = _generation;
+    final refreshBase = _withProgress(confirmed, const RelationGroupIdle());
     _activeRequest = request;
-    state = _withProgress(confirmed, const RelationGroupRefreshing());
+    state = _withSummaryStatus(refreshBase, const RelationSummaryRefreshing());
 
     try {
       for (var attempt = 0; attempt < _maxRefreshAttempts; attempt += 1) {
         final invalidation = _invalidation;
         final assembly = await _assembleGroup(
-          confirmed,
+          refreshBase,
           request,
           generation,
           invalidation,
@@ -345,7 +351,7 @@ final class RelationNeighborhoodViewModel
               continue;
             }
             state = _withScrollAnchor(
-              previous: confirmed,
+              previous: refreshBase,
               replacement: replacement,
             );
             return;
@@ -354,18 +360,18 @@ final class RelationNeighborhoodViewModel
               _finishIntentionContext();
               return;
             }
-            state = _withProgress(
-              confirmed,
-              RelationGroupRefreshFailure(failure),
+            state = _withSummaryStatus(
+              refreshBase,
+              RelationSummaryRefreshFailure(failure),
             );
             return;
           case _AssemblyInterrupted():
             continue;
         }
       }
-      state = _withProgress(
-        confirmed,
-        const RelationGroupRefreshFailure(RelationGroupUnavailableFailure()),
+      state = _withSummaryStatus(
+        refreshBase,
+        const RelationSummaryRefreshFailure(RelationGroupUnavailableFailure()),
       );
     } finally {
       if (identical(_activeRequest, request)) {
@@ -508,6 +514,7 @@ final class RelationNeighborhoodViewModel
       selection: confirmed.selection,
       counts: confirmed.counts,
       revision: confirmed.revision,
+      summaryStatus: confirmed.summaryStatus,
       items: combined,
       nextCursor: page.nextCursor,
       scrollAnchor: confirmed.scrollAnchor,
@@ -569,9 +576,9 @@ final class RelationNeighborhoodViewModel
         final mapped = _relationFailureForIntention(failure);
         final current = state;
         state = switch (current) {
-          RelationGroupConfirmedState() => _withProgress(
+          RelationGroupConfirmedState() => _withSummaryStatus(
             current,
-            RelationGroupRefreshFailure(mapped),
+            RelationSummaryRefreshFailure(mapped),
           ),
           RelationGroupInitialLoad() || RelationGroupInitialFailure() =>
             _initialFailure(current.selection, mapped),
@@ -807,6 +814,14 @@ final class RelationNeighborhoodViewModel
     RelationGroupEmpty() => const [],
   };
 
+  RelationGroupConfirmedState _withSummaryStatus(
+    RelationGroupConfirmedState confirmed,
+    RelationSummaryStatus summaryStatus,
+  ) => switch (confirmed) {
+    final RelationGroupEmpty empty => empty.withSummaryStatus(summaryStatus),
+    final RelationGroupLoaded loaded => loaded.withSummaryStatus(summaryStatus),
+  };
+
   RelationGroupConfirmedState _withProgress(
     RelationGroupConfirmedState confirmed,
     RelationGroupProgress progress,
@@ -883,6 +898,7 @@ final class RelationNeighborhoodViewModel
         selection: replacement.selection,
         counts: replacement.counts,
         revision: replacement.revision,
+        summaryStatus: replacement.summaryStatus,
         items: replacement.items,
         nextCursor: replacement.nextCursor,
         progress: replacement.progress,

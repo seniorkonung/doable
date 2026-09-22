@@ -70,6 +70,45 @@ enum RelationSummaryFreshness {
   stale,
 }
 
+/// Независимое состояние актуализации опубликованной сводки.
+///
+/// Оно хранится отдельно от подгрузки продолжения: поздний ответ порции не
+/// может выдать прежние числа за актуальные или скрыть ошибку обновления.
+sealed class RelationSummaryStatus {
+  const RelationSummaryStatus();
+
+  RelationSummaryFreshness get freshness;
+}
+
+/// Опубликованные числа относятся к текущему согласованному снимку.
+final class RelationSummaryCurrent extends RelationSummaryStatus {
+  const RelationSummaryCurrent();
+
+  @override
+  RelationSummaryFreshness get freshness => RelationSummaryFreshness.current;
+}
+
+/// Прежняя согласованная пара доступна, пока собирается новая основа.
+final class RelationSummaryRefreshing extends RelationSummaryStatus {
+  const RelationSummaryRefreshing();
+
+  @override
+  RelationSummaryFreshness get freshness => RelationSummaryFreshness.refreshing;
+}
+
+/// Новую основу получить не удалось, поэтому сохранённые числа устарели.
+final class RelationSummaryRefreshFailure extends RelationSummaryStatus {
+  const RelationSummaryRefreshFailure(this.failure);
+
+  final RelationGroupReadFailure failure;
+
+  /// Обычный повтор предоставляется только при устранимой недоступности.
+  bool get canRetry => failure is RelationGroupUnavailableFailure;
+
+  @override
+  RelationSummaryFreshness get freshness => RelationSummaryFreshness.stale;
+}
+
 /// Первое чтение выбранной группы: подтверждённых строк ещё нет.
 final class RelationGroupInitialLoad extends RelationNeighborhoodState {
   const RelationGroupInitialLoad({
@@ -123,22 +162,18 @@ sealed class RelationGroupConfirmedState extends RelationNeighborhoodState {
     required super.selection,
     required this.counts,
     required this.revision,
+    this.summaryStatus = const RelationSummaryCurrent(),
   });
 
   /// Полная сводка восьми групп, полученная вместе с первой порцией.
   final RelationCounts counts;
   final GraphRevision revision;
+  final RelationSummaryStatus summaryStatus;
   RelationGroupProgress get progress;
   RelationGroupScrollAnchor? get scrollAnchor;
 
   /// Подгрузка продолжения не меняет актуальность полной сводки.
-  RelationSummaryFreshness get summaryFreshness => switch (progress) {
-    RelationGroupRefreshing() => RelationSummaryFreshness.refreshing,
-    RelationGroupRefreshFailure() => RelationSummaryFreshness.stale,
-    RelationGroupIdle() ||
-    RelationGroupLoadingMore() ||
-    RelationGroupLoadMoreFailure() => RelationSummaryFreshness.current,
-  };
+  RelationSummaryFreshness get summaryFreshness => summaryStatus.freshness;
 
   /// Полное количество связей выбранной группы.
   int get totalCount => counts.forGroup(
@@ -155,6 +190,7 @@ final class RelationGroupEmpty extends RelationGroupConfirmedState {
     required super.selection,
     required super.counts,
     required super.revision,
+    super.summaryStatus,
     this.progress = const RelationGroupIdle(),
     this.scrollAnchor,
   });
@@ -171,7 +207,19 @@ final class RelationGroupEmpty extends RelationGroupConfirmedState {
         selection: selection,
         counts: counts,
         revision: revision,
+        summaryStatus: summaryStatus,
         progress: value,
+        scrollAnchor: scrollAnchor,
+      );
+
+  RelationGroupEmpty withSummaryStatus(RelationSummaryStatus value) =>
+      RelationGroupEmpty(
+        intentionId: intentionId,
+        selection: selection,
+        counts: counts,
+        revision: revision,
+        summaryStatus: value,
+        progress: progress,
         scrollAnchor: scrollAnchor,
       );
 }
@@ -182,6 +230,7 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
     required super.selection,
     required super.counts,
     required super.revision,
+    super.summaryStatus,
     required List<LongTermRelationSummary> items,
     required this.nextCursor,
     this.progress = const RelationGroupIdle(),
@@ -199,8 +248,11 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
 
   /// Подтверждённый конец списка: продолжения больше нет.
   ///
-  /// Конец определяется успешным результатом получения, а не ошибкой.
-  bool get hasConfirmedEnd => nextCursor == null;
+  /// Конец определяется успешным результатом получения актуального снимка,
+  /// а не ошибкой или завершением порции уже устаревшей сводки.
+  bool get hasConfirmedEnd =>
+      nextCursor == null &&
+      summaryFreshness == RelationSummaryFreshness.current;
 
   RelationGroupLoaded withProgress(RelationGroupProgress value) =>
       RelationGroupLoaded(
@@ -208,9 +260,23 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
         selection: selection,
         counts: counts,
         revision: revision,
+        summaryStatus: summaryStatus,
         items: items,
         nextCursor: nextCursor,
         progress: value,
+        scrollAnchor: scrollAnchor,
+      );
+
+  RelationGroupLoaded withSummaryStatus(RelationSummaryStatus value) =>
+      RelationGroupLoaded(
+        intentionId: intentionId,
+        selection: selection,
+        counts: counts,
+        revision: revision,
+        summaryStatus: value,
+        items: items,
+        nextCursor: nextCursor,
+        progress: progress,
         scrollAnchor: scrollAnchor,
       );
 }
@@ -230,24 +296,9 @@ final class RelationGroupLoadingMore extends RelationGroupProgress {
   const RelationGroupLoadingMore();
 }
 
-/// Выполняется получение новой основы уже загруженной части группы.
-final class RelationGroupRefreshing extends RelationGroupProgress {
-  const RelationGroupRefreshing();
-}
-
 /// Отказ подгрузки: прежние строки, продолжение и количества сохранены.
 final class RelationGroupLoadMoreFailure extends RelationGroupProgress {
   const RelationGroupLoadMoreFailure(this.failure);
-
-  final RelationGroupReadFailure failure;
-
-  /// Обычный повтор предоставляется только при устранимой недоступности.
-  bool get canRetry => failure is RelationGroupUnavailableFailure;
-}
-
-/// Отказ обновления: прежняя подтверждённая пара сохранена целиком.
-final class RelationGroupRefreshFailure extends RelationGroupProgress {
-  const RelationGroupRefreshFailure(this.failure);
 
   final RelationGroupReadFailure failure;
 
