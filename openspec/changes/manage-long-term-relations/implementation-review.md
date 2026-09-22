@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** F2: обновление снимка того же участника ошибочно снимает ошибку занятой или совпадающей пары.
+**Summary:** Активных замечаний нет; F1 и F2 переданы в незавершённую корректирующую Phase 4 и задачи 4.1–4.3.
 
 ## Review target
 
@@ -59,20 +59,13 @@
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Complete | Три свежих изолированных reviewer без planning/history/report проверили на `6683ec26221d45632656460331ccfae83e73a608` U1, U2 и overlap-группу U3/U4. Вместе они охватили все delivery/test paths, все четыре task-коммита и границы snapshot/revision, freshness/paging, participant identity/error correction и presentation ownership. U1 и U4 не дали замечаний; U2 и U3 дали F1 и F2. |
-| OpenSpec conformance | Complete | Proposal, design, delta-спецификации и задачи 3.32–3.35 сопоставлены с неизменяемым снимком `6683ec26221d45632656460331ccfae83e73a608`. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `mise exec --no-deps -- openspec instructions apply --change manage-long-term-relations --json` и `mise exec --no-deps -- openspec validate manage-long-term-relations --strict --no-interactive --json` подтвердили schema `intent-driven`, 60/60 отмеченных задач и валидный change на reviewed head. F1 передан в новую корректирующую фазу и задачи 4.1–4.2 без переоткрытия завершённой 3.33; F2 остаётся расхождением фактического поведения с завершёнными критериями. |
+| OpenSpec conformance | Complete | Proposal, design, delta-спецификации и задачи 3.32–3.35 сопоставлены с неизменяемым снимком `6683ec26221d45632656460331ccfae83e73a608`. `mise exec --no-deps -- openspec status --change manage-long-term-relations --json`, `mise exec --no-deps -- openspec instructions apply --change manage-long-term-relations --json` и `mise exec --no-deps -- openspec validate manage-long-term-relations --strict --no-interactive --json` подтвердили schema `intent-driven`, 60/60 отмеченных задач и валидный change на reviewed head. F1 и F2 по явному решению переданы в незавершённую корректирующую Phase 4 и задачи 4.1–4.3 без переоткрытия завершённых задач 3.33 и 3.34. |
 | Code quality | Complete | Проверены корректность, читаемость, архитектура, безопасность и производительность всех 30 delivery/test paths диапазона: ревизионные барьеры, неизменяемые состояния, paging races, локализация/semantics, типизированные ID, коррекция ошибок и владение claim. Dart MCP analysis не нашёл ошибок; task-focused `flutter test` выполнил 165 тестов; `mise run codegen-check`, `mise run check` (format без изменений, analyze без замечаний, 693 теста) и `git diff --check 755b3f97cc5a7377cf4a3b1d81c03d7c36ad429a 6683ec26221d45632656460331ccfae83e73a608` прошли. Запущенного DTD-сеанса не было, поэтому runtime hot reload не выполнялся. |
 
 ## Findings
 
-### F2 · Medium — Обновление снимка того же участника ошибочно считается исправлением пары
-
-- **Evidence:** `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart:44-55` вызывает `withParticipant`, если у прежнего ID изменились title, archive state или count. `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart:278-295` при любом таком повторном выборе применяет коррекцию ошибки, а строки 380-390 снимают `RelationEditorPairOccupied` и `RelationEditorSameParticipants` для любого выбора участника. При этом полнота черновика и команда используют только прежние ID (`relation_editor_state.dart:242-264`, `relation_editor_view_model.dart:110-118`), а picker исключает лишь другого участника и допускает повторный выбор того же ID (`relation_editor_page.dart:179-205`). Поэтому переименование или иной новый снимок того же намерения скрывает конфликт и разрешает повторно отправить неизменённую пару ID. Изменённые тесты не покрывают повторный выбор того же ID после pair-dependent failure.
-- **Evidence revisions:** ["6683ec26221d45632656460331ccfae83e73a608"]
-- **Impact:** После `PairOccupied` или `SameParticipants` форма может показать конфликт как исправленный и повторно отправить заведомо ту же недопустимую пару; подробности прежней ошибки также исчезают без изменения её причины.
-- **Required outcome:** Обновление отображаемого снимка участника с тем же ID не должно считаться исправлением ошибки, зависящей от пары; такая ошибка снимается только при фактическом изменении соответствующего ID либо при подтверждённом исчезновении конфликта.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/presentation/editor/relation_editor_page.dart","lib/src/long_term_relation/presentation/editor/relation_editor_state.dart","lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart","test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Проверен точный диапазон `755b3f97cc5a7377cf4a3b1d81c03d7c36ad429a..6683ec26221d45632656460331ccfae83e73a608`: четыре target-коммита и задачи 3.32–3.35 сопоставлены соответственно с U1–U4. Все 31 reviewable path учтены: `tasks.md` служит planning evidence, остальные 30 входят в implementation target хотя бы одного review unit; unmapped paths нет. Отдельно исследованы гонки команд, наблюдений, первой порции и continuation; сохранение целостных snapshot; RU/EN и semantics при масштабе текста; идентичность одноимённых участников и переходы ошибок; смена локали, renderer и сессии для presentation claim. F1 удалён из Findings после явно согласованной передачи его required outcome в новую корректирующую фазу и незавершённые задачи 4.1–4.2; реализация остаётся отдельной будущей работой. F2 остаётся единственным активным finding; принятых residual risks нет.
+Проверен точный диапазон `755b3f97cc5a7377cf4a3b1d81c03d7c36ad429a..6683ec26221d45632656460331ccfae83e73a608`: четыре target-коммита и задачи 3.32–3.35 сопоставлены соответственно с U1–U4. Все 31 reviewable path учтены: `tasks.md` служит planning evidence, остальные 30 входят в implementation target хотя бы одного review unit; unmapped paths нет. Отдельно исследованы гонки команд, наблюдений, первой порции и continuation; сохранение целостных snapshot; RU/EN и semantics при масштабе текста; идентичность одноимённых участников и переходы ошибок; смена локали, renderer и сессии для presentation claim. F1 и F2 удалены из Findings после явно согласованной передачи их required outcomes в пересмотренную корректирующую Phase 4 и незавершённые задачи 4.1–4.3; реализация остаётся отдельной будущей работой. Активных findings и принятых residual risks нет.
