@@ -964,6 +964,28 @@
   "@relationDetailsRestoreAction": {
     "description": "Действие самостоятельного восстановления связи"
   },
+  "relationDetailsDeleteAction": "Delete relation permanently",
+  "@relationDetailsDeleteAction": {
+    "description": "Действие начала физического удаления конкретной долговременной связи"
+  },
+  "relationDetailsDeleteConfirmationTitle": "Delete relation permanently?",
+  "@relationDetailsDeleteConfirmationTitle": {
+    "description": "Заголовок подтверждения необратимого удаления конкретной связи"
+  },
+  "relationDetailsDeleteConfirmationMessage": "Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. Both intentions and all other relations will remain.",
+  "@relationDetailsDeleteConfirmationMessage": {
+    "description": "Контекст и объяснение необратимости удаления конкретной связи",
+    "placeholders": {
+      "phrase": {"type": "String"},
+      "sourceTitle": {"type": "String"},
+      "relatedTitle": {"type": "String"},
+      "scope": {"type": "String"}
+    }
+  },
+  "relationDetailsConfirmDeleteAction": "Delete permanently",
+  "@relationDetailsConfirmDeleteAction": {
+    "description": "Явное подтверждение физического удаления конкретной связи"
+  },
   "relationDetailsOpenSourceParticipantAction": "Open source intention",
   "@relationDetailsOpenSourceParticipantAction": {
     "description": "Переход к архивному исходному участнику, блокирующему восстановление связи"

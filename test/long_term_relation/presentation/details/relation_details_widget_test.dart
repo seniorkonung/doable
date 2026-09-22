@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -593,6 +595,202 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+    'удаление конкретной архивной связи требует содержательного подтверждения',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledRelationDetailsRepository();
+      addTearDown(repository.dispose);
+      final relationId = testRelationId(15);
+      final details = testRelationDetails(
+        relationId: relationId,
+        sourceId: testIntentionId(1),
+        relatedId: testIntentionId(2),
+        sourceTitle: 'быть здоровым',
+        relatedTitle: 'много ходить',
+        scope: RelationScope.archived,
+      );
+
+      await _pumpRelationDetails(
+        tester,
+        repository,
+        relationId,
+        locale: const Locale('ru'),
+        textScaler: const TextScaler.linear(3),
+      );
+      repository
+          .watchAt(0)
+          .emitDetails(details, revision: const TestGraphRevision(1));
+      await tester.pumpAndSettle();
+
+      final delete = find.byKey(
+        const ValueKey('relation-details-delete-relation'),
+      );
+      await tester.ensureVisible(delete);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Удалить связь навсегда?'), findsOneWidget);
+      expect(
+        find.textContaining('Чтобы быть здоровым, нужно много ходить'),
+        findsWidgets,
+      );
+      expect(
+        find.textContaining('Исходное намерение: быть здоровым'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Связанное намерение: много ходить'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Состояние связи: Связь в архиве'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Это действие нельзя отменить'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
+      await tester.pumpAndSettle();
+      expect(repository.relationCommands, isEmpty);
+
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-confirm-delete')),
+      );
+      await tester.pump();
+
+      expect(repository.relationCommands.single, isA<DeleteLongTermRelation>());
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets('отказ удаления сохраняет данные и предлагает уместный повтор', (
+    tester,
+  ) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(16);
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      description: 'Подтверждённое описание',
+    );
+
+    await _pumpRelationDetails(tester, repository, relationId);
+    repository
+        .watchAt(0)
+        .emitDetails(details, revision: const TestGraphRevision(1));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-delete-relation')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-confirm-delete')),
+    );
+    await tester.pump();
+    repository.failRelationCommand(
+      0,
+      const LongTermRelationUnavailableFailure(),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      _textOf(tester, 'relation-details-description'),
+      'Подтверждённое описание',
+    );
+    expect(
+      find.text('The relation couldn’t be deleted. Try again.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('relation-details-lifecycle-retry')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('успешное удаление закрывает просмотр до позднего снимка', (
+    tester,
+  ) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(17);
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
+      retry: (retryCount, error) => null,
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: FilledButton(
+                key: const ValueKey('open-relation-details'),
+                onPressed: () => unawaited(
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          RelationDetailsPage(relationId: relationId),
+                    ),
+                  ),
+                ),
+                child: const Text('Открыть связь'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('open-relation-details')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    final watch = repository.watchAt(0);
+    watch.emitDetails(details, revision: const TestGraphRevision(1));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-delete-relation')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-confirm-delete')),
+    );
+    await tester.pump();
+    repository.completeRelationDelete(
+      0,
+      relation: details.relation,
+      revision: const TestGraphRevision(2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('open-relation-details')), findsOneWidget);
+    expect(find.byKey(const ValueKey('relation-details-phrase')), findsNothing);
+
+    watch.emitDetails(details, revision: const TestGraphRevision(3));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('relation-details-phrase')), findsNothing);
   });
 }
 

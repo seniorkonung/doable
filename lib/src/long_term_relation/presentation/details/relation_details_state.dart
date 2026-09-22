@@ -54,10 +54,10 @@ final class RelationDetailsLoaded extends RelationDetailsState {
   );
 }
 
-/// Самостоятельное изменение архивного состояния связи.
-enum RelationDetailsLifecycleKind { archive, restore }
+/// Самостоятельное изменение жизненного цикла конкретной связи.
+enum RelationDetailsLifecycleKind { archive, restore, delete }
 
-/// Состояние команды архивирования или восстановления в этом просмотре.
+/// Состояние команды архивирования, восстановления или удаления в просмотре.
 sealed class RelationDetailsLifecycleChange {
   const RelationDetailsLifecycleChange(this.kind);
 
@@ -90,6 +90,11 @@ final class RelationDetailsLifecycleFailed
 /// Чтение подтвердило, что связи больше нет.
 final class RelationDetailsNotFound extends RelationDetailsState {
   const RelationDetailsNotFound({required super.isOperationRunning});
+}
+
+/// Подтверждённое удаление завершило контекст прежней связи.
+final class RelationDetailsDeleted extends RelationDetailsState {
+  const RelationDetailsDeleted() : super(isOperationRunning: false);
 }
 
 /// Временная недоступность хранилища: повтор уместен.

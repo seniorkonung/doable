@@ -838,6 +838,26 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationDetailsRestoreAction => 'Восстановить связь';
 
   @override
+  String get relationDetailsDeleteAction => 'Удалить связь навсегда';
+
+  @override
+  String get relationDetailsDeleteConfirmationTitle =>
+      'Удалить связь навсегда?';
+
+  @override
+  String relationDetailsDeleteConfirmationMessage(
+    String phrase,
+    String sourceTitle,
+    String relatedTitle,
+    String scope,
+  ) {
+    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Оба намерения и все остальные связи сохранятся.';
+  }
+
+  @override
+  String get relationDetailsConfirmDeleteAction => 'Удалить навсегда';
+
+  @override
   String get relationDetailsOpenSourceParticipantAction =>
       'Открыть исходное намерение';
 

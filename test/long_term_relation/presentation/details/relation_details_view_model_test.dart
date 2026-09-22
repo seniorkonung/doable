@@ -755,6 +755,105 @@ void main() {
     );
   });
 
+  test('отказ удаления сохраняет снимок и допускает уместный повтор', () async {
+    final harness = _RelationDetailsHarness();
+    addTearDown(harness.dispose);
+    final details = testRelationDetails(
+      relationId: harness.relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      scope: RelationScope.archived,
+      description: 'Подтверждённое описание',
+    );
+    harness.repository
+        .watchAt(0)
+        .emitDetails(details, revision: const TestGraphRevision(1));
+    await pumpEventQueue();
+
+    harness.viewModel.delete();
+
+    expect(
+      harness.repository.relationCommands.single,
+      isA<DeleteLongTermRelation>().having(
+        (command) => command.relationId,
+        'конкретная связь',
+        harness.relationId,
+      ),
+    );
+    harness.repository.failRelationCommand(
+      0,
+      const LongTermRelationUnavailableFailure(),
+    );
+    await pumpEventQueue();
+
+    expect(
+      harness.state,
+      isA<RelationDetailsLoaded>()
+          .having(
+            (state) => state.details,
+            'последний подтверждённый снимок',
+            same(details),
+          )
+          .having(
+            (state) => state.lifecycleChange,
+            'устранимый отказ удаления',
+            isA<RelationDetailsLifecycleFailed>()
+                .having(
+                  (change) => change.kind,
+                  'вид операции',
+                  RelationDetailsLifecycleKind.delete,
+                )
+                .having((change) => change.canRetry, 'повтор', isTrue),
+          ),
+    );
+
+    harness.viewModel.retryLifecycleChange();
+    expect(harness.repository.relationCommands, hasLength(2));
+    expect(
+      harness.repository.relationCommands.last,
+      isA<DeleteLongTermRelation>(),
+    );
+  });
+
+  test(
+    'успешное удаление завершает просмотр и отбрасывает поздний снимок',
+    () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      final details = testRelationDetails(
+        relationId: harness.relationId,
+        sourceId: testIntentionId(1),
+        relatedId: testIntentionId(2),
+      );
+      final watch = harness.repository.watchAt(0);
+      watch.emitDetails(details, revision: const TestGraphRevision(1));
+      await pumpEventQueue();
+
+      harness.viewModel.delete();
+      harness.repository.completeRelationDelete(
+        0,
+        relation: details.relation,
+        revision: const TestGraphRevision(2),
+      );
+      await pumpEventQueue();
+
+      expect(harness.state, isA<RelationDetailsDeleted>());
+
+      watch.emitDetails(
+        testRelationDetails(
+          relationId: harness.relationId,
+          sourceId: testIntentionId(1),
+          relatedId: testIntentionId(2),
+          description: 'Запоздалые данные',
+        ),
+        revision: const TestGraphRevision(3),
+      );
+      await pumpEventQueue();
+
+      expect(harness.state, isA<RelationDetailsDeleted>());
+    },
+  );
+
   test('подтверждённое отсутствие завершает прежний контекст', () async {
     final harness = _RelationDetailsHarness();
     addTearDown(harness.dispose);

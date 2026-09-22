@@ -836,6 +836,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationDetailsRestoreAction => 'Restore relation';
 
   @override
+  String get relationDetailsDeleteAction => 'Delete relation permanently';
+
+  @override
+  String get relationDetailsDeleteConfirmationTitle =>
+      'Delete relation permanently?';
+
+  @override
+  String relationDetailsDeleteConfirmationMessage(
+    String phrase,
+    String sourceTitle,
+    String relatedTitle,
+    String scope,
+  ) {
+    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. Both intentions and all other relations will remain.';
+  }
+
+  @override
+  String get relationDetailsConfirmDeleteAction => 'Delete permanently';
+
+  @override
   String get relationDetailsOpenSourceParticipantAction =>
       'Open source intention';
 
