@@ -59,6 +59,68 @@ final class CreateLongTermRelation extends LongTermRelationCommand {
   final LongTermRelationDescription? description;
 }
 
+sealed class LongTermRelationFieldPatch<T extends Object> {
+  const LongTermRelationFieldPatch();
+}
+
+final class LongTermRelationFieldUnchanged<T extends Object>
+    extends LongTermRelationFieldPatch<T> {
+  const LongTermRelationFieldUnchanged();
+}
+
+final class LongTermRelationFieldSet<T extends Object>
+    extends LongTermRelationFieldPatch<T> {
+  const LongTermRelationFieldSet(this.value);
+
+  final T value;
+}
+
+sealed class LongTermRelationDescriptionPatch {
+  const LongTermRelationDescriptionPatch();
+
+  static LongTermRelationDescriptionPatch fromInput(String input) {
+    final description = LongTermRelationDescription.fromInput(input);
+    return description == null
+        ? const LongTermRelationDescriptionCleared()
+        : LongTermRelationDescriptionReplaced(description);
+  }
+}
+
+final class LongTermRelationDescriptionUnchanged
+    extends LongTermRelationDescriptionPatch {
+  const LongTermRelationDescriptionUnchanged();
+}
+
+final class LongTermRelationDescriptionCleared
+    extends LongTermRelationDescriptionPatch {
+  const LongTermRelationDescriptionCleared();
+}
+
+final class LongTermRelationDescriptionReplaced
+    extends LongTermRelationDescriptionPatch {
+  const LongTermRelationDescriptionReplaced(this.value);
+
+  final LongTermRelationDescription value;
+}
+
+final class LongTermRelationPatch {
+  const LongTermRelationPatch({
+    this.type = const LongTermRelationFieldUnchanged<LongTermRelationType>(),
+    this.priority = const LongTermRelationFieldUnchanged<RelationPriority>(),
+    this.sourceIntentionId =
+        const LongTermRelationFieldUnchanged<IntentionId>(),
+    this.relatedIntentionId =
+        const LongTermRelationFieldUnchanged<IntentionId>(),
+    this.description = const LongTermRelationDescriptionUnchanged(),
+  });
+
+  final LongTermRelationFieldPatch<LongTermRelationType> type;
+  final LongTermRelationFieldPatch<RelationPriority> priority;
+  final LongTermRelationFieldPatch<IntentionId> sourceIntentionId;
+  final LongTermRelationFieldPatch<IntentionId> relatedIntentionId;
+  final LongTermRelationDescriptionPatch description;
+}
+
 enum RelationParticipantRole { source, related }
 
 sealed class LongTermRelationCommandFailure implements GraphCommandFailure {
