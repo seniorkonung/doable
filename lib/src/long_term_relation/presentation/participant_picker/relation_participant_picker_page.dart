@@ -27,11 +27,15 @@ import '../../application/long_term_relation_projection.dart';
 final class RelationParticipantPickerPage extends ConsumerStatefulWidget {
   const RelationParticipantPickerPage({
     required this.excludedIntentionId,
+    required this.selectionContext,
     super.key,
   });
 
   /// Намерение, уже занятое вторым участником пары.
   final IntentionId excludedIntentionId;
+
+  /// Архивное состояние редактируемой связи, выраженное допустимым охватом.
+  final RelationParticipantSelectionContext selectionContext;
 
   @override
   ConsumerState<RelationParticipantPickerPage> createState() =>
@@ -55,6 +59,7 @@ final class _RelationParticipantPickerPageState
     final localizations = AppLocalizations.of(context);
     final purpose = SelectRelationParticipant(
       excludedIntentionId: widget.excludedIntentionId,
+      selectionContext: widget.selectionContext,
     );
     final catalog = ref.watch(intentionCatalogViewModelProvider(purpose));
     final notifier = ref.read(

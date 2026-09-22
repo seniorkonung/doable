@@ -7,8 +7,10 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -38,6 +40,80 @@ void main() {
     expect(query.pageSize, 100);
     expect(query.titleFilter, isNull);
     expect(query.cursor, isNull);
+  });
+
+  testWidgets(
+    'для архивной связи выбирает активные и архивированные намерения',
+    (tester) async {
+      final repository = ControlledParticipantPickerRepository();
+      addTearDown(repository.dispose);
+      final router = await _pumpAppWithCatalog(tester, repository);
+      addTearDown(router.dispose);
+
+      final selection = _pushPicker(
+        router,
+        excludedIndex: 9,
+        selectionContext: RelationParticipantSelectionContext.archivedRelation,
+      );
+      await _settleRoute(tester);
+
+      expect(repository.queryAt(1).scope, IntentionScope.all);
+      _completePage(repository, 1, [
+        testSummary(index: 1, title: 'Активное'),
+        testSummary(
+          index: 2,
+          title: 'Архивное',
+          archiveState: IntentionArchiveState.archived,
+        ),
+      ]);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('Archived'), findsOneWidget);
+      await tester.tap(find.text('Архивное'));
+      await tester.pumpAndSettle();
+
+      expect(
+        await selection,
+        isA<RelationParticipantSummary>()
+            .having((value) => value.id, 'идентификатор', _testIntentionId(2))
+            .having(
+              (value) => value.archiveState,
+              'архивное состояние',
+              IntentionArchiveState.archived,
+            ),
+      );
+    },
+  );
+
+  testWidgets('фильтр архивной связи сохраняет полный охват выбора', (
+    tester,
+  ) async {
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+
+    unawaited(
+      _pushPicker(
+        router,
+        excludedIndex: 9,
+        selectionContext: RelationParticipantSelectionContext.archivedRelation,
+      ),
+    );
+    await _settleRoute(tester);
+    _completePage(repository, 1, [testSummary(index: 1, title: 'Ходить')]);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('participant-picker-filter-field')),
+      '100%',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+
+    expect(repository.queryAt(2).scope, IntentionScope.all);
+    expect(repository.queryAt(2).titleFilter?.map((value) => value), '100%');
   });
 
   testWidgets('применяет буквальный фильтр названия к тому же каталогу', (
@@ -207,7 +283,9 @@ void main() {
     expect(find.text('Ходить'), findsNothing);
   });
 
-  testWidgets('подгружает следующую порцию до конца каталога', (tester) async {
+  testWidgets('архивный выбор подгружает следующую порцию полного каталога', (
+    tester,
+  ) async {
     final repository = ControlledParticipantPickerRepository();
     addTearDown(repository.dispose);
     final router = await _pumpAppWithCatalog(
@@ -218,7 +296,13 @@ void main() {
     );
     addTearDown(router.dispose);
 
-    unawaited(_pushPicker(router, excludedIndex: 9));
+    unawaited(
+      _pushPicker(
+        router,
+        excludedIndex: 9,
+        selectionContext: RelationParticipantSelectionContext.archivedRelation,
+      ),
+    );
     await _settleRoute(tester);
     repository.complete(
       1,
@@ -239,12 +323,19 @@ void main() {
     expect(repository.queries, hasLength(3));
     expect(repository.queryAt(2).cursor, isNotNull);
     expect(repository.queryAt(2).pageSize, 2);
+    expect(repository.queryAt(2).scope, IntentionScope.all);
 
     repository.complete(
       2,
       ResultSuccess(
         IntentionCatalogContinuationPage(
-          items: [testSummary(index: 3, title: 'Третье')],
+          items: [
+            testSummary(
+              index: 3,
+              title: 'Третье архивное',
+              archiveState: IntentionArchiveState.archived,
+            ),
+          ],
           nextCursor: null,
           revision: const TestPickerRevision(1),
         ),
@@ -252,7 +343,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Третье'), findsOneWidget);
+    expect(find.text('Третье архивное'), findsOneWidget);
+    expect(find.text('Archived'), findsOneWidget);
   });
 
   testWidgets('продолжает каталог, когда порция занята участником связи', (
@@ -482,9 +574,12 @@ IntentionId _testIntentionId(int index) => testSummary(index: index).id;
 Future<RelationParticipantSummary?> _pushPicker(
   AppRouter router, {
   required int excludedIndex,
+  RelationParticipantSelectionContext selectionContext =
+      RelationParticipantSelectionContext.activeRelation,
 }) => router.push<RelationParticipantSummary>(
   RelationParticipantPickerRoute(
     excludedIntentionId: _testIntentionId(excludedIndex),
+    selectionContext: selectionContext,
   ),
 );
 

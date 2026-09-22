@@ -8,6 +8,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
@@ -197,7 +198,10 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
       return;
     }
     final selected = await context.router.push<RelationParticipantSummary>(
-      RelationParticipantPickerRoute(excludedIntentionId: excluded),
+      RelationParticipantPickerRoute(
+        excludedIntentionId: excluded,
+        selectionContext: RelationParticipantSelectionContext.activeRelation,
+      ),
     );
     if (!mounted || selected == null) {
       return;
