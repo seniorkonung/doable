@@ -755,7 +755,7 @@ Phase 1 не включает получение соседства и его с
   - **Вероятные файлы:** `lib/src/long_term_relation/presentation/details/relation_details_state.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_page.dart`, `test/long_term_relation/presentation/details/relation_details_view_model_test.dart`, `test/long_term_relation/presentation/details/relation_details_widget_test.dart`; RU/EN-строки из 5.10 при уточнении подписей.
   - **Размер:** M.
 
-- [ ] 5.12 Подтвердить независимость архивного состояния связи от её участников
+- [x] 5.12 Подтвердить независимость архивного состояния связи от её участников
   - **Критерии приёмки:**
     - Архивирование и восстановление сохраняют поля и порядок связи; архивирование намерения по-прежнему выполняет каскад, а его восстановление не восстанавливает связи. Предусмотренные конкурирующие операции дают только целостный последовательный результат.
     - Общий ключ, однократное предъявление и согласование снимков подтверждены вместе с регрессиями редактирования; ранее принятые инварианты не ослаблены.
