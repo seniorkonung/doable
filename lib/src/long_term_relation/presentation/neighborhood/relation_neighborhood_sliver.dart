@@ -12,6 +12,8 @@ import '../../application/relation_counts.dart';
 import '../../application/relation_group_page.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
+import 'blocking_relations_selection_state.dart';
+import 'blocking_relations_selection_view_model.dart';
 import 'relation_neighborhood_state.dart';
 import 'relation_neighborhood_view_model.dart';
 
@@ -24,6 +26,7 @@ final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
     required this.intentionId,
     required this.onOpenRelation,
     required this.onCreateRelation,
+    this.selectionMode = false,
     super.key,
   });
 
@@ -34,6 +37,9 @@ final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
 
   /// Открывает создание связи в направлении выбранной группы соседства.
   final ValueChanged<RelationDirection> onCreateRelation;
+
+  /// Показывает явный выбор блокирующих связей в текущих порциях соседства.
+  final bool selectionMode;
 
   @override
   ConsumerState<RelationNeighborhoodSliver> createState() =>
@@ -77,6 +83,11 @@ final class _RelationNeighborhoodSliverState
     final provider = relationNeighborhoodViewModelProvider(widget.intentionId);
     final state = ref.watch(provider);
     final viewModel = ref.read(provider.notifier);
+    final selection = widget.selectionMode
+        ? ref.watch(
+            blockingRelationsSelectionViewModelProvider(widget.intentionId),
+          )
+        : null;
     final summaryStatus = state is RelationGroupConfirmedState
         ? state.summaryStatus
         : null;
@@ -100,9 +111,10 @@ final class _RelationNeighborhoodSliverState
             onSelectDirection: viewModel.selectDirection,
             onCreateRelation: widget.onCreateRelation,
             onRetryRefresh: onRetryRefresh,
+            selectedCount: selection?.selected.length,
           );
         }
-        return _buildBodyChild(context, state, index - 1, viewModel);
+        return _buildBodyChild(context, state, index - 1, viewModel, selection);
       }, childCount: bodyChildCount + 1),
     );
   }
@@ -120,6 +132,7 @@ final class _RelationNeighborhoodSliverState
     RelationNeighborhoodState state,
     int index,
     RelationNeighborhoodViewModel viewModel,
+    BlockingRelationsSelectionState? selection,
   ) => switch (state) {
     RelationGroupInitialLoad() => const SizedBox(height: 16),
     final RelationGroupInitialFailure failure => _InitialFailure(
@@ -139,7 +152,7 @@ final class _RelationNeighborhoodSliverState
           : null,
     ),
     final RelationGroupLoaded loaded when index < loaded.items.length =>
-      _buildRelationRow(loaded, index, viewModel),
+      _buildRelationRow(loaded, index, viewModel, selection),
     final RelationGroupLoaded loaded => _LoadedGroupFooter(
       state: loaded,
       onRetryLoadMore:
@@ -160,6 +173,7 @@ final class _RelationNeighborhoodSliverState
     RelationGroupLoaded state,
     int index,
     RelationNeighborhoodViewModel viewModel,
+    BlockingRelationsSelectionState? selection,
   ) {
     _scheduleLoadMore(index, viewModel);
     final item = state.items[index];
@@ -173,6 +187,22 @@ final class _RelationNeighborhoodSliverState
         ),
         item: item,
         onOpen: widget.onOpenRelation,
+        direction: state.selection.direction,
+        isSelected: selection?.selected.containsKey(item.relation.id),
+        onToggleSelection: selection is BlockingRelationsSelectionEditing
+            ? () {
+                final editor = ref.read(
+                  blockingRelationsSelectionViewModelProvider(
+                    widget.intentionId,
+                  ).notifier,
+                );
+                if (selection.selected.containsKey(item.relation.id)) {
+                  editor.unselect(item.relation.id);
+                } else {
+                  editor.select(item);
+                }
+              }
+            : null,
       ),
     );
   }
@@ -298,6 +328,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
     required this.onSelectDirection,
     required this.onCreateRelation,
     required this.onRetryRefresh,
+    this.selectedCount,
   });
 
   final RelationNeighborhoodState state;
@@ -307,6 +338,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
   final ValueChanged<RelationDirection> onSelectDirection;
   final ValueChanged<RelationDirection> onCreateRelation;
   final Future<void> Function()? onRetryRefresh;
+  final int? selectedCount;
 
   @override
   Widget build(BuildContext context) {
@@ -328,6 +360,18 @@ final class _NeighborhoodHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          if (selectedCount case final count?) ...[
+            Semantics(
+              container: true,
+              liveRegion: true,
+              child: Text(
+                localizations.relationNeighborhoodSelectedCount(count),
+                key: const ValueKey('relation-neighborhood-selected-count'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (confirmed case final value?)
             _RelationSummary(
               counts: value.counts,
@@ -791,10 +835,20 @@ final class _ChoiceGroup<T> extends StatelessWidget {
 }
 
 final class _RelationRow extends StatelessWidget {
-  const _RelationRow({required this.item, required this.onOpen, super.key});
+  const _RelationRow({
+    required this.item,
+    required this.onOpen,
+    required this.direction,
+    this.isSelected,
+    this.onToggleSelection,
+    super.key,
+  });
 
   final LongTermRelationSummary item;
   final ValueChanged<LongTermRelationId> onOpen;
+  final RelationDirection direction;
+  final bool? isSelected;
+  final VoidCallback? onToggleSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -818,61 +872,92 @@ final class _RelationRow extends StatelessWidget {
     final relationState = relation.scope == RelationScope.active
         ? localizations.relationNeighborhoodRelationActive
         : localizations.relationNeighborhoodRelationArchived;
+    final selectionAction = isSelected == true
+        ? localizations.relationNeighborhoodRemoveFromSelection
+        : localizations.relationNeighborhoodAddToSelection;
+    final directionLabel = direction == RelationDirection.outgoing
+        ? localizations.relationNeighborhoodDirectionOutgoing
+        : localizations.relationNeighborhoodDirectionIncoming;
     return Card(
       clipBehavior: Clip.antiAlias,
-      // Строка объявляется одним узлом: экранный диктор получает формулировку,
-      // приоритет, состояние и обоих участников вместе с назначением перехода.
-      child: MergeSemantics(
-        child: Semantics(
-          hint: localizations.relationNeighborhoodOpenRelation,
-          child: InkWell(
-            onTap: () => onOpen(relation.id),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          phrase,
-                          style: Theme.of(context).textTheme.titleMedium,
+      child: Column(
+        children: [
+          // Переход и выбор остаются разными доступными действиями.
+          MergeSemantics(
+            child: Semantics(
+              hint: localizations.relationNeighborhoodOpenRelation,
+              child: InkWell(
+                onTap: () => onOpen(relation.id),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              localizations.relationNeighborhoodPriority(
-                                priority,
-                              ),
+                              phrase,
+                              style: Theme.of(context).textTheme.titleMedium,
                             ),
-                            Text(relationState),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  localizations.relationNeighborhoodPriority(
+                                    priority,
+                                  ),
+                                ),
+                                Text(relationState),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      _Participant(
+                        label:
+                            localizations.relationNeighborhoodSourceParticipant,
+                        participant: item.source,
+                      ),
+                      _Participant(
+                        label: localizations
+                            .relationNeighborhoodRelatedParticipant,
+                        participant: item.related,
+                      ),
+                    ],
                   ),
-                  _Participant(
-                    label: localizations.relationNeighborhoodSourceParticipant,
-                    participant: item.source,
-                  ),
-                  _Participant(
-                    label: localizations.relationNeighborhoodRelatedParticipant,
-                    participant: item.related,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          if (isSelected case final checked?)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Checkbox(
+                    key: ValueKey(
+                      'relation-neighborhood-select-${relation.id.toCanonicalString()}',
+                    ),
+                    value: checked,
+                    onChanged: onToggleSelection == null
+                        ? null
+                        : (_) => onToggleSelection!(),
+                    semanticLabel:
+                        '$selectionAction: $phrase. $directionLabel. $relationState',
+                  ),
+                  Expanded(child: Text(selectionAction)),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

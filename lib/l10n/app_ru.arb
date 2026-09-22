@@ -49,6 +49,12 @@
   "intentionActiveRelationCountLoading": "Загружаем количество активных связей…",
   "intentionActiveRelationCountUnknown": "Количество активных связей неизвестно.",
   "relationNeighborhoodTitle": "Связи",
+  "relationNeighborhoodSelectedCount": "Выбрано связей: {count}",
+  "@relationNeighborhoodSelectedCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodAddToSelection": "Добавить в выбор",
+  "relationNeighborhoodRemoveFromSelection": "Убрать из выбора",
   "relationNeighborhoodSummaryLoading": "Загружаем связи и сводку…",
   "relationNeighborhoodSummaryUnavailable": "Не удалось загрузить сводку связей.",
   "relationNeighborhoodSavedSummaryRefreshing": "Обновляем сохранённые числа связей…",

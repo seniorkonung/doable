@@ -392,6 +392,24 @@ abstract class AppLocalizations {
   /// **'Relations'**
   String get relationNeighborhoodTitle;
 
+  /// No description provided for @relationNeighborhoodSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations: {count}'**
+  String relationNeighborhoodSelectedCount(int count);
+
+  /// Действие выбора конкретной блокирующей связи
+  ///
+  /// In en, this message translates to:
+  /// **'Add to selection'**
+  String get relationNeighborhoodAddToSelection;
+
+  /// Действие снятия выбора конкретной блокирующей связи
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from selection'**
+  String get relationNeighborhoodRemoveFromSelection;
+
   /// Первоначальная загрузка соседства и полной сводки
   ///
   /// In en, this message translates to:

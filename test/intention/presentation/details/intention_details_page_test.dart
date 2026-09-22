@@ -18,6 +18,8 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,6 +32,83 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  testWidgets(
+    'конфликт удаления открывает выбор блокирующих связей в соседстве',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 101, title: 'Намерение');
+      final counts = testRelationCounts(activeNeedOutgoing: 1);
+      final relation = testDetailsRelationRow(ownerId: intention.id, index: 1);
+      repository.onRelationGroupPage = (query) => GraphResultSuccess(
+        RelationGroupFirstPage(
+          items: [relation],
+          counts: counts,
+          nextCursor: null,
+          revision: const TestDetailsRevision(0),
+        ),
+      );
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(
+        ResultSuccess(intention),
+        relationCounts: counts,
+      );
+      await tester.pumpAndSettle();
+
+      final delete = find.byKey(const ValueKey('intention-details-delete'));
+      await tester.ensureVisible(delete);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('intention-details-confirm-delete')),
+      );
+      await tester.pump();
+      repository.completeCommand(
+        0,
+        ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
+      );
+      await tester.pumpAndSettle();
+
+      final show = find.byKey(
+        const ValueKey('intention-details-show-blocking-relations'),
+      );
+      await Scrollable.ensureVisible(tester.element(show), alignment: 0.3);
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 180));
+      await tester.pumpAndSettle();
+      await tester.tap(show);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(RelationNeighborhoodSliver), findsOneWidget);
+      expect(find.text('Selected relations: 0'), findsOneWidget);
+      final row = find.byKey(
+        ValueKey(
+          'relation-neighborhood-select-${relation.relation.id.toCanonicalString()}',
+        ),
+      );
+      await tester.scrollUntilVisible(
+        row,
+        300,
+        scrollable: find.byType(Scrollable),
+      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -250));
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(RelationNeighborhoodSliver)),
+      );
+      expect(
+        container
+            .read(blockingRelationsSelectionViewModelProvider(intention.id))
+            .selected
+            .keys,
+        {relation.relation.id},
+      );
+      expect(repository.relationGroupQueries, hasLength(2));
+    },
+  );
 
   test('маршрут подробного просмотра хранит предметный идентификатор', () {
     final id = testDetailsIntentionId(1);

@@ -20,13 +20,49 @@ import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
 
 @RoutePage()
-final class IntentionDetailsPage extends ConsumerWidget {
+final class IntentionDetailsPage extends ConsumerStatefulWidget {
   const IntentionDetailsPage({required this.intentionId, super.key});
 
   final IntentionId intentionId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<IntentionDetailsPage> createState() =>
+      _IntentionDetailsPageState();
+}
+
+final class _IntentionDetailsPageState
+    extends ConsumerState<IntentionDetailsPage> {
+  final _neighborhoodKey = GlobalKey();
+  var _selectionMode = false;
+
+  @override
+  void didUpdateWidget(covariant IntentionDetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.intentionId != widget.intentionId) {
+      _selectionMode = false;
+    }
+  }
+
+  void _showBlockingRelations() {
+    ref
+        .read(
+          relationNeighborhoodViewModelProvider(widget.intentionId).notifier,
+        )
+        .showBlockingRelations();
+    setState(() => _selectionMode = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final neighborhoodContext = _neighborhoodKey.currentContext;
+      if (mounted && neighborhoodContext != null) {
+        unawaited(
+          Scrollable.ensureVisible(neighborhoodContext, alignment: 0.05),
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final intentionId = widget.intentionId;
     final localizations = AppLocalizations.of(context);
     final provider = intentionDetailsViewModelProvider(intentionId);
     final details = ref.watch(provider);
@@ -47,7 +83,13 @@ final class IntentionDetailsPage extends ConsumerWidget {
           children: [
             if (details.isOperationRunning) const _RunningOperationStatus(),
             Expanded(
-              child: _DetailsContent(intentionId: intentionId, state: details),
+              child: _DetailsContent(
+                intentionId: intentionId,
+                state: details,
+                selectionMode: _selectionMode,
+                neighborhoodKey: _neighborhoodKey,
+                onShowBlockingRelations: _showBlockingRelations,
+              ),
             ),
           ],
         ),
@@ -83,10 +125,19 @@ final class _RunningOperationStatus extends StatelessWidget {
 }
 
 final class _DetailsContent extends ConsumerWidget {
-  const _DetailsContent({required this.intentionId, required this.state});
+  const _DetailsContent({
+    required this.intentionId,
+    required this.state,
+    required this.selectionMode,
+    required this.neighborhoodKey,
+    required this.onShowBlockingRelations,
+  });
 
   final IntentionId intentionId;
   final IntentionDetailsState state;
+  final bool selectionMode;
+  final GlobalKey neighborhoodKey;
+  final VoidCallback onShowBlockingRelations;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -98,6 +149,8 @@ final class _DetailsContent extends ConsumerWidget {
       ),
       final IntentionDetailsLoaded loaded => _LoadedDetails(
         state: loaded,
+        selectionMode: selectionMode,
+        neighborhoodKey: neighborhoodKey,
         onBeginEditing: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .beginEditing,
@@ -131,9 +184,7 @@ final class _DetailsContent extends ConsumerWidget {
         onRetryStateChange: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .retryStateChange,
-        onShowBlockingRelations: ref
-            .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
-            .showBlockingRelations,
+        onShowBlockingRelations: onShowBlockingRelations,
         onShowArchivedRelations: ref
             .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
             .showArchivedRelations,
@@ -164,6 +215,8 @@ final class _DetailsContent extends ConsumerWidget {
 final class _LoadedDetails extends StatelessWidget {
   const _LoadedDetails({
     required this.state,
+    required this.selectionMode,
+    required this.neighborhoodKey,
     required this.onBeginEditing,
     required this.onCancelEditing,
     required this.onTitleChanged,
@@ -180,6 +233,8 @@ final class _LoadedDetails extends StatelessWidget {
   });
 
   final IntentionDetailsLoaded state;
+  final bool selectionMode;
+  final GlobalKey neighborhoodKey;
   final VoidCallback onBeginEditing;
   final VoidCallback onCancelEditing;
   final ValueChanged<String> onTitleChanged;
@@ -271,7 +326,9 @@ final class _LoadedDetails extends StatelessWidget {
           ),
         ),
         RelationNeighborhoodSliver(
+          key: neighborhoodKey,
           intentionId: intention.id,
+          selectionMode: selectionMode,
           onOpenRelation: (relationId) => unawaited(
             context.router.push(RelationDetailsRoute(relationId: relationId)),
           ),

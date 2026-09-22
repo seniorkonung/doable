@@ -203,6 +203,18 @@
     "description": "Количество активных связей неизвестно из-за ошибки получения"
   },
   "relationNeighborhoodTitle": "Relations",
+  "relationNeighborhoodSelectedCount": "Selected relations: {count}",
+  "@relationNeighborhoodSelectedCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodAddToSelection": "Add to selection",
+  "@relationNeighborhoodAddToSelection": {
+    "description": "Действие выбора конкретной блокирующей связи"
+  },
+  "relationNeighborhoodRemoveFromSelection": "Remove from selection",
+  "@relationNeighborhoodRemoveFromSelection": {
+    "description": "Действие снятия выбора конкретной блокирующей связи"
+  },
   "relationNeighborhoodSummaryLoading": "Loading relations and summary…",
   "relationNeighborhoodSummaryUnavailable": "The relation summary couldn’t be loaded.",
   "relationNeighborhoodSavedSummaryRefreshing": "Updating saved relation numbers…",
