@@ -381,6 +381,71 @@ void main() {
     },
   );
 
+  testWidgets(
+    'удаление связи после ухода ждёт общую поверхность и предъявляется один раз',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final intention = harness.startDelete(index: 1, title: 'Намерение');
+      final deletion = harness.startRelationDelete();
+      harness.completeDeleted(intention);
+      harness.completeRelationDeleted(deletion);
+      await tester.pumpAndSettle();
+
+      expect(find.text(_deleted('Намерение')), findsOneWidget);
+      expect(find.text(_relationDeleted), findsNothing);
+      expect(harness.repository.relationCommands, hasLength(1));
+
+      await _closeMessage(tester);
+      expect(find.text(_relationDeleted), findsOneWidget);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('graph-operation-message')),
+        ),
+        matchesSemantics(
+          label: _relationDeleted,
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
+      );
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.relationCommands, hasLength(1));
+    },
+  );
+
+  for (final scenario in _relationDeleteFailures) {
+    testWidgets(
+      'переданная ошибка удаления связи «${scenario.name}» предъявляется безопасным текстом',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester);
+        final deletion = harness.startRelationDelete();
+        harness.completeRelationFailure(deletion, scenario.failure);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(_relationDeleteOutcome(scenario.outcome)),
+          findsOneWidget,
+        );
+
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets('удаление связи предъявляется на русском языке', (tester) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final deletion = harness.startRelationDelete();
+    harness.completeRelationDeleted(deletion);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Удаление — «связь»: Связь удалена.'), findsOneWidget);
+
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
   for (final scenario in <({RelationParticipantRole role, String outcome})>[
     (
       role: RelationParticipantRole.source,
@@ -604,6 +669,11 @@ String _relationRestoreOutcome(String outcome) =>
 
 final _relationRestored = _relationRestoreOutcome('Relation restored.');
 
+String _relationDeleteOutcome(String outcome) =>
+    'Delete — “relation”: $outcome';
+
+final _relationDeleted = _relationDeleteOutcome('Relation deleted.');
+
 final _relationFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
       (
@@ -708,6 +778,40 @@ final _relationUpdateFailures =
         outcome:
             'The relation couldn’t be updated because of an unexpected '
             'error.',
+      ),
+    ];
+
+final _relationDeleteFailures =
+    <({String name, LongTermRelationCommandFailure failure, String outcome})>[
+      (
+        name: 'validation',
+        failure: const LongTermRelationCommandValidationFailure(
+          CreateLongTermRelationValidationFailure.sameIntention,
+        ),
+        outcome:
+            'The relation couldn’t be deleted because its current state '
+            'conflicts with the operation.',
+      ),
+      (
+        name: 'notFound',
+        failure: LongTermRelationNotFoundFailure(_relationId),
+        outcome: 'This relation no longer exists.',
+      ),
+      (
+        name: 'unavailable',
+        failure: const LongTermRelationUnavailableFailure(),
+        outcome: 'The relation couldn’t be deleted. Try again.',
+      ),
+      (
+        name: 'corruption',
+        failure: const LongTermRelationCorruptionFailure(),
+        outcome: 'Stored data is damaged. The relation wasn’t deleted.',
+      ),
+      (
+        name: 'unexpected',
+        failure: const LongTermRelationUnexpectedFailure(),
+        outcome:
+            'The relation couldn’t be deleted because of an unexpected error.',
       ),
     ];
 
@@ -837,6 +941,13 @@ final class _PresenterHarness {
     releaseInitiator: releaseInitiator,
   );
 
+  LongTermRelationCommandAccepted startRelationDelete({
+    bool releaseInitiator = true,
+  }) => _startExistingRelationCommand(
+    DeleteLongTermRelation(_relationId),
+    releaseInitiator: releaseInitiator,
+  );
+
   LongTermRelationCommandAccepted _startExistingRelationCommand(
     LongTermRelationCommand command, {
     required bool releaseInitiator,
@@ -845,6 +956,7 @@ final class _PresenterHarness {
     final accepted = switch (command) {
       ArchiveLongTermRelation() => _coordinator.acceptRelationArchive(command),
       RestoreLongTermRelation() => _coordinator.acceptRelationRestore(command),
+      DeleteLongTermRelation() => _coordinator.acceptRelationDelete(command),
       _ => throw ArgumentError.value(command, 'command'),
     } as LongTermRelationCommandAccepted;
     if (releaseInitiator) {
@@ -946,6 +1058,36 @@ final class _PresenterHarness {
         afterScope: RelationScope.active,
         revision: 4,
       );
+
+  void completeRelationDeleted(LongTermRelationCommandAccepted accepted) {
+    const revision = TestDetailsRevision(5);
+    final relation = LongTermRelation(
+      id: _relationId,
+      sourceIntentionId: testDetailsIntentionId(1),
+      relatedIntentionId: testDetailsIntentionId(2),
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: RelationScope.active,
+      creationSequence: RelationCreationSequence(1),
+    );
+    repository.completeRelationCommand(
+      _relationIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationDeleted(
+            relation: relation,
+            changes: <GraphChange>[
+              LongTermRelationDeletedChange(
+                revision: revision,
+                relation: relation,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   void _completeRelationScopeChanged(
     LongTermRelationCommandAccepted accepted, {

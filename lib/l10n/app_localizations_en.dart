@@ -747,6 +747,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be restored because of an unexpected error.';
 
   @override
+  String get relationDeleted => 'Relation deleted.';
+
+  @override
+  String get relationDeleteNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationDeleteConflict =>
+      'The relation couldn’t be deleted because its current state conflicts with the operation.';
+
+  @override
+  String get relationDeleteUnavailable =>
+      'The relation couldn’t be deleted. Try again.';
+
+  @override
+  String get relationDeleteCorruption =>
+      'Stored data is damaged. The relation wasn’t deleted.';
+
+  @override
+  String get relationDeleteUnexpected =>
+      'The relation couldn’t be deleted because of an unexpected error.';
+
+  @override
   String get relationNeighborhoodOpenRelation => 'Opens the relation details';
 
   @override

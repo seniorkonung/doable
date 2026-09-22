@@ -139,6 +139,107 @@ void main() {
       await coordinator.shutdown();
     });
 
+    test('удаление разделяет ключ со всеми операциями той же связи', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final coordinator = _coordinator(repository);
+
+      final deletion = coordinator.acceptRelationDelete(
+        DeleteLongTermRelation(_relationId),
+      );
+      final repeatedDeletion = coordinator.acceptRelationDelete(
+        DeleteLongTermRelation(_relationId),
+      );
+      final competingUpdate = coordinator.acceptRelationUpdate(
+        _updateRelation(_relationId),
+      );
+      final competingArchive = coordinator.acceptRelationArchive(
+        ArchiveLongTermRelation(_relationId),
+      );
+      final competingRestore = coordinator.acceptRelationRestore(
+        RestoreLongTermRelation(_relationId),
+      );
+      final independentDeletion = coordinator.acceptRelationDelete(
+        DeleteLongTermRelation(_otherRelationId),
+      );
+
+      expect(deletion, isA<LongTermRelationCommandAccepted>());
+      expect(repeatedDeletion, isA<LongTermRelationCommandAlreadyRunning>());
+      expect(competingUpdate, isA<LongTermRelationCommandAlreadyRunning>());
+      expect(competingArchive, isA<LongTermRelationCommandAlreadyRunning>());
+      expect(competingRestore, isA<LongTermRelationCommandAlreadyRunning>());
+      expect(independentDeletion, isA<LongTermRelationCommandAccepted>());
+      expect(repository.commands, [
+        isA<DeleteLongTermRelation>(),
+        isA<DeleteLongTermRelation>(),
+      ]);
+
+      repository
+        ..completeRelationDeleted(0, _relationId, revision: 1)
+        ..completeRelationFailure(1);
+      final deletionCompletion =
+          await (deletion as LongTermRelationCommandAccepted).future;
+      await (independentDeletion as LongTermRelationCommandAccepted).future;
+
+      expect(deletionCompletion.kind, LongTermRelationCommandKind.delete);
+      expect(
+        deletionCompletion.result,
+        isA<
+              GraphResultSuccess<
+                LongTermRelationCommandSuccess,
+                LongTermRelationCommandFailure
+              >
+            >()
+            .having(
+              (result) => result.value,
+              'результат',
+              isA<LongTermRelationDeleted>(),
+            ),
+      );
+      expect(coordinator.isRelationRunning(_relationId), isFalse);
+      await coordinator.shutdown();
+    });
+
+    test('удерживает исход удаления после ухода и предъявляет каждую попытку один раз', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final coordinator = _coordinator(repository);
+      final registration = coordinator.registerAppPresentation();
+      final completions = <GraphCommandCompletion>[];
+      final subscription = coordinator.completions.listen(completions.add);
+
+      final deletion = coordinator.acceptRelationDelete(
+        DeleteLongTermRelation(_relationId),
+      ) as LongTermRelationCommandAccepted;
+      coordinator.releaseInitiatorPresentation(deletion.token);
+      final firstClaimFuture = registration.nextClaim();
+      repository.completeRelationDeleted(0, _relationId, revision: 1);
+
+      final deletionCompletion = await deletion.future;
+      final firstClaim = await firstClaimFuture;
+      expect(firstClaim, isNotNull);
+      expect(firstClaim!.completion, same(deletionCompletion));
+      expect(completions, [same(deletionCompletion)]);
+
+      final retry = coordinator.acceptRelationDelete(
+        DeleteLongTermRelation(_relationId),
+      ) as LongTermRelationCommandAccepted;
+      coordinator.releaseInitiatorPresentation(retry.token);
+      final secondClaimFuture = registration.nextClaim();
+      repository.completeRelationFailure(1);
+      final retryCompletion = await retry.future;
+      await Future<void>.delayed(Duration.zero);
+      expect(completions, [same(deletionCompletion), same(retryCompletion)]);
+
+      coordinator.confirmPresentation(firstClaim);
+      final secondClaim = await secondClaimFuture;
+      expect(secondClaim, isNotNull);
+      expect(secondClaim!.completion, same(retryCompletion));
+      coordinator.confirmPresentation(secondClaim);
+
+      await subscription.cancel();
+      registration.release();
+      await coordinator.shutdown();
+    });
+
     test(
       'публикует изменение в общем порядке с видом и контекстом связи',
       () async {
@@ -277,6 +378,30 @@ void main() {
         expect(shutdownCompleted, isTrue);
       },
     );
+
+    test('shutdown ждёт принятое удаление связи', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final coordinator = _coordinator(repository);
+      final accepted = coordinator.acceptRelationDelete(
+        DeleteLongTermRelation(_relationId),
+      ) as LongTermRelationCommandAccepted;
+
+      final shutdown = coordinator.shutdown();
+      var shutdownCompleted = false;
+      unawaited(shutdown.then((_) => shutdownCompleted = true));
+
+      expect(
+        coordinator.acceptRelationUpdate(_updateRelation(_otherRelationId)),
+        isA<GraphCommandCoordinatorDraining>(),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(shutdownCompleted, isFalse);
+
+      repository.completeRelationDeleted(0, _relationId, revision: 1);
+      await accepted.future;
+      await shutdown;
+      expect(shutdownCompleted, isTrue);
+    });
   });
 }
 
@@ -430,6 +555,34 @@ final class _ControlledPersonalGraphRepository
             changes: [
               LongTermRelationUnchangedChange(
                 revision: revision,
+                relation: relation,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeRelationDeleted(
+    int index,
+    LongTermRelationId id, {
+    required int revision,
+  }) {
+    final graphRevision = _TestRevision(revision);
+    final relation = _relation(id, RelationPriority.p2);
+    _results[index].complete(
+      GraphCommandSucceeded<
+        LongTermRelationCommandSuccess,
+        LongTermRelationCommandFailure
+      >(
+        ConfirmedGraphResult(
+          revision: graphRevision,
+          value: LongTermRelationDeleted(
+            relation: relation,
+            changes: [
+              LongTermRelationDeletedChange(
+                revision: graphRevision,
                 relation: relation,
               ),
             ],
