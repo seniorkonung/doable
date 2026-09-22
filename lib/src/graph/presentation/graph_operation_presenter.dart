@@ -245,6 +245,8 @@ String _relationOutcomeFor(
   GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
     (LongTermRelationCommandKind.create, LongTermRelationCreated()) =>
       localizations.relationEditorCreated,
+    (LongTermRelationCommandKind.create, LongTermRelationUpdated()) =>
+      localizations.relationEditorCreateUnexpected,
   },
   GraphResultFailure(:final failure) => switch (completion.kind) {
     LongTermRelationCommandKind.create => switch (failure) {
@@ -252,6 +254,8 @@ String _relationOutcomeFor(
         localizations.relationEditorCreateInvalidInput,
       LongTermRelationPairOccupiedFailure() =>
         localizations.relationEditorCreatePairOccupied,
+      LongTermRelationNotFoundFailure() =>
+        localizations.relationEditorCreateUnexpected,
       LongTermRelationParticipantNotFoundFailure() =>
         localizations.relationEditorCreateParticipantNotFound,
       LongTermRelationParticipantArchivedFailure() =>
