@@ -10,6 +10,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
@@ -163,6 +164,34 @@ void main() {
         testRelationId(4),
       });
       expect(find.text('Selected relations: 2'), findsOneWidget);
+      final review = find.byKey(const ValueKey('blocking-relations-review'));
+      await tester.ensureVisible(review);
+      await tester.pumpAndSettle();
+      await tester.tap(review);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('To Намерение-владелец, you need Связанное 1'),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(
+        find.byKey(
+          ValueKey(
+            'blocking-relations-confirm-row-${testRelationId(4).toCanonicalString()}',
+          ),
+        ),
+      );
+      expect(find.text('Archived relation'), findsWidgets);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('blocking-relations-cancel')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-cancel')));
+      await tester.pumpAndSettle();
+      expect(container.read(selection).selected.keys, {
+        testRelationId(1),
+        testRelationId(4),
+      });
+      await _scrollTo(tester, archived);
       await tester.tap(archived);
       await tester.pumpAndSettle();
       expect(container.read(selection).selected.keys, {testRelationId(1)});
@@ -257,6 +286,80 @@ void main() {
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
       semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'новая связь при открытом подтверждении не входит в выбранный набор',
+    (tester) async {
+      final repository = ControlledNeighborhoodRepository();
+      addTearDown(repository.dispose);
+      final ownerId = testIntentionId(1);
+      await _pumpNeighborhoodSliver(
+        tester,
+        repository,
+        ownerId,
+        selectionMode: true,
+      );
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
+          counts: testRelationCounts(activeNeedOutgoing: 1),
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final first = find.byKey(
+        ValueKey(
+          'relation-neighborhood-select-${testRelationId(1).toCanonicalString()}',
+        ),
+      );
+      await _scrollTo(tester, first);
+      await tester.tap(first);
+      await tester.pumpAndSettle();
+      final review = find.byKey(const ValueKey('blocking-relations-review'));
+      await tester.ensureVisible(review);
+      await tester.pumpAndSettle();
+      await tester.tap(review);
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(RelationNeighborhoodSliver)),
+      );
+      container
+          .read(relationNeighborhoodViewModelProvider(ownerId).notifier)
+          .showBlockingRelations();
+      await tester.pump();
+      repository.completePage(
+        1,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: ownerId, from: 1, count: 2),
+          counts: testRelationCounts(activeNeedOutgoing: 2),
+          nextCursor: null,
+          revision: const TestGraphRevision(2),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final prepared = container.read(
+        blockingRelationsSelectionViewModelProvider(ownerId),
+      ) as BlockingRelationsSelectionPrepared;
+      expect(prepared.snapshot.command.relationIds, {testRelationId(1)});
+      expect(
+        find.byKey(
+          ValueKey(
+            'blocking-relations-confirm-row-${testRelationId(2).toCanonicalString()}',
+          ),
+        ),
+        findsNothing,
+      );
+      final cancel = find.byKey(const ValueKey('blocking-relations-cancel'));
+      await tester.ensureVisible(cancel);
+      await tester.pumpAndSettle();
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(repository.requestCount, 2);
     },
   );
 
@@ -857,6 +960,7 @@ Future<void> _pumpNeighborhoodSliver(
             slivers: [
               RelationNeighborhoodSliver(
                 intentionId: ownerId,
+                intentionTitle: 'Намерение-владелец',
                 selectionMode: selectionMode,
                 onOpenRelation: onOpenRelation ?? (_) {},
                 onCreateRelation: (_) {},

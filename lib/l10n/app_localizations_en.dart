@@ -186,6 +186,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationNeighborhoodRemoveFromSelection => 'Remove from selection';
 
   @override
+  String get blockingRelationsReviewAction => 'Review selected relations';
+
+  @override
+  String get blockingRelationsConfirmationTitle =>
+      'Delete selected relations permanently?';
+
+  @override
+  String get blockingRelationsConfirmationWarning =>
+      'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.';
+
+  @override
+  String blockingRelationsConfirmationCount(int count) {
+    return 'To delete: $count';
+  }
+
+  @override
+  String blockingRelationsParticipantId(String id) {
+    return 'Identifier: $id';
+  }
+
+  @override
+  String get blockingRelationsDeleting => 'Deleting selected relations…';
+
+  @override
+  String get blockingRelationsBusy =>
+      'Another change to these relations or the intention is already running.';
+
+  @override
+  String get blockingRelationsDraining =>
+      'The app is closing. The change was not accepted.';
+
+  @override
+  String get blockingRelationsEditSelectionAction => 'Return to selection';
+
+  @override
   String get relationNeighborhoodSummaryLoading =>
       'Loading relations and summary…';
 
