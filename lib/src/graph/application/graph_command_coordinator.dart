@@ -86,7 +86,9 @@ sealed class GraphCommandCompletion {
   const GraphCommandCompletion();
 
   GraphOperationToken get token;
-  GraphRevision? get revision;
+  ConfirmedGraphChangePackage? get confirmedChange;
+
+  GraphRevision? get revision => confirmedChange?.revision;
 
   /// Отличает отказ от успеха без знания конкретной предметной операции.
   ///
@@ -115,8 +117,8 @@ final class IntentionCommandCompletion extends GraphCommandCompletion {
   };
 
   @override
-  GraphRevision? get revision => switch (confirmedResult) {
-    ResultSuccess(:final value) => value.revision,
+  ConfirmedGraphChangePackage? get confirmedChange => switch (confirmedResult) {
+    ResultSuccess(:final value) => value,
     ResultFailure() => null,
   };
 
@@ -159,8 +161,8 @@ final class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   };
 
   @override
-  GraphRevision? get revision => switch (confirmedResult) {
-    GraphResultSuccess(:final value) => value.revision,
+  ConfirmedGraphChangePackage? get confirmedChange => switch (confirmedResult) {
+    GraphResultSuccess(:final value) => value,
     GraphResultFailure() => null,
   };
 

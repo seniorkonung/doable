@@ -303,6 +303,7 @@ Result<IntentionCommandSuccess> testDetailsSavedResult(
   Intention intention, {
   Intention? before,
   GraphRevision revision = const TestDetailsRevision(0),
+  Iterable<GraphChange> additionalChanges = const [],
 }) {
   final afterSnapshot = _DetailsCatalogEntrySnapshot(intention);
   final mutation = before == null
@@ -312,7 +313,13 @@ Result<IntentionCommandSuccess> testDetailsSavedResult(
           before: _DetailsCatalogEntrySnapshot(before),
           after: afterSnapshot,
         );
-  return ResultSuccess(IntentionSaved(intention, catalogMutation: mutation));
+  return ResultSuccess(
+    IntentionSaved(
+      intention,
+      catalogMutation: mutation,
+      additionalChanges: additionalChanges,
+    ),
+  );
 }
 
 Result<IntentionCommandSuccess> testDetailsDeletedResult(

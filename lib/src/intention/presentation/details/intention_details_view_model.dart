@@ -5,7 +5,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
-import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/intention_command.dart';
@@ -265,78 +264,39 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     if (state.isOperationRunning) {
       _scheduleGateRefresh();
     }
-    switch (completion) {
-      case IntentionCommandCompletion():
-        _handleIntentionCompletion(completion);
-      case LongTermRelationCommandCompletion():
-        _handleRelationCompletion(completion);
+    final confirmedChange = completion.confirmedChange;
+    if (confirmedChange == null) {
+      return;
     }
-  }
-
-  void _handleIntentionCompletion(IntentionCommandCompletion completion) {
-    switch (completion.confirmedResult) {
-      case ResultSuccess(
-            value: ConfirmedGraphResult(
-              :final revision,
-              value: IntentionSaved(:final intention),
-            ),
-          )
-          when intention.id == _intentionId:
-        if (!_acceptSnapshotRevision(revision)) {
-          return;
-        }
-        _advanceGeneration();
-        _preserveAuthoritativeStateWhileLoading = true;
-        // Завершение задаёт только барьер ревизии. Намерение и сводка
-        // публикуются вместе из полного снимка нового наблюдения.
-        _startObservation();
-      case ResultSuccess(
-            value: ConfirmedGraphResult(
-              :final revision,
-              value: IntentionDeleted(:final id),
-            ),
-          )
-          when id == _intentionId:
-        _acceptedRevision = revision;
-        _advanceGeneration();
-        _isDeleted = true;
-        _observationSubscription?.close();
-        _observationSubscription = null;
-        state = const IntentionDetailsDeleted();
-      case ResultSuccess(
-        value: ConfirmedGraphResult(:final revision, :final changes),
-      ):
-        _refreshAfterRelationCountChange(revision, changes);
-      case ResultFailure():
-        return;
+    final mutations = confirmedChange.changes
+        .whereType<IntentionCatalogMutation>()
+        .where(
+          (change) =>
+              change.before?.summary.id == _intentionId ||
+              change.after?.summary.id == _intentionId,
+        );
+    final deleted = mutations.any((change) => change.after == null);
+    final affectsIntention =
+        deleted ||
+        mutations.isNotEmpty ||
+        confirmedChange.changes.whereType<IntentionRelationCountsChanged>().any(
+          (change) => change.intentionId == _intentionId,
+        );
+    if (!affectsIntention ||
+        !_acceptSnapshotRevision(confirmedChange.revision)) {
+      return;
     }
-  }
-
-  void _handleRelationCompletion(LongTermRelationCommandCompletion completion) {
-    switch (completion.confirmedResult) {
-      case GraphResultSuccess(
-        value: ConfirmedGraphResult(:final revision, :final changes),
-      ):
-        _refreshAfterRelationCountChange(revision, changes);
-      case GraphResultFailure():
-        return;
-    }
-  }
-
-  void _refreshAfterRelationCountChange(
-    GraphRevision revision,
-    Iterable<GraphChange> changes,
-  ) {
-    final affectsIntention = changes
-        .whereType<IntentionRelationCountsChanged>()
-        .any((change) => change.intentionId == _intentionId);
-    if (!affectsIntention || !_acceptSnapshotRevision(revision)) {
+    if (deleted) {
+      _advanceGeneration();
+      _isDeleted = true;
+      _observationSubscription?.close();
+      _observationSubscription = null;
+      state = const IntentionDetailsDeleted();
       return;
     }
     _advanceGeneration();
     _preserveAuthoritativeStateWhileLoading = true;
-    // Абсолютное число в завершении задаёт барьер, но подробные поля и сводка
-    // публикуются только цельным снимком одной ревизии из репозитория.
+    // Пакет задаёт барьер; поля и сводка публикуются цельным снимком.
     _startObservation();
   }
 
