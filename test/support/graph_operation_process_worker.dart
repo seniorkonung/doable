@@ -24,6 +24,8 @@ const _readyMarker = 'DOABLE_GRAPH_WORKER_READY';
 
 const _sourceIdValue = '018f0b5d-6b2e-7c80-8000-000000000901';
 const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
+const _secondNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000903';
+const _unrelatedIdValue = '018f0b5d-6b2e-7c80-8000-000000000904';
 const _workerRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000954';
 
 void main() {
@@ -76,9 +78,42 @@ void main() {
           _GraphOperation.cascade => await repository.execute(
             ArchiveIntention(_intentionId(_sourceIdValue)),
           ),
+          _GraphOperation.update => await repository.execute(
+            UpdateLongTermRelation(
+              relationId: _relationId(_workerRelationIdValue),
+              patch: LongTermRelationPatch(
+                sourceIntentionId: LongTermRelationFieldSet(
+                  _intentionId(_secondNeighborIdValue),
+                ),
+                relatedIntentionId: LongTermRelationFieldSet(
+                  _intentionId(_unrelatedIdValue),
+                ),
+                type: const LongTermRelationFieldSet(LongTermRelationType.can),
+                priority: const LongTermRelationFieldSet(RelationPriority.p4),
+                description: LongTermRelationDescriptionReplaced(
+                  LongTermRelationDescription.fromInput(
+                    'Изменено дочерним процессом',
+                  )!,
+                ),
+              ),
+            ),
+          ),
+          _GraphOperation.archive => await repository.execute(
+            ArchiveLongTermRelation(_relationId(_workerRelationIdValue)),
+          ),
+          _GraphOperation.restore => await repository.execute(
+            RestoreLongTermRelation(_relationId(_workerRelationIdValue)),
+          ),
+          _GraphOperation.delete => await repository.execute(
+            DeleteLongTermRelation(_relationId(_workerRelationIdValue)),
+          ),
         };
         final succeeded = switch (operation) {
-          _GraphOperation.create => result is GraphCommandSucceeded,
+          _GraphOperation.create ||
+          _GraphOperation.update ||
+          _GraphOperation.archive ||
+          _GraphOperation.restore ||
+          _GraphOperation.delete => result is GraphCommandSucceeded,
           _GraphOperation.cascade => result is ResultSuccess,
         };
         if (!succeeded) {
@@ -118,6 +153,18 @@ final class _GraphOperationStopObserver
             statement.statements.any(
               (sql) => sql.contains('UPDATE long_term_relations'),
             ),
+      _GraphOperation.update ||
+      _GraphOperation.archive ||
+      _GraphOperation.restore =>
+        statement.operation == LocalDatabaseSqlOperation.update &&
+            statement.statements.any(
+              (sql) => sql.contains('long_term_relations'),
+            ),
+      _GraphOperation.delete =>
+        statement.operation == LocalDatabaseSqlOperation.delete &&
+            statement.statements.any(
+              (sql) => sql.contains('long_term_relations'),
+            ),
     };
     if (matches) await _reportReadyAndWait();
   }
@@ -132,11 +179,19 @@ Future<Never> _reportReadyAndWait() async {
 
 enum _GraphOperation {
   create,
-  cascade;
+  cascade,
+  update,
+  archive,
+  restore,
+  delete;
 
   static _GraphOperation parse(String? value) => switch (value) {
     'create' => create,
     'cascade' => cascade,
+    'update' => update,
+    'archive' => archive,
+    'restore' => restore,
+    'delete' => delete,
     _ => throw StateError('Неизвестная операция графа: $value.'),
   };
 }
