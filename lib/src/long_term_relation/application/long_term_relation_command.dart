@@ -128,6 +128,18 @@ final class UpdateLongTermRelation extends LongTermRelationCommand {
   final LongTermRelationPatch patch;
 }
 
+final class ArchiveLongTermRelation extends LongTermRelationCommand {
+  const ArchiveLongTermRelation(this.relationId);
+
+  final LongTermRelationId relationId;
+}
+
+final class RestoreLongTermRelation extends LongTermRelationCommand {
+  const RestoreLongTermRelation(this.relationId);
+
+  final LongTermRelationId relationId;
+}
+
 enum RelationParticipantRole { source, related }
 
 sealed class LongTermRelationCommandFailure implements GraphCommandFailure {
