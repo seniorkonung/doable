@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -389,6 +390,59 @@ void main() {
     },
   );
 
+  testWidgets('смена локали сохраняет владельца непредъявленной ошибки формы', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
+      Locale('en'),
+    ];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final router = await _openForm(
+      tester,
+      repository,
+      RelationDirection.outgoing,
+      locale: null,
+    );
+    await _completeDraft(tester, repository);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+    repository.failRelationCommand(
+      0,
+      const LongTermRelationUnavailableFailure(),
+    );
+    await tester.pumpAndSettle();
+
+    const englishMessage = 'The relation couldn’t be created. Try again.';
+    const russianMessage = 'Не удалось создать связь. Повторите попытку.';
+    const shellMessage = 'Создание — «новая связь»: $russianMessage';
+    expect(find.text(englishMessage), findsOneWidget);
+
+    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
+      Locale('ru'),
+    ];
+    await tester.pumpAndSettle();
+
+    expect(find.text(englishMessage), findsNothing);
+    expect(find.text(russianMessage), findsOneWidget);
+    expect(find.text(shellMessage), findsNothing);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.text(russianMessage), findsOneWidget);
+    expect(find.text(shellMessage), findsNothing);
+    expect(repository.relationCommands, hasLength(1));
+
+    await router.maybePop();
+    await tester.pumpAndSettle();
+
+    expect(find.text(shellMessage), findsNothing);
+    expect(repository.relationCommands, hasLength(1));
+  });
+
   testWidgets(
     'временная невидимость renderer удерживает право формы до подтверждённого кадра',
     (tester) async {
@@ -515,7 +569,7 @@ Future<AppRouter> _openForm(
   WidgetTester tester,
   ControlledRelationFormRepository repository,
   RelationDirection direction, {
-  Locale locale = const Locale('en'),
+  Locale? locale = const Locale('en'),
 }) async {
   // Высокая поверхность держит поля формы построенными без прокрутки.
   tester.view.physicalSize = const Size(1200, 4000);
@@ -533,6 +587,7 @@ Future<AppRouter> _openForm(
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
+        localeListResolutionCallback: resolveAppLocale,
         routerConfig: router.config(),
         builder: (context, child) =>
             GraphOperationPresenter(child: child ?? const SizedBox.shrink()),

@@ -159,6 +159,48 @@ void main() {
     expect(harness.claimAgain(claim), isNull);
   });
 
+  testWidgets(
+    'смена локализованного сообщения сохраняет renderer и его claim',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createClaim(index: 9);
+      final message = ValueNotifier('The operation failed.');
+      addTearDown(message.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<String>(
+            valueListenable: message,
+            builder: (context, value, _) =>
+                OperationFailurePresentation(claim: claim, message: value),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      message.value = 'Операцию выполнить не удалось.';
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('The operation failed.'), findsNothing);
+      expect(find.text('Операцию выполнить не удалось.'), findsOneWidget);
+      expect(harness.claimAgain(claim), same(claim));
+      expect(fallback, isNull);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(harness.claimAgain(claim), isNull);
+      expect(fallback, isNull);
+    },
+  );
+
   testWidgets('удерживает renderer на скрытом маршруте до его возвращения', (
     tester,
   ) async {

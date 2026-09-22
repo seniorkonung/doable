@@ -27,10 +27,9 @@ final class OperationFailurePresentation extends ConsumerStatefulWidget {
 }
 
 final class _OperationFailureRenderer {
-  const _OperationFailureRenderer(this.claim, this.message);
+  const _OperationFailureRenderer(this.claim);
 
   final GraphInitiatorPresentationClaim? claim;
-  final String message;
 }
 
 final class _OperationFailurePresentationState
@@ -44,16 +43,15 @@ final class _OperationFailurePresentationState
   void initState() {
     super.initState();
     _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
-    _renderer = _OperationFailureRenderer(widget.claim, widget.message);
+    _renderer = _OperationFailureRenderer(widget.claim);
   }
 
   @override
   void didUpdateWidget(OperationFailurePresentation oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.claim, widget.claim) ||
-        oldWidget.message != widget.message) {
+    if (!identical(oldWidget.claim, widget.claim)) {
       _releaseIfPending(oldWidget.claim);
-      _renderer = _OperationFailureRenderer(widget.claim, widget.message);
+      _renderer = _OperationFailureRenderer(widget.claim);
     }
   }
 
