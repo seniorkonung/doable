@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation;
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -25,6 +26,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/large_blocking_relations_fixture.dart';
 import '../../support/schema_v1_fixture.dart';
 
 const _sourceIdValue = '018f0b5d-6b2e-7c80-8000-000000000901';
@@ -302,6 +304,46 @@ void main() {
     await _expectCanonicalConnectionIntegrity(database);
   });
 
+  test(
+    'отказ после первой порции массового удаления откатывает файл',
+    () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      final observer = _FailAfterSqlObserver(
+        operation: LocalDatabaseSqlOperation.update,
+        sqlFragment: 'DELETE FROM long_term_relations WHERE id IN',
+      );
+      final database = await harness.openReadyDatabase(observer: observer);
+      await _insertIntention(database, _sourceId, title: 'Владелец');
+      await LargeBlockingRelationsFixture.seed(database, _sourceId);
+      final beforeRelations = await _relationRows(database);
+      final beforeIntentions = await _intentionRows(database);
+      observer.arm();
+
+      final result = await _repository(database, const []).execute(
+        DeleteBlockingRelations(
+          intentionId: _sourceId,
+          relationIds: LargeBlockingRelationsFixture.selectedIds,
+        ),
+      );
+
+      expect(result, isA<GraphCommandFailed>());
+      expect(observer.didFail, isTrue);
+      await harness.closePersistenceObjectGraph();
+      final reopened = await harness.openReadyDatabase();
+      expect(await _relationRows(reopened), beforeRelations);
+      expect(await _intentionRows(reopened), beforeIntentions);
+      expect(
+        (await _counts(
+          _repository(reopened, const []),
+          _sourceId,
+        )).activeNeedOutgoing,
+        LargeBlockingRelationsFixture.selectedCount + 1,
+      );
+      await _expectCanonicalConnectionIntegrity(reopened);
+    },
+  );
+
   for (final installation in _LifecycleInstallation.values) {
     test(
       'полный жизненный цикл сохраняется ${installation.testDescription}',
@@ -578,8 +620,13 @@ void main() {
     );
   }
 
-  for (final operation in _GraphProcessOperation.values) {
-    for (final stopPoint in _GraphProcessStopPoint.values) {
+  for (final operation in _GraphProcessOperation.values.where(
+    (operation) => operation != _GraphProcessOperation.bulkDelete,
+  )) {
+    for (final stopPoint in [
+      _GraphProcessStopPoint.beforeCommit,
+      _GraphProcessStopPoint.afterCommit,
+    ]) {
       test(
         'прерывание ${operation.testDescription} ${stopPoint.testDescription} '
         'оставляет целое состояние',
@@ -609,6 +656,8 @@ void main() {
                 database,
                 archived: operation == _GraphProcessOperation.restore,
               );
+            case _GraphProcessOperation.bulkDelete:
+              throw StateError('Массовое удаление проверяется отдельно.');
           }
           await harness.closePersistenceObjectGraph();
 
@@ -635,12 +684,101 @@ void main() {
                 operation,
                 committed: stopPoint.isAfterCommit,
               );
+            case _GraphProcessOperation.bulkDelete:
+              throw StateError('Массовое удаление проверяется отдельно.');
           }
           await _expectCanonicalConnectionIntegrity(reopenedDatabase);
         },
         timeout: Timeout.none,
       );
     }
+  }
+
+  for (final stopPoint in [
+    _GraphProcessStopPoint.beforeDelete,
+    _GraphProcessStopPoint.duringDelete,
+    _GraphProcessStopPoint.afterCommit,
+  ]) {
+    test('прерывание удаления большого набора ${stopPoint.testDescription} '
+        'оставляет целое состояние', () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      final database = await harness.openReadyDatabase();
+      await _insertIntention(database, _sourceId, title: 'Владелец');
+      await LargeBlockingRelationsFixture.seed(database, _sourceId);
+      final selected = LargeBlockingRelationsFixture.selectedIds
+          .map((id) => id.toCanonicalString())
+          .toSet();
+      final beforeRelations = await _relationRows(database);
+      final beforeIntentions = await _intentionRows(database);
+      final deletedPairSequence =
+          beforeRelations.singleWhere(
+                (row) =>
+                    row['id'] ==
+                    LargeBlockingRelationsFixture.selected(0)
+                        .toCanonicalString(),
+              )['creation_sequence']
+              as int;
+      await harness.closePersistenceObjectGraph();
+
+      await _runGraphWorkerUntilStopPoint(
+        harness,
+        _GraphProcessOperation.bulkDelete,
+        stopPoint,
+      );
+
+      var reopened = await harness.openReadyDatabase();
+      final committed = stopPoint.isAfterCommit;
+      final expectedRelations = committed
+          ? beforeRelations
+                .where((row) => !selected.contains(row['id']))
+                .toList()
+          : beforeRelations;
+      expect(await _relationRows(reopened), expectedRelations);
+      expect(await _intentionRows(reopened), beforeIntentions);
+      await _expectCanonicalConnectionIntegrity(reopened);
+      final repository = _repository(reopened, [_workerRelationId]);
+      expect(
+        (await _counts(repository, _sourceId)).activeNeedOutgoing,
+        committed ? 1 : LargeBlockingRelationsFixture.selectedCount + 1,
+      );
+      expect(
+        (await _counts(
+          repository,
+          LargeBlockingRelationsFixture.participant(0),
+        )).activeNeedIncoming,
+        committed ? 0 : 1,
+      );
+
+      if (committed) {
+        expect(
+          await repository.execute(
+            _createCommand(
+              relatedId: LargeBlockingRelationsFixture.participant(0),
+              type: LongTermRelationType.need,
+              priority: RelationPriority.p2,
+              description: 'Новая связь той же пары',
+            ),
+          ),
+          isA<GraphCommandSucceeded>(),
+        );
+        final newRelation = (await _relationRows(reopened))
+            .singleWhere((row) => row['id'] == _workerRelationIdValue);
+        expect(
+          newRelation['creation_sequence'],
+          greaterThan(deletedPairSequence),
+        );
+        expect(
+          newRelation['id'],
+          isNot(LargeBlockingRelationsFixture.selected(0).toCanonicalString()),
+        );
+        await harness.closePersistenceObjectGraph();
+        reopened = await harness.openReadyDatabase();
+        expect((await _relationRows(reopened)).last, newRelation);
+        expect(await _intentionRows(reopened), beforeIntentions);
+        await _expectCanonicalConnectionIntegrity(reopened);
+      }
+    }, timeout: Timeout.none);
   }
 }
 
@@ -1173,7 +1311,11 @@ enum _GraphProcessOperation {
   update(environmentValue: 'update', testDescription: 'изменения связи'),
   archive(environmentValue: 'archive', testDescription: 'архивирования связи'),
   restore(environmentValue: 'restore', testDescription: 'восстановления связи'),
-  delete(environmentValue: 'delete', testDescription: 'удаления связи');
+  delete(environmentValue: 'delete', testDescription: 'удаления связи'),
+  bulkDelete(
+    environmentValue: 'bulk_delete',
+    testDescription: 'удаления большого набора',
+  );
 
   const _GraphProcessOperation({
     required this.environmentValue,
@@ -1195,6 +1337,14 @@ enum _LifecycleInstallation {
 
 enum _GraphProcessStopPoint {
   beforeCommit(environmentValue: 'before_commit', testDescription: 'до commit'),
+  beforeDelete(
+    environmentValue: 'before_delete',
+    testDescription: 'до первого удаления',
+  ),
+  duringDelete(
+    environmentValue: 'during_delete',
+    testDescription: 'после первой SQL-порции',
+  ),
   afterCommit(
     environmentValue: 'after_commit',
     testDescription: 'после commit',
