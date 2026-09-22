@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/intention_command.dart';
@@ -48,7 +50,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   late IntentionId _intentionId;
   late GraphCommandCoordinator _coordinator;
   late _DetailObservationGeneration _generation;
-  late StreamSubscription<IntentionCommandCompletion> _completionSubscription;
+  late StreamSubscription<GraphCommandCompletion> _completionSubscription;
   ProviderSubscription<
     AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
   >?
@@ -64,7 +66,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     _generation = _DetailObservationGeneration.initial;
     _acceptedRevision = null;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
-    _completionSubscription = _coordinator.intentionCompletions.listen(
+    _completionSubscription = _coordinator.completions.listen(
       _handleCompletion,
     );
     ref.onDispose(() {
@@ -256,13 +258,22 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     state = _stateFromObservation(observation, previousLoaded: loaded);
   }
 
-  void _handleCompletion(IntentionCommandCompletion completion) {
+  void _handleCompletion(GraphCommandCompletion completion) {
     if (!ref.mounted || _isDeleted) {
       return;
     }
     if (state.isOperationRunning) {
       _scheduleGateRefresh();
     }
+    switch (completion) {
+      case IntentionCommandCompletion():
+        _handleIntentionCompletion(completion);
+      case LongTermRelationCommandCompletion():
+        _handleRelationCompletion(completion);
+    }
+  }
+
+  void _handleIntentionCompletion(IntentionCommandCompletion completion) {
     switch (completion.confirmedResult) {
       case ResultSuccess(
             value: ConfirmedGraphResult(
@@ -292,9 +303,41 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         _observationSubscription?.close();
         _observationSubscription = null;
         state = const IntentionDetailsDeleted();
-      case ResultSuccess() || ResultFailure():
+      case ResultSuccess(
+        value: ConfirmedGraphResult(:final revision, :final changes),
+      ):
+        _refreshAfterRelationCountChange(revision, changes);
+      case ResultFailure():
         return;
     }
+  }
+
+  void _handleRelationCompletion(LongTermRelationCommandCompletion completion) {
+    switch (completion.confirmedResult) {
+      case GraphResultSuccess(
+        value: ConfirmedGraphResult(:final revision, :final changes),
+      ):
+        _refreshAfterRelationCountChange(revision, changes);
+      case GraphResultFailure():
+        return;
+    }
+  }
+
+  void _refreshAfterRelationCountChange(
+    GraphRevision revision,
+    Iterable<GraphChange> changes,
+  ) {
+    final affectsIntention = changes
+        .whereType<IntentionRelationCountsChanged>()
+        .any((change) => change.intentionId == _intentionId);
+    if (!affectsIntention || !_acceptSnapshotRevision(revision)) {
+      return;
+    }
+    _advanceGeneration();
+    _preserveAuthoritativeStateWhileLoading = true;
+    // Абсолютное число в завершении задаёт барьер, но подробные поля и сводка
+    // публикуются только цельным снимком одной ревизии из репозитория.
+    _startObservation();
   }
 
   Future<void> _finishUpdate(Future<IntentionCommandCompletion> future) async {

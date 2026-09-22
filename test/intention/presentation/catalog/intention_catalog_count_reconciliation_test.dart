@@ -210,6 +210,221 @@ void main() {
     expect(repository.queries, hasLength(2));
   });
 
+  test('жизненный цикл связи заменяет абсолютные количества фильтрованного каталога', () async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(
+      repository,
+      filterDebounce: Duration.zero,
+      pageSize: 4,
+      prefetchRemaining: 0,
+    );
+    final confirmedStates = _observeConfirmedStates(container);
+
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
+    container
+        .read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .notifier,
+        )
+        .changeTitleFilter('Участник');
+    await waitForCatalogQueries(repository, 2);
+
+    final first = testSummary(
+      index: 1,
+      title: 'Участник А',
+      activeRelationCount: 1,
+    );
+    final second = testSummary(
+      index: 2,
+      title: 'Участник Б',
+      activeRelationCount: 1,
+    );
+    final third = testSummary(index: 3, title: 'Участник В');
+    final fourth = testSummary(index: 4, title: 'Участник Г');
+    const cursor = TestCatalogCursor();
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [fourth, third, second, first],
+          totalCount: 5,
+          nextCursor: cursor,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
+    confirmedStates.clear();
+
+    final stableFields = _stableCatalogFields(_loaded(container));
+    final relationBefore = testRelation(
+      sourceIntentionId: first.id,
+      relatedIntentionId: second.id,
+      index: 17,
+    );
+    final relationMoved = _copyRelation(
+      relationBefore,
+      sourceIntentionId: third.id,
+      relatedIntentionId: fourth.id,
+    );
+    await completeRelationCommand(
+      container,
+      repository,
+      UpdateLongTermRelation(
+        relationId: relationBefore.id,
+        patch: LongTermRelationPatch(
+          sourceIntentionId: LongTermRelationFieldSet(third.id),
+          relatedIntentionId: LongTermRelationFieldSet(fourth.id),
+        ),
+      ),
+      _relationUpdateSuccess(
+        revision: const TestCatalogRevision(2),
+        before: relationBefore,
+        after: relationMoved,
+        activeCounts: {first.id: 0, second.id: 0, third.id: 1, fourth.id: 1},
+      ),
+    );
+
+    var current = _loaded(container);
+    expect(current.items.map((item) => item.activeRelationCount), [1, 1, 0, 0]);
+    expect(_stableCatalogFields(current), stableFields);
+    expect(current.selection.titleFilterText, 'Участник');
+    expect(current.totalCount, 5);
+    expect(current.nextCursor, same(cursor));
+    expect(current.revision, const TestCatalogRevision(2));
+
+    final relationMetadataChanged = _copyRelation(
+      relationMoved,
+      type: LongTermRelationType.can,
+      priority: RelationPriority.p1,
+    );
+    await completeRelationCommand(
+      container,
+      repository,
+      UpdateLongTermRelation(
+        relationId: relationBefore.id,
+        patch: const LongTermRelationPatch(
+          type: LongTermRelationFieldSet(LongTermRelationType.can),
+          priority: LongTermRelationFieldSet(RelationPriority.p1),
+        ),
+      ),
+      _relationUpdateSuccess(
+        revision: const TestCatalogRevision(3),
+        before: relationMoved,
+        after: relationMetadataChanged,
+        activeCounts: {third.id: 1, fourth.id: 1},
+      ),
+    );
+
+    current = _loaded(container);
+    expect(current.items.map((item) => item.activeRelationCount), [1, 1, 0, 0]);
+    expect(_stableCatalogFields(current), stableFields);
+    expect(current.totalCount, 5);
+    expect(current.nextCursor, same(cursor));
+
+    final beforeNoOp = current;
+    await completeRelationCommand(
+      container,
+      repository,
+      UpdateLongTermRelation(
+        relationId: relationBefore.id,
+        patch: const LongTermRelationPatch(
+          priority: LongTermRelationFieldSet(RelationPriority.p1),
+        ),
+      ),
+      _relationNoOpSuccess(
+        revision: const TestCatalogRevision(3),
+        relation: relationMetadataChanged,
+      ),
+    );
+    expect(_loaded(container), same(beforeNoOp));
+
+    await completeRelationCommand(
+      container,
+      repository,
+      UpdateLongTermRelation(
+        relationId: relationBefore.id,
+        patch: const LongTermRelationPatch(
+          priority: LongTermRelationFieldSet(RelationPriority.p2),
+        ),
+      ),
+      const GraphCommandFailed<
+        LongTermRelationCommandSuccess,
+        LongTermRelationCommandFailure
+      >(LongTermRelationUnavailableFailure()),
+    );
+    expect(_loaded(container), same(beforeNoOp));
+
+    final archived = _copyRelation(
+      relationMetadataChanged,
+      scope: RelationScope.archived,
+    );
+    await completeRelationCommand(
+      container,
+      repository,
+      ArchiveLongTermRelation(relationBefore.id),
+      _relationUpdateSuccess(
+        revision: const TestCatalogRevision(4),
+        before: relationMetadataChanged,
+        after: archived,
+        activeCounts: {third.id: 0, fourth.id: 0},
+      ),
+    );
+    current = _loaded(container);
+    expect(current.items.map((item) => item.activeRelationCount), [0, 0, 0, 0]);
+    expect(_stableCatalogFields(current), stableFields);
+
+    await completeRelationCommand(
+      container,
+      repository,
+      RestoreLongTermRelation(relationBefore.id),
+      _relationUpdateSuccess(
+        revision: const TestCatalogRevision(5),
+        before: archived,
+        after: relationMetadataChanged,
+        activeCounts: {third.id: 1, fourth.id: 1},
+      ),
+    );
+    current = _loaded(container);
+    expect(current.items.map((item) => item.activeRelationCount), [1, 1, 0, 0]);
+    expect(_stableCatalogFields(current), stableFields);
+
+    await completeRelationCommand(
+      container,
+      repository,
+      DeleteLongTermRelation(relationBefore.id),
+      _relationDeleteSuccess(
+        revision: const TestCatalogRevision(6),
+        relation: relationMetadataChanged,
+        activeCounts: {third.id: 0, fourth.id: 0},
+      ),
+    );
+    current = _loaded(container);
+    expect(current.items.map((item) => item.activeRelationCount), [0, 0, 0, 0]);
+    expect(_stableCatalogFields(current), stableFields);
+    expect(current.selection.titleFilterText, 'Участник');
+    expect(current.totalCount, 5);
+    expect(current.nextCursor, same(cursor));
+    expect(current.revision, const TestCatalogRevision(6));
+    expect(confirmedStates, hasLength(5));
+    expect(repository.queries, hasLength(2));
+  });
+
   test(
     'каскадное архивирование применяет членство и количества вместе',
     () async {
@@ -653,4 +868,93 @@ IntentionRelationCountsChanged _countsChanged(
   revision: revision,
   intentionId: intentionId,
   counts: testRelationCounts(activeNeedOutgoing: activeCount),
+);
+
+List<Object> _stableCatalogFields(IntentionCatalogLoaded catalog) => [
+  for (final item in catalog.items)
+    (
+      item.id,
+      item.title,
+      item.readiness,
+      item.archiveState,
+      item.createdAt.value,
+      item.updatedAt.value,
+    ),
+];
+
+LongTermRelation _copyRelation(
+  LongTermRelation relation, {
+  IntentionId? sourceIntentionId,
+  IntentionId? relatedIntentionId,
+  LongTermRelationType? type,
+  RelationPriority? priority,
+  RelationScope? scope,
+}) => LongTermRelation(
+  id: relation.id,
+  sourceIntentionId: sourceIntentionId ?? relation.sourceIntentionId,
+  relatedIntentionId: relatedIntentionId ?? relation.relatedIntentionId,
+  type: type ?? relation.type,
+  priority: priority ?? relation.priority,
+  scope: scope ?? relation.scope,
+  creationSequence: relation.creationSequence,
+);
+
+LongTermRelationCommandResult _relationUpdateSuccess({
+  required GraphRevision revision,
+  required LongTermRelation before,
+  required LongTermRelation after,
+  required Map<IntentionId, int> activeCounts,
+}) => GraphCommandSucceeded(
+  ConfirmedGraphResult(
+    revision: revision,
+    value: LongTermRelationUpdated(
+      before: before,
+      relation: after,
+      description: null,
+      changes: [
+        for (final entry in activeCounts.entries)
+          _countsChanged(entry.key, revision, entry.value),
+        LongTermRelationUpdatedChange(
+          revision: revision,
+          before: before,
+          after: after,
+        ),
+      ],
+    ),
+  ),
+);
+
+LongTermRelationCommandResult _relationNoOpSuccess({
+  required GraphRevision revision,
+  required LongTermRelation relation,
+}) => GraphCommandSucceeded(
+  ConfirmedGraphResult(
+    revision: revision,
+    value: LongTermRelationUpdated(
+      before: relation,
+      relation: relation,
+      description: null,
+      changes: [
+        LongTermRelationUnchangedChange(revision: revision, relation: relation),
+      ],
+    ),
+  ),
+);
+
+LongTermRelationCommandResult _relationDeleteSuccess({
+  required GraphRevision revision,
+  required LongTermRelation relation,
+  required Map<IntentionId, int> activeCounts,
+}) => GraphCommandSucceeded(
+  ConfirmedGraphResult(
+    revision: revision,
+    value: LongTermRelationDeleted(
+      relation: relation,
+      changes: [
+        for (final entry in activeCounts.entries)
+          _countsChanged(entry.key, revision, entry.value),
+        LongTermRelationDeletedChange(revision: revision, relation: relation),
+      ],
+    ),
+  ),
 );
