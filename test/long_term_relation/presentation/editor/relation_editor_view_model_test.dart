@@ -57,11 +57,11 @@ void main() {
       harness.viewModel
         ..selectParticipant(
           RelationParticipantRole.related,
-          testEditorParticipant(2),
+          testEditorSelection(2),
         )
         ..selectParticipant(
           RelationParticipantRole.source,
-          testEditorParticipant(3),
+          testEditorSelection(3),
         );
 
       expect(harness.state.sourceIntentionId, testEditorIntentionId(3));
@@ -76,7 +76,7 @@ void main() {
       harness.viewModel
         ..selectParticipant(
           RelationParticipantRole.related,
-          testEditorParticipant(2),
+          testEditorSelection(2),
         )
         ..selectType(LongTermRelationType.need);
 
@@ -346,6 +346,7 @@ void main() {
             ),
             description: refreshed.description,
           ),
+          const TestRelationEditorRevision(2),
         );
 
         expect(harness.state.description, 'Введённый текст');
@@ -383,6 +384,7 @@ void main() {
             priority: RelationPriority.p4,
             description: 'Чужое описание',
           ),
+          const TestRelationEditorRevision(2),
         )
         ..submit();
 
@@ -405,7 +407,7 @@ void main() {
       harness.viewModel
         ..selectParticipant(
           RelationParticipantRole.related,
-          testEditorParticipant(3),
+          testEditorSelection(3),
         )
         ..selectPriority(RelationPriority.p4)
         ..submit();
@@ -444,7 +446,7 @@ void main() {
       harness.viewModel
         ..selectParticipant(
           RelationParticipantRole.related,
-          testEditorParticipant(3),
+          testEditorSelection(3),
         )
         ..submit();
       harness.repository.failRelationCommand(
@@ -462,7 +464,7 @@ void main() {
       harness.viewModel
         ..selectParticipant(
           RelationParticipantRole.related,
-          testEditorParticipant(4),
+          testEditorSelection(4),
         )
         ..submit();
       expect(harness.repository.commandCount, 2);
@@ -658,11 +660,12 @@ void main() {
             };
             harness.viewModel.selectParticipant(
               role,
-              testEditorParticipant(
+              testEditorSelection(
                 currentIndex,
                 title: 'Обновлённое намерение $currentIndex',
                 archiveState: IntentionArchiveState.archived,
                 activeRelationCount: 7,
+                revision: 2,
               ),
             );
 
@@ -694,7 +697,7 @@ void main() {
             harness.viewModel.submit();
             expect(harness.repository.commandCount, 1);
 
-            harness.viewModel.selectParticipant(role, testEditorParticipant(5));
+            harness.viewModel.selectParticipant(role, testEditorSelection(5));
 
             expect(harness.state.operation, isA<RelationEditorIdle>());
             expect(harness.state.failurePresentation, isNull);
@@ -763,13 +766,13 @@ void main() {
       // Исправляет только замена отклонённого участника.
       harness.viewModel.selectParticipant(
         RelationParticipantRole.source,
-        testEditorParticipant(4),
+        testEditorSelection(4),
       );
       expect(harness.state.operation, isA<RelationEditorFailed>());
 
       harness.viewModel.selectParticipant(
         RelationParticipantRole.related,
-        testEditorParticipant(5),
+        testEditorSelection(5),
       );
       expect(harness.state.operation, isA<RelationEditorIdle>());
     });
@@ -891,7 +894,12 @@ final class _EditorHarness {
   );
 
   factory _EditorHarness.editing(LongTermRelationDetails details) =>
-      _EditorHarness(RelationEditingContext(details));
+      _EditorHarness(
+        RelationEditingContext(
+          details,
+          revision: const TestRelationEditorRevision(0),
+        ),
+      );
 
   final RelationEditorViewModelProvider provider;
   final repository = ControlledRelationEditorRepository();
@@ -909,7 +917,7 @@ final class _EditorHarness {
     viewModel
       ..selectParticipant(
         RelationParticipantRole.related,
-        testEditorParticipant(2),
+        testEditorSelection(2),
       )
       ..selectType(LongTermRelationType.need)
       ..selectPriority(RelationPriority.p2)

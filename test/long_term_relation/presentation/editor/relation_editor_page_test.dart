@@ -5,6 +5,7 @@ import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
@@ -34,6 +35,217 @@ void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
+    );
+  });
+
+  for (final role in RelationParticipantRole.values) {
+    testWidgets('повторный выбор ${role.name} не откатывается снимком связи', (
+      tester,
+    ) async {
+      final repository = ControlledRelationFormRepository();
+      addTearDown(repository.dispose);
+      final relationId = testFormRelationId(115);
+      final sourceId = testSummary(index: 1).id;
+      final relatedId = testSummary(index: 2).id;
+      final details = testRelationDetails(
+        relationId: relationId,
+        sourceId: sourceId,
+        relatedId: relatedId,
+        sourceTitle: 'Исходное',
+        relatedTitle: 'Связанное',
+        scope: RelationScope.archived,
+      );
+      await _openDetailsForEditing(tester, repository, details);
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-edit-relation')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('relation-editor-description')),
+        'Черновик',
+      );
+      await _selectParticipant(
+        tester,
+        repository,
+        actionKey: role == RelationParticipantRole.source
+            ? 'relation-editor-change-source'
+            : 'relation-editor-change-related',
+        catalogIndex: 1,
+        title: 'Название из каталога',
+        index: role == RelationParticipantRole.source ? 1 : 2,
+        revision: const TestCatalogRevision(5),
+        archiveState: IntentionArchiveState.archived,
+      );
+
+      repository
+          .watchAt(0)
+          .emitDetails(
+            testRelationDetails(
+              relationId: relationId,
+              sourceId: sourceId,
+              relatedId: relatedId,
+              sourceTitle: role == RelationParticipantRole.source
+                  ? 'Старое исходное'
+                  : 'Исходное',
+              relatedTitle: role == RelationParticipantRole.related
+                  ? 'Старое связанное'
+                  : 'Связанное',
+              scope: RelationScope.archived,
+            ),
+            revision: const TestCatalogRevision(3),
+          );
+      await tester.pumpAndSettle();
+      expect(find.text('Название из каталога'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(
+                ValueKey(
+                  'relation-editor-participant-archive-state-${role.name}',
+                ),
+              ),
+            )
+            .data,
+        'Archived',
+      );
+      expect(
+        find.text(
+          'To ${role == RelationParticipantRole.source ? 'Название из каталога' : 'Исходное'}, you need ${role == RelationParticipantRole.related ? 'Название из каталога' : 'Связанное'}',
+        ),
+        findsOneWidget,
+      );
+
+      repository
+          .watchAt(0)
+          .emitDetails(
+            testRelationDetails(
+              relationId: relationId,
+              sourceId: sourceId,
+              relatedId: relatedId,
+              sourceTitle: role == RelationParticipantRole.source
+                  ? 'Новое исходное'
+                  : 'Исходное',
+              relatedTitle: role == RelationParticipantRole.related
+                  ? 'Новое связанное'
+                  : 'Связанное',
+              scope: RelationScope.archived,
+            ),
+            revision: const TestCatalogRevision(6),
+          );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          role == RelationParticipantRole.source
+              ? 'Новое исходное'
+              : 'Новое связанное',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Название из каталога'), findsNothing);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(
+                ValueKey(
+                  'relation-editor-participant-archive-state-${role.name}',
+                ),
+              ),
+            )
+            .data,
+        'Active',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('relation-editor-description')),
+            )
+            .controller
+            ?.text,
+        'Черновик',
+      );
+      await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+      await tester.pump();
+      expect(repository.relationUpdateCommands, hasLength(1));
+      final command = repository.updateCommandAt(0);
+      expect(command.relationId, relationId);
+      expect(
+        command.patch.sourceIntentionId,
+        isA<LongTermRelationFieldUnchanged>(),
+      );
+      expect(
+        command.patch.relatedIntentionId,
+        isA<LongTermRelationFieldUnchanged>(),
+      );
+    });
+  }
+
+  testWidgets('другая эпоха требует нового подтверждённого снимка участника', (
+    tester,
+  ) async {
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final relationId = testFormRelationId(116);
+    final sourceId = testSummary(index: 1).id;
+    final relatedId = testSummary(index: 2).id;
+    await _openDetailsForEditing(
+      tester,
+      repository,
+      testRelationDetails(
+        relationId: relationId,
+        sourceId: sourceId,
+        relatedId: relatedId,
+        sourceTitle: 'Исходное',
+        relatedTitle: 'Связанное',
+        scope: RelationScope.archived,
+      ),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+    await _selectParticipant(
+      tester,
+      repository,
+      actionKey: 'relation-editor-change-source',
+      catalogIndex: 1,
+      title: 'Снимок каталога',
+      index: 1,
+      revision: const TestCatalogRevision(5),
+    );
+
+    repository
+        .watchAt(0)
+        .emitDetails(
+          testRelationDetails(
+            relationId: relationId,
+            sourceId: sourceId,
+            relatedId: relatedId,
+            sourceTitle: 'Несопоставимое название',
+            relatedTitle: 'Связанное',
+            scope: RelationScope.archived,
+          ),
+          revision: const TestCatalogRevision(1, epoch: 1),
+        );
+    await tester.pumpAndSettle();
+    expect(find.text('Снимок каталога'), findsOneWidget);
+    expect(find.text('Несопоставимое название'), findsNothing);
+    expect(repository.watchedIntentionIds, contains(sourceId));
+
+    repository.emitIntention(
+      testDetailsIntention(
+        index: 1,
+        title: 'Подтверждённая новая эпоха',
+        archiveState: IntentionArchiveState.archived,
+      ),
+      counts: testRelationCounts(),
+      revision: const TestCatalogRevision(2, epoch: 1),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Подтверждённая новая эпоха'), findsOneWidget);
+    expect(find.text('Снимок каталога'), findsNothing);
+    expect(
+      find.text('To Подтверждённая новая эпоха, you need Связанное'),
+      findsOneWidget,
     );
   });
 
@@ -1383,12 +1595,14 @@ Future<void> _selectParticipant(
   required int catalogIndex,
   required String title,
   required int index,
+  GraphRevision revision = const TestCatalogRevision(1),
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) async {
   await tester.tap(find.byKey(ValueKey(actionKey)));
   await _settlePicker(tester);
   repository.completeCatalogPage(catalogIndex, [
-    testSummary(index: index, title: title),
-  ]);
+    testSummary(index: index, title: title, archiveState: archiveState),
+  ], revision: revision);
   await tester.pumpAndSettle();
   await tester.tap(find.text(title));
   await tester.pumpAndSettle();

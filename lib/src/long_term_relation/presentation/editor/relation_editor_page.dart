@@ -7,7 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
+import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/application/intention_result.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
@@ -43,6 +46,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
   final _formKey = LongTermRelationCreationFormKey();
   final _replacementSubscriptions =
       <RelationParticipantRole, ProviderSubscription<IntentionDetailsState>>{};
+  final _basisReads = <RelationParticipantRole, IntentionId>{};
   late final TextEditingController _descriptionController;
 
   @override
@@ -64,8 +68,17 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
         if (next case RelationDetailsLoaded(
           refreshStatus: RelationDetailsFresh(),
           :final details,
+          :final revision,
         )) {
-          ref.read(editorProvider.notifier).refreshConfirmedDetails(details);
+          final needsNewBasis = ref
+              .read(editorProvider.notifier)
+              .refreshConfirmedDetails(details, revision);
+          for (final role in needsNewBasis) {
+            final id = role == RelationParticipantRole.source
+                ? details.source.id
+                : details.related.id;
+            unawaited(_refreshParticipantBasis(role, id));
+          }
         }
       }
 
@@ -262,22 +275,26 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     if (excluded == null) {
       return;
     }
-    final selected = await context.router.push<RelationParticipantSummary>(
-      RelationParticipantPickerRoute(
-        excludedIntentionId: excluded,
-        selectionContext: switch (draft.editingBasis?.relation.scope) {
-          RelationScope.archived =>
-            RelationParticipantSelectionContext.archivedRelation,
-          RelationScope.active ||
-          null => RelationParticipantSelectionContext.activeRelation,
-        },
-      ),
-    );
+    final selected = await context.router
+        .push<GraphSnapshot<RelationParticipantSummary>>(
+          RelationParticipantPickerRoute(
+            excludedIntentionId: excluded,
+            selectionContext: switch (draft.editingBasis?.relation.scope) {
+              RelationScope.archived =>
+                RelationParticipantSelectionContext.archivedRelation,
+              RelationScope.active ||
+              null => RelationParticipantSelectionContext.activeRelation,
+            },
+          ),
+        );
     if (!mounted || selected == null) {
       return;
     }
-    notifier.selectParticipant(role, selected);
-    _watchReplacement(role, selected.id);
+    final needsNewBasis = notifier.selectParticipant(role, selected);
+    _watchReplacement(role, selected.value.id);
+    if (needsNewBasis) {
+      unawaited(_refreshParticipantBasis(role, selected.value.id));
+    }
   }
 
   void _watchReplacement(RelationParticipantRole role, IntentionId id) {
@@ -304,7 +321,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
         return;
       }
       final intention = next.intention;
-      ref
+      final needsNewBasis = ref
           .read(editorProvider.notifier)
           .refreshConfirmedParticipant(
             role,
@@ -314,7 +331,11 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
               archiveState: intention.archiveState,
               activeRelationCount: next.details.activeRelationCount,
             ),
+            next.revision,
           );
+      if (needsNewBasis) {
+        unawaited(_refreshParticipantBasis(role, id));
+      }
     }
 
     final subscription = ref.listenManual(
@@ -323,6 +344,59 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     );
     _replacementSubscriptions[role] = subscription;
     refresh(subscription.read());
+  }
+
+  Future<void> _refreshParticipantBasis(
+    RelationParticipantRole role,
+    IntentionId id,
+  ) async {
+    if (_basisReads[role] == id) {
+      return;
+    }
+    final editorProvider = relationEditorViewModelProvider(
+      _formKey,
+      widget.editorContext,
+    );
+    final expectedRevision = ref.read(editorProvider).revisionFor(role);
+    if (expectedRevision == null) {
+      return;
+    }
+    _basisReads[role] = id;
+    try {
+      final result = await ref
+          .read(personalGraphRepositoryProvider)
+          .watchIntention(id)
+          .first;
+      if (!mounted) {
+        return;
+      }
+      if (result case ResultSuccess(
+        value: GraphSnapshot(value: final details?, :final revision),
+      )) {
+        final intention = details.intention;
+        ref
+            .read(editorProvider.notifier)
+            .rebaseConfirmedParticipant(
+              role,
+              GraphSnapshot(
+                revision: revision,
+                value: RelationParticipantSummary(
+                  id: intention.id,
+                  title: intention.title,
+                  archiveState: intention.archiveState,
+                  activeRelationCount: details.activeRelationCount,
+                ),
+              ),
+              expectedRevision,
+            );
+      }
+    } on Object {
+      // Последний сравнимый снимок остаётся видимым до следующего подтверждения.
+    } finally {
+      if (_basisReads[role] == id) {
+        _basisReads.remove(role);
+      }
+    }
   }
 
   String _submitLabel(

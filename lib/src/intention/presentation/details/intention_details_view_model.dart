@@ -583,10 +583,14 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     IntentionDetailsLoaded? previousLoaded,
   }) => switch (result) {
     ResultSuccess(
-      value: GraphSnapshot(value: final application.IntentionDetails details),
+      value: GraphSnapshot(
+        value: final application.IntentionDetails details,
+        :final revision,
+      ),
     ) =>
       IntentionDetailsLoaded(
         details: details,
+        revision: revision,
         isOperationRunning: isOperationRunning,
         edit: previousLoaded?.edit,
         stateChange: previousLoaded?.stateChange,

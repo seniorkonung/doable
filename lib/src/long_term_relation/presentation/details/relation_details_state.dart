@@ -1,4 +1,5 @@
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 
@@ -26,12 +27,14 @@ final class RelationDetailsLoading extends RelationDetailsState {
 final class RelationDetailsLoaded extends RelationDetailsState {
   const RelationDetailsLoaded({
     required this.details,
+    required this.revision,
     required super.isOperationRunning,
     this.refreshStatus = const RelationDetailsFresh(),
     this.lifecycleChange,
   });
 
   final LongTermRelationDetails details;
+  final GraphRevision revision;
   final RelationDetailsRefreshStatus refreshStatus;
   final RelationDetailsLifecycleChange? lifecycleChange;
 
@@ -40,12 +43,14 @@ final class RelationDetailsLoaded extends RelationDetailsState {
 
   RelationDetailsLoaded copyWith({
     LongTermRelationDetails? details,
+    GraphRevision? revision,
     bool? isOperationRunning,
     RelationDetailsRefreshStatus? refreshStatus,
     RelationDetailsLifecycleChange? lifecycleChange,
     bool clearLifecycleChange = false,
   }) => RelationDetailsLoaded(
     details: details ?? this.details,
+    revision: revision ?? this.revision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     refreshStatus: refreshStatus ?? this.refreshStatus,
     lifecycleChange: clearLifecycleChange

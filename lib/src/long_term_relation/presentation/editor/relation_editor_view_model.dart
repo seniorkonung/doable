@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -43,31 +44,20 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     return RelationEditorState.initial(context);
   }
 
-  void selectParticipant(
+  bool selectParticipant(
     RelationParticipantRole role,
-    RelationParticipantSummary participant,
+    GraphSnapshot<RelationParticipantSummary> selected,
   ) {
-    final current = switch (role) {
-      RelationParticipantRole.source => state.sourceIntentionId,
-      RelationParticipantRole.related => state.relatedIntentionId,
-    };
-    if (current != participant.id ||
-        !_sameParticipantSnapshot(role, participant)) {
-      state = state.withParticipant(role, participant);
+    final needsNewBasis = state.needsNewBasis(
+      role,
+      selected.value.id,
+      selected.revision,
+    );
+    final refreshed = state.withParticipant(role, selected);
+    if (!identical(refreshed, state)) {
+      state = refreshed;
     }
-  }
-
-  bool _sameParticipantSnapshot(
-    RelationParticipantRole role,
-    RelationParticipantSummary participant,
-  ) {
-    final current = switch (role) {
-      RelationParticipantRole.source => state.sourceParticipant,
-      RelationParticipantRole.related => state.relatedParticipant,
-    };
-    return current?.title == participant.title &&
-        current?.archiveState == participant.archiveState &&
-        current?.activeRelationCount == participant.activeRelationCount;
+    return needsNewBasis;
   }
 
   void selectType(LongTermRelationType value) {
@@ -89,19 +79,55 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
   }
 
   /// Принимает более новый подтверждённый снимок без перезаписи черновика.
-  void refreshConfirmedDetails(LongTermRelationDetails details) {
-    final refreshed = state.withConfirmedDetails(details);
+  Set<RelationParticipantRole> refreshConfirmedDetails(
+    LongTermRelationDetails details,
+    GraphRevision revision,
+  ) {
+    final needsNewBasis = <RelationParticipantRole>{
+      if (state.needsNewBasis(
+        RelationParticipantRole.source,
+        details.source.id,
+        revision,
+      ))
+        RelationParticipantRole.source,
+      if (state.needsNewBasis(
+        RelationParticipantRole.related,
+        details.related.id,
+        revision,
+      ))
+        RelationParticipantRole.related,
+    };
+    final refreshed = state.withConfirmedDetails(details, revision);
     if (!identical(refreshed, state)) {
       state = refreshed;
     }
+    return needsNewBasis;
   }
 
   /// Обновляет только показ выбранного участника по его наблюдению.
-  void refreshConfirmedParticipant(
+  bool refreshConfirmedParticipant(
     RelationParticipantRole role,
     RelationParticipantSummary participant,
+    GraphRevision revision,
   ) {
-    final refreshed = state.withConfirmedParticipant(role, participant);
+    final needsNewBasis = state.needsNewBasis(role, participant.id, revision);
+    final refreshed = state.withConfirmedParticipant(
+      role,
+      participant,
+      revision,
+    );
+    if (!identical(refreshed, state)) {
+      state = refreshed;
+    }
+    return needsNewBasis;
+  }
+
+  void rebaseConfirmedParticipant(
+    RelationParticipantRole role,
+    GraphSnapshot<RelationParticipantSummary> snapshot,
+    GraphRevision expectedRevision,
+  ) {
+    final refreshed = state.withNewBasis(role, snapshot, expectedRevision);
     if (!identical(refreshed, state)) {
       state = refreshed;
     }

@@ -378,9 +378,12 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     LongTermRelationReadResult result, {
     RelationDetailsLoaded? previousLoaded,
   }) => switch (result) {
-    GraphResultSuccess(value: GraphSnapshot(value: final details?)) =>
+    GraphResultSuccess(
+      value: GraphSnapshot(value: final details?, :final revision),
+    ) =>
       RelationDetailsLoaded(
         details: details,
+        revision: revision,
         isOperationRunning: _isOperationRunning,
       ),
     GraphResultSuccess() => _terminateAsNotFound(),
