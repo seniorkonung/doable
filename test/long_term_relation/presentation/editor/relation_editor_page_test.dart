@@ -10,6 +10,7 @@ import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -676,6 +677,150 @@ void main() {
     expect(repository.relationUpdateCommands, isEmpty);
     expect(find.text('Прежнее описание'), findsOneWidget);
   });
+
+  testWidgets(
+    'открытая форма получает подтверждённые снимки без потери черновика и ошибки пары',
+    (tester) async {
+      final repository = ControlledRelationFormRepository();
+      addTearDown(repository.dispose);
+      final relationId = testFormRelationId(93);
+      final sourceId = testSummary(index: 1).id;
+      final relatedId = testSummary(index: 2).id;
+      final details = testRelationDetails(
+        relationId: relationId,
+        sourceId: sourceId,
+        relatedId: relatedId,
+        sourceTitle: 'Исходное',
+        relatedTitle: 'Связанное',
+        scope: RelationScope.archived,
+        description: 'Прежнее описание',
+      );
+      await _openDetailsForEditing(tester, repository, details);
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-edit-relation')),
+      );
+      await tester.pumpAndSettle();
+      await _selectType(tester, 'can');
+      await tester.enterText(
+        find.byKey(const ValueKey('relation-editor-description')),
+        'Черновик пользователя',
+      );
+      await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+      await tester.pump();
+      repository.failRelationCommand(
+        0,
+        LongTermRelationPairOccupiedFailure(testFormRelationId(94)),
+      );
+      await tester.pumpAndSettle();
+
+      final renamed = testRelationDetails(
+        relationId: relationId,
+        sourceId: sourceId,
+        relatedId: relatedId,
+        sourceTitle: 'Исходное после переименования',
+        relatedTitle: 'Связанное после переименования',
+        relatedArchiveState: IntentionArchiveState.archived,
+        scope: RelationScope.archived,
+        description: 'Чужое описание',
+      );
+      repository
+          .watchAt(0)
+          .emitDetails(renamed, revision: const TestCatalogRevision(3));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Исходное после переименования'), findsOneWidget);
+      expect(find.text('Связанное после переименования'), findsOneWidget);
+      expect(
+        find.text(
+          'To Исходное после переименования, you can '
+          'Связанное после переименования',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('relation-editor-participant-archive-state-related'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Archived'), findsOneWidget);
+      expect(
+        find.text(
+          'A relation with this direction already exists between the selected '
+          'intentions.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('relation-editor-description')),
+            )
+            .controller
+            ?.text,
+        'Черновик пользователя',
+      );
+      expect(repository.relationUpdateCommands, hasLength(1));
+
+      await _selectParticipant(
+        tester,
+        repository,
+        actionKey: 'relation-editor-change-related',
+        catalogIndex: 1,
+        title: 'Новое связанное',
+        index: 3,
+      );
+      repository
+          .watchAt(0)
+          .emitDetails(
+            testRelationDetails(
+              relationId: relationId,
+              sourceId: sourceId,
+              relatedId: relatedId,
+              sourceTitle: 'Актуальное исходное',
+              relatedTitle: 'Старое связанное после замены',
+              scope: RelationScope.archived,
+            ),
+            revision: const TestCatalogRevision(4),
+          );
+      await tester.pumpAndSettle();
+      repository
+          .watchAt(0)
+          .emitDetails(details, revision: const TestCatalogRevision(2));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Актуальное исходное'), findsOneWidget);
+      expect(find.text('Новое связанное'), findsOneWidget);
+      expect(find.text('Старое связанное после замены'), findsNothing);
+      expect(find.text('Исходное'), findsNothing);
+      expect(
+        find.text('To Актуальное исходное, you can Новое связанное'),
+        findsOneWidget,
+      );
+      expect(repository.relationUpdateCommands, hasLength(1));
+      await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+      await tester.pump();
+      expect(repository.relationUpdateCommands, hasLength(2));
+      final patch = repository.updateCommandAt(1).patch;
+      expect(patch.sourceIntentionId, isA<LongTermRelationFieldUnchanged>());
+      expect(
+        patch.relatedIntentionId,
+        isA<LongTermRelationFieldSet<IntentionId>>().having(
+          (field) => field.value,
+          'выбранный участник',
+          testSummary(index: 3).id,
+        ),
+      );
+      expect(
+        patch.description,
+        isA<LongTermRelationDescriptionReplaced>().having(
+          (field) => field.value.value,
+          'черновик описания',
+          'Черновик пользователя',
+        ),
+      );
+    },
+  );
 
   testWidgets('ошибка изменения сохраняет исправляемый черновик', (
     tester,
