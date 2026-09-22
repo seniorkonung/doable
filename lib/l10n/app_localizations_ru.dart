@@ -176,6 +176,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationNeighborhoodTitle => 'Связи';
 
   @override
+  String relationNeighborhoodSelectedCount(int count) {
+    return 'Выбрано связей: $count';
+  }
+
+  @override
+  String get relationNeighborhoodAddToSelection => 'Добавить в выбор';
+
+  @override
+  String get relationNeighborhoodRemoveFromSelection => 'Убрать из выбора';
+
+  @override
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
 
   @override

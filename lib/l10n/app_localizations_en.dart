@@ -175,6 +175,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationNeighborhoodTitle => 'Relations';
 
   @override
+  String relationNeighborhoodSelectedCount(int count) {
+    return 'Selected relations: $count';
+  }
+
+  @override
+  String get relationNeighborhoodAddToSelection => 'Add to selection';
+
+  @override
+  String get relationNeighborhoodRemoveFromSelection => 'Remove from selection';
+
+  @override
   String get relationNeighborhoodSummaryLoading =>
       'Loading relations and summary…';
 
