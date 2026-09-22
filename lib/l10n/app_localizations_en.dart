@@ -601,6 +601,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationDelete => 'Delete';
 
   @override
+  String get graphOperationDeleteBlockingRelations =>
+      'Delete selected relations';
+
+  @override
+  String get blockingRelationsDeleted => 'Selected relations deleted.';
+
+  @override
+  String get blockingRelationsDeleteIntentionNotFound =>
+      'This intention no longer exists. Relations weren’t deleted.';
+
+  @override
+  String get blockingRelationsDeleteConflict =>
+      'The selected relations changed. Refresh the selection and confirm again.';
+
+  @override
+  String get blockingRelationsDeleteUnavailable =>
+      'Selected relations couldn’t be deleted. Try again.';
+
+  @override
+  String get blockingRelationsDeleteCorruption =>
+      'Stored data is damaged. Selected relations weren’t deleted.';
+
+  @override
+  String get blockingRelationsDeleteUnexpected =>
+      'Selected relations couldn’t be deleted because of an unexpected error.';
+
+  @override
   String get graphOperationNewIntention => 'new intention';
 
   @override

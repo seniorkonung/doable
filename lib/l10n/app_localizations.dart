@@ -1112,6 +1112,48 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get graphOperationDelete;
 
+  /// Вид массовой операции в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected relations'**
+  String get graphOperationDeleteBlockingRelations;
+
+  /// Успешное массовое удаление выбранных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations deleted.'**
+  String get blockingRelationsDeleted;
+
+  /// Намерение исчезло до массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'This intention no longer exists. Relations weren’t deleted.'**
+  String get blockingRelationsDeleteIntentionNotFound;
+
+  /// Устаревший набор массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'The selected relations changed. Refresh the selection and confirm again.'**
+  String get blockingRelationsDeleteConflict;
+
+  /// Временная недоступность массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations couldn’t be deleted. Try again.'**
+  String get blockingRelationsDeleteUnavailable;
+
+  /// Повреждение данных при массовом удалении
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. Selected relations weren’t deleted.'**
+  String get blockingRelationsDeleteCorruption;
+
+  /// Непредвиденная ошибка массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations couldn’t be deleted because of an unexpected error.'**
+  String get blockingRelationsDeleteUnexpected;
+
   /// Безопасное обозначение создаваемого намерения до подтверждения
   ///
   /// In en, this message translates to:
