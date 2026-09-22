@@ -13,8 +13,10 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -52,6 +54,87 @@ void main() {
       RelationScope.archived,
       expectedCount: _archivedGroupSize,
       expectedOtherCount: _activeGroupSize,
+    );
+
+    final movedActiveId = _decodedRelationId(_activeGroupSize - 1);
+    final movedActiveCanonicalId = movedActiveId.toCanonicalString();
+    final initialActivePosition = active.orderedIds.indexOf(
+      movedActiveCanonicalId,
+    );
+    await _expectCommandSuccess(
+      repository.execute(
+        UpdateLongTermRelation(
+          relationId: movedActiveId,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
+          ),
+        ),
+      ),
+    );
+    final movedActive = await _traverseGroup(
+      repository,
+      trace,
+      RelationScope.active,
+      expectedCount: _activeGroupSize,
+      expectedOtherCount: _archivedGroupSize,
+    );
+    expect(
+      movedActive.orderedIds.indexOf(movedActiveCanonicalId),
+      lessThan(initialActivePosition),
+    );
+
+    await _expectCommandSuccess(
+      repository.execute(
+        UpdateLongTermRelation(
+          relationId: movedActiveId,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p2),
+          ),
+        ),
+      ),
+    );
+    final restoredActive = await _traverseGroup(
+      repository,
+      trace,
+      RelationScope.active,
+      expectedCount: _activeGroupSize,
+      expectedOtherCount: _archivedGroupSize,
+    );
+    expect(restoredActive.orderedIds, active.orderedIds);
+
+    final unviewedArchivedId = _decodedRelationId(_activeGroupSize);
+    final unviewedArchivedCanonicalId = unviewedArchivedId.toCanonicalString();
+    final initialArchivedPosition = archived.orderedIds.indexOf(
+      unviewedArchivedCanonicalId,
+    );
+    await _expectCommandSuccess(
+      repository.execute(
+        UpdateLongTermRelation(
+          relationId: unviewedArchivedId,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
+          ),
+        ),
+      ),
+    );
+    final activeAfterUnviewedMutation = await _traverseGroup(
+      repository,
+      trace,
+      RelationScope.active,
+      expectedCount: _activeGroupSize,
+      expectedOtherCount: _archivedGroupSize,
+    );
+    expect(activeAfterUnviewedMutation.orderedIds, active.orderedIds);
+    final archivedAfterMutation = await _traverseGroup(
+      repository,
+      trace,
+      RelationScope.archived,
+      expectedCount: _archivedGroupSize,
+      expectedOtherCount: _activeGroupSize,
+    );
+    expect(
+      archivedAfterMutation.orderedIds.indexOf(unviewedArchivedCanonicalId),
+      lessThan(initialArchivedPosition),
     );
 
     trace.clear();
@@ -186,6 +269,7 @@ Future<_TraversalMeasurements> _traverseGroup(
   final totalStopwatch = Stopwatch()..start();
   final pageLatencies = <Duration>[];
   final ids = <String>{};
+  final orderedIds = <String>[];
   var pageCount = 0;
   var previousPriority = 0;
   var previousSequence = 0;
@@ -246,7 +330,9 @@ Future<_TraversalMeasurements> _traverseGroup(
       );
       previousPriority = priority;
       previousSequence = sequence;
-      expect(ids.add(relation.id.toCanonicalString()), isTrue);
+      final canonicalId = relation.id.toCanonicalString();
+      expect(ids.add(canonicalId), isTrue);
+      orderedIds.add(canonicalId);
       expect(relation.scope, scope);
       expect(relation.type, LongTermRelationType.need);
       expect(relation.sourceIntentionId, _ownerId);
@@ -314,6 +400,7 @@ Future<_TraversalMeasurements> _traverseGroup(
 
   return _TraversalMeasurements(
     itemCount: ids.length,
+    orderedIds: List.unmodifiable(orderedIds),
     pageCount: pageCount,
     total: totalStopwatch.elapsed,
     pageP95: _percentile95(pageLatencies),
@@ -431,6 +518,12 @@ RelationGroupPage _page(RelationGroupPageResult result) {
   return (result as RelationGroupPageSuccess).value;
 }
 
+Future<void> _expectCommandSuccess(
+  Future<LongTermRelationCommandResult> result,
+) async {
+  expect(await result, isA<GraphCommandSucceeded>());
+}
+
 Duration _percentile95(List<Duration> samples) {
   final sorted = [...samples]..sort();
   final index = ((sorted.length * 95 + 99) ~/ 100) - 1;
@@ -451,9 +544,14 @@ String _participantId(int index) =>
 String _relationId(int index) =>
     '018f0b5d-6b2e-7c80-8002-${index.toRadixString(16).padLeft(12, '0')}';
 
+LongTermRelationId _decodedRelationId(int index) => (LongTermRelationId.decode(
+  _relationId(index),
+) as LongTermRelationIdDecodingSuccess).id;
+
 final class _TraversalMeasurements {
   const _TraversalMeasurements({
     required this.itemCount,
+    required this.orderedIds,
     required this.pageCount,
     required this.total,
     required this.pageP95,
@@ -462,6 +560,7 @@ final class _TraversalMeasurements {
   });
 
   final int itemCount;
+  final List<String> orderedIds;
   final int pageCount;
   final Duration total;
   final Duration pageP95;
