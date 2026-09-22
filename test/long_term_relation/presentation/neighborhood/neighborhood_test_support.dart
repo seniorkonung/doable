@@ -312,6 +312,7 @@ Result<IntentionCommandSuccess> testNeighborhoodSavedResult({
   required Intention before,
   required Intention after,
   required GraphRevision revision,
+  Iterable<IntentionCatalogMutation> additionalCatalogMutations = const [],
   Iterable<GraphChange> additionalChanges = const [],
 }) => ResultSuccess(
   IntentionSaved(
@@ -321,8 +322,19 @@ Result<IntentionCommandSuccess> testNeighborhoodSavedResult({
       before: _NeighborhoodCatalogEntrySnapshot(before),
       after: _NeighborhoodCatalogEntrySnapshot(after),
     ),
+    additionalCatalogMutations: additionalCatalogMutations,
     additionalChanges: additionalChanges,
   ),
+);
+
+IntentionCatalogUpdated testNeighborhoodCatalogUpdated({
+  required Intention before,
+  required Intention after,
+  required GraphRevision revision,
+}) => IntentionCatalogUpdated(
+  revision: revision,
+  before: _NeighborhoodCatalogEntrySnapshot(before),
+  after: _NeighborhoodCatalogEntrySnapshot(after),
 );
 
 final class _NeighborhoodCatalogEntrySnapshot

@@ -591,33 +591,19 @@ final class RelationNeighborhoodViewModel
     if (!ref.mounted || _isTerminated) {
       return;
     }
-    final ConfirmedGraphResult<GraphCommandOutcome>? confirmed;
-    switch (completion) {
-      case IntentionCommandCompletion(
-        confirmedResult: GraphResultSuccess(:final value),
-      ):
-        switch (value.value) {
-          case IntentionDeleted(:final id) when id == _intentionId:
-            _requiredRevision = value.revision;
-            _finishIntentionContext();
-            return;
-          case IntentionSaved(:final intention)
-              when _observedIntentionIds.contains(intention.id):
-            confirmed = value;
-          case IntentionSaved() || IntentionDeleted():
-            confirmed = _changesAffectObservedState(value.changes)
-                ? value
-                : null;
-        }
-      case LongTermRelationCommandCompletion(
-        confirmedResult: GraphResultSuccess(:final value),
-      ):
-        confirmed = _changesAffectObservedState(value.changes) ? value : null;
-      case IntentionCommandCompletion() || LongTermRelationCommandCompletion():
-        confirmed = null;
+    final confirmedChange = completion.confirmedChange;
+    if (confirmedChange == null) {
+      return;
     }
-    if (confirmed != null) {
-      _requestReconciliation(confirmed.revision);
+    if (confirmedChange.changes.whereType<IntentionCatalogDeleted>().any(
+      (change) => change.before.summary.id == _intentionId,
+    )) {
+      _requiredRevision = confirmedChange.revision;
+      _finishIntentionContext();
+      return;
+    }
+    if (_changesAffectObservedState(confirmedChange.changes)) {
+      _requestReconciliation(confirmedChange.revision);
     }
   }
 
@@ -641,8 +627,14 @@ final class RelationNeighborhoodViewModel
       },
     };
     final loadedRelationIds = {for (final item in items) item.relation.id};
+    final observedIntentionIds = _observedIntentionIds;
     for (final change in changes) {
       switch (change) {
+        case IntentionCatalogMutation(:final before, :final after):
+          if (observedIntentionIds.contains(before?.summary.id) ||
+              observedIntentionIds.contains(after?.summary.id)) {
+            return true;
+          }
         case IntentionRelationCountsChanged(:final intentionId, :final counts):
           if (intentionId == _intentionId) {
             if (current is! RelationGroupConfirmedState ||

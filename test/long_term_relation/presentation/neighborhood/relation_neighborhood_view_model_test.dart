@@ -1110,6 +1110,69 @@ void main() {
     },
   );
 
+  test('пакет чужой команды обновляет загруженного участника', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = _NeighborhoodHarness(repository);
+    addTearDown(harness.dispose);
+    harness.completeFirstPage(index: 0, from: 1, count: 1, totalCount: 1);
+    await pumpEventQueue();
+
+    final unrelatedId = testIntentionId(3000);
+    final unrelated = testNeighborhoodIntention(id: unrelatedId);
+    final participantId = testIntentionId(1001);
+    final participant = testNeighborhoodIntention(id: participantId);
+    const revision = TestGraphRevision(9);
+    final start = harness.coordinator.acceptExisting(
+      UpdateIntention(
+        id: unrelatedId,
+        title: unrelated.title,
+        description: unrelated.description,
+      ),
+      presentationTitle: unrelated.title,
+    );
+    repository.completeIntentionCommand(
+      0,
+      testNeighborhoodSavedResult(
+        before: unrelated,
+        after: unrelated,
+        revision: revision,
+        additionalCatalogMutations: [
+          testNeighborhoodCatalogUpdated(
+            before: participant,
+            after: testNeighborhoodIntention(
+              id: participantId,
+              title: 'Новое название',
+            ),
+            revision: revision,
+          ),
+        ],
+      ),
+    );
+    await (start as IntentionCommandAccepted).future;
+    await pumpEventQueue();
+
+    expect(repository.requestCount, 2);
+    expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
+    expect(harness.loaded.items.single.related.title, 'Связанное 1');
+
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: harness.intentionId,
+          from: 1,
+          count: 1,
+          neighborTitles: const {1: 'Новое название'},
+        ),
+        counts: testRelationCounts(activeNeedOutgoing: 1),
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.loaded.items.single.related.title, 'Новое название');
+  });
+
   test(
     'создание связи вне выбранной группы обновляет счётчик участника',
     () async {
@@ -1860,6 +1923,110 @@ void main() {
     expect(harness.loaded.counts.archivedCanIncoming, 1);
     expect(harness.loaded.items.length, 2);
     expect(harness.loaded.progress, isA<RelationGroupIdle>());
+  });
+
+  test('составной пакет удалений заменяет только загруженную группу', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = _NeighborhoodHarness(repository, pageSize: 2);
+    addTearDown(harness.dispose);
+    final ownerId = harness.intentionId;
+    final first = testGroupRow(ownerId: ownerId, index: 1);
+    final removed = testGroupRow(ownerId: ownerId, index: 2);
+    final remaining = testGroupRow(ownerId: ownerId, index: 3);
+    final archived = testGroupRow(
+      ownerId: ownerId,
+      index: 99,
+      scope: RelationScope.archived,
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: [first, removed],
+        counts: testRelationCounts(
+          activeNeedOutgoing: 3,
+          archivedNeedOutgoing: 1,
+        ),
+        nextCursor: const TestRelationGroupCursor(2),
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    harness.scrollTo(1);
+    expect(repository.requestCount, 2);
+
+    const revision = TestGraphRevision(9);
+    final start = harness.coordinator.acceptRelationDelete(
+      DeleteLongTermRelation(removed.relation.id),
+    );
+    repository.completeRelationCommand(
+      0,
+      GraphResultSuccess(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationDeleted(
+            relation: removed.relation,
+            changes: [
+              IntentionRelationCountsChanged(
+                revision: revision,
+                intentionId: ownerId,
+                counts: testRelationCounts(activeNeedOutgoing: 2),
+              ),
+              IntentionRelationCountsChanged(
+                revision: revision,
+                intentionId: removed.related.id,
+                counts: testRelationCounts(),
+              ),
+              IntentionRelationCountsChanged(
+                revision: revision,
+                intentionId: archived.related.id,
+                counts: testRelationCounts(),
+              ),
+              LongTermRelationDeletedChange(
+                revision: revision,
+                relation: removed.relation,
+              ),
+              LongTermRelationDeletedChange(
+                revision: revision,
+                relation: archived.relation,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await (start as LongTermRelationCommandAccepted).future;
+    await pumpEventQueue();
+    expect(repository.requestCount, 2);
+    expect(harness.relationIds, [first.relation.id, removed.relation.id]);
+
+    repository.completePage(
+      1,
+      RelationGroupContinuationPage(
+        items: [remaining],
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    expect(repository.requestCount, 3);
+    expect(repository.queryAt(2).cursor, isNull);
+    expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
+    expect(harness.loaded.counts.archivedNeedOutgoing, 1);
+
+    repository.completePage(
+      2,
+      RelationGroupFirstPage(
+        items: [first, remaining],
+        counts: testRelationCounts(activeNeedOutgoing: 2),
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.relationIds, [first.relation.id, remaining.relation.id]);
+    expect(harness.loaded.counts.archivedNeedOutgoing, 0);
+    expect(harness.loaded.nextCursor, isNull);
+    expect(repository.requestCount, 3);
   });
 
   test(
