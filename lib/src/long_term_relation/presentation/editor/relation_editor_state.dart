@@ -279,8 +279,13 @@ final class RelationEditorState {
     RelationParticipantRole role,
     RelationParticipantSummary participant,
   ) {
+    final currentParticipant = switch (role) {
+      RelationParticipantRole.source => sourceParticipant,
+      RelationParticipantRole.related => relatedParticipant,
+    };
+    final identityChanged = currentParticipant?.id != participant.id;
     final nextOperation = _operationAfter(
-      (failure) => _isCorrectedByParticipant(role, failure),
+      (failure) => _isCorrectedByParticipant(role, identityChanged, failure),
     );
     return _copyWith(
       sourceParticipant: switch (role) {
@@ -379,11 +384,13 @@ final class RelationEditorState {
 
   static bool _isCorrectedByParticipant(
     RelationParticipantRole role,
+    bool identityChanged,
     RelationEditorFailure failure,
   ) => switch (failure) {
     RelationEditorParticipantRejected(role: final rejected) => rejected == role,
     // Занятость пары и самосвязь зависят только от участников.
-    RelationEditorPairOccupied() || RelationEditorSameParticipants() => true,
+    RelationEditorPairOccupied() ||
+    RelationEditorSameParticipants() => identityChanged,
     RelationEditorDescriptionInvalid() ||
     RelationEditorUnavailable() ||
     RelationEditorCorruption() ||
