@@ -278,7 +278,7 @@ final class _LoadedDetails extends StatelessWidget {
           onCreateRelation: (direction) => unawaited(
             context.router.push(
               RelationEditorRoute(
-                creationContext: RelationCreationContext(
+                editorContext: RelationCreationContext(
                   participant: RelationParticipantSummary(
                     id: intention.id,
                     title: intention.title,

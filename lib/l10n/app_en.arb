@@ -864,6 +864,10 @@
   "@relationDetailsOpenParticipant": {
     "description": "Назначение перехода к участнику связи"
   },
+  "relationDetailsEditAction": "Edit relation",
+  "@relationDetailsEditAction": {
+    "description": "Переход из подробного просмотра к изменению связи"
+  },
   "participantPickerTitle": "Select a participant",
   "@participantPickerTitle": {
     "description": "Заголовок выбора участника долговременной связи"
@@ -887,6 +891,14 @@
   "relationEditorTitle": "New relation",
   "@relationEditorTitle": {
     "description": "Заголовок формы создания долговременной связи"
+  },
+  "relationEditorEditTitle": "Edit relation",
+  "@relationEditorEditTitle": {
+    "description": "Заголовок формы изменения долговременной связи"
+  },
+  "relationEditorPhraseLabel": "Relation phrase",
+  "@relationEditorPhraseLabel": {
+    "description": "Доступная подпись текущей формулировки связи"
   },
   "relationEditorSourceLabel": "Source intention",
   "@relationEditorSourceLabel": {
@@ -983,6 +995,14 @@
   "relationEditorCreating": "Creating…",
   "@relationEditorCreating": {
     "description": "Выполняемое создание долговременной связи"
+  },
+  "relationEditorSaveAction": "Save changes",
+  "@relationEditorSaveAction": {
+    "description": "Команда сохранения изменений долговременной связи"
+  },
+  "relationEditorSaving": "Saving…",
+  "@relationEditorSaving": {
+    "description": "Выполняемое изменение долговременной связи"
   },
   "relationNeighborhoodCreateOutgoingAction": "Create an outgoing relation",
   "@relationNeighborhoodCreateOutgoingAction": {

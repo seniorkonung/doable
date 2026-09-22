@@ -10,6 +10,7 @@ import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
+import '../editor/relation_editor_state.dart';
 import 'relation_details_state.dart';
 import 'relation_details_view_model.dart';
 
@@ -47,6 +48,17 @@ final class RelationDetailsPage extends ConsumerWidget {
                 final RelationDetailsLoaded loaded => _LoadedRelation(
                   state: loaded,
                   onRetry: viewModel.retry,
+                  onEdit: loaded.isOperationRunning
+                      ? null
+                      : () => unawaited(
+                          context.router.push(
+                            RelationEditorRoute(
+                              editorContext: RelationEditingContext(
+                                loaded.details,
+                              ),
+                            ),
+                          ),
+                        ),
                 ),
                 RelationDetailsNotFound() => _RelationDetailsStatus(
                   message: localizations.relationDetailsNotFound,
@@ -71,10 +83,15 @@ final class RelationDetailsPage extends ConsumerWidget {
 }
 
 final class _LoadedRelation extends StatelessWidget {
-  const _LoadedRelation({required this.state, required this.onRetry});
+  const _LoadedRelation({
+    required this.state,
+    required this.onRetry,
+    required this.onEdit,
+  });
 
   final RelationDetailsLoaded state;
   final VoidCallback onRetry;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +121,16 @@ final class _LoadedRelation extends StatelessWidget {
             phrase,
             key: const ValueKey('relation-details-phrase'),
             style: Theme.of(context).textTheme.headlineSmall,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonalIcon(
+            key: const ValueKey('relation-details-edit-relation'),
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
+            label: Text(localizations.relationDetailsEditAction),
           ),
         ),
         const SizedBox(height: 24),

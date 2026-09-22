@@ -13,6 +13,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
 import '../../../intention/presentation/catalog/catalog_test_support.dart';
@@ -27,6 +28,7 @@ final class ControlledRelationFormRepository
     implements PersonalGraphRepository {
   final catalogQueries = <IntentionCatalogQuery>[];
   final relationCommands = <CreateLongTermRelation>[];
+  final relationUpdateCommands = <UpdateLongTermRelation>[];
   final relationWatches = <ControlledRelationWatch>[];
   final _intentionStreams =
       <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
@@ -34,6 +36,11 @@ final class ControlledRelationFormRepository
   final _relationRequests = <Completer<LongTermRelationCommandResult>>[];
 
   CreateLongTermRelation commandAt(int index) => relationCommands[index];
+
+  UpdateLongTermRelation updateCommandAt(int index) =>
+      relationUpdateCommands[index];
+
+  ControlledRelationWatch watchAt(int index) => relationWatches[index];
 
   /// Отдаёт очередную порцию каталога выбора участника.
   void completeCatalogPage(int index, List<IntentionSummary> items) =>
@@ -84,6 +91,36 @@ final class ControlledRelationFormRepository
     return relation;
   }
 
+  /// Подтверждает изменение связи по отправленной команде того же индекса.
+  void completeRelationUpdated(
+    int index, {
+    required LongTermRelation before,
+    required LongTermRelation after,
+    required LongTermRelationDescription? description,
+    int revision = 1,
+  }) {
+    final graphRevision = TestCatalogRevision(revision);
+    _relationRequests[index].complete(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: graphRevision,
+          value: LongTermRelationUpdated(
+            before: before,
+            relation: after,
+            description: description,
+            changes: <GraphChange>[
+              LongTermRelationUpdatedChange(
+                revision: graphRevision,
+                before: before,
+                after: after,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -91,7 +128,10 @@ final class ControlledRelationFormRepository
   >(GraphCommand<TSuccess, TFailure> command) async {
     final result = switch (command) {
       final CreateLongTermRelation creation => await _createRelation(creation),
-      _ => throw UnsupportedError('Форма связи отправляет только создание.'),
+      final UpdateLongTermRelation update => await _updateRelation(update),
+      _ => throw UnsupportedError(
+        'Форма связи отправляет только создание или изменение.',
+      ),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
   }
@@ -146,6 +186,15 @@ final class ControlledRelationFormRepository
     CreateLongTermRelation command,
   ) {
     relationCommands.add(command);
+    final request = Completer<LongTermRelationCommandResult>();
+    _relationRequests.add(request);
+    return request.future;
+  }
+
+  Future<LongTermRelationCommandResult> _updateRelation(
+    UpdateLongTermRelation command,
+  ) {
+    relationUpdateCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationRequests.add(request);
     return request.future;

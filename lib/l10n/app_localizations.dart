@@ -1346,6 +1346,12 @@ abstract class AppLocalizations {
   /// **'Opens the intention and its own relations'**
   String get relationDetailsOpenParticipant;
 
+  /// Переход из подробного просмотра к изменению связи
+  ///
+  /// In en, this message translates to:
+  /// **'Edit relation'**
+  String get relationDetailsEditAction;
+
   /// Заголовок выбора участника долговременной связи
   ///
   /// In en, this message translates to:
@@ -1381,6 +1387,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New relation'**
   String get relationEditorTitle;
+
+  /// Заголовок формы изменения долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Edit relation'**
+  String get relationEditorEditTitle;
+
+  /// Доступная подпись текущей формулировки связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation phrase'**
+  String get relationEditorPhraseLabel;
 
   /// Подпись исходного участника в форме создания связи
   ///
@@ -1525,6 +1543,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Creating…'**
   String get relationEditorCreating;
+
+  /// Команда сохранения изменений долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get relationEditorSaveAction;
+
+  /// Выполняемое изменение долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get relationEditorSaving;
 
   /// Создание связи из исходящей группы соседства
   ///
