@@ -7,6 +7,7 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -22,16 +23,20 @@ import '../details/relation_details_test_support.dart';
 /// Граф для страницы создания связи: команды, каталог выбора участника и
 /// подробный просмотр связи конфликтующей пары.
 ///
-/// Соседство и сводка здесь недоступны намеренно: открытая форма не заводит
-/// собственного чтения графа и опирается только на общий каталог намерений.
+/// Соседство и отдельная сводка здесь недоступны: форма получает выбор из
+/// каталога и наблюдает выбранные на замену намерения до сохранения связи.
 final class ControlledRelationFormRepository
     implements PersonalGraphRepository {
   final catalogQueries = <IntentionCatalogQuery>[];
   final relationCommands = <CreateLongTermRelation>[];
   final relationUpdateCommands = <UpdateLongTermRelation>[];
   final relationWatches = <ControlledRelationWatch>[];
+  final watchedIntentionIds = <IntentionId>[];
   final _intentionStreams =
-      <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
+      <
+        IntentionId,
+        StreamController<Result<GraphSnapshot<IntentionDetails?>>>
+      >{};
   final _catalogRequests = <Completer<Result<IntentionCatalogPage>>>[];
   final _relationRequests = <Completer<LongTermRelationCommandResult>>[];
 
@@ -41,6 +46,19 @@ final class ControlledRelationFormRepository
       relationUpdateCommands[index];
 
   ControlledRelationWatch watchAt(int index) => relationWatches[index];
+
+  void emitIntention(
+    Intention intention, {
+    required RelationCounts counts,
+    required GraphRevision revision,
+  }) => _intentionStreams[intention.id]!.add(
+    ResultSuccess(
+      GraphSnapshot(
+        value: IntentionDetails(intention: intention, relationCounts: counts),
+        revision: revision,
+      ),
+    ),
+  );
 
   /// Отдаёт очередную порцию каталога выбора участника.
   void completeCatalogPage(int index, List<IntentionSummary> items) =>
@@ -167,9 +185,14 @@ final class ControlledRelationFormRepository
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) {
-    final controller =
-        StreamController<Result<GraphSnapshot<IntentionDetails?>>>.broadcast();
-    _intentionStreams.add(controller);
+    watchedIntentionIds.add(id);
+    final controller = _intentionStreams.putIfAbsent(
+      id,
+      () =>
+          StreamController<
+            Result<GraphSnapshot<IntentionDetails?>>
+          >.broadcast(),
+    );
     return controller.stream;
   }
 
@@ -177,7 +200,7 @@ final class ControlledRelationFormRepository
     for (final watch in relationWatches) {
       await watch.close();
     }
-    for (final controller in _intentionStreams) {
+    for (final controller in _intentionStreams.values) {
       await controller.close();
     }
   }

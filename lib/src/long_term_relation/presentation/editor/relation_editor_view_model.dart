@@ -96,6 +96,17 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     }
   }
 
+  /// Обновляет только показ выбранного участника по его наблюдению.
+  void refreshConfirmedParticipant(
+    RelationParticipantRole role,
+    RelationParticipantSummary participant,
+  ) {
+    final refreshed = state.withConfirmedParticipant(role, participant);
+    if (!identical(refreshed, state)) {
+      state = refreshed;
+    }
+  }
+
   void submit() {
     if (!state.canSubmit) {
       return;
