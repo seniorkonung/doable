@@ -20,6 +20,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,6 +47,7 @@ void main() {
       final database = (await tester.runAsync(
         LocalDatabaseHarness.fileBacked,
       ))!;
+      final diagnostics = InMemoryDiagnosticsSink();
       final runtimes = <AppRuntime>[];
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
@@ -55,7 +57,8 @@ void main() {
         await database.dispose();
       });
 
-      final firstRuntime = _fileRuntime(database)..also(runtimes.add);
+      final firstRuntime = _fileRuntime(database, diagnostics: diagnostics)
+        ..also(runtimes.add);
       await tester.pumpWidget(MainApp(runtime: firstRuntime));
       await _pumpUntilFound(
         tester,
@@ -72,6 +75,19 @@ void main() {
         tester,
         title: 'Много ходить',
         description: 'Описание участника',
+      );
+      await _dismissOperationMessage(tester);
+      const sameTitle = 'Одинаковое намерение';
+      await _createIntention(
+        tester,
+        title: sameTitle,
+        description: 'Первый одноимённый участник',
+      );
+      await _dismissOperationMessage(tester);
+      await _createIntention(
+        tester,
+        title: sameTitle,
+        description: 'Второй одноимённый участник',
       );
       await _dismissOperationMessage(tester);
 
@@ -189,7 +205,8 @@ void main() {
       await firstRuntime.shutdown();
       runtimes.remove(firstRuntime);
 
-      final reopenedRuntime = _fileRuntime(database)..also(runtimes.add);
+      final reopenedRuntime = _fileRuntime(database, diagnostics: diagnostics)
+        ..also(runtimes.add);
       await tester.pumpWidget(MainApp(runtime: reopenedRuntime));
       await _pumpUntilFound(tester, find.text('Укреплять здоровье'));
       expect(find.text('Много ходить'), findsOneWidget);
@@ -267,6 +284,135 @@ void main() {
             .isLiveRegion,
         isTrue,
       );
+
+      const conflictingDraft = 'Этот текст не должен заменять сохранённый';
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('relation-editor-description')),
+            )
+            .controller
+            ?.text,
+        conflictingDraft,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('relation-editor-open-existing')),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-edit-relation')),
+      );
+
+      const lifecycleDescription = '  Литеральный текст\n🧭  ';
+      const lifecyclePhrase =
+          'To Одинаковое намерение, you can Одинаковое намерение';
+      await _editRelation(
+        tester,
+        sourceTitle: sameTitle,
+        relatedTitle: sameTitle,
+        description: lifecycleDescription,
+      );
+      await _dismissOperationMessage(tester);
+      expect(_textByKey(tester, 'relation-details-phrase'), lifecyclePhrase);
+      expect(_textByKey(tester, 'relation-details-type'), 'Can');
+      expect(_textByKey(tester, 'relation-details-priority'), 'P4');
+      expect(
+        _textByKey(tester, 'relation-details-description'),
+        lifecycleDescription,
+      );
+      expect(_textByKey(tester, 'relation-details-scope'), 'Archived relation');
+
+      await _restoreCurrentRelation(tester);
+      await _dismissOperationMessage(tester);
+      await _archiveCurrentRelation(tester);
+      await _dismissOperationMessage(tester);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await reopenedRuntime.shutdown();
+      runtimes.remove(reopenedRuntime);
+
+      final lifecycleRuntime = _fileRuntime(database, diagnostics: diagnostics)
+        ..also(runtimes.add);
+      await tester.pumpWidget(MainApp(runtime: lifecycleRuntime));
+      await _pumpUntilFound(tester, find.text(sameTitle));
+      await _openArchivedCanRelation(
+        tester,
+        participantTitle: sameTitle,
+        phrase: lifecyclePhrase,
+      );
+      expect(
+        _textByKey(tester, 'relation-details-description'),
+        lifecycleDescription,
+      );
+      expect(_textByKey(tester, 'relation-details-priority'), 'P4');
+
+      await _restoreCurrentRelation(tester);
+      await _dismissOperationMessage(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-source-participant')),
+      );
+      await _pumpUntilDetailsTitle(tester, sameTitle);
+
+      await _deleteCurrentIntention(tester);
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('intention-details-state-change-failure')),
+      );
+      expect(
+        find.textContaining('relations still block deletion'),
+        findsOneWidget,
+      );
+      final showBlocking = find.byKey(
+        const ValueKey('intention-details-show-blocking-relations'),
+      );
+      await _ensureVisible(tester, showBlocking);
+      await tester.tap(showBlocking);
+      await _tapWhenFound(tester, find.text(lifecyclePhrase));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-delete-relation')),
+      );
+
+      await _deleteCurrentRelation(tester);
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('intention-details-delete')),
+      );
+      await _dismissOperationMessage(tester);
+      expect(find.text(lifecyclePhrase), findsNothing);
+
+      await _deleteCurrentIntention(tester);
+      await _pumpUntilAbsent(
+        tester,
+        find.byKey(const ValueKey('intention-details-delete')),
+      );
+      await _dismissOperationMessage(tester);
+      await _returnToCatalog(tester);
+      await _pumpUntilFound(tester, find.text(sameTitle));
+      expect(
+        find.ancestor(
+          of: find.text(sameTitle),
+          matching: find.byType(IntentionSummaryView),
+        ),
+        findsOneWidget,
+      );
+
+      final successfulRelationCommands = diagnostics.events
+          .whereType<LongTermRelationCommandDiagnosticsEvent>()
+          .where((event) => event.status is DiagnosticsSucceeded)
+          .map((event) => event.commandType)
+          .toSet();
+      expect(
+        successfulRelationCommands,
+        containsAll(const {
+          LongTermRelationCommandDiagnosticsType.create,
+          LongTermRelationCommandDiagnosticsType.update,
+          LongTermRelationCommandDiagnosticsType.archive,
+          LongTermRelationCommandDiagnosticsType.restore,
+          LongTermRelationCommandDiagnosticsType.delete,
+        }),
+      );
       semantics.dispose();
     },
   );
@@ -328,6 +474,163 @@ void main() {
   );
 
   testWidgets(
+    'не повторяет команды жизненного цикла после ухода и повторного открытия',
+    (tester) async {
+      await _prepareAppSurface(tester);
+      final app = await _pumpDelayedRelationApp(tester, delayCreation: false);
+
+      await _createIntention(
+        tester,
+        title: 'Беречь здоровье',
+        description: 'Причина',
+      );
+      await _dismissOperationMessage(tester);
+      await _createIntention(tester, title: 'Много ходить', description: 'Шаг');
+      await _dismissOperationMessage(tester);
+      await _openIntention(tester, 'Беречь здоровье');
+      await _createNeedRelation(
+        tester,
+        relatedTitle: 'Много ходить',
+        description: 'Исходное описание',
+      );
+      await _dismissOperationMessage(tester);
+
+      const phrase = 'To Беречь здоровье, you need Много ходить';
+      await _tapWhenFound(tester, find.text(phrase));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-edit-relation')),
+      );
+
+      app.repository.holdNext(UpdateLongTermRelation);
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-edit-relation')),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-editor-description')),
+      );
+      const updatedDescription = 'Описание после принятого изменения';
+      await tester.enterText(
+        find.byKey(const ValueKey('relation-editor-description')),
+        updatedDescription,
+      );
+      await tester.pump();
+      final submit = find.byKey(const ValueKey('relation-editor-submit'));
+      await _ensureVisible(tester, submit);
+      expect(tester.widget<FilledButton>(submit).onPressed, isNotNull);
+      await tester.tap(submit);
+      await _pumpUntilCommandAttempt(
+        tester,
+        app.repository,
+        UpdateLongTermRelation,
+      );
+      expect(app.repository.attemptsFor(UpdateLongTermRelation), 1);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      await tester.pageBack();
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      await _tapWhenFound(tester, find.text(phrase));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-operation-running')),
+      );
+      await app.repository.completePendingWithRealResult();
+      await _pumpUntilFound(tester, find.text(updatedDescription));
+      expect(app.repository.attemptsFor(UpdateLongTermRelation), 1);
+      await _dismissOperationMessage(tester);
+
+      app.repository.holdNext(ArchiveLongTermRelation);
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-archive-relation')),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-operation-running')),
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      await _tapWhenFound(tester, find.text(phrase));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-operation-running')),
+      );
+      await app.repository.completePendingWithRealResult();
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-restore-relation')),
+      );
+      expect(app.repository.attemptsFor(ArchiveLongTermRelation), 1);
+      await _dismissOperationMessage(tester);
+
+      app.repository.holdNext(RestoreLongTermRelation);
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-restore-relation')),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-operation-running')),
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      final archived = find.byKey(
+        const ValueKey('relation-neighborhood-scope-archived'),
+      );
+      await _ensureVisible(tester, archived);
+      await tester.tap(archived);
+      await _tapWhenFound(tester, find.text(phrase));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-operation-running')),
+      );
+      await app.repository.completePendingWithRealResult();
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-archive-relation')),
+      );
+      expect(app.repository.attemptsFor(RestoreLongTermRelation), 1);
+      await _dismissOperationMessage(tester);
+
+      app.repository.holdNext(DeleteLongTermRelation);
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-delete-relation')),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-confirm-delete')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('relation-details-confirm-delete')),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-operation-running')),
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      final active = find.byKey(
+        const ValueKey('relation-neighborhood-scope-active'),
+      );
+      await _ensureVisible(tester, active);
+      await tester.tap(active);
+      await _tapWhenFound(tester, find.text(phrase));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-operation-running')),
+      );
+      await app.repository.completePendingWithRealResult();
+      await _pumpUntilAbsent(
+        tester,
+        find.byKey(const ValueKey('relation-details-delete-relation')),
+      );
+      expect(app.repository.attemptsFor(DeleteLongTermRelation), 1);
+      await _dismissOperationMessage(tester);
+      expect(find.text(phrase), findsNothing);
+    },
+  );
+
+  testWidgets(
     'передаёт ошибку до кадра оболочке и не повторяет неизвестный отказ',
     (tester) async {
       await _prepareAppSurface(tester);
@@ -384,7 +687,10 @@ Future<void> _prepareAppSurface(WidgetTester tester) async {
   addTearDown(tester.view.reset);
 }
 
-Future<_DelayedApp> _pumpDelayedRelationApp(WidgetTester tester) async {
+Future<_DelayedApp> _pumpDelayedRelationApp(
+  WidgetTester tester, {
+  bool delayCreation = true,
+}) async {
   final diagnostics = InMemoryDiagnosticsSink();
   late _DelayedRelationRepository repository;
   final runtime = AppRuntime(
@@ -399,6 +705,7 @@ Future<_DelayedApp> _pumpDelayedRelationApp(WidgetTester tester) async {
           diagnostics,
           relationIdGenerator: UuidV7LongTermRelationIdGenerator(),
         ),
+        delayCreation: delayCreation,
       );
       return repository;
     },
@@ -417,9 +724,12 @@ typedef _DelayedApp = ({
   _DelayedRelationRepository repository,
 });
 
-AppRuntime _fileRuntime(LocalDatabaseHarness database) => AppRuntime(
+AppRuntime _fileRuntime(
+  LocalDatabaseHarness database, {
+  required InMemoryDiagnosticsSink diagnostics,
+}) => AppRuntime(
   connectionFactory: () => openFileBackedLocalDatabase(database.databaseFile),
-  diagnosticsSink: InMemoryDiagnosticsSink(),
+  diagnosticsSink: diagnostics,
 );
 
 Future<void> _createIntention(
@@ -535,6 +845,172 @@ Future<void> _createNeedRelation(
   );
 }
 
+Future<void> _editRelation(
+  WidgetTester tester, {
+  required String sourceTitle,
+  required String relatedTitle,
+  required String description,
+}) async {
+  final edit = find.byKey(const ValueKey('relation-details-edit-relation'));
+  await _ensureVisible(tester, edit);
+  await tester.tap(edit);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('relation-editor-change-source')),
+  );
+
+  await _selectParticipant(
+    tester,
+    actionKey: 'relation-editor-change-source',
+    title: sourceTitle,
+  );
+  await _selectParticipant(
+    tester,
+    actionKey: 'relation-editor-change-related',
+    title: relatedTitle,
+  );
+
+  final type = find.byKey(const ValueKey('relation-editor-type-can'));
+  await _ensureVisible(tester, type);
+  await tester.tap(type);
+  final priority = find.byKey(const ValueKey('relation-editor-priority-p4'));
+  await _ensureVisible(tester, priority);
+  await tester.tap(priority);
+  await tester.enterText(
+    find.byKey(const ValueKey('relation-editor-description')),
+    description,
+  );
+
+  final submit = find.byKey(const ValueKey('relation-editor-submit'));
+  await _ensureVisible(tester, submit);
+  await tester.tap(submit);
+  await _pumpUntilAbsent(tester, submit);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('relation-details-phrase')),
+  );
+}
+
+Future<void> _selectParticipant(
+  WidgetTester tester, {
+  required String actionKey,
+  required String title,
+}) async {
+  final action = find.byKey(ValueKey(actionKey));
+  await _ensureVisible(tester, action);
+  await tester.tap(action);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('participant-picker-filter-field')),
+  );
+
+  final matchingTitles = find.text(title);
+  await _pumpUntilFound(tester, matchingTitles);
+  final selected = matchingTitles.first;
+  await _ensureVisible(tester, selected);
+  await tester.tap(selected);
+  await _pumpUntilFound(tester, find.byKey(ValueKey(actionKey)));
+}
+
+Future<void> _archiveCurrentRelation(WidgetTester tester) async {
+  final archive = find.byKey(
+    const ValueKey('relation-details-archive-relation'),
+  );
+  await _ensureVisible(tester, archive);
+  await tester.tap(archive);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('relation-details-restore-relation')),
+  );
+}
+
+Future<void> _restoreCurrentRelation(WidgetTester tester) async {
+  final restore = find.byKey(
+    const ValueKey('relation-details-restore-relation'),
+  );
+  await _ensureVisible(tester, restore);
+  await tester.tap(restore);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('relation-details-archive-relation')),
+  );
+}
+
+Future<void> _openArchivedCanRelation(
+  WidgetTester tester, {
+  required String participantTitle,
+  required String phrase,
+}) async {
+  await _openIntention(tester, participantTitle);
+  final archived = find.byKey(
+    const ValueKey('relation-neighborhood-scope-archived'),
+  );
+  await _ensureVisible(tester, archived);
+  await tester.tap(archived);
+  final can = find.byKey(const ValueKey('relation-neighborhood-type-can'));
+  await _ensureVisible(tester, can);
+  await tester.tap(can);
+  await tester.pumpAndSettle(const Duration(milliseconds: 1));
+
+  final outgoing = find.byKey(
+    const ValueKey('relation-neighborhood-direction-outgoing'),
+  );
+  await _ensureVisible(tester, outgoing);
+  final outgoingLabel = tester.getSemantics(outgoing).label;
+  if (!outgoingLabel.contains('Outgoing: 1')) {
+    final incoming = find.byKey(
+      const ValueKey('relation-neighborhood-direction-incoming'),
+    );
+    await _ensureVisible(tester, incoming);
+    await tester.tap(incoming);
+  }
+
+  await _tapWhenFound(tester, find.text(phrase));
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('relation-details-description')),
+  );
+}
+
+Future<void> _deleteCurrentRelation(WidgetTester tester) async {
+  final delete = find.byKey(const ValueKey('relation-details-delete-relation'));
+  await _ensureVisible(tester, delete);
+  await tester.tap(delete);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('relation-details-confirm-delete')),
+  );
+  await tester.tap(
+    find.byKey(const ValueKey('relation-details-confirm-delete')),
+  );
+  await _pumpUntilAbsent(tester, delete);
+}
+
+Future<void> _deleteCurrentIntention(WidgetTester tester) async {
+  final delete = find.byKey(const ValueKey('intention-details-delete'));
+  await _ensureVisible(tester, delete);
+  await tester.tap(delete);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('intention-details-confirm-delete')),
+  );
+  await tester.tap(
+    find.byKey(const ValueKey('intention-details-confirm-delete')),
+  );
+}
+
+Future<void> _returnToCatalog(WidgetTester tester) async {
+  final catalog = find.byKey(const ValueKey('catalog-create-intention'));
+  for (var attempt = 0; attempt < 4; attempt += 1) {
+    if (catalog.evaluate().isNotEmpty) {
+      return;
+    }
+    await tester.pageBack();
+    await tester.pumpAndSettle(const Duration(milliseconds: 1));
+  }
+  fail('App-level поток не вернулся в каталог после удаления намерения.');
+}
+
 Future<void> _renameCurrentIntention(WidgetTester tester, String title) async {
   final edit = find.byKey(const ValueKey('intention-details-edit'));
   await _ensureVisible(tester, edit);
@@ -601,15 +1077,59 @@ Future<void> _pumpUntilAbsent(
   fail('App-level поток не закрыл ожидаемый элемент: $finder');
 }
 
+Future<void> _tapWhenFound(
+  WidgetTester tester,
+  Finder finder, {
+  int attempts = 1000,
+}) async {
+  for (var attempt = 0; attempt < attempts; attempt += 1) {
+    if (finder.evaluate().isNotEmpty) {
+      await tester.tap(finder.first);
+      await tester.pump();
+      return;
+    }
+    await tester.pump(const Duration(milliseconds: 1));
+  }
+  fail('App-level поток не позволил выбрать ожидаемый элемент: $finder');
+}
+
+Future<void> _pumpUntilCommandAttempt(
+  WidgetTester tester,
+  _DelayedRelationRepository repository,
+  Type commandType, {
+  int attempts = 1000,
+}) async {
+  for (var attempt = 0; attempt < attempts; attempt += 1) {
+    if (repository.attemptsFor(commandType) > 0) {
+      return;
+    }
+    await tester.pump(const Duration(milliseconds: 1));
+  }
+  fail('App-level поток не отправил ожидаемую команду $commandType.');
+}
+
 String _textByKey(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
 final class _DelayedRelationRepository implements PersonalGraphRepository {
-  _DelayedRelationRepository(this._inner);
+  _DelayedRelationRepository(this._inner, {required bool delayCreation})
+    : _heldCommandType = delayCreation ? CreateLongTermRelation : null;
 
   final PersonalGraphRepository _inner;
-  _PendingRelationCreation? _pendingCreation;
-  var createAttempts = 0;
+  final Map<Type, int> _attempts = {};
+  Type? _heldCommandType;
+  _PendingRelationCommand? _pendingCommand;
+
+  int get createAttempts => attemptsFor(CreateLongTermRelation);
+
+  int attemptsFor(Type commandType) => _attempts[commandType] ?? 0;
+
+  void holdNext(Type commandType) {
+    if (_heldCommandType != null || _pendingCommand != null) {
+      throw StateError('Тест уже удерживает команду связи.');
+    }
+    _heldCommandType = commandType;
+  }
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -640,18 +1160,26 @@ final class _DelayedRelationRepository implements PersonalGraphRepository {
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
-    if (command is CreateLongTermRelation) {
-      if (_pendingCreation != null) {
-        throw StateError('Тест уже удерживает создание связи.');
-      }
-      createAttempts += 1;
-      final pending = _PendingRelationCreation(
-        command as CreateLongTermRelation,
-        Completer<LongTermRelationCommandResult>(),
+    if (command is LongTermRelationCommand) {
+      final relationCommand = command as LongTermRelationCommand;
+      _attempts.update(
+        relationCommand.runtimeType,
+        (value) => value + 1,
+        ifAbsent: () => 1,
       );
-      _pendingCreation = pending;
-      return await pending.result.future
-          as GraphCommandResult<TSuccess, TFailure>;
+      if (relationCommand.runtimeType == _heldCommandType) {
+        if (_pendingCommand != null) {
+          throw StateError('Тест уже удерживает команду связи.');
+        }
+        _heldCommandType = null;
+        final pending = _PendingRelationCommand(
+          relationCommand,
+          Completer<LongTermRelationCommandResult>(),
+        );
+        _pendingCommand = pending;
+        return await pending.result.future
+            as GraphCommandResult<TSuccess, TFailure>;
+      }
     }
     return _inner.execute(command);
   }
@@ -668,20 +1196,20 @@ final class _DelayedRelationRepository implements PersonalGraphRepository {
     );
   }
 
-  _PendingRelationCreation _takePending() {
-    final pending = _pendingCreation;
+  _PendingRelationCommand _takePending() {
+    final pending = _pendingCommand;
     if (pending == null) {
-      throw StateError('Тест не удерживает создание связи.');
+      throw StateError('Тест не удерживает команду связи.');
     }
-    _pendingCreation = null;
+    _pendingCommand = null;
     return pending;
   }
 }
 
-final class _PendingRelationCreation {
-  const _PendingRelationCreation(this.command, this.result);
+final class _PendingRelationCommand {
+  const _PendingRelationCommand(this.command, this.result);
 
-  final CreateLongTermRelation command;
+  final LongTermRelationCommand command;
   final Completer<LongTermRelationCommandResult> result;
 }
 
