@@ -82,7 +82,7 @@ final class RelationEditorViewModelProvider
 }
 
 String _$relationEditorViewModelHash() =>
-    r'6c950e130ad59f956dbfcb3aa889578d8b056d82';
+    r'5269fba762b04aa6a471f396c1c8289c09878168';
 
 /// Черновик одной формы создания долговременной связи.
 ///

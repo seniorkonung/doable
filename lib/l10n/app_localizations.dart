@@ -1136,6 +1136,12 @@ abstract class AppLocalizations {
   /// **'new relation'**
   String get graphOperationNewRelation;
 
+  /// Безопасное обозначение существующей связи
+  ///
+  /// In en, this message translates to:
+  /// **'relation'**
+  String get graphOperationRelation;
+
   /// Подтверждение успешного создания долговременной связи
   ///
   /// In en, this message translates to:
@@ -1183,6 +1189,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The relation couldn’t be created because of an unexpected error.'**
   String get relationEditorCreateUnexpected;
+
+  /// Подтверждение успешного изменения долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation updated.'**
+  String get relationEditorUpdated;
+
+  /// Ошибка проверки данных изменения связи
+  ///
+  /// In en, this message translates to:
+  /// **'Check the selected intentions and relation changes.'**
+  String get relationEditorUpdateInvalidInput;
+
+  /// Конфликт занятой направленной пары при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'A relation with this direction already exists between the selected intentions.'**
+  String get relationEditorUpdatePairOccupied;
+
+  /// Отсутствие изменяемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationEditorUpdateNotFound;
+
+  /// Отсутствие участника при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'One of the selected intentions no longer exists.'**
+  String get relationEditorUpdateParticipantNotFound;
+
+  /// Конфликт архивного состояния участника при изменении активной связи
+  ///
+  /// In en, this message translates to:
+  /// **'An active relation can only link active intentions.'**
+  String get relationEditorUpdateParticipantArchived;
+
+  /// Устранимая недоступность изменения связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be updated. Try again.'**
+  String get relationEditorUpdateUnavailable;
+
+  /// Терминальное повреждение данных при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t updated.'**
+  String get relationEditorUpdateCorruption;
+
+  /// Терминальная непредвиденная ошибка изменения связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be updated because of an unexpected error.'**
+  String get relationEditorUpdateUnexpected;
 
   /// Назначение перехода из строки соседства в подробный просмотр связи
   ///

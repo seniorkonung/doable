@@ -331,6 +331,26 @@ void main() {
     },
   );
 
+  testWidgets(
+    'успех изменения связи ждёт сообщение намерения в той же очереди',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final intention = harness.startDelete(index: 1, title: 'Намерение');
+      final relation = harness.startRelationUpdate();
+      harness.completeDeleted(intention);
+      harness.completeRelationUpdated(relation);
+      await tester.pumpAndSettle();
+
+      expect(find.text(_deleted('Намерение')), findsOneWidget);
+      expect(find.text(_relationUpdated), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_relationUpdated), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
   testWidgets('успех создания связи не предлагается инлайн-владельцу', (
     tester,
   ) async {
@@ -362,6 +382,43 @@ void main() {
       },
     );
   }
+
+  for (final scenario in _relationUpdateFailures) {
+    testWidgets(
+      'переданная ошибка изменения связи «${scenario.name}» предъявляется безопасным текстом',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester);
+        final relation = harness.startRelationUpdate();
+        harness.completeRelationFailure(relation, scenario.failure);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(_relationUpdateOutcome(scenario.outcome)),
+          findsOneWidget,
+        );
+
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets('изменение связи предъявляется на русском языке', (tester) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final relation = harness.startRelationUpdate();
+    harness.completeRelationFailure(
+      relation,
+      const LongTermRelationUnavailableFailure(),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Изменение — «связь»: Не удалось изменить связь. Повторите попытку.',
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('результат связи без фокуса ждёт возвращения в resumed', (
     tester,
@@ -425,6 +482,10 @@ String _relationOutcome(String outcome) => 'Create — “new relation”: $outc
 
 final _relationCreated = _relationOutcome('Relation created.');
 
+String _relationUpdateOutcome(String outcome) => 'Edit — “relation”: $outcome';
+
+final _relationUpdated = _relationUpdateOutcome('Relation updated.');
+
 final _relationFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
       (
@@ -476,8 +537,73 @@ final _relationFailures =
       ),
     ];
 
+final _relationUpdateFailures =
+    <({String name, LongTermRelationCommandFailure failure, String outcome})>[
+      (
+        name: 'validation',
+        failure: const LongTermRelationCommandValidationFailure(
+          CreateLongTermRelationValidationFailure.sameIntention,
+        ),
+        outcome: 'Check the selected intentions and relation changes.',
+      ),
+      (
+        name: 'pair conflict',
+        failure: LongTermRelationPairOccupiedFailure(_otherRelationId),
+        outcome:
+            'A relation with this direction already exists between the '
+            'selected intentions.',
+      ),
+      (
+        name: 'relation not found',
+        failure: LongTermRelationNotFoundFailure(_relationId),
+        outcome: 'This relation no longer exists.',
+      ),
+      (
+        name: 'participant not found',
+        failure: LongTermRelationParticipantNotFoundFailure(
+          role: RelationParticipantRole.related,
+          intentionId: testDetailsIntentionId(2),
+        ),
+        outcome: 'One of the selected intentions no longer exists.',
+      ),
+      (
+        name: 'participant archived',
+        failure: LongTermRelationParticipantArchivedFailure(
+          role: RelationParticipantRole.source,
+          intentionId: testDetailsIntentionId(1),
+        ),
+        outcome: 'An active relation can only link active intentions.',
+      ),
+      (
+        name: 'unavailable',
+        failure: const LongTermRelationUnavailableFailure(),
+        outcome: 'The relation couldn’t be updated. Try again.',
+      ),
+      (
+        name: 'corruption',
+        failure: const LongTermRelationCorruptionFailure(),
+        outcome: 'Stored data is damaged. The relation wasn’t updated.',
+      ),
+      (
+        name: 'unexpected',
+        failure: const LongTermRelationUnexpectedFailure(),
+        outcome:
+            'The relation couldn’t be updated because of an unexpected '
+            'error.',
+      ),
+    ];
+
 final _relationId = switch (LongTermRelationId.decode(
   '018f47c2-6b7d-7abc-8def-0123456789ab',
+)) {
+  LongTermRelationIdDecodingSuccess(:final id) => id,
+  InvalidLongTermRelationIdDecoding() => throw StateError(
+    'Некорректный fixture связи.',
+  ),
+};
+
+final _otherRelationId = switch (LongTermRelationId.decode(
+  '018f47c2-6b7d-7abc-8def-0123456789ac',
 )) {
   LongTermRelationIdDecodingSuccess(:final id) => id,
   InvalidLongTermRelationIdDecoding() => throw StateError(
@@ -560,6 +686,25 @@ final class _PresenterHarness {
     return accepted;
   }
 
+  LongTermRelationCommandAccepted startRelationUpdate({
+    bool releaseInitiator = true,
+  }) {
+    final commandIndex = repository.relationCommands.length;
+    final accepted = _coordinator.acceptRelationUpdate(
+      UpdateLongTermRelation(
+        relationId: _relationId,
+        patch: const LongTermRelationPatch(
+          priority: LongTermRelationFieldSet(RelationPriority.p1),
+        ),
+      ),
+    ) as LongTermRelationCommandAccepted;
+    if (releaseInitiator) {
+      _coordinator.releaseInitiatorPresentation(accepted.token);
+    }
+    _relationIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
     GraphOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
@@ -595,6 +740,48 @@ final class _PresenterHarness {
     );
   }
 
+  void completeRelationUpdated(LongTermRelationCommandAccepted accepted) {
+    const revision = TestDetailsRevision(2);
+    final before = LongTermRelation(
+      id: _relationId,
+      sourceIntentionId: testDetailsIntentionId(1),
+      relatedIntentionId: testDetailsIntentionId(2),
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: RelationScope.active,
+      creationSequence: RelationCreationSequence(1),
+    );
+    final after = LongTermRelation(
+      id: _relationId,
+      sourceIntentionId: testDetailsIntentionId(1),
+      relatedIntentionId: testDetailsIntentionId(2),
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p1,
+      scope: RelationScope.active,
+      creationSequence: RelationCreationSequence(1),
+    );
+    repository.completeRelationCommand(
+      _relationIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationUpdated(
+            before: before,
+            relation: after,
+            description: null,
+            changes: <GraphChange>[
+              LongTermRelationUpdatedChange(
+                revision: revision,
+                before: before,
+                after: after,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void completeRelationFailure(
     LongTermRelationCommandAccepted accepted,
     LongTermRelationCommandFailure failure,
@@ -613,7 +800,10 @@ final class _PresenterHarness {
   }
 }
 
-Future<_PresenterHarness> _pumpPresenterApp(WidgetTester tester) async {
+Future<_PresenterHarness> _pumpPresenterApp(
+  WidgetTester tester, {
+  Locale locale = const Locale('en'),
+}) async {
   final repository = ControlledDetailsRepository();
   final container = ProviderContainer(
     overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
@@ -627,7 +817,7 @@ Future<_PresenterHarness> _pumpPresenterApp(WidgetTester tester) async {
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
-        locale: const Locale('en'),
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => ValueListenableBuilder<int>(

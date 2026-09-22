@@ -619,6 +619,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationNewRelation => 'new relation';
 
   @override
+  String get graphOperationRelation => 'relation';
+
+  @override
   String get relationEditorCreated => 'Relation created.';
 
   @override
@@ -648,6 +651,40 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorCreateUnexpected =>
       'The relation couldn’t be created because of an unexpected error.';
+
+  @override
+  String get relationEditorUpdated => 'Relation updated.';
+
+  @override
+  String get relationEditorUpdateInvalidInput =>
+      'Check the selected intentions and relation changes.';
+
+  @override
+  String get relationEditorUpdatePairOccupied =>
+      'A relation with this direction already exists between the selected intentions.';
+
+  @override
+  String get relationEditorUpdateNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationEditorUpdateParticipantNotFound =>
+      'One of the selected intentions no longer exists.';
+
+  @override
+  String get relationEditorUpdateParticipantArchived =>
+      'An active relation can only link active intentions.';
+
+  @override
+  String get relationEditorUpdateUnavailable =>
+      'The relation couldn’t be updated. Try again.';
+
+  @override
+  String get relationEditorUpdateCorruption =>
+      'Stored data is damaged. The relation wasn’t updated.';
+
+  @override
+  String get relationEditorUpdateUnexpected =>
+      'The relation couldn’t be updated because of an unexpected error.';
 
   @override
   String get relationNeighborhoodOpenRelation => 'Opens the relation details';

@@ -225,11 +225,15 @@ String _relationMessage(
   AppLocalizations localizations,
   LongTermRelationCommandCompletion completion,
 ) {
-  final (operation, target) = switch (completion.kind) {
-    LongTermRelationCommandKind.create => (
-      localizations.graphOperationCreate,
+  final operation = switch (completion.kind) {
+    LongTermRelationCommandKind.create => localizations.graphOperationCreate,
+    LongTermRelationCommandKind.update => localizations.graphOperationUpdate,
+  };
+  final target = switch (completion.target) {
+    CreatingLongTermRelationOperationTarget() =>
       localizations.graphOperationNewRelation,
-    ),
+    ExistingLongTermRelationOperationTarget() =>
+      localizations.graphOperationRelation,
   };
   return localizations.graphOperationMessage(
     operation,
@@ -247,6 +251,10 @@ String _relationOutcomeFor(
       localizations.relationEditorCreated,
     (LongTermRelationCommandKind.create, LongTermRelationUpdated()) =>
       localizations.relationEditorCreateUnexpected,
+    (LongTermRelationCommandKind.update, LongTermRelationUpdated()) =>
+      localizations.relationEditorUpdated,
+    (LongTermRelationCommandKind.update, LongTermRelationCreated()) =>
+      localizations.relationEditorUpdateUnexpected,
   },
   GraphResultFailure(:final failure) => switch (completion.kind) {
     LongTermRelationCommandKind.create => switch (failure) {
@@ -266,6 +274,24 @@ String _relationOutcomeFor(
         localizations.relationEditorCreateCorruption,
       LongTermRelationUnexpectedFailure() =>
         localizations.relationEditorCreateUnexpected,
+    },
+    LongTermRelationCommandKind.update => switch (failure) {
+      LongTermRelationCommandValidationFailure() =>
+        localizations.relationEditorUpdateInvalidInput,
+      LongTermRelationPairOccupiedFailure() =>
+        localizations.relationEditorUpdatePairOccupied,
+      LongTermRelationNotFoundFailure() =>
+        localizations.relationEditorUpdateNotFound,
+      LongTermRelationParticipantNotFoundFailure() =>
+        localizations.relationEditorUpdateParticipantNotFound,
+      LongTermRelationParticipantArchivedFailure() =>
+        localizations.relationEditorUpdateParticipantArchived,
+      LongTermRelationUnavailableFailure() =>
+        localizations.relationEditorUpdateUnavailable,
+      LongTermRelationCorruptionFailure() =>
+        localizations.relationEditorUpdateCorruption,
+      LongTermRelationUnexpectedFailure() =>
+        localizations.relationEditorUpdateUnexpected,
     },
   },
 };
