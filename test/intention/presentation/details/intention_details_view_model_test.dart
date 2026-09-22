@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -1122,6 +1123,107 @@ void main() {
   });
 
   test(
+    'единый пакет обновляет подробные данные нескольких участников',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final first = testDetailsIntention(index: 71);
+      final second = testDetailsIntention(index: 72);
+      final firstProvider = intentionDetailsViewModelProvider(first.id);
+      final secondProvider = intentionDetailsViewModelProvider(second.id);
+      final firstSubscription = container.listen(firstProvider, (_, _) {});
+      final secondSubscription = container.listen(secondProvider, (_, _) {});
+      addTearDown(firstSubscription.close);
+      addTearDown(secondSubscription.close);
+      await waitForDetailRequests(repository, 2);
+      repository.detailRequests[0].add(
+        ResultSuccess(first),
+        revision: const TestDetailsRevision(1),
+      );
+      repository.detailRequests[1].add(
+        ResultSuccess(second),
+        revision: const TestDetailsRevision(1),
+      );
+      await pumpEventQueue();
+
+      final start =
+          container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptExisting(
+                    ArchiveIntention(first.id),
+                    presentationTitle: first.title,
+                  )
+              as IntentionCommandAccepted;
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(
+          first,
+          revision: const TestDetailsRevision(3),
+          additionalChanges: [
+            IntentionRelationCountsChanged(
+              revision: const TestDetailsRevision(3),
+              intentionId: first.id,
+              counts: testRelationCounts(),
+            ),
+            IntentionRelationCountsChanged(
+              revision: const TestDetailsRevision(3),
+              intentionId: second.id,
+              counts: testRelationCounts(activeNeedOutgoing: 2),
+            ),
+          ],
+        ),
+      );
+      final completion = await start.future;
+      expect(completion.confirmedChange?.changes, hasLength(3));
+      await waitForDetailRequests(repository, 4);
+      expect(repository.detailIds, [first.id, second.id, first.id, second.id]);
+
+      repository.detailRequests[2].add(
+        ResultSuccess(first),
+        revision: const TestDetailsRevision(2),
+      );
+      repository.detailRequests[3].add(
+        ResultSuccess(second),
+        revision: const TestDetailsRevision(2),
+      );
+      await pumpEventQueue();
+      expect(
+        (container.read(firstProvider) as IntentionDetailsLoaded).revision,
+        const TestDetailsRevision(1),
+      );
+      expect(
+        (container.read(secondProvider) as IntentionDetailsLoaded).revision,
+        const TestDetailsRevision(1),
+      );
+
+      repository.detailRequests[2].add(
+        ResultSuccess(first),
+        revision: const TestDetailsRevision(3),
+        relationCounts: testRelationCounts(activeNeedOutgoing: 1),
+      );
+      repository.detailRequests[3].add(
+        ResultSuccess(second),
+        revision: const TestDetailsRevision(3),
+        relationCounts: testRelationCounts(activeNeedOutgoing: 2),
+      );
+      await pumpEventQueue();
+      expect(
+        (container.read(
+          firstProvider,
+        ) as IntentionDetailsLoaded).details.activeRelationCount,
+        1,
+      );
+      expect(
+        (container.read(
+          secondProvider,
+        ) as IntentionDetailsLoaded).details.activeRelationCount,
+        2,
+      );
+    },
+  );
+
+  test(
     'повторно открытый details ждёт сводку после completion до первого чтения',
     () async {
       final repository = ControlledDetailsRepository();
@@ -1202,7 +1304,8 @@ void main() {
       0,
       const ResultFailure(IntentionUnavailableFailure()),
     );
-    await (start as IntentionCommandAccepted).future;
+    final completion = await (start as IntentionCommandAccepted).future;
+    expect(completion.confirmedChange, isNull);
     await pumpEventQueue();
 
     expect(repository.detailRequests, hasLength(1));

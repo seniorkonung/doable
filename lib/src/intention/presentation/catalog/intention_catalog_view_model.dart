@@ -4,7 +4,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
-import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
@@ -588,25 +587,14 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   ///
   /// Отказ не согласует данные: подтверждённого пакета у него нет.
   void _handleCompletion(GraphCommandCompletion completion) {
-    switch (completion) {
-      case IntentionCommandCompletion(:final confirmedResult):
-        switch (confirmedResult) {
-          case ResultSuccess(:final value):
-            _reconcilePackage(
-              _CatalogChangePackage(value.revision, value.changes),
-            );
-          case ResultFailure():
-            return;
-        }
-      case LongTermRelationCommandCompletion(:final confirmedResult):
-        switch (confirmedResult) {
-          case GraphResultSuccess(:final value):
-            _reconcilePackage(
-              _CatalogChangePackage(value.revision, value.changes),
-            );
-          case GraphResultFailure():
-            return;
-        }
+    final confirmedChange = completion.confirmedChange;
+    if (confirmedChange != null) {
+      _reconcilePackage(
+        _CatalogChangePackage(
+          confirmedChange.revision,
+          confirmedChange.changes,
+        ),
+      );
     }
   }
 

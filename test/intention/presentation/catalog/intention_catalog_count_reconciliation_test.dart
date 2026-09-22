@@ -354,7 +354,7 @@ void main() {
     );
     expect(_loaded(container), same(beforeNoOp));
 
-    await completeRelationCommand(
+    final failedCompletion = await completeRelationCommand(
       container,
       repository,
       UpdateLongTermRelation(
@@ -368,6 +368,7 @@ void main() {
         LongTermRelationCommandFailure
       >(LongTermRelationUnavailableFailure()),
     );
+    expect(failedCompletion.confirmedChange, isNull);
     expect(_loaded(container), same(beforeNoOp));
 
     final archived = _copyRelation(
@@ -489,7 +490,7 @@ void main() {
 
     final first = testSummary(index: 1);
     final second = testSummary(index: 2);
-    await completeRelationCommand(
+    final completion = await completeRelationCommand(
       container,
       repository,
       _createRelation(first.id, second.id),
@@ -502,6 +503,16 @@ void main() {
           activeCounts: {first.id: 1, second.id: 1},
         ),
       ),
+    );
+
+    final confirmed = completion.confirmedChange;
+    expect(confirmed, isNotNull);
+    expect(confirmed!.revision, const TestCatalogRevision(2));
+    expect(
+      confirmed.changes.whereType<IntentionRelationCountsChanged>().map(
+        (change) => change.intentionId,
+      ),
+      [first.id, second.id],
     );
 
     repository.complete(
