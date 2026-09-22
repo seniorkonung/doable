@@ -1286,6 +1286,30 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be loaded because of an unexpected error.'**
   String get relationDetailsUnexpected;
 
+  /// Согласование сохранённого подробного просмотра связи с новой ревизией
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing relation details…'**
+  String get relationDetailsRefreshing;
+
+  /// Устранимая ошибка обновления при сохранённых подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation details couldn’t be refreshed. Previously confirmed data is still shown.'**
+  String get relationDetailsRefreshUnavailable;
+
+  /// Повреждение при обновлении с сохранением прежних подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. Previously confirmed relation details are still shown.'**
+  String get relationDetailsRefreshCorruption;
+
+  /// Непредвиденная ошибка обновления с сохранением прежних подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation details couldn’t be refreshed because of an unexpected error. Previously confirmed data is still shown.'**
+  String get relationDetailsRefreshUnexpected;
+
   /// Подпись типа связи в подробном просмотре
   ///
   /// In en, this message translates to:
