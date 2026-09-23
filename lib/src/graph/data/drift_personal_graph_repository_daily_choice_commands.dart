@@ -10,6 +10,9 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
     if (command is ReplaceDailyChoicePath) {
       return _replaceDailyChoicePath(command);
     }
+    if (command is DeleteDailyChoice) {
+      return _deleteDailyChoice(command);
+    }
     final stopwatch = Stopwatch()..start();
     var stage = DailyChoiceCommandDiagnosticsStage.validation;
     void record(DiagnosticsStatus status) => _recordDiagnostics(
@@ -555,6 +558,125 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
         ),
       );
       return GraphCommandFailed(_classifyDailyChoiceCommandFailure(error));
+    }
+  }
+
+  Future<DailyChoiceCommandResult> _deleteDailyChoice(
+    DeleteDailyChoice command,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    var stage = DailyChoiceCommandDiagnosticsStage.validation;
+    void record(DiagnosticsStatus status) => _recordDiagnostics(
+      DailyChoiceCommandDiagnosticsEvent(
+        commandType: DailyChoiceCommandDiagnosticsType.delete,
+        stage: stage,
+        status: status,
+      ),
+    );
+
+    record(const DiagnosticsStarted());
+    try {
+      final confirmed = await _sequencer.run(() async {
+        final committed = await _database.transaction(() async {
+          final existing = await _readVerifiedDailyChoice(command.choiceId);
+          if (existing == null) throw const DailyChoiceNotFoundFailure();
+          final before = existing.choice;
+          final participants = {
+            before.sourceIntentionId,
+            before.selectedIntentionId,
+          };
+          final countsBefore = await _readVerifiedRelationCountsFor(
+            participants,
+          );
+          final released = existing.path
+              .map((item) => item.relation.id)
+              .toSet();
+          record(DiagnosticsSucceeded(stopwatch.elapsed));
+          stage = DailyChoiceCommandDiagnosticsStage.write;
+          record(const DiagnosticsStarted());
+
+          final deletedRows =
+              await (_database.delete(_database.dailyChoices)..where(
+                    (row) =>
+                        row.id.equals(command.choiceId.toCanonicalString()),
+                  ))
+                  .go();
+          if (deletedRows != 1) throw const _StoredIntentionCorruption();
+          record(DiagnosticsSucceeded(stopwatch.elapsed));
+          stage = DailyChoiceCommandDiagnosticsStage.resultRead;
+          record(const DiagnosticsStarted());
+
+          if (await _readVerifiedDailyChoice(command.choiceId) != null) {
+            throw const _StoredIntentionCorruption();
+          }
+          final remainingSteps = await _database
+              .customSelect(
+                '''SELECT COUNT(*) AS remaining_steps FROM daily_choice_path_steps
+               WHERE daily_choice_id = ?''',
+                variables: [
+                  Variable<String>(command.choiceId.toCanonicalString()),
+                ],
+                readsFrom: {_database.dailyChoicePathSteps},
+              )
+              .getSingle();
+          if (remainingSteps.read<int>('remaining_steps') != 0) {
+            throw const _StoredIntentionCorruption();
+          }
+          final counts = await _readVerifiedRelationCountsFor(participants);
+          for (final id in participants) {
+            final previous = countsBefore[id]!;
+            final current = counts[id]!;
+            if (current.dailySource !=
+                    previous.dailySource -
+                        (id == before.sourceIntentionId ? 1 : 0) ||
+                current.dailySelected !=
+                    previous.dailySelected -
+                        (id == before.selectedIntentionId ? 1 : 0) ||
+                current.longTermTotal != previous.longTermTotal) {
+              throw const _StoredIntentionCorruption();
+            }
+          }
+          final permissions =
+              <LongTermRelationId, LongTermRelationPermissions>{};
+          final relationIds = released.toList();
+          for (var start = 0; start < relationIds.length; start += 400) {
+            permissions.addAll(
+              await _relationCountAggregates.readPermissions(
+                relationIds.skip(start).take(400),
+              ),
+            );
+          }
+          if (permissions.length != released.length) {
+            throw const _StoredIntentionCorruption();
+          }
+          final revision = _DriftGraphRevision(_epoch, _mutationSequence + 1);
+          final change = DailyChoiceChange(
+            revision: revision,
+            before: before,
+            after: null,
+            releasedRelationIds: released,
+            occupiedRelationIds: const [],
+            intentionCounts: counts,
+            relationPermissions: permissions,
+          );
+          final success = DailyChoiceDeleted(choice: before, changes: [change]);
+          record(DiagnosticsSucceeded(stopwatch.elapsed));
+          return ConfirmedGraphResult(revision: revision, value: success);
+        });
+        _mutationSequence++;
+        _notifyGraphWatchersFor(committed.changes);
+        return committed;
+      });
+      return GraphCommandSucceeded(confirmed);
+    } on Object catch (error) {
+      final failure = _classifyDailyChoiceCommandFailure(error);
+      record(
+        DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: _graphCommandDiagnosticsFailureCode(failure),
+        ),
+      );
+      return GraphCommandFailed(failure);
     }
   }
 
