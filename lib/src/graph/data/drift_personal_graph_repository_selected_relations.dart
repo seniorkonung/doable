@@ -152,7 +152,7 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
     _selectedRelationsWatchers.add(registration);
     GraphRevision? lastSuccessfulRevision;
     try {
-      var result = await _readSelectedRelations(
+      var result = await _readCurrentSelectedRelations(
         query,
         registration: registration,
       );
@@ -166,7 +166,7 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
             case GraphRevisionOrder.same) {
           continue;
         }
-        result = await _readSelectedRelations(
+        result = await _readCurrentSelectedRelations(
           query,
           registration: registration,
         );
@@ -185,6 +185,23 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
     }
   }
 
+  Future<SelectedRelationsReadResult> _readCurrentSelectedRelations(
+    SelectedRelationsQuery query, {
+    required _SelectedRelationsWatchRegistration registration,
+  }) async {
+    while (true) {
+      final result = await _readSelectedRelations(
+        query,
+        registration: registration,
+      );
+      if (result is! SelectedRelationsReadSuccess ||
+          result.value.revision.compareTo(_currentRevision) !=
+              GraphRevisionOrder.older) {
+        return result;
+      }
+    }
+  }
+
   void _notifySelectedRelationsWatchersFor(Iterable<GraphChange> changes) {
     final affectedRelations = <LongTermRelationId>{};
     final affectedParticipants = <IntentionId>{};
@@ -199,6 +216,13 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
           if (afterId != null) affectedParticipants.add(afterId);
         case LongTermRelationChange(:final id):
           affectedRelations.add(id);
+        case DailyChoiceChange(
+          :final releasedRelationIds,
+          :final occupiedRelationIds,
+        ):
+          affectedRelations
+            ..addAll(releasedRelationIds)
+            ..addAll(occupiedRelationIds);
         case GraphChange():
           break;
       }

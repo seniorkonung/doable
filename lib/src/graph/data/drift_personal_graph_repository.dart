@@ -80,6 +80,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
+  final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
+  _dailyChoiceWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
   final Set<_SelectedRelationsWatchRegistration> _selectedRelationsWatchers =
@@ -95,6 +97,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
       _readDailyChoice(id);
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      _watchDailyChoice(id);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -464,6 +470,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           final afterId = after?.summary.id;
           if (beforeId != null) affected.add(beforeId);
           if (afterId != null) affected.add(afterId);
+        case DailyChoiceChange(:final intentionCounts):
+          affected.addAll(intentionCounts.keys);
         case GraphChange():
           break;
       }
@@ -476,6 +484,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   void _notifyGraphWatchersFor(Iterable<GraphChange> changes) {
     final stableChanges = List<GraphChange>.unmodifiable(changes);
     _notifyIntentionWatchersFor(stableChanges);
+    _notifyDailyChoiceWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
     _notifySelectedRelationsWatchersFor(stableChanges);
   }

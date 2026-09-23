@@ -802,6 +802,12 @@ final class _ControlledGraphRepository implements PersonalGraphRepository {
       );
 
   @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
+  @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
   ) => throw UnsupportedError(
@@ -890,6 +896,12 @@ final class _ControlledPersonalGraphRepository
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
       throw UnsupportedError(
         'Чтение дневного выбора не используется этим тестом.',
+      );
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
       );
 
   @override
