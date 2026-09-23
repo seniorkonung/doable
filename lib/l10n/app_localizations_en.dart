@@ -221,6 +221,54 @@ class AppLocalizationsEn extends AppLocalizations {
   String get blockingRelationsEditSelectionAction => 'Return to selection';
 
   @override
+  String get blockingRelationsRefreshSelectionAction => 'Refresh selection';
+
+  @override
+  String get blockingRelationsRefreshingSelection =>
+      'Checking selected relations…';
+
+  @override
+  String blockingRelationsInvalidSelectedRelationId(String id) {
+    return 'Relation: $id';
+  }
+
+  @override
+  String get blockingRelationsInvalidMissing =>
+      'This relation no longer exists. Remove it from the selection and confirm the remaining set again.';
+
+  @override
+  String get blockingRelationsInvalidMoved =>
+      'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.';
+
+  @override
+  String get blockingRelationsRefreshIntentionNotFound =>
+      'This intention no longer exists. Its relations cannot be deleted here.';
+
+  @override
+  String get blockingRelationsRefreshUnavailable =>
+      'Selected relations could not be checked. Your selection is unchanged; try checking again.';
+
+  @override
+  String get blockingRelationsRefreshCorruption =>
+      'Selected relations could not be checked because the data is damaged. Deletion was not started.';
+
+  @override
+  String get blockingRelationsRefreshUnexpected =>
+      'Selected relations could not be checked. Deletion was not started.';
+
+  @override
+  String get blockingRelationsDeleteMissing =>
+      'A selected relation no longer exists. Refresh the selection and confirm it again.';
+
+  @override
+  String get blockingRelationsDeleteMoved =>
+      'A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.';
+
+  @override
+  String get blockingRelationsDeleteProhibited =>
+      'A selected relation can no longer be deleted. Refresh the selection and confirm it again.';
+
+  @override
   String get relationNeighborhoodSummaryLoading =>
       'Loading relations and summary…';
 

@@ -464,6 +464,78 @@ abstract class AppLocalizations {
   /// **'Return to selection'**
   String get blockingRelationsEditSelectionAction;
 
+  /// Явная актуализация выбранного набора после конфликта или перед просмотром
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh selection'**
+  String get blockingRelationsRefreshSelectionAction;
+
+  /// Состояние проверки выбранных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Checking selected relations…'**
+  String get blockingRelationsRefreshingSelection;
+
+  /// Идентификатор недоступной выбранной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation: {id}'**
+  String blockingRelationsInvalidSelectedRelationId(String id);
+
+  /// Причина устаревания выбранной связи: удалена
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists. Remove it from the selection and confirm the remaining set again.'**
+  String get blockingRelationsInvalidMissing;
+
+  /// Причина устаревания выбранной связи: заменён участник
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.'**
+  String get blockingRelationsInvalidMoved;
+
+  /// Безопасное отсутствие намерения при проверке выбора
+  ///
+  /// In en, this message translates to:
+  /// **'This intention no longer exists. Its relations cannot be deleted here.'**
+  String get blockingRelationsRefreshIntentionNotFound;
+
+  /// Устранимая ошибка чтения выбранного набора
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations could not be checked. Your selection is unchanged; try checking again.'**
+  String get blockingRelationsRefreshUnavailable;
+
+  /// Повреждение данных при чтении выбранного набора
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations could not be checked because the data is damaged. Deletion was not started.'**
+  String get blockingRelationsRefreshCorruption;
+
+  /// Неожиданная ошибка чтения выбранного набора
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations could not be checked. Deletion was not started.'**
+  String get blockingRelationsRefreshUnexpected;
+
+  /// Конфликт массового удаления: выбранная связь отсутствует
+  ///
+  /// In en, this message translates to:
+  /// **'A selected relation no longer exists. Refresh the selection and confirm it again.'**
+  String get blockingRelationsDeleteMissing;
+
+  /// Конфликт массового удаления: связь сменила участников
+  ///
+  /// In en, this message translates to:
+  /// **'A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.'**
+  String get blockingRelationsDeleteMoved;
+
+  /// Конфликт массового удаления: связь заблокирована
+  ///
+  /// In en, this message translates to:
+  /// **'A selected relation can no longer be deleted. Refresh the selection and confirm it again.'**
+  String get blockingRelationsDeleteProhibited;
+
   /// Первоначальная загрузка соседства и полной сводки
   ///
   /// In en, this message translates to:

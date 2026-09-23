@@ -24,6 +24,9 @@ final class ControlledNeighborhoodRepository
   final intentionIds = <IntentionId>[];
   final intentionCommands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
+  final _relationRows = <LongTermRelationId, LongTermRelationSummary>{};
+  RelationCounts? _latestCounts;
+  GraphRevision? _latestRevision;
   final _intentionController =
       StreamController<Result<GraphSnapshot<IntentionDetails?>>>.broadcast(
         sync: true,
@@ -41,6 +44,13 @@ final class ControlledNeighborhoodRepository
   }
 
   void completePage(int index, RelationGroupPage page) {
+    for (final row in page.items) {
+      _relationRows[row.relation.id] = row;
+    }
+    if (page is RelationGroupFirstPage) {
+      _latestCounts = page.counts;
+      _latestRevision = page.revision;
+    }
     complete(index, GraphResultSuccess(page));
   }
 
@@ -117,11 +127,30 @@ final class ControlledNeighborhoodRepository
   @override
   Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
     IntentionId intentionId,
-  ) => throw UnsupportedError('Отдельная сводка не читается этим тестом.');
+  ) async => switch ((_latestCounts, _latestRevision)) {
+    (final RelationCounts counts, final GraphRevision revision) =>
+      ResultSuccess(GraphSnapshot(value: counts, revision: revision)),
+    _ => const ResultFailure(IntentionUnexpectedFailure()),
+  };
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
-      throw UnsupportedError('Подробные данные связи не наблюдаются здесь.');
+      Stream.value(
+        LongTermRelationReadSuccess(
+          GraphSnapshot(
+            value: switch (_relationRows[id]) {
+              null => null,
+              final row => LongTermRelationDetails(
+                relation: row.relation,
+                source: row.source,
+                related: row.related,
+                description: null,
+              ),
+            },
+            revision: _latestRevision ?? const TestGraphRevision(0),
+          ),
+        ),
+      );
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(

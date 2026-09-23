@@ -6,9 +6,16 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_confirmation.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -126,9 +133,12 @@ void main() {
       harness.select(second);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await _finishSelectionRead(tester, harness);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
+      await tester.scrollUntilVisible(
         find.byKey(const ValueKey('blocking-relations-cancel')),
+        200,
+        scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('blocking-relations-cancel')));
@@ -150,7 +160,11 @@ void main() {
       final confirm = find.byKey(
         const ValueKey('blocking-relations-confirm-delete'),
       );
-      await tester.ensureVisible(confirm);
+      await tester.scrollUntilVisible(
+        confirm,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
       await tester.pumpAndSettle();
       await tester.tap(confirm);
       await tester.tap(confirm, warnIfMissed: false);
@@ -186,11 +200,17 @@ void main() {
     harness.select(testGroupRow(ownerId: harness.intentionId, index: 1));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await _finishSelectionRead(tester, harness);
     await tester.pumpAndSettle();
     final confirm = find.byKey(
       const ValueKey('blocking-relations-confirm-delete'),
     );
-    await tester.ensureVisible(confirm);
+    await tester.scrollUntilVisible(
+      confirm,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(confirm);
     await tester.pump();
     expect(find.text('Удаляем выбранные связи…'), findsOneWidget);
@@ -238,6 +258,203 @@ void main() {
       );
     },
   );
+
+  testWidgets('конфликт показывает недоступную связь до явного исправления', (
+    tester,
+  ) async {
+    final harness = await _pumpAction(tester, const Locale('ru'));
+    final first = testGroupRow(ownerId: harness.intentionId, index: 1);
+    final missing = testGroupRow(
+      ownerId: harness.intentionId,
+      index: 2,
+      type: LongTermRelationType.can,
+      direction: RelationDirection.incoming,
+      scope: RelationScope.archived,
+    );
+    harness.select(first);
+    harness.select(missing);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await _finishSelectionRead(tester, harness);
+    await tester.pumpAndSettle();
+    final confirm = find.byKey(
+      const ValueKey('blocking-relations-confirm-delete'),
+    );
+    await tester.scrollUntilVisible(
+      confirm,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await tester.pump();
+    expect(harness.repository.commands, hasLength(1));
+
+    harness.repository.rows.remove(missing.relation.id);
+    harness.repository.requests.single.complete(
+      GraphCommandFailed<
+        BlockingRelationsDeleted,
+        DeleteBlockingRelationsFailure
+      >(
+        DeleteBlockingRelationsSelectionConflictFailure(
+          relationId: missing.relation.id,
+          reason: BlockingRelationConflictReason.relationMissing,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('blocking-relations-refresh-selection')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('blocking-relations-refresh-selection')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(
+        ValueKey(
+          'blocking-relations-invalid-${missing.relation.id.toCanonicalString()}',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('blocking-relations-review')),
+      findsNothing,
+    );
+    expect(harness.repository.commands, hasLength(1));
+
+    await tester.tap(
+      find.byKey(
+        ValueKey(
+          'blocking-relations-remove-invalid-${missing.relation.id.toCanonicalString()}',
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      confirm,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await tester.pump();
+    expect(harness.repository.commands, hasLength(2));
+    expect(
+      (harness.repository.commands.last as DeleteBlockingRelations).relationIds,
+      {first.relation.id},
+    );
+  });
+
+  testWidgets('просмотр получает изменённые поля выбранной связи', (
+    tester,
+  ) async {
+    final harness = await _pumpAction(tester, const Locale('en'));
+    final original = testGroupRow(ownerId: harness.intentionId, index: 1);
+    harness.select(original);
+    harness.repository.rows[original.relation.id] = testGroupRow(
+      ownerId: harness.intentionId,
+      index: 1,
+      type: LongTermRelationType.can,
+      scope: RelationScope.archived,
+      neighborTitle: 'New title',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('To Намерение-владелец, you can New title'),
+      findsOneWidget,
+    );
+    expect(find.text('Archived relation'), findsWidgets);
+    expect(harness.repository.commands, isEmpty);
+  });
+
+  testWidgets('открытое подтверждение показывает новые поля без смены набора', (
+    tester,
+  ) async {
+    final harness = await _pumpAction(tester, const Locale('ru'));
+    final original = testGroupRow(ownerId: harness.intentionId, index: 1);
+    harness.select(original);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await tester.pumpAndSettle();
+
+    final changed = testGroupRow(
+      ownerId: harness.intentionId,
+      index: 1,
+      type: LongTermRelationType.can,
+      scope: RelationScope.archived,
+      priority: RelationPriority.p1,
+      neighborTitle: 'Новое название',
+    );
+    harness.repository.emitRelation(
+      changed,
+      revision: const TestGraphRevision(5),
+      description: 'Новое описание',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Чтобы Намерение-владелец, можно Новое название'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('P1'), findsWidgets);
+    expect(find.text('Новое описание'), findsOneWidget);
+    expect(find.text('Связь в архиве'), findsWidgets);
+
+    harness.repository.emitRelation(
+      original,
+      revision: const TestGraphRevision(4),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Новое описание'), findsOneWidget);
+    expect(harness.repository.commands, isEmpty);
+  });
+
+  testWidgets(
+    'ошибка актуализации сохраняет выбор и не открывает подтверждение',
+    (tester) async {
+      final harness = await _pumpAction(tester, const Locale('ru'));
+      final row = testGroupRow(ownerId: harness.intentionId, index: 1);
+      harness.select(row);
+      harness.repository.readFailure =
+          const LongTermRelationReadUnavailableFailure();
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('blocking-relations-confirm-delete')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('blocking-relations-refresh-retry')),
+        findsOneWidget,
+      );
+      expect(harness.repository.commands, isEmpty);
+      expect(
+        harness.container
+            .read(
+              blockingRelationsSelectionViewModelProvider(harness.intentionId),
+            )
+            .selected
+            .keys,
+        {row.relation.id},
+      );
+      harness.repository.readFailure = null;
+      await tester.tap(
+        find.byKey(const ValueKey('blocking-relations-refresh-retry')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('blocking-relations-review')),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
 Future<_Harness> _pumpAction(WidgetTester tester, Locale locale) async {
@@ -265,7 +482,28 @@ Future<_Harness> _pumpAction(WidgetTester tester, Locale locale) async {
   return harness
     ..container = ProviderScope.containerOf(
       tester.element(find.byType(BlockingRelationsConfirmationAction)),
+    )
+    ..repository.isPrepared = () => harness.container.read(
+      blockingRelationsSelectionViewModelProvider(harness.intentionId),
+    ) is BlockingRelationsSelectionPrepared;
+}
+
+Future<void> _finishSelectionRead(WidgetTester tester, _Harness harness) async {
+  for (var attempt = 0; attempt < 50; attempt++) {
+    await tester.pump(const Duration(milliseconds: 1));
+    final state = harness.container.read(
+      blockingRelationsSelectionViewModelProvider(harness.intentionId),
     );
+    if (state is! BlockingRelationsSelectionRefreshing &&
+        (state is! BlockingRelationsSelectionPrepared ||
+            find
+                .byKey(const ValueKey('blocking-relations-confirm-list'))
+                .evaluate()
+                .isNotEmpty)) {
+      return;
+    }
+  }
+  fail('Проверка выбранного набора не завершилась.');
 }
 
 final class _Harness {
@@ -275,12 +513,98 @@ final class _Harness {
 
   bool select(LongTermRelationSummary row) => container
       .read(blockingRelationsSelectionViewModelProvider(intentionId).notifier)
-      .select(row);
+      .select(repository.rows[row.relation.id] = row);
 }
 
 final class _CommandRepository implements PersonalGraphRepository {
   final commands = <GraphCommand>[];
   final requests = <Completer<Object>>[];
+  final rows = <LongTermRelationId, LongTermRelationSummary>{};
+  final _relationUpdates =
+      <LongTermRelationId, StreamController<LongTermRelationReadResult>>{};
+  LongTermRelationReadFailure? readFailure;
+  bool Function()? isPrepared;
+
+  @override
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) async => ResultSuccess(
+    GraphSnapshot(
+      value: testRelationCounts(),
+      revision: const TestGraphRevision(1),
+    ),
+  );
+
+  void emitRelation(
+    LongTermRelationSummary row, {
+    required GraphRevision revision,
+    String? description,
+  }) {
+    rows[row.relation.id] = row;
+    _relationUpdates[row.relation.id]?.add(
+      LongTermRelationReadSuccess(
+        GraphSnapshot(
+          value: LongTermRelationDetails(
+            relation: row.relation,
+            source: row.source,
+            related: row.related,
+            description: description == null
+                ? null
+                : LongTermRelationDescription.fromInput(description),
+          ),
+          revision: revision,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) => Stream.value(
+    ResultSuccess(
+      GraphSnapshot(
+        value: IntentionDetails(
+          intention: testNeighborhoodIntention(id: id),
+          relationCounts: testRelationCounts(),
+        ),
+        revision: const TestGraphRevision(1),
+      ),
+    ),
+  );
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
+    if (!(isPrepared?.call() ?? false)) {
+      return Stream.value(_currentRelation(id));
+    }
+    return Stream.multi((controller) {
+      controller.addSync(_currentRelation(id));
+      final subscription = _relationUpdates
+          .putIfAbsent(id, () => StreamController.broadcast(sync: true))
+          .stream
+          .listen(controller.addSync);
+      controller.onCancel = subscription.cancel;
+    });
+  }
+
+  LongTermRelationReadResult _currentRelation(LongTermRelationId id) =>
+      readFailure != null
+      ? LongTermRelationReadError(readFailure!)
+      : LongTermRelationReadSuccess(
+          GraphSnapshot(
+            value: switch (rows[id]) {
+              null => null,
+              final row => LongTermRelationDetails(
+                relation: row.relation,
+                source: row.source,
+                related: row.related,
+                description: null,
+              ),
+            },
+            revision: const TestGraphRevision(2),
+          ),
+        );
 
   @override
   Future<GraphCommandResult<T, F>> execute<

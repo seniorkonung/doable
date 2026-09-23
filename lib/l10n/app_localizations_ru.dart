@@ -222,6 +222,54 @@ class AppLocalizationsRu extends AppLocalizations {
   String get blockingRelationsEditSelectionAction => 'Вернуться к выбору';
 
   @override
+  String get blockingRelationsRefreshSelectionAction => 'Актуализировать выбор';
+
+  @override
+  String get blockingRelationsRefreshingSelection =>
+      'Проверяем выбранные связи…';
+
+  @override
+  String blockingRelationsInvalidSelectedRelationId(String id) {
+    return 'Связь: $id';
+  }
+
+  @override
+  String get blockingRelationsInvalidMissing =>
+      'Связь больше не существует. Уберите её из выбора и подтвердите оставшийся набор заново.';
+
+  @override
+  String get blockingRelationsInvalidMoved =>
+      'Связь больше не принадлежит этому намерению. Уберите её из выбора и подтвердите оставшийся набор заново.';
+
+  @override
+  String get blockingRelationsRefreshIntentionNotFound =>
+      'Намерение больше не существует. Удаление связей недоступно.';
+
+  @override
+  String get blockingRelationsRefreshUnavailable =>
+      'Не удалось проверить выбранные связи. Сохранённый выбор не изменён; повторите проверку.';
+
+  @override
+  String get blockingRelationsRefreshCorruption =>
+      'Не удалось проверить выбранные связи из-за повреждённых данных. Удаление не запущено.';
+
+  @override
+  String get blockingRelationsRefreshUnexpected =>
+      'Не удалось проверить выбранные связи. Удаление не запущено.';
+
+  @override
+  String get blockingRelationsDeleteMissing =>
+      'Одна выбранная связь больше не существует. Актуализируйте выбор и подтвердите его заново.';
+
+  @override
+  String get blockingRelationsDeleteMoved =>
+      'Одна выбранная связь больше не принадлежит этому намерению. Актуализируйте выбор и подтвердите его заново.';
+
+  @override
+  String get blockingRelationsDeleteProhibited =>
+      'Удаление одной выбранной связи теперь заблокировано. Актуализируйте выбор и подтвердите его заново.';
+
+  @override
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
 
   @override

@@ -9,11 +9,13 @@ final class BlockingRelationsPreparedSelection {
   BlockingRelationsPreparedSelection._({
     required this.command,
     required this.rows,
+    required this.descriptions,
   });
 
   factory BlockingRelationsPreparedSelection.fromSelected({
     required IntentionId intentionId,
     required Map<LongTermRelationId, LongTermRelationSummary> selected,
+    Map<LongTermRelationId, String?> descriptions = const {},
   }) {
     final rows = List<LongTermRelationSummary>.unmodifiable(selected.values);
     return BlockingRelationsPreparedSelection._(
@@ -22,11 +24,13 @@ final class BlockingRelationsPreparedSelection {
         relationIds: rows.map((row) => row.relation.id),
       ),
       rows: rows,
+      descriptions: Map.unmodifiable(descriptions),
     );
   }
 
   final DeleteBlockingRelations command;
   final List<LongTermRelationSummary> rows;
+  final Map<LongTermRelationId, String?> descriptions;
 }
 
 /// Выбор принадлежит одному намерению и не зависит от кэша соседства.
@@ -40,12 +44,46 @@ sealed class BlockingRelationsSelectionState {
   final Map<LongTermRelationId, LongTermRelationSummary> selected;
 }
 
+enum BlockingRelationsInvalidReason { missing, noLongerBlocking }
+
 final class BlockingRelationsSelectionEditing
     extends BlockingRelationsSelectionState {
   BlockingRelationsSelectionEditing({
     required super.intentionId,
     required super.selected,
+    Map<LongTermRelationId, BlockingRelationsInvalidReason> invalidReasons =
+        const {},
+  }) : invalidReasons = Map.unmodifiable(invalidReasons);
+
+  /// Эти идентификаторы остаются видимыми до явного исправления выбора.
+  final Map<LongTermRelationId, BlockingRelationsInvalidReason> invalidReasons;
+  Set<LongTermRelationId> get invalidIds => invalidReasons.keys.toSet();
+}
+
+final class BlockingRelationsSelectionRefreshing
+    extends BlockingRelationsSelectionState {
+  BlockingRelationsSelectionRefreshing({
+    required super.intentionId,
+    required super.selected,
   });
+}
+
+enum BlockingRelationsRefreshFailure {
+  intentionNotFound,
+  unavailable,
+  corruption,
+  unexpected,
+}
+
+final class BlockingRelationsSelectionRefreshFailed
+    extends BlockingRelationsSelectionState {
+  BlockingRelationsSelectionRefreshFailed({
+    required super.intentionId,
+    required super.selected,
+    required this.failure,
+  });
+
+  final BlockingRelationsRefreshFailure failure;
 }
 
 final class BlockingRelationsSelectionPrepared
