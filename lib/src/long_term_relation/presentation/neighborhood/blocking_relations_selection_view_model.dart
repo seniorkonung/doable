@@ -12,6 +12,7 @@ import '../../../graph/application/selected_relations.dart';
 import '../../../intention/application/intention_result.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation_id.dart';
 import 'blocking_relations_selection_state.dart';
 
@@ -333,7 +334,13 @@ final class BlockingRelationsSelectionViewModel
         case SelectedRelationNoLongerBlocking():
           invalidReasons[id] = BlockingRelationsInvalidReason.noLongerBlocking;
         case SelectedRelationPresent(:final details):
-          invalidReasons.remove(id);
+          if (details.permissions.restriction ==
+              LongTermRelationPermissionRestriction.referencedByDailyPath) {
+            invalidReasons[id] =
+                BlockingRelationsInvalidReason.referencedByDailyPath;
+          } else {
+            invalidReasons.remove(id);
+          }
           descriptions[id] = details.description?.value;
           refreshed[id] = LongTermRelationSummary(
             relation: details.relation,

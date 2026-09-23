@@ -6,6 +6,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
@@ -19,6 +20,100 @@ import 'relation_details_test_support.dart';
 
 void main() {
   const revision = TestGraphRevision(1);
+
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    testWidgets(
+      'зависимость дневного пути объясняет запрет удаления на ${locale.languageCode}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledRelationDetailsRepository();
+        addTearDown(repository.dispose);
+        final relationId = testRelationId(101);
+        await _pumpRelationDetails(
+          tester,
+          repository,
+          relationId,
+          locale: locale,
+          textScaler: const TextScaler.linear(2.5),
+        );
+        repository
+            .watchAt(0)
+            .emitDetails(
+              testRelationDetails(
+                relationId: relationId,
+                sourceId: testIntentionId(1),
+                relatedId: testIntentionId(2),
+                permissions:
+                    const LongTermRelationPermissions.referencedByDailyPath(),
+              ),
+              revision: revision,
+            );
+        await tester.pumpAndSettle();
+
+        final delete = tester.widget<OutlinedButton>(
+          find.byKey(const ValueKey('relation-details-delete-relation')),
+        );
+        expect(delete.onPressed, isNull);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('relation-details-edit-relation')),
+              )
+              .onPressed,
+          isNotNull,
+        );
+        final reason = find.byKey(
+          const ValueKey('relation-details-path-protection'),
+        );
+        expect(reason, findsOneWidget);
+        expect(
+          tester.getSemantics(reason).label,
+          contains(locale.languageCode == 'ru' ? 'дневном пути' : 'daily path'),
+        );
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
+  testWidgets('новая зависимость закрывает уже открытое удаление', (
+    tester,
+  ) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final relationId = testRelationId(102);
+    await _pumpRelationDetails(tester, repository, relationId);
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+    );
+    repository.watchAt(0).emitDetails(details, revision: revision);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-delete-relation')),
+    );
+    await tester.pumpAndSettle();
+    repository
+        .watchAt(0)
+        .emitDetails(
+          details.withPermissions(
+            const LongTermRelationPermissions.referencedByDailyPath(),
+          ),
+          revision: const TestGraphRevision(2),
+        );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('relation-details-confirm-delete')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(find.textContaining('daily path'), findsWidgets);
+    expect(repository.relationCommands, isEmpty);
+  });
 
   testWidgets('раскрывает полное описание, тип, приоритет и архив связи', (
     tester,

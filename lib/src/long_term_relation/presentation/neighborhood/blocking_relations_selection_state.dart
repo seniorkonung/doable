@@ -44,7 +44,11 @@ sealed class BlockingRelationsSelectionState {
   final Map<LongTermRelationId, LongTermRelationSummary> selected;
 }
 
-enum BlockingRelationsInvalidReason { missing, noLongerBlocking }
+enum BlockingRelationsInvalidReason {
+  missing,
+  noLongerBlocking,
+  referencedByDailyPath,
+}
 
 final class BlockingRelationsSelectionEditing
     extends BlockingRelationsSelectionState {

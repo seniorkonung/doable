@@ -494,6 +494,12 @@ abstract class AppLocalizations {
   /// **'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.'**
   String get blockingRelationsInvalidMoved;
 
+  /// Защита выбранной связи сохранённым дневным путём
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used in a saved daily path. It cannot be deleted with the selected relations. Remove it from the selection to confirm the others.'**
+  String get blockingRelationsInvalidProtected;
+
   /// Безопасное отсутствие намерения при проверке выбора
   ///
   /// In en, this message translates to:
@@ -533,7 +539,7 @@ abstract class AppLocalizations {
   /// Конфликт массового удаления: связь заблокирована
   ///
   /// In en, this message translates to:
-  /// **'A selected relation can no longer be deleted. Refresh the selection and confirm it again.'**
+  /// **'A selected relation is now used in a saved daily path and was not deleted. Refresh the selection and confirm the other relations again.'**
   String get blockingRelationsDeleteProhibited;
 
   /// Первоначальная загрузка соседства и полной сводки
@@ -1508,6 +1514,18 @@ abstract class AppLocalizations {
   /// **'This relation is used by a saved daily path. Its type and participants can’t be changed.'**
   String get relationEditorUpdateReferencedByDailyPath;
 
+  /// Ограничение смысла связи сохранённым дневным путём
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.'**
+  String get relationEditorPathProtection;
+
+  /// Исправление черновика при новом ограничении пути
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.'**
+  String get relationEditorPathProtectionWithDraft;
+
   /// Устранимая недоступность изменения связи
   ///
   /// In en, this message translates to:
@@ -1789,6 +1807,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete relation permanently'**
   String get relationDetailsDeleteAction;
+
+  /// Причина недоступности удаления связи в подробностях
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used in a saved daily path. It cannot be deleted, and its type and participants cannot be changed. Its description, priority, and archive state remain editable.'**
+  String get relationDetailsPathProtection;
+
+  /// Неизвестные разрешения на удаление связи
+  ///
+  /// In en, this message translates to:
+  /// **'Deletion is unavailable until this relation’s dependencies are confirmed.'**
+  String get relationDetailsDeletionChecking;
 
   /// Заголовок подтверждения необратимого удаления конкретной связи
   ///

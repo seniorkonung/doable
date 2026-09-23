@@ -44,37 +44,43 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
               key: ValueKey(
                 'blocking-relations-invalid-${entry.key.toCanonicalString()}',
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      localizations.blockingRelationsInvalidSelectedRelationId(
-                        entry.key.toCanonicalString(),
+              child: Semantics(
+                container: true,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        localizations
+                            .blockingRelationsInvalidSelectedRelationId(
+                              entry.key.toCanonicalString(),
+                            ),
                       ),
-                    ),
-                    Text(
-                      '${selection.selected[entry.key]!.source.title} → '
-                      '${selection.selected[entry.key]!.related.title}',
-                    ),
-                    Text(switch (entry.value) {
-                      BlockingRelationsInvalidReason.missing =>
-                        localizations.blockingRelationsInvalidMissing,
-                      BlockingRelationsInvalidReason.noLongerBlocking =>
-                        localizations.blockingRelationsInvalidMoved,
-                    }),
-                    TextButton(
-                      key: ValueKey(
-                        'blocking-relations-remove-invalid-${entry.key.toCanonicalString()}',
+                      Text(
+                        '${selection.selected[entry.key]!.source.title} → '
+                        '${selection.selected[entry.key]!.related.title}',
                       ),
-                      onPressed: () =>
-                          ref.read(provider.notifier).unselect(entry.key),
-                      child: Text(
-                        localizations.relationNeighborhoodRemoveFromSelection,
+                      Text(switch (entry.value) {
+                        BlockingRelationsInvalidReason.missing =>
+                          localizations.blockingRelationsInvalidMissing,
+                        BlockingRelationsInvalidReason.noLongerBlocking =>
+                          localizations.blockingRelationsInvalidMoved,
+                        BlockingRelationsInvalidReason.referencedByDailyPath =>
+                          localizations.blockingRelationsInvalidProtected,
+                      }),
+                      TextButton(
+                        key: ValueKey(
+                          'blocking-relations-remove-invalid-${entry.key.toCanonicalString()}',
+                        ),
+                        onPressed: () =>
+                            ref.read(provider.notifier).unselect(entry.key),
+                        child: Text(
+                          localizations.relationNeighborhoodRemoveFromSelection,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -265,6 +271,14 @@ final class _BlockingRelationsConfirmationState
                         if (!canConfirm) ...[
                           const SizedBox(height: 8),
                           Text(switch (selection) {
+                            BlockingRelationsSelectionEditing(
+                              :final invalidReasons,
+                            )
+                                when invalidReasons.values.contains(
+                                  BlockingRelationsInvalidReason
+                                      .referencedByDailyPath,
+                                ) =>
+                              localizations.blockingRelationsInvalidProtected,
                             BlockingRelationsSelectionRefreshFailed(
                               :final failure,
                             ) =>

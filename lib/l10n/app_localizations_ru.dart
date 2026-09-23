@@ -242,6 +242,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связь больше не принадлежит этому намерению. Уберите её из выбора и подтвердите оставшийся набор заново.';
 
   @override
+  String get blockingRelationsInvalidProtected =>
+      'Связь используется в сохранённом дневном пути. Её нельзя удалить вместе с выбранными связями. Уберите её из выбора, чтобы подтвердить остальные связи.';
+
+  @override
   String get blockingRelationsRefreshIntentionNotFound =>
       'Намерение больше не существует. Удаление связей недоступно.';
 
@@ -267,7 +271,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get blockingRelationsDeleteProhibited =>
-      'Удаление одной выбранной связи теперь заблокировано. Актуализируйте выбор и подтвердите его заново.';
+      'Одна выбранная связь теперь используется в сохранённом дневном пути. Она не удалена. Актуализируйте выбор и подтвердите остальные связи заново.';
 
   @override
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
@@ -854,6 +858,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить.';
 
   @override
+  String get relationEditorPathProtection =>
+      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить. Описание и приоритет остаются доступными.';
+
+  @override
+  String get relationEditorPathProtectionWithDraft =>
+      'Связь используется в сохранённом дневном пути. Верните прежние тип и участников, чтобы сохранить изменения описания и приоритета.';
+
+  @override
   String get relationEditorUpdateUnavailable =>
       'Не удалось изменить связь. Повторите попытку.';
 
@@ -1021,6 +1033,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationDetailsDeleteAction => 'Удалить связь навсегда';
+
+  @override
+  String get relationDetailsPathProtection =>
+      'Связь используется в сохранённом дневном пути. Удалить её или изменить тип и участников нельзя. Описание, приоритет и архивное состояние остаются доступными.';
+
+  @override
+  String get relationDetailsDeletionChecking =>
+      'Удаление недоступно, пока не подтверждены зависимости связи.';
 
   @override
   String get relationDetailsDeleteConfirmationTitle =>

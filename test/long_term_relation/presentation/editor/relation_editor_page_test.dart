@@ -16,6 +16,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
@@ -35,6 +36,171 @@ void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
+    );
+  });
+
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    testWidgets(
+      'защищённый путь оставляет описание и приоритет доступными на ${locale.languageCode}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledRelationFormRepository();
+        addTearDown(repository.dispose);
+        final details = testRelationDetails(
+          relationId: testFormRelationId(151),
+          sourceId: testSummary(index: 1).id,
+          relatedId: testSummary(index: 2).id,
+          permissions:
+              const LongTermRelationPermissions.referencedByDailyPath(),
+        );
+        await _openDetailsForEditing(
+          tester,
+          repository,
+          details,
+          locale: locale,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('relation-details-edit-relation')),
+        );
+        await tester.pumpAndSettle();
+
+        final reason = find.byKey(
+          const ValueKey('relation-editor-path-protection'),
+        );
+        expect(reason, findsOneWidget);
+        expect(
+          tester.getSemantics(reason).label,
+          contains(locale.languageCode == 'ru' ? 'дневном пути' : 'daily path'),
+        );
+        expect(
+          tester
+              .widget<OutlinedButton>(
+                find.byKey(const ValueKey('relation-editor-change-source')),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<ChoiceChip>(
+                find.byKey(const ValueKey('relation-editor-type-can')),
+              )
+              .onSelected,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const ValueKey('relation-editor-description')),
+              )
+              .enabled,
+          isTrue,
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('relation-editor-description')),
+          'Описание пути',
+        );
+        await tester.pump();
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('relation-editor-submit')),
+              )
+              .onPressed,
+          isNotNull,
+        );
+        await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+        await tester.pump();
+        expect(repository.relationUpdateCommands, hasLength(1));
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
+  testWidgets('изменение разрешения открытой формы сохраняет исправимый ввод', (
+    tester,
+  ) async {
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final relationId = testFormRelationId(152);
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+    );
+    await _openDetailsForEditing(tester, repository, details);
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('relation-editor-description')),
+      'Исправимый ввод',
+    );
+    repository
+        .watchAt(0)
+        .emitDetails(
+          details.withPermissions(
+            const LongTermRelationPermissions.referencedByDailyPath(),
+          ),
+          revision: const TestCatalogRevision(3),
+        );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('relation-editor-path-protection')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey('relation-editor-change-related')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('relation-editor-description')),
+          )
+          .controller
+          ?.text,
+      'Исправимый ввод',
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('relation-editor-submit')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+
+    repository
+        .watchAt(0)
+        .emitDetails(details, revision: const TestCatalogRevision(4));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('relation-editor-path-protection')),
+      findsNothing,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey('relation-editor-change-related')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('relation-editor-description')),
+          )
+          .controller
+          ?.text,
+      'Исправимый ввод',
     );
   });
 
