@@ -1093,7 +1093,7 @@ Phase 1 не включает получение соседства и его с
   - **Вероятные файлы:** `lib/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/blocking_relations_confirmation.dart`, `test/long_term_relation/presentation/neighborhood/blocking_relations_selection_test.dart`, `test/long_term_relation/presentation/neighborhood/blocking_relations_confirmation_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/graph/data/drift_relation_group_large_fixture_test.dart`, новое `openspec/changes/manage-long-term-relations/verification-6.21.md`.
   - **Размер:** M.
 
-- [ ] 6.22 Восстановить воспроизводимость производного Riverpod-файла выбора блокирующих связей
+- [x] 6.22 Восстановить воспроизводимость производного Riverpod-файла выбора блокирующих связей
   - **Критерии приёмки:**
     - `blocking_relations_selection_view_model.g.dart` соответствует `blocking_relations_selection_view_model.dart` при закреплённых проектом версиях инструментов; производный хеш получен штатной генерацией, а не исправлен вручную.
     - Повторная генерация в чистом рабочем дереве не меняет отслеживаемые файлы и завершается успешной проверкой `codegen-check`.
