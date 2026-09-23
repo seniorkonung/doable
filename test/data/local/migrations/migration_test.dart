@@ -24,6 +24,25 @@ void main() {
     await verifyDoableDatabaseSchema(database);
   });
 
+  test(
+    'новое хранилище создаётся в версии 3 с пустыми дневными выборами',
+    () async {
+      final version = await database
+          .customSelect('PRAGMA user_version')
+          .getSingle();
+      final choices = await database
+          .customSelect('SELECT id FROM daily_choices')
+          .get();
+      final steps = await database
+          .customSelect('SELECT id FROM daily_choice_path_steps')
+          .get();
+
+      expect(version.read<int>('user_version'), 3);
+      expect(choices, isEmpty);
+      expect(steps, isEmpty);
+    },
+  );
+
   test('фикстура опубликованной схемы 1 использует снимок и обязательную настройку', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
@@ -64,7 +83,7 @@ void main() {
     );
   });
 
-  test('переходит со схемы 1 на схему 2 без переписывания намерений', () async {
+  test('переходит со схемы 1 на схему 3 без переписывания намерений', () async {
     await database.close();
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
@@ -133,7 +152,7 @@ void main() {
         .customSelect('SELECT id FROM long_term_relations')
         .get();
 
-    expect(version.read<int>('user_version'), 2);
+    expect(version.read<int>('user_version'), 3);
     expect(
       intentions
           .map(
@@ -305,6 +324,33 @@ void main() {
     expect(await _intentionRowId(database), previousRowId);
     await expectLater(verifyIntentionTitlesFtsIntegrity(database), completes);
   });
+
+  test(
+    'повреждённый FTS не позволяет подтвердить новую версию схемы',
+    () async {
+      await _insertIntention(database);
+      await database.customStatement(
+        "INSERT INTO intention_titles_fts(intention_titles_fts) VALUES ('delete-all')",
+      );
+
+      await expectLater(
+        runAtomicMigration(
+          database,
+          targetSchemaVersion: _nextSchemaVersion,
+          migrate: () async {},
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      final version = await database
+          .customSelect('PRAGMA user_version')
+          .getSingle();
+      expect(
+        version.read<int>('user_version'),
+        AppDatabase.currentSchemaVersion,
+      );
+    },
+  );
 }
 
 Future<void> _insertIntention(AppDatabase database) {

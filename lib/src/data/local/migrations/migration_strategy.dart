@@ -58,11 +58,10 @@ MigrationStrategy localDataMigrationStrategy(
         await runAtomicMigration(
           database,
           targetSchemaVersion: to,
-          migrate: () => generated.stepByStep(from1To2: _migrateFrom1To2)(
-            migrator,
-            from,
-            to,
-          ),
+          migrate: () => generated.stepByStep(
+            from1To2: _migrateFrom1To2,
+            from2To3: _migrateFrom2To3,
+          )(migrator, from, to),
         );
       },
     ),
@@ -87,6 +86,24 @@ Future<void> _migrateFrom1To2(
   await migrator.create(schema.longTermRelationsActiveParticipantsAfterInsert);
   await migrator.create(schema.longTermRelationsActiveParticipantsAfterUpdate);
   await migrator.create(schema.intentionsArchiveRequiresNoActiveRelations);
+}
+
+Future<void> _migrateFrom2To3(
+  Migrator migrator,
+  generated.Schema3 schema,
+) async {
+  await migrator.create(schema.dailyChoices);
+  await migrator.create(schema.dailyChoicesDateCreationOrder);
+  await migrator.create(schema.dailyChoicesSourceDateCreationOrder);
+  await migrator.create(schema.dailyChoicesSelectedDateCreationOrder);
+  await migrator.create(schema.dailyChoicesSourceRecent);
+  await migrator.create(schema.dailyChoicesSelectedRecent);
+  await migrator.create(schema.dailyChoicesImmutableIdentity);
+  await migrator.create(schema.dailyChoicePathSteps);
+  await migrator.create(schema.dailyChoicePathStepsOneRoot);
+  await migrator.create(schema.dailyChoicePathStepsOneSuccessor);
+  await migrator.create(schema.dailyChoicePathStepsRelation);
+  await migrator.create(schema.longTermRelationsProtectDailyChoicePath);
 }
 
 Future<void> _recordMigration(
