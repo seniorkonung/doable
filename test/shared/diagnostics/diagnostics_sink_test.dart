@@ -8,6 +8,100 @@ import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
   group('DiagnosticsSink', () {
+    test(
+      'дневные события различают чтение, проверку, запись и чтение результата',
+      () {
+        final messages = <String>[];
+        final sink = DeveloperDiagnosticsSink(messages.add);
+        final events = <DiagnosticsEvent>[
+          const DailyChoiceReadDiagnosticsEvent(
+            status: DiagnosticsSucceeded(Duration(milliseconds: 2)),
+          ),
+          const DailyChoicePathValidationDiagnosticsEvent(
+            commandType: DailyChoicePathCommandDiagnosticsType.create,
+            status: DiagnosticsFailed(
+              duration: Duration(milliseconds: 3),
+              code: DiagnosticsFailureCode.conflict,
+            ),
+          ),
+          const DailyChoiceCommandDiagnosticsEvent(
+            commandType: DailyChoiceCommandDiagnosticsType.updateFields,
+            stage: DailyChoiceCommandDiagnosticsStage.write,
+            status: DiagnosticsFailed(
+              duration: Duration(milliseconds: 5),
+              code: DiagnosticsFailureCode.unexpected,
+            ),
+          ),
+          const DailyChoiceCommandDiagnosticsEvent(
+            commandType: DailyChoiceCommandDiagnosticsType.replacePath,
+            stage: DailyChoiceCommandDiagnosticsStage.resultRead,
+            status: DiagnosticsSucceeded(Duration(milliseconds: 7)),
+          ),
+        ];
+
+        for (final event in events) {
+          sink.record(event);
+        }
+
+        expect(messages.map(jsonDecode), [
+          {
+            'operation': 'dailyChoiceDetailRead',
+            'stage': 'read',
+            'outcome': 'succeeded',
+            'durationMicros': 2000,
+          },
+          {
+            'operation': 'dailyChoicePathValidation',
+            'commandType': 'create',
+            'stage': 'validation',
+            'outcome': 'failed',
+            'durationMicros': 3000,
+            'failureCode': 'conflict',
+          },
+          {
+            'operation': 'dailyChoiceCommand',
+            'commandType': 'updateFields',
+            'stage': 'write',
+            'outcome': 'failed',
+            'durationMicros': 5000,
+            'failureCode': 'unexpected',
+          },
+          {
+            'operation': 'dailyChoiceCommand',
+            'commandType': 'replacePath',
+            'stage': 'resultRead',
+            'outcome': 'succeeded',
+            'durationMicros': 7000,
+          },
+        ]);
+        for (final canary in [
+          '2026-09-23',
+          'c0ffee00-cafe-4bad-8ace-0123456789ab',
+          'CANARY-route',
+          'CANARY-description',
+          'CANARY-SQL-PARAMETER',
+          'CANARY-database-exception',
+        ]) {
+          expect(messages.join(), isNot(contains(canary)));
+        }
+      },
+    );
+
+    test('падающий получатель не влияет на исход дневной операции', () {
+      final sink = _ThrowingDiagnosticsSink();
+      const event = DailyChoiceCommandDiagnosticsEvent(
+        commandType: DailyChoiceCommandDiagnosticsType.create,
+        stage: DailyChoiceCommandDiagnosticsStage.validation,
+        status: DiagnosticsFailed(
+          duration: Duration(milliseconds: 1),
+          code: DiagnosticsFailureCode.corruption,
+        ),
+      );
+
+      expect(() => recordDiagnosticsSafely(sink, event), returnsNormally);
+      expect(sink.attemptedEvents, [same(event)]);
+    });
+
     test('сохраняет закрытые типизированные события без telemetry', () {
       final sink = InMemoryDiagnosticsSink();
 
@@ -129,7 +223,18 @@ void main() {
         expect(() => sink.record(event), returnsNormally);
       }
 
-      expect(writeAttempts, _events().length);
+      expect(
+        () => sink.record(
+          const DailyChoiceCommandDiagnosticsEvent(
+            commandType: DailyChoiceCommandDiagnosticsType.delete,
+            stage: DailyChoiceCommandDiagnosticsStage.write,
+            status: DiagnosticsSucceeded(Duration(milliseconds: 1)),
+          ),
+        ),
+        returnsNormally,
+      );
+
+      expect(writeAttempts, _events().length + 1);
     });
 
     test(

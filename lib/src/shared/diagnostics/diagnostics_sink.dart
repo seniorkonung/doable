@@ -68,6 +68,42 @@ enum LongTermRelationCommandDiagnosticsType {
   delete,
 }
 
+enum DailyChoicePathCommandDiagnosticsType { create, replacePath }
+
+enum DailyChoiceCommandDiagnosticsType {
+  create,
+  updateFields,
+  replacePath,
+  delete,
+}
+
+enum DailyChoiceCommandDiagnosticsStage { validation, write, resultRead }
+
+final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
+  const DailyChoiceReadDiagnosticsEvent({required DiagnosticsStatus status})
+    : super(status);
+}
+
+final class DailyChoicePathValidationDiagnosticsEvent extends DiagnosticsEvent {
+  const DailyChoicePathValidationDiagnosticsEvent({
+    required this.commandType,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final DailyChoicePathCommandDiagnosticsType commandType;
+}
+
+final class DailyChoiceCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const DailyChoiceCommandDiagnosticsEvent({
+    required this.commandType,
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final DailyChoiceCommandDiagnosticsType commandType;
+  final DailyChoiceCommandDiagnosticsStage stage;
+}
+
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
   const BootstrapDiagnosticsEvent({
     required DiagnosticsStatus status,
