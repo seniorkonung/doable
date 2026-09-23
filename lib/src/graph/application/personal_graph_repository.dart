@@ -1,3 +1,5 @@
+import '../../daily_choice/application/daily_choice_details.dart';
+import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_result.dart';
@@ -19,6 +21,9 @@ abstract interface class GraphCommandRepository {
 
 abstract interface class PersonalGraphRepository
     implements GraphCommandRepository {
+  /// Возвращает null в снимке, если выбор отсутствует на момент чтения.
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id);
+
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   );

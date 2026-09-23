@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart'
@@ -704,6 +706,12 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
   @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,

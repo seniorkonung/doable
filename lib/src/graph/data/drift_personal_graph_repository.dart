@@ -3,6 +3,12 @@ import 'dart:async';
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
+import '../../daily_choice/application/daily_choice_details.dart';
+import '../../daily_choice/domain/calendar_date.dart';
+import '../../daily_choice/domain/choice_path_step_id.dart';
+import '../../daily_choice/domain/daily_choice.dart';
+import '../../daily_choice/domain/daily_choice_description.dart';
+import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -33,6 +39,8 @@ import 'drift_relation_count_aggregates.dart';
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+part 'drift_daily_choice_path_validation.dart';
+part 'drift_personal_graph_repository_daily_choice_reads.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_blocking_relations.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
@@ -68,6 +76,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   DriftRelationCountAggregates get _relationCountAggregates =>
       DriftRelationCountAggregates(_database);
+
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      _readDailyChoice(id);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
