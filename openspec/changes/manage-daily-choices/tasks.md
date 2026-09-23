@@ -57,7 +57,7 @@
   - **Вероятные файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `test/support/doable_schema_verifier.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/data/local/migrations/fault_injection_test.dart`; generated `app_database.g.dart`, `generated_schema.dart` и новый `drift_schemas/drift_schema_v3.json`.
   - **Размер:** M.
 
-- [ ] 1.6 Подтвердить сохранность прежнего графа до подключения новых операций
+- [x] 1.6 Подтвердить сохранность прежнего графа до подключения новых операций
   - **Критерии приёмки:**
     - Создание v3 и оба пути обновления дают схему committed snapshot и одинаковые прежние данные; дневные таблицы пусты, отказы не пересоздают базу.
     - Прежние операции намерений, долговременных связей, поиск и bootstrap работают на новой схеме; настройки соединений и политика одной установки по ADR-0002/0004/0008 сохранены.
