@@ -7,6 +7,9 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
     if (command is UpdateDailyChoiceFields) {
       return _updateDailyChoiceFields(command);
     }
+    if (command is ReplaceDailyChoicePath) {
+      return _replaceDailyChoicePath(command);
+    }
     final stopwatch = Stopwatch()..start();
     var stage = DailyChoiceCommandDiagnosticsStage.validation;
     void record(DiagnosticsStatus status) => _recordDiagnostics(
@@ -32,7 +35,11 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
             ),
           );
           try {
-            await _validateConfirmedChoicePath(command);
+            await _validateConfirmedChoicePath(
+              sourceIntentionId: command.sourceIntentionId,
+              selectedIntentionId: command.selectedIntentionId,
+              path: command.path,
+            );
             _recordDiagnostics(
               DailyChoicePathValidationDiagnosticsEvent(
                 commandType: DailyChoicePathCommandDiagnosticsType.create,
@@ -333,10 +340,232 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
     }
   }
 
-  Future<void> _validateConfirmedChoicePath(CreateDailyChoice command) async {
-    final steps = command.path.steps;
-    final visited = <IntentionId>{command.sourceIntentionId};
-    var current = command.sourceIntentionId;
+  Future<DailyChoiceCommandResult> _replaceDailyChoicePath(
+    ReplaceDailyChoicePath command,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    var stage = DailyChoiceCommandDiagnosticsStage.validation;
+    void record(DiagnosticsStatus status) => _recordDiagnostics(
+      DailyChoiceCommandDiagnosticsEvent(
+        commandType: DailyChoiceCommandDiagnosticsType.replacePath,
+        stage: stage,
+        status: status,
+      ),
+    );
+
+    record(const DiagnosticsStarted());
+    try {
+      final confirmed = await _sequencer.run(() async {
+        final result = await _database.transaction(() async {
+          final existing = await _readVerifiedDailyChoice(command.choiceId);
+          if (existing == null) throw const DailyChoiceNotFoundFailure();
+          final before = existing.choice;
+          final pathStopwatch = Stopwatch()..start();
+          _recordDiagnostics(
+            const DailyChoicePathValidationDiagnosticsEvent(
+              commandType: DailyChoicePathCommandDiagnosticsType.replacePath,
+              status: DiagnosticsStarted(),
+            ),
+          );
+          try {
+            await _validateConfirmedChoicePath(
+              sourceIntentionId: command.sourceIntentionId,
+              selectedIntentionId: command.selectedIntentionId,
+              path: command.path,
+            );
+            _recordDiagnostics(
+              DailyChoicePathValidationDiagnosticsEvent(
+                commandType: DailyChoicePathCommandDiagnosticsType.replacePath,
+                status: DiagnosticsSucceeded(pathStopwatch.elapsed),
+              ),
+            );
+          } on Object catch (error) {
+            _recordDiagnostics(
+              DailyChoicePathValidationDiagnosticsEvent(
+                commandType: DailyChoicePathCommandDiagnosticsType.replacePath,
+                status: DiagnosticsFailed(
+                  duration: pathStopwatch.elapsed,
+                  code: _graphCommandDiagnosticsFailureCode(
+                    _classifyDailyChoiceCommandFailure(error),
+                  ),
+                ),
+              ),
+            );
+            rethrow;
+          }
+          final oldIds = existing.path.map((item) => item.relation.id).toList();
+          final newIds = command.path.steps
+              .map((step) => step.relationId)
+              .toList();
+          final didMutate =
+              before.sourceIntentionId != command.sourceIntentionId ||
+              before.selectedIntentionId != command.selectedIntentionId ||
+              oldIds.length != newIds.length ||
+              !oldIds.indexed.every((entry) => entry.$2 == newIds[entry.$1]);
+          final participants = <IntentionId>{
+            before.sourceIntentionId,
+            before.selectedIntentionId,
+            command.sourceIntentionId,
+            command.selectedIntentionId,
+          };
+          final countsBefore = await _readVerifiedRelationCountsFor(
+            participants,
+          );
+          record(DiagnosticsSucceeded(stopwatch.elapsed));
+
+          var verified = existing;
+          if (didMutate) {
+            stage = DailyChoiceCommandDiagnosticsStage.write;
+            record(const DiagnosticsStarted());
+            await (_database.delete(_database.dailyChoicePathSteps)..where(
+                  (row) => row.dailyChoiceId.equals(
+                    command.choiceId.toCanonicalString(),
+                  ),
+                ))
+                .go();
+            final updatedRows =
+                await (_database.update(_database.dailyChoices)..where(
+                      (row) =>
+                          row.id.equals(command.choiceId.toCanonicalString()),
+                    ))
+                    .write(
+                      local.DailyChoicesCompanion(
+                        sourceIntentionId: Value(
+                          command.sourceIntentionId.toCanonicalString(),
+                        ),
+                        selectedIntentionId: Value(
+                          command.selectedIntentionId.toCanonicalString(),
+                        ),
+                      ),
+                    );
+            if (updatedRows != 1) throw const _StoredIntentionCorruption();
+            ChoicePathStepId? previousId;
+            final generatedStepIds = <ChoicePathStepId>[];
+            for (final expected in command.path.steps) {
+              final stepId = _choicePathStepIdGenerator.generate();
+              await _database.customInsert(
+                '''INSERT INTO daily_choice_path_steps
+                   (id, daily_choice_id, long_term_relation_id, previous_step_id)
+                   VALUES (?, ?, ?, ?)''',
+                variables: [
+                  Variable<String>(stepId.toCanonicalString()),
+                  Variable<String>(command.choiceId.toCanonicalString()),
+                  Variable<String>(expected.relationId.toCanonicalString()),
+                  Variable<String>(previousId?.toCanonicalString()),
+                ],
+                updates: {_database.dailyChoicePathSteps},
+              );
+              generatedStepIds.add(stepId);
+              previousId = stepId;
+            }
+            record(DiagnosticsSucceeded(stopwatch.elapsed));
+            stage = DailyChoiceCommandDiagnosticsStage.resultRead;
+            record(const DiagnosticsStarted());
+            verified =
+                await _readVerifiedDailyChoice(command.choiceId) ??
+                (throw const _StoredIntentionCorruption());
+            final after = verified.choice;
+            if (after.id != before.id ||
+                after.sourceIntentionId != command.sourceIntentionId ||
+                after.selectedIntentionId != command.selectedIntentionId ||
+                after.date != before.date ||
+                after.description != before.description ||
+                after.isCompleted != before.isCompleted ||
+                verified.path.length != generatedStepIds.length) {
+              throw const _StoredIntentionCorruption();
+            }
+            for (var index = 0; index < generatedStepIds.length; index++) {
+              if (verified.path[index].step.id != generatedStepIds[index] ||
+                  verified.path[index].relation.id != newIds[index]) {
+                throw const _StoredIntentionCorruption();
+              }
+            }
+          }
+
+          final counts = await _readVerifiedRelationCountsFor(participants);
+          for (final id in participants) {
+            final previous = countsBefore[id]!;
+            final current = counts[id]!;
+            if (current.dailySource !=
+                    previous.dailySource +
+                        (id == command.sourceIntentionId ? 1 : 0) -
+                        (id == before.sourceIntentionId ? 1 : 0) ||
+                current.dailySelected !=
+                    previous.dailySelected +
+                        (id == command.selectedIntentionId ? 1 : 0) -
+                        (id == before.selectedIntentionId ? 1 : 0) ||
+                current.longTermTotal != previous.longTermTotal) {
+              throw const _StoredIntentionCorruption();
+            }
+          }
+          final released = oldIds.toSet().difference(newIds.toSet());
+          final occupied = newIds.toSet().difference(oldIds.toSet());
+          final affectedRelations = {...released, ...occupied}.toList();
+          final permissions =
+              <LongTermRelationId, LongTermRelationPermissions>{};
+          for (var start = 0; start < affectedRelations.length; start += 400) {
+            permissions.addAll(
+              await _relationCountAggregates.readPermissions(
+                affectedRelations.skip(start).take(400),
+              ),
+            );
+          }
+          if (occupied.any((id) => permissions[id]!.canDelete)) {
+            throw const _StoredIntentionCorruption();
+          }
+          final revision = _DriftGraphRevision(
+            _epoch,
+            _mutationSequence + (didMutate ? 1 : 0),
+          );
+          final change = DailyChoiceChange(
+            revision: revision,
+            before: before,
+            after: verified.choice,
+            releasedRelationIds: released,
+            occupiedRelationIds: occupied,
+            intentionCounts: counts,
+            relationPermissions: permissions,
+          );
+          final success = DailyChoicePathReplaced(
+            before: before,
+            choice: verified.choice,
+            path: StoredChoicePath(verified.path.map((item) => item.step)),
+            changes: [change],
+          );
+          if (didMutate) record(DiagnosticsSucceeded(stopwatch.elapsed));
+          return (
+            didMutate,
+            ConfirmedGraphResult(revision: revision, value: success),
+          );
+        });
+        if (result.$1) {
+          _mutationSequence++;
+          _notifyGraphWatchersFor(result.$2.changes);
+        }
+        return result.$2;
+      });
+      return GraphCommandSucceeded(confirmed);
+    } on Object catch (error) {
+      record(
+        DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: _graphCommandDiagnosticsFailureCode(
+            _classifyDailyChoiceCommandFailure(error),
+          ),
+        ),
+      );
+      return GraphCommandFailed(_classifyDailyChoiceCommandFailure(error));
+    }
+  }
+
+  Future<void> _validateConfirmedChoicePath({
+    required IntentionId sourceIntentionId,
+    required IntentionId selectedIntentionId,
+    required ConfirmedChoicePath path,
+  }) async {
+    final steps = path.steps;
+    final visited = <IntentionId>{sourceIntentionId};
+    var current = sourceIntentionId;
     for (final step in steps) {
       if (step.sourceIntentionId != current ||
           !visited.add(step.relatedIntentionId)) {
@@ -346,7 +575,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
       }
       current = step.relatedIntentionId;
     }
-    if (current != command.selectedIntentionId) {
+    if (current != selectedIntentionId) {
       throw const DailyChoiceValidationFailure(DailyChoiceValidationField.path);
     }
 
@@ -386,7 +615,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           DailyChoiceConflictReason.participantArchived,
         );
       }
-      if (id == command.selectedIntentionId &&
+      if (id == selectedIntentionId &&
           intention.readiness != domain.IntentionReadiness.ready) {
         throw const DailyChoiceConflictFailure(
           DailyChoiceConflictReason.selectedIntentionNotReady,

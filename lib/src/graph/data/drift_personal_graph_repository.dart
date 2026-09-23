@@ -4,6 +4,7 @@ import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
 import '../../daily_choice/application/daily_choice_details.dart';
+import '../../daily_choice/application/confirmed_choice_path.dart';
 import '../../daily_choice/application/daily_choice_command.dart';
 import '../../daily_choice/application/daily_choice_id_generator.dart';
 import '../../daily_choice/application/daily_choice_result.dart';
