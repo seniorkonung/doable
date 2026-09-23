@@ -6,6 +6,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -56,6 +57,13 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
     await tester.pumpAndSettle();
+    expect(harness.repository.selectedReads, 1);
+    expect(harness.repository.selectedWatches, 1);
+    expect(harness.repository.relationWatches, 0);
+    expect(
+      harness.repository.selectedIds,
+      rows.map((row) => row.relation.id).toSet(),
+    );
     expect(
       find.text('Чтобы Намерение-владелец, нужно Связанное 1'),
       findsOneWidget,
@@ -455,6 +463,83 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'исчезновение выбранной связи запрещает подтверждение до исправления',
+    (tester) async {
+      final harness = await _pumpAction(tester, const Locale('ru'));
+      final first = testGroupRow(ownerId: harness.intentionId, index: 1);
+      final second = testGroupRow(ownerId: harness.intentionId, index: 2);
+      harness.select(first);
+      harness.select(second);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await tester.pumpAndSettle();
+
+      harness.repository.emitMissing(
+        second.relation.id,
+        revision: const TestGraphRevision(5),
+      );
+      await tester.pumpAndSettle();
+      final confirm = find.byKey(
+        const ValueKey('blocking-relations-confirm-delete'),
+      );
+      await tester.scrollUntilVisible(
+        confirm,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+      expect(harness.repository.commands, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-cancel')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          ValueKey(
+            'blocking-relations-invalid-${second.relation.id.toCanonicalString()}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(harness.repository.selectedIds, {
+        first.relation.id,
+        second.relation.id,
+      });
+    },
+  );
+
+  testWidgets('отказ наблюдения сохраняет набор и блокирует отправку', (
+    tester,
+  ) async {
+    final harness = await _pumpAction(tester, const Locale('en'));
+    final row = testGroupRow(ownerId: harness.intentionId, index: 1);
+    harness.select(row);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await tester.pumpAndSettle();
+
+    harness.repository.emitSelectionFailure();
+    await tester.pumpAndSettle();
+    final confirm = find.byKey(
+      const ValueKey('blocking-relations-confirm-delete'),
+    );
+    await tester.scrollUntilVisible(
+      confirm,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+    expect(harness.repository.commands, isEmpty);
+    expect(
+      harness.container
+          .read(
+            blockingRelationsSelectionViewModelProvider(harness.intentionId),
+          )
+          .selected
+          .keys,
+      {row.relation.id},
+    );
+  });
 }
 
 Future<_Harness> _pumpAction(WidgetTester tester, Locale locale) async {
@@ -520,6 +605,15 @@ final class _CommandRepository implements PersonalGraphRepository {
   final commands = <GraphCommand>[];
   final requests = <Completer<Object>>[];
   final rows = <LongTermRelationId, LongTermRelationSummary>{};
+  final descriptions = <LongTermRelationId, String?>{};
+  final _selectionUpdates =
+      StreamController<SelectedRelationsReadResult>.broadcast(sync: true);
+  SelectedRelationsQuery? _watchedQuery;
+  GraphRevision _revision = const TestGraphRevision(2);
+  int selectedReads = 0;
+  int selectedWatches = 0;
+  int relationWatches = 0;
+  Set<LongTermRelationId> selectedIds = {};
   final _relationUpdates =
       <LongTermRelationId, StreamController<LongTermRelationReadResult>>{};
   LongTermRelationReadFailure? readFailure;
@@ -541,6 +635,12 @@ final class _CommandRepository implements PersonalGraphRepository {
     String? description,
   }) {
     rows[row.relation.id] = row;
+    descriptions[row.relation.id] = description;
+    _revision = revision;
+    final query = _watchedQuery;
+    if (query != null) {
+      _selectionUpdates.add(_currentSelection(query));
+    }
     _relationUpdates[row.relation.id]?.add(
       LongTermRelationReadSuccess(
         GraphSnapshot(
@@ -553,6 +653,85 @@ final class _CommandRepository implements PersonalGraphRepository {
                 : LongTermRelationDescription.fromInput(description),
           ),
           revision: revision,
+        ),
+      ),
+    );
+  }
+
+  void emitMissing(LongTermRelationId id, {required GraphRevision revision}) {
+    rows.remove(id);
+    _revision = revision;
+    final query = _watchedQuery;
+    if (query != null) _selectionUpdates.add(_currentSelection(query));
+  }
+
+  void emitSelectionFailure() => _selectionUpdates.add(
+    const SelectedRelationsReadError(SelectedRelationsReadUnavailableFailure()),
+  );
+
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) async {
+    selectedReads++;
+    selectedIds = query.relationIds;
+    return _currentSelection(query);
+  }
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => Stream.multi((controller) {
+    selectedWatches++;
+    selectedIds = query.relationIds;
+    _watchedQuery = query;
+    controller.addSync(_currentSelection(query));
+    final subscription = _selectionUpdates.stream.listen(controller.addSync);
+    controller.onCancel = () {
+      _watchedQuery = null;
+      return subscription.cancel();
+    };
+  });
+
+  SelectedRelationsReadResult _currentSelection(SelectedRelationsQuery query) {
+    final failure = readFailure;
+    if (failure != null) {
+      return SelectedRelationsReadError(switch (failure) {
+        LongTermRelationReadUnavailableFailure() =>
+          const SelectedRelationsReadUnavailableFailure(),
+        LongTermRelationReadCorruptionFailure() =>
+          const SelectedRelationsReadCorruptionFailure(),
+        LongTermRelationReadUnexpectedFailure() =>
+          const SelectedRelationsReadUnexpectedFailure(),
+      });
+    }
+    return SelectedRelationsReadSuccess(
+      GraphSnapshot(
+        revision: _revision,
+        value: SelectedRelationsSnapshot(
+          query: query,
+          entries: {
+            for (final id in query.relationIds)
+              id: switch (rows[id]) {
+                null => SelectedRelationMissing(id),
+                final row
+                    when row.relation.sourceIntentionId != query.intentionId &&
+                        row.relation.relatedIntentionId != query.intentionId =>
+                  SelectedRelationNoLongerBlocking(id),
+                final row => SelectedRelationPresent(
+                  LongTermRelationDetails(
+                    relation: row.relation,
+                    source: row.source,
+                    related: row.related,
+                    description: descriptions[id] == null
+                        ? null
+                        : LongTermRelationDescription.fromInput(
+                            descriptions[id]!,
+                          ),
+                  ),
+                ),
+              },
+          },
         ),
       ),
     );
@@ -575,6 +754,7 @@ final class _CommandRepository implements PersonalGraphRepository {
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
+    relationWatches++;
     if (!(isPrepared?.call() ?? false)) {
       return Stream.value(_currentRelation(id));
     }

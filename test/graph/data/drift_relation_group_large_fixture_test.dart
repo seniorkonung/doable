@@ -423,14 +423,25 @@ void main() {
       );
       expect(prepared.snapshot.command.relationIds, chosenIds);
       expect(trace.groupRowsSelects, isEmpty);
-      expect(trace.relationContentSelects, hasLength(chosenIds.length));
-      expect(trace.selectedRelationSelects, hasLength(chosenIds.length));
+      expect(trace.relationContentSelects, hasLength(2));
+      expect(trace.selectedRelationSelects, isEmpty);
       expect(
-        trace.selectedRelationSelects
-            .map((select) => select.arguments.single)
+        trace.relationContentSelects
+            .expand((select) => select.arguments)
             .toSet(),
         chosenIds.map((id) => id.toCanonicalString()).toSet(),
       );
+      expect(
+        trace.relationContentSelects,
+        everyElement(
+          isA<_TracedSelect>().having(
+            (select) => select.arguments.length,
+            'размер SQL-порции выбранных связей',
+            lessThanOrEqualTo(400),
+          ),
+        ),
+      );
+      expect(trace.aggregateSelects.length, lessThanOrEqualTo(6));
       final reviewAggregateTime = _elapsedSelects(trace.aggregateSelects);
       final reviewAggregateQueries = trace.aggregateSelects.length;
 
