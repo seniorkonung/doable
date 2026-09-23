@@ -5,10 +5,14 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../application/delete_blocking_relations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
+import '../../long_term_relation/application/long_term_relation_command.dart';
+import '../../long_term_relation/presentation/relation_command_failure_message.dart';
 import '../../shared/presentation/presentation_frame_evidence.dart';
 import '../application/graph_command_coordinator.dart';
+import '../application/graph_command_result.dart';
 
 /// Единственный владелец общей поверхности сообщений результатов операций.
 ///
@@ -109,7 +113,7 @@ final class _GraphOperationPresenterState
     );
     final controller = messenger.showSnackBar(
       SnackBar(
-        content: PresentationFrameEvidence<IntentionAppPresentationClaim>(
+        content: PresentationFrameEvidence<GraphAppPresentationClaim>(
           subject: surface.claim,
           requiresCurrentRoute: false,
           onPresented: (_) => _confirm(surface),
@@ -159,7 +163,7 @@ final class _GraphOperationPresenterState
 final class _PresentationSurface {
   _PresentationSurface(this.claim);
 
-  final IntentionAppPresentationClaim claim;
+  final GraphAppPresentationClaim claim;
   ScaffoldMessengerState? messenger;
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller;
   var isConfirmed = false;
@@ -177,6 +181,44 @@ final class _PresentationSurface {
 }
 
 String _messageFor(
+  AppLocalizations localizations,
+  GraphCommandCompletion completion,
+) => switch (completion) {
+  IntentionCommandCompletion() => _intentionMessage(localizations, completion),
+  LongTermRelationCommandCompletion() => _relationMessage(
+    localizations,
+    completion,
+  ),
+  BlockingRelationsDeleteCompletion() => _blockingRelationsDeleteMessage(
+    localizations,
+    completion,
+  ),
+};
+
+String _blockingRelationsDeleteMessage(
+  AppLocalizations localizations,
+  BlockingRelationsDeleteCompletion completion,
+) => localizations.graphOperationMessage(
+  localizations.graphOperationDeleteBlockingRelations,
+  completion.presentationTitle,
+  switch (completion.result) {
+    GraphResultSuccess() => localizations.blockingRelationsDeleted,
+    GraphResultFailure(:final failure) => switch (failure) {
+      DeleteBlockingRelationsIntentionNotFoundFailure() =>
+        localizations.blockingRelationsDeleteIntentionNotFound,
+      DeleteBlockingRelationsSelectionConflictFailure() =>
+        localizations.blockingRelationsDeleteConflict,
+      DeleteBlockingRelationsUnavailableFailure() =>
+        localizations.blockingRelationsDeleteUnavailable,
+      DeleteBlockingRelationsCorruptionFailure() =>
+        localizations.blockingRelationsDeleteCorruption,
+      DeleteBlockingRelationsUnexpectedFailure() =>
+        localizations.blockingRelationsDeleteUnexpected,
+    },
+  },
+);
+
+String _intentionMessage(
   AppLocalizations localizations,
   IntentionCommandCompletion completion,
 ) {
@@ -202,11 +244,81 @@ String _messageFor(
   return localizations.graphOperationMessage(
     operation,
     target,
-    _outcomeFor(localizations, completion),
+    _intentionOutcomeFor(localizations, completion),
   );
 }
 
-String _outcomeFor(
+/// Связь не имеет собственного пользовательского названия, поэтому сообщение
+/// опирается только на локализованное обозначение вида операции и её предмета.
+String _relationMessage(
+  AppLocalizations localizations,
+  LongTermRelationCommandCompletion completion,
+) {
+  final operation = switch (completion.kind) {
+    LongTermRelationCommandKind.create => localizations.graphOperationCreate,
+    LongTermRelationCommandKind.update => localizations.graphOperationUpdate,
+    LongTermRelationCommandKind.archive => localizations.graphOperationArchive,
+    LongTermRelationCommandKind.restore => localizations.graphOperationRestore,
+    LongTermRelationCommandKind.delete => localizations.graphOperationDelete,
+  };
+  final target = switch (completion.target) {
+    CreatingLongTermRelationOperationTarget() =>
+      localizations.graphOperationNewRelation,
+    ExistingLongTermRelationOperationTarget() =>
+      localizations.graphOperationRelation,
+  };
+  return localizations.graphOperationMessage(
+    operation,
+    target,
+    _relationOutcomeFor(localizations, completion),
+  );
+}
+
+String _relationOutcomeFor(
+  AppLocalizations localizations,
+  LongTermRelationCommandCompletion completion,
+) => switch (completion.result) {
+  GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
+    (LongTermRelationCommandKind.create, LongTermRelationCreated()) =>
+      localizations.relationEditorCreated,
+    (LongTermRelationCommandKind.create, LongTermRelationUpdated()) =>
+      localizations.relationEditorCreateUnexpected,
+    (LongTermRelationCommandKind.create, LongTermRelationDeleted()) =>
+      localizations.relationEditorCreateUnexpected,
+    (LongTermRelationCommandKind.update, LongTermRelationUpdated()) =>
+      localizations.relationEditorUpdated,
+    (LongTermRelationCommandKind.update, LongTermRelationCreated()) =>
+      localizations.relationEditorUpdateUnexpected,
+    (LongTermRelationCommandKind.update, LongTermRelationDeleted()) =>
+      localizations.relationEditorUpdateUnexpected,
+    (LongTermRelationCommandKind.archive, LongTermRelationUpdated()) =>
+      localizations.relationArchived,
+    (LongTermRelationCommandKind.archive, LongTermRelationCreated()) =>
+      localizations.relationArchiveUnexpected,
+    (LongTermRelationCommandKind.archive, LongTermRelationDeleted()) =>
+      localizations.relationArchiveUnexpected,
+    (LongTermRelationCommandKind.restore, LongTermRelationUpdated()) =>
+      localizations.relationRestored,
+    (LongTermRelationCommandKind.restore, LongTermRelationCreated()) =>
+      localizations.relationRestoreUnexpected,
+    (LongTermRelationCommandKind.restore, LongTermRelationDeleted()) =>
+      localizations.relationRestoreUnexpected,
+    (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
+      localizations.relationDeleted,
+    (LongTermRelationCommandKind.delete, LongTermRelationCreated()) ||
+    (
+      LongTermRelationCommandKind.delete,
+      LongTermRelationUpdated(),
+    ) => localizations.relationDeleteUnexpected,
+  },
+  GraphResultFailure(:final failure) => longTermRelationCommandFailureMessage(
+    localizations,
+    completion.kind,
+    failure,
+  ),
+};
+
+String _intentionOutcomeFor(
   AppLocalizations localizations,
   IntentionCommandCompletion completion,
 ) => switch (completion.result) {
@@ -264,6 +376,8 @@ String _failureFor(
   IntentionCommandKind.create => switch (failure) {
     IntentionValidationFailure() => localizations.editorInvalidInput,
     IntentionConflictFailure() => localizations.editorCreateConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.editorCreateUnexpected,
     IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
     IntentionCorruptionFailure() => localizations.editorCreateCorruption,
     IntentionNotFoundFailure() ||
@@ -273,6 +387,8 @@ String _failureFor(
     IntentionValidationFailure() => localizations.detailsUpdateInvalidInput,
     IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
     IntentionConflictFailure() => localizations.detailsUpdateConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsUpdateUnexpected,
     IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
     IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
     IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,
@@ -284,6 +400,8 @@ String _failureFor(
     IntentionValidationFailure() => localizations.detailsStateChangeInvalid,
     IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
     IntentionConflictFailure() => localizations.detailsStateChangeConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsStateChangeUnexpected,
     IntentionUnavailableFailure() =>
       localizations.detailsStateChangeUnavailable,
     IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
@@ -293,6 +411,8 @@ String _failureFor(
     IntentionValidationFailure() => localizations.detailsDeleteInvalid,
     IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
     IntentionConflictFailure() => localizations.detailsDeleteConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsDeleteBlockedByRelations,
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,

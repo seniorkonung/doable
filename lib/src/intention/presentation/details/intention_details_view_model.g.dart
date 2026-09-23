@@ -16,13 +16,13 @@ final _intentionDetailsObservationProvider =
 final class _IntentionDetailsObservationProvider
     extends
         $FunctionalProvider<
-          AsyncValue<Result<GraphSnapshot<Intention?>>>,
-          Result<GraphSnapshot<Intention?>>,
-          Stream<Result<GraphSnapshot<Intention?>>>
+          AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>,
+          Result<GraphSnapshot<application.IntentionDetails?>>,
+          Stream<Result<GraphSnapshot<application.IntentionDetails?>>>
         >
     with
-        $FutureModifier<Result<GraphSnapshot<Intention?>>>,
-        $StreamProvider<Result<GraphSnapshot<Intention?>>> {
+        $FutureModifier<Result<GraphSnapshot<application.IntentionDetails?>>>,
+        $StreamProvider<Result<GraphSnapshot<application.IntentionDetails?>>> {
   _IntentionDetailsObservationProvider._({
     required _IntentionDetailsObservationFamily super.from,
     required (IntentionId, _DetailObservationGeneration) super.argument,
@@ -46,12 +46,11 @@ final class _IntentionDetailsObservationProvider
 
   @$internal
   @override
-  $StreamProviderElement<Result<GraphSnapshot<Intention?>>> $createElement(
-    $ProviderPointer pointer,
-  ) => $StreamProviderElement(pointer);
+  $StreamProviderElement<Result<GraphSnapshot<application.IntentionDetails?>>>
+  $createElement($ProviderPointer pointer) => $StreamProviderElement(pointer);
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> create(Ref ref) {
+  Stream<Result<GraphSnapshot<application.IntentionDetails?>>> create(Ref ref) {
     final argument =
         this.argument as (IntentionId, _DetailObservationGeneration);
     return _intentionDetailsObservation(ref, argument.$1, argument.$2);
@@ -70,12 +69,12 @@ final class _IntentionDetailsObservationProvider
 }
 
 String _$_intentionDetailsObservationHash() =>
-    r'22087f4ffe121f808c473d758c1c4775eab4b46f';
+    r'28ef8917f553b0157c62e11bf2027bb97a188667';
 
 final class _IntentionDetailsObservationFamily extends $Family
     with
         $FunctionalFamilyOverride<
-          Stream<Result<GraphSnapshot<Intention?>>>,
+          Stream<Result<GraphSnapshot<application.IntentionDetails?>>>,
           (IntentionId, _DetailObservationGeneration)
         > {
   _IntentionDetailsObservationFamily._()
@@ -151,7 +150,7 @@ final class IntentionDetailsViewModelProvider
 }
 
 String _$intentionDetailsViewModelHash() =>
-    r'2a781c9caf2b1c9db26917b03fbe40fb324a9928';
+    r'1ddfa7c7bfec475f92096febded25e834d76fe7b';
 
 final class IntentionDetailsViewModelFamily extends $Family
     with

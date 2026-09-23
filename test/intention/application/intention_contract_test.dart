@@ -1,14 +1,23 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:io';
 
+import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -430,6 +439,7 @@ void main() {
         const ResultFailure(IntentionGenericValidationFailure()),
         const ResultFailure(IntentionNotFoundFailure()),
         const ResultFailure(IntentionConflictFailure()),
+        ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
         const ResultFailure(IntentionUnavailableFailure()),
         const ResultFailure(IntentionCorruptionFailure()),
         const ResultFailure(IntentionUnexpectedFailure()),
@@ -441,7 +451,7 @@ void main() {
       );
       expect(
         results.whereType<ResultFailure<IntentionCommandSuccess>>(),
-        hasLength(6),
+        hasLength(7),
       );
       expect(_resultSuccessDescription(results[0]), 'saved');
       expect(_resultSuccessDescription(results[1]), 'deleted');
@@ -449,6 +459,7 @@ void main() {
         'validation',
         'notFound',
         'conflict',
+        'blockingRelations',
         'unavailable',
         'corruption',
         'unexpected',
@@ -496,35 +507,36 @@ void main() {
   });
 
   group('общая граница личного графа', () {
-    test(
-      'выражает текущие чтения и команды намерений без методов связей',
-      () async {
-        final PersonalGraphRepository repository =
-            _FailingPersonalGraphRepository();
-        final id = _intentionId('00000000-0000-4000-8000-000000000001');
+    test('выражает чтения намерений и их счётчиков', () async {
+      final PersonalGraphRepository repository =
+          _FailingPersonalGraphRepository();
+      final id = _intentionId('00000000-0000-4000-8000-000000000001');
 
-        expect(
-          await repository.getCatalogPage(_query()),
-          isA<ResultFailure<IntentionCatalogPage>>(),
-        );
-        await expectLater(
-          repository.watchIntention(id),
-          emits(
-            isA<ResultFailure<GraphSnapshot<Intention?>>>().having(
-              (result) => result.failure,
-              'failure',
-              isA<IntentionUnavailableFailure>(),
-            ),
+      expect(
+        await repository.getCatalogPage(_query()),
+        isA<ResultFailure<IntentionCatalogPage>>(),
+      );
+      expect(
+        await repository.getRelationCounts(id),
+        isA<ResultFailure<GraphSnapshot<RelationCounts>>>(),
+      );
+      await expectLater(
+        repository.watchIntention(id),
+        emits(
+          isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
+            (result) => result.failure,
+            'failure',
+            isA<IntentionUnavailableFailure>(),
           ),
-        );
-        expect(
-          await repository.execute(
-            const CreateIntention(title: 'Здоровье', description: null),
-          ),
-          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
-        );
-      },
-    );
+        ),
+      );
+      expect(
+        await repository.execute(
+          const CreateIntention(title: 'Здоровье', description: null),
+        ),
+        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+    });
 
     test('снимок связывает подтверждённое значение с одной ревизией', () {
       const revision = _TestGraphRevision(epoch: 'первая', sequence: 3);
@@ -561,6 +573,45 @@ void main() {
         () => result.changes.add(
           IntentionCatalogUnchanged(revision: revision, entry: after),
         ),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('пакет намерения включает неизменяемые абсолютные счётчики', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
+      final intention = _intention();
+      final entry = _TestCatalogEntrySnapshot(
+        _summary(id: intention.id.toCanonicalString()),
+      );
+      final mutation = IntentionCatalogUpdated(
+        revision: revision,
+        before: entry,
+        after: entry,
+      );
+      final countChange = IntentionRelationCountsChanged(
+        revision: revision,
+        intentionId: intention.id,
+        counts: RelationCounts(
+          activeNeedIncoming: 0,
+          activeNeedOutgoing: 0,
+          activeCanIncoming: 0,
+          activeCanOutgoing: 0,
+          archivedNeedIncoming: 1,
+          archivedNeedOutgoing: 0,
+          archivedCanIncoming: 0,
+          archivedCanOutgoing: 0,
+        ),
+      );
+      final success = IntentionSaved(
+        intention,
+        catalogMutation: mutation,
+        additionalChanges: [countChange],
+      );
+      final result = ConfirmedGraphResult(revision: revision, value: success);
+
+      expect(result.changes, [mutation, countChange]);
+      expect(
+        () => success.additionalChanges.add(mutation),
         throwsUnsupportedError,
       );
     });
@@ -649,6 +700,7 @@ IntentionSummary _summary({
     hasDescription: false,
     readiness: IntentionReadiness.notReady,
     archiveState: archiveState,
+    activeRelationCount: 0,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
   );
@@ -700,6 +752,7 @@ String _failureDescription(IntentionFailure failure) => switch (failure) {
   IntentionValidationFailure() => 'validation',
   IntentionNotFoundFailure() => 'notFound',
   IntentionConflictFailure() => 'conflict',
+  IntentionHasBlockingRelationsFailure() => 'blockingRelations',
   IntentionUnavailableFailure() => 'unavailable',
   IntentionCorruptionFailure() => 'corruption',
   IntentionUnexpectedFailure() => 'unexpected',
@@ -752,9 +805,31 @@ IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
 
 final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) async => const ResultFailure(IntentionUnavailableFailure());
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! IntentionCommand) {
+      throw UnsupportedError('Команды связей не используются в этих тестах.');
+    }
+    return const ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>(
+      IntentionUnavailableFailure(),
+    ) as GraphCommandResult<TSuccess, TFailure>;
+  }
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -762,8 +837,27 @@ final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
   ) async => const ResultFailure(IntentionUnavailableFailure());
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
-      Stream.value(const ResultFailure(IntentionUnavailableFailure()));
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) async => const ResultFailure(IntentionUnavailableFailure());
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) async => const RelationGroupPageFailure(RelationGroupUnavailableFailure());
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      Stream.value(
+        const LongTermRelationReadError(
+          LongTermRelationReadUnavailableFailure(),
+        ),
+      );
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) => Stream.value(const ResultFailure(IntentionUnavailableFailure()));
 }
 
 final class _EmptyGraphCommandOutcome implements GraphCommandOutcome {

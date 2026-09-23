@@ -19,6 +19,12 @@ abstract interface class GraphCommandOutcome {
   Iterable<GraphChange> get changes;
 }
 
+/// Целый пакет изменений одной подтверждённой ревизии графа.
+abstract interface class ConfirmedGraphChangePackage {
+  GraphRevision get revision;
+  List<GraphChange> get changes;
+}
+
 enum ConfirmedGraphResultValidationFailure { emptyChanges, revisionMismatch }
 
 final class ConfirmedGraphResultValidationException implements Exception {
@@ -27,7 +33,8 @@ final class ConfirmedGraphResultValidationException implements Exception {
   final ConfirmedGraphResultValidationFailure failure;
 }
 
-final class ConfirmedGraphResult<T extends GraphCommandOutcome> {
+final class ConfirmedGraphResult<T extends GraphCommandOutcome>
+    implements ConfirmedGraphChangePackage {
   factory ConfirmedGraphResult({
     required GraphRevision revision,
     required T value,
@@ -60,7 +67,9 @@ final class ConfirmedGraphResult<T extends GraphCommandOutcome> {
     required this.changes,
   });
 
+  @override
   final GraphRevision revision;
   final T value;
+  @override
   final List<GraphChange> changes;
 }

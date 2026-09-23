@@ -191,17 +191,47 @@ final class IntentionSummary {
     required this.hasDescription,
     required this.readiness,
     required this.archiveState,
+    required int activeRelationCount,
     required this.createdAt,
     required this.updatedAt,
-  }) : title = IntentionText.normalizeTitle(title);
+  }) : title = IntentionText.normalizeTitle(title),
+       activeRelationCount = _requireNonNegativeCount(activeRelationCount);
 
   final IntentionId id;
   final String title;
   final bool hasDescription;
   final IntentionReadiness readiness;
   final IntentionArchiveState archiveState;
+  final int activeRelationCount;
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
+
+  /// Заменяет только производный счётчик активных связей.
+  ///
+  /// Остальные данные краткого представления переносятся без изменений,
+  /// поэтому соответствие фильтру, порядок и временные метки сохраняются.
+  IntentionSummary withActiveRelationCount(int activeRelationCount) =>
+      IntentionSummary(
+        id: id,
+        title: title,
+        hasDescription: hasDescription,
+        readiness: readiness,
+        archiveState: archiveState,
+        activeRelationCount: activeRelationCount,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      );
+
+  static int _requireNonNegativeCount(int value) {
+    if (value < 0) {
+      throw ArgumentError.value(
+        value,
+        'activeRelationCount',
+        'Количество активных связей не может быть отрицательным.',
+      );
+    }
+    return value;
+  }
 }
 
 abstract interface class IntentionCatalogEntrySnapshot {
@@ -278,16 +308,20 @@ sealed class IntentionCommandSuccess implements GraphCommandOutcome {
   IntentionCommandSuccess({
     required this.catalogMutation,
     Iterable<IntentionCatalogMutation> additionalCatalogMutations = const [],
+    Iterable<GraphChange> additionalChanges = const [],
   }) : catalogMutations = List.unmodifiable([
          catalogMutation,
          ...additionalCatalogMutations,
-       ]);
+       ]),
+       additionalChanges = List.unmodifiable(additionalChanges);
 
   final IntentionCatalogMutation catalogMutation;
   final List<IntentionCatalogMutation> catalogMutations;
+  final List<GraphChange> additionalChanges;
 
   @override
-  Iterable<GraphChange> get changes => catalogMutations;
+  Iterable<GraphChange> get changes =>
+      List.unmodifiable([...catalogMutations, ...additionalChanges]);
 }
 
 final class IntentionSaved extends IntentionCommandSuccess {
@@ -295,6 +329,7 @@ final class IntentionSaved extends IntentionCommandSuccess {
     this.intention, {
     required super.catalogMutation,
     super.additionalCatalogMutations,
+    super.additionalChanges,
   });
 
   final Intention intention;
@@ -305,6 +340,7 @@ final class IntentionDeleted extends IntentionCommandSuccess {
     this.id, {
     required super.catalogMutation,
     super.additionalCatalogMutations,
+    super.additionalChanges,
   });
 
   final IntentionId id;

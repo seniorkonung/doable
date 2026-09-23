@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/intention_command.dart';
 import '../../application/intention_catalog.dart';
+import '../../application/intention_details.dart' as application;
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
@@ -35,7 +37,8 @@ final class _DetailObservationGeneration {
 }
 
 @riverpod
-Stream<Result<GraphSnapshot<Intention?>>> _intentionDetailsObservation(
+Stream<Result<GraphSnapshot<application.IntentionDetails?>>>
+_intentionDetailsObservation(
   Ref ref,
   IntentionId intentionId,
   _DetailObservationGeneration generation,
@@ -46,8 +49,10 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   late IntentionId _intentionId;
   late GraphCommandCoordinator _coordinator;
   late _DetailObservationGeneration _generation;
-  late StreamSubscription<IntentionCommandCompletion> _completionSubscription;
-  ProviderSubscription<AsyncValue<Result<GraphSnapshot<Intention?>>>>?
+  late StreamSubscription<GraphCommandCompletion> _completionSubscription;
+  ProviderSubscription<
+    AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
+  >?
   _observationSubscription;
   IntentionOperationToken? _activeToken;
   GraphRevision? _acceptedRevision;
@@ -193,7 +198,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     _startStateChange(stateChange.kind);
   }
 
-  AsyncValue<Result<GraphSnapshot<Intention?>>> _startObservation() {
+  AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
+  _startObservation() {
     _observationSubscription?.close();
     final generation = _generation;
     final subscription = ref.listen(
@@ -206,28 +212,37 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   void _handleObservation(
     _DetailObservationGeneration generation,
-    AsyncValue<Result<GraphSnapshot<Intention?>>> observation,
+    AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
+    observation,
   ) {
     if (!ref.mounted || _isDeleted || generation != _generation) {
       return;
     }
-    if (observation is AsyncLoading<Result<GraphSnapshot<Intention?>>> &&
+    if (observation
+            is AsyncLoading<
+              Result<GraphSnapshot<application.IntentionDetails?>>
+            > &&
         _preserveAuthoritativeStateWhileLoading) {
       return;
     }
-    if (observation is! AsyncLoading<Result<GraphSnapshot<Intention?>>>) {
+    if (observation
+        is! AsyncLoading<
+          Result<GraphSnapshot<application.IntentionDetails?>>
+        >) {
       _preserveAuthoritativeStateWhileLoading = false;
     }
     final current = state;
     final loaded = current is IntentionDetailsLoaded ? current : null;
     final hasNoConfirmedIntention = switch (observation) {
       AsyncData(
-        value: ResultSuccess(value: GraphSnapshot(value: Intention())),
+        value: ResultSuccess(
+          value: GraphSnapshot(value: application.IntentionDetails()),
+        ),
       ) =>
         false,
-      AsyncLoading<Result<GraphSnapshot<Intention?>>>() ||
-      AsyncError<Result<GraphSnapshot<Intention?>>>() ||
-      AsyncData<Result<GraphSnapshot<Intention?>>>() => true,
+      AsyncLoading<Result<GraphSnapshot<application.IntentionDetails?>>>() ||
+      AsyncError<Result<GraphSnapshot<application.IntentionDetails?>>>() ||
+      AsyncData<Result<GraphSnapshot<application.IntentionDetails?>>>() => true,
     };
     if (loaded?.edit != null && hasNoConfirmedIntention) {
       return;
@@ -242,53 +257,47 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     state = _stateFromObservation(observation, previousLoaded: loaded);
   }
 
-  void _handleCompletion(IntentionCommandCompletion completion) {
+  void _handleCompletion(GraphCommandCompletion completion) {
     if (!ref.mounted || _isDeleted) {
       return;
     }
     if (state.isOperationRunning) {
       _scheduleGateRefresh();
     }
-    switch (completion.confirmedResult) {
-      case ResultSuccess(
-            value: ConfirmedGraphResult(
-              :final revision,
-              value: IntentionSaved(:final intention),
-            ),
-          )
-          when intention.id == _intentionId:
-        if (!_acceptSnapshotRevision(revision)) {
-          return;
-        }
-        _advanceGeneration();
-        _preserveAuthoritativeStateWhileLoading = true;
-        final current = state;
-        final loaded = current is IntentionDetailsLoaded ? current : null;
-        state = IntentionDetailsLoaded(
-          intention: intention,
-          isOperationRunning: _isOperationRunning,
-          edit: loaded?.edit,
-          stateChange: identical(_activeToken, completion.token)
-              ? loaded?.stateChange
-              : null,
-        );
-        _startObservation();
-      case ResultSuccess(
-            value: ConfirmedGraphResult(
-              :final revision,
-              value: IntentionDeleted(:final id),
-            ),
-          )
-          when id == _intentionId:
-        _acceptedRevision = revision;
-        _advanceGeneration();
-        _isDeleted = true;
-        _observationSubscription?.close();
-        _observationSubscription = null;
-        state = const IntentionDetailsDeleted();
-      case ResultSuccess() || ResultFailure():
-        return;
+    final confirmedChange = completion.confirmedChange;
+    if (confirmedChange == null) {
+      return;
     }
+    final mutations = confirmedChange.changes
+        .whereType<IntentionCatalogMutation>()
+        .where(
+          (change) =>
+              change.before?.summary.id == _intentionId ||
+              change.after?.summary.id == _intentionId,
+        );
+    final deleted = mutations.any((change) => change.after == null);
+    final affectsIntention =
+        deleted ||
+        mutations.isNotEmpty ||
+        confirmedChange.changes.whereType<IntentionRelationCountsChanged>().any(
+          (change) => change.intentionId == _intentionId,
+        );
+    if (!affectsIntention ||
+        !_acceptSnapshotRevision(confirmedChange.revision)) {
+      return;
+    }
+    if (deleted) {
+      _advanceGeneration();
+      _isDeleted = true;
+      _observationSubscription?.close();
+      _observationSubscription = null;
+      state = const IntentionDetailsDeleted();
+      return;
+    }
+    _advanceGeneration();
+    _preserveAuthoritativeStateWhileLoading = true;
+    // Пакет задаёт барьер; поля и сводка публикуются цельным снимком.
+    _startObservation();
   }
 
   Future<void> _finishUpdate(Future<IntentionCommandCompletion> future) async {
@@ -455,7 +464,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     IntentionDetailsStateChangeKind.delete => true,
   };
 
-  IntentionInitiatorPresentationClaim? _claimFailure(
+  GraphInitiatorPresentationClaim? _claimFailure(
     IntentionOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
 
@@ -513,7 +522,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   bool get _isOperationRunning => _coordinator.isRunning(_intentionId);
 
   IntentionDetailsState _stateFromObservation(
-    AsyncValue<Result<GraphSnapshot<Intention?>>> observation, {
+    AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
+    observation, {
     IntentionDetailsLoaded? previousLoaded,
   }) => observation.when(
     data: (result) => _stateFromResult(
@@ -528,13 +538,19 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   );
 
   IntentionDetailsState _stateFromResult(
-    Result<GraphSnapshot<Intention?>> result,
+    Result<GraphSnapshot<application.IntentionDetails?>> result,
     bool isOperationRunning, {
     IntentionDetailsLoaded? previousLoaded,
   }) => switch (result) {
-    ResultSuccess(value: GraphSnapshot(value: final Intention intention)) =>
+    ResultSuccess(
+      value: GraphSnapshot(
+        value: final application.IntentionDetails details,
+        :final revision,
+      ),
+    ) =>
       IntentionDetailsLoaded(
-        intention: intention,
+        details: details,
+        revision: revision,
         isOperationRunning: isOperationRunning,
         edit: previousLoaded?.edit,
         stateChange: previousLoaded?.stateChange,
@@ -549,6 +565,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       failure: IntentionValidationFailure() ||
           IntentionNotFoundFailure() ||
           IntentionConflictFailure() ||
+          IntentionHasBlockingRelationsFailure() ||
           IntentionUnexpectedFailure(),
     ) =>
       IntentionDetailsUnexpected(isOperationRunning: isOperationRunning),

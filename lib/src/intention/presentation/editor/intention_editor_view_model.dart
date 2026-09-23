@@ -114,7 +114,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     }
   }
 
-  IntentionInitiatorPresentationClaim? _claimFailure(
+  GraphInitiatorPresentationClaim? _claimFailure(
     IntentionOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
 }

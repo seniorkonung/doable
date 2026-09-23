@@ -3,6 +3,8 @@ import 'package:drift/native.dart';
 import 'package:sqlite3/common.dart' show CommonDatabase;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import 'sqlite_relation_integrity_functions.dart';
+
 const doableTitleSearchKeyFunctionName = 'doable_title_search_key';
 
 /// Регистрирует долговечную SQLite-функцию поискового ключа до работы Drift.
@@ -14,6 +16,7 @@ void configureDoableSqliteConnection(CommonDatabase database) {
     directOnly: false,
     function: (arguments) => titleSearchKey(arguments.single as String),
   );
+  registerRelationIntegrityFunctions(database);
 }
 
 DatabaseSetup composeDoableSqliteConnectionSetup(DatabaseSetup? fixtureSetup) =>

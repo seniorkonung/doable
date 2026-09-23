@@ -15,6 +15,11 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +32,83 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  testWidgets(
+    'конфликт удаления открывает выбор блокирующих связей в соседстве',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 101, title: 'Намерение');
+      final counts = testRelationCounts(activeNeedOutgoing: 1);
+      final relation = testDetailsRelationRow(ownerId: intention.id, index: 1);
+      repository.onRelationGroupPage = (query) => GraphResultSuccess(
+        RelationGroupFirstPage(
+          items: [relation],
+          counts: counts,
+          nextCursor: null,
+          revision: const TestDetailsRevision(0),
+        ),
+      );
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(
+        ResultSuccess(intention),
+        relationCounts: counts,
+      );
+      await tester.pumpAndSettle();
+
+      final delete = find.byKey(const ValueKey('intention-details-delete'));
+      await tester.ensureVisible(delete);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('intention-details-confirm-delete')),
+      );
+      await tester.pump();
+      repository.completeCommand(
+        0,
+        ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
+      );
+      await tester.pumpAndSettle();
+
+      final show = find.byKey(
+        const ValueKey('intention-details-show-blocking-relations'),
+      );
+      await Scrollable.ensureVisible(tester.element(show), alignment: 0.3);
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 180));
+      await tester.pumpAndSettle();
+      await tester.tap(show);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(RelationNeighborhoodSliver), findsOneWidget);
+      expect(find.text('Selected relations: 0'), findsOneWidget);
+      final row = find.byKey(
+        ValueKey(
+          'relation-neighborhood-select-${relation.relation.id.toCanonicalString()}',
+        ),
+      );
+      await tester.scrollUntilVisible(
+        row,
+        300,
+        scrollable: find.byType(Scrollable),
+      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -250));
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(RelationNeighborhoodSliver)),
+      );
+      expect(
+        container
+            .read(blockingRelationsSelectionViewModelProvider(intention.id))
+            .selected
+            .keys,
+        {relation.relation.id},
+      );
+      expect(repository.relationGroupQueries, hasLength(2));
+    },
+  );
 
   test('маршрут подробного просмотра хранит предметный идентификатор', () {
     final id = testDetailsIntentionId(1);
@@ -188,7 +270,10 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
       await tester.pumpAndSettle();
       expect(repository.commands, isEmpty);
-      expect(find.text('Not ready for action'), findsOneWidget);
+      expect(
+        find.text('Not ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
 
       await tester.tap(enableReadiness);
       await tester.pumpAndSettle();
@@ -196,7 +281,10 @@ void main() {
       await tester.pump();
 
       expect(repository.commands.single, isA<EnableIntentionReadiness>());
-      expect(find.text('Not ready for action'), findsOneWidget);
+      expect(
+        find.text('Not ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
       expect(find.text('Saving changes…'), findsOneWidget);
 
       repository.completeCommand(
@@ -205,6 +293,7 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(ResultSuccess(saved));
       await tester.pump();
       await tester.pump();
 
@@ -212,10 +301,16 @@ void main() {
         find.textContaining('Marked as ready for action.'),
         findsOneWidget,
       );
-      expect(find.text('Ready for action'), findsOneWidget);
+      expect(
+        find.text('Ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
       repository.detailRequests[0].add(ResultSuccess(before));
       await tester.pump();
-      expect(find.text('Ready for action'), findsOneWidget);
+      expect(
+        find.text('Ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
     },
   );
 
@@ -251,6 +346,7 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(ResultSuccess(notReady));
       await tester.pumpAndSettle();
       expect(
         find.textContaining('Marked as not ready for action.'),
@@ -269,10 +365,14 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 3);
+      repository.detailRequests[2].add(ResultSuccess(archived));
       await tester.pumpAndSettle();
       expect(find.textContaining('Intention archived.'), findsOneWidget);
-      expect(find.text('Archived'), findsOneWidget);
-      expect(find.text('Not ready for action'), findsOneWidget);
+      expect(find.text('Archived', skipOffstage: false), findsOneWidget);
+      expect(
+        find.text('Not ready for action', skipOffstage: false),
+        findsOneWidget,
+      );
       await _closeOperationMessage(tester);
 
       final restore = find.byKey(const ValueKey('intention-details-restore'));
@@ -286,9 +386,10 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 4);
+      repository.detailRequests[3].add(ResultSuccess(restored));
       await tester.pumpAndSettle();
       expect(find.textContaining('Intention restored.'), findsOneWidget);
-      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('Active', skipOffstage: false), findsOneWidget);
     },
   );
 
@@ -335,12 +436,15 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text(message), findsOneWidget);
-        expect(find.text('Active'), findsOneWidget);
+        expect(find.text('Active', skipOffstage: false), findsOneWidget);
         final retry = find.byKey(
           const ValueKey('intention-details-state-change-retry'),
         );
         expect(retry, canRetry ? findsOneWidget : findsNothing);
         if (canRetry) {
+          await tester.ensureVisible(retry);
+          await tester.drag(find.byType(Scrollable), const Offset(0, 100));
+          await tester.pumpAndSettle();
           await tester.tap(retry);
           await tester.pump();
           expect(repository.commands, hasLength(2));
@@ -354,6 +458,201 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       }
+    },
+  );
+
+  testWidgets(
+    'объясняет каскад до архивирования и сохранённый архив после него',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      // Намерение в цикле: одна исходящая и одна входящая связь «нужно».
+      final active = testDetailsIntention(index: 26);
+      final archived = testDetailsIntention(
+        index: 26,
+        archiveState: IntentionArchiveState.archived,
+      );
+      final activeCounts = testRelationCounts(
+        activeNeedIncoming: 1,
+        activeNeedOutgoing: 1,
+      );
+      final archivedCounts = testRelationCounts(
+        archivedNeedIncoming: 1,
+        archivedNeedOutgoing: 1,
+      );
+      var counts = activeCounts;
+      repository.onRelationGroupPage = (query) => GraphResultSuccess(
+        RelationGroupFirstPage(
+          items: query.scope == RelationScope.archived
+              ? [
+                  testDetailsRelationRow(
+                    ownerId: active.id,
+                    index: 1,
+                    scope: RelationScope.archived,
+                  ),
+                ]
+              : const [],
+          counts: counts,
+          nextCursor: null,
+          revision: const TestDetailsRevision(0),
+        ),
+      );
+      await _pumpDetailsPage(tester, repository, active.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(
+        ResultSuccess(active),
+        relationCounts: activeCounts,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Archiving also archives the intention’s direct relations. '
+          'Neighbouring intentions and their other relations stay unchanged.',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('intention-details-restore-explanation')),
+        findsNothing,
+      );
+
+      final archive = find.byKey(const ValueKey('intention-details-archive'));
+      await tester.ensureVisible(archive);
+      await tester.tap(archive);
+      await tester.pump();
+      counts = archivedCounts;
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(archived, before: active),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(
+        ResultSuccess(archived),
+        revision: const TestDetailsRevision(1),
+        relationCounts: archivedCounts,
+      );
+      await tester.pumpAndSettle();
+      await _closeOperationMessage(tester);
+
+      // Восстановление не обещает обратного каскада.
+      expect(
+        find.text(
+          'Restoring returns only the intention. '
+          'Its relations stay archived: 2.',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('intention-details-archive-explanation')),
+        findsNothing,
+      );
+
+      // Архивное соседство доступно после каскада.
+      final showArchived = find.byKey(
+        const ValueKey('intention-details-show-archived-relations'),
+      );
+      await tester.ensureVisible(showArchived);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 100));
+      await tester.pumpAndSettle();
+      await tester.tap(showArchived);
+      await tester.pumpAndSettle();
+
+      expect(
+        repository.relationGroupQueries.last.scope,
+        RelationScope.archived,
+      );
+      expect(
+        find.text('Archived relations: 2', skipOffstage: false),
+        findsWidgets,
+      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'To Намерение-владелец, you need Связанное 1',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'объясняет влияние связей на обоих языках и объявляет объяснение',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledDetailsRepository();
+      final locale = ValueNotifier(const Locale('en'));
+      addTearDown(locale.dispose);
+      final archived = testDetailsIntention(
+        index: 27,
+        archiveState: IntentionArchiveState.archived,
+      );
+      final counts = testRelationCounts(archivedCanIncoming: 3);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          retry: (retryCount, error) => null,
+          child: ValueListenableBuilder<Locale>(
+            valueListenable: locale,
+            builder: (context, value, child) => _localizedApp(
+              IntentionDetailsPage(intentionId: archived.id),
+              locale: value,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(
+        ResultSuccess(archived),
+        relationCounts: counts,
+      );
+      await tester.pumpAndSettle();
+
+      const explanationKey = ValueKey('intention-details-restore-explanation');
+      expect(
+        tester.getSemantics(find.byKey(explanationKey)),
+        matchesSemantics(
+          label:
+              'Restoring returns only the intention. '
+              'Its relations stay archived: 3.',
+        ),
+      );
+      expect(
+        find.widgetWithText(
+          OutlinedButton,
+          'Show archived relations',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+
+      locale.value = const Locale('ru');
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getSemantics(find.byKey(explanationKey)),
+        matchesSemantics(
+          label:
+              'Восстановление возвращает только само намерение. '
+              'Его связи остаются в архиве: 3.',
+        ),
+      );
+      expect(
+        find.widgetWithText(
+          OutlinedButton,
+          'Показать архив связей',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      semantics.dispose();
     },
   );
 
@@ -807,6 +1106,7 @@ void main() {
     );
     await tester.pump();
     await waitForDetailRequests(repository, 2);
+    repository.detailRequests[1].add(ResultSuccess(saved));
     await tester.pump();
     await tester.pump();
 
@@ -948,7 +1248,8 @@ void main() {
 
     expect(router.current.name, IntentionDetailsRoute.name);
     expect(find.byType(IntentionDetailsPage), findsOneWidget);
-    expect(repository.detailIds.single, intention.id);
+    expect(repository.detailIds, hasLength(2));
+    expect(repository.detailIds, everyElement(intention.id));
   });
 
   testWidgets('IntentionDeleted завершает открытый details route', (
@@ -1057,9 +1358,10 @@ void main() {
       );
       await tester.pump();
       await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(ResultSuccess(archived));
       await tester.pumpAndSettle();
 
-      expect(find.text('Archived'), findsOneWidget);
+      expect(find.text('Archived', skipOffstage: false), findsOneWidget);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.textContaining('Intention archived.'), findsNothing);
 

@@ -156,6 +156,272 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogNoDescription => 'Нет описания';
 
   @override
+  String intentionActiveRelationCount(int count) {
+    return 'Активных связей: $count';
+  }
+
+  @override
+  String get intentionActiveRelationCountRefreshFailed =>
+      'Не удалось обновить количество активных связей.';
+
+  @override
+  String get intentionActiveRelationCountLoading =>
+      'Загружаем количество активных связей…';
+
+  @override
+  String get intentionActiveRelationCountUnknown =>
+      'Количество активных связей неизвестно.';
+
+  @override
+  String get relationNeighborhoodTitle => 'Связи';
+
+  @override
+  String relationNeighborhoodSelectedCount(int count) {
+    return 'Выбрано связей: $count';
+  }
+
+  @override
+  String get relationNeighborhoodAddToSelection => 'Добавить в выбор';
+
+  @override
+  String get relationNeighborhoodRemoveFromSelection => 'Убрать из выбора';
+
+  @override
+  String get blockingRelationsReviewAction => 'Просмотреть выбранные связи';
+
+  @override
+  String get blockingRelationsConfirmationTitle =>
+      'Удалить выбранные связи навсегда?';
+
+  @override
+  String get blockingRelationsConfirmationWarning =>
+      'Проверьте каждую выбранную связь. Удаление нельзя отменить. Само намерение останется; для его удаления понадобится отдельное подтверждение.';
+
+  @override
+  String blockingRelationsConfirmationCount(int count) {
+    return 'К удалению: $count';
+  }
+
+  @override
+  String blockingRelationsParticipantId(String id) {
+    return 'Идентификатор: $id';
+  }
+
+  @override
+  String get blockingRelationsDeleting => 'Удаляем выбранные связи…';
+
+  @override
+  String get blockingRelationsBusy =>
+      'Другое изменение этих связей или намерения уже выполняется.';
+
+  @override
+  String get blockingRelationsDraining =>
+      'Приложение завершает работу. Изменение не принято.';
+
+  @override
+  String get blockingRelationsEditSelectionAction => 'Вернуться к выбору';
+
+  @override
+  String get blockingRelationsRefreshSelectionAction => 'Актуализировать выбор';
+
+  @override
+  String get blockingRelationsRefreshingSelection =>
+      'Проверяем выбранные связи…';
+
+  @override
+  String blockingRelationsInvalidSelectedRelationId(String id) {
+    return 'Связь: $id';
+  }
+
+  @override
+  String get blockingRelationsInvalidMissing =>
+      'Связь больше не существует. Уберите её из выбора и подтвердите оставшийся набор заново.';
+
+  @override
+  String get blockingRelationsInvalidMoved =>
+      'Связь больше не принадлежит этому намерению. Уберите её из выбора и подтвердите оставшийся набор заново.';
+
+  @override
+  String get blockingRelationsRefreshIntentionNotFound =>
+      'Намерение больше не существует. Удаление связей недоступно.';
+
+  @override
+  String get blockingRelationsRefreshUnavailable =>
+      'Не удалось проверить выбранные связи. Сохранённый выбор не изменён; повторите проверку.';
+
+  @override
+  String get blockingRelationsRefreshCorruption =>
+      'Не удалось проверить выбранные связи из-за повреждённых данных. Удаление не запущено.';
+
+  @override
+  String get blockingRelationsRefreshUnexpected =>
+      'Не удалось проверить выбранные связи. Удаление не запущено.';
+
+  @override
+  String get blockingRelationsDeleteMissing =>
+      'Одна выбранная связь больше не существует. Актуализируйте выбор и подтвердите его заново.';
+
+  @override
+  String get blockingRelationsDeleteMoved =>
+      'Одна выбранная связь больше не принадлежит этому намерению. Актуализируйте выбор и подтвердите его заново.';
+
+  @override
+  String get blockingRelationsDeleteProhibited =>
+      'Удаление одной выбранной связи теперь заблокировано. Актуализируйте выбор и подтвердите его заново.';
+
+  @override
+  String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
+
+  @override
+  String get relationNeighborhoodSummaryUnavailable =>
+      'Не удалось загрузить сводку связей.';
+
+  @override
+  String get relationNeighborhoodSavedSummaryRefreshing =>
+      'Обновляем сохранённые числа связей…';
+
+  @override
+  String get relationNeighborhoodSavedSummaryStale =>
+      'Сохранённые числа связей устарели: обновить данные не удалось.';
+
+  @override
+  String relationNeighborhoodTotal(int count) {
+    return 'Всего связей: $count';
+  }
+
+  @override
+  String relationNeighborhoodActiveTotal(int count) {
+    return 'Активных связей: $count';
+  }
+
+  @override
+  String relationNeighborhoodArchivedTotal(int count) {
+    return 'Архивных связей: $count';
+  }
+
+  @override
+  String relationNeighborhoodNeedTotal(int count) {
+    return 'Нужно: $count';
+  }
+
+  @override
+  String relationNeighborhoodCanTotal(int count) {
+    return 'Можно: $count';
+  }
+
+  @override
+  String get relationNeighborhoodScopeLabel => 'Состояние связей';
+
+  @override
+  String get relationNeighborhoodScopeActive => 'Активные связи';
+
+  @override
+  String get relationNeighborhoodScopeArchived => 'Архивные связи';
+
+  @override
+  String get relationNeighborhoodTypeLabel => 'Тип связи';
+
+  @override
+  String get relationNeighborhoodTypeNeed => 'Нужно';
+
+  @override
+  String get relationNeighborhoodTypeCan => 'Можно';
+
+  @override
+  String get relationNeighborhoodDirectionLabel => 'Направление';
+
+  @override
+  String get relationNeighborhoodDirectionIncoming => 'Входящие';
+
+  @override
+  String get relationNeighborhoodDirectionOutgoing => 'Исходящие';
+
+  @override
+  String relationNeighborhoodSelectedGroupCount(int count) {
+    return 'Во всей выбранной группе: $count';
+  }
+
+  @override
+  String get relationNeighborhoodInitialUnavailable =>
+      'Не удалось загрузить связи и сводку. Повторите попытку.';
+
+  @override
+  String get relationNeighborhoodInitialCorruption =>
+      'Сохранённые данные связей повреждены и не могут быть показаны.';
+
+  @override
+  String get relationNeighborhoodInitialUnexpected =>
+      'Не удалось загрузить связи из-за непредвиденной ошибки.';
+
+  @override
+  String get relationNeighborhoodInitialInvalid =>
+      'Выбранную группу связей больше нельзя открыть.';
+
+  @override
+  String get relationNeighborhoodIntentionNotFound =>
+      'Намерение для просмотра связей больше не существует.';
+
+  @override
+  String get relationNeighborhoodEmpty => 'В этой группе связей нет.';
+
+  @override
+  String get relationNeighborhoodLoadingMore => 'Загружаем ещё связи…';
+
+  @override
+  String get relationNeighborhoodLoadMoreUnavailable =>
+      'Не удалось загрузить следующие связи.';
+
+  @override
+  String get relationNeighborhoodLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующие связи нельзя показать.';
+
+  @override
+  String get relationNeighborhoodLoadMoreUnexpected =>
+      'Не удалось загрузить следующие связи из-за непредвиденной ошибки.';
+
+  @override
+  String get relationNeighborhoodLoadMoreInvalid =>
+      'Продолжение этой группы больше недействительно.';
+
+  @override
+  String get relationNeighborhoodRefreshing => 'Обновляем связи…';
+
+  @override
+  String get relationNeighborhoodRefreshFailed =>
+      'Не удалось обновить связи. Ранее загруженные данные по-прежнему показаны.';
+
+  @override
+  String get relationNeighborhoodConfirmedEnd =>
+      'Все связи этой группы загружены.';
+
+  @override
+  String get relationNeighborhoodRelationActive => 'Активная связь';
+
+  @override
+  String get relationNeighborhoodRelationArchived => 'Связь в архиве';
+
+  @override
+  String relationNeighborhoodPriority(String priority) {
+    return 'Приоритет $priority';
+  }
+
+  @override
+  String get relationNeighborhoodSourceParticipant => 'Исходное намерение';
+
+  @override
+  String get relationNeighborhoodRelatedParticipant => 'Связанное намерение';
+
+  @override
+  String relationNeighborhoodNeedPhrase(String source, String related) {
+    return 'Чтобы $source, нужно $related';
+  }
+
+  @override
+  String relationNeighborhoodCanPhrase(String source, String related) {
+    return 'Чтобы $source, можно $related';
+  }
+
+  @override
   String get detailsTitle => 'Подробности намерения';
 
   @override
@@ -298,7 +564,26 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsDeleteConflict =>
-      'Намерение всё ещё связано с другими данными, поэтому его нельзя удалить.';
+      'Намерение изменено в другом месте и не удалено.';
+
+  @override
+  String get detailsDeleteBlockedByRelations =>
+      'Намерение не удалено: его связи блокируют удаление. Архивные и ещё не загруженные связи тоже блокируют.';
+
+  @override
+  String get detailsShowBlockingRelationsAction => 'Показать блокирующие связи';
+
+  @override
+  String get detailsArchiveCascadeExplanation =>
+      'Архивирование также архивирует непосредственные связи намерения. Соседние намерения и их остальные связи не изменяются.';
+
+  @override
+  String detailsRestoreRelationsExplanation(int count) {
+    return 'Восстановление возвращает только само намерение. Его связи остаются в архиве: $count.';
+  }
+
+  @override
+  String get detailsShowArchivedRelationsAction => 'Показать архив связей';
 
   @override
   String get detailsDeleteUnavailable =>
@@ -411,6 +696,33 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationDelete => 'Удаление';
 
   @override
+  String get graphOperationDeleteBlockingRelations =>
+      'Удаление выбранных связей';
+
+  @override
+  String get blockingRelationsDeleted => 'Выбранные связи удалены.';
+
+  @override
+  String get blockingRelationsDeleteIntentionNotFound =>
+      'Это намерение больше не существует. Связи не удалены.';
+
+  @override
+  String get blockingRelationsDeleteConflict =>
+      'Выбранный набор устарел. Обновите выбор и подтвердите его снова.';
+
+  @override
+  String get blockingRelationsDeleteUnavailable =>
+      'Не удалось удалить выбранные связи. Повторите попытку.';
+
+  @override
+  String get blockingRelationsDeleteCorruption =>
+      'Сохранённые данные повреждены. Выбранные связи не удалены.';
+
+  @override
+  String get blockingRelationsDeleteUnexpected =>
+      'Не удалось удалить выбранные связи из-за непредвиденной ошибки.';
+
+  @override
   String get graphOperationNewIntention => 'новое намерение';
 
   @override
@@ -423,5 +735,375 @@ class AppLocalizationsRu extends AppLocalizations {
     String outcome,
   ) {
     return '$operation — «$target»: $outcome';
+  }
+
+  @override
+  String get graphOperationNewRelation => 'новая связь';
+
+  @override
+  String get graphOperationRelation => 'связь';
+
+  @override
+  String get relationEditorCreated => 'Связь создана.';
+
+  @override
+  String get relationEditorCreateInvalidInput =>
+      'Проверьте выбранные намерения и данные связи.';
+
+  @override
+  String get relationEditorCreatePairOccupied =>
+      'Связь этого направления между выбранными намерениями уже есть.';
+
+  @override
+  String get relationEditorCreateParticipantNotFound =>
+      'Одно из выбранных намерений больше не существует.';
+
+  @override
+  String get relationEditorCreateParticipantArchived =>
+      'Связать можно только активные намерения.';
+
+  @override
+  String get relationEditorCreateUnavailable =>
+      'Не удалось создать связь. Повторите попытку.';
+
+  @override
+  String get relationEditorCreateCorruption =>
+      'Сохранённые данные повреждены. Связь не создана.';
+
+  @override
+  String get relationEditorCreateUnexpected =>
+      'Не удалось создать связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationEditorUpdated => 'Связь изменена.';
+
+  @override
+  String get relationEditorUpdateInvalidInput =>
+      'Проверьте выбранные намерения и изменения связи.';
+
+  @override
+  String get relationEditorUpdatePairOccupied =>
+      'Связь этого направления между выбранными намерениями уже есть.';
+
+  @override
+  String get relationEditorUpdateNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationEditorUpdateParticipantNotFound =>
+      'Одно из выбранных намерений больше не существует.';
+
+  @override
+  String get relationEditorUpdateParticipantArchived =>
+      'Активная связь может соединять только активные намерения.';
+
+  @override
+  String get relationEditorUpdateUnavailable =>
+      'Не удалось изменить связь. Повторите попытку.';
+
+  @override
+  String get relationEditorUpdateCorruption =>
+      'Сохранённые данные повреждены. Связь не изменена.';
+
+  @override
+  String get relationEditorUpdateUnexpected =>
+      'Не удалось изменить связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationArchived => 'Связь архивирована.';
+
+  @override
+  String get relationArchiveNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationArchiveConflict =>
+      'Связь не удалось архивировать из-за конфликта актуального состояния.';
+
+  @override
+  String get relationArchiveUnavailable =>
+      'Не удалось архивировать связь. Повторите попытку.';
+
+  @override
+  String get relationArchiveCorruption =>
+      'Сохранённые данные повреждены. Связь не архивирована.';
+
+  @override
+  String get relationArchiveUnexpected =>
+      'Не удалось архивировать связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationRestored => 'Связь восстановлена.';
+
+  @override
+  String get relationRestoreNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationRestoreConflict =>
+      'Связь не удалось восстановить из-за конфликта актуального состояния.';
+
+  @override
+  String get relationRestoreSourceNotFound =>
+      'Исходное намерение больше не существует. Связь не восстановлена.';
+
+  @override
+  String get relationRestoreRelatedNotFound =>
+      'Связанное намерение больше не существует. Связь не восстановлена.';
+
+  @override
+  String get relationRestoreSourceArchived =>
+      'Сначала восстановите исходное намерение, затем восстановите эту связь.';
+
+  @override
+  String get relationRestoreRelatedArchived =>
+      'Сначала восстановите связанное намерение, затем восстановите эту связь.';
+
+  @override
+  String get relationRestoreUnavailable =>
+      'Не удалось восстановить связь. Повторите попытку.';
+
+  @override
+  String get relationRestoreCorruption =>
+      'Сохранённые данные повреждены. Связь не восстановлена.';
+
+  @override
+  String get relationRestoreUnexpected =>
+      'Не удалось восстановить связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationDeleted => 'Связь удалена.';
+
+  @override
+  String get relationDeleteNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationDeleteConflict =>
+      'Связь не удалось удалить из-за конфликта актуального состояния.';
+
+  @override
+  String get relationDeleteUnavailable =>
+      'Не удалось удалить связь. Повторите попытку.';
+
+  @override
+  String get relationDeleteCorruption =>
+      'Сохранённые данные повреждены. Связь не удалена.';
+
+  @override
+  String get relationDeleteUnexpected =>
+      'Не удалось удалить связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationNeighborhoodOpenRelation =>
+      'Открывает подробные данные связи';
+
+  @override
+  String get relationDetailsTitle => 'Связь';
+
+  @override
+  String get relationDetailsLoading => 'Загружаем связь…';
+
+  @override
+  String get relationDetailsNotFound => 'Эта связь больше не существует.';
+
+  @override
+  String get relationDetailsUnavailable =>
+      'Не удалось загрузить связь. Повторите попытку.';
+
+  @override
+  String get relationDetailsCorruption =>
+      'Сохранённые данные связи повреждены и не могут быть показаны.';
+
+  @override
+  String get relationDetailsUnexpected =>
+      'Не удалось загрузить связь из-за непредвиденной ошибки.';
+
+  @override
+  String get relationDetailsRefreshing => 'Обновляем подробные данные связи…';
+
+  @override
+  String get relationDetailsRefreshUnavailable =>
+      'Не удалось обновить подробные данные связи. Ранее подтверждённые данные по-прежнему показаны.';
+
+  @override
+  String get relationDetailsRefreshCorruption =>
+      'Сохранённые данные повреждены. Ранее подтверждённые подробные данные связи по-прежнему показаны.';
+
+  @override
+  String get relationDetailsRefreshUnexpected =>
+      'Не удалось обновить подробные данные связи из-за непредвиденной ошибки. Ранее подтверждённые данные по-прежнему показаны.';
+
+  @override
+  String get relationDetailsTypeLabel => 'Тип связи';
+
+  @override
+  String get relationDetailsPriorityLabel => 'Приоритет';
+
+  @override
+  String get relationDetailsScopeLabel => 'Состояние связи';
+
+  @override
+  String get relationDetailsDescriptionLabel => 'Описание';
+
+  @override
+  String get relationDetailsNoDescription => 'Описания нет';
+
+  @override
+  String get relationDetailsOpenParticipant =>
+      'Открывает намерение и его собственные связи';
+
+  @override
+  String get relationDetailsEditAction => 'Редактировать связь';
+
+  @override
+  String get relationDetailsArchiveAction => 'Архивировать связь';
+
+  @override
+  String get relationDetailsRestoreAction => 'Восстановить связь';
+
+  @override
+  String get relationDetailsDeleteAction => 'Удалить связь навсегда';
+
+  @override
+  String get relationDetailsDeleteConfirmationTitle =>
+      'Удалить связь навсегда?';
+
+  @override
+  String relationDetailsDeleteConfirmationMessage(
+    String phrase,
+    String sourceTitle,
+    String relatedTitle,
+    String scope,
+  ) {
+    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Оба намерения и все остальные связи сохранятся.';
+  }
+
+  @override
+  String get relationDetailsConfirmDeleteAction => 'Удалить навсегда';
+
+  @override
+  String get relationDetailsOpenSourceParticipantAction =>
+      'Открыть исходное намерение';
+
+  @override
+  String get relationDetailsOpenRelatedParticipantAction =>
+      'Открыть связанное намерение';
+
+  @override
+  String get participantPickerTitle => 'Выбор участника';
+
+  @override
+  String get participantPickerCancel => 'Отменить выбор';
+
+  @override
+  String get participantPickerEmpty => 'Других намерений для выбора нет.';
+
+  @override
+  String get participantPickerSelectHint =>
+      'Выбирает это намерение участником связи';
+
+  @override
+  String get participantPickerOpenDetails =>
+      'Открыть подробные данные намерения';
+
+  @override
+  String get relationEditorTitle => 'Новая связь';
+
+  @override
+  String get relationEditorEditTitle => 'Редактирование связи';
+
+  @override
+  String get relationEditorPhraseLabel => 'Формулировка связи';
+
+  @override
+  String get relationEditorSourceLabel => 'Исходное намерение';
+
+  @override
+  String get relationEditorRelatedLabel => 'Связанное намерение';
+
+  @override
+  String get relationEditorParticipantSelected => 'Выбрано';
+
+  @override
+  String get relationEditorParticipantNotSelected => 'Не выбрано';
+
+  @override
+  String get relationEditorSelectSourceAction => 'Выбрать исходное намерение';
+
+  @override
+  String get relationEditorChangeSourceAction => 'Изменить исходное намерение';
+
+  @override
+  String get relationEditorSelectRelatedAction => 'Выбрать связанное намерение';
+
+  @override
+  String get relationEditorChangeRelatedAction =>
+      'Изменить связанное намерение';
+
+  @override
+  String get relationEditorTypeLabel => 'Тип связи';
+
+  @override
+  String get relationEditorTypeNeed => 'Нужно';
+
+  @override
+  String get relationEditorTypeCan => 'Можно';
+
+  @override
+  String get relationEditorPriorityLabel => 'Приоритет';
+
+  @override
+  String get relationEditorDescriptionLabel => 'Описание (необязательно)';
+
+  @override
+  String get relationEditorDescriptionTooLong =>
+      'Используйте не более 4096 символов.';
+
+  @override
+  String get relationEditorDescriptionInvalidUnicode =>
+      'Введите корректный Unicode-текст без NUL.';
+
+  @override
+  String get relationEditorCreateSameParticipants =>
+      'Намерение нельзя связать с самим собой.';
+
+  @override
+  String get relationEditorMissingTitle => 'Чтобы создать связь, укажите:';
+
+  @override
+  String get relationEditorMissingSource => 'исходное намерение';
+
+  @override
+  String get relationEditorMissingRelated => 'связанное намерение';
+
+  @override
+  String get relationEditorMissingType => 'тип связи';
+
+  @override
+  String get relationEditorMissingPriority => 'приоритет от P1 до P4';
+
+  @override
+  String get relationEditorOpenExistingRelation => 'Открыть существующую связь';
+
+  @override
+  String get relationEditorSubmitAction => 'Создать связь';
+
+  @override
+  String get relationEditorCreating => 'Создаём…';
+
+  @override
+  String get relationEditorSaveAction => 'Сохранить изменения';
+
+  @override
+  String get relationEditorSaving => 'Сохраняем…';
+
+  @override
+  String get relationNeighborhoodCreateOutgoingAction =>
+      'Создать исходящую связь';
+
+  @override
+  String get relationNeighborhoodCreateIncomingAction =>
+      'Создать входящую связь';
+
+  @override
+  String relationEditorPriorityOption(String priority) {
+    return 'Приоритет $priority';
   }
 }

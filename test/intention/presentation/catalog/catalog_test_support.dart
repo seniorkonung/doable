@@ -1,19 +1,45 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
 final class ControlledCatalogRepository implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   final queries = <IntentionCatalogQuery>[];
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
   final commands = <IntentionCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
+  final relationCommands = <LongTermRelationCommand>[];
+  final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -37,6 +63,13 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
     });
   }
 
+  void completeRelationCommand(
+    int index,
+    LongTermRelationCommandResult result,
+  ) {
+    _relationCommandRequests[index].complete(result);
+  }
+
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
@@ -48,9 +81,47 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
   }
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) => throw UnsupportedError('Сводка не используется в тесте каталога.');
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) =>
+      throw UnsupportedError('Группы связей не используются в тесте каталога.');
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      throw UnsupportedError('Связи не наблюдаются в тесте каталога.');
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    final result = switch (command) {
+      final IntentionCommand intentionCommand => await _executeIntention(
+        intentionCommand,
+      ),
+      final LongTermRelationCommand relationCommand =>
+        await _executeLongTermRelation(relationCommand),
+      _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
+    };
+    return result as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<LongTermRelationCommandResult> _executeLongTermRelation(
+    LongTermRelationCommand command,
   ) {
+    relationCommands.add(command);
+    final request = Completer<LongTermRelationCommandResult>();
+    _relationCommandRequests.add(request);
+    return request.future;
+  }
+
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) {
     commands.add(command);
     final request =
         Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
@@ -59,8 +130,9 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
   }
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
-      throw UnsupportedError('Подробное чтение не используется в тесте.');
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) => throw UnsupportedError('Подробное чтение не используется в тесте.');
 }
 
 final class TestCatalogCursor implements IntentionCatalogCursor {
@@ -104,6 +176,7 @@ IntentionSummary testSummary({
   bool hasDescription = false,
   IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
+  int activeRelationCount = 0,
   int? createdDay,
   int? updatedDay,
 }) {
@@ -127,6 +200,7 @@ IntentionSummary testSummary({
     hasDescription: hasDescription,
     readiness: readiness,
     archiveState: archiveState,
+    activeRelationCount: activeRelationCount,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );
@@ -142,5 +216,49 @@ Intention testIntention({int index = 1, String title = 'Намерение'}) {
     archiveState: summary.archiveState,
     createdAt: summary.createdAt,
     updatedAt: summary.updatedAt,
+  );
+}
+
+RelationCounts testRelationCounts({
+  int activeNeedIncoming = 0,
+  int activeNeedOutgoing = 0,
+  int activeCanIncoming = 0,
+  int activeCanOutgoing = 0,
+  int archivedNeedIncoming = 0,
+  int archivedNeedOutgoing = 0,
+  int archivedCanIncoming = 0,
+  int archivedCanOutgoing = 0,
+}) => RelationCounts(
+  activeNeedIncoming: activeNeedIncoming,
+  activeNeedOutgoing: activeNeedOutgoing,
+  activeCanIncoming: activeCanIncoming,
+  activeCanOutgoing: activeCanOutgoing,
+  archivedNeedIncoming: archivedNeedIncoming,
+  archivedNeedOutgoing: archivedNeedOutgoing,
+  archivedCanIncoming: archivedCanIncoming,
+  archivedCanOutgoing: archivedCanOutgoing,
+);
+
+LongTermRelation testRelation({
+  required IntentionId sourceIntentionId,
+  required IntentionId relatedIntentionId,
+  int index = 1,
+}) {
+  final encodedId =
+      '018f0001-0000-7000-8000-${index.toString().padLeft(12, '0')}';
+  final id = switch (LongTermRelationId.decode(encodedId)) {
+    LongTermRelationIdDecodingSuccess(:final id) => id,
+    InvalidLongTermRelationIdDecoding() => throw StateError(
+      'Некорректный fixture ID связи.',
+    ),
+  };
+  return LongTermRelation(
+    id: id,
+    sourceIntentionId: sourceIntentionId,
+    relatedIntentionId: relatedIntentionId,
+    type: LongTermRelationType.need,
+    priority: RelationPriority.p2,
+    scope: RelationScope.active,
+    creationSequence: RelationCreationSequence(index),
   );
 }

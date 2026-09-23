@@ -155,6 +155,274 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogNoDescription => 'No description';
 
   @override
+  String intentionActiveRelationCount(int count) {
+    return 'Active relations: $count';
+  }
+
+  @override
+  String get intentionActiveRelationCountRefreshFailed =>
+      'The active relation count couldn’t be refreshed.';
+
+  @override
+  String get intentionActiveRelationCountLoading =>
+      'Loading the active relation count…';
+
+  @override
+  String get intentionActiveRelationCountUnknown =>
+      'The active relation count is unknown.';
+
+  @override
+  String get relationNeighborhoodTitle => 'Relations';
+
+  @override
+  String relationNeighborhoodSelectedCount(int count) {
+    return 'Selected relations: $count';
+  }
+
+  @override
+  String get relationNeighborhoodAddToSelection => 'Add to selection';
+
+  @override
+  String get relationNeighborhoodRemoveFromSelection => 'Remove from selection';
+
+  @override
+  String get blockingRelationsReviewAction => 'Review selected relations';
+
+  @override
+  String get blockingRelationsConfirmationTitle =>
+      'Delete selected relations permanently?';
+
+  @override
+  String get blockingRelationsConfirmationWarning =>
+      'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.';
+
+  @override
+  String blockingRelationsConfirmationCount(int count) {
+    return 'To delete: $count';
+  }
+
+  @override
+  String blockingRelationsParticipantId(String id) {
+    return 'Identifier: $id';
+  }
+
+  @override
+  String get blockingRelationsDeleting => 'Deleting selected relations…';
+
+  @override
+  String get blockingRelationsBusy =>
+      'Another change to these relations or the intention is already running.';
+
+  @override
+  String get blockingRelationsDraining =>
+      'The app is closing. The change was not accepted.';
+
+  @override
+  String get blockingRelationsEditSelectionAction => 'Return to selection';
+
+  @override
+  String get blockingRelationsRefreshSelectionAction => 'Refresh selection';
+
+  @override
+  String get blockingRelationsRefreshingSelection =>
+      'Checking selected relations…';
+
+  @override
+  String blockingRelationsInvalidSelectedRelationId(String id) {
+    return 'Relation: $id';
+  }
+
+  @override
+  String get blockingRelationsInvalidMissing =>
+      'This relation no longer exists. Remove it from the selection and confirm the remaining set again.';
+
+  @override
+  String get blockingRelationsInvalidMoved =>
+      'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.';
+
+  @override
+  String get blockingRelationsRefreshIntentionNotFound =>
+      'This intention no longer exists. Its relations cannot be deleted here.';
+
+  @override
+  String get blockingRelationsRefreshUnavailable =>
+      'Selected relations could not be checked. Your selection is unchanged; try checking again.';
+
+  @override
+  String get blockingRelationsRefreshCorruption =>
+      'Selected relations could not be checked because the data is damaged. Deletion was not started.';
+
+  @override
+  String get blockingRelationsRefreshUnexpected =>
+      'Selected relations could not be checked. Deletion was not started.';
+
+  @override
+  String get blockingRelationsDeleteMissing =>
+      'A selected relation no longer exists. Refresh the selection and confirm it again.';
+
+  @override
+  String get blockingRelationsDeleteMoved =>
+      'A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.';
+
+  @override
+  String get blockingRelationsDeleteProhibited =>
+      'A selected relation can no longer be deleted. Refresh the selection and confirm it again.';
+
+  @override
+  String get relationNeighborhoodSummaryLoading =>
+      'Loading relations and summary…';
+
+  @override
+  String get relationNeighborhoodSummaryUnavailable =>
+      'The relation summary couldn’t be loaded.';
+
+  @override
+  String get relationNeighborhoodSavedSummaryRefreshing =>
+      'Updating saved relation numbers…';
+
+  @override
+  String get relationNeighborhoodSavedSummaryStale =>
+      'Saved relation numbers are out of date because the refresh failed.';
+
+  @override
+  String relationNeighborhoodTotal(int count) {
+    return 'Total relations: $count';
+  }
+
+  @override
+  String relationNeighborhoodActiveTotal(int count) {
+    return 'Active relations: $count';
+  }
+
+  @override
+  String relationNeighborhoodArchivedTotal(int count) {
+    return 'Archived relations: $count';
+  }
+
+  @override
+  String relationNeighborhoodNeedTotal(int count) {
+    return 'Need: $count';
+  }
+
+  @override
+  String relationNeighborhoodCanTotal(int count) {
+    return 'Can: $count';
+  }
+
+  @override
+  String get relationNeighborhoodScopeLabel => 'Relation state';
+
+  @override
+  String get relationNeighborhoodScopeActive => 'Active relations';
+
+  @override
+  String get relationNeighborhoodScopeArchived => 'Archived relations';
+
+  @override
+  String get relationNeighborhoodTypeLabel => 'Relation type';
+
+  @override
+  String get relationNeighborhoodTypeNeed => 'Need';
+
+  @override
+  String get relationNeighborhoodTypeCan => 'Can';
+
+  @override
+  String get relationNeighborhoodDirectionLabel => 'Direction';
+
+  @override
+  String get relationNeighborhoodDirectionIncoming => 'Incoming';
+
+  @override
+  String get relationNeighborhoodDirectionOutgoing => 'Outgoing';
+
+  @override
+  String relationNeighborhoodSelectedGroupCount(int count) {
+    return 'In the whole selected group: $count';
+  }
+
+  @override
+  String get relationNeighborhoodInitialUnavailable =>
+      'The relations and summary couldn’t be loaded. Try again.';
+
+  @override
+  String get relationNeighborhoodInitialCorruption =>
+      'Stored relation data is damaged and can’t be shown.';
+
+  @override
+  String get relationNeighborhoodInitialUnexpected =>
+      'The relations couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get relationNeighborhoodInitialInvalid =>
+      'The selected relation group can no longer be opened.';
+
+  @override
+  String get relationNeighborhoodIntentionNotFound =>
+      'The intention whose relations were being viewed no longer exists.';
+
+  @override
+  String get relationNeighborhoodEmpty =>
+      'There are no relations in this group.';
+
+  @override
+  String get relationNeighborhoodLoadingMore => 'Loading more relations…';
+
+  @override
+  String get relationNeighborhoodLoadMoreUnavailable =>
+      'The next relations couldn’t be loaded.';
+
+  @override
+  String get relationNeighborhoodLoadMoreCorruption =>
+      'Stored data is damaged; the next relations can’t be shown.';
+
+  @override
+  String get relationNeighborhoodLoadMoreUnexpected =>
+      'The next relations couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get relationNeighborhoodLoadMoreInvalid =>
+      'The continuation for this group is no longer valid.';
+
+  @override
+  String get relationNeighborhoodRefreshing => 'Refreshing relations…';
+
+  @override
+  String get relationNeighborhoodRefreshFailed =>
+      'The relations couldn’t be refreshed. Previously loaded data is still shown.';
+
+  @override
+  String get relationNeighborhoodConfirmedEnd =>
+      'All relations in this group are loaded.';
+
+  @override
+  String get relationNeighborhoodRelationActive => 'Active relation';
+
+  @override
+  String get relationNeighborhoodRelationArchived => 'Archived relation';
+
+  @override
+  String relationNeighborhoodPriority(String priority) {
+    return 'Priority $priority';
+  }
+
+  @override
+  String get relationNeighborhoodSourceParticipant => 'Source intention';
+
+  @override
+  String get relationNeighborhoodRelatedParticipant => 'Related intention';
+
+  @override
+  String relationNeighborhoodNeedPhrase(String source, String related) {
+    return 'To $source, you need $related';
+  }
+
+  @override
+  String relationNeighborhoodCanPhrase(String source, String related) {
+    return 'To $source, you can $related';
+  }
+
+  @override
   String get detailsTitle => 'Intention details';
 
   @override
@@ -295,7 +563,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsDeleteConflict =>
-      'The intention is still linked and can’t be deleted.';
+      'The intention changed elsewhere. It wasn’t deleted.';
+
+  @override
+  String get detailsDeleteBlockedByRelations =>
+      'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.';
+
+  @override
+  String get detailsShowBlockingRelationsAction => 'Show blocking relations';
+
+  @override
+  String get detailsArchiveCascadeExplanation =>
+      'Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.';
+
+  @override
+  String detailsRestoreRelationsExplanation(int count) {
+    return 'Restoring returns only the intention. Its relations stay archived: $count.';
+  }
+
+  @override
+  String get detailsShowArchivedRelationsAction => 'Show archived relations';
 
   @override
   String get detailsDeleteUnavailable =>
@@ -408,6 +695,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationDelete => 'Delete';
 
   @override
+  String get graphOperationDeleteBlockingRelations =>
+      'Delete selected relations';
+
+  @override
+  String get blockingRelationsDeleted => 'Selected relations deleted.';
+
+  @override
+  String get blockingRelationsDeleteIntentionNotFound =>
+      'This intention no longer exists. Relations weren’t deleted.';
+
+  @override
+  String get blockingRelationsDeleteConflict =>
+      'The selected relations changed. Refresh the selection and confirm again.';
+
+  @override
+  String get blockingRelationsDeleteUnavailable =>
+      'Selected relations couldn’t be deleted. Try again.';
+
+  @override
+  String get blockingRelationsDeleteCorruption =>
+      'Stored data is damaged. Selected relations weren’t deleted.';
+
+  @override
+  String get blockingRelationsDeleteUnexpected =>
+      'Selected relations couldn’t be deleted because of an unexpected error.';
+
+  @override
   String get graphOperationNewIntention => 'new intention';
 
   @override
@@ -420,5 +734,375 @@ class AppLocalizationsEn extends AppLocalizations {
     String outcome,
   ) {
     return '$operation — “$target”: $outcome';
+  }
+
+  @override
+  String get graphOperationNewRelation => 'new relation';
+
+  @override
+  String get graphOperationRelation => 'relation';
+
+  @override
+  String get relationEditorCreated => 'Relation created.';
+
+  @override
+  String get relationEditorCreateInvalidInput =>
+      'Check the selected intentions and relation details.';
+
+  @override
+  String get relationEditorCreatePairOccupied =>
+      'A relation with this direction already exists between the selected intentions.';
+
+  @override
+  String get relationEditorCreateParticipantNotFound =>
+      'One of the selected intentions no longer exists.';
+
+  @override
+  String get relationEditorCreateParticipantArchived =>
+      'Only active intentions can be linked.';
+
+  @override
+  String get relationEditorCreateUnavailable =>
+      'The relation couldn’t be created. Try again.';
+
+  @override
+  String get relationEditorCreateCorruption =>
+      'Stored data is damaged. The relation wasn’t created.';
+
+  @override
+  String get relationEditorCreateUnexpected =>
+      'The relation couldn’t be created because of an unexpected error.';
+
+  @override
+  String get relationEditorUpdated => 'Relation updated.';
+
+  @override
+  String get relationEditorUpdateInvalidInput =>
+      'Check the selected intentions and relation changes.';
+
+  @override
+  String get relationEditorUpdatePairOccupied =>
+      'A relation with this direction already exists between the selected intentions.';
+
+  @override
+  String get relationEditorUpdateNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationEditorUpdateParticipantNotFound =>
+      'One of the selected intentions no longer exists.';
+
+  @override
+  String get relationEditorUpdateParticipantArchived =>
+      'An active relation can only link active intentions.';
+
+  @override
+  String get relationEditorUpdateUnavailable =>
+      'The relation couldn’t be updated. Try again.';
+
+  @override
+  String get relationEditorUpdateCorruption =>
+      'Stored data is damaged. The relation wasn’t updated.';
+
+  @override
+  String get relationEditorUpdateUnexpected =>
+      'The relation couldn’t be updated because of an unexpected error.';
+
+  @override
+  String get relationArchived => 'Relation archived.';
+
+  @override
+  String get relationArchiveNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationArchiveConflict =>
+      'The relation couldn’t be archived because its current state conflicts with the operation.';
+
+  @override
+  String get relationArchiveUnavailable =>
+      'The relation couldn’t be archived. Try again.';
+
+  @override
+  String get relationArchiveCorruption =>
+      'Stored data is damaged. The relation wasn’t archived.';
+
+  @override
+  String get relationArchiveUnexpected =>
+      'The relation couldn’t be archived because of an unexpected error.';
+
+  @override
+  String get relationRestored => 'Relation restored.';
+
+  @override
+  String get relationRestoreNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationRestoreConflict =>
+      'The relation couldn’t be restored because its current state conflicts with the operation.';
+
+  @override
+  String get relationRestoreSourceNotFound =>
+      'The source intention no longer exists. The relation wasn’t restored.';
+
+  @override
+  String get relationRestoreRelatedNotFound =>
+      'The related intention no longer exists. The relation wasn’t restored.';
+
+  @override
+  String get relationRestoreSourceArchived =>
+      'Restore the source intention before restoring this relation.';
+
+  @override
+  String get relationRestoreRelatedArchived =>
+      'Restore the related intention before restoring this relation.';
+
+  @override
+  String get relationRestoreUnavailable =>
+      'The relation couldn’t be restored. Try again.';
+
+  @override
+  String get relationRestoreCorruption =>
+      'Stored data is damaged. The relation wasn’t restored.';
+
+  @override
+  String get relationRestoreUnexpected =>
+      'The relation couldn’t be restored because of an unexpected error.';
+
+  @override
+  String get relationDeleted => 'Relation deleted.';
+
+  @override
+  String get relationDeleteNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationDeleteConflict =>
+      'The relation couldn’t be deleted because its current state conflicts with the operation.';
+
+  @override
+  String get relationDeleteUnavailable =>
+      'The relation couldn’t be deleted. Try again.';
+
+  @override
+  String get relationDeleteCorruption =>
+      'Stored data is damaged. The relation wasn’t deleted.';
+
+  @override
+  String get relationDeleteUnexpected =>
+      'The relation couldn’t be deleted because of an unexpected error.';
+
+  @override
+  String get relationNeighborhoodOpenRelation => 'Opens the relation details';
+
+  @override
+  String get relationDetailsTitle => 'Relation';
+
+  @override
+  String get relationDetailsLoading => 'Loading the relation…';
+
+  @override
+  String get relationDetailsNotFound => 'This relation no longer exists.';
+
+  @override
+  String get relationDetailsUnavailable =>
+      'The relation couldn’t be loaded. Try again.';
+
+  @override
+  String get relationDetailsCorruption =>
+      'Stored relation data is damaged and can’t be shown.';
+
+  @override
+  String get relationDetailsUnexpected =>
+      'The relation couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get relationDetailsRefreshing => 'Refreshing relation details…';
+
+  @override
+  String get relationDetailsRefreshUnavailable =>
+      'The relation details couldn’t be refreshed. Previously confirmed data is still shown.';
+
+  @override
+  String get relationDetailsRefreshCorruption =>
+      'Stored data is damaged. Previously confirmed relation details are still shown.';
+
+  @override
+  String get relationDetailsRefreshUnexpected =>
+      'The relation details couldn’t be refreshed because of an unexpected error. Previously confirmed data is still shown.';
+
+  @override
+  String get relationDetailsTypeLabel => 'Relation type';
+
+  @override
+  String get relationDetailsPriorityLabel => 'Priority';
+
+  @override
+  String get relationDetailsScopeLabel => 'Relation state';
+
+  @override
+  String get relationDetailsDescriptionLabel => 'Description';
+
+  @override
+  String get relationDetailsNoDescription => 'No description';
+
+  @override
+  String get relationDetailsOpenParticipant =>
+      'Opens the intention and its own relations';
+
+  @override
+  String get relationDetailsEditAction => 'Edit relation';
+
+  @override
+  String get relationDetailsArchiveAction => 'Archive relation';
+
+  @override
+  String get relationDetailsRestoreAction => 'Restore relation';
+
+  @override
+  String get relationDetailsDeleteAction => 'Delete relation permanently';
+
+  @override
+  String get relationDetailsDeleteConfirmationTitle =>
+      'Delete relation permanently?';
+
+  @override
+  String relationDetailsDeleteConfirmationMessage(
+    String phrase,
+    String sourceTitle,
+    String relatedTitle,
+    String scope,
+  ) {
+    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. Both intentions and all other relations will remain.';
+  }
+
+  @override
+  String get relationDetailsConfirmDeleteAction => 'Delete permanently';
+
+  @override
+  String get relationDetailsOpenSourceParticipantAction =>
+      'Open source intention';
+
+  @override
+  String get relationDetailsOpenRelatedParticipantAction =>
+      'Open related intention';
+
+  @override
+  String get participantPickerTitle => 'Select a participant';
+
+  @override
+  String get participantPickerCancel => 'Cancel the selection';
+
+  @override
+  String get participantPickerEmpty =>
+      'No other intentions are available to select.';
+
+  @override
+  String get participantPickerSelectHint =>
+      'Selects this intention as a relation participant';
+
+  @override
+  String get participantPickerOpenDetails => 'Open intention details';
+
+  @override
+  String get relationEditorTitle => 'New relation';
+
+  @override
+  String get relationEditorEditTitle => 'Edit relation';
+
+  @override
+  String get relationEditorPhraseLabel => 'Relation phrase';
+
+  @override
+  String get relationEditorSourceLabel => 'Source intention';
+
+  @override
+  String get relationEditorRelatedLabel => 'Related intention';
+
+  @override
+  String get relationEditorParticipantSelected => 'Selected';
+
+  @override
+  String get relationEditorParticipantNotSelected => 'Not selected';
+
+  @override
+  String get relationEditorSelectSourceAction => 'Select the source intention';
+
+  @override
+  String get relationEditorChangeSourceAction => 'Change the source intention';
+
+  @override
+  String get relationEditorSelectRelatedAction =>
+      'Select the related intention';
+
+  @override
+  String get relationEditorChangeRelatedAction =>
+      'Change the related intention';
+
+  @override
+  String get relationEditorTypeLabel => 'Relation type';
+
+  @override
+  String get relationEditorTypeNeed => 'Need';
+
+  @override
+  String get relationEditorTypeCan => 'Can';
+
+  @override
+  String get relationEditorPriorityLabel => 'Priority';
+
+  @override
+  String get relationEditorDescriptionLabel => 'Description (optional)';
+
+  @override
+  String get relationEditorDescriptionTooLong =>
+      'Use no more than 4096 characters.';
+
+  @override
+  String get relationEditorDescriptionInvalidUnicode =>
+      'Enter valid Unicode text without NUL.';
+
+  @override
+  String get relationEditorCreateSameParticipants =>
+      'An intention can’t be related to itself.';
+
+  @override
+  String get relationEditorMissingTitle => 'To create the relation, provide:';
+
+  @override
+  String get relationEditorMissingSource => 'the source intention';
+
+  @override
+  String get relationEditorMissingRelated => 'the related intention';
+
+  @override
+  String get relationEditorMissingType => 'the relation type';
+
+  @override
+  String get relationEditorMissingPriority => 'a priority from P1 to P4';
+
+  @override
+  String get relationEditorOpenExistingRelation => 'Open the existing relation';
+
+  @override
+  String get relationEditorSubmitAction => 'Create relation';
+
+  @override
+  String get relationEditorCreating => 'Creating…';
+
+  @override
+  String get relationEditorSaveAction => 'Save changes';
+
+  @override
+  String get relationEditorSaving => 'Saving…';
+
+  @override
+  String get relationNeighborhoodCreateOutgoingAction =>
+      'Create an outgoing relation';
+
+  @override
+  String get relationNeighborhoodCreateIncomingAction =>
+      'Create an incoming relation';
+
+  @override
+  String relationEditorPriorityOption(String priority) {
+    return 'Priority $priority';
   }
 }

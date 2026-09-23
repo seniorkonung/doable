@@ -60,6 +60,14 @@ enum IntentionCommandDiagnosticsType {
   delete,
 }
 
+enum LongTermRelationCommandDiagnosticsType {
+  create,
+  update,
+  archive,
+  restore,
+  delete,
+}
+
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
   const BootstrapDiagnosticsEvent({
     required DiagnosticsStatus status,
@@ -94,6 +102,37 @@ final class IntentionDetailReadDiagnosticsEvent extends DiagnosticsEvent {
     : super(status);
 }
 
+final class RelationCountsReadDiagnosticsEvent extends DiagnosticsEvent {
+  const RelationCountsReadDiagnosticsEvent({required DiagnosticsStatus status})
+    : super(status);
+}
+
+final class RelationGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const RelationGroupPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required this.requiresNewSnapshot,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+  final bool requiresNewSnapshot;
+}
+
+final class LongTermRelationDetailReadDiagnosticsEvent
+    extends DiagnosticsEvent {
+  const LongTermRelationDetailReadDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
+}
+
+final class SelectedRelationsReadDiagnosticsEvent extends DiagnosticsEvent {
+  const SelectedRelationsReadDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
+}
+
 final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
   const IntentionCommandDiagnosticsEvent({
     required this.commandType,
@@ -101,4 +140,19 @@ final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(status);
 
   final IntentionCommandDiagnosticsType commandType;
+}
+
+final class LongTermRelationCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const LongTermRelationCommandDiagnosticsEvent({
+    required this.commandType,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final LongTermRelationCommandDiagnosticsType commandType;
+}
+
+final class BlockingRelationsDeleteDiagnosticsEvent extends DiagnosticsEvent {
+  const BlockingRelationsDeleteDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
 }

@@ -1,4 +1,6 @@
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
+import '../../application/intention_details.dart' as application;
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
@@ -16,25 +18,30 @@ final class IntentionDetailsLoading extends IntentionDetailsState {
 
 final class IntentionDetailsLoaded extends IntentionDetailsState {
   const IntentionDetailsLoaded({
-    required this.intention,
+    required this.details,
+    required this.revision,
     required super.isOperationRunning,
     this.edit,
     this.stateChange,
   });
 
-  final Intention intention;
+  final application.IntentionDetails details;
+  final GraphRevision revision;
+  Intention get intention => details.intention;
   final IntentionDetailsEdit? edit;
   final IntentionDetailsStateChange? stateChange;
 
   IntentionDetailsLoaded copyWith({
-    Intention? intention,
+    application.IntentionDetails? details,
+    GraphRevision? revision,
     bool? isOperationRunning,
     IntentionDetailsEdit? edit,
     bool clearEdit = false,
     IntentionDetailsStateChange? stateChange,
     bool clearStateChange = false,
   }) => IntentionDetailsLoaded(
-    intention: intention ?? this.intention,
+    details: details ?? this.details,
+    revision: revision ?? this.revision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     edit: clearEdit ? null : edit ?? this.edit,
     stateChange: clearStateChange ? null : stateChange ?? this.stateChange,
@@ -64,7 +71,7 @@ final class IntentionDetailsStateChange {
   final OperationState<Intention> operation;
 
   /// Право открытого просмотра предъявить ошибку перехода по видимому кадру.
-  final IntentionInitiatorPresentationClaim? failurePresentation;
+  final GraphInitiatorPresentationClaim? failurePresentation;
 
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
@@ -95,7 +102,7 @@ final class IntentionDetailsEdit {
   final OperationState<Intention> operation;
 
   /// Право открытой формы изменения предъявить ошибку по видимому кадру.
-  final IntentionInitiatorPresentationClaim? failurePresentation;
+  final GraphInitiatorPresentationClaim? failurePresentation;
 
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
@@ -121,7 +128,7 @@ final class IntentionDetailsEdit {
 
   IntentionDetailsEdit withOperation(
     OperationState<Intention> value, {
-    IntentionInitiatorPresentationClaim? failurePresentation,
+    GraphInitiatorPresentationClaim? failurePresentation,
   }) => IntentionDetailsEdit(
     title: title,
     description: description,
@@ -158,6 +165,7 @@ final class IntentionDetailsEdit {
       IntentionTextInputValidationFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
+      IntentionHasBlockingRelationsFailure() ||
       IntentionUnavailableFailure() ||
       IntentionCorruptionFailure() ||
       IntentionUnexpectedFailure() => current,

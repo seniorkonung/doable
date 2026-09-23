@@ -20,7 +20,12 @@ void main() {
         MigrationDiagnosticsEvent,
         CatalogPageReadDiagnosticsEvent,
         IntentionDetailReadDiagnosticsEvent,
+        RelationGroupPageReadDiagnosticsEvent,
+        LongTermRelationDetailReadDiagnosticsEvent,
         IntentionCommandDiagnosticsEvent,
+        LongTermRelationCommandDiagnosticsEvent,
+        BlockingRelationsDeleteDiagnosticsEvent,
+        SelectedRelationsReadDiagnosticsEvent,
       ]);
       expect(sink.events[0].status, isA<DiagnosticsStarted>());
       expect(sink.events[1].status, isA<DiagnosticsSucceeded>());
@@ -63,11 +68,42 @@ void main() {
           'failureCode': 'unavailable',
         },
         {
+          'operation': 'relationGroupPageRead',
+          'outcome': 'failed',
+          'durationMicros': 4000,
+          'failureCode': 'conflict',
+          'pageSize': 50,
+          'isContinuation': true,
+          'requiresNewSnapshot': true,
+        },
+        {
+          'operation': 'longTermRelationDetailRead',
+          'outcome': 'succeeded',
+          'durationMicros': 6000,
+        },
+        {
           'operation': 'intentionCommand',
           'outcome': 'failed',
           'durationMicros': 12000,
           'failureCode': 'conflict',
           'commandType': 'archive',
+        },
+        {
+          'operation': 'longTermRelationCommand',
+          'outcome': 'succeeded',
+          'durationMicros': 5000,
+          'commandType': 'create',
+        },
+        {
+          'operation': 'blockingRelationsDelete',
+          'outcome': 'failed',
+          'durationMicros': 7000,
+          'failureCode': 'conflict',
+        },
+        {
+          'operation': 'selectedRelationsRead',
+          'outcome': 'succeeded',
+          'durationMicros': 9000,
         },
       ]);
       for (final canary in [
@@ -130,12 +166,37 @@ List<DiagnosticsEvent> _events() => [
       code: DiagnosticsFailureCode.unavailable,
     ),
   ),
+  const RelationGroupPageReadDiagnosticsEvent(
+    pageSize: 50,
+    isContinuation: true,
+    requiresNewSnapshot: true,
+    status: DiagnosticsFailed(
+      duration: Duration(milliseconds: 4),
+      code: DiagnosticsFailureCode.conflict,
+    ),
+  ),
+  const LongTermRelationDetailReadDiagnosticsEvent(
+    status: DiagnosticsSucceeded(Duration(milliseconds: 6)),
+  ),
   const IntentionCommandDiagnosticsEvent(
     commandType: IntentionCommandDiagnosticsType.archive,
     status: DiagnosticsFailed(
       duration: Duration(milliseconds: 12),
       code: DiagnosticsFailureCode.conflict,
     ),
+  ),
+  const LongTermRelationCommandDiagnosticsEvent(
+    commandType: LongTermRelationCommandDiagnosticsType.create,
+    status: DiagnosticsSucceeded(Duration(milliseconds: 5)),
+  ),
+  const BlockingRelationsDeleteDiagnosticsEvent(
+    status: DiagnosticsFailed(
+      duration: Duration(milliseconds: 7),
+      code: DiagnosticsFailureCode.conflict,
+    ),
+  ),
+  const SelectedRelationsReadDiagnosticsEvent(
+    status: DiagnosticsSucceeded(Duration(milliseconds: 9)),
   ),
 ];
 

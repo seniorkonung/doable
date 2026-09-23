@@ -1,10 +1,15 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,7 +63,7 @@ void main() {
       final claim = await harness.createClaim(index: 2);
       final showError = ValueNotifier(true);
       addTearDown(showError.dispose);
-      IntentionAppPresentationClaim? fallback;
+      GraphAppPresentationClaim? fallback;
       unawaited(
         harness.registration.nextClaim().then((value) => fallback = value),
       );
@@ -156,15 +161,55 @@ void main() {
     expect(harness.claimAgain(claim), isNull);
   });
 
+  testWidgets(
+    'смена локализованного сообщения сохраняет renderer и его claim',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createClaim(index: 9);
+      final message = ValueNotifier('The operation failed.');
+      addTearDown(message.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<String>(
+            valueListenable: message,
+            builder: (context, value, _) =>
+                OperationFailurePresentation(claim: claim, message: value),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      message.value = 'Операцию выполнить не удалось.';
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('The operation failed.'), findsNothing);
+      expect(find.text('Операцию выполнить не удалось.'), findsOneWidget);
+      expect(harness.claimAgain(claim), same(claim));
+      expect(fallback, isNull);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(harness.claimAgain(claim), isNull);
+      expect(fallback, isNull);
+    },
+  );
+
   testWidgets('удерживает renderer на скрытом маршруте до его возвращения', (
     tester,
   ) async {
     final harness = _FailureHarness();
     addTearDown(harness.dispose);
     final claim = await harness.createClaim(index: 7);
-    final currentClaim = ValueNotifier<IntentionInitiatorPresentationClaim?>(
-      null,
-    );
+    final currentClaim = ValueNotifier<GraphInitiatorPresentationClaim?>(null);
     addTearDown(currentClaim.dispose);
 
     await tester.pumpWidget(
@@ -179,7 +224,7 @@ void main() {
                 ),
                 child: const Text('Открыть диалог'),
               ),
-              ValueListenableBuilder<IntentionInitiatorPresentationClaim?>(
+              ValueListenableBuilder<GraphInitiatorPresentationClaim?>(
                 valueListenable: currentClaim,
                 builder: (context, value, _) => OperationFailurePresentation(
                   claim: value,
@@ -213,7 +258,7 @@ void main() {
     final claim = await harness.createClaim(index: 8);
     final showError = ValueNotifier(true);
     addTearDown(showError.dispose);
-    IntentionAppPresentationClaim? fallback;
+    GraphAppPresentationClaim? fallback;
     unawaited(
       harness.registration.nextClaim().then((value) => fallback = value),
     );
@@ -249,7 +294,7 @@ void main() {
       final second = await harness.createClaim(index: 6);
       final current = ValueNotifier((claim: first, message: 'Первая ошибка'));
       addTearDown(current.dispose);
-      IntentionAppPresentationClaim? fallback;
+      GraphAppPresentationClaim? fallback;
       unawaited(
         harness.registration.nextClaim().then((value) => fallback = value),
       );
@@ -258,7 +303,7 @@ void main() {
       await tester.pumpWidget(
         harness.app(
           ValueListenableBuilder<
-            ({IntentionInitiatorPresentationClaim claim, String message})
+            ({GraphInitiatorPresentationClaim claim, String message})
           >(
             valueListenable: current,
             builder: (context, value, _) => OperationFailurePresentation(
@@ -281,6 +326,154 @@ void main() {
       await tester.pump();
 
       expect(harness.claimAgain(second), isNull);
+    },
+  );
+
+  testWidgets(
+    'ошибка создания связи подтверждается кадром своего инлайн-renderer',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createRelationClaim();
+
+      await tester.pumpWidget(
+        harness.app(
+          OperationFailurePresentation(
+            claim: claim,
+            message: 'Не удалось создать связь',
+            messageKey: const ValueKey('relation-failure-message'),
+          ),
+        ),
+      );
+
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('relation-failure-message')),
+        ),
+        matchesSemantics(
+          label: 'Не удалось создать связь',
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
+      );
+      expect(harness.claimAgain(claim), isNull);
+    },
+  );
+
+  testWidgets(
+    'исчезновение renderer связи до кадра передаёт результат оболочке',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createRelationClaim();
+      final showError = ValueNotifier(true);
+      addTearDown(showError.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<bool>(
+            valueListenable: showError,
+            builder: (context, visible, _) => visible
+                ? OperationFailurePresentation(
+                    claim: claim,
+                    message: 'Не удалось создать связь',
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(harness.claimAgain(claim), same(claim));
+      expect(fallback, isNull);
+
+      showError.value = false;
+      await tester.pump();
+      await tester.pump();
+
+      expect(fallback?.token, same(claim.token));
+      expect(
+        fallback?.completion,
+        isA<LongTermRelationCommandCompletion>().having(
+          (completion) => completion.kind,
+          'вид операции',
+          LongTermRelationCommandKind.create,
+        ),
+      );
+    },
+  );
+
+  testWidgets('массовый отказ подтверждается кадром инлайн-renderer', (
+    tester,
+  ) async {
+    final harness = _FailureHarness();
+    addTearDown(harness.dispose);
+    final claim = await harness.createBlockingRelationsClaim();
+
+    await tester.pumpWidget(
+      harness.app(
+        OperationFailurePresentation(
+          claim: claim,
+          message: 'Выбранные связи не удалены',
+          messageKey: const ValueKey('blocking-relations-failure-message'),
+        ),
+      ),
+    );
+
+    expect(
+      tester.getSemantics(
+        find.byKey(const ValueKey('blocking-relations-failure-message')),
+      ),
+      matchesSemantics(
+        label: 'Выбранные связи не удалены',
+        isLiveRegion: true,
+        textDirection: TextDirection.ltr,
+      ),
+    );
+    expect(harness.claimAgain(claim), isNull);
+  });
+
+  testWidgets(
+    'исчезновение массовой инлайн-ошибки до кадра передаёт тот же token оболочке',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createBlockingRelationsClaim();
+      final showError = ValueNotifier(true);
+      addTearDown(showError.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<bool>(
+            valueListenable: showError,
+            builder: (context, visible, _) => visible
+                ? OperationFailurePresentation(
+                    claim: claim,
+                    message: 'Выбранные связи не удалены',
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(harness.claimAgain(claim), same(claim));
+      expect(fallback, isNull);
+
+      showError.value = false;
+      await tester.pump();
+      await tester.pump();
+      expect(fallback?.token, same(claim.token));
+      expect(fallback?.completion, isA<BlockingRelationsDeleteCompletion>());
     },
   );
 }
@@ -310,7 +503,7 @@ final class _FailureHarness {
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
 
-  Future<IntentionInitiatorPresentationClaim> createClaim({
+  Future<GraphInitiatorPresentationClaim> createClaim({
     required int index,
   }) async {
     final intention = testDetailsIntention(index: index);
@@ -326,8 +519,57 @@ final class _FailureHarness {
     return coordinator.claimInitiatorFailure(accepted.token)!;
   }
 
-  IntentionInitiatorPresentationClaim? claimAgain(
-    IntentionInitiatorPresentationClaim claim,
+  Future<GraphInitiatorPresentationClaim> createRelationClaim() async {
+    final accepted = coordinator.acceptRelationCreation(
+      LongTermRelationCreationFormKey(),
+      CreateLongTermRelation(
+        sourceIntentionId: testDetailsIntentionId(1),
+        relatedIntentionId: testDetailsIntentionId(2),
+        type: LongTermRelationType.need,
+        priority: RelationPriority.p1,
+        description: null,
+      ),
+    ) as LongTermRelationCommandAccepted;
+    repository.completeRelationCommand(
+      repository.relationCommands.length - 1,
+      const GraphCommandFailed<
+        LongTermRelationCommandSuccess,
+        LongTermRelationCommandFailure
+      >(LongTermRelationUnavailableFailure()),
+    );
+    await accepted.future;
+    return coordinator.claimInitiatorFailure(accepted.token)!;
+  }
+
+  Future<GraphInitiatorPresentationClaim> createBlockingRelationsClaim() async {
+    final relationId = switch (LongTermRelationId.decode(
+      '018f47c2-6b7d-7abc-8def-0123456789ab',
+    )) {
+      LongTermRelationIdDecodingSuccess(:final id) => id,
+      InvalidLongTermRelationIdDecoding() => throw StateError(
+        'Некорректный fixture связи.',
+      ),
+    };
+    final accepted = coordinator.acceptBlockingRelationsDelete(
+      DeleteBlockingRelations(
+        intentionId: testDetailsIntentionId(1),
+        relationIds: {relationId},
+      ),
+      presentationTitle: 'Намерение',
+    ) as BlockingRelationsDeleteAccepted;
+    repository.completeBlockingRelationsCommand(
+      repository.blockingRelationsCommands.length - 1,
+      const GraphCommandFailed<
+        BlockingRelationsDeleted,
+        DeleteBlockingRelationsFailure
+      >(DeleteBlockingRelationsUnavailableFailure()),
+    );
+    await accepted.future;
+    return coordinator.claimInitiatorFailure(accepted.token)!;
+  }
+
+  GraphInitiatorPresentationClaim? claimAgain(
+    GraphInitiatorPresentationClaim claim,
   ) => coordinator.claimInitiatorFailure(claim.token);
 
   Widget app(Widget body) => UncontrolledProviderScope(

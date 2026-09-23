@@ -362,6 +362,420 @@ abstract class AppLocalizations {
   /// **'No description'**
   String get catalogNoDescription;
 
+  /// Количество активных связей намерения в его представлении
+  ///
+  /// In en, this message translates to:
+  /// **'Active relations: {count}'**
+  String intentionActiveRelationCount(int count);
+
+  /// Ошибка обновления количества активных связей при сохранённом прежнем числе
+  ///
+  /// In en, this message translates to:
+  /// **'The active relation count couldn’t be refreshed.'**
+  String get intentionActiveRelationCountRefreshFailed;
+
+  /// Количество активных связей ещё не получено
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the active relation count…'**
+  String get intentionActiveRelationCountLoading;
+
+  /// Количество активных связей неизвестно из-за ошибки получения
+  ///
+  /// In en, this message translates to:
+  /// **'The active relation count is unknown.'**
+  String get intentionActiveRelationCountUnknown;
+
+  /// Заголовок соседства намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Relations'**
+  String get relationNeighborhoodTitle;
+
+  /// No description provided for @relationNeighborhoodSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations: {count}'**
+  String relationNeighborhoodSelectedCount(int count);
+
+  /// Действие выбора конкретной блокирующей связи
+  ///
+  /// In en, this message translates to:
+  /// **'Add to selection'**
+  String get relationNeighborhoodAddToSelection;
+
+  /// Действие снятия выбора конкретной блокирующей связи
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from selection'**
+  String get relationNeighborhoodRemoveFromSelection;
+
+  /// Открыть полный набор выбранных связей для подтверждения
+  ///
+  /// In en, this message translates to:
+  /// **'Review selected relations'**
+  String get blockingRelationsReviewAction;
+
+  /// Заголовок подтверждения массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected relations permanently?'**
+  String get blockingRelationsConfirmationTitle;
+
+  /// Необратимость удаления связей и сохранность намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.'**
+  String get blockingRelationsConfirmationWarning;
+
+  /// Число связей в подтверждённом наборе
+  ///
+  /// In en, this message translates to:
+  /// **'To delete: {count}'**
+  String blockingRelationsConfirmationCount(int count);
+
+  /// Идентификатор участника для различения одноимённых намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Identifier: {id}'**
+  String blockingRelationsParticipantId(String id);
+
+  /// Состояние принятого массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting selected relations…'**
+  String get blockingRelationsDeleting;
+
+  /// Отказ при занятом намерении или выбранной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Another change to these relations or the intention is already running.'**
+  String get blockingRelationsBusy;
+
+  /// Отказ при завершении работы приложения
+  ///
+  /// In en, this message translates to:
+  /// **'The app is closing. The change was not accepted.'**
+  String get blockingRelationsDraining;
+
+  /// Вернуться к сохранённому выбору после ошибки
+  ///
+  /// In en, this message translates to:
+  /// **'Return to selection'**
+  String get blockingRelationsEditSelectionAction;
+
+  /// Явная актуализация выбранного набора после конфликта или перед просмотром
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh selection'**
+  String get blockingRelationsRefreshSelectionAction;
+
+  /// Состояние проверки выбранных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Checking selected relations…'**
+  String get blockingRelationsRefreshingSelection;
+
+  /// Идентификатор недоступной выбранной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation: {id}'**
+  String blockingRelationsInvalidSelectedRelationId(String id);
+
+  /// Причина устаревания выбранной связи: удалена
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists. Remove it from the selection and confirm the remaining set again.'**
+  String get blockingRelationsInvalidMissing;
+
+  /// Причина устаревания выбранной связи: заменён участник
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.'**
+  String get blockingRelationsInvalidMoved;
+
+  /// Безопасное отсутствие намерения при проверке выбора
+  ///
+  /// In en, this message translates to:
+  /// **'This intention no longer exists. Its relations cannot be deleted here.'**
+  String get blockingRelationsRefreshIntentionNotFound;
+
+  /// Устранимая ошибка чтения выбранного набора
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations could not be checked. Your selection is unchanged; try checking again.'**
+  String get blockingRelationsRefreshUnavailable;
+
+  /// Повреждение данных при чтении выбранного набора
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations could not be checked because the data is damaged. Deletion was not started.'**
+  String get blockingRelationsRefreshCorruption;
+
+  /// Неожиданная ошибка чтения выбранного набора
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations could not be checked. Deletion was not started.'**
+  String get blockingRelationsRefreshUnexpected;
+
+  /// Конфликт массового удаления: выбранная связь отсутствует
+  ///
+  /// In en, this message translates to:
+  /// **'A selected relation no longer exists. Refresh the selection and confirm it again.'**
+  String get blockingRelationsDeleteMissing;
+
+  /// Конфликт массового удаления: связь сменила участников
+  ///
+  /// In en, this message translates to:
+  /// **'A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.'**
+  String get blockingRelationsDeleteMoved;
+
+  /// Конфликт массового удаления: связь заблокирована
+  ///
+  /// In en, this message translates to:
+  /// **'A selected relation can no longer be deleted. Refresh the selection and confirm it again.'**
+  String get blockingRelationsDeleteProhibited;
+
+  /// Первоначальная загрузка соседства и полной сводки
+  ///
+  /// In en, this message translates to:
+  /// **'Loading relations and summary…'**
+  String get relationNeighborhoodSummaryLoading;
+
+  /// Полная сводка ещё не подтверждена из-за ошибки
+  ///
+  /// In en, this message translates to:
+  /// **'The relation summary couldn’t be loaded.'**
+  String get relationNeighborhoodSummaryUnavailable;
+
+  /// Состояние обновления сохранённой согласованной сводки рядом с её числами
+  ///
+  /// In en, this message translates to:
+  /// **'Updating saved relation numbers…'**
+  String get relationNeighborhoodSavedSummaryRefreshing;
+
+  /// Состояние устаревшей сохранённой сводки рядом с её числами
+  ///
+  /// In en, this message translates to:
+  /// **'Saved relation numbers are out of date because the refresh failed.'**
+  String get relationNeighborhoodSavedSummaryStale;
+
+  /// No description provided for @relationNeighborhoodTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total relations: {count}'**
+  String relationNeighborhoodTotal(int count);
+
+  /// No description provided for @relationNeighborhoodActiveTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Active relations: {count}'**
+  String relationNeighborhoodActiveTotal(int count);
+
+  /// No description provided for @relationNeighborhoodArchivedTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relations: {count}'**
+  String relationNeighborhoodArchivedTotal(int count);
+
+  /// No description provided for @relationNeighborhoodNeedTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Need: {count}'**
+  String relationNeighborhoodNeedTotal(int count);
+
+  /// No description provided for @relationNeighborhoodCanTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Can: {count}'**
+  String relationNeighborhoodCanTotal(int count);
+
+  /// Подпись выбора активных или архивных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Relation state'**
+  String get relationNeighborhoodScopeLabel;
+
+  /// Активный охват соседства
+  ///
+  /// In en, this message translates to:
+  /// **'Active relations'**
+  String get relationNeighborhoodScopeActive;
+
+  /// Архивный охват соседства
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relations'**
+  String get relationNeighborhoodScopeArchived;
+
+  /// Подпись выбора типа долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation type'**
+  String get relationNeighborhoodTypeLabel;
+
+  /// Тип долговременной связи нужно
+  ///
+  /// In en, this message translates to:
+  /// **'Need'**
+  String get relationNeighborhoodTypeNeed;
+
+  /// Тип долговременной связи можно
+  ///
+  /// In en, this message translates to:
+  /// **'Can'**
+  String get relationNeighborhoodTypeCan;
+
+  /// Подпись выбора направления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get relationNeighborhoodDirectionLabel;
+
+  /// Входящее направление относительно намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming'**
+  String get relationNeighborhoodDirectionIncoming;
+
+  /// Исходящее направление относительно намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Outgoing'**
+  String get relationNeighborhoodDirectionOutgoing;
+
+  /// No description provided for @relationNeighborhoodSelectedGroupCount.
+  ///
+  /// In en, this message translates to:
+  /// **'In the whole selected group: {count}'**
+  String relationNeighborhoodSelectedGroupCount(int count);
+
+  /// Устранимая ошибка начального чтения группы
+  ///
+  /// In en, this message translates to:
+  /// **'The relations and summary couldn’t be loaded. Try again.'**
+  String get relationNeighborhoodInitialUnavailable;
+
+  /// Повреждение при начальном чтении группы
+  ///
+  /// In en, this message translates to:
+  /// **'Stored relation data is damaged and can’t be shown.'**
+  String get relationNeighborhoodInitialCorruption;
+
+  /// Непредвиденная ошибка начального чтения группы
+  ///
+  /// In en, this message translates to:
+  /// **'The relations couldn’t be loaded because of an unexpected error.'**
+  String get relationNeighborhoodInitialUnexpected;
+
+  /// Недействительный запрос начальной группы
+  ///
+  /// In en, this message translates to:
+  /// **'The selected relation group can no longer be opened.'**
+  String get relationNeighborhoodInitialInvalid;
+
+  /// Владелец соседства подтверждённо отсутствует
+  ///
+  /// In en, this message translates to:
+  /// **'The intention whose relations were being viewed no longer exists.'**
+  String get relationNeighborhoodIntentionNotFound;
+
+  /// Подтверждённо пустая выбранная группа
+  ///
+  /// In en, this message translates to:
+  /// **'There are no relations in this group.'**
+  String get relationNeighborhoodEmpty;
+
+  /// Подгрузка следующей порции выбранной группы
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more relations…'**
+  String get relationNeighborhoodLoadingMore;
+
+  /// Устранимая ошибка подгрузки
+  ///
+  /// In en, this message translates to:
+  /// **'The next relations couldn’t be loaded.'**
+  String get relationNeighborhoodLoadMoreUnavailable;
+
+  /// Повреждение при подгрузке
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged; the next relations can’t be shown.'**
+  String get relationNeighborhoodLoadMoreCorruption;
+
+  /// Непредвиденная ошибка подгрузки
+  ///
+  /// In en, this message translates to:
+  /// **'The next relations couldn’t be loaded because of an unexpected error.'**
+  String get relationNeighborhoodLoadMoreUnexpected;
+
+  /// Недействительное продолжение группы
+  ///
+  /// In en, this message translates to:
+  /// **'The continuation for this group is no longer valid.'**
+  String get relationNeighborhoodLoadMoreInvalid;
+
+  /// Согласованное обновление сводки и выбранной группы
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing relations…'**
+  String get relationNeighborhoodRefreshing;
+
+  /// Ошибка обновления при сохранённых прежних данных
+  ///
+  /// In en, this message translates to:
+  /// **'The relations couldn’t be refreshed. Previously loaded data is still shown.'**
+  String get relationNeighborhoodRefreshFailed;
+
+  /// Подтверждённый конец выбранной группы
+  ///
+  /// In en, this message translates to:
+  /// **'All relations in this group are loaded.'**
+  String get relationNeighborhoodConfirmedEnd;
+
+  /// Активное состояние строки связи
+  ///
+  /// In en, this message translates to:
+  /// **'Active relation'**
+  String get relationNeighborhoodRelationActive;
+
+  /// Архивное состояние строки связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relation'**
+  String get relationNeighborhoodRelationArchived;
+
+  /// No description provided for @relationNeighborhoodPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}'**
+  String relationNeighborhoodPriority(String priority);
+
+  /// Подпись исходного участника связи
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get relationNeighborhoodSourceParticipant;
+
+  /// Подпись связанного участника связи
+  ///
+  /// In en, this message translates to:
+  /// **'Related intention'**
+  String get relationNeighborhoodRelatedParticipant;
+
+  /// No description provided for @relationNeighborhoodNeedPhrase.
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, you need {related}'**
+  String relationNeighborhoodNeedPhrase(String source, String related);
+
+  /// No description provided for @relationNeighborhoodCanPhrase.
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, you can {related}'**
+  String relationNeighborhoodCanPhrase(String source, String related);
+
   /// Заголовок подробного просмотра намерения
   ///
   /// In en, this message translates to:
@@ -614,11 +1028,41 @@ abstract class AppLocalizations {
   /// **'The intention no longer exists. It wasn’t deleted.'**
   String get detailsDeleteNotFound;
 
-  /// Безопасная ошибка блокирующей связи при удалении намерения
+  /// Безопасная ошибка конфликта при удалении намерения
   ///
   /// In en, this message translates to:
-  /// **'The intention is still linked and can’t be deleted.'**
+  /// **'The intention changed elsewhere. It wasn’t deleted.'**
   String get detailsDeleteConflict;
+
+  /// Объяснение блокировки удаления намерения его связями
+  ///
+  /// In en, this message translates to:
+  /// **'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.'**
+  String get detailsDeleteBlockedByRelations;
+
+  /// Переход к актуальным группам связей, блокирующих удаление
+  ///
+  /// In en, this message translates to:
+  /// **'Show blocking relations'**
+  String get detailsShowBlockingRelationsAction;
+
+  /// Объяснение каскада непосредственных связей перед архивированием
+  ///
+  /// In en, this message translates to:
+  /// **'Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.'**
+  String get detailsArchiveCascadeExplanation;
+
+  /// Объяснение сохранённого архива связей перед восстановлением
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring returns only the intention. Its relations stay archived: {count}.'**
+  String detailsRestoreRelationsExplanation(int count);
+
+  /// Переход к архивным группам связей намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Show archived relations'**
+  String get detailsShowArchivedRelationsAction;
 
   /// Устранимая недоступность физического удаления намерения
   ///
@@ -812,6 +1256,48 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get graphOperationDelete;
 
+  /// Вид массовой операции в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected relations'**
+  String get graphOperationDeleteBlockingRelations;
+
+  /// Успешное массовое удаление выбранных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations deleted.'**
+  String get blockingRelationsDeleted;
+
+  /// Намерение исчезло до массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'This intention no longer exists. Relations weren’t deleted.'**
+  String get blockingRelationsDeleteIntentionNotFound;
+
+  /// Устаревший набор массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'The selected relations changed. Refresh the selection and confirm again.'**
+  String get blockingRelationsDeleteConflict;
+
+  /// Временная недоступность массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations couldn’t be deleted. Try again.'**
+  String get blockingRelationsDeleteUnavailable;
+
+  /// Повреждение данных при массовом удалении
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. Selected relations weren’t deleted.'**
+  String get blockingRelationsDeleteCorruption;
+
+  /// Непредвиденная ошибка массового удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Selected relations couldn’t be deleted because of an unexpected error.'**
+  String get blockingRelationsDeleteUnexpected;
+
   /// Безопасное обозначение создаваемого намерения до подтверждения
   ///
   /// In en, this message translates to:
@@ -829,6 +1315,635 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{operation} — “{target}”: {outcome}'**
   String graphOperationMessage(String operation, String target, String outcome);
+
+  /// Безопасное обозначение создаваемой связи до подтверждения
+  ///
+  /// In en, this message translates to:
+  /// **'new relation'**
+  String get graphOperationNewRelation;
+
+  /// Безопасное обозначение существующей связи
+  ///
+  /// In en, this message translates to:
+  /// **'relation'**
+  String get graphOperationRelation;
+
+  /// Подтверждение успешного создания долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation created.'**
+  String get relationEditorCreated;
+
+  /// Ошибка проверки данных создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Check the selected intentions and relation details.'**
+  String get relationEditorCreateInvalidInput;
+
+  /// Конфликт занятой направленной пары при создании связи
+  ///
+  /// In en, this message translates to:
+  /// **'A relation with this direction already exists between the selected intentions.'**
+  String get relationEditorCreatePairOccupied;
+
+  /// Отсутствие участника при создании связи
+  ///
+  /// In en, this message translates to:
+  /// **'One of the selected intentions no longer exists.'**
+  String get relationEditorCreateParticipantNotFound;
+
+  /// Конфликт архивного состояния участника при создании связи
+  ///
+  /// In en, this message translates to:
+  /// **'Only active intentions can be linked.'**
+  String get relationEditorCreateParticipantArchived;
+
+  /// Устранимая недоступность создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be created. Try again.'**
+  String get relationEditorCreateUnavailable;
+
+  /// Терминальное повреждение данных при создании связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t created.'**
+  String get relationEditorCreateCorruption;
+
+  /// Терминальная непредвиденная ошибка создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be created because of an unexpected error.'**
+  String get relationEditorCreateUnexpected;
+
+  /// Подтверждение успешного изменения долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation updated.'**
+  String get relationEditorUpdated;
+
+  /// Ошибка проверки данных изменения связи
+  ///
+  /// In en, this message translates to:
+  /// **'Check the selected intentions and relation changes.'**
+  String get relationEditorUpdateInvalidInput;
+
+  /// Конфликт занятой направленной пары при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'A relation with this direction already exists between the selected intentions.'**
+  String get relationEditorUpdatePairOccupied;
+
+  /// Отсутствие изменяемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationEditorUpdateNotFound;
+
+  /// Отсутствие участника при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'One of the selected intentions no longer exists.'**
+  String get relationEditorUpdateParticipantNotFound;
+
+  /// Конфликт архивного состояния участника при изменении активной связи
+  ///
+  /// In en, this message translates to:
+  /// **'An active relation can only link active intentions.'**
+  String get relationEditorUpdateParticipantArchived;
+
+  /// Устранимая недоступность изменения связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be updated. Try again.'**
+  String get relationEditorUpdateUnavailable;
+
+  /// Терминальное повреждение данных при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t updated.'**
+  String get relationEditorUpdateCorruption;
+
+  /// Терминальная непредвиденная ошибка изменения связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be updated because of an unexpected error.'**
+  String get relationEditorUpdateUnexpected;
+
+  /// Подтверждение успешного архивирования долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation archived.'**
+  String get relationArchived;
+
+  /// Отсутствие архивируемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationArchiveNotFound;
+
+  /// Конфликт актуального состояния при архивировании связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be archived because its current state conflicts with the operation.'**
+  String get relationArchiveConflict;
+
+  /// Устранимая недоступность архивирования связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be archived. Try again.'**
+  String get relationArchiveUnavailable;
+
+  /// Терминальное повреждение данных при архивировании связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t archived.'**
+  String get relationArchiveCorruption;
+
+  /// Терминальная непредвиденная ошибка архивирования связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be archived because of an unexpected error.'**
+  String get relationArchiveUnexpected;
+
+  /// Подтверждение успешного восстановления долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation restored.'**
+  String get relationRestored;
+
+  /// Отсутствие восстанавливаемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationRestoreNotFound;
+
+  /// Конфликт актуального состояния при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be restored because its current state conflicts with the operation.'**
+  String get relationRestoreConflict;
+
+  /// Отсутствие исходного участника при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'The source intention no longer exists. The relation wasn’t restored.'**
+  String get relationRestoreSourceNotFound;
+
+  /// Отсутствие связанного участника при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'The related intention no longer exists. The relation wasn’t restored.'**
+  String get relationRestoreRelatedNotFound;
+
+  /// Архивное состояние исходного участника при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the source intention before restoring this relation.'**
+  String get relationRestoreSourceArchived;
+
+  /// Архивное состояние связанного участника при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the related intention before restoring this relation.'**
+  String get relationRestoreRelatedArchived;
+
+  /// Устранимая недоступность восстановления связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be restored. Try again.'**
+  String get relationRestoreUnavailable;
+
+  /// Терминальное повреждение данных при восстановлении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t restored.'**
+  String get relationRestoreCorruption;
+
+  /// Терминальная непредвиденная ошибка восстановления связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be restored because of an unexpected error.'**
+  String get relationRestoreUnexpected;
+
+  /// Подтверждение успешного физического удаления долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation deleted.'**
+  String get relationDeleted;
+
+  /// Отсутствие удаляемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationDeleteNotFound;
+
+  /// Конфликт актуального состояния при удалении связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be deleted because its current state conflicts with the operation.'**
+  String get relationDeleteConflict;
+
+  /// Устранимая недоступность удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be deleted. Try again.'**
+  String get relationDeleteUnavailable;
+
+  /// Терминальное повреждение данных при удалении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The relation wasn’t deleted.'**
+  String get relationDeleteCorruption;
+
+  /// Терминальная непредвиденная ошибка удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be deleted because of an unexpected error.'**
+  String get relationDeleteUnexpected;
+
+  /// Назначение перехода из строки соседства в подробный просмотр связи
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the relation details'**
+  String get relationNeighborhoodOpenRelation;
+
+  /// Заголовок подробного просмотра связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation'**
+  String get relationDetailsTitle;
+
+  /// Первое чтение подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the relation…'**
+  String get relationDetailsLoading;
+
+  /// Подтверждённое отсутствие связи в подробном просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'This relation no longer exists.'**
+  String get relationDetailsNotFound;
+
+  /// Устранимая недоступность чтения подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be loaded. Try again.'**
+  String get relationDetailsUnavailable;
+
+  /// Повреждение сохранённых данных связи в подробном просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Stored relation data is damaged and can’t be shown.'**
+  String get relationDetailsCorruption;
+
+  /// Безопасный непредвиденный отказ чтения подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation couldn’t be loaded because of an unexpected error.'**
+  String get relationDetailsUnexpected;
+
+  /// Согласование сохранённого подробного просмотра связи с новой ревизией
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing relation details…'**
+  String get relationDetailsRefreshing;
+
+  /// Устранимая ошибка обновления при сохранённых подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation details couldn’t be refreshed. Previously confirmed data is still shown.'**
+  String get relationDetailsRefreshUnavailable;
+
+  /// Повреждение при обновлении с сохранением прежних подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. Previously confirmed relation details are still shown.'**
+  String get relationDetailsRefreshCorruption;
+
+  /// Непредвиденная ошибка обновления с сохранением прежних подробных данных связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation details couldn’t be refreshed because of an unexpected error. Previously confirmed data is still shown.'**
+  String get relationDetailsRefreshUnexpected;
+
+  /// Подпись типа связи в подробном просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Relation type'**
+  String get relationDetailsTypeLabel;
+
+  /// Подпись приоритета связи в подробном просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get relationDetailsPriorityLabel;
+
+  /// Подпись собственного архивного состояния связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation state'**
+  String get relationDetailsScopeLabel;
+
+  /// Подпись полного описания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get relationDetailsDescriptionLabel;
+
+  /// Отсутствие описания у связи
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get relationDetailsNoDescription;
+
+  /// Назначение перехода к участнику связи
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the intention and its own relations'**
+  String get relationDetailsOpenParticipant;
+
+  /// Переход из подробного просмотра к изменению связи
+  ///
+  /// In en, this message translates to:
+  /// **'Edit relation'**
+  String get relationDetailsEditAction;
+
+  /// Действие самостоятельного архивирования связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archive relation'**
+  String get relationDetailsArchiveAction;
+
+  /// Действие самостоятельного восстановления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Restore relation'**
+  String get relationDetailsRestoreAction;
+
+  /// Действие начала физического удаления конкретной долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete relation permanently'**
+  String get relationDetailsDeleteAction;
+
+  /// Заголовок подтверждения необратимого удаления конкретной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete relation permanently?'**
+  String get relationDetailsDeleteConfirmationTitle;
+
+  /// Контекст и объяснение необратимости удаления конкретной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. Both intentions and all other relations will remain.'**
+  String relationDetailsDeleteConfirmationMessage(
+    String phrase,
+    String sourceTitle,
+    String relatedTitle,
+    String scope,
+  );
+
+  /// Явное подтверждение физического удаления конкретной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete permanently'**
+  String get relationDetailsConfirmDeleteAction;
+
+  /// Переход к архивному исходному участнику, блокирующему восстановление связи
+  ///
+  /// In en, this message translates to:
+  /// **'Open source intention'**
+  String get relationDetailsOpenSourceParticipantAction;
+
+  /// Переход к архивному связанному участнику, блокирующему восстановление связи
+  ///
+  /// In en, this message translates to:
+  /// **'Open related intention'**
+  String get relationDetailsOpenRelatedParticipantAction;
+
+  /// Заголовок выбора участника долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Select a participant'**
+  String get participantPickerTitle;
+
+  /// Назначение отмены выбора участника
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel the selection'**
+  String get participantPickerCancel;
+
+  /// Отсутствие намерений, доступных для выбора участником
+  ///
+  /// In en, this message translates to:
+  /// **'No other intentions are available to select.'**
+  String get participantPickerEmpty;
+
+  /// Назначение выбора строки участником связи
+  ///
+  /// In en, this message translates to:
+  /// **'Selects this intention as a relation participant'**
+  String get participantPickerSelectHint;
+
+  /// Назначение перехода к подробным данным намерения из выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Open intention details'**
+  String get participantPickerOpenDetails;
+
+  /// Заголовок формы создания долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation'**
+  String get relationEditorTitle;
+
+  /// Заголовок формы изменения долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Edit relation'**
+  String get relationEditorEditTitle;
+
+  /// Доступная подпись текущей формулировки связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation phrase'**
+  String get relationEditorPhraseLabel;
+
+  /// Подпись исходного участника в форме создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get relationEditorSourceLabel;
+
+  /// Подпись связанного участника в форме создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Related intention'**
+  String get relationEditorRelatedLabel;
+
+  /// Состояние выбранного участника связи
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get relationEditorParticipantSelected;
+
+  /// Состояние невыбранного участника связи
+  ///
+  /// In en, this message translates to:
+  /// **'Not selected'**
+  String get relationEditorParticipantNotSelected;
+
+  /// Переход к выбору исходного участника
+  ///
+  /// In en, this message translates to:
+  /// **'Select the source intention'**
+  String get relationEditorSelectSourceAction;
+
+  /// Замена выбранного исходного участника
+  ///
+  /// In en, this message translates to:
+  /// **'Change the source intention'**
+  String get relationEditorChangeSourceAction;
+
+  /// Переход к выбору связанного участника
+  ///
+  /// In en, this message translates to:
+  /// **'Select the related intention'**
+  String get relationEditorSelectRelatedAction;
+
+  /// Замена выбранного связанного участника
+  ///
+  /// In en, this message translates to:
+  /// **'Change the related intention'**
+  String get relationEditorChangeRelatedAction;
+
+  /// Подпись выбора типа связи в форме создания
+  ///
+  /// In en, this message translates to:
+  /// **'Relation type'**
+  String get relationEditorTypeLabel;
+
+  /// Тип связи «нужно» в форме создания
+  ///
+  /// In en, this message translates to:
+  /// **'Need'**
+  String get relationEditorTypeNeed;
+
+  /// Тип связи «можно» в форме создания
+  ///
+  /// In en, this message translates to:
+  /// **'Can'**
+  String get relationEditorTypeCan;
+
+  /// Подпись выбора приоритета связи
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get relationEditorPriorityLabel;
+
+  /// Подпись описания создаваемой связи
+  ///
+  /// In en, this message translates to:
+  /// **'Description (optional)'**
+  String get relationEditorDescriptionLabel;
+
+  /// Превышение предела описания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Use no more than 4096 characters.'**
+  String get relationEditorDescriptionTooLong;
+
+  /// Недопустимый Unicode в описании связи
+  ///
+  /// In en, this message translates to:
+  /// **'Enter valid Unicode text without NUL.'**
+  String get relationEditorDescriptionInvalidUnicode;
+
+  /// Отказ создания связи намерения с самим собой
+  ///
+  /// In en, this message translates to:
+  /// **'An intention can’t be related to itself.'**
+  String get relationEditorCreateSameParticipants;
+
+  /// Объяснение недостающего обязательного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'To create the relation, provide:'**
+  String get relationEditorMissingTitle;
+
+  /// Недостающий исходный участник связи
+  ///
+  /// In en, this message translates to:
+  /// **'the source intention'**
+  String get relationEditorMissingSource;
+
+  /// Недостающий связанный участник связи
+  ///
+  /// In en, this message translates to:
+  /// **'the related intention'**
+  String get relationEditorMissingRelated;
+
+  /// Недостающий тип связи
+  ///
+  /// In en, this message translates to:
+  /// **'the relation type'**
+  String get relationEditorMissingType;
+
+  /// Недостающий приоритет связи
+  ///
+  /// In en, this message translates to:
+  /// **'a priority from P1 to P4'**
+  String get relationEditorMissingPriority;
+
+  /// Переход к связи, занявшей направленную пару
+  ///
+  /// In en, this message translates to:
+  /// **'Open the existing relation'**
+  String get relationEditorOpenExistingRelation;
+
+  /// Команда создания долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Create relation'**
+  String get relationEditorSubmitAction;
+
+  /// Выполняемое создание долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Creating…'**
+  String get relationEditorCreating;
+
+  /// Команда сохранения изменений долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get relationEditorSaveAction;
+
+  /// Выполняемое изменение долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get relationEditorSaving;
+
+  /// Создание связи из исходящей группы соседства
+  ///
+  /// In en, this message translates to:
+  /// **'Create an outgoing relation'**
+  String get relationNeighborhoodCreateOutgoingAction;
+
+  /// Создание связи из входящей группы соседства
+  ///
+  /// In en, this message translates to:
+  /// **'Create an incoming relation'**
+  String get relationNeighborhoodCreateIncomingAction;
+
+  /// Вариант приоритета P1–P4 в форме создания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}'**
+  String relationEditorPriorityOption(String priority);
 }
 
 class _AppLocalizationsDelegate

@@ -47,10 +47,43 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'operation': 'intentionDetailRead',
     ..._encodeStatus(event.status),
   },
+  RelationCountsReadDiagnosticsEvent() => {
+    'operation': 'relationCountsRead',
+    ..._encodeStatus(event.status),
+  },
+  RelationGroupPageReadDiagnosticsEvent(
+    :final pageSize,
+    :final isContinuation,
+    :final requiresNewSnapshot,
+  ) =>
+    {
+      'operation': 'relationGroupPageRead',
+      ..._encodeStatus(event.status),
+      'pageSize': pageSize,
+      'isContinuation': isContinuation,
+      'requiresNewSnapshot': requiresNewSnapshot,
+    },
+  LongTermRelationDetailReadDiagnosticsEvent() => {
+    'operation': 'longTermRelationDetailRead',
+    ..._encodeStatus(event.status),
+  },
+  SelectedRelationsReadDiagnosticsEvent() => {
+    'operation': 'selectedRelationsRead',
+    ..._encodeStatus(event.status),
+  },
   IntentionCommandDiagnosticsEvent(:final commandType) => {
     'operation': 'intentionCommand',
     ..._encodeStatus(event.status),
     'commandType': commandType.name,
+  },
+  LongTermRelationCommandDiagnosticsEvent(:final commandType) => {
+    'operation': 'longTermRelationCommand',
+    ..._encodeStatus(event.status),
+    'commandType': commandType.name,
+  },
+  BlockingRelationsDeleteDiagnosticsEvent() => {
+    'operation': 'blockingRelationsDelete',
+    ..._encodeStatus(event.status),
   },
 };
 

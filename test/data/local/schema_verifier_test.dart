@@ -21,10 +21,27 @@ void main() {
         database,
         'Straße',
       );
+      final relationValidation =
+          await readDoableVerifierReferenceRelationValidation(database);
 
       expect(referenceSearchKey, titleSearchKey('Straße'));
+      expect(relationValidation.validId, 1);
+      expect(relationValidation.malformedDescription, 0);
     },
   );
+
+  test('сохраняемая схема не ссылается на функции проверки связей', () async {
+    final database = AppDatabase(openInMemoryLocalDatabase());
+    addTearDown(database.close);
+
+    final references = await database.customSelect('''
+      SELECT name
+      FROM sqlite_schema
+      WHERE sql LIKE '%doable_relation_%'
+    ''').get();
+
+    expect(references, isEmpty);
+  });
 
   group('raw-negative SQLite setup fixture', () {
     test(

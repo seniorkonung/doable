@@ -1,3 +1,5 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 
 import 'package:doable/src/app/app_runtime.dart';
@@ -10,14 +12,22 @@ import 'package:doable/src/data/local/app_database.dart'
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -215,6 +225,120 @@ void main() {
     });
 
     test(
+      'подключает создание связи к coordinator времени жизни приложения',
+      () async {
+        final repository = _ControlledPersonalGraphRepository();
+        final closeObserver = _CloseTrackingObserver();
+        final runtime = AppRuntime(
+          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+            openInMemoryLocalDatabase(),
+            closeObserver,
+          ),
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+          repositoryFactory: (_) => repository,
+        );
+        addTearDown(runtime.shutdown);
+        await runtime.bootstrap();
+        final coordinator = runtime.commandCoordinator;
+        final accepted = coordinator.acceptRelationCreation(
+          LongTermRelationCreationFormKey(),
+          CreateLongTermRelation(
+            sourceIntentionId: _intentionId(_relationSourceUuid),
+            relatedIntentionId: _intentionId(_relationRelatedUuid),
+            type: LongTermRelationType.need,
+            priority: RelationPriority.p2,
+            description: null,
+          ),
+        ) as LongTermRelationCommandAccepted;
+
+        final shutdown = runtime.shutdown();
+
+        expect(closeObserver.closeCalls, 0);
+        expect(
+          coordinator.acceptRelationCreation(
+            LongTermRelationCreationFormKey(),
+            CreateLongTermRelation(
+              sourceIntentionId: _intentionId(_relationSourceUuid),
+              relatedIntentionId: _intentionId(_relationRelatedUuid),
+              type: LongTermRelationType.can,
+              priority: RelationPriority.p4,
+              description: null,
+            ),
+          ),
+          isA<GraphCommandCoordinatorDraining>(),
+        );
+
+        repository.complete(
+          const GraphCommandFailed<
+            LongTermRelationCommandSuccess,
+            LongTermRelationCommandFailure
+          >(LongTermRelationUnavailableFailure()),
+        );
+        await accepted.future;
+        await shutdown;
+
+        expect(closeObserver.closeCalls, 1);
+      },
+    );
+
+    test(
+      'shutdown дожидается массового удаления и освобождает весь набор',
+      () async {
+        final repository = _ControlledPersonalGraphRepository();
+        final closeObserver = _CloseTrackingObserver();
+        final runtime = AppRuntime(
+          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+            openInMemoryLocalDatabase(),
+            closeObserver,
+          ),
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+          repositoryFactory: (_) => repository,
+        );
+        addTearDown(runtime.shutdown);
+        await runtime.bootstrap();
+        final coordinator = runtime.commandCoordinator;
+        final intentionId = _intentionId(_relationSourceUuid);
+        final relationId = _relationId(_relationRelatedUuid);
+        final accepted = coordinator.acceptBlockingRelationsDelete(
+          DeleteBlockingRelations(
+            intentionId: intentionId,
+            relationIds: {relationId},
+          ),
+          presentationTitle: 'Намерение',
+        ) as BlockingRelationsDeleteAccepted;
+        coordinator.releaseInitiatorPresentation(accepted.token);
+
+        final shutdown = runtime.shutdown();
+        expect(coordinator.isRunning(intentionId), isTrue);
+        expect(coordinator.isRelationRunning(relationId), isTrue);
+        expect(closeObserver.closeCalls, 0);
+        expect(
+          coordinator.acceptBlockingRelationsDelete(
+            DeleteBlockingRelations(
+              intentionId: _intentionId(_relationRelatedUuid),
+              relationIds: {_relationId(_relationSourceUuid)},
+            ),
+            presentationTitle: 'Другое',
+          ),
+          isA<GraphCommandCoordinatorDraining>(),
+        );
+
+        repository.complete(
+          const GraphCommandFailed<
+            BlockingRelationsDeleted,
+            DeleteBlockingRelationsFailure
+          >(DeleteBlockingRelationsUnavailableFailure()),
+        );
+        final completion = await accepted.future;
+        expect(completion.token, same(accepted.token));
+        expect(coordinator.isRunning(intentionId), isFalse);
+        expect(coordinator.isRelationRunning(relationId), isFalse);
+        await shutdown;
+        expect(closeObserver.closeCalls, 1);
+      },
+    );
+
+    test(
       'shutdown ждёт in-flight bootstrap и не создаёт provider graph',
       () async {
         final openingStarted = Completer<void>();
@@ -261,20 +385,33 @@ void main() {
 
 final class _ControlledPersonalGraphRepository
     implements PersonalGraphRepository {
-  Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>?
-  _pendingCommand;
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) {
-    final pending =
-        Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
+  Completer<Object>? _pendingCommand;
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    final pending = Completer<Object>();
     _pendingCommand = pending;
-    return pending.future;
+    return await pending.future as GraphCommandResult<TSuccess, TFailure>;
   }
 
-  void complete(Result<ConfirmedGraphResult<IntentionCommandSuccess>> result) {
+  void complete(Object result) {
     _pendingCommand!.complete(result);
   }
 
@@ -284,9 +421,43 @@ final class _ControlledPersonalGraphRepository
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      throw UnsupportedError('Связи не наблюдаются в этих тестах.');
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) =>
       throw UnsupportedError('Подробное чтение не используется в этих тестах.');
 }
+
+IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
+  IntentionIdDecodingSuccess(:final id) => id,
+  InvalidIntentionIdDecoding() => throw StateError(
+    'Некорректный UUID fixture.',
+  ),
+};
+
+LongTermRelationId _relationId(String value) =>
+    switch (LongTermRelationId.decode(value)) {
+      LongTermRelationIdDecodingSuccess(:final id) => id,
+      InvalidLongTermRelationIdDecoding() => throw StateError(
+        'Некорректный UUID fixture связи.',
+      ),
+    };
+
+const _relationSourceUuid = '018f47c2-6b7d-7abc-8def-0123456789ab';
+const _relationRelatedUuid = '018f47c2-6b7d-7abc-8def-0123456789ac';
 
 final class _CloseTrackingObserver extends LocalDatabaseConnectionObserver {
   var closeCalls = 0;

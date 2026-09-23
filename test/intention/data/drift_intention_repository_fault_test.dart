@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -6,10 +8,11 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
@@ -32,49 +35,58 @@ void main() {
   tearDown(() => database.close());
 
   group('DriftPersonalGraphRepository.execute — физическое удаление', () {
-    test('преобразует blocking foreign key удаления в conflict и сохраняет строку с FTS', () async {
-      final id = _id(_firstUuid);
-      final createdAt = DateTime.utc(2026, 9, 2, 10);
-      await _insertIntention(
-        database,
-        id: id,
-        title: 'Блокирующее намерение',
-        description: 'Исходное описание',
-        isActionReady: true,
-        isArchived: true,
-        createdAt: createdAt,
-      );
-      await database.customStatement('''
+    test(
+      'не выдаёт посторонний blocking foreign key за конфликт связей',
+      () async {
+        final id = _id(_firstUuid);
+        final createdAt = DateTime.utc(2026, 9, 2, 10);
+        await _insertIntention(
+          database,
+          id: id,
+          title: 'Блокирующее намерение',
+          description: 'Исходное описание',
+          isActionReady: true,
+          isArchived: true,
+          createdAt: createdAt,
+        );
+        await database.customStatement('''
         CREATE TABLE test_only_blocking_links (
           intention_id TEXT NOT NULL REFERENCES intentions(id)
         )
       ''');
-      await database.customStatement(
-        'INSERT INTO test_only_blocking_links (intention_id) VALUES (?)',
-        [id.toCanonicalString()],
-      );
+        await database.customStatement(
+          'INSERT INTO test_only_blocking_links (intention_id) VALUES (?)',
+          [id.toCanonicalString()],
+        );
 
-      final result = await repository.execute(DeleteIntention(id));
+        final result = await repository.execute(DeleteIntention(id));
 
-      expect(result, _failure<IntentionConflictFailure>());
-      await _expectStoredIntention(
-        database,
-        id: id,
-        title: 'Блокирующее намерение',
-        description: 'Исходное описание',
-        isActionReady: true,
-        isArchived: true,
-        createdAt: createdAt,
-      );
-      expect(await _matchingIds(repository, 'блокирующее'), [id]);
-      await expectLater(verifyIntentionTitlesFtsIntegrity(database), completes);
-      expect(diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(), [
-        _failedCommand(
-          IntentionCommandDiagnosticsType.delete,
-          DiagnosticsFailureCode.conflict,
-        ),
-      ]);
-    });
+        expect(result, _failure<IntentionUnexpectedFailure>());
+        await _expectStoredIntention(
+          database,
+          id: id,
+          title: 'Блокирующее намерение',
+          description: 'Исходное описание',
+          isActionReady: true,
+          isArchived: true,
+          createdAt: createdAt,
+        );
+        expect(await _matchingIds(repository, 'блокирующее'), [id]);
+        await expectLater(
+          verifyIntentionTitlesFtsIntegrity(database),
+          completes,
+        );
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+          [
+            _failedCommand(
+              IntentionCommandDiagnosticsType.delete,
+              DiagnosticsFailureCode.unexpected,
+            ),
+          ],
+        );
+      },
+    );
   });
 
   group('DriftPersonalGraphRepository.execute — откат после DML', () {
@@ -195,6 +207,81 @@ void main() {
           verifyIntentionTitlesFtsIntegrity(database),
           completes,
         );
+      },
+    );
+
+    test(
+      'откатывает связи и намерение при отказе между шагами каскада',
+      () async {
+        final interceptor = _FailAfterDmlInterceptor(_DmlOperation.update);
+        final replacement = await _replaceDatabase(
+          interceptor,
+          database,
+          diagnostics,
+        );
+        database = replacement.database;
+        repository = replacement.repository;
+        final owner = _id(_firstUuid);
+        final neighbor = _id(_secondUuid);
+        final createdAt = DateTime.utc(2026, 9, 2, 10);
+        await _insertIntention(
+          database,
+          id: owner,
+          title: 'Архивируемое намерение',
+          createdAt: createdAt,
+        );
+        await _insertIntention(
+          database,
+          id: neighbor,
+          title: 'Соседнее намерение',
+          createdAt: createdAt,
+        );
+        await _insertRelation(
+          database,
+          id: _relationUuid,
+          sourceId: owner,
+          relatedId: neighbor,
+        );
+        final revisionBefore = _countsRevision(
+          await repository.getRelationCounts(owner),
+        );
+        final ownerEvents = StreamIterator(repository.watchIntention(owner));
+        final neighborEvents = StreamIterator(
+          repository.watchIntention(neighbor),
+        );
+        addTearDown(ownerEvents.cancel);
+        addTearDown(neighborEvents.cancel);
+        expect(await ownerEvents.moveNext(), isTrue);
+        expect(await neighborEvents.moveNext(), isTrue);
+        interceptor.detailReadStatements.clear();
+        interceptor.arm();
+
+        final result = await repository.execute(ArchiveIntention(owner));
+
+        expect(result, _failure<IntentionUnexpectedFailure>());
+        await _expectStoredIntention(
+          database,
+          id: owner,
+          title: 'Архивируемое намерение',
+          description: null,
+          isActionReady: false,
+          isArchived: false,
+          createdAt: createdAt,
+        );
+        expect(await _relationIsArchived(database, _relationUuid), isFalse);
+        expect(
+          interceptor.failedStatement,
+          contains('UPDATE long_term_relations'),
+        );
+        final revisionAfter = _countsRevision(
+          await repository.getRelationCounts(owner),
+        );
+        expect(
+          revisionBefore.compareTo(revisionAfter),
+          GraphRevisionOrder.same,
+        );
+        await pumpEventQueue();
+        expect(interceptor.detailReadStatements, isEmpty);
       },
     );
 
@@ -385,7 +472,10 @@ void main() {
       final detailResult = await repository.watchIntention(id).first;
 
       expect(catalogResult, isA<ResultSuccess<IntentionCatalogPage>>());
-      expect(detailResult, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+      expect(
+        detailResult,
+        isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>(),
+      );
       expect(
         failingDiagnostics.attemptedEvents.map((event) => event.runtimeType),
         [
@@ -422,6 +512,53 @@ void main() {
         ]);
       },
     );
+
+    test('сохраняет весь каскад при ошибке диагностики после commit', () async {
+      final owner = _id(_firstUuid);
+      final neighbor = _id(_secondUuid);
+      final createdAt = DateTime.utc(2026, 9, 2, 10);
+      await _insertIntention(
+        database,
+        id: owner,
+        title: 'Архивируемое намерение',
+        createdAt: createdAt,
+      );
+      await _insertIntention(
+        database,
+        id: neighbor,
+        title: 'Соседнее намерение',
+        createdAt: createdAt,
+      );
+      await _insertRelation(
+        database,
+        id: _relationUuid,
+        sourceId: owner,
+        relatedId: neighbor,
+      );
+      final failingDiagnostics = _ThrowingDiagnosticsSink();
+      repository = _repository(database, failingDiagnostics);
+
+      final result = await repository.execute(ArchiveIntention(owner));
+
+      expect(
+        result,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      await _expectStoredIntention(
+        database,
+        id: owner,
+        title: 'Архивируемое намерение',
+        description: null,
+        isActionReady: false,
+        isArchived: true,
+        createdAt: createdAt,
+        updatedAt: DateTime.utc(2026, 9, 3, 12),
+      );
+      expect(await _relationIsArchived(database, _relationUuid), isTrue);
+      expect(failingDiagnostics.attemptedEvents, [
+        isA<IntentionCommandDiagnosticsEvent>(),
+      ]);
+    });
   });
 }
 
@@ -482,6 +619,7 @@ Future<void> _expectStoredIntention(
   required bool isActionReady,
   required bool isArchived,
   required DateTime createdAt,
+  DateTime? updatedAt,
 }) async {
   final row = await (database.select(
     database.intentions,
@@ -492,7 +630,43 @@ Future<void> _expectStoredIntention(
   expect(row.isActionReady, isActionReady);
   expect(row.isArchived, isArchived);
   expect(row.createdAt, createdAt.microsecondsSinceEpoch);
-  expect(row.updatedAt, createdAt.microsecondsSinceEpoch);
+  expect(row.updatedAt, (updatedAt ?? createdAt).microsecondsSinceEpoch);
+}
+
+Future<void> _insertRelation(
+  AppDatabase database, {
+  required String id,
+  required IntentionId sourceId,
+  required IntentionId relatedId,
+}) => database.customStatement(
+  '''
+    INSERT INTO long_term_relations (
+      id,
+      source_intention_id,
+      related_intention_id,
+      type,
+      priority,
+      is_archived
+    ) VALUES (?, ?, ?, 'need', 1, 0)
+  ''',
+  [id, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
+);
+
+Future<bool> _relationIsArchived(AppDatabase database, String id) async {
+  final row = await database
+      .customSelect(
+        'SELECT is_archived FROM long_term_relations WHERE id = ?',
+        variables: [Variable<String>(id)],
+      )
+      .getSingle();
+  return row.read<int>('is_archived') == 1;
+}
+
+GraphRevision _countsRevision(Result<GraphSnapshot<RelationCounts>> result) {
+  expect(result, isA<ResultSuccess<GraphSnapshot<RelationCounts>>>());
+  return (result as ResultSuccess<GraphSnapshot<RelationCounts>>)
+      .value
+      .revision;
 }
 
 Future<List<IntentionId>> _matchingIds(
@@ -568,14 +742,28 @@ final class _FailAfterDmlInterceptor extends LocalDatabaseConnectionObserver {
   final _DmlOperation _operation;
   var _armed = false;
   var _hasFailed = false;
+  String? failedStatement;
+  final List<String> detailReadStatements = [];
 
   void arm() => _armed = true;
+
+  @override
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    final sql = statement.statements.single;
+    if (statement.operation == LocalDatabaseSqlOperation.select &&
+        sql.contains('FROM intentions') &&
+        sql.contains('description') &&
+        !sql.contains('title_search_key')) {
+      detailReadStatements.add(sql);
+    }
+  }
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
     if (!_matches(statement.operation)) return;
     if (_armed && !_hasFailed) {
       _hasFailed = true;
+      failedStatement = statement.statements.single;
       throw StateError('CANARY-after-dml-failure');
     }
   }
@@ -610,3 +798,4 @@ final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
 
 const _firstUuid = '018f0b5d-6b2e-7c80-8000-000000000401';
 const _secondUuid = '018f0b5d-6b2e-7c80-8000-000000000402';
+const _relationUuid = '018f0b5d-6b2e-7c80-8000-000000000403';

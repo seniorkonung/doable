@@ -639,6 +639,7 @@ Result<IntentionCommandSuccess> _savedResult({required String title}) {
             hasDescription: intention.description != null,
             readiness: intention.readiness,
             archiveState: intention.archiveState,
+            activeRelationCount: 0,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,
           ),

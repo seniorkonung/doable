@@ -1,20 +1,6 @@
+import '../../graph/application/graph_command_result.dart';
+import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
-
-sealed class Result<T> {
-  const Result();
-}
-
-final class ResultSuccess<T> extends Result<T> {
-  const ResultSuccess(this.value);
-
-  final T value;
-}
-
-final class ResultFailure<T> extends Result<T> {
-  const ResultFailure(this.failure);
-
-  final IntentionFailure failure;
-}
 
 enum IntentionFailureCode {
   validation,
@@ -25,10 +11,20 @@ enum IntentionFailureCode {
   unexpected,
 }
 
-sealed class IntentionFailure {
+sealed class IntentionFailure implements GraphCommandFailure {
   const IntentionFailure();
 
   IntentionFailureCode get code;
+
+  @override
+  GraphFailureCategory get category => switch (code) {
+    IntentionFailureCode.validation => GraphFailureCategory.validation,
+    IntentionFailureCode.notFound => GraphFailureCategory.notFound,
+    IntentionFailureCode.conflict => GraphFailureCategory.conflict,
+    IntentionFailureCode.unavailable => GraphFailureCategory.unavailable,
+    IntentionFailureCode.corruption => GraphFailureCategory.corruption,
+    IntentionFailureCode.unexpected => GraphFailureCategory.unexpected,
+  };
 }
 
 sealed class IntentionValidationFailure extends IntentionFailure {
@@ -64,6 +60,15 @@ final class IntentionConflictFailure extends IntentionFailure {
   IntentionFailureCode get code => IntentionFailureCode.conflict;
 }
 
+final class IntentionHasBlockingRelationsFailure extends IntentionFailure {
+  const IntentionHasBlockingRelationsFailure(this.intentionId);
+
+  final IntentionId intentionId;
+
+  @override
+  IntentionFailureCode get code => IntentionFailureCode.conflict;
+}
+
 final class IntentionUnavailableFailure extends IntentionFailure {
   const IntentionUnavailableFailure();
 
@@ -84,3 +89,7 @@ final class IntentionUnexpectedFailure extends IntentionFailure {
   @override
   IntentionFailureCode get code => IntentionFailureCode.unexpected;
 }
+
+typedef Result<T> = GraphResult<T, IntentionFailure>;
+typedef ResultSuccess<T> = GraphResultSuccess<T, IntentionFailure>;
+typedef ResultFailure<T> = GraphResultFailure<T, IntentionFailure>;

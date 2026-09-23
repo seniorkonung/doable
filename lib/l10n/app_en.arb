@@ -181,6 +181,251 @@
   "@catalogNoDescription": {
     "description": "Признак отсутствия описания намерения"
   },
+  "intentionActiveRelationCount": "Active relations: {count}",
+  "@intentionActiveRelationCount": {
+    "description": "Количество активных связей намерения в его представлении",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "intentionActiveRelationCountRefreshFailed": "The active relation count couldn’t be refreshed.",
+  "@intentionActiveRelationCountRefreshFailed": {
+    "description": "Ошибка обновления количества активных связей при сохранённом прежнем числе"
+  },
+  "intentionActiveRelationCountLoading": "Loading the active relation count…",
+  "@intentionActiveRelationCountLoading": {
+    "description": "Количество активных связей ещё не получено"
+  },
+  "intentionActiveRelationCountUnknown": "The active relation count is unknown.",
+  "@intentionActiveRelationCountUnknown": {
+    "description": "Количество активных связей неизвестно из-за ошибки получения"
+  },
+  "relationNeighborhoodTitle": "Relations",
+  "relationNeighborhoodSelectedCount": "Selected relations: {count}",
+  "@relationNeighborhoodSelectedCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodAddToSelection": "Add to selection",
+  "@relationNeighborhoodAddToSelection": {
+    "description": "Действие выбора конкретной блокирующей связи"
+  },
+  "relationNeighborhoodRemoveFromSelection": "Remove from selection",
+  "@relationNeighborhoodRemoveFromSelection": {
+    "description": "Действие снятия выбора конкретной блокирующей связи"
+  },
+  "blockingRelationsReviewAction": "Review selected relations",
+  "@blockingRelationsReviewAction": {"description": "Открыть полный набор выбранных связей для подтверждения"},
+  "blockingRelationsConfirmationTitle": "Delete selected relations permanently?",
+  "@blockingRelationsConfirmationTitle": {"description": "Заголовок подтверждения массового удаления"},
+  "blockingRelationsConfirmationWarning": "Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.",
+  "@blockingRelationsConfirmationWarning": {"description": "Необратимость удаления связей и сохранность намерения"},
+  "blockingRelationsConfirmationCount": "To delete: {count}",
+  "@blockingRelationsConfirmationCount": {"description": "Число связей в подтверждённом наборе", "placeholders": {"count": {"type": "int"}}},
+  "blockingRelationsParticipantId": "Identifier: {id}",
+  "@blockingRelationsParticipantId": {"description": "Идентификатор участника для различения одноимённых намерений", "placeholders": {"id": {"type": "String"}}},
+  "blockingRelationsDeleting": "Deleting selected relations…",
+  "@blockingRelationsDeleting": {"description": "Состояние принятого массового удаления"},
+  "blockingRelationsBusy": "Another change to these relations or the intention is already running.",
+  "@blockingRelationsBusy": {"description": "Отказ при занятом намерении или выбранной связи"},
+  "blockingRelationsDraining": "The app is closing. The change was not accepted.",
+  "@blockingRelationsDraining": {"description": "Отказ при завершении работы приложения"},
+  "blockingRelationsEditSelectionAction": "Return to selection",
+  "@blockingRelationsEditSelectionAction": {"description": "Вернуться к сохранённому выбору после ошибки"},
+  "blockingRelationsRefreshSelectionAction": "Refresh selection",
+  "@blockingRelationsRefreshSelectionAction": {"description": "Явная актуализация выбранного набора после конфликта или перед просмотром"},
+  "blockingRelationsRefreshingSelection": "Checking selected relations…",
+  "@blockingRelationsRefreshingSelection": {"description": "Состояние проверки выбранных связей"},
+  "blockingRelationsInvalidSelectedRelationId": "Relation: {id}",
+  "@blockingRelationsInvalidSelectedRelationId": {"description": "Идентификатор недоступной выбранной связи", "placeholders": {"id": {"type": "String"}}},
+  "blockingRelationsInvalidMissing": "This relation no longer exists. Remove it from the selection and confirm the remaining set again.",
+  "@blockingRelationsInvalidMissing": {"description": "Причина устаревания выбранной связи: удалена"},
+  "blockingRelationsInvalidMoved": "This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.",
+  "@blockingRelationsInvalidMoved": {"description": "Причина устаревания выбранной связи: заменён участник"},
+  "blockingRelationsRefreshIntentionNotFound": "This intention no longer exists. Its relations cannot be deleted here.",
+  "@blockingRelationsRefreshIntentionNotFound": {"description": "Безопасное отсутствие намерения при проверке выбора"},
+  "blockingRelationsRefreshUnavailable": "Selected relations could not be checked. Your selection is unchanged; try checking again.",
+  "@blockingRelationsRefreshUnavailable": {"description": "Устранимая ошибка чтения выбранного набора"},
+  "blockingRelationsRefreshCorruption": "Selected relations could not be checked because the data is damaged. Deletion was not started.",
+  "@blockingRelationsRefreshCorruption": {"description": "Повреждение данных при чтении выбранного набора"},
+  "blockingRelationsRefreshUnexpected": "Selected relations could not be checked. Deletion was not started.",
+  "@blockingRelationsRefreshUnexpected": {"description": "Неожиданная ошибка чтения выбранного набора"},
+  "blockingRelationsDeleteMissing": "A selected relation no longer exists. Refresh the selection and confirm it again.",
+  "@blockingRelationsDeleteMissing": {"description": "Конфликт массового удаления: выбранная связь отсутствует"},
+  "blockingRelationsDeleteMoved": "A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.",
+  "@blockingRelationsDeleteMoved": {"description": "Конфликт массового удаления: связь сменила участников"},
+  "blockingRelationsDeleteProhibited": "A selected relation can no longer be deleted. Refresh the selection and confirm it again.",
+  "@blockingRelationsDeleteProhibited": {"description": "Конфликт массового удаления: связь заблокирована"},
+  "relationNeighborhoodSummaryLoading": "Loading relations and summary…",
+  "relationNeighborhoodSummaryUnavailable": "The relation summary couldn’t be loaded.",
+  "relationNeighborhoodSavedSummaryRefreshing": "Updating saved relation numbers…",
+  "@relationNeighborhoodSavedSummaryRefreshing": {
+    "description": "Состояние обновления сохранённой согласованной сводки рядом с её числами"
+  },
+  "relationNeighborhoodSavedSummaryStale": "Saved relation numbers are out of date because the refresh failed.",
+  "@relationNeighborhoodSavedSummaryStale": {
+    "description": "Состояние устаревшей сохранённой сводки рядом с её числами"
+  },
+  "relationNeighborhoodTotal": "Total relations: {count}",
+  "@relationNeighborhoodTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodActiveTotal": "Active relations: {count}",
+  "@relationNeighborhoodActiveTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodArchivedTotal": "Archived relations: {count}",
+  "@relationNeighborhoodArchivedTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodNeedTotal": "Need: {count}",
+  "@relationNeighborhoodNeedTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodCanTotal": "Can: {count}",
+  "@relationNeighborhoodCanTotal": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodScopeLabel": "Relation state",
+  "relationNeighborhoodScopeActive": "Active relations",
+  "relationNeighborhoodScopeArchived": "Archived relations",
+  "relationNeighborhoodTypeLabel": "Relation type",
+  "relationNeighborhoodTypeNeed": "Need",
+  "relationNeighborhoodTypeCan": "Can",
+  "relationNeighborhoodDirectionLabel": "Direction",
+  "relationNeighborhoodDirectionIncoming": "Incoming",
+  "relationNeighborhoodDirectionOutgoing": "Outgoing",
+  "relationNeighborhoodSelectedGroupCount": "In the whole selected group: {count}",
+  "@relationNeighborhoodSelectedGroupCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "relationNeighborhoodInitialUnavailable": "The relations and summary couldn’t be loaded. Try again.",
+  "relationNeighborhoodInitialCorruption": "Stored relation data is damaged and can’t be shown.",
+  "relationNeighborhoodInitialUnexpected": "The relations couldn’t be loaded because of an unexpected error.",
+  "relationNeighborhoodInitialInvalid": "The selected relation group can no longer be opened.",
+  "relationNeighborhoodIntentionNotFound": "The intention whose relations were being viewed no longer exists.",
+  "relationNeighborhoodEmpty": "There are no relations in this group.",
+  "relationNeighborhoodLoadingMore": "Loading more relations…",
+  "relationNeighborhoodLoadMoreUnavailable": "The next relations couldn’t be loaded.",
+  "relationNeighborhoodLoadMoreCorruption": "Stored data is damaged; the next relations can’t be shown.",
+  "relationNeighborhoodLoadMoreUnexpected": "The next relations couldn’t be loaded because of an unexpected error.",
+  "relationNeighborhoodLoadMoreInvalid": "The continuation for this group is no longer valid.",
+  "relationNeighborhoodRefreshing": "Refreshing relations…",
+  "relationNeighborhoodRefreshFailed": "The relations couldn’t be refreshed. Previously loaded data is still shown.",
+  "relationNeighborhoodConfirmedEnd": "All relations in this group are loaded.",
+  "relationNeighborhoodRelationActive": "Active relation",
+  "relationNeighborhoodRelationArchived": "Archived relation",
+  "relationNeighborhoodPriority": "Priority {priority}",
+  "@relationNeighborhoodPriority": {
+    "placeholders": {"priority": {"type": "String"}}
+  },
+  "relationNeighborhoodSourceParticipant": "Source intention",
+  "relationNeighborhoodRelatedParticipant": "Related intention",
+  "relationNeighborhoodNeedPhrase": "To {source}, you need {related}",
+  "@relationNeighborhoodNeedPhrase": {
+    "placeholders": {
+      "source": {"type": "String"},
+      "related": {"type": "String"}
+    }
+  },
+  "relationNeighborhoodCanPhrase": "To {source}, you can {related}",
+  "@relationNeighborhoodCanPhrase": {
+    "placeholders": {
+      "source": {"type": "String"},
+      "related": {"type": "String"}
+    }
+  },
+  "@relationNeighborhoodTitle": {
+    "description": "Заголовок соседства намерения"
+  },
+  "@relationNeighborhoodSummaryLoading": {
+    "description": "Первоначальная загрузка соседства и полной сводки"
+  },
+  "@relationNeighborhoodSummaryUnavailable": {
+    "description": "Полная сводка ещё не подтверждена из-за ошибки"
+  },
+  "@relationNeighborhoodScopeLabel": {
+    "description": "Подпись выбора активных или архивных связей"
+  },
+  "@relationNeighborhoodScopeActive": {
+    "description": "Активный охват соседства"
+  },
+  "@relationNeighborhoodScopeArchived": {
+    "description": "Архивный охват соседства"
+  },
+  "@relationNeighborhoodTypeLabel": {
+    "description": "Подпись выбора типа долговременной связи"
+  },
+  "@relationNeighborhoodTypeNeed": {
+    "description": "Тип долговременной связи нужно"
+  },
+  "@relationNeighborhoodTypeCan": {
+    "description": "Тип долговременной связи можно"
+  },
+  "@relationNeighborhoodDirectionLabel": {
+    "description": "Подпись выбора направления связи"
+  },
+  "@relationNeighborhoodDirectionIncoming": {
+    "description": "Входящее направление относительно намерения"
+  },
+  "@relationNeighborhoodDirectionOutgoing": {
+    "description": "Исходящее направление относительно намерения"
+  },
+  "@relationNeighborhoodInitialUnavailable": {
+    "description": "Устранимая ошибка начального чтения группы"
+  },
+  "@relationNeighborhoodInitialCorruption": {
+    "description": "Повреждение при начальном чтении группы"
+  },
+  "@relationNeighborhoodInitialUnexpected": {
+    "description": "Непредвиденная ошибка начального чтения группы"
+  },
+  "@relationNeighborhoodInitialInvalid": {
+    "description": "Недействительный запрос начальной группы"
+  },
+  "@relationNeighborhoodIntentionNotFound": {
+    "description": "Владелец соседства подтверждённо отсутствует"
+  },
+  "@relationNeighborhoodEmpty": {
+    "description": "Подтверждённо пустая выбранная группа"
+  },
+  "@relationNeighborhoodLoadingMore": {
+    "description": "Подгрузка следующей порции выбранной группы"
+  },
+  "@relationNeighborhoodLoadMoreUnavailable": {
+    "description": "Устранимая ошибка подгрузки"
+  },
+  "@relationNeighborhoodLoadMoreCorruption": {
+    "description": "Повреждение при подгрузке"
+  },
+  "@relationNeighborhoodLoadMoreUnexpected": {
+    "description": "Непредвиденная ошибка подгрузки"
+  },
+  "@relationNeighborhoodLoadMoreInvalid": {
+    "description": "Недействительное продолжение группы"
+  },
+  "@relationNeighborhoodRefreshing": {
+    "description": "Согласованное обновление сводки и выбранной группы"
+  },
+  "@relationNeighborhoodRefreshFailed": {
+    "description": "Ошибка обновления при сохранённых прежних данных"
+  },
+  "@relationNeighborhoodConfirmedEnd": {
+    "description": "Подтверждённый конец выбранной группы"
+  },
+  "@relationNeighborhoodRelationActive": {
+    "description": "Активное состояние строки связи"
+  },
+  "@relationNeighborhoodRelationArchived": {
+    "description": "Архивное состояние строки связи"
+  },
+  "@relationNeighborhoodSourceParticipant": {
+    "description": "Подпись исходного участника связи"
+  },
+  "@relationNeighborhoodRelatedParticipant": {
+    "description": "Подпись связанного участника связи"
+  },
   "detailsTitle": "Intention details",
   "@detailsTitle": {
     "description": "Заголовок подробного просмотра намерения"
@@ -349,9 +594,34 @@
   "@detailsDeleteNotFound": {
     "description": "Безопасная ошибка удаления отсутствующего намерения"
   },
-  "detailsDeleteConflict": "The intention is still linked and can’t be deleted.",
+  "detailsDeleteConflict": "The intention changed elsewhere. It wasn’t deleted.",
   "@detailsDeleteConflict": {
-    "description": "Безопасная ошибка блокирующей связи при удалении намерения"
+    "description": "Безопасная ошибка конфликта при удалении намерения"
+  },
+  "detailsDeleteBlockedByRelations": "The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.",
+  "@detailsDeleteBlockedByRelations": {
+    "description": "Объяснение блокировки удаления намерения его связями"
+  },
+  "detailsShowBlockingRelationsAction": "Show blocking relations",
+  "@detailsShowBlockingRelationsAction": {
+    "description": "Переход к актуальным группам связей, блокирующих удаление"
+  },
+  "detailsArchiveCascadeExplanation": "Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.",
+  "@detailsArchiveCascadeExplanation": {
+    "description": "Объяснение каскада непосредственных связей перед архивированием"
+  },
+  "detailsRestoreRelationsExplanation": "Restoring returns only the intention. Its relations stay archived: {count}.",
+  "@detailsRestoreRelationsExplanation": {
+    "description": "Объяснение сохранённого архива связей перед восстановлением",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "detailsShowArchivedRelationsAction": "Show archived relations",
+  "@detailsShowArchivedRelationsAction": {
+    "description": "Переход к архивным группам связей намерения"
   },
   "detailsDeleteUnavailable": "The intention couldn’t be deleted. Try again.",
   "@detailsDeleteUnavailable": {
@@ -481,6 +751,34 @@
   "@graphOperationDelete": {
     "description": "Вид операции удаления намерения в сообщении оболочки"
   },
+  "graphOperationDeleteBlockingRelations": "Delete selected relations",
+  "@graphOperationDeleteBlockingRelations": {
+    "description": "Вид массовой операции в сообщении оболочки"
+  },
+  "blockingRelationsDeleted": "Selected relations deleted.",
+  "@blockingRelationsDeleted": {
+    "description": "Успешное массовое удаление выбранных связей"
+  },
+  "blockingRelationsDeleteIntentionNotFound": "This intention no longer exists. Relations weren’t deleted.",
+  "@blockingRelationsDeleteIntentionNotFound": {
+    "description": "Намерение исчезло до массового удаления"
+  },
+  "blockingRelationsDeleteConflict": "The selected relations changed. Refresh the selection and confirm again.",
+  "@blockingRelationsDeleteConflict": {
+    "description": "Устаревший набор массового удаления"
+  },
+  "blockingRelationsDeleteUnavailable": "Selected relations couldn’t be deleted. Try again.",
+  "@blockingRelationsDeleteUnavailable": {
+    "description": "Временная недоступность массового удаления"
+  },
+  "blockingRelationsDeleteCorruption": "Stored data is damaged. Selected relations weren’t deleted.",
+  "@blockingRelationsDeleteCorruption": {
+    "description": "Повреждение данных при массовом удалении"
+  },
+  "blockingRelationsDeleteUnexpected": "Selected relations couldn’t be deleted because of an unexpected error.",
+  "@blockingRelationsDeleteUnexpected": {
+    "description": "Непредвиденная ошибка массового удаления"
+  },
   "graphOperationNewIntention": "new intention",
   "@graphOperationNewIntention": {
     "description": "Безопасное обозначение создаваемого намерения до подтверждения"
@@ -500,6 +798,433 @@
         "type": "String"
       },
       "outcome": {
+        "type": "String"
+      }
+    }
+  },
+  "graphOperationNewRelation": "new relation",
+  "@graphOperationNewRelation": {
+    "description": "Безопасное обозначение создаваемой связи до подтверждения"
+  },
+  "graphOperationRelation": "relation",
+  "@graphOperationRelation": {
+    "description": "Безопасное обозначение существующей связи"
+  },
+  "relationEditorCreated": "Relation created.",
+  "@relationEditorCreated": {
+    "description": "Подтверждение успешного создания долговременной связи"
+  },
+  "relationEditorCreateInvalidInput": "Check the selected intentions and relation details.",
+  "@relationEditorCreateInvalidInput": {
+    "description": "Ошибка проверки данных создания связи"
+  },
+  "relationEditorCreatePairOccupied": "A relation with this direction already exists between the selected intentions.",
+  "@relationEditorCreatePairOccupied": {
+    "description": "Конфликт занятой направленной пары при создании связи"
+  },
+  "relationEditorCreateParticipantNotFound": "One of the selected intentions no longer exists.",
+  "@relationEditorCreateParticipantNotFound": {
+    "description": "Отсутствие участника при создании связи"
+  },
+  "relationEditorCreateParticipantArchived": "Only active intentions can be linked.",
+  "@relationEditorCreateParticipantArchived": {
+    "description": "Конфликт архивного состояния участника при создании связи"
+  },
+  "relationEditorCreateUnavailable": "The relation couldn’t be created. Try again.",
+  "@relationEditorCreateUnavailable": {
+    "description": "Устранимая недоступность создания связи"
+  },
+  "relationEditorCreateCorruption": "Stored data is damaged. The relation wasn’t created.",
+  "@relationEditorCreateCorruption": {
+    "description": "Терминальное повреждение данных при создании связи"
+  },
+  "relationEditorCreateUnexpected": "The relation couldn’t be created because of an unexpected error.",
+  "@relationEditorCreateUnexpected": {
+    "description": "Терминальная непредвиденная ошибка создания связи"
+  },
+  "relationEditorUpdated": "Relation updated.",
+  "@relationEditorUpdated": {
+    "description": "Подтверждение успешного изменения долговременной связи"
+  },
+  "relationEditorUpdateInvalidInput": "Check the selected intentions and relation changes.",
+  "@relationEditorUpdateInvalidInput": {
+    "description": "Ошибка проверки данных изменения связи"
+  },
+  "relationEditorUpdatePairOccupied": "A relation with this direction already exists between the selected intentions.",
+  "@relationEditorUpdatePairOccupied": {
+    "description": "Конфликт занятой направленной пары при изменении связи"
+  },
+  "relationEditorUpdateNotFound": "This relation no longer exists.",
+  "@relationEditorUpdateNotFound": {
+    "description": "Отсутствие изменяемой связи"
+  },
+  "relationEditorUpdateParticipantNotFound": "One of the selected intentions no longer exists.",
+  "@relationEditorUpdateParticipantNotFound": {
+    "description": "Отсутствие участника при изменении связи"
+  },
+  "relationEditorUpdateParticipantArchived": "An active relation can only link active intentions.",
+  "@relationEditorUpdateParticipantArchived": {
+    "description": "Конфликт архивного состояния участника при изменении активной связи"
+  },
+  "relationEditorUpdateUnavailable": "The relation couldn’t be updated. Try again.",
+  "@relationEditorUpdateUnavailable": {
+    "description": "Устранимая недоступность изменения связи"
+  },
+  "relationEditorUpdateCorruption": "Stored data is damaged. The relation wasn’t updated.",
+  "@relationEditorUpdateCorruption": {
+    "description": "Терминальное повреждение данных при изменении связи"
+  },
+  "relationEditorUpdateUnexpected": "The relation couldn’t be updated because of an unexpected error.",
+  "@relationEditorUpdateUnexpected": {
+    "description": "Терминальная непредвиденная ошибка изменения связи"
+  },
+  "relationArchived": "Relation archived.",
+  "@relationArchived": {
+    "description": "Подтверждение успешного архивирования долговременной связи"
+  },
+  "relationArchiveNotFound": "This relation no longer exists.",
+  "@relationArchiveNotFound": {
+    "description": "Отсутствие архивируемой связи"
+  },
+  "relationArchiveConflict": "The relation couldn’t be archived because its current state conflicts with the operation.",
+  "@relationArchiveConflict": {
+    "description": "Конфликт актуального состояния при архивировании связи"
+  },
+  "relationArchiveUnavailable": "The relation couldn’t be archived. Try again.",
+  "@relationArchiveUnavailable": {
+    "description": "Устранимая недоступность архивирования связи"
+  },
+  "relationArchiveCorruption": "Stored data is damaged. The relation wasn’t archived.",
+  "@relationArchiveCorruption": {
+    "description": "Терминальное повреждение данных при архивировании связи"
+  },
+  "relationArchiveUnexpected": "The relation couldn’t be archived because of an unexpected error.",
+  "@relationArchiveUnexpected": {
+    "description": "Терминальная непредвиденная ошибка архивирования связи"
+  },
+  "relationRestored": "Relation restored.",
+  "@relationRestored": {
+    "description": "Подтверждение успешного восстановления долговременной связи"
+  },
+  "relationRestoreNotFound": "This relation no longer exists.",
+  "@relationRestoreNotFound": {
+    "description": "Отсутствие восстанавливаемой связи"
+  },
+  "relationRestoreConflict": "The relation couldn’t be restored because its current state conflicts with the operation.",
+  "@relationRestoreConflict": {
+    "description": "Конфликт актуального состояния при восстановлении связи"
+  },
+  "relationRestoreSourceNotFound": "The source intention no longer exists. The relation wasn’t restored.",
+  "@relationRestoreSourceNotFound": {
+    "description": "Отсутствие исходного участника при восстановлении связи"
+  },
+  "relationRestoreRelatedNotFound": "The related intention no longer exists. The relation wasn’t restored.",
+  "@relationRestoreRelatedNotFound": {
+    "description": "Отсутствие связанного участника при восстановлении связи"
+  },
+  "relationRestoreSourceArchived": "Restore the source intention before restoring this relation.",
+  "@relationRestoreSourceArchived": {
+    "description": "Архивное состояние исходного участника при восстановлении связи"
+  },
+  "relationRestoreRelatedArchived": "Restore the related intention before restoring this relation.",
+  "@relationRestoreRelatedArchived": {
+    "description": "Архивное состояние связанного участника при восстановлении связи"
+  },
+  "relationRestoreUnavailable": "The relation couldn’t be restored. Try again.",
+  "@relationRestoreUnavailable": {
+    "description": "Устранимая недоступность восстановления связи"
+  },
+  "relationRestoreCorruption": "Stored data is damaged. The relation wasn’t restored.",
+  "@relationRestoreCorruption": {
+    "description": "Терминальное повреждение данных при восстановлении связи"
+  },
+  "relationRestoreUnexpected": "The relation couldn’t be restored because of an unexpected error.",
+  "@relationRestoreUnexpected": {
+    "description": "Терминальная непредвиденная ошибка восстановления связи"
+  },
+  "relationDeleted": "Relation deleted.",
+  "@relationDeleted": {
+    "description": "Подтверждение успешного физического удаления долговременной связи"
+  },
+  "relationDeleteNotFound": "This relation no longer exists.",
+  "@relationDeleteNotFound": {
+    "description": "Отсутствие удаляемой связи"
+  },
+  "relationDeleteConflict": "The relation couldn’t be deleted because its current state conflicts with the operation.",
+  "@relationDeleteConflict": {
+    "description": "Конфликт актуального состояния при удалении связи"
+  },
+  "relationDeleteUnavailable": "The relation couldn’t be deleted. Try again.",
+  "@relationDeleteUnavailable": {
+    "description": "Устранимая недоступность удаления связи"
+  },
+  "relationDeleteCorruption": "Stored data is damaged. The relation wasn’t deleted.",
+  "@relationDeleteCorruption": {
+    "description": "Терминальное повреждение данных при удалении связи"
+  },
+  "relationDeleteUnexpected": "The relation couldn’t be deleted because of an unexpected error.",
+  "@relationDeleteUnexpected": {
+    "description": "Терминальная непредвиденная ошибка удаления связи"
+  },
+  "relationNeighborhoodOpenRelation": "Opens the relation details",
+  "@relationNeighborhoodOpenRelation": {
+    "description": "Назначение перехода из строки соседства в подробный просмотр связи"
+  },
+  "relationDetailsTitle": "Relation",
+  "@relationDetailsTitle": {
+    "description": "Заголовок подробного просмотра связи"
+  },
+  "relationDetailsLoading": "Loading the relation…",
+  "@relationDetailsLoading": {
+    "description": "Первое чтение подробных данных связи"
+  },
+  "relationDetailsNotFound": "This relation no longer exists.",
+  "@relationDetailsNotFound": {
+    "description": "Подтверждённое отсутствие связи в подробном просмотре"
+  },
+  "relationDetailsUnavailable": "The relation couldn’t be loaded. Try again.",
+  "@relationDetailsUnavailable": {
+    "description": "Устранимая недоступность чтения подробных данных связи"
+  },
+  "relationDetailsCorruption": "Stored relation data is damaged and can’t be shown.",
+  "@relationDetailsCorruption": {
+    "description": "Повреждение сохранённых данных связи в подробном просмотре"
+  },
+  "relationDetailsUnexpected": "The relation couldn’t be loaded because of an unexpected error.",
+  "@relationDetailsUnexpected": {
+    "description": "Безопасный непредвиденный отказ чтения подробных данных связи"
+  },
+  "relationDetailsRefreshing": "Refreshing relation details…",
+  "@relationDetailsRefreshing": {
+    "description": "Согласование сохранённого подробного просмотра связи с новой ревизией"
+  },
+  "relationDetailsRefreshUnavailable": "The relation details couldn’t be refreshed. Previously confirmed data is still shown.",
+  "@relationDetailsRefreshUnavailable": {
+    "description": "Устранимая ошибка обновления при сохранённых подробных данных связи"
+  },
+  "relationDetailsRefreshCorruption": "Stored data is damaged. Previously confirmed relation details are still shown.",
+  "@relationDetailsRefreshCorruption": {
+    "description": "Повреждение при обновлении с сохранением прежних подробных данных связи"
+  },
+  "relationDetailsRefreshUnexpected": "The relation details couldn’t be refreshed because of an unexpected error. Previously confirmed data is still shown.",
+  "@relationDetailsRefreshUnexpected": {
+    "description": "Непредвиденная ошибка обновления с сохранением прежних подробных данных связи"
+  },
+  "relationDetailsTypeLabel": "Relation type",
+  "@relationDetailsTypeLabel": {
+    "description": "Подпись типа связи в подробном просмотре"
+  },
+  "relationDetailsPriorityLabel": "Priority",
+  "@relationDetailsPriorityLabel": {
+    "description": "Подпись приоритета связи в подробном просмотре"
+  },
+  "relationDetailsScopeLabel": "Relation state",
+  "@relationDetailsScopeLabel": {
+    "description": "Подпись собственного архивного состояния связи"
+  },
+  "relationDetailsDescriptionLabel": "Description",
+  "@relationDetailsDescriptionLabel": {
+    "description": "Подпись полного описания связи"
+  },
+  "relationDetailsNoDescription": "No description",
+  "@relationDetailsNoDescription": {
+    "description": "Отсутствие описания у связи"
+  },
+  "relationDetailsOpenParticipant": "Opens the intention and its own relations",
+  "@relationDetailsOpenParticipant": {
+    "description": "Назначение перехода к участнику связи"
+  },
+  "relationDetailsEditAction": "Edit relation",
+  "@relationDetailsEditAction": {
+    "description": "Переход из подробного просмотра к изменению связи"
+  },
+  "relationDetailsArchiveAction": "Archive relation",
+  "@relationDetailsArchiveAction": {
+    "description": "Действие самостоятельного архивирования связи"
+  },
+  "relationDetailsRestoreAction": "Restore relation",
+  "@relationDetailsRestoreAction": {
+    "description": "Действие самостоятельного восстановления связи"
+  },
+  "relationDetailsDeleteAction": "Delete relation permanently",
+  "@relationDetailsDeleteAction": {
+    "description": "Действие начала физического удаления конкретной долговременной связи"
+  },
+  "relationDetailsDeleteConfirmationTitle": "Delete relation permanently?",
+  "@relationDetailsDeleteConfirmationTitle": {
+    "description": "Заголовок подтверждения необратимого удаления конкретной связи"
+  },
+  "relationDetailsDeleteConfirmationMessage": "Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. Both intentions and all other relations will remain.",
+  "@relationDetailsDeleteConfirmationMessage": {
+    "description": "Контекст и объяснение необратимости удаления конкретной связи",
+    "placeholders": {
+      "phrase": {"type": "String"},
+      "sourceTitle": {"type": "String"},
+      "relatedTitle": {"type": "String"},
+      "scope": {"type": "String"}
+    }
+  },
+  "relationDetailsConfirmDeleteAction": "Delete permanently",
+  "@relationDetailsConfirmDeleteAction": {
+    "description": "Явное подтверждение физического удаления конкретной связи"
+  },
+  "relationDetailsOpenSourceParticipantAction": "Open source intention",
+  "@relationDetailsOpenSourceParticipantAction": {
+    "description": "Переход к архивному исходному участнику, блокирующему восстановление связи"
+  },
+  "relationDetailsOpenRelatedParticipantAction": "Open related intention",
+  "@relationDetailsOpenRelatedParticipantAction": {
+    "description": "Переход к архивному связанному участнику, блокирующему восстановление связи"
+  },
+  "participantPickerTitle": "Select a participant",
+  "@participantPickerTitle": {
+    "description": "Заголовок выбора участника долговременной связи"
+  },
+  "participantPickerCancel": "Cancel the selection",
+  "@participantPickerCancel": {
+    "description": "Назначение отмены выбора участника"
+  },
+  "participantPickerEmpty": "No other intentions are available to select.",
+  "@participantPickerEmpty": {
+    "description": "Отсутствие намерений, доступных для выбора участником"
+  },
+  "participantPickerSelectHint": "Selects this intention as a relation participant",
+  "@participantPickerSelectHint": {
+    "description": "Назначение выбора строки участником связи"
+  },
+  "participantPickerOpenDetails": "Open intention details",
+  "@participantPickerOpenDetails": {
+    "description": "Назначение перехода к подробным данным намерения из выбора"
+  },
+  "relationEditorTitle": "New relation",
+  "@relationEditorTitle": {
+    "description": "Заголовок формы создания долговременной связи"
+  },
+  "relationEditorEditTitle": "Edit relation",
+  "@relationEditorEditTitle": {
+    "description": "Заголовок формы изменения долговременной связи"
+  },
+  "relationEditorPhraseLabel": "Relation phrase",
+  "@relationEditorPhraseLabel": {
+    "description": "Доступная подпись текущей формулировки связи"
+  },
+  "relationEditorSourceLabel": "Source intention",
+  "@relationEditorSourceLabel": {
+    "description": "Подпись исходного участника в форме создания связи"
+  },
+  "relationEditorRelatedLabel": "Related intention",
+  "@relationEditorRelatedLabel": {
+    "description": "Подпись связанного участника в форме создания связи"
+  },
+  "relationEditorParticipantSelected": "Selected",
+  "@relationEditorParticipantSelected": {
+    "description": "Состояние выбранного участника связи"
+  },
+  "relationEditorParticipantNotSelected": "Not selected",
+  "@relationEditorParticipantNotSelected": {
+    "description": "Состояние невыбранного участника связи"
+  },
+  "relationEditorSelectSourceAction": "Select the source intention",
+  "@relationEditorSelectSourceAction": {
+    "description": "Переход к выбору исходного участника"
+  },
+  "relationEditorChangeSourceAction": "Change the source intention",
+  "@relationEditorChangeSourceAction": {
+    "description": "Замена выбранного исходного участника"
+  },
+  "relationEditorSelectRelatedAction": "Select the related intention",
+  "@relationEditorSelectRelatedAction": {
+    "description": "Переход к выбору связанного участника"
+  },
+  "relationEditorChangeRelatedAction": "Change the related intention",
+  "@relationEditorChangeRelatedAction": {
+    "description": "Замена выбранного связанного участника"
+  },
+  "relationEditorTypeLabel": "Relation type",
+  "@relationEditorTypeLabel": {
+    "description": "Подпись выбора типа связи в форме создания"
+  },
+  "relationEditorTypeNeed": "Need",
+  "@relationEditorTypeNeed": {
+    "description": "Тип связи «нужно» в форме создания"
+  },
+  "relationEditorTypeCan": "Can",
+  "@relationEditorTypeCan": {
+    "description": "Тип связи «можно» в форме создания"
+  },
+  "relationEditorPriorityLabel": "Priority",
+  "@relationEditorPriorityLabel": {
+    "description": "Подпись выбора приоритета связи"
+  },
+  "relationEditorDescriptionLabel": "Description (optional)",
+  "@relationEditorDescriptionLabel": {
+    "description": "Подпись описания создаваемой связи"
+  },
+  "relationEditorDescriptionTooLong": "Use no more than 4096 characters.",
+  "@relationEditorDescriptionTooLong": {
+    "description": "Превышение предела описания связи"
+  },
+  "relationEditorDescriptionInvalidUnicode": "Enter valid Unicode text without NUL.",
+  "@relationEditorDescriptionInvalidUnicode": {
+    "description": "Недопустимый Unicode в описании связи"
+  },
+  "relationEditorCreateSameParticipants": "An intention can’t be related to itself.",
+  "@relationEditorCreateSameParticipants": {
+    "description": "Отказ создания связи намерения с самим собой"
+  },
+  "relationEditorMissingTitle": "To create the relation, provide:",
+  "@relationEditorMissingTitle": {
+    "description": "Объяснение недостающего обязательного выбора"
+  },
+  "relationEditorMissingSource": "the source intention",
+  "@relationEditorMissingSource": {
+    "description": "Недостающий исходный участник связи"
+  },
+  "relationEditorMissingRelated": "the related intention",
+  "@relationEditorMissingRelated": {
+    "description": "Недостающий связанный участник связи"
+  },
+  "relationEditorMissingType": "the relation type",
+  "@relationEditorMissingType": {
+    "description": "Недостающий тип связи"
+  },
+  "relationEditorMissingPriority": "a priority from P1 to P4",
+  "@relationEditorMissingPriority": {
+    "description": "Недостающий приоритет связи"
+  },
+  "relationEditorOpenExistingRelation": "Open the existing relation",
+  "@relationEditorOpenExistingRelation": {
+    "description": "Переход к связи, занявшей направленную пару"
+  },
+  "relationEditorSubmitAction": "Create relation",
+  "@relationEditorSubmitAction": {
+    "description": "Команда создания долговременной связи"
+  },
+  "relationEditorCreating": "Creating…",
+  "@relationEditorCreating": {
+    "description": "Выполняемое создание долговременной связи"
+  },
+  "relationEditorSaveAction": "Save changes",
+  "@relationEditorSaveAction": {
+    "description": "Команда сохранения изменений долговременной связи"
+  },
+  "relationEditorSaving": "Saving…",
+  "@relationEditorSaving": {
+    "description": "Выполняемое изменение долговременной связи"
+  },
+  "relationNeighborhoodCreateOutgoingAction": "Create an outgoing relation",
+  "@relationNeighborhoodCreateOutgoingAction": {
+    "description": "Создание связи из исходящей группы соседства"
+  },
+  "relationNeighborhoodCreateIncomingAction": "Create an incoming relation",
+  "@relationNeighborhoodCreateIncomingAction": {
+    "description": "Создание связи из входящей группы соседства"
+  },
+  "relationEditorPriorityOption": "Priority {priority}",
+  "@relationEditorPriorityOption": {
+    "description": "Вариант приоритета P1–P4 в форме создания связи",
+    "placeholders": {
+      "priority": {
         "type": "String"
       }
     }

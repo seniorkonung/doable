@@ -1,14 +1,22 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -59,7 +67,9 @@ void main() {
       final coordinator = _graphCoordinator(repository);
       final epoch = Object();
       final completions = <IntentionCommandCompletion>[];
-      final subscription = coordinator.completions.listen(completions.add);
+      final subscription = coordinator.intentionCompletions.listen(
+        completions.add,
+      );
       final firstId = _id(_firstUuid);
       final secondId = _id(_secondUuid);
 
@@ -220,10 +230,10 @@ void main() {
         final coordinator = _graphCoordinator(repository);
         final firstConsumer = <IntentionCommandCompletion>[];
         final secondConsumer = <IntentionCommandCompletion>[];
-        final firstSubscription = coordinator.completions.listen(
+        final firstSubscription = coordinator.intentionCompletions.listen(
           firstConsumer.add,
         );
-        final secondSubscription = coordinator.completions.listen(
+        final secondSubscription = coordinator.intentionCompletions.listen(
           secondConsumer.add,
         );
 
@@ -241,7 +251,7 @@ void main() {
         expect(secondConsumer, [same(completion)]);
 
         final lateConsumer = <IntentionCommandCompletion>[];
-        final lateSubscription = coordinator.completions.listen(
+        final lateSubscription = coordinator.intentionCompletions.listen(
           lateConsumer.add,
         );
         await Future<void>.delayed(Duration.zero);
@@ -262,14 +272,14 @@ void main() {
       final secondId = _id(_secondUuid);
       final firstDetails = <IntentionCommandSuccess>[];
       final secondDetails = <IntentionCommandSuccess>[];
-      final firstSubscription = coordinator.completions.listen(
+      final firstSubscription = coordinator.intentionCompletions.listen(
         (completion) => _collectSuccessFor(
           completion,
           intentionId: firstId,
           target: firstDetails,
         ),
       );
-      final secondSubscription = coordinator.completions.listen(
+      final secondSubscription = coordinator.intentionCompletions.listen(
         (completion) => _collectSuccessFor(
           completion,
           intentionId: secondId,
@@ -354,7 +364,7 @@ void main() {
 
         expect(coordinator.claimInitiatorFailure(completion.token), isNull);
         final claim = await registration.nextClaim();
-        expect(claim, isA<IntentionAppPresentationClaim>());
+        expect(claim, isA<GraphAppPresentationClaim>());
         expect(claim!.completion, same(completion));
 
         coordinator.confirmPresentation(claim);
@@ -387,7 +397,7 @@ void main() {
       final initiatorClaim = coordinator.claimInitiatorFailure(
         failedCompletion.token,
       );
-      expect(initiatorClaim, isA<IntentionInitiatorPresentationClaim>());
+      expect(initiatorClaim, isA<GraphInitiatorPresentationClaim>());
       expect(
         coordinator.claimInitiatorFailure(failedCompletion.token),
         same(initiatorClaim),
@@ -479,7 +489,7 @@ void main() {
         final firstClaim = await registration.nextClaim();
         expect(firstClaim!.token, same(first.token));
 
-        IntentionAppPresentationClaim? secondClaim;
+        GraphAppPresentationClaim? secondClaim;
         final pending = registration.nextClaim()
           ..then((claim) => secondClaim = claim);
         expect(registration.nextClaim(), same(pending));
@@ -498,7 +508,9 @@ void main() {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);
       final completions = <IntentionCommandCompletion>[];
-      final subscription = coordinator.completions.listen(completions.add);
+      final subscription = coordinator.intentionCompletions.listen(
+        completions.add,
+      );
       final firstPresenter = coordinator.registerAppPresentation();
 
       final accepted = _acceptExisting(
@@ -572,7 +584,7 @@ void main() {
       final coordinator = _graphCoordinator(repository);
       final previous = coordinator.registerAppPresentation();
       final next = coordinator.registerAppPresentation();
-      IntentionAppPresentationClaim? issued;
+      GraphAppPresentationClaim? issued;
       final request = next.nextClaim()..then((claim) => issued = claim);
 
       final accepted = _acceptExisting(
@@ -637,7 +649,9 @@ void main() {
         final coordinator = _graphCoordinator(repository);
         final intentionId = _id(_firstUuid);
         IntentionCommandAccepted? acceptedFromCompletion;
-        final subscription = coordinator.completions.listen((completion) {
+        final subscription = coordinator.intentionCompletions.listen((
+          completion,
+        ) {
           acceptedFromCompletion = _acceptExisting(
             coordinator,
             ArchiveIntention(intentionId),
@@ -779,15 +793,39 @@ IntentionCommandStart _acceptExisting(
 ) => coordinator.acceptExisting(command, presentationTitle: 'Намерение');
 
 final class _ControlledGraphRepository implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   final commands = <IntentionCommand>[];
   final _results =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   Object? nextError;
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) {
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! IntentionCommand) {
+      throw UnsupportedError('Команды связей не используются в этих тестах.');
+    }
+    return await _executeIntention(command as IntentionCommand)
+        as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) {
     commands.add(command);
     final error = nextError;
     if (error != null) {
@@ -818,20 +856,60 @@ final class _ControlledGraphRepository implements PersonalGraphRepository {
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      throw UnsupportedError('Связи не наблюдаются в этих тестах.');
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) =>
       throw UnsupportedError('Подробное чтение не используется в этих тестах.');
 }
 
 final class _ControlledPersonalGraphRepository
     implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   final commands = <IntentionCommand>[];
   final _results =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
 
   @override
-  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>> execute(
-    IntentionCommand command,
-  ) {
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! IntentionCommand) {
+      throw UnsupportedError('Команды связей не используются в этих тестах.');
+    }
+    return await _executeIntention(command as IntentionCommand)
+        as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
+  _executeIntention(IntentionCommand command) {
     commands.add(command);
     final result =
         Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
@@ -852,7 +930,23 @@ final class _ControlledPersonalGraphRepository
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Stream<Result<GraphSnapshot<Intention?>>> watchIntention(IntentionId id) =>
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
+
+  @override
+  Future<RelationGroupPageResult> getRelationGroupPage(
+    RelationGroupQuery query,
+  ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      throw UnsupportedError('Связи не наблюдаются в этих тестах.');
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) =>
       throw UnsupportedError('Подробное чтение не используется в этих тестах.');
 }
 
@@ -892,6 +986,7 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
         hasDescription: false,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
+        activeRelationCount: 0,
         createdAt: IntentionTimestamp(DateTime.utc(2026)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026)),
       );

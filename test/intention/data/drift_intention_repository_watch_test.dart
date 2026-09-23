@@ -6,6 +6,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -139,9 +140,9 @@ void main() {
     test('публикует начальное подтверждённое отсутствие', () async {
       final result = await repository.watchIntention(_id(_uuidV7)).first;
 
-      expect(result, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
+      expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
       expect(
-        (result as ResultSuccess<GraphSnapshot<Intention?>>).value.value,
+        (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value.value,
         isNull,
       );
       expect(diagnostics.events, [
@@ -670,17 +671,22 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
 };
 
 Matcher _isSuccessfulAbsence() =>
-    isA<ResultSuccess<GraphSnapshot<Intention?>>>().having(
+    isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>().having(
       (result) => result.value.value,
       'value',
       isNull,
     );
 
 GraphSnapshot<Intention?> _graphSnapshot(
-  Result<GraphSnapshot<Intention?>> result,
+  Result<GraphSnapshot<IntentionDetails?>> result,
 ) {
-  expect(result, isA<ResultSuccess<GraphSnapshot<Intention?>>>());
-  return (result as ResultSuccess<GraphSnapshot<Intention?>>).value;
+  expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
+  final snapshot =
+      (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
+  return GraphSnapshot(
+    value: snapshot.value?.intention,
+    revision: snapshot.revision,
+  );
 }
 
 Matcher _isSuccessfulIntention({
@@ -691,34 +697,38 @@ Matcher _isSuccessfulIntention({
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   DateTime? createdAt,
   DateTime? updatedAt,
-}) => isA<ResultSuccess<GraphSnapshot<Intention?>>>()
+}) => isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>()
     .having((result) => result.value.value, 'value', isNotNull)
-    .having((result) => result.value.value!.id, 'id', id)
-    .having((result) => result.value.value!.title, 'title', title)
+    .having((result) => result.value.value!.intention.id, 'id', id)
+    .having((result) => result.value.value!.intention.title, 'title', title)
     .having(
-      (result) => result.value.value!.description,
+      (result) => result.value.value!.intention.description,
       'description',
       description,
     )
-    .having((result) => result.value.value!.readiness, 'readiness', readiness)
     .having(
-      (result) => result.value.value!.archiveState,
+      (result) => result.value.value!.intention.readiness,
+      'readiness',
+      readiness,
+    )
+    .having(
+      (result) => result.value.value!.intention.archiveState,
       'archiveState',
       archiveState,
     )
     .having(
-      (result) => result.value.value!.createdAt.value,
+      (result) => result.value.value!.intention.createdAt.value,
       'createdAt',
       createdAt ?? DateTime.utc(2026, 9, 2, 10),
     )
     .having(
-      (result) => result.value.value!.updatedAt.value,
+      (result) => result.value.value!.intention.updatedAt.value,
       'updatedAt',
       updatedAt ?? createdAt ?? DateTime.utc(2026, 9, 2, 10),
     );
 
 Matcher _isFailure<TFailure extends IntentionFailure>() =>
-    isA<ResultFailure<GraphSnapshot<Intention?>>>().having(
+    isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
       (result) => result.failure,
       'failure',
       isA<TFailure>(),

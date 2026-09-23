@@ -17,7 +17,7 @@ final class OperationFailurePresentation extends ConsumerStatefulWidget {
     super.key,
   });
 
-  final IntentionInitiatorPresentationClaim? claim;
+  final GraphInitiatorPresentationClaim? claim;
   final String message;
   final Key? messageKey;
 
@@ -27,33 +27,31 @@ final class OperationFailurePresentation extends ConsumerStatefulWidget {
 }
 
 final class _OperationFailureRenderer {
-  const _OperationFailureRenderer(this.claim, this.message);
+  const _OperationFailureRenderer(this.claim);
 
-  final IntentionInitiatorPresentationClaim? claim;
-  final String message;
+  final GraphInitiatorPresentationClaim? claim;
 }
 
 final class _OperationFailurePresentationState
     extends ConsumerState<OperationFailurePresentation> {
   late final GraphCommandCoordinator _coordinator;
   late _OperationFailureRenderer _renderer;
-  IntentionInitiatorPresentationClaim? _confirmedClaim;
-  IntentionInitiatorPresentationClaim? _releasedClaim;
+  GraphInitiatorPresentationClaim? _confirmedClaim;
+  GraphInitiatorPresentationClaim? _releasedClaim;
 
   @override
   void initState() {
     super.initState();
     _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
-    _renderer = _OperationFailureRenderer(widget.claim, widget.message);
+    _renderer = _OperationFailureRenderer(widget.claim);
   }
 
   @override
   void didUpdateWidget(OperationFailurePresentation oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.claim, widget.claim) ||
-        oldWidget.message != widget.message) {
+    if (!identical(oldWidget.claim, widget.claim)) {
       _releaseIfPending(oldWidget.claim);
-      _renderer = _OperationFailureRenderer(widget.claim, widget.message);
+      _renderer = _OperationFailureRenderer(widget.claim);
     }
   }
 
@@ -104,7 +102,7 @@ final class _OperationFailurePresentationState
     _coordinator.confirmPresentation(claim);
   }
 
-  void _releaseIfPending(IntentionInitiatorPresentationClaim? claim) {
+  void _releaseIfPending(GraphInitiatorPresentationClaim? claim) {
     if (claim == null ||
         identical(claim, _confirmedClaim) ||
         identical(claim, _releasedClaim)) {
