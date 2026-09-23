@@ -1,4 +1,5 @@
 import '../../daily_choice/application/daily_choice_details.dart';
+import '../../daily_choice/application/choice_path_continuations.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
@@ -21,6 +22,19 @@ abstract interface class GraphCommandRepository {
 
 abstract interface class PersonalGraphRepository
     implements GraphCommandRepository {
+  /// Проверяет весь префикс и вычисляет продолжения на одном снимке графа.
+  /// Активное исходное намерение без шагов допустимо. Изменённый, архивный или
+  /// утративший связность префикс возвращает конфликт, а отсутствующее текущее
+  /// намерение — отдельный отказ. Результат содержит актуальные данные конца,
+  /// возможность его подтвердить и порцию активных достижимых переходов.
+  /// Порядок: «нужно», затем «можно»; внутри группы P1–P4 и порядок создания.
+  /// Чужой курсор или курсор другого запроса — ошибка ввода; смена ревизии или
+  /// эпохи курсора — конфликт с требованием начать чтение с новой основы.
+  /// Ошибка чтения не заменяется пустым набором. SQL остаётся внутри модуля.
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  );
+
   /// Возвращает null в снимке, если выбор отсутствует на момент чтения.
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id);
 
