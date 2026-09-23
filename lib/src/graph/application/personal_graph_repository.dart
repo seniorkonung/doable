@@ -1,4 +1,5 @@
 import '../../daily_choice/application/daily_choice_details.dart';
+import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../daily_choice/application/choice_path_continuations.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -40,6 +41,15 @@ abstract interface class PersonalGraphRepository
 
   /// Наблюдает выбор вместе с текущими данными участников и связей его пути.
   Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id);
+
+  /// Возвращает ограниченную порцию проверенных дневных выборов и точное
+  /// количество на одной ревизии для первой порции. По умолчанию доступны все
+  /// даты и оба состояния. Порядок: дата по убыванию, затем порядок создания
+  /// по убыванию; технический ключ остаётся внутри adapter.
+  /// Чужое продолжение даёт отказ ввода, смена эпохи или ревизии — конфликт.
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  );
 
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
