@@ -4,11 +4,13 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -28,6 +30,112 @@ import '../../long_term_relation/presentation/neighborhood/neighborhood_test_sup
     hide testRelationCounts;
 
 void main() {
+  testWidgets('верхний обход открывается из активного намерения', (
+    tester,
+  ) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final router = AppRouter();
+    addTearDown(router.dispose);
+    final sourceId = testIntentionId(51);
+    final relatedId = testIntentionId(52);
+
+    await _pumpRouter(tester, repository, router);
+    unawaited(router.push(IntentionDetailsRoute(intentionId: sourceId)));
+    await _settleNeighborhood(
+      tester,
+      repository,
+      expectedWatches: 2,
+      expectedQueries: 1,
+    );
+    const revision = TestGraphRevision(1);
+    final source = testNeighborhoodIntention(id: sourceId, title: 'Действие');
+    repository.emitIntention(
+      Intention(
+        id: source.id,
+        title: source.title,
+        description: source.description,
+        readiness: IntentionReadiness.ready,
+        archiveState: source.archiveState,
+        createdAt: source.createdAt,
+        updatedAt: source.updatedAt,
+      ),
+      counts: testRelationCounts(activeNeedOutgoing: 1),
+      revision: revision,
+    );
+    repository.completeGroupPage(
+      0,
+      RelationGroupFirstPage(
+        items: [
+          _row(
+            relationId: testRelationId(51),
+            sourceId: sourceId,
+            relatedId: relatedId,
+            sourceTitle: 'Действие',
+            relatedTitle: 'Другое действие',
+          ),
+        ],
+        counts: testRelationCounts(activeNeedOutgoing: 1),
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final open = find.byKey(const ValueKey('intention-details-choose-path'));
+    expect(open, findsOneWidget);
+    await tester.ensureVisible(open);
+    await tester.tap(open);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    expect(router.current.name, ChoicePathRoute.name);
+    expect(
+      router.current.argsAs<ChoicePathRouteArgs>().sourceIntentionId,
+      sourceId,
+    );
+    expect(find.byType(ChoicePathPage), findsOneWidget);
+  });
+
+  testWidgets('архивное намерение не предлагает верхний обход', (tester) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final router = AppRouter();
+    addTearDown(router.dispose);
+    final sourceId = testIntentionId(53);
+
+    await _pumpRouter(tester, repository, router);
+    unawaited(router.push(IntentionDetailsRoute(intentionId: sourceId)));
+    await _settleNeighborhood(
+      tester,
+      repository,
+      expectedWatches: 2,
+      expectedQueries: 1,
+    );
+    const revision = TestGraphRevision(1);
+    repository.emitIntention(
+      testNeighborhoodIntention(
+        id: sourceId,
+        archiveState: IntentionArchiveState.archived,
+      ),
+      counts: testRelationCounts(),
+      revision: revision,
+    );
+    repository.completeGroupPage(
+      0,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: testRelationCounts(),
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('intention-details-choose-path')),
+      findsNothing,
+    );
+  });
+
   testWidgets(
     'открывает начальный каталог через сгенерированный PageRouteInfo',
     (tester) async {

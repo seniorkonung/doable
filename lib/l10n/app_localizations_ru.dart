@@ -1187,4 +1187,93 @@ class AppLocalizationsRu extends AppLocalizations {
   String relationEditorPriorityOption(String priority) {
     return 'Приоритет $priority';
   }
+
+  @override
+  String get detailsChoosePathAction => 'Выбрать действие по пути';
+
+  @override
+  String get choicePathTitle => 'Выбор пути к действию';
+
+  @override
+  String get choicePathDirection => 'Путь от исходного намерения к действию';
+
+  @override
+  String choicePathSource(String source) {
+    return 'Исходное намерение: $source';
+  }
+
+  @override
+  String get choicePathSourcePending => 'Загружаем исходное намерение…';
+
+  @override
+  String choicePathReturnTo(String source) {
+    return 'Вернуться к «$source»';
+  }
+
+  @override
+  String choicePathStepSemantics(int index, String phrase, String priority) {
+    return 'Шаг $index: $phrase. Приоритет $priority';
+  }
+
+  @override
+  String get choicePathActionSelected => 'Действие выбрано';
+
+  @override
+  String choicePathSelectAction(String action) {
+    return 'Выбрать действие «$action»';
+  }
+
+  @override
+  String get choicePathSelectionNotSaved => 'Связь «я сегодня» ещё не создана.';
+
+  @override
+  String get choicePathContinuations => 'Доступные продолжения';
+
+  @override
+  String get choicePathLoading => 'Проверяем доступные продолжения…';
+
+  @override
+  String get choicePathNoPath =>
+      'Из этого намерения сейчас нет допустимого пути к другому действию.';
+
+  @override
+  String get choicePathNoFurtherPath =>
+      'Дальнейших допустимых продолжений нет.';
+
+  @override
+  String get choicePathConflict =>
+      'Граф изменился. Актуализируйте путь перед дальнейшим выбором.';
+
+  @override
+  String get choicePathRefresh => 'Актуализировать путь';
+
+  @override
+  String get choicePathNotFound => 'Намерение пути больше не существует.';
+
+  @override
+  String get choicePathInvalid =>
+      'Не удалось проверить продолжения из-за неверного запроса.';
+
+  @override
+  String get choicePathUnavailable =>
+      'Продолжения временно недоступны. Повторите попытку.';
+
+  @override
+  String get choicePathCorruption =>
+      'Сохранённые данные пути повреждены. Продолжение недоступно.';
+
+  @override
+  String get choicePathUnexpected =>
+      'Не удалось проверить продолжения из-за непредвиденной ошибки.';
+
+  @override
+  String get choicePathLoadMore => 'Показать ещё продолжения';
+
+  @override
+  String get choicePathLoadingMore => 'Загружаем следующую порцию…';
+
+  @override
+  String choicePathContinueSemantics(String phrase, String priority) {
+    return 'Продолжить по связи: $phrase. Приоритет $priority';
+  }
 }

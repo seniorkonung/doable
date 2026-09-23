@@ -1435,7 +1435,8 @@ void main() {
       expect(find.text(busyMessage), findsOneWidget);
 
       final delete = find.byKey(const ValueKey('intention-details-delete'));
-      await tester.ensureVisible(delete);
+      await Scrollable.ensureVisible(tester.element(delete), alignment: 0.3);
+      await tester.pumpAndSettle();
       await tester.tap(delete);
       await tester.pumpAndSettle();
       await tester.tap(

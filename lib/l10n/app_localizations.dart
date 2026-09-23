@@ -2076,6 +2076,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Priority {priority}'**
   String relationEditorPriorityOption(String priority);
+
+  /// Открыть верхний обход из активного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an action along a path'**
+  String get detailsChoosePathAction;
+
+  /// Заголовок верхнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a path to an action'**
+  String get choicePathTitle;
+
+  /// Направление верхнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Path from the source intention to an action'**
+  String get choicePathDirection;
+
+  /// Исходное намерение пути
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention: {source}'**
+  String choicePathSource(String source);
+
+  /// Загрузка исходного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the source intention…'**
+  String get choicePathSourcePending;
+
+  /// Возврат к выбранному префиксу пути
+  ///
+  /// In en, this message translates to:
+  /// **'Return to “{source}”'**
+  String choicePathReturnTo(String source);
+
+  /// Семантика направленного шага пути
+  ///
+  /// In en, this message translates to:
+  /// **'Step {index}: {phrase}. Priority {priority}'**
+  String choicePathStepSemantics(int index, String phrase, String priority);
+
+  /// Состояние выбора достигнутого действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action selected'**
+  String get choicePathActionSelected;
+
+  /// Выбрать достигнутое действие
+  ///
+  /// In en, this message translates to:
+  /// **'Choose action “{action}”'**
+  String choicePathSelectAction(String action);
+
+  /// Выбор действия ещё не создаёт дневную связь
+  ///
+  /// In en, this message translates to:
+  /// **'The daily choice has not been created yet.'**
+  String get choicePathSelectionNotSaved;
+
+  /// Заголовок допустимых продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Available continuations'**
+  String get choicePathContinuations;
+
+  /// Загрузка допустимых продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Checking available continuations…'**
+  String get choicePathLoading;
+
+  /// Из исходного намерения нет допустимого пути
+  ///
+  /// In en, this message translates to:
+  /// **'There is no valid path from this intention to another action right now.'**
+  String get choicePathNoPath;
+
+  /// У достигнутого шага нет продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'There are no further valid continuations.'**
+  String get choicePathNoFurtherPath;
+
+  /// Устаревший префикс пути
+  ///
+  /// In en, this message translates to:
+  /// **'The graph has changed. Refresh the path before continuing.'**
+  String get choicePathConflict;
+
+  /// Актуализировать путь после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh path'**
+  String get choicePathRefresh;
+
+  /// Намерение пути отсутствует
+  ///
+  /// In en, this message translates to:
+  /// **'An intention on this path no longer exists.'**
+  String get choicePathNotFound;
+
+  /// Недопустимый запрос продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Continuations could not be checked because of an invalid request.'**
+  String get choicePathInvalid;
+
+  /// Временная недоступность продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Continuations are temporarily unavailable. Try again.'**
+  String get choicePathUnavailable;
+
+  /// Повреждение данных пути
+  ///
+  /// In en, this message translates to:
+  /// **'Saved path data is damaged. Continuation is unavailable.'**
+  String get choicePathCorruption;
+
+  /// Неизвестная ошибка чтения продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Continuations could not be checked because of an unexpected error.'**
+  String get choicePathUnexpected;
+
+  /// Загрузить следующую порцию продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Show more continuations'**
+  String get choicePathLoadMore;
+
+  /// Загрузка следующей порции продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the next page…'**
+  String get choicePathLoadingMore;
+
+  /// Доступная связь для следующего шага
+  ///
+  /// In en, this message translates to:
+  /// **'Continue along relation: {phrase}. Priority {priority}'**
+  String choicePathContinueSemantics(String phrase, String priority);
 }
 
 class _AppLocalizationsDelegate
