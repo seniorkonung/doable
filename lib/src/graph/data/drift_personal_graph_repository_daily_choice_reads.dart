@@ -2,6 +2,10 @@ part of 'drift_personal_graph_repository.dart';
 
 extension _DailyChoiceReading on DriftPersonalGraphRepository {
   Future<DailyChoiceReadResult> _readDailyChoice(DailyChoiceId id) async {
+    final stopwatch = Stopwatch()..start();
+    _recordDiagnostics(
+      const DailyChoiceReadDiagnosticsEvent(status: DiagnosticsStarted()),
+    );
     try {
       final snapshot = await _sequencer.run(
         () => _database.transaction(
@@ -11,17 +15,31 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
           ),
         ),
       );
+      _recordDiagnostics(
+        DailyChoiceReadDiagnosticsEvent(
+          status: DiagnosticsSucceeded(stopwatch.elapsed),
+        ),
+      );
       return DailyChoiceReadSuccess(snapshot);
     } on Object catch (error) {
-      if (error is _StoredIntentionCorruption) {
-        return const DailyChoiceReadError(DailyChoiceReadCorruptionFailure());
-      }
-      final failure = switch (classifySqliteFailure(error)) {
-        SqliteCorruptionFailure() => const DailyChoiceReadCorruptionFailure(),
-        SqliteUnavailableFailure() => const DailyChoiceReadUnavailableFailure(),
-        SqliteConstraintFailure() ||
-        SqliteUnexpectedFailure() => const DailyChoiceReadUnexpectedFailure(),
-      };
+      final failure = error is _StoredIntentionCorruption
+          ? const DailyChoiceReadCorruptionFailure()
+          : switch (classifySqliteFailure(error)) {
+              SqliteCorruptionFailure() =>
+                const DailyChoiceReadCorruptionFailure(),
+              SqliteUnavailableFailure() =>
+                const DailyChoiceReadUnavailableFailure(),
+              SqliteConstraintFailure() || SqliteUnexpectedFailure() =>
+                const DailyChoiceReadUnexpectedFailure(),
+            };
+      _recordDiagnostics(
+        DailyChoiceReadDiagnosticsEvent(
+          status: DiagnosticsFailed(
+            duration: stopwatch.elapsed,
+            code: _graphCommandDiagnosticsFailureCode(failure),
+          ),
+        ),
+      );
       return DailyChoiceReadError(failure);
     }
   }

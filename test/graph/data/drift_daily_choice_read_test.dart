@@ -6,6 +6,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -22,9 +23,11 @@ void main() {
   late sqlite.Database raw;
   late DriftPersonalGraphRepository repository;
   late _ReadProbe probe;
+  late InMemoryDiagnosticsSink diagnostics;
 
   setUp(() async {
     probe = _ReadProbe();
+    diagnostics = InMemoryDiagnosticsSink();
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(setup: (db) => raw = db),
@@ -36,7 +39,7 @@ void main() {
       database,
       UuidV7IntentionIdGenerator(),
       () => DateTime.utc(2026, 9, 23),
-      InMemoryDiagnosticsSink(),
+      diagnostics,
     );
   });
 
@@ -128,6 +131,13 @@ void main() {
 
       final result = await repository.getDailyChoice(_choiceId(201));
       expect(result, isA<DailyChoiceReadSuccess>());
+      expect(
+        diagnostics.events
+            .whereType<DailyChoiceReadDiagnosticsEvent>()
+            .last
+            .status,
+        isA<DiagnosticsSucceeded>(),
+      );
       final details = (result as DailyChoiceReadSuccess).value.value!;
       expect(details.choice.description!.value, ' Выбор ');
       expect(details.choice.isCompleted, isTrue);
@@ -176,6 +186,15 @@ void main() {
         GraphFailureCategory.corruption,
       ),
     );
+    expect(
+      (diagnostics.events
+                  .whereType<DailyChoiceReadDiagnosticsEvent>()
+                  .last
+                  .status
+              as DiagnosticsFailed)
+          .code,
+      DiagnosticsFailureCode.corruption,
+    );
   });
 
   test('различает временную недоступность и неизвестный отказ', () async {
@@ -191,6 +210,15 @@ void main() {
         GraphFailureCategory.unavailable,
       ),
     );
+    expect(
+      (diagnostics.events
+                  .whereType<DailyChoiceReadDiagnosticsEvent>()
+                  .last
+                  .status
+              as DiagnosticsFailed)
+          .code,
+      DiagnosticsFailureCode.unavailable,
+    );
     probe.failure = StateError('неизвестный отказ');
     expect(
       await repository.getDailyChoice(_choiceId(201)),
@@ -199,6 +227,15 @@ void main() {
         'категория',
         GraphFailureCategory.unexpected,
       ),
+    );
+    expect(
+      (diagnostics.events
+                  .whereType<DailyChoiceReadDiagnosticsEvent>()
+                  .last
+                  .status
+              as DiagnosticsFailed)
+          .code,
+      DiagnosticsFailureCode.unexpected,
     );
   });
 

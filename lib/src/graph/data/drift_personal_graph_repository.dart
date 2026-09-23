@@ -4,6 +4,9 @@ import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
 import '../../daily_choice/application/daily_choice_details.dart';
+import '../../daily_choice/application/daily_choice_command.dart';
+import '../../daily_choice/application/daily_choice_id_generator.dart';
+import '../../daily_choice/application/daily_choice_result.dart';
 import '../../daily_choice/domain/calendar_date.dart';
 import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
@@ -42,6 +45,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 part 'drift_daily_choice_path_validation.dart';
 part 'drift_personal_graph_repository_daily_choice_reads.dart';
+part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_blocking_relations.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
@@ -55,14 +59,22 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     this._now,
     this._diagnosticsSink, {
     LongTermRelationIdGenerator? relationIdGenerator,
+    DailyChoiceIdGenerator? dailyChoiceIdGenerator,
+    ChoicePathStepIdGenerator? choicePathStepIdGenerator,
   }) : _relationIdGenerator =
-           relationIdGenerator ?? UuidV7LongTermRelationIdGenerator();
+           relationIdGenerator ?? UuidV7LongTermRelationIdGenerator(),
+       _dailyChoiceIdGenerator =
+           dailyChoiceIdGenerator ?? UuidV7DailyChoiceIdGenerator(),
+       _choicePathStepIdGenerator =
+           choicePathStepIdGenerator ?? UuidV7ChoicePathStepIdGenerator();
 
   final local.AppDatabase _database;
   final IntentionIdGenerator _idGenerator;
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
   final LongTermRelationIdGenerator _relationIdGenerator;
+  final DailyChoiceIdGenerator _dailyChoiceIdGenerator;
+  final ChoicePathStepIdGenerator _choicePathStepIdGenerator;
   final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
@@ -350,6 +362,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         await _executeLongTermRelation(relationCommand),
       final DeleteBlockingRelations deleteCommand =>
         await _executeDeleteBlockingRelations(deleteCommand),
+      final DailyChoiceCommand dailyChoiceCommand => await _executeDailyChoice(
+        dailyChoiceCommand,
+      ),
       _ => throw UnsupportedError(
         'Команда не поддерживается модулем личного графа.',
       ),
