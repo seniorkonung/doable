@@ -743,6 +743,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationRelation => 'relation';
 
   @override
+  String get graphOperationDailyChoice => 'daily choice';
+
+  @override
+  String get dailyChoiceOperationSucceeded => 'Daily choice change saved.';
+
+  @override
+  String get dailyChoiceOperationInvalid => 'Check the daily choice details.';
+
+  @override
+  String get dailyChoiceOperationNotFound =>
+      'This daily choice no longer exists.';
+
+  @override
+  String get dailyChoiceOperationConflict =>
+      'The data changed. Refresh the daily choice and confirm again.';
+
+  @override
+  String get dailyChoiceOperationUnavailable =>
+      'Could not save the daily choice. Try again.';
+
+  @override
+  String get dailyChoiceOperationCorruption =>
+      'Stored data is damaged. The daily choice was not changed.';
+
+  @override
+  String get dailyChoiceOperationUnexpected =>
+      'Could not change the daily choice because of an unexpected error.';
+
+  @override
   String get relationEditorCreated => 'Relation created.';
 
   @override

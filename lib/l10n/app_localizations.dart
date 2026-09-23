@@ -1328,6 +1328,54 @@ abstract class AppLocalizations {
   /// **'relation'**
   String get graphOperationRelation;
 
+  /// Безопасное обозначение дневного выбора в сообщении операции
+  ///
+  /// In en, this message translates to:
+  /// **'daily choice'**
+  String get graphOperationDailyChoice;
+
+  /// Подтверждение сохранения изменения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice change saved.'**
+  String get dailyChoiceOperationSucceeded;
+
+  /// Ошибка проверки данных дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the daily choice details.'**
+  String get dailyChoiceOperationInvalid;
+
+  /// Дневной выбор отсутствует при выполнении команды
+  ///
+  /// In en, this message translates to:
+  /// **'This daily choice no longer exists.'**
+  String get dailyChoiceOperationNotFound;
+
+  /// Конфликт актуальности дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'The data changed. Refresh the daily choice and confirm again.'**
+  String get dailyChoiceOperationConflict;
+
+  /// Временная недоступность при сохранении дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the daily choice. Try again.'**
+  String get dailyChoiceOperationUnavailable;
+
+  /// Повреждение данных дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The daily choice was not changed.'**
+  String get dailyChoiceOperationCorruption;
+
+  /// Неожиданный отказ команды дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Could not change the daily choice because of an unexpected error.'**
+  String get dailyChoiceOperationUnexpected;
+
   /// Подтверждение успешного создания долговременной связи
   ///
   /// In en, this message translates to:
