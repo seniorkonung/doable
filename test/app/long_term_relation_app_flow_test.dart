@@ -3,6 +3,8 @@ import 'package:doable/src/graph/application/selected_relations.dart';
 import 'dart:async';
 import 'dart:ui' show CheckedState, Tristate;
 
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/main.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -1879,6 +1881,12 @@ String _textByKey(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
 final class _DelayedRelationRepository implements PersonalGraphRepository {
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
   @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,

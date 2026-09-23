@@ -1,0 +1,217 @@
+part of 'drift_personal_graph_repository.dart';
+
+extension _DailyChoiceReading on DriftPersonalGraphRepository {
+  Future<DailyChoiceReadResult> _readDailyChoice(DailyChoiceId id) async {
+    try {
+      final snapshot = await _sequencer.run(
+        () => _database.transaction(
+          () async => GraphSnapshot(
+            value: await _readVerifiedDailyChoice(id),
+            revision: _currentRevision,
+          ),
+        ),
+      );
+      return DailyChoiceReadSuccess(snapshot);
+    } on Object catch (error) {
+      if (error is _StoredIntentionCorruption) {
+        return const DailyChoiceReadError(DailyChoiceReadCorruptionFailure());
+      }
+      final failure = switch (classifySqliteFailure(error)) {
+        SqliteCorruptionFailure() => const DailyChoiceReadCorruptionFailure(),
+        SqliteUnavailableFailure() => const DailyChoiceReadUnavailableFailure(),
+        SqliteConstraintFailure() ||
+        SqliteUnexpectedFailure() => const DailyChoiceReadUnexpectedFailure(),
+      };
+      return DailyChoiceReadError(failure);
+    }
+  }
+
+  /// Вызывать только внутри транзакции общего исполнителя графа.
+  Future<DailyChoiceDetails?> _readVerifiedDailyChoice(DailyChoiceId id) async {
+    final choiceRow = await _database
+        .customSelect(
+          '''SELECT creation_sequence, id, source_intention_id,
+                selected_intention_id, choice_date, description, is_completed
+         FROM daily_choices WHERE id = ?''',
+          variables: [Variable<String>(id.toCanonicalString())],
+          readsFrom: {_database.dailyChoices},
+        )
+        .getSingleOrNull();
+    if (choiceRow == null) return null;
+    final choice = _decodeStoredDailyChoice(choiceRow, id);
+
+    final stepRows = await _database
+        .customSelect(
+          '''SELECT id, daily_choice_id, long_term_relation_id, previous_step_id
+         FROM daily_choice_path_steps WHERE daily_choice_id = ?''',
+          variables: [Variable<String>(id.toCanonicalString())],
+          readsFrom: {_database.dailyChoicePathSteps},
+        )
+        .get();
+    final steps = [for (final row in stepRows) _decodeStoredChoiceStep(row)];
+    if (steps.isEmpty) throw const _StoredIntentionCorruption();
+
+    final relationIds = steps.map((step) => step.relationId).toSet();
+    final orderedRelationIds = relationIds.toList();
+    final relations = <LongTermRelationId, _StoredRelationGroupRow>{};
+    for (var start = 0; start < orderedRelationIds.length; start += 400) {
+      final batch = orderedRelationIds.skip(start).take(400).toList();
+      final rows = await _database
+          .customSelect(
+            '''SELECT creation_sequence, id, source_intention_id,
+                  related_intention_id, type, priority, description, is_archived
+           FROM long_term_relations
+           WHERE id IN (${List.filled(batch.length, '?').join(',')})''',
+            variables: [
+              for (final relationId in batch)
+                Variable<String>(relationId.toCanonicalString()),
+            ],
+            readsFrom: {_database.longTermRelations},
+          )
+          .get();
+      for (final row in rows) {
+        final stored = _StoredRelationGroupRow.fromRawRow(row);
+        if (!relationIds.contains(stored.id) ||
+            relations.containsKey(stored.id)) {
+          throw const _StoredIntentionCorruption();
+        }
+        relations[stored.id] = stored;
+      }
+    }
+    if (relations.length != relationIds.length) {
+      throw const _StoredIntentionCorruption();
+    }
+
+    final intentionIds = <IntentionId>{
+      choice.sourceIntentionId,
+      choice.selectedIntentionId,
+      for (final relation in relations.values) ...[
+        relation.sourceIntentionId,
+        relation.relatedIntentionId,
+      ],
+    };
+    final orderedIntentionIds = intentionIds.toList();
+    final intentions = <IntentionId, domain.Intention>{};
+    for (var start = 0; start < orderedIntentionIds.length; start += 400) {
+      final batch = orderedIntentionIds.skip(start).take(400).toList();
+      final rows = await _database
+          .customSelect(
+            '''SELECT id, title, description, is_action_ready, is_archived,
+                  created_at, updated_at FROM intentions
+           WHERE id IN (${List.filled(batch.length, '?').join(',')})''',
+            variables: [
+              for (final intentionId in batch)
+                Variable<String>(intentionId.toCanonicalString()),
+            ],
+            readsFrom: {_database.intentions},
+          )
+          .get();
+      for (final row in rows) {
+        final intention = _rehydrateDetailRow(row);
+        if (!intentionIds.contains(intention.id) ||
+            intentions.containsKey(intention.id)) {
+          throw const _StoredIntentionCorruption();
+        }
+        intentions[intention.id] = intention;
+      }
+    }
+    if (intentions.length != intentionIds.length) {
+      throw const _StoredIntentionCorruption();
+    }
+    final path = _validateStoredChoicePath(
+      choice: choice,
+      steps: steps,
+      relations: relations,
+      intentions: intentions,
+    );
+    return DailyChoiceDetails(
+      choice: choice,
+      source: intentions[choice.sourceIntentionId]!,
+      selected: intentions[choice.selectedIntentionId]!,
+      path: path,
+    );
+  }
+}
+
+DailyChoice _decodeStoredDailyChoice(QueryRow row, DailyChoiceId requestedId) {
+  final data = row.data;
+  if (_requiredStoredInteger(data, 'creation_sequence') <= 0) {
+    throw const _StoredIntentionCorruption();
+  }
+  final id = switch (DailyChoiceId.decode(_requiredStoredString(data, 'id'))) {
+    DailyChoiceIdDecodingSuccess(:final id) => id,
+    InvalidDailyChoiceIdDecoding() => throw const _StoredIntentionCorruption(),
+  };
+  if (id != requestedId) throw const _StoredIntentionCorruption();
+  final sourceId = _decodeStoredRelationIntentionId(
+    _requiredStoredString(data, 'source_intention_id'),
+  );
+  final selectedId = _decodeStoredRelationIntentionId(
+    _requiredStoredString(data, 'selected_intention_id'),
+  );
+  final description = data['description'];
+  if (description != null && description is! String) {
+    throw const _StoredIntentionCorruption();
+  }
+  final completed = switch (_requiredStoredInteger(data, 'is_completed')) {
+    0 => false,
+    1 => true,
+    _ => throw const _StoredIntentionCorruption(),
+  };
+  try {
+    return DailyChoice(
+      id: id,
+      sourceIntentionId: sourceId,
+      selectedIntentionId: selectedId,
+      date: CalendarDate.parseCanonical(
+        _requiredStoredString(data, 'choice_date'),
+      ),
+      description: description == null
+          ? null
+          : DailyChoiceDescription.fromStored(description),
+      isCompleted: completed,
+    );
+  } on CalendarDateValidationException catch (_) {
+    throw const _StoredIntentionCorruption();
+  } on DailyChoiceDescriptionValidationException catch (_) {
+    throw const _StoredIntentionCorruption();
+  } on ArgumentError catch (_) {
+    throw const _StoredIntentionCorruption();
+  }
+}
+
+ChoicePathStep _decodeStoredChoiceStep(QueryRow row) {
+  final data = row.data;
+  final id = switch (ChoicePathStepId.decode(
+    _requiredStoredString(data, 'id'),
+  )) {
+    ChoicePathStepIdDecodingSuccess(:final id) => id,
+    InvalidChoicePathStepIdDecoding() =>
+      throw const _StoredIntentionCorruption(),
+  };
+  final owner = switch (DailyChoiceId.decode(
+    _requiredStoredString(data, 'daily_choice_id'),
+  )) {
+    DailyChoiceIdDecodingSuccess(:final id) => id,
+    InvalidDailyChoiceIdDecoding() => throw const _StoredIntentionCorruption(),
+  };
+  final previousRaw = data['previous_step_id'];
+  if (previousRaw != null && previousRaw is! String) {
+    throw const _StoredIntentionCorruption();
+  }
+  final previous = previousRaw == null
+      ? null
+      : switch (ChoicePathStepId.decode(previousRaw)) {
+          ChoicePathStepIdDecodingSuccess(:final id) => id,
+          InvalidChoicePathStepIdDecoding() =>
+            throw const _StoredIntentionCorruption(),
+        };
+  return ChoicePathStep(
+    id: id,
+    dailyChoiceId: owner,
+    relationId: _decodeStoredRelationId(
+      _requiredStoredString(data, 'long_term_relation_id'),
+    ),
+    previousStepId: previous,
+  );
+}
