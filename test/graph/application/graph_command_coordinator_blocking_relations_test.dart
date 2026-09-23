@@ -305,8 +305,10 @@ GraphCommandCoordinator _coordinator(PersonalGraphRepository repository) {
 DeleteBlockingRelations _delete(
   IntentionId intentionId,
   Set<LongTermRelationId> relationIds,
-) =>
-    DeleteBlockingRelations(intentionId: intentionId, relationIds: relationIds);
+) => DeleteBlockingRelations.longTerm(
+  intentionId: intentionId,
+  relationIds: relationIds,
+);
 
 final class _ControlledRepository implements PersonalGraphRepository {
   @override

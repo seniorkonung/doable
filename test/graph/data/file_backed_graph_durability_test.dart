@@ -321,7 +321,7 @@ void main() {
       observer.arm();
 
       final result = await _repository(database, const []).execute(
-        DeleteBlockingRelations(
+        DeleteBlockingRelations.longTerm(
           intentionId: _sourceId,
           relationIds: LargeBlockingRelationsFixture.selectedIds,
         ),

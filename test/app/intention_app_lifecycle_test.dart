@@ -231,7 +231,7 @@ void main() {
       await _openDetails(tester, repository, intentionA, requestIndex: 0);
 
       final accepted = runtime.commandCoordinator.acceptBlockingRelationsDelete(
-        DeleteBlockingRelations(
+        DeleteBlockingRelations.longTerm(
           intentionId: intentionA.id,
           relationIds: {_relationId},
         ),

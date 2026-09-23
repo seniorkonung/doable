@@ -306,7 +306,7 @@ void main() {
         BlockingRelationsDeleted,
         DeleteBlockingRelationsFailure
       >(
-        DeleteBlockingRelationsSelectionConflictFailure(
+        DeleteBlockingRelationsSelectionConflictFailure.longTerm(
           relationId: missing.relation.id,
           reason: BlockingRelationConflictReason.relationMissing,
         ),

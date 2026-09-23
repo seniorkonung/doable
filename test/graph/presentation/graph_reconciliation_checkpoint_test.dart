@@ -224,7 +224,7 @@ void main() {
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
-      final command = DeleteBlockingRelations(
+      final command = DeleteBlockingRelations.longTerm(
         intentionId: ids[0],
         relationIds: [selectedActive, selectedArchived],
       );

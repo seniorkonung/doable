@@ -19,7 +19,7 @@ final class BlockingRelationsPreparedSelection {
   }) {
     final rows = List<LongTermRelationSummary>.unmodifiable(selected.values);
     return BlockingRelationsPreparedSelection._(
-      command: DeleteBlockingRelations(
+      command: DeleteBlockingRelations.longTerm(
         intentionId: intentionId,
         relationIds: rows.map((row) => row.relation.id),
       ),
