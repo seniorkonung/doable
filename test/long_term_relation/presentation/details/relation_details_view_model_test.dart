@@ -4,6 +4,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -13,9 +14,83 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../neighborhood/neighborhood_test_support.dart';
+import '../daily_path_change_test_support.dart';
 import 'relation_details_test_support.dart';
 
 void main() {
+  test('дневные пути меняют разрешения без изменения строки связи', () async {
+    final harness = _RelationDetailsHarness();
+    addTearDown(harness.dispose);
+    final relation = testRelationDetails(
+      relationId: harness.relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+    );
+    harness.repository
+        .watchAt(0)
+        .emitDetails(relation, revision: const TestGraphRevision(1));
+    await pumpEventQueue();
+
+    final unrelated = testRelationDetails(
+      relationId: testRelationId(9),
+      sourceId: testIntentionId(3),
+      relatedId: testIntentionId(4),
+    ).relation;
+    for (final (number, created, permission) in [
+      (2, true, const LongTermRelationPermissions.referencedByDailyPath()),
+      (3, true, const LongTermRelationPermissions.referencedByDailyPath()),
+      (4, false, const LongTermRelationPermissions.referencedByDailyPath()),
+      (5, false, const LongTermRelationPermissions.unrestricted()),
+    ]) {
+      final start = harness.coordinator.acceptRelationUpdate(
+        UpdateLongTermRelation(
+          relationId: unrelated.id,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
+          ),
+        ),
+      );
+      final revision = TestGraphRevision(number);
+      harness.repository.completeRelationUpdate(
+        number - 2,
+        before: unrelated,
+        after: unrelated,
+        revision: revision,
+        additionalChanges: [
+          testDailyPathChange(
+            revision: revision,
+            relationId: relation.relation.id,
+            sourceId: relation.source.id,
+            selectedId: relation.related.id,
+            choiceNumber: created ? number : number - 2,
+            isCreated: created,
+            permissions: permission,
+          ),
+        ],
+      );
+      await (start as LongTermRelationCommandAccepted).future;
+      await pumpEventQueue();
+
+      final loaded = harness.state as RelationDetailsLoaded;
+      expect(loaded.permissions.canDelete, number == 5);
+      expect(loaded.permissions.canChangeMeaning, number == 5);
+      expect(loaded.permissions.canEditDescriptionAndPriority, isTrue);
+      expect(loaded.permissions.canChangeArchiveState, isTrue);
+      if (number == 2) {
+        harness.viewModel.delete();
+        expect(harness.repository.relationCommands, hasLength(1));
+        harness.repository
+            .watchAt(0)
+            .emitDetails(relation, revision: const TestGraphRevision(1));
+        await pumpEventQueue();
+        expect(
+          (harness.state as RelationDetailsLoaded).permissions.canDelete,
+          isFalse,
+        );
+      }
+    }
+  });
+
   test('открытие начинает наблюдение именно запрошенной связи', () async {
     final harness = _RelationDetailsHarness();
     addTearDown(harness.dispose);
