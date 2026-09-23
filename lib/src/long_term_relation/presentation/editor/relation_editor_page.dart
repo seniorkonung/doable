@@ -482,6 +482,8 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
           localizations.relationEditorCreateSameParticipants,
         RelationEditorRelationNotFound() =>
           localizations.relationEditorUpdateNotFound,
+        RelationEditorReferencedByDailyPath() =>
+          localizations.relationEditorUpdateReferencedByDailyPath,
         RelationEditorUnavailable() =>
           isEditing
               ? localizations.relationEditorUpdateUnavailable

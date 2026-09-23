@@ -86,6 +86,26 @@ extension _BlockingRelationsDeletion on DriftPersonalGraphRepository {
           ? start + batchSize
           : selected.length;
       final batch = selected.sublist(start, end);
+      final permissions = await _relationCountAggregates.readPermissions(
+        batch.map((relation) => relation.id),
+      );
+      for (final relation in batch) {
+        final permission = permissions[relation.id];
+        if (permission == null) throw const _StoredIntentionCorruption();
+        if (!permission.canDelete) {
+          throw DeleteBlockingRelationsSelectionConflictFailure(
+            relationId: relation.id,
+            reason: BlockingRelationConflictReason.deletionProhibited,
+          );
+        }
+      }
+    }
+
+    for (var start = 0; start < selected.length; start += batchSize) {
+      final end = start + batchSize < selected.length
+          ? start + batchSize
+          : selected.length;
+      final batch = selected.sublist(start, end);
       final placeholders = List.filled(batch.length, '?').join(', ');
       final deletedRows = await _database.customUpdate(
         'DELETE FROM long_term_relations WHERE id IN ($placeholders)',

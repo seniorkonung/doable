@@ -723,13 +723,20 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
               FROM long_term_relations
               WHERE source_intention_id = ? OR related_intention_id = ?
               LIMIT 1
+            ) OR EXISTS (
+              SELECT 1
+              FROM daily_choices
+              WHERE source_intention_id = ? OR selected_intention_id = ?
+              LIMIT 1
             ) AS has_blocking_relations
           ''',
           variables: [
             Variable<String>(serializedId),
             Variable<String>(serializedId),
+            Variable<String>(serializedId),
+            Variable<String>(serializedId),
           ],
-          readsFrom: {_database.longTermRelations},
+          readsFrom: {_database.longTermRelations, _database.dailyChoices},
         )
         .getSingle();
     return row.read<int>('has_blocking_relations') == 1;

@@ -866,6 +866,10 @@
   "@relationEditorUpdateParticipantArchived": {
     "description": "Конфликт архивного состояния участника при изменении активной связи"
   },
+  "relationEditorUpdateReferencedByDailyPath": "This relation is used by a saved daily path. Its type and participants can’t be changed.",
+  "@relationEditorUpdateReferencedByDailyPath": {
+    "description": "Конфликт изменения смысла используемой дневным путём связи"
+  },
   "relationEditorUpdateUnavailable": "The relation couldn’t be updated. Try again.",
   "@relationEditorUpdateUnavailable": {
     "description": "Устранимая недоступность изменения связи"
@@ -953,6 +957,10 @@
   "relationDeleteConflict": "The relation couldn’t be deleted because its current state conflicts with the operation.",
   "@relationDeleteConflict": {
     "description": "Конфликт актуального состояния при удалении связи"
+  },
+  "relationDeleteReferencedByDailyPath": "This relation is used by a saved daily path. Delete or replace the daily choices that use it first.",
+  "@relationDeleteReferencedByDailyPath": {
+    "description": "Конфликт удаления используемой дневным путём связи"
   },
   "relationDeleteUnavailable": "The relation couldn’t be deleted. Try again.",
   "@relationDeleteUnavailable": {

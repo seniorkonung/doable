@@ -797,6 +797,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Активная связь может соединять только активные намерения.';
 
   @override
+  String get relationEditorUpdateReferencedByDailyPath =>
+      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить.';
+
+  @override
   String get relationEditorUpdateUnavailable =>
       'Не удалось изменить связь. Повторите попытку.';
 
@@ -877,6 +881,10 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationDeleteConflict =>
       'Связь не удалось удалить из-за конфликта актуального состояния.';
+
+  @override
+  String get relationDeleteReferencedByDailyPath =>
+      'Связь используется в сохранённом дневном пути. Сначала удалите или замените использующие её дневные выборы.';
 
   @override
   String get relationDeleteUnavailable =>

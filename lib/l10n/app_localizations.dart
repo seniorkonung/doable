@@ -1412,6 +1412,12 @@ abstract class AppLocalizations {
   /// **'An active relation can only link active intentions.'**
   String get relationEditorUpdateParticipantArchived;
 
+  /// Конфликт изменения смысла используемой дневным путём связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used by a saved daily path. Its type and participants can’t be changed.'**
+  String get relationEditorUpdateReferencedByDailyPath;
+
   /// Устранимая недоступность изменения связи
   ///
   /// In en, this message translates to:
@@ -1543,6 +1549,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The relation couldn’t be deleted because its current state conflicts with the operation.'**
   String get relationDeleteConflict;
+
+  /// Конфликт удаления используемой дневным путём связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used by a saved daily path. Delete or replace the daily choices that use it first.'**
+  String get relationDeleteReferencedByDailyPath;
 
   /// Устранимая недоступность удаления связи
   ///

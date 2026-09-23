@@ -433,6 +433,49 @@ void main() {
       expect(patch.description, isA<LongTermRelationDescriptionUnchanged>());
     });
 
+    test(
+      'конфликт пути сохраняет черновик и допускает правку прежнего смысла',
+      () async {
+        final harness = _EditorHarness.editing(testEditorRelationDetails());
+
+        harness.viewModel
+          ..selectType(LongTermRelationType.can)
+          ..selectPriority(RelationPriority.p4)
+          ..submit();
+        harness.repository.failRelationCommand(
+          0,
+          LongTermRelationReferencedByDailyPathFailure(testRelationId(1)),
+        );
+        await harness.settle();
+
+        expect(
+          harness.state.operation,
+          isA<RelationEditorFailed>().having(
+            (operation) => operation.failure,
+            'конфликт',
+            isA<RelationEditorReferencedByDailyPath>(),
+          ),
+        );
+        expect(harness.state.canSubmit, isFalse);
+
+        harness.viewModel
+          ..selectType(LongTermRelationType.need)
+          ..submit();
+
+        expect(harness.repository.commandCount, 2);
+        final patch = harness.repository.updateCommandAt(1).patch;
+        expect(patch.type, isA<LongTermRelationFieldUnchanged>());
+        expect(
+          patch.priority,
+          isA<LongTermRelationFieldSet<RelationPriority>>().having(
+            (field) => field.value,
+            'приоритет',
+            RelationPriority.p4,
+          ),
+        );
+      },
+    );
+
     test('отказ сохраняет обе ссылки, а исправленная отправка получает новый token', () async {
       final harness = _EditorHarness.editing(testEditorRelationDetails());
       final tokens = <LongTermRelationOperationToken>[];
