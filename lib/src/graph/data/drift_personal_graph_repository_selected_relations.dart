@@ -96,6 +96,23 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
       participantIds,
       knownActiveCounts: const {},
     );
+    final permissions = <LongTermRelationId, LongTermRelationPermissions>{};
+    const permissionBatchSize = 400;
+    final presentIds = present.keys.toList(growable: false);
+    for (
+      var start = 0;
+      start < presentIds.length;
+      start += permissionBatchSize
+    ) {
+      final end = start + permissionBatchSize < presentIds.length
+          ? start + permissionBatchSize
+          : presentIds.length;
+      permissions.addAll(
+        await _relationCountAggregates.readPermissions(
+          presentIds.sublist(start, end),
+        ),
+      );
+    }
     final entries = <LongTermRelationId, SelectedRelationEntry>{};
     for (final id in query.relationIds) {
       final row = present[id];
@@ -116,6 +133,8 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
               participants[relation.relatedIntentionId] ??
               (throw const _StoredIntentionCorruption()),
           description: row.description,
+          permissions:
+              permissions[id] ?? (throw const _StoredIntentionCorruption()),
         ),
       );
     }

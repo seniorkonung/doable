@@ -1,5 +1,6 @@
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/relation_counts.dart';
+import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/domain/long_term_relation.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import 'graph_revision.dart';
@@ -23,17 +24,21 @@ sealed class LongTermRelationChange implements GraphChange {
   LongTermRelationId get id;
   LongTermRelation? get before;
   LongTermRelation? get after;
+  LongTermRelationPermissions? get permissions;
 }
 
 final class LongTermRelationCreatedChange extends LongTermRelationChange {
   const LongTermRelationCreatedChange({
     required this.revision,
     required this.relation,
+    this.permissions = const LongTermRelationPermissions.unknown(),
   });
 
   @override
   final GraphRevision revision;
   final LongTermRelation relation;
+  @override
+  final LongTermRelationPermissions permissions;
 
   @override
   LongTermRelationId get id => relation.id;
@@ -58,6 +63,8 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
     required GraphRevision revision,
     required LongTermRelation before,
     required LongTermRelation after,
+    LongTermRelationPermissions permissions =
+        const LongTermRelationPermissions.unknown(),
   }) {
     if (before.id != after.id) {
       throw const LongTermRelationChangeValidationException(
@@ -68,6 +75,7 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
       revision: revision,
       before: before,
       after: after,
+      permissions: permissions,
     );
   }
 
@@ -75,6 +83,7 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
     required this.revision,
     required this.before,
     required this.after,
+    required this.permissions,
   });
 
   @override
@@ -85,6 +94,8 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
 
   @override
   final LongTermRelation after;
+  @override
+  final LongTermRelationPermissions permissions;
 
   @override
   LongTermRelationId get id => after.id;
@@ -94,12 +105,15 @@ final class LongTermRelationUnchangedChange extends LongTermRelationChange {
   const LongTermRelationUnchangedChange({
     required this.revision,
     required this.relation,
+    this.permissions = const LongTermRelationPermissions.unknown(),
   });
 
   @override
   final GraphRevision revision;
 
   final LongTermRelation relation;
+  @override
+  final LongTermRelationPermissions permissions;
 
   @override
   LongTermRelationId get id => relation.id;
@@ -129,4 +143,6 @@ final class LongTermRelationDeletedChange extends LongTermRelationChange {
 
   @override
   LongTermRelation? get after => null;
+  @override
+  LongTermRelationPermissions? get permissions => null;
 }

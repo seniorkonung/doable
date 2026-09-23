@@ -21,6 +21,7 @@ import '../../intention/domain/intention_text.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/application/long_term_relation_id_generator.dart';
 import '../../long_term_relation/application/long_term_relation_projection.dart';
+import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/application/relation_group_page.dart';
 import '../../long_term_relation/domain/long_term_relation.dart'
@@ -329,6 +330,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     }
     return Map.unmodifiable(counts);
   }
+
+  Future<LongTermRelationPermissions> _readRelationPermissions(
+    LongTermRelationId id,
+  ) async =>
+      (await _relationCountAggregates.readPermissions([id]))[id] ??
+      (throw const _StoredIntentionCorruption());
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

@@ -122,6 +122,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       relation: created,
       description: command.description,
       affectedCounts: affectedCounts,
+      permissions: const LongTermRelationPermissions.unrestricted(),
     );
   }
 
@@ -195,6 +196,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         relation: after,
         description: description,
         affectedCounts: const {},
+        permissions: await _readRelationPermissions(before.id),
         didMutate: false,
       );
     }
@@ -264,6 +266,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       relation: verifiedAfter,
       description: storedAfter.description,
       affectedCounts: affectedCounts,
+      permissions: await _readRelationPermissions(verifiedAfter.id),
       didMutate: true,
     );
   }
@@ -306,6 +309,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         relation: after,
         description: storedBefore.description,
         affectedCounts: const {},
+        permissions: await _readRelationPermissions(before.id),
         didMutate: false,
       );
     }
@@ -342,6 +346,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       relation: verifiedAfter,
       description: storedAfter.description,
       affectedCounts: affectedCounts,
+      permissions: await _readRelationPermissions(verifiedAfter.id),
       didMutate: true,
     );
   }
@@ -467,11 +472,13 @@ final class _CommittedLongTermRelationCreation
     required this.relation,
     required this.description,
     required Map<IntentionId, RelationCounts> affectedCounts,
+    required this.permissions,
   }) : affectedCounts = Map.unmodifiable(affectedCounts);
 
   final relation_domain.LongTermRelation relation;
   final LongTermRelationDescription? description;
   final Map<IntentionId, RelationCounts> affectedCounts;
+  final LongTermRelationPermissions permissions;
 
   @override
   bool get didMutate => true;
@@ -481,6 +488,7 @@ final class _CommittedLongTermRelationCreation
       LongTermRelationCreated(
         relation: relation,
         description: description,
+        permissions: permissions,
         changes: [
           for (final entry in affectedCounts.entries)
             IntentionRelationCountsChanged(
@@ -488,7 +496,11 @@ final class _CommittedLongTermRelationCreation
               intentionId: entry.key,
               counts: entry.value,
             ),
-          LongTermRelationCreatedChange(revision: revision, relation: relation),
+          LongTermRelationCreatedChange(
+            revision: revision,
+            relation: relation,
+            permissions: permissions,
+          ),
         ],
       );
 }
@@ -500,6 +512,7 @@ final class _CommittedLongTermRelationUpdate
     required this.relation,
     required this.description,
     required Map<IntentionId, RelationCounts> affectedCounts,
+    required this.permissions,
     required this.didMutate,
   }) : affectedCounts = Map.unmodifiable(affectedCounts);
 
@@ -507,6 +520,7 @@ final class _CommittedLongTermRelationUpdate
   final relation_domain.LongTermRelation relation;
   final LongTermRelationDescription? description;
   final Map<IntentionId, RelationCounts> affectedCounts;
+  final LongTermRelationPermissions permissions;
 
   @override
   final bool didMutate;
@@ -517,6 +531,7 @@ final class _CommittedLongTermRelationUpdate
         before: before,
         relation: relation,
         description: description,
+        permissions: permissions,
         changes: didMutate
             ? [
                 for (final entry in affectedCounts.entries)
@@ -529,12 +544,14 @@ final class _CommittedLongTermRelationUpdate
                   revision: revision,
                   before: before,
                   after: relation,
+                  permissions: permissions,
                 ),
               ]
             : [
                 LongTermRelationUnchangedChange(
                   revision: revision,
                   relation: relation,
+                  permissions: permissions,
                 ),
               ],
       );

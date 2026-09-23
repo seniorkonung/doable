@@ -406,10 +406,7 @@ void main() {
         'Купить молоко',
       ]);
       expect(page.items.last.hasDescription, isTrue);
-      expect(
-        trace.statements.where((statement) => statement.contains('COUNT(')),
-        hasLength(1),
-      );
+      expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
       expect(
         trace.statements.where((statement) => statement.contains('MATCH')),
         hasLength(2),
@@ -678,10 +675,7 @@ void main() {
       (result as ResultFailure<IntentionCatalogPage>).failure,
       isA<IntentionCorruptionFailure>(),
     );
-    expect(
-      trace.statements.where((statement) => statement.contains('COUNT(')),
-      hasLength(1),
-    );
+    expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
     expect(
       diagnostics.events.last,
       isA<CatalogPageReadDiagnosticsEvent>().having(
@@ -787,10 +781,7 @@ void main() {
         (result as ResultFailure<IntentionCatalogPage>).failure,
         isA<IntentionCorruptionFailure>(),
       );
-      expect(
-        trace.statements.where((statement) => statement.contains('COUNT(')),
-        isEmpty,
-      );
+      expect(trace.statements.where(_isCatalogCountStatement), isEmpty);
     },
   );
 
@@ -918,10 +909,7 @@ void main() {
         }
 
         expect(actualIds, expectedIds);
-        expect(
-          trace.statements.where((statement) => statement.contains('COUNT(')),
-          isEmpty,
-        );
+        expect(trace.statements.where(_isCatalogCountStatement), isEmpty);
         expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
       }
     },
@@ -1394,6 +1382,10 @@ void main() {
     );
   });
 }
+
+bool _isCatalogCountStatement(String statement) =>
+    statement.contains('COUNT(') &&
+    !statement.contains('doable_relation_count_aggregates');
 
 Future<void> _insertIntention(
   AppDatabase database, {

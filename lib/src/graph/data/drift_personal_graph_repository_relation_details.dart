@@ -102,6 +102,7 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
               participants[relation.relatedIntentionId] ??
               (throw const _StoredIntentionCorruption()),
           description: stored.description,
+          permissions: await _readRelationPermissions(relation.id),
         ),
         revision: _currentRevision,
       );

@@ -3,7 +3,9 @@ import 'package:drift/drift.dart';
 import '../../data/local/app_database.dart';
 import '../../data/local/sqlite_relation_integrity_functions.dart';
 import '../../intention/domain/intention_id.dart';
+import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/application/relation_counts.dart';
+import '../../long_term_relation/domain/long_term_relation_id.dart';
 
 final class RelationCountAggregate {
   const RelationCountAggregate({
@@ -38,7 +40,11 @@ final class DriftRelationCountAggregates {
             for (final serialized in requested.keys)
               Variable<String>(serialized),
           ],
-          readsFrom: {_database.intentions, _database.longTermRelations},
+          readsFrom: {
+            _database.intentions,
+            _database.longTermRelations,
+            _database.dailyChoices,
+          },
         )
         .get();
     final bySerializedId = <String, RelationCountAggregate>{
@@ -53,6 +59,8 @@ final class DriftRelationCountAggregates {
             archivedNeedOutgoing: row.read<int>('archived_need_outgoing'),
             archivedCanIncoming: row.read<int>('archived_can_incoming'),
             archivedCanOutgoing: row.read<int>('archived_can_outgoing'),
+            dailySource: row.read<int>('daily_source'),
+            dailySelected: row.read<int>('daily_selected'),
           ),
           hasIntegrityViolation: row.read<int>('has_integrity_violation') != 0,
         ),
@@ -63,6 +71,59 @@ final class DriftRelationCountAggregates {
         entry.value:
             bySerializedId[entry.key] ??
             (throw StateError('SQLite не вернул агрегат намерения.')),
+    });
+  }
+
+  Future<Map<LongTermRelationId, LongTermRelationPermissions>> readPermissions(
+    Iterable<LongTermRelationId> relationIds,
+  ) async {
+    final requested = <String, LongTermRelationId>{
+      for (final id in relationIds) id.toCanonicalString(): id,
+    };
+    if (requested.isEmpty) return const {};
+
+    final values = List.filled(requested.length, '(?)').join(', ');
+    final rows = await _database
+        .customSelect(
+          '''
+        /* doable_daily_path_permissions */
+        WITH requested(relation_id) AS (VALUES $values)
+        SELECT requested.relation_id,
+          relation.id IS NOT NULL AS relation_exists,
+          EXISTS (
+            SELECT 1 FROM daily_choice_path_steps AS step
+              INDEXED BY daily_choice_path_steps_relation
+            WHERE step.long_term_relation_id = requested.relation_id
+          ) AS referenced_by_daily_path
+        FROM requested
+        LEFT JOIN long_term_relations AS relation
+          ON relation.id = requested.relation_id
+      ''',
+          variables: [for (final id in requested.keys) Variable<String>(id)],
+          readsFrom: {
+            _database.longTermRelations,
+            _database.dailyChoicePathSteps,
+          },
+        )
+        .get();
+
+    final bySerializedId = <String, LongTermRelationPermissions>{};
+    for (final row in rows) {
+      if (row.read<int>('relation_exists') != 1) {
+        throw StateError('SQLite не нашёл связь для разрешения.');
+      }
+      final reference = row.read<int>('referenced_by_daily_path');
+      bySerializedId[row.read<String>('relation_id')] = switch (reference) {
+        0 => const LongTermRelationPermissions.unrestricted(),
+        1 => const LongTermRelationPermissions.referencedByDailyPath(),
+        _ => throw StateError('SQLite вернул недопустимое разрешение.'),
+      };
+    }
+    return Map.unmodifiable({
+      for (final entry in requested.entries)
+        entry.value:
+            bySerializedId[entry.key] ??
+            (throw StateError('SQLite не вернул разрешение связи.')),
     });
   }
 }
@@ -136,6 +197,20 @@ String _aggregateSql(String requestedValues) =>
       MAX(integrity_violation) AS has_integrity_violation
     FROM neighboring
     GROUP BY owner_id
+  ),
+  daily_sources AS (
+    SELECT requested.owner_id, COUNT(*) AS daily_source
+    FROM requested
+    JOIN daily_choices AS choice INDEXED BY daily_choices_source_recent
+      ON choice.source_intention_id = requested.owner_id
+    GROUP BY requested.owner_id
+  ),
+  daily_selected AS (
+    SELECT requested.owner_id, COUNT(*) AS daily_selected
+    FROM requested
+    JOIN daily_choices AS choice INDEXED BY daily_choices_selected_recent
+      ON choice.selected_intention_id = requested.owner_id
+    GROUP BY requested.owner_id
   )
   SELECT
     requested.owner_id AS owner_id,
@@ -147,10 +222,14 @@ String _aggregateSql(String requestedValues) =>
     COALESCE(aggregated.archived_need_outgoing, 0) AS archived_need_outgoing,
     COALESCE(aggregated.archived_can_incoming, 0) AS archived_can_incoming,
     COALESCE(aggregated.archived_can_outgoing, 0) AS archived_can_outgoing,
+    COALESCE(daily_sources.daily_source, 0) AS daily_source,
+    COALESCE(daily_selected.daily_selected, 0) AS daily_selected,
     COALESCE(aggregated.has_integrity_violation, 0)
       AS has_integrity_violation
   FROM requested
   LEFT JOIN aggregated USING (owner_id)
+  LEFT JOIN daily_sources USING (owner_id)
+  LEFT JOIN daily_selected USING (owner_id)
   ORDER BY requested.owner_id
 ''';
 

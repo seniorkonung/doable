@@ -2,6 +2,7 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
@@ -10,6 +11,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('прикладные проекции долговременной связи', () {
+    test('неизвестное разрешение не допускает удаление или смену смысла', () {
+      const permissions = LongTermRelationPermissions.unknown();
+      expect(permissions.isConfirmed, isFalse);
+      expect(permissions.canDelete, isFalse);
+      expect(permissions.canChangeMeaning, isFalse);
+      expect(permissions.canEditDescriptionAndPriority, isFalse);
+    });
     test('краткие данные участника содержат активное количество', () {
       final participant = RelationParticipantSummary(
         id: _intentionId('0f8fad5b-d9cb-469f-a165-70867728950e'),
@@ -81,10 +89,15 @@ void main() {
           'Много ходить',
         ),
         description: description,
+        permissions: const LongTermRelationPermissions.referencedByDailyPath(),
       );
 
       expect(details.description, same(description));
       expect(details.description!.value, text);
+      expect(
+        details.permissions.restriction,
+        LongTermRelationPermissionRestriction.referencedByDailyPath,
+      );
     });
 
     test('проекции отклоняют участников, не совпадающих со связью', () {

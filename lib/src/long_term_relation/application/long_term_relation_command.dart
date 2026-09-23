@@ -4,6 +4,7 @@ import '../../intention/domain/intention_id.dart';
 import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
 import '../domain/long_term_relation_id.dart';
+import 'long_term_relation_permissions.dart';
 
 sealed class LongTermRelationCommand
     implements
@@ -246,11 +247,13 @@ final class LongTermRelationCreated extends LongTermRelationCommandSuccess {
   LongTermRelationCreated({
     required this.relation,
     required this.description,
+    this.permissions = const LongTermRelationPermissions.unknown(),
     required super.changes,
   });
 
   final LongTermRelation relation;
   final LongTermRelationDescription? description;
+  final LongTermRelationPermissions permissions;
 }
 
 final class LongTermRelationUpdated extends LongTermRelationCommandSuccess {
@@ -258,12 +261,14 @@ final class LongTermRelationUpdated extends LongTermRelationCommandSuccess {
     required this.before,
     required this.relation,
     required this.description,
+    this.permissions = const LongTermRelationPermissions.unknown(),
     required super.changes,
   });
 
   final LongTermRelation before;
   final LongTermRelation relation;
   final LongTermRelationDescription? description;
+  final LongTermRelationPermissions permissions;
 }
 
 final class LongTermRelationDeleted extends LongTermRelationCommandSuccess {
