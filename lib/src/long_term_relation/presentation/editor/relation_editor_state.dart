@@ -197,6 +197,11 @@ final class RelationEditorRelationNotFound extends RelationEditorFailure {
   const RelationEditorRelationNotFound();
 }
 
+/// Сохранённый дневной путь использует смысл редактируемой связи.
+final class RelationEditorReferencedByDailyPath extends RelationEditorFailure {
+  const RelationEditorReferencedByDailyPath();
+}
+
 /// Доказанно устранимая недоступность хранилища.
 final class RelationEditorUnavailable extends RelationEditorFailure {
   const RelationEditorUnavailable();
@@ -447,8 +452,13 @@ final class RelationEditorState {
     );
   }
 
-  RelationEditorState withType(LongTermRelationType value) =>
-      _copyWith(type: value, operation: operation);
+  RelationEditorState withType(LongTermRelationType value) => _copyWith(
+    type: value,
+    operation: _operationAfter(
+      (failure) =>
+          failure is RelationEditorReferencedByDailyPath && value != type,
+    ),
+  );
 
   RelationEditorState withPriority(RelationPriority value) =>
       _copyWith(priority: value, operation: operation);
@@ -646,6 +656,7 @@ final class RelationEditorState {
         RelationEditorPairOccupied() ||
         RelationEditorSameParticipants() ||
         RelationEditorRelationNotFound() ||
+        RelationEditorReferencedByDailyPath() ||
         RelationEditorUnavailable() ||
         RelationEditorCorruption() ||
         RelationEditorUnexpected() => false,
@@ -660,6 +671,7 @@ final class RelationEditorState {
     // Занятость пары и самосвязь зависят только от участников.
     RelationEditorPairOccupied() ||
     RelationEditorSameParticipants() => identityChanged,
+    RelationEditorReferencedByDailyPath() => identityChanged,
     RelationEditorDescriptionInvalid() ||
     RelationEditorRelationNotFound() ||
     RelationEditorUnavailable() ||

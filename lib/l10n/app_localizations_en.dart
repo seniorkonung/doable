@@ -796,6 +796,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'An active relation can only link active intentions.';
 
   @override
+  String get relationEditorUpdateReferencedByDailyPath =>
+      'This relation is used by a saved daily path. Its type and participants can’t be changed.';
+
+  @override
   String get relationEditorUpdateUnavailable =>
       'The relation couldn’t be updated. Try again.';
 
@@ -876,6 +880,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationDeleteConflict =>
       'The relation couldn’t be deleted because its current state conflicts with the operation.';
+
+  @override
+  String get relationDeleteReferencedByDailyPath =>
+      'This relation is used by a saved daily path. Delete or replace the daily choices that use it first.';
 
   @override
   String get relationDeleteUnavailable =>

@@ -173,6 +173,16 @@ final class LongTermRelationPairOccupiedFailure
   GraphFailureCategory get category => GraphFailureCategory.conflict;
 }
 
+final class LongTermRelationReferencedByDailyPathFailure
+    extends LongTermRelationCommandFailure {
+  const LongTermRelationReferencedByDailyPathFailure(this.relationId);
+
+  final LongTermRelationId relationId;
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.conflict;
+}
+
 final class LongTermRelationNotFoundFailure
     extends LongTermRelationCommandFailure {
   const LongTermRelationNotFoundFailure(this.relationId);

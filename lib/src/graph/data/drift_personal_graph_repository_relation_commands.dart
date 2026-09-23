@@ -167,6 +167,14 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     }
 
     final type = _applyRelationFieldPatch(before.type, command.patch.type);
+    if (sourceId != before.sourceIntentionId ||
+        relatedId != before.relatedIntentionId ||
+        type != before.type) {
+      final permissions = await _readRelationPermissions(before.id);
+      if (!permissions.canChangeMeaning) {
+        throw _LongTermRelationReferencedByDailyPath(before.id);
+      }
+    }
     final priority = _applyRelationFieldPatch(
       before.priority,
       command.patch.priority,
@@ -359,6 +367,9 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       throw _LongTermRelationNotFound(relationId);
     }
     final relation = stored.toDomain();
+    if (!(await _readRelationPermissions(relationId)).canDelete) {
+      throw _LongTermRelationReferencedByDailyPath(relationId);
+    }
 
     final deletedRows = await (_database.delete(
       _database.longTermRelations,
@@ -595,6 +606,9 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
   if (error case _LongTermRelationNotFound(:final relationId)) {
     return LongTermRelationNotFoundFailure(relationId);
   }
+  if (error case _LongTermRelationReferencedByDailyPath(:final relationId)) {
+    return LongTermRelationReferencedByDailyPathFailure(relationId);
+  }
   if (error is _LongTermRelationSameParticipants) {
     return const LongTermRelationCommandValidationFailure(
       CreateLongTermRelationValidationFailure.sameIntention,
@@ -653,6 +667,12 @@ final class _LongTermRelationPairOccupied implements Exception {
 
 final class _LongTermRelationNotFound implements Exception {
   const _LongTermRelationNotFound(this.relationId);
+
+  final LongTermRelationId relationId;
+}
+
+final class _LongTermRelationReferencedByDailyPath implements Exception {
+  const _LongTermRelationReferencedByDailyPath(this.relationId);
 
   final LongTermRelationId relationId;
 }
