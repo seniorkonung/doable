@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../daily_choice/application/daily_choice_command.dart';
+import '../../daily_choice/application/daily_choice_result.dart';
+import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
-import '../../shared/presentation/exclusive_operation.dart';
+import 'blocking_relation_reference.dart';
 import 'delete_blocking_relations.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
@@ -65,6 +68,23 @@ final class ExistingLongTermRelationKey extends GraphCommandKey {
   int get hashCode => relationId.hashCode;
 }
 
+final class DailyChoiceCreationFormKey extends GraphCommandKey {
+  DailyChoiceCreationFormKey();
+}
+
+final class ExistingDailyChoiceKey extends GraphCommandKey {
+  const ExistingDailyChoiceKey(this.choiceId);
+
+  final DailyChoiceId choiceId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ExistingDailyChoiceKey && other.choiceId == choiceId;
+
+  @override
+  int get hashCode => Object.hash(ExistingDailyChoiceKey, choiceId);
+}
+
 sealed class GraphOperationToken {
   const GraphOperationToken();
 }
@@ -88,6 +108,13 @@ final class BlockingRelationsDeleteOperationToken extends GraphOperationToken {
 
   @override
   String toString() => 'BlockingRelationsDeleteOperationToken';
+}
+
+final class DailyChoiceOperationToken extends GraphOperationToken {
+  DailyChoiceOperationToken._();
+
+  @override
+  String toString() => 'DailyChoiceOperationToken';
 }
 
 sealed class GraphCommandCompletion {
@@ -208,6 +235,36 @@ final class BlockingRelationsDeleteCompletion extends GraphCommandCompletion {
   };
 }
 
+enum DailyChoiceCommandKind { create, update, replace, delete }
+
+final class DailyChoiceCommandCompletion extends GraphCommandCompletion {
+  const DailyChoiceCommandCompletion._({
+    required this.token,
+    required this.kind,
+    required this.confirmedResult,
+  });
+
+  @override
+  final DailyChoiceOperationToken token;
+  final DailyChoiceCommandKind kind;
+  final DailyChoiceCommandResult confirmedResult;
+
+  GraphResult<DailyChoiceCommandSuccess, DailyChoiceCommandFailure>
+  get result => switch (confirmedResult) {
+    GraphResultSuccess(:final value) => GraphResultSuccess(value.value),
+    GraphResultFailure(:final failure) => GraphResultFailure(failure),
+  };
+
+  @override
+  ConfirmedGraphChangePackage? get confirmedChange => switch (confirmedResult) {
+    GraphResultSuccess(:final value) => value,
+    GraphResultFailure() => null,
+  };
+
+  @override
+  bool get isFailure => confirmedResult is GraphResultFailure;
+}
+
 sealed class IntentionOperationTarget {
   const IntentionOperationTarget();
 }
@@ -281,6 +338,21 @@ sealed class BlockingRelationsDeleteStart {
   const BlockingRelationsDeleteStart();
 }
 
+sealed class DailyChoiceCommandStart {
+  const DailyChoiceCommandStart();
+}
+
+final class DailyChoiceCommandAccepted extends DailyChoiceCommandStart {
+  const DailyChoiceCommandAccepted({required this.token, required this.future});
+
+  final DailyChoiceOperationToken token;
+  final Future<DailyChoiceCommandCompletion> future;
+}
+
+final class DailyChoiceCommandAlreadyRunning extends DailyChoiceCommandStart {
+  const DailyChoiceCommandAlreadyRunning();
+}
+
 final class BlockingRelationsDeleteAccepted
     extends BlockingRelationsDeleteStart {
   const BlockingRelationsDeleteAccepted({
@@ -298,7 +370,10 @@ final class BlockingRelationsDeleteAlreadyRunning
 }
 
 final class GraphCommandCoordinatorDraining extends IntentionCommandStart
-    implements LongTermRelationCommandStart, BlockingRelationsDeleteStart {
+    implements
+        LongTermRelationCommandStart,
+        BlockingRelationsDeleteStart,
+        DailyChoiceCommandStart {
   const GraphCommandCoordinatorDraining();
 }
 
@@ -366,8 +441,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   // вставки совпадает с порядком публикации terminal outcome.
   final _entries = <GraphOperationToken, _PresentationEntry>{};
   final _registrations = <GraphAppPresentationRegistration>[];
-  final _gates =
-      <GraphCommandKey, ExclusiveOperation<GraphCommandCompletion>>{};
+  final _gates = <GraphCommandKey, _PresentationEntry>{};
   final _inFlight = <Future<void>>{};
   late GraphCommandRepository _repository;
   Future<void> _publicationTail = Future<void>.value();
@@ -393,7 +467,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   bool isRelationRunning(LongTermRelationId relationId) =>
       isKeyRunning(ExistingLongTermRelationKey(relationId));
 
-  bool isKeyRunning(GraphCommandKey key) => _gates[key]?.isRunning ?? false;
+  bool isDailyChoiceRunning(DailyChoiceId choiceId) =>
+      isKeyRunning(ExistingDailyChoiceKey(choiceId));
+
+  bool isKeyRunning(GraphCommandKey key) => _gates.containsKey(key);
 
   IntentionCommandStart acceptCreation(
     IntentionCreationFormKey formKey,
@@ -458,6 +535,61 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     target: ExistingLongTermRelationOperationTarget(command.relationId),
   );
 
+  DailyChoiceCommandStart acceptDailyChoiceCreation(
+    DailyChoiceCreationFormKey formKey,
+    CreateDailyChoice command,
+  ) => _acceptDailyChoice(formKey, command, DailyChoiceCommandKind.create);
+
+  DailyChoiceCommandStart acceptDailyChoiceUpdate(
+    UpdateDailyChoiceFields command,
+  ) => _acceptDailyChoice(
+    ExistingDailyChoiceKey(command.choiceId),
+    command,
+    DailyChoiceCommandKind.update,
+  );
+
+  DailyChoiceCommandStart acceptDailyChoiceReplace(
+    ReplaceDailyChoicePath command,
+  ) => _acceptDailyChoice(
+    ExistingDailyChoiceKey(command.choiceId),
+    command,
+    DailyChoiceCommandKind.replace,
+  );
+
+  DailyChoiceCommandStart acceptDailyChoiceDelete(DeleteDailyChoice command) =>
+      _acceptDailyChoice(
+        ExistingDailyChoiceKey(command.choiceId),
+        command,
+        DailyChoiceCommandKind.delete,
+      );
+
+  DailyChoiceCommandStart _acceptDailyChoice(
+    GraphCommandKey key,
+    DailyChoiceCommand command,
+    DailyChoiceCommandKind kind,
+  ) {
+    final token = DailyChoiceOperationToken._();
+    final acceptance = _acceptOperation(
+      keys: {key},
+      entry: _PresentationEntry(token),
+      execute: () async => DailyChoiceCommandCompletion._(
+        token: token,
+        kind: kind,
+        confirmedResult: await _executeDailyChoice(command),
+      ),
+    );
+    return switch (acceptance) {
+      _GraphCommandAccepted(:final future) => DailyChoiceCommandAccepted(
+        token: token,
+        future: future.then(
+          (completion) => completion as DailyChoiceCommandCompletion,
+        ),
+      ),
+      _GraphCommandAlreadyRunning() => const DailyChoiceCommandAlreadyRunning(),
+      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
+    };
+  }
+
   BlockingRelationsDeleteStart acceptBlockingRelationsDelete(
     DeleteBlockingRelations command, {
     required String presentationTitle,
@@ -466,8 +598,13 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     final acceptance = _acceptOperation(
       keys: {
         ExistingIntentionKey(command.intentionId),
-        for (final relationId in command.relationIds)
-          ExistingLongTermRelationKey(relationId),
+        for (final reference in command.references)
+          switch (reference) {
+            LongTermBlockingRelationReference(:final id) =>
+              ExistingLongTermRelationKey(id),
+            DailyChoiceBlockingRelationReference(:final id) =>
+              ExistingDailyChoiceKey(id),
+          },
       },
       entry: _PresentationEntry(token),
       execute: () async => BlockingRelationsDeleteCompletion._(
@@ -564,35 +701,26 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       return const _GraphCommandDraining();
     }
 
-    if (keys.any((key) => _gates[key]?.isRunning ?? false)) {
+    if (keys.any(_gates.containsKey)) {
       return const _GraphCommandAlreadyRunning();
     }
 
-    final gate = ExclusiveOperation<GraphCommandCompletion>();
     for (final key in keys) {
-      _gates[key] = gate;
+      _gates[key] = entry;
     }
     _entries[entry.token] = entry;
-    final started = gate.start(execute);
-    final operation =
-        started as ExclusiveOperationAccepted<GraphCommandCompletion>;
-    final operationFuture = operation.future;
-
-    unawaited(
-      operationFuture.whenComplete(() {
-        for (final key in keys) {
-          if (identical(_gates[key], gate) && !gate.isRunning) {
-            _gates.remove(key);
-          }
-        }
-      }),
-    );
+    final operationFuture = Future<GraphCommandCompletion>.sync(execute);
 
     final completionCompleter = Completer<GraphCommandCompletion>();
     late final Future<void> tracked;
     final publication = _publicationTail.then<void>((_) async {
       final completion = await operationFuture;
       entry.completion = completion;
+      for (final key in keys) {
+        if (identical(_gates[key], entry)) {
+          _gates.remove(key);
+        }
+      }
       _completionController.add(completion);
       completionCompleter.complete(completion);
       _dispatchAppPresentation();
@@ -826,6 +954,19 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         BlockingRelationsDeleted,
         DeleteBlockingRelationsFailure
       >(DeleteBlockingRelationsUnexpectedFailure());
+    }
+  }
+
+  Future<DailyChoiceCommandResult> _executeDailyChoice(
+    DailyChoiceCommand command,
+  ) async {
+    try {
+      return await _repository.execute(command);
+    } on Object {
+      return const GraphCommandFailed<
+        DailyChoiceCommandSuccess,
+        DailyChoiceCommandFailure
+      >(DailyChoiceUnexpectedFailure());
     }
   }
 

@@ -807,6 +807,38 @@
     "description": "Безопасное обозначение создаваемой связи до подтверждения"
   },
   "graphOperationRelation": "relation",
+  "graphOperationDailyChoice": "daily choice",
+  "@graphOperationDailyChoice": {
+    "description": "Безопасное обозначение дневного выбора в сообщении операции"
+  },
+  "dailyChoiceOperationSucceeded": "Daily choice change saved.",
+  "@dailyChoiceOperationSucceeded": {
+    "description": "Подтверждение сохранения изменения дневного выбора"
+  },
+  "dailyChoiceOperationInvalid": "Check the daily choice details.",
+  "@dailyChoiceOperationInvalid": {
+    "description": "Ошибка проверки данных дневного выбора"
+  },
+  "dailyChoiceOperationNotFound": "This daily choice no longer exists.",
+  "@dailyChoiceOperationNotFound": {
+    "description": "Дневной выбор отсутствует при выполнении команды"
+  },
+  "dailyChoiceOperationConflict": "The data changed. Refresh the daily choice and confirm again.",
+  "@dailyChoiceOperationConflict": {
+    "description": "Конфликт актуальности дневного выбора"
+  },
+  "dailyChoiceOperationUnavailable": "Could not save the daily choice. Try again.",
+  "@dailyChoiceOperationUnavailable": {
+    "description": "Временная недоступность при сохранении дневного выбора"
+  },
+  "dailyChoiceOperationCorruption": "Stored data is damaged. The daily choice was not changed.",
+  "@dailyChoiceOperationCorruption": {
+    "description": "Повреждение данных дневного выбора"
+  },
+  "dailyChoiceOperationUnexpected": "Could not change the daily choice because of an unexpected error.",
+  "@dailyChoiceOperationUnexpected": {
+    "description": "Неожиданный отказ команды дневного выбора"
+  },
   "@graphOperationRelation": {
     "description": "Безопасное обозначение существующей связи"
   },

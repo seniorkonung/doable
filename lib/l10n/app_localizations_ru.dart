@@ -744,6 +744,36 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationRelation => 'связь';
 
   @override
+  String get graphOperationDailyChoice => 'дневной выбор';
+
+  @override
+  String get dailyChoiceOperationSucceeded =>
+      'Изменение дневного выбора сохранено.';
+
+  @override
+  String get dailyChoiceOperationInvalid => 'Проверьте данные дневного выбора.';
+
+  @override
+  String get dailyChoiceOperationNotFound =>
+      'Дневной выбор больше не существует.';
+
+  @override
+  String get dailyChoiceOperationConflict =>
+      'Данные изменились. Обновите дневной выбор и подтвердите снова.';
+
+  @override
+  String get dailyChoiceOperationUnavailable =>
+      'Не удалось сохранить дневной выбор. Повторите попытку.';
+
+  @override
+  String get dailyChoiceOperationCorruption =>
+      'Сохранённые данные повреждены. Дневной выбор не изменён.';
+
+  @override
+  String get dailyChoiceOperationUnexpected =>
+      'Не удалось изменить дневной выбор из-за непредвиденной ошибки.';
+
+  @override
   String get relationEditorCreated => 'Связь создана.';
 
   @override
