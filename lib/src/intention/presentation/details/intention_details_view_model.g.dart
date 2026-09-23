@@ -150,7 +150,7 @@ final class IntentionDetailsViewModelProvider
 }
 
 String _$intentionDetailsViewModelHash() =>
-    r'1ddfa7c7bfec475f92096febded25e834d76fe7b';
+    r'37ce54365bcb2507066fca6bb6ce78d2744740c4';
 
 final class IntentionDetailsViewModelFamily extends $Family
     with
