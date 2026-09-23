@@ -737,8 +737,16 @@ final class RelationNeighborhoodViewModel
     }
     _requiredRevision = revision;
     _invalidation += 1;
-    if (current is RelationGroupConfirmedState && _activeRequest == null) {
-      unawaited(_refresh(current, includeRequestedPage: false));
+    if (current is RelationGroupConfirmedState) {
+      if (current is RelationGroupLoaded &&
+          current.progress is RelationGroupLoadingMore) {
+        // Продолжение прежней ревизии может задержаться или не завершиться.
+        // Новую основу читаем сразу, сохраняя предел запрошенной порции.
+        _activeRequest = null;
+        unawaited(_refresh(current, includeRequestedPage: true));
+      } else if (_activeRequest == null) {
+        unawaited(_refresh(current, includeRequestedPage: false));
+      }
     }
   }
 

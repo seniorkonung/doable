@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -24,6 +25,302 @@ import 'package:flutter_test/flutter_test.dart';
 import 'neighborhood_test_support.dart';
 
 void main() {
+  test('старая первая порция не возвращает массово удалённую связь', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = _NeighborhoodHarness(repository);
+    addTearDown(harness.dispose);
+    final owner = harness.intentionId;
+    final removed = testGroupRow(ownerId: owner, index: 1);
+    final command = DeleteBlockingRelations(
+      intentionId: owner,
+      relationIds: [removed.relation.id],
+    );
+    final start = harness.coordinator.acceptBlockingRelationsDelete(
+      command,
+      presentationTitle: 'Владелец',
+    ) as BlockingRelationsDeleteAccepted;
+    const revision = TestGraphRevision(9);
+    repository.completeBlockingCommand(
+      0,
+      GraphCommandSucceeded<
+        BlockingRelationsDeleted,
+        DeleteBlockingRelationsFailure
+      >(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: BlockingRelationsDeleted(
+            command: command,
+            revision: revision,
+            deletedRelations: [removed.relation],
+            counts: {
+              owner: testRelationCounts(),
+              removed.related.id: testRelationCounts(),
+            },
+          ),
+        ),
+      ),
+    );
+    await start.future;
+    await pumpEventQueue();
+
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: [removed],
+        counts: testRelationCounts(activeNeedOutgoing: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.state, isA<RelationGroupInitialLoad>());
+    expect(repository.requestCount, 2);
+
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: testRelationCounts(),
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.state, isA<RelationGroupEmpty>());
+    expect((harness.state as RelationGroupEmpty).counts.total, 0);
+  });
+
+  for (final oldPageFails in [false, true]) {
+    test('массовое удаление сразу заменяет прежнюю подгрузку '
+        '${oldPageFails ? 'при отказе' : 'при успехе'}', () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository, pageSize: 2);
+      addTearDown(harness.dispose);
+      final owner = harness.intentionId;
+      final first = testGroupRow(ownerId: owner, index: 1);
+      final removed = testGroupRow(ownerId: owner, index: 2);
+      final remaining = testGroupRow(ownerId: owner, index: 3);
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: [first, removed],
+          counts: testRelationCounts(activeNeedOutgoing: 3),
+          nextCursor: const TestRelationGroupCursor(2),
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      await pumpEventQueue();
+      harness.scrollTo(1);
+      expect(repository.requestCount, 2);
+
+      final command = DeleteBlockingRelations(
+        intentionId: owner,
+        relationIds: [removed.relation.id],
+      );
+      final start = harness.coordinator.acceptBlockingRelationsDelete(
+        command,
+        presentationTitle: 'Владелец',
+      );
+      expect(start, isA<BlockingRelationsDeleteAccepted>());
+      const revision = TestGraphRevision(9);
+      final outcome = BlockingRelationsDeleted(
+        command: command,
+        revision: revision,
+        deletedRelations: [removed.relation],
+        counts: {
+          owner: testRelationCounts(activeNeedOutgoing: 2),
+          removed.related.id: testRelationCounts(),
+        },
+      );
+      repository.completeBlockingCommand(
+        0,
+        GraphCommandSucceeded<
+          BlockingRelationsDeleted,
+          DeleteBlockingRelationsFailure
+        >(ConfirmedGraphResult(revision: revision, value: outcome)),
+      );
+      await (start as BlockingRelationsDeleteAccepted).future;
+      await pumpEventQueue();
+
+      expect(repository.requestCount, 3);
+      expect(repository.queryAt(2).cursor, isNull);
+      expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
+      expect(harness.loaded.totalCount, 3);
+      expect(harness.relationIds, [first.relation.id, removed.relation.id]);
+
+      repository.failRead(2, const RelationGroupUnavailableFailure());
+      await pumpEventQueue();
+      expect(harness.loaded.summaryFreshness, RelationSummaryFreshness.stale);
+      expect(harness.loaded.totalCount, 3);
+      expect(harness.loaded.hasConfirmedEnd, isFalse);
+
+      if (oldPageFails) {
+        repository.failRead(1, const RelationGroupUnavailableFailure());
+        await pumpEventQueue();
+        expect(repository.requestCount, 3);
+        expect(harness.loaded.summaryFreshness, RelationSummaryFreshness.stale);
+        expect(harness.relationIds, [first.relation.id, removed.relation.id]);
+      }
+
+      harness.retryRefresh();
+      expect(repository.requestCount, 4);
+      expect(repository.queryAt(3).cursor, isNull);
+      repository.completePage(
+        3,
+        RelationGroupFirstPage(
+          items: [first, remaining],
+          counts: testRelationCounts(activeNeedOutgoing: 2),
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await pumpEventQueue();
+      expect(harness.relationIds, [first.relation.id, remaining.relation.id]);
+      expect(harness.loaded.totalCount, 2);
+      expect(harness.loaded.hasConfirmedEnd, isTrue);
+      expect(harness.loaded.revision, revision);
+      expect(repository.blockingCommands.single, same(command));
+      if (!oldPageFails) {
+        repository.completePage(
+          1,
+          RelationGroupContinuationPage(
+            items: [remaining],
+            nextCursor: null,
+            revision: const TestGraphRevision(4),
+          ),
+        );
+        await pumpEventQueue();
+      }
+      repository.emitIntention(
+        testNeighborhoodIntention(id: owner),
+        counts: testRelationCounts(activeNeedOutgoing: 2),
+        revision: revision,
+      );
+      await pumpEventQueue();
+      expect(repository.requestCount, 4);
+      expect(harness.relationIds, [first.relation.id, remaining.relation.id]);
+    });
+  }
+
+  for (final initiallyEmpty in [false, true]) {
+    test(
+      'массовое удаление в другой группе сохраняет согласованную '
+      '${initiallyEmpty ? 'пустую' : 'полную'} выдачу при ошибке обновления',
+      () async {
+        final repository = ControlledNeighborhoodRepository();
+        final harness = _NeighborhoodHarness(repository, pageSize: 2);
+        addTearDown(harness.dispose);
+        final owner = harness.intentionId;
+        final kept = testGroupRow(ownerId: owner, index: 1);
+        final removed = testGroupRow(
+          ownerId: owner,
+          index: 2,
+          scope: RelationScope.archived,
+        );
+        final initialItems = initiallyEmpty
+            ? <LongTermRelationSummary>[]
+            : [kept];
+        final activeCount = initiallyEmpty ? 0 : 1;
+        repository.completePage(
+          0,
+          RelationGroupFirstPage(
+            items: initialItems,
+            counts: testRelationCounts(
+              activeNeedOutgoing: activeCount,
+              archivedNeedOutgoing: 1,
+            ),
+            nextCursor: null,
+            revision: const TestGraphRevision(4),
+          ),
+        );
+        await pumpEventQueue();
+
+        final command = DeleteBlockingRelations(
+          intentionId: owner,
+          relationIds: [removed.relation.id],
+        );
+        final start = harness.coordinator.acceptBlockingRelationsDelete(
+          command,
+          presentationTitle: 'Владелец',
+        ) as BlockingRelationsDeleteAccepted;
+        const revision = TestGraphRevision(9);
+        repository.completeBlockingCommand(
+          0,
+          GraphCommandSucceeded<
+            BlockingRelationsDeleted,
+            DeleteBlockingRelationsFailure
+          >(
+            ConfirmedGraphResult(
+              revision: revision,
+              value: BlockingRelationsDeleted(
+                command: command,
+                revision: revision,
+                deletedRelations: [removed.relation],
+                counts: {
+                  owner: testRelationCounts(activeNeedOutgoing: activeCount),
+                  removed.related.id: testRelationCounts(),
+                },
+              ),
+            ),
+          ),
+        );
+        await start.future;
+        await pumpEventQueue();
+        expect(repository.requestCount, 2);
+        final old = harness.state as RelationGroupConfirmedState;
+        expect(old.counts.archivedNeedOutgoing, 1);
+        expect(old.summaryFreshness, RelationSummaryFreshness.refreshing);
+
+        repository.failRead(1, const RelationGroupUnavailableFailure());
+        await pumpEventQueue();
+        final stale = harness.state as RelationGroupConfirmedState;
+        expect(stale.counts.archivedNeedOutgoing, 1);
+        expect(stale.summaryFreshness, RelationSummaryFreshness.stale);
+        repository.emitIntention(
+          testNeighborhoodIntention(id: owner),
+          counts: testRelationCounts(
+            activeNeedOutgoing: activeCount,
+            archivedNeedOutgoing: 1,
+          ),
+          revision: const TestGraphRevision(4),
+        );
+        await pumpEventQueue();
+        expect(repository.requestCount, 2);
+        expect(
+          (harness.state as RelationGroupConfirmedState).summaryFreshness,
+          RelationSummaryFreshness.stale,
+        );
+
+        harness.retryRefresh();
+        expect(repository.requestCount, 3);
+        repository.completePage(
+          2,
+          RelationGroupFirstPage(
+            items: initialItems,
+            counts: testRelationCounts(activeNeedOutgoing: activeCount),
+            nextCursor: null,
+            revision: revision,
+          ),
+        );
+        await pumpEventQueue();
+        final current = harness.state as RelationGroupConfirmedState;
+        expect(current.counts.archivedNeedOutgoing, 0);
+        expect(current.summaryFreshness, RelationSummaryFreshness.current);
+        expect(current.revision, revision);
+        expect(
+          current,
+          initiallyEmpty
+              ? isA<RelationGroupEmpty>()
+              : isA<RelationGroupLoaded>(),
+        );
+        if (!initiallyEmpty) {
+          expect(harness.relationIds, [kept.relation.id]);
+          expect(harness.loaded.hasConfirmedEnd, isTrue);
+        }
+      },
+    );
+  }
+
   test('первое чтение открывает активную исходящую группу «нужно»', () async {
     final repository = ControlledNeighborhoodRepository();
     final harness = _NeighborhoodHarness(repository);
@@ -1996,7 +2293,8 @@ void main() {
     );
     await (start as LongTermRelationCommandAccepted).future;
     await pumpEventQueue();
-    expect(repository.requestCount, 2);
+    expect(repository.requestCount, 3);
+    expect(repository.queryAt(2).cursor, isNull);
     expect(harness.relationIds, [first.relation.id, removed.relation.id]);
 
     repository.completePage(
@@ -2009,7 +2307,6 @@ void main() {
     );
     await pumpEventQueue();
     expect(repository.requestCount, 3);
-    expect(repository.queryAt(2).cursor, isNull);
     expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
     expect(harness.loaded.counts.archivedNeedOutgoing, 1);
 
