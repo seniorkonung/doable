@@ -1,6 +1,6 @@
 # ADR-0009: Объединить управление личным графом и согласование его снимков
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-long-term-relations
 - Date: 2026-09-13
 - Supersedes: [ADR-0005](0005-use-bounded-catalog-snapshots.md)

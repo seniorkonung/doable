@@ -1,6 +1,6 @@
 # ADR-0012: Централизовать предъявление результатов операций графа
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-long-term-relations
 - Date: 2026-09-14
 
