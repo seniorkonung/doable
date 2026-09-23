@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -31,8 +34,13 @@ final class _Fixture {
   late final DriftPersonalGraphRepository repository;
   final diagnostics = InMemoryDiagnosticsSink();
 
-  Future<void> open() async {
-    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
+  Future<void> open({LocalDatabaseConnectionObserver? observer}) async {
+    final connection = openInMemoryLocalDatabase(setup: (db) => raw = db);
+    database = AppDatabase(
+      observer == null
+          ? connection
+          : observeConfiguredLocalDatabaseConnection(connection, observer),
+    );
     await database.open();
     repository = DriftPersonalGraphRepository(
       database,
@@ -107,6 +115,73 @@ final class _Fixture {
 final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
   @override
   void record(DiagnosticsEvent event) => throw StateError('Сбой диагностики');
+}
+
+final class _ContinuationSelectTrace extends LocalDatabaseConnectionObserver {
+  final selects = <_MeasuredSelect>[];
+  final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
+
+  @override
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation == LocalDatabaseSqlOperation.select) {
+      _started[statement] = Stopwatch()..start();
+    }
+  }
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    final stopwatch = _started.remove(statement)!..stop();
+    selects.add(
+      _MeasuredSelect(
+        sql: statement.statements.single,
+        arguments: statement.arguments,
+        rowCount: rows.length,
+        elapsed: stopwatch.elapsed,
+      ),
+    );
+    return rows;
+  }
+}
+
+final class _MeasuredSelect {
+  const _MeasuredSelect({
+    required this.sql,
+    required this.arguments,
+    required this.rowCount,
+    required this.elapsed,
+  });
+
+  final String sql;
+  final List<Object?> arguments;
+  final int rowCount;
+  final Duration elapsed;
+}
+
+final class _IsolateResponsivenessTrace
+    extends LocalDatabaseConnectionObserver {
+  bool _eventLoopAdvanced = false;
+  bool? advancedBeforeReachabilityFinished;
+
+  @override
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.statements.single.contains('WITH RECURSIVE')) {
+      Timer.run(() => _eventLoopAdvanced = true);
+    }
+  }
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    if (statement.statements.single.contains('WITH RECURSIVE')) {
+      advancedBeforeReachabilityFinished = _eventLoopAdvanced;
+    }
+    return rows;
+  }
 }
 
 void main() {
@@ -366,6 +441,182 @@ void main() {
       print('Продолжения: цикл $length, ${stopwatch.elapsedMilliseconds} мс');
     },
   );
+
+  test('большой разветвлённый граф сохраняет ветви при разных порциях и измеряет ожидание команды', () async {
+    await fixture.close();
+    final trace = _ContinuationSelectTrace();
+    fixture = _Fixture();
+    await fixture.open(observer: trace);
+
+    fixture.raw.execute('BEGIN');
+    for (var node = 1; node <= 1900; node++) {
+      fixture.intention(node, ready: node == 1800);
+    }
+    for (var node = 2; node <= 121; node++) {
+      fixture.relation(10000 + node, 1, node);
+    }
+    for (var node = 2; node < 1800; node++) {
+      fixture.relation(20000 + node, node, node + 1);
+      if (node + 7 <= 1800) {
+        fixture.relation(30000 + node, node, node + 7);
+      }
+      if (node + 37 <= 1800) {
+        fixture.relation(40000 + node, node, node + 37);
+      }
+    }
+    fixture.relation(10999, 1, 1801);
+    for (var node = 1801; node <= 1900; node++) {
+      fixture.relation(50000 + node, node, node == 1900 ? 1801 : node + 1);
+    }
+    fixture.raw.execute('COMMIT');
+
+    final draft = ChoicePathDraftStart(_intention(1));
+    Future<(List<LongTermRelationId>, Duration)> collect(int pageSize) async {
+      final stopwatch = Stopwatch()..start();
+      final ids = <LongTermRelationId>[];
+      ChoicePathContinuationCursor? cursor;
+      do {
+        final page = await fixture.page(
+          draft,
+          pageSize: pageSize,
+          cursor: cursor,
+        );
+        ids.addAll(page.items.map((item) => item.relation.id));
+        cursor = page.nextCursor;
+      } while (cursor != null);
+      stopwatch.stop();
+      return (ids, stopwatch.elapsed);
+    }
+
+    trace.selects.clear();
+    final (smallPageIds, smallPageTime) = await collect(7);
+    final smallPageSelects = List<_MeasuredSelect>.of(trace.selects);
+    trace.selects.clear();
+    final (largePageIds, largePageTime) = await collect(100);
+    final largePageSelects = List<_MeasuredSelect>.of(trace.selects);
+
+    expect(smallPageIds, largePageIds);
+    expect(largePageIds, [
+      for (var node = 2; node <= 121; node++) _relation(10000 + node),
+    ]);
+    expect(
+      [
+        ...smallPageSelects,
+        ...largePageSelects,
+      ].map((select) => select.rowCount),
+      everyElement(lessThanOrEqualTo(101)),
+    );
+    final reachabilitySelects = largePageSelects.where(
+      (select) => select.sql.contains('WITH RECURSIVE'),
+    );
+    expect(reachabilitySelects, hasLength(2));
+    expect(reachabilitySelects.map((select) => select.rowCount), [101, 20]);
+    final plan = fixture.raw.select(
+      'EXPLAIN QUERY PLAN ${reachabilitySelects.first.sql}',
+      reachabilitySelects.first.arguments,
+    );
+    expect(
+      plan.map((row) => row['detail'].toString()).join(' '),
+      contains('reachable'),
+    );
+
+    final readWatch = Stopwatch()..start();
+    final pendingRead = fixture.page(draft, pageSize: 1);
+    final queuedCommandWatch = Stopwatch()..start();
+    final pendingCommand = fixture.repository.execute(
+      EnableIntentionReadiness(_intention(1850)),
+    );
+    await pendingRead;
+    readWatch.stop();
+    expect(await pendingCommand, isA<GraphCommandSucceeded>());
+    queuedCommandWatch.stop();
+    final singleCommandWatch = Stopwatch()..start();
+    expect(
+      await fixture.repository.execute(
+        EnableIntentionReadiness(_intention(1851)),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    singleCommandWatch.stop();
+
+    final sqliteVersion = fixture.raw
+        .select('SELECT sqlite_version()')
+        .single['sqlite_version()'];
+    // Измерения информируют о стоимости; пороги времени зависят от машины.
+    // ignore: avoid_print
+    print(
+      'Продолжения: 1900 намерений, 5573 связи, SQLite $sqliteVersion; '
+      'порция 7: ${smallPageTime.inMicroseconds} мкс / 18 страниц, '
+      'порция 100: ${largePageTime.inMicroseconds} мкс / 2 страницы; '
+      'запросы достижимости: '
+      '${reachabilitySelects.map((select) => select.elapsed.inMicroseconds).toList()} мкс; '
+      'чтение перед командой: ${readWatch.elapsedMicroseconds} мкс, '
+      'команда в очереди: ${queuedCommandWatch.elapsedMicroseconds} мкс, '
+      'отдельная команда: ${singleCommandWatch.elapsedMicroseconds} мкс',
+    );
+    // ignore: avoid_print
+    print('План достижимости: ${plan.map((row) => row['detail']).join(' | ')}');
+  });
+
+  test('изолятное соединение не удерживает цикл событий во время поиска', () async {
+    await fixture.close();
+    final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
+    final trace = _IsolateResponsivenessTrace();
+    final database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(await isolate.connect(), trace),
+    );
+    try {
+      await database.open();
+      await database.customStatement('''
+        WITH RECURSIVE ids(n) AS (
+          VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 4000
+        )
+        INSERT INTO intentions
+          (id, title, is_action_ready, is_archived, created_at, updated_at)
+        SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
+               'Намерение', n = 4000, 0, 1, 1 FROM ids
+      ''');
+      for (final (offset, idBase) in [(1, 10000), (7, 20000), (37, 30000)]) {
+        await database.customStatement('''
+          WITH RECURSIVE ids(n) AS (
+            VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < ${4000 - offset}
+          )
+          INSERT INTO long_term_relations
+            (id, source_intention_id, related_intention_id, type, priority,
+             is_archived)
+          SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', $idBase + n),
+                 printf('018f0b5d-6b2e-7c80-8000-%012x', n),
+                 printf('018f0b5d-6b2e-7c80-8000-%012x', n + $offset),
+                 'need', 2, 0 FROM ids
+        ''');
+      }
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 23),
+        InMemoryDiagnosticsSink(),
+      );
+      final stopwatch = Stopwatch()..start();
+      final result = await repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(draft: ChoicePathDraftStart(_intention(1))),
+      );
+      stopwatch.stop();
+      expect(result, isA<ChoicePathContinuationSuccess>());
+      expect(
+        (result as ChoicePathContinuationSuccess).value.items,
+        hasLength(3),
+      );
+      expect(trace.advancedBeforeReachabilityFinished, isTrue);
+      // ignore: avoid_print
+      print(
+        'Изолятное чтение: 4000 намерений, 11955 связей, '
+        '${stopwatch.elapsedMicroseconds} мкс; цикл событий обслужен до ответа',
+      );
+    } finally {
+      await database.close();
+      await isolate.shutdownAll();
+    }
+  });
 
   test('малые графы совпадают с независимым перебором простых путей', () async {
     for (var seed = 0; seed < 12; seed++) {
