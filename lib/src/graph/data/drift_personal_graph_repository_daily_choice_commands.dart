@@ -4,6 +4,9 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
   Future<DailyChoiceCommandResult> _executeDailyChoice(
     DailyChoiceCommand command,
   ) async {
+    if (command is UpdateDailyChoiceFields) {
+      return _updateDailyChoiceFields(command);
+    }
     final stopwatch = Stopwatch()..start();
     var stage = DailyChoiceCommandDiagnosticsStage.validation;
     void record(DiagnosticsStatus status) => _recordDiagnostics(
@@ -169,6 +172,155 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
         return committed;
       });
       return GraphCommandSucceeded(created);
+    } on Object catch (error) {
+      final failure = _classifyDailyChoiceCommandFailure(error);
+      record(
+        DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: _graphCommandDiagnosticsFailureCode(failure),
+        ),
+      );
+      return GraphCommandFailed(failure);
+    }
+  }
+
+  Future<DailyChoiceCommandResult> _updateDailyChoiceFields(
+    UpdateDailyChoiceFields command,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    var stage = DailyChoiceCommandDiagnosticsStage.validation;
+    void record(DiagnosticsStatus status) => _recordDiagnostics(
+      DailyChoiceCommandDiagnosticsEvent(
+        commandType: DailyChoiceCommandDiagnosticsType.updateFields,
+        stage: stage,
+        status: status,
+      ),
+    );
+
+    record(const DiagnosticsStarted());
+    try {
+      final confirmed = await _sequencer.run(() async {
+        final result = await _database.transaction(() async {
+          final existing = await _readVerifiedDailyChoice(command.choiceId);
+          if (existing == null) throw const DailyChoiceNotFoundFailure();
+          final before = existing.choice;
+          final date = switch (command.patch.date) {
+            DailyChoiceFieldUnchanged<CalendarDate>() => before.date,
+            DailyChoiceFieldSet<CalendarDate>(:final value) => value,
+          };
+          final description = switch (command.patch.description) {
+            DailyChoiceDescriptionUnchanged() => before.description,
+            DailyChoiceDescriptionCleared() => null,
+            DailyChoiceDescriptionSet(:final value) => value,
+          };
+          final isCompleted = switch (command.patch.isCompleted) {
+            DailyChoiceFieldUnchanged<bool>() => before.isCompleted,
+            DailyChoiceFieldSet<bool>(:final value) => value,
+          };
+          final didMutate =
+              date != before.date ||
+              description != before.description ||
+              isCompleted != before.isCompleted;
+          record(DiagnosticsSucceeded(stopwatch.elapsed));
+
+          var verified = existing;
+          if (didMutate) {
+            stage = DailyChoiceCommandDiagnosticsStage.write;
+            record(const DiagnosticsStarted());
+            final updatedRows =
+                await (_database.update(_database.dailyChoices)..where(
+                      (row) =>
+                          row.id.equals(command.choiceId.toCanonicalString()),
+                    ))
+                    .write(
+                      local.DailyChoicesCompanion(
+                        choiceDate: switch (command.patch.date) {
+                          DailyChoiceFieldUnchanged<CalendarDate>() =>
+                            const Value.absent(),
+                          DailyChoiceFieldSet<CalendarDate>(:final value) =>
+                            Value(value.toCanonicalString()),
+                        },
+                        description: switch (command.patch.description) {
+                          DailyChoiceDescriptionUnchanged() =>
+                            const Value.absent(),
+                          DailyChoiceDescriptionCleared() => const Value(null),
+                          DailyChoiceDescriptionSet(:final value) => Value(
+                            value.value,
+                          ),
+                        },
+                        isCompleted: switch (command.patch.isCompleted) {
+                          DailyChoiceFieldUnchanged<bool>() =>
+                            const Value.absent(),
+                          DailyChoiceFieldSet<bool>(:final value) => Value(
+                            value,
+                          ),
+                        },
+                      ),
+                    );
+            if (updatedRows != 1) throw const _StoredIntentionCorruption();
+            record(DiagnosticsSucceeded(stopwatch.elapsed));
+            stage = DailyChoiceCommandDiagnosticsStage.resultRead;
+            record(const DiagnosticsStarted());
+            verified =
+                await _readVerifiedDailyChoice(command.choiceId) ??
+                (throw const _StoredIntentionCorruption());
+            final after = verified.choice;
+            if (after.sourceIntentionId != before.sourceIntentionId ||
+                after.selectedIntentionId != before.selectedIntentionId ||
+                after.date != date ||
+                after.description != description ||
+                after.isCompleted != isCompleted ||
+                verified.path.length != existing.path.length) {
+              throw const _StoredIntentionCorruption();
+            }
+            for (var index = 0; index < existing.path.length; index++) {
+              final oldStep = existing.path[index].step;
+              final newStep = verified.path[index].step;
+              if (newStep.id != oldStep.id ||
+                  newStep.dailyChoiceId != oldStep.dailyChoiceId ||
+                  newStep.relationId != oldStep.relationId ||
+                  newStep.previousStepId != oldStep.previousStepId) {
+                throw const _StoredIntentionCorruption();
+              }
+            }
+          }
+
+          final revision = _DriftGraphRevision(
+            _epoch,
+            _mutationSequence + (didMutate ? 1 : 0),
+          );
+          final counts = await _readVerifiedRelationCountsFor([
+            before.sourceIntentionId,
+            before.selectedIntentionId,
+          ]);
+          final change = DailyChoiceChange(
+            revision: revision,
+            before: before,
+            after: verified.choice,
+            releasedRelationIds: const [],
+            occupiedRelationIds: const [],
+            intentionCounts: counts,
+            relationPermissions: const {},
+          );
+          final success = DailyChoiceFieldsUpdated(
+            before: before,
+            choice: verified.choice,
+            path: StoredChoicePath(verified.path.map((item) => item.step)),
+            changes: [change],
+          );
+          if (didMutate) record(DiagnosticsSucceeded(stopwatch.elapsed));
+          return (
+            didMutate,
+            ConfirmedGraphResult(revision: revision, value: success),
+          );
+        });
+        if (result.$1) {
+          _mutationSequence++;
+          _notifyGraphWatchersFor(result.$2.changes);
+        }
+        return result.$2;
+      });
+      return GraphCommandSucceeded(confirmed);
     } on Object catch (error) {
       final failure = _classifyDailyChoiceCommandFailure(error);
       record(
