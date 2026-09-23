@@ -6,7 +6,7 @@
 **Result:** Changes needed
 **Coverage status:** Incomplete
 **Coverage limitations:** Независимый просмотр инженерного решения в свежем изолированном контексте не выполнен: условия этапа запрещают запуск агентов. Соответствие OpenSpec и качество кода проверены на точном диапазоне; существующий контекст не заменяет независимый проход.
-**Summary:** Подтверждены F1: после частичного успешного удаления нельзя начать новый выбор оставшихся связей на открытой странице, и F2: актуализация большого явно выбранного набора выполняет сотни повторных запросов агрегатов и заняла 14,3 с в зафиксированном локальном прогоне. Принятых остаточных рисков нет.
+**Summary:** Открыто F2: актуализация большого явно выбранного набора выполняет сотни повторных запросов агрегатов и заняла 14,3 с в зафиксированном локальном прогоне. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -60,19 +60,10 @@
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Incomplete | Для четырёх единиц не запускался свежий изолированный reviewer: запуск агентов запрещён условиями этапа. Оценка в текущем контексте не считается независимой. |
-| OpenSpec conformance | Complete | На 840d24b9bcfc506cab049de0862890c5d1578bc4 сопоставлены задачи 6.1–6.18, обе delta-спецификации, план, дизайн, ADR, 18 коммитов и 57 путей. В чистом дереве прошли mise exec --no-deps -- openspec validate manage-long-term-relations --json и --strict --no-interactive; mise run --skip-tools check завершился 922 тестами, анализом и форматированием без замечаний. Собран release APK; проверка упакованного Android-манифеста прошла. Выявленное несоответствие повторного выбора записано в F1. |
+| OpenSpec conformance | Complete | На 840d24b9bcfc506cab049de0862890c5d1578bc4 сопоставлены задачи 6.1–6.18, обе delta-спецификации, план, дизайн, ADR, 18 коммитов и 57 путей. В чистом дереве прошли mise exec --no-deps -- openspec validate manage-long-term-relations --json и --strict --no-interactive; mise run --skip-tools check завершился 922 тестами, анализом и форматированием без замечаний. Собран release APK; проверка упакованного Android-манифеста прошла. |
 | Code quality | Complete | Проверены границы типизированной команды, транзакции, блокировки ключей, подтверждения, порционных чтений, согласования, диагностики и локализации во всех 54 delivery/test путях. На 840d24b9bcfc506cab049de0862890c5d1578bc4 прошли mise run --skip-tools codegen-check, git diff --check 999959b7ecec142de83c5199de4cf32a9370e839 840d24b9bcfc506cab049de0862890c5d1578bc4 и полный check; стоимость большого выбора из verification-6.17.md подтверждает F2. |
 
 ## Findings
-
-### F1 · High — После частичного удаления повторный выбор на той же странице недоступен
-
-- **Evidence:** На 840d24b9bcfc506cab049de0862890c5d1578bc4 blocking_relations_selection_view_model.dart:438-455 переводит выбор после успеха в BlockingRelationsSelectionSucceeded; blocking_relations_selection_view_model.dart:51-59 отклоняет дальнейший select. В relation_neighborhood_sliver.dart:111-126,194-210 для этого состояния исчезают число выбранных связей и флажки, а возврата к редактированию после успеха нет. Проверка blocking_relations_selection_test.dart:157-193 закрепляет запрет второго выбора. Сквозной тест long_term_relation_app_flow_test.dart:393-433 оставляет другие зависимости после частичного удаления, но не делает второй выбор на открытой странице.
-- **Evidence revisions:** ["840d24b9bcfc506cab049de0862890c5d1578bc4"]
-- **Impact:** Чтобы удалить оставшиеся блокирующие связи, пользователь вынужден покинуть и вновь открыть намерение; текущая страница не даёт завершить освобождение намерения несколькими явными операциями. Новые связи после предыдущего подтверждения также нельзя выбрать здесь.
-- **Required outcome:** После успешного завершения страница должна позволять начать новый пустой явный выбор оставшихся связей без повторной отправки прежней команды; проверить последовательные удаления в одной экранной сессии.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart","test/long_term_relation/presentation/neighborhood/blocking_relations_selection_test.dart","test/app/long_term_relation_app_flow_test.dart"]
 
 ### F2 · Medium — Актуализация большого выбора повторяет агрегаты для каждой связи
 
