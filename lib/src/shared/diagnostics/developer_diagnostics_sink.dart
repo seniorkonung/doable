@@ -26,6 +26,23 @@ final class DeveloperDiagnosticsSink implements DiagnosticsSink {
 }
 
 Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
+  DailyChoiceReadDiagnosticsEvent() => {
+    'operation': 'dailyChoiceDetailRead',
+    'stage': 'read',
+    ..._encodeStatus(event.status),
+  },
+  DailyChoicePathValidationDiagnosticsEvent(:final commandType) => {
+    'operation': 'dailyChoicePathValidation',
+    'commandType': commandType.name,
+    'stage': 'validation',
+    ..._encodeStatus(event.status),
+  },
+  DailyChoiceCommandDiagnosticsEvent(:final commandType, :final stage) => {
+    'operation': 'dailyChoiceCommand',
+    'commandType': commandType.name,
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
   BootstrapDiagnosticsEvent(:final schemaVersion) => {
     'operation': 'bootstrap',
     ..._encodeStatus(event.status),
