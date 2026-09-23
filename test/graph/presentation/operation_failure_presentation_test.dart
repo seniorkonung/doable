@@ -1,5 +1,10 @@
 import 'dart:async';
 
+import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_command_failure_message.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -476,6 +481,90 @@ void main() {
       expect(fallback?.completion, isA<BlockingRelationsDeleteCompletion>());
     },
   );
+
+  for (final scenario in <({Locale locale, String message})>[
+    (locale: const Locale('en'), message: 'Check the daily choice date.'),
+    (locale: const Locale('ru'), message: 'Проверьте дату дневного выбора.'),
+  ]) {
+    testWidgets(
+      'дневная ошибка поля доступна локально для ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = _FailureHarness();
+        addTearDown(harness.dispose);
+        final claim = await harness.createDailyChoiceClaim();
+
+        await tester.pumpWidget(
+          harness.app(
+            Builder(
+              builder: (context) => OperationFailurePresentation(
+                claim: claim,
+                message: dailyChoiceCommandFailureMessage(
+                  AppLocalizations.of(context),
+                  const DailyChoiceValidationFailure(
+                    DailyChoiceValidationField.date,
+                  ),
+                ),
+                messageKey: const ValueKey('daily-choice-failure-message'),
+              ),
+            ),
+            locale: scenario.locale,
+          ),
+        );
+
+        expect(find.text(scenario.message), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('daily-choice-failure-message')),
+          ),
+          matchesSemantics(
+            label: scenario.message,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        expect(harness.claimAgain(claim), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'исчезнувшая дневная ошибка передаётся оболочке после потери фокуса',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createDailyChoiceClaim();
+      final showError = ValueNotifier(true);
+      addTearDown(showError.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<bool>(
+            valueListenable: showError,
+            builder: (context, visible, _) => visible
+                ? OperationFailurePresentation(
+                    claim: claim,
+                    message: 'Проверьте дату дневного выбора.',
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(harness.claimAgain(claim), same(claim));
+      expect(fallback, isNull);
+
+      showError.value = false;
+      await tester.pump();
+      await tester.pump();
+      expect(fallback?.token, same(claim.token));
+      expect(fallback?.completion, isA<DailyChoiceCommandCompletion>());
+    },
+  );
 }
 
 final class _FailureHarness {
@@ -568,14 +657,48 @@ final class _FailureHarness {
     return coordinator.claimInitiatorFailure(accepted.token)!;
   }
 
+  Future<GraphInitiatorPresentationClaim> createDailyChoiceClaim() async {
+    final choiceId = switch (DailyChoiceId.decode(
+      '018f1400-0000-7000-8000-000000000001',
+    )) {
+      DailyChoiceIdDecodingSuccess(:final id) => id,
+      InvalidDailyChoiceIdDecoding() => throw StateError(
+        'Некорректный ID дневного выбора.',
+      ),
+    };
+    final accepted = coordinator.acceptDailyChoiceUpdate(
+      UpdateDailyChoiceFields(
+        choiceId: choiceId,
+        patch: const DailyChoiceFieldsPatch(
+          isCompleted: DailyChoiceFieldSet(true),
+        ),
+      ),
+    ) as DailyChoiceCommandAccepted;
+    repository.completeDailyChoiceCommand(
+      repository.dailyChoiceCommands.length - 1,
+      const GraphCommandFailed<
+        DailyChoiceCommandSuccess,
+        DailyChoiceCommandFailure
+      >(DailyChoiceValidationFailure(DailyChoiceValidationField.date)),
+    );
+    await accepted.future;
+    return coordinator.claimInitiatorFailure(accepted.token)!;
+  }
+
   GraphInitiatorPresentationClaim? claimAgain(
     GraphInitiatorPresentationClaim claim,
   ) => coordinator.claimInitiatorFailure(claim.token);
 
-  Widget app(Widget body) => UncontrolledProviderScope(
-    container: container,
-    child: MaterialApp(home: Scaffold(body: body)),
-  );
+  Widget app(Widget body, {Locale locale = const Locale('en')}) =>
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: body),
+        ),
+      );
 
   void dispose() {
     registration.release();

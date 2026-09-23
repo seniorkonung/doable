@@ -5,7 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../daily_choice/application/daily_choice_result.dart';
+import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
 import '../application/delete_blocking_relations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
@@ -212,21 +212,16 @@ String _dailyChoiceMessage(
   },
   localizations.graphOperationDailyChoice,
   switch (completion.result) {
-    GraphResultSuccess() => localizations.dailyChoiceOperationSucceeded,
-    GraphResultFailure(:final failure) => switch (failure) {
-      DailyChoiceValidationFailure() =>
-        localizations.dailyChoiceOperationInvalid,
-      DailyChoiceNotFoundFailure() =>
-        localizations.dailyChoiceOperationNotFound,
-      DailyChoiceConflictFailure() =>
-        localizations.dailyChoiceOperationConflict,
-      DailyChoiceUnavailableFailure() =>
-        localizations.dailyChoiceOperationUnavailable,
-      DailyChoiceCorruptionFailure() =>
-        localizations.dailyChoiceOperationCorruption,
-      DailyChoiceUnexpectedFailure() =>
-        localizations.dailyChoiceOperationUnexpected,
+    GraphResultSuccess() => switch (completion.kind) {
+      DailyChoiceCommandKind.create => localizations.dailyChoiceCreated,
+      DailyChoiceCommandKind.update => localizations.dailyChoiceUpdated,
+      DailyChoiceCommandKind.replace => localizations.dailyChoicePathReplaced,
+      DailyChoiceCommandKind.delete => localizations.dailyChoiceDeleted,
     },
+    GraphResultFailure(:final failure) => dailyChoiceCommandFailureMessage(
+      localizations,
+      failure,
+    ),
   },
 );
 
