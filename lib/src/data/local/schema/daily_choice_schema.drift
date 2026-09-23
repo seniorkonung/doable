@@ -1,0 +1,95 @@
+import 'long_term_relation_schema.drift';
+
+CREATE TABLE daily_choices (
+  creation_sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
+    CHECK (creation_sequence > 0),
+  id TEXT NOT NULL UNIQUE,
+  source_intention_id TEXT NOT NULL
+    REFERENCES intentions(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  selected_intention_id TEXT NOT NULL
+    REFERENCES intentions(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  choice_date TEXT NOT NULL CHECK (
+    typeof(choice_date) = 'text' AND
+    length(choice_date) = 10 AND
+    choice_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+  ),
+  description TEXT CHECK (
+    description IS NULL OR
+    (
+      typeof(description) = 'text' AND
+      instr(CAST(description AS BLOB), x'00') = 0
+    )
+  ),
+  is_completed BOOLEAN NOT NULL CHECK (
+    typeof(is_completed) = 'integer' AND
+    is_completed IN (0, 1)
+  ),
+  CHECK (source_intention_id <> selected_intention_id)
+);
+
+CREATE INDEX daily_choices_date_creation_order
+  ON daily_choices (choice_date, creation_sequence);
+
+CREATE INDEX daily_choices_source_date_creation_order
+  ON daily_choices (source_intention_id, choice_date, creation_sequence);
+
+CREATE INDEX daily_choices_selected_date_creation_order
+  ON daily_choices (selected_intention_id, choice_date, creation_sequence);
+
+CREATE INDEX daily_choices_source_recent
+  ON daily_choices (source_intention_id, creation_sequence DESC);
+
+CREATE INDEX daily_choices_selected_recent
+  ON daily_choices (selected_intention_id, creation_sequence DESC);
+
+CREATE TRIGGER daily_choices_immutable_identity
+AFTER UPDATE OF creation_sequence, id ON daily_choices
+WHEN
+  new.creation_sequence <> old.creation_sequence OR
+  new.id <> old.id
+BEGIN
+  SELECT RAISE(ABORT, 'daily choice identity is immutable');
+END;
+
+CREATE TABLE daily_choice_path_steps (
+  id TEXT NOT NULL PRIMARY KEY,
+  daily_choice_id TEXT NOT NULL
+    REFERENCES daily_choices(id) ON UPDATE RESTRICT ON DELETE CASCADE,
+  long_term_relation_id TEXT NOT NULL
+    REFERENCES long_term_relations(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  previous_step_id TEXT,
+  UNIQUE (daily_choice_id, id),
+  FOREIGN KEY (daily_choice_id, previous_step_id)
+    REFERENCES daily_choice_path_steps(daily_choice_id, id)
+    ON UPDATE NO ACTION ON DELETE NO ACTION
+    DEFERRABLE INITIALLY DEFERRED,
+  CHECK (previous_step_id IS NULL OR previous_step_id <> id)
+);
+
+CREATE UNIQUE INDEX daily_choice_path_steps_one_root
+  ON daily_choice_path_steps (daily_choice_id)
+  WHERE previous_step_id IS NULL;
+
+CREATE UNIQUE INDEX daily_choice_path_steps_one_successor
+  ON daily_choice_path_steps (daily_choice_id, previous_step_id)
+  WHERE previous_step_id IS NOT NULL;
+
+CREATE INDEX daily_choice_path_steps_relation
+  ON daily_choice_path_steps (long_term_relation_id);
+
+CREATE TRIGGER long_term_relations_protect_daily_choice_path
+BEFORE UPDATE OF type, source_intention_id, related_intention_id
+ON long_term_relations
+WHEN
+  (
+    new.type <> old.type OR
+    new.source_intention_id <> old.source_intention_id OR
+    new.related_intention_id <> old.related_intention_id
+  ) AND
+  EXISTS (
+    SELECT 1 FROM daily_choice_path_steps
+    WHERE long_term_relation_id = old.id
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'long-term relation is used by a daily choice path');
+END;
