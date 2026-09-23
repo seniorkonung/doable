@@ -43,12 +43,82 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/catalog/catalog_test_support.dart'
     as catalog_support;
+import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
 
 /// Контрольная точка согласования: каталог, подробные данные и соседство
 /// обслуживаются одним графом, одним coordinator и одним потоком завершений.
 void main() {
+  test('смешанная команда публикует целый пакет и целые снимки', () async {
+    final database = AppDatabase(openInMemoryLocalDatabase());
+    await database.open();
+    addTearDown(database.close);
+    await seedDurabilityGraph(database);
+    final repository = durabilityRepository(database);
+    expect(
+      await repository.execute(durabilityCreate()),
+      isA<GraphCommandSucceeded>(),
+    );
+
+    final choice = StreamIterator(
+      repository.watchDailyChoice(durabilityChoice(201)),
+    );
+    final relation = StreamIterator(
+      repository.watchRelation(durabilityRelation(104)),
+    );
+    final intention = StreamIterator(
+      repository.watchIntention(durabilityIntention(1)),
+    );
+    addTearDown(() async {
+      await choice.cancel();
+      await relation.cancel();
+      await intention.cancel();
+    });
+    expect(await choice.moveNext(), isTrue);
+    expect(await relation.moveNext(), isTrue);
+    expect(await intention.moveNext(), isTrue);
+    expect(choice.current, isA<DailyChoiceReadSuccess>());
+    expect(relation.current, isA<LongTermRelationReadSuccess>());
+    expect(intention.current, isA<ResultSuccess>());
+    final before = (choice.current as DailyChoiceReadSuccess).value.revision;
+
+    final result = await repository.execute(durabilityMixedDelete(201));
+
+    final committed = (result as GraphCommandSucceeded).value;
+    final changes = committed.changes;
+    expect(changes, hasLength(5));
+    expect(changes.whereType<DailyChoiceChange>(), hasLength(1));
+    expect(changes.whereType<LongTermRelationChange>(), hasLength(1));
+    expect(changes.whereType<IntentionRelationCountsChanged>(), hasLength(3));
+    for (final change in changes) {
+      expect(
+        change.revision.compareTo(committed.revision),
+        GraphRevisionOrder.same,
+      );
+    }
+    expect(before.compareTo(committed.revision), GraphRevisionOrder.older);
+
+    expect(await choice.moveNext(), isTrue);
+    expect(await relation.moveNext(), isTrue);
+    expect(await intention.moveNext(), isTrue);
+    final choiceAfter = (choice.current as DailyChoiceReadSuccess).value;
+    final relationAfter =
+        (relation.current as LongTermRelationReadSuccess).value;
+    final intentionAfter = (intention.current as ResultSuccess).value;
+    expect(choiceAfter.value, isNull);
+    expect(relationAfter.value, isNull);
+    expect(intentionAfter.value.relationCounts.dailySource, 0);
+    expect(intentionAfter.value.relationCounts.total, 2);
+    for (final revision in [
+      choiceAfter.revision,
+      relationAfter.revision,
+      intentionAfter.revision,
+    ]) {
+      expect(revision.compareTo(committed.revision), GraphRevisionOrder.same);
+    }
+  });
+
   test(
     'массовое удаление Drift согласует все открытые представления',
     () async {
