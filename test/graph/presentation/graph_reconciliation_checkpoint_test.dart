@@ -1,3 +1,4 @@
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
@@ -1390,6 +1391,13 @@ final class _CheckpointGraphRepository implements PersonalGraphRepository {
     _catalogRequests.add(request);
     return request.future;
   }
+
+  @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(

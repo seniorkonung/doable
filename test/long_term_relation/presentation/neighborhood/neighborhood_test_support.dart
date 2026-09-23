@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
@@ -187,6 +188,13 @@ final class ControlledNeighborhoodRepository
   void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) {
     _dailyChoiceRequests[index].complete(result);
   }
+
+  @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(

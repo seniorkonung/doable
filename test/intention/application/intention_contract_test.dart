@@ -1,3 +1,4 @@
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:io';
@@ -861,6 +862,13 @@ final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
   Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
     IntentionId intentionId,
   ) async => const ResultFailure(IntentionUnavailableFailure());
+
+  @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(

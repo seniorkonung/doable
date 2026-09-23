@@ -5,6 +5,7 @@ import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
 import '../../daily_choice/application/daily_choice_details.dart';
+import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../daily_choice/application/choice_path_continuations.dart';
 import '../../daily_choice/application/choice_path_draft.dart';
 import '../../daily_choice/application/confirmed_choice_path.dart';
@@ -110,6 +111,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
       _watchDailyChoice(id);
+
+  @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) async =>
+      const DailyChoiceCatalogPageError(DailyChoiceCatalogUnavailableFailure());
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

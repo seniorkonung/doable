@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
@@ -809,6 +810,13 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
         revision: _Revision(_revisions[intentionId] ?? 0),
       ),
     ),
+  );
+
+  @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
   );
 
   @override
