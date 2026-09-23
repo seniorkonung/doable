@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -18,6 +19,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'large_blocking_relations_fixture.dart';
+import 'daily_choice_durability_fixture.dart';
 
 const _operationEnvironment = 'DOABLE_GRAPH_OPERATION';
 const _stopPointEnvironment = 'DOABLE_GRAPH_STOP_POINT';
@@ -67,6 +69,24 @@ void main() {
           ),
         );
         final result = switch (operation) {
+          _GraphOperation.dailyCreate => await durabilityRepository(
+            database,
+            choiceNumber: 203,
+            firstStepNumber: 311,
+          ).execute(durabilityCreate()),
+          _GraphOperation.dailyUpdate => await repository.execute(
+            durabilityUpdate(201),
+          ),
+          _GraphOperation.dailyReplace => await durabilityRepository(
+            database,
+            firstStepNumber: 313,
+          ).execute(durabilityReplace(201)),
+          _GraphOperation.dailyDelete => await repository.execute(
+            DeleteDailyChoice(durabilityChoice(201)),
+          ),
+          _GraphOperation.dailyMixedDelete => await repository.execute(
+            durabilityMixedDelete(201),
+          ),
           _GraphOperation.create => await repository.execute(
             CreateLongTermRelation(
               sourceIntentionId: _intentionId(_sourceIdValue),
@@ -124,6 +144,11 @@ void main() {
           _GraphOperation.restore ||
           _GraphOperation.delete => result is GraphCommandSucceeded,
           _GraphOperation.bulkDelete => result is GraphCommandSucceeded,
+          _GraphOperation.dailyCreate ||
+          _GraphOperation.dailyUpdate ||
+          _GraphOperation.dailyReplace ||
+          _GraphOperation.dailyDelete ||
+          _GraphOperation.dailyMixedDelete => result is GraphCommandSucceeded,
           _GraphOperation.cascade => result is ResultSuccess,
         };
         if (!succeeded) {
@@ -144,10 +169,11 @@ void main() {
 
 final class _GraphOperationStopObserver
     extends LocalDatabaseConnectionObserver {
-  const _GraphOperationStopObserver(this.operation, this.stopPoint);
+  _GraphOperationStopObserver(this.operation, this.stopPoint);
 
   final _GraphOperation operation;
   final _GraphStopPoint stopPoint;
+  var _stepInserts = 0;
 
   @override
   Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
@@ -166,7 +192,31 @@ final class _GraphOperationStopObserver
       await _reportReadyAndWait();
     }
     if (stopPoint != _GraphStopPoint.beforeCommit) return;
+    if (statement.operation == LocalDatabaseSqlOperation.insert &&
+        statement.statements.any(
+          (sql) => sql.contains('INSERT INTO daily_choice_path_steps'),
+        )) {
+      _stepInserts++;
+    }
     final matches = switch (operation) {
+      _GraphOperation.dailyCreate =>
+        _stepInserts == 2 &&
+            statement.operation == LocalDatabaseSqlOperation.insert &&
+            statement.statements.any(
+              (sql) => sql.contains('INSERT INTO daily_choice_path_steps'),
+            ),
+      _GraphOperation.dailyUpdate =>
+        statement.operation == LocalDatabaseSqlOperation.update &&
+            statement.statements.any((sql) => sql.contains('daily_choices')),
+      _GraphOperation.dailyReplace =>
+        _stepInserts == 1 &&
+            statement.operation == LocalDatabaseSqlOperation.insert &&
+            statement.statements.any(
+              (sql) => sql.contains('INSERT INTO daily_choice_path_steps'),
+            ),
+      _GraphOperation.dailyDelete || _GraphOperation.dailyMixedDelete =>
+        statement.operation == LocalDatabaseSqlOperation.delete &&
+            statement.statements.any((sql) => sql.contains('daily_choices')),
       _GraphOperation.create =>
         statement.operation == LocalDatabaseSqlOperation.insert &&
             statement.statements.any(
@@ -209,6 +259,11 @@ Future<Never> _reportReadyAndWait() async {
 }
 
 enum _GraphOperation {
+  dailyCreate,
+  dailyUpdate,
+  dailyReplace,
+  dailyDelete,
+  dailyMixedDelete,
   create,
   cascade,
   update,
@@ -218,6 +273,11 @@ enum _GraphOperation {
   bulkDelete;
 
   static _GraphOperation parse(String? value) => switch (value) {
+    'daily_create' => dailyCreate,
+    'daily_update' => dailyUpdate,
+    'daily_replace' => dailyReplace,
+    'daily_delete' => dailyDelete,
+    'daily_mixed_delete' => dailyMixedDelete,
     'create' => create,
     'cascade' => cascade,
     'update' => update,
