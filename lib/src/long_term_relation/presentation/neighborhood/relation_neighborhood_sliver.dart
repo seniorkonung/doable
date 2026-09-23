@@ -116,9 +116,7 @@ final class _RelationNeighborhoodSliverState
             onSelectDirection: viewModel.selectDirection,
             onCreateRelation: widget.onCreateRelation,
             onRetryRefresh: onRetryRefresh,
-            selectedCount: selection is BlockingRelationsSelectionSucceeded
-                ? null
-                : selection?.selected.length,
+            selectedCount: selection?.selected.length,
           );
         }
         return _buildBodyChild(context, state, index - 1, viewModel, selection);
@@ -195,9 +193,7 @@ final class _RelationNeighborhoodSliverState
         item: item,
         onOpen: widget.onOpenRelation,
         direction: state.selection.direction,
-        isSelected: selection is BlockingRelationsSelectionSucceeded
-            ? null
-            : selection?.selected.containsKey(item.relation.id),
+        isSelected: selection?.selected.containsKey(item.relation.id),
         onToggleSelection: selection is BlockingRelationsSelectionEditing
             ? () {
                 final editor = ref.read(

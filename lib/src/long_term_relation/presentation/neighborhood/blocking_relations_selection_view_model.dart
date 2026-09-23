@@ -51,7 +51,6 @@ final class BlockingRelationsSelectionViewModel
   bool select(LongTermRelationSummary row) {
     final current = state;
     if (current is BlockingRelationsSelectionRunning ||
-        current is BlockingRelationsSelectionSucceeded ||
         current is BlockingRelationsSelectionRefreshing ||
         current is BlockingRelationsSelectionRefreshFailed ||
         (current is BlockingRelationsSelectionFailed &&
@@ -80,7 +79,6 @@ final class BlockingRelationsSelectionViewModel
   bool unselect(LongTermRelationId relationId) {
     final current = state;
     if (current is BlockingRelationsSelectionRunning ||
-        current is BlockingRelationsSelectionSucceeded ||
         current is BlockingRelationsSelectionRefreshing ||
         current is BlockingRelationsSelectionRefreshFailed ||
         (current is BlockingRelationsSelectionFailed &&
@@ -233,7 +231,6 @@ final class BlockingRelationsSelectionViewModel
     final current = state;
     if (current is BlockingRelationsSelectionPrepared ||
         current is BlockingRelationsSelectionRunning ||
-        current is BlockingRelationsSelectionSucceeded ||
         current is BlockingRelationsSelectionRefreshing ||
         current.selected.isEmpty) {
       return false;
@@ -435,25 +432,25 @@ final class BlockingRelationsSelectionViewModel
       if (current is! BlockingRelationsSelectionRunning) {
         return;
       }
-      state = switch (completion.result) {
-        GraphResultSuccess(value: final confirmed) =>
-          BlockingRelationsSelectionSucceeded(
+      switch (completion.result) {
+        case GraphResultSuccess():
+          _rowRevisions.clear();
+          _descriptions.clear();
+          _invalidReasons.clear();
+          _activeToken = null;
+          state = BlockingRelationsSelectionEditing(
+            intentionId: current.intentionId,
+            selected: const {},
+          );
+        case GraphResultFailure(:final failure):
+          state = BlockingRelationsSelectionFailed(
             intentionId: current.intentionId,
             selected: current.selected,
-            snapshot: current.snapshot,
-            deleted: confirmed.value,
-          ),
-        GraphResultFailure(:final failure) => BlockingRelationsSelectionFailed(
-          intentionId: current.intentionId,
-          selected: current.selected,
-          failure: BlockingRelationsSelectionCommandFailure(failure),
-          presentationClaim: _coordinator.claimInitiatorFailure(
-            completion.token,
-          ),
-        ),
-      };
-      if (completion.result is GraphResultSuccess) {
-        _activeToken = null;
+            failure: BlockingRelationsSelectionCommandFailure(failure),
+            presentationClaim: _coordinator.claimInitiatorFailure(
+              completion.token,
+            ),
+          );
       }
     } on Object {
       if (!ref.mounted) {

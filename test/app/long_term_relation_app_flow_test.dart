@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:doable/main.dart';
 import 'package:doable/l10n/app_localizations.dart';
@@ -187,25 +187,13 @@ void main() {
         await tester.tap(showBlocking);
         await _selectBlockingRelation(tester, 100);
         await _scrollDetailsToTop(tester);
-        final can = find.byKey(
-          const ValueKey('relation-neighborhood-type-can'),
-        );
-        await _ensureVisible(tester, can);
-        await tester.tap(can);
-        final incoming = find.byKey(
-          const ValueKey('relation-neighborhood-direction-incoming'),
-        );
-        await _ensureVisible(tester, incoming);
-        await tester.tap(incoming);
-        await _selectBlockingRelation(tester, 200);
-        await _scrollDetailsToTop(tester);
         expect(
-          find.text(loc.relationNeighborhoodSelectedCount(2)),
+          find.text(loc.relationNeighborhoodSelectedCount(1)),
           findsOneWidget,
         );
         await _reviewBlockingSelection(tester);
         expect(
-          find.text(loc.blockingRelationsConfirmationCount(2)),
+          find.text(loc.blockingRelationsConfirmationCount(1)),
           findsOneWidget,
         );
         final confirm = find.byKey(
@@ -228,6 +216,60 @@ void main() {
         );
         await _dismissOperationMessage(tester);
         await _scrollDetailsToTop(tester);
+        expect(
+          find.text(loc.relationNeighborhoodSelectedCount(0)),
+          findsOneWidget,
+        );
+        expect(
+          find.text(loc.relationNeighborhoodArchivedTotal(1)),
+          findsWidgets,
+        );
+        final can = find.byKey(
+          const ValueKey('relation-neighborhood-type-can'),
+        );
+        await _ensureVisible(tester, can);
+        await tester.tap(can);
+        final incoming = find.byKey(
+          const ValueKey('relation-neighborhood-direction-incoming'),
+        );
+        await _ensureVisible(tester, incoming);
+        await tester.tap(incoming);
+        await _selectBlockingRelation(tester, 200);
+        final secondSelect = find.byKey(
+          ValueKey(
+            'relation-neighborhood-select-${_blockingRelationId(200).toCanonicalString()}',
+          ),
+        );
+        expect(
+          tester.getSemantics(secondSelect).flagsCollection.isChecked,
+          CheckedState.isTrue,
+        );
+        await _scrollDetailsToTop(tester);
+        expect(
+          find.text(loc.relationNeighborhoodSelectedCount(1)),
+          findsOneWidget,
+        );
+        await _reviewBlockingSelection(tester);
+        expect(
+          find.text(loc.blockingRelationsConfirmationCount(1)),
+          findsOneWidget,
+        );
+        await tester.scrollUntilVisible(
+          confirm,
+          300,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.tap(confirm);
+        await _pumpUntilFound(
+          tester,
+          find.textContaining(loc.blockingRelationsDeleted),
+        );
+        await _dismissOperationMessage(tester);
+        await _scrollDetailsToTop(tester);
+        expect(
+          find.text(loc.relationNeighborhoodSelectedCount(0)),
+          findsOneWidget,
+        );
 
         final delete = find.byKey(const ValueKey('intention-details-delete'));
         await _ensureVisible(tester, delete);
@@ -307,7 +349,7 @@ void main() {
       await tester.pumpWidget(MainApp(runtime: runtime));
       await _pumpUntilFound(tester, find.text(_blockingOwnerTitle));
       await _openIntention(tester, _blockingOwnerTitle);
-      expect(find.text('Active relations: 51'), findsWidgets);
+      expect(find.text('Active relations: 53'), findsWidgets);
       expect(find.text('Archived relations: 2'), findsWidgets);
 
       await _deleteCurrentIntention(tester);
@@ -402,6 +444,83 @@ void main() {
         findsOneWidget,
       );
       await _dismissOperationMessage(tester);
+      await _scrollDetailsToTop(tester);
+      expect(find.text('Selected relations: 0'), findsOneWidget);
+      expect(find.text('Active relations: 51'), findsWidgets);
+      expect(find.text('Archived relations: 1'), findsWidgets);
+
+      for (final key in [
+        'relation-neighborhood-scope-active',
+        'relation-neighborhood-type-need',
+        'relation-neighborhood-direction-outgoing',
+      ]) {
+        final control = find.byKey(ValueKey(key));
+        await _ensureVisible(tester, control);
+        await tester.tap(control);
+        await tester.pump();
+      }
+      await _selectBlockingRelation(tester, 101);
+      await _selectBlockingRelation(tester, 152);
+      await _scrollDetailsToTop(tester);
+      await _ensureVisible(
+        tester,
+        find.byKey(const ValueKey('relation-neighborhood-scope-archived')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('relation-neighborhood-scope-archived')),
+      );
+      await _ensureVisible(
+        tester,
+        find.byKey(const ValueKey('relation-neighborhood-direction-incoming')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('relation-neighborhood-direction-incoming')),
+      );
+      await _selectBlockingRelation(tester, 202);
+      await _scrollDetailsToTop(tester);
+      expect(find.text('Selected relations: 3'), findsOneWidget);
+      await _reviewBlockingSelection(tester);
+      expect(find.text('To delete: 3'), findsOneWidget);
+      for (final id in [100, 150, 200]) {
+        expect(
+          find.byKey(
+            ValueKey(
+              'blocking-relations-confirm-row-${_blockingRelationId(id).toCanonicalString()}',
+            ),
+          ),
+          findsNothing,
+        );
+      }
+      for (final id in [101, 152, 202]) {
+        final row = find.byKey(
+          ValueKey(
+            'blocking-relations-confirm-row-${_blockingRelationId(id).toCanonicalString()}',
+          ),
+        );
+        await tester.scrollUntilVisible(
+          row,
+          300,
+          scrollable: find.byType(Scrollable).last,
+        );
+        expect(row, findsOneWidget);
+      }
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('blocking-relations-confirm-delete')),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('blocking-relations-confirm-delete')),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.textContaining('Selected relations deleted.'),
+      );
+      await _dismissOperationMessage(tester);
+      await _scrollDetailsToTop(tester);
+      expect(find.text('Selected relations: 0'), findsOneWidget);
+      expect(find.text('Active relations: 49'), findsWidgets);
+      expect(find.text('Archived relations: 0'), findsWidgets);
       await _deleteCurrentIntention(tester);
       await _pumpUntilFound(
         tester,
@@ -444,7 +563,7 @@ void main() {
       await _pumpUntilFound(tester, find.text(_blockingOwnerTitle));
       await _openIntention(tester, _blockingOwnerTitle);
       expect(find.text('Active relations: 50'), findsWidgets);
-      expect(find.text('Archived relations: 1'), findsWidgets);
+      expect(find.text('Archived relations: 0'), findsWidgets);
       semantics.dispose();
       await tester.pumpWidget(const SizedBox.shrink());
       await reopened.shutdown();
@@ -468,15 +587,23 @@ void main() {
       );
       expect(
         relationIds,
-        contains(_blockingRelationId(101).toCanonicalString()),
+        isNot(contains(_blockingRelationId(101).toCanonicalString())),
+      );
+      expect(
+        relationIds,
+        isNot(contains(_blockingRelationId(152).toCanonicalString())),
+      );
+      expect(
+        relationIds,
+        isNot(contains(_blockingRelationId(202).toCanonicalString())),
+      );
+      expect(
+        relationIds,
+        contains(_blockingRelationId(102).toCanonicalString()),
       );
       expect(
         relationIds,
         contains(_blockingRelationId(201).toCanonicalString()),
-      );
-      expect(
-        relationIds,
-        contains(_blockingRelationId(202).toCanonicalString()),
       );
       final intentions = await persisted.select(persisted.intentions).get();
       expect(
@@ -1159,7 +1286,7 @@ Future<void> _seedBlockingFlow(
         isArchived: Value(!largeGroup),
       ),
     );
-    final last = largeGroup ? 150 : 100;
+    final last = largeGroup ? 152 : 100;
     for (var index = 100; index <= last; index += 1) {
       final neighbor = _blockingIntentionId(index).toCanonicalString();
       batch.insert(

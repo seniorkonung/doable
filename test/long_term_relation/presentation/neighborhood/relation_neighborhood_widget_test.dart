@@ -2,6 +2,9 @@ import 'dart:io';
 import 'dart:ui' show CheckedState;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -23,6 +26,108 @@ import 'neighborhood_test_support.dart';
 
 void main() {
   const revision = TestGraphRevision(1);
+
+  testWidgets('после удаления флажки оставшейся связи снова доступны', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledNeighborhoodRepository();
+    addTearDown(repository.dispose);
+    final ownerId = testIntentionId(1);
+    final rows = testGroupRows(ownerId: ownerId, from: 1, count: 2);
+    await _pumpNeighborhoodSliver(
+      tester,
+      repository,
+      ownerId,
+      selectionMode: true,
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: rows,
+        counts: testRelationCounts(activeNeedOutgoing: 2),
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(RelationNeighborhoodSliver)),
+    );
+    final provider = blockingRelationsSelectionViewModelProvider(ownerId);
+    final viewModel = container.read(provider.notifier);
+    final first = find.byKey(
+      ValueKey(
+        'relation-neighborhood-select-${testRelationId(1).toCanonicalString()}',
+      ),
+    );
+    final second = find.byKey(
+      ValueKey(
+        'relation-neighborhood-select-${testRelationId(2).toCanonicalString()}',
+      ),
+    );
+    await _scrollTo(tester, first);
+    await tester.tap(first);
+    await tester.pump();
+    expect(viewModel.prepare(), isTrue);
+    final command = (container.read(
+      provider,
+    ) as BlockingRelationsSelectionPrepared).snapshot.command;
+    viewModel.confirm(presentationTitle: 'Намерение-владелец');
+    await tester.pump();
+    expect(tester.widget<Checkbox>(second).onChanged, isNull);
+
+    const nextRevision = TestGraphRevision(2);
+    repository.completeBlockingCommand(
+      0,
+      GraphCommandSucceeded<
+        BlockingRelationsDeleted,
+        DeleteBlockingRelationsFailure
+      >(
+        ConfirmedGraphResult(
+          revision: nextRevision,
+          value: BlockingRelationsDeleted(
+            command: command,
+            revision: nextRevision,
+            deletedRelations: [rows.first.relation],
+            counts: {
+              ownerId: testRelationCounts(activeNeedOutgoing: 1),
+              rows.first.related.id: testRelationCounts(),
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(container.read(provider).selected, isEmpty);
+    await _pumpUntilRequestCount(tester, repository, 2);
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: [rows.last],
+        counts: testRelationCounts(activeNeedOutgoing: 1),
+        nextCursor: null,
+        revision: nextRevision,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(Scrollable), const Offset(0, 3000));
+    await tester.pump();
+    expect(find.text('Selected relations: 0'), findsOneWidget);
+    await _scrollTo(tester, second);
+    expect(tester.widget<Checkbox>(second).onChanged, isNotNull);
+    expect(
+      tester.getSemantics(second).flagsCollection.isChecked,
+      CheckedState.isFalse,
+    );
+    await tester.tap(second);
+    await tester.pump();
+    expect(container.read(provider).selected.keys, {testRelationId(2)});
+    await tester.drag(find.byType(Scrollable), const Offset(0, 3000));
+    await tester.pump();
+    expect(find.text('Selected relations: 1'), findsOneWidget);
+    semantics.dispose();
+  });
 
   testWidgets(
     'выбирает только отмеченные связи и сохраняет набор между порциями и группами',
