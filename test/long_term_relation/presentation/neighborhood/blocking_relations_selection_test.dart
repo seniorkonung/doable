@@ -5,8 +5,13 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -144,7 +149,7 @@ void main() {
       harness.viewModel.confirm(presentationTitle: 'Намерение');
       expect(harness.repository.commands, hasLength(1));
       harness.viewModel.resumeEditing();
-      expect(harness.state, isA<BlockingRelationsSelectionEditing>());
+      expect(harness.state, isA<BlockingRelationsSelectionFailed>());
       expect(harness.state.selected.keys, {row.relation.id});
     },
   );
@@ -181,6 +186,187 @@ void main() {
     harness.viewModel.confirm(presentationTitle: 'Намерение');
     expect(harness.repository.commands, hasLength(1));
   });
+
+  test('конфликт требует чтения и явного удаления недоступной связи', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    final first = testGroupRow(ownerId: harness.intentionId, index: 1);
+    final second = testGroupRow(ownerId: harness.intentionId, index: 2);
+    harness.viewModel.select(first);
+    harness.viewModel.select(second);
+    harness.viewModel.prepare();
+    harness.viewModel.confirm(presentationTitle: 'Намерение');
+    harness.repository.fail(
+      0,
+      DeleteBlockingRelationsSelectionConflictFailure(
+        relationId: second.relation.id,
+        reason: BlockingRelationConflictReason.relationMissing,
+      ),
+    );
+    await pumpEventQueue();
+
+    harness.repository.queueRelation(
+      first,
+      revision: const TestGraphRevision(3),
+    );
+    harness.repository.queueMissing(second.relation.id);
+    expect(await harness.viewModel.refreshSelection(), isTrue);
+    final editing = harness.state as BlockingRelationsSelectionEditing;
+    expect(editing.selected.keys, {first.relation.id, second.relation.id});
+    expect(editing.invalidIds, {second.relation.id});
+    expect(harness.viewModel.prepare(), isFalse);
+    expect(harness.repository.commands, hasLength(1));
+
+    expect(harness.viewModel.unselect(second.relation.id), isTrue);
+    expect(harness.viewModel.prepare(), isTrue);
+    harness.viewModel.confirm(presentationTitle: 'Намерение');
+    expect(harness.repository.commands, hasLength(2));
+    expect(
+      (harness.repository.commands.last as DeleteBlockingRelations).relationIds,
+      {first.relation.id},
+    );
+  });
+
+  test(
+    'актуализация сохраняет идентификаторы при изменении полей и ревизий',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final original = testGroupRow(ownerId: harness.intentionId, index: 1);
+      final changed = testGroupRow(
+        ownerId: harness.intentionId,
+        index: 1,
+        type: LongTermRelationType.can,
+        scope: RelationScope.archived,
+        priority: RelationPriority.p1,
+        neighborTitle: 'Новое название',
+      );
+      harness.viewModel.select(original);
+      harness.repository.queueRelation(
+        changed,
+        revision: const TestGraphRevision(5),
+      );
+      expect(await harness.viewModel.refreshSelection(), isTrue);
+      expect(
+        harness.state.selected[original.relation.id],
+        isNot(same(original)),
+      );
+      expect(
+        harness.state.selected[original.relation.id]!.related.title,
+        'Новое название',
+      );
+      expect(harness.viewModel.prepare(), isTrue);
+      final prepared =
+          (harness.state as BlockingRelationsSelectionPrepared).snapshot;
+      expect(prepared.command.relationIds, {original.relation.id});
+      expect(prepared.rows.single.relation.type, LongTermRelationType.can);
+      harness.viewModel.cancel();
+
+      harness.repository.queueRelation(
+        original,
+        revision: const TestGraphRevision(4),
+      );
+      expect(await harness.viewModel.refreshSelection(), isTrue);
+      expect(
+        harness.state.selected[original.relation.id]!.related.title,
+        'Новое название',
+      );
+    },
+  );
+
+  test(
+    'ошибка чтения и отсутствие намерения не становятся пустым выбором',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final row = testGroupRow(ownerId: harness.intentionId, index: 1);
+      harness.viewModel.select(row);
+      harness.repository.queueRelationFailure(
+        row.relation.id,
+        const LongTermRelationReadUnavailableFailure(),
+      );
+      expect(await harness.viewModel.refreshSelection(), isFalse);
+      expect(harness.state, isA<BlockingRelationsSelectionRefreshFailed>());
+      expect(harness.state.selected.keys, {row.relation.id});
+      expect(harness.viewModel.prepare(), isFalse);
+
+      harness.repository.intentionExists = false;
+      expect(await harness.viewModel.refreshSelection(), isFalse);
+      final missing = harness.state as BlockingRelationsSelectionRefreshFailed;
+      expect(
+        missing.failure,
+        BlockingRelationsRefreshFailure.intentionNotFound,
+      );
+      expect(missing.selected.keys, {row.relation.id});
+    },
+  );
+
+  test(
+    'перенос связи вне текущей группы сохраняет её в исправляемом выборе',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final row = testGroupRow(ownerId: harness.intentionId, index: 9);
+      final moved = testGroupRow(ownerId: testIntentionId(500), index: 9);
+      harness.viewModel.select(row);
+      harness.repository.queueRelation(
+        moved,
+        revision: const TestGraphRevision(5),
+      );
+
+      expect(await harness.viewModel.refreshSelection(), isTrue);
+      final editing = harness.state as BlockingRelationsSelectionEditing;
+      expect(editing.selected[row.relation.id], same(row));
+      expect(
+        editing.invalidReasons[row.relation.id],
+        BlockingRelationsInvalidReason.noLongerBlocking,
+      );
+      expect(harness.viewModel.prepare(), isFalse);
+      expect(harness.repository.commands, isEmpty);
+
+      harness.repository.queueRelation(
+        row,
+        revision: const TestGraphRevision(4),
+      );
+      expect(await harness.viewModel.refreshSelection(), isTrue);
+      expect(
+        (harness.state as BlockingRelationsSelectionEditing).invalidReasons[row
+            .relation
+            .id],
+        BlockingRelationsInvalidReason.noLongerBlocking,
+      );
+    },
+  );
+
+  test(
+    'повреждение и неожиданный отказ чтения остаются отдельными состояниями',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final row = testGroupRow(ownerId: harness.intentionId, index: 1);
+      harness.viewModel.select(row);
+      harness.repository.queueRelationFailure(
+        row.relation.id,
+        const LongTermRelationReadCorruptionFailure(),
+      );
+      expect(await harness.viewModel.refreshSelection(), isFalse);
+      expect(
+        (harness.state as BlockingRelationsSelectionRefreshFailed).failure,
+        BlockingRelationsRefreshFailure.corruption,
+      );
+      harness.repository.queueRelationFailure(
+        row.relation.id,
+        const LongTermRelationReadUnexpectedFailure(),
+      );
+      expect(await harness.viewModel.refreshSelection(), isFalse);
+      expect(
+        (harness.state as BlockingRelationsSelectionRefreshFailed).failure,
+        BlockingRelationsRefreshFailure.unexpected,
+      );
+      expect(harness.state.selected.keys, {row.relation.id});
+      expect(harness.repository.commands, isEmpty);
+    },
+  );
 }
 
 final class _Harness {
@@ -218,6 +404,75 @@ final class _Harness {
 final class _Repository implements PersonalGraphRepository {
   final commands = <GraphCommand>[];
   final _results = <Completer<Object>>[];
+  final _relationReads =
+      <LongTermRelationId, List<LongTermRelationReadResult>>{};
+  bool intentionExists = true;
+
+  @override
+  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
+    IntentionId intentionId,
+  ) async => intentionExists
+      ? ResultSuccess(
+          GraphSnapshot(
+            value: testRelationCounts(),
+            revision: const TestGraphRevision(1),
+          ),
+        )
+      : const ResultFailure(IntentionNotFoundFailure());
+
+  void queueRelation(
+    LongTermRelationSummary row, {
+    GraphRevision revision = const TestGraphRevision(1),
+  }) => _queue(
+    row.relation.id,
+    LongTermRelationReadSuccess(
+      GraphSnapshot(
+        value: LongTermRelationDetails(
+          relation: row.relation,
+          source: row.source,
+          related: row.related,
+          description: null,
+        ),
+        revision: revision,
+      ),
+    ),
+  );
+
+  void queueMissing(LongTermRelationId id) => _queue(
+    id,
+    const LongTermRelationReadSuccess(
+      GraphSnapshot(value: null, revision: TestGraphRevision(2)),
+    ),
+  );
+
+  void queueRelationFailure(
+    LongTermRelationId id,
+    LongTermRelationReadFailure failure,
+  ) => _queue(id, LongTermRelationReadError(failure));
+
+  void _queue(LongTermRelationId id, LongTermRelationReadResult result) =>
+      _relationReads.putIfAbsent(id, () => []).add(result);
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
+      Stream.value(_relationReads[id]!.removeAt(0));
+
+  @override
+  Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) => Stream.value(
+    ResultSuccess(
+      GraphSnapshot(
+        value: intentionExists
+            ? IntentionDetails(
+                intention: testNeighborhoodIntention(id: id),
+                relationCounts: testRelationCounts(),
+              )
+            : null,
+        revision: const TestGraphRevision(1),
+      ),
+    ),
+  );
 
   @override
   Future<GraphCommandResult<T, F>> execute<

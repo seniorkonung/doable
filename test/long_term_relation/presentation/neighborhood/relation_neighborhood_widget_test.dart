@@ -181,8 +181,10 @@ void main() {
         ),
       );
       expect(find.text('Archived relation'), findsWidgets);
-      await tester.ensureVisible(
+      await tester.scrollUntilVisible(
         find.byKey(const ValueKey('blocking-relations-cancel')),
+        200,
+        scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('blocking-relations-cancel')));

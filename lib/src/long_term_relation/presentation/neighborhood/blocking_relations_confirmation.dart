@@ -30,13 +30,70 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (selection is BlockingRelationsSelectionEditing &&
-            selection.selected.isNotEmpty)
+            selection.selected.isNotEmpty &&
+            selection.invalidReasons.isEmpty)
           FilledButton.icon(
             key: const ValueKey('blocking-relations-review'),
             onPressed: () => _review(context, ref, provider),
             icon: const Icon(Icons.preview_outlined),
             label: Text(localizations.blockingRelationsReviewAction),
           ),
+        if (selection is BlockingRelationsSelectionEditing)
+          for (final entry in selection.invalidReasons.entries)
+            Card(
+              key: ValueKey(
+                'blocking-relations-invalid-${entry.key.toCanonicalString()}',
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      localizations.blockingRelationsInvalidSelectedRelationId(
+                        entry.key.toCanonicalString(),
+                      ),
+                    ),
+                    Text(
+                      '${selection.selected[entry.key]!.source.title} → '
+                      '${selection.selected[entry.key]!.related.title}',
+                    ),
+                    Text(switch (entry.value) {
+                      BlockingRelationsInvalidReason.missing =>
+                        localizations.blockingRelationsInvalidMissing,
+                      BlockingRelationsInvalidReason.noLongerBlocking =>
+                        localizations.blockingRelationsInvalidMoved,
+                    }),
+                    TextButton(
+                      key: ValueKey(
+                        'blocking-relations-remove-invalid-${entry.key.toCanonicalString()}',
+                      ),
+                      onPressed: () =>
+                          ref.read(provider.notifier).unselect(entry.key),
+                      child: Text(
+                        localizations.relationNeighborhoodRemoveFromSelection,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        if (selection is BlockingRelationsSelectionRefreshing)
+          Semantics(
+            liveRegion: true,
+            child: Text(localizations.blockingRelationsRefreshingSelection),
+          ),
+        if (selection is BlockingRelationsSelectionRefreshFailed) ...[
+          Text(_refreshFailureMessage(localizations, selection.failure)),
+          if (selection.failure == BlockingRelationsRefreshFailure.unavailable)
+            OutlinedButton(
+              key: const ValueKey('blocking-relations-refresh-retry'),
+              onPressed: ref.read(provider.notifier).refreshSelection,
+              child: Text(
+                localizations.blockingRelationsRefreshSelectionAction,
+              ),
+            ),
+        ],
         if (selection is BlockingRelationsSelectionRunning)
           Semantics(
             liveRegion: true,
@@ -49,11 +106,24 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
             messageKey: const ValueKey('blocking-relations-delete-failure'),
           ),
           const SizedBox(height: 8),
-          OutlinedButton(
-            key: const ValueKey('blocking-relations-edit-selection'),
-            onPressed: ref.read(provider.notifier).resumeEditing,
-            child: Text(localizations.blockingRelationsEditSelectionAction),
-          ),
+          if (selection.requiresRefresh)
+            OutlinedButton(
+              key: const ValueKey('blocking-relations-refresh-selection'),
+              onPressed: ref.read(provider.notifier).refreshSelection,
+              child: Text(
+                localizations.blockingRelationsRefreshSelectionAction,
+              ),
+            )
+          else if (selection.failure
+                  is! BlockingRelationsSelectionCommandFailure ||
+              (selection.failure as BlockingRelationsSelectionCommandFailure)
+                      .failure
+                  is DeleteBlockingRelationsUnavailableFailure)
+            OutlinedButton(
+              key: const ValueKey('blocking-relations-edit-selection'),
+              onPressed: ref.read(provider.notifier).resumeEditing,
+              child: Text(localizations.blockingRelationsEditSelectionAction),
+            ),
         ],
       ],
     );
@@ -65,21 +135,26 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
     BlockingRelationsSelectionViewModelProvider provider,
   ) async {
     final viewModel = ref.read(provider.notifier);
+    if (!await viewModel.refreshSelection() || !context.mounted) {
+      return;
+    }
     if (!viewModel.prepare()) {
       return;
     }
     final prepared = ref.read(provider) as BlockingRelationsSelectionPrepared;
+    viewModel.observePrepared();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) =>
-          _BlockingRelationsConfirmation(snapshot: prepared.snapshot),
+      builder: (_) => _BlockingRelationsConfirmation(
+        snapshot: prepared.snapshot,
+        provider: provider,
+      ),
     );
     if (!context.mounted) {
       return;
     }
     final current = ref.read(provider);
-    if (current is! BlockingRelationsSelectionPrepared ||
-        !identical(current.snapshot, prepared.snapshot)) {
+    if (current is! BlockingRelationsSelectionPrepared) {
       return;
     }
     if (confirmed == true) {
@@ -89,6 +164,20 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
     }
   }
 }
+
+String _refreshFailureMessage(
+  AppLocalizations localizations,
+  BlockingRelationsRefreshFailure failure,
+) => switch (failure) {
+  BlockingRelationsRefreshFailure.intentionNotFound =>
+    localizations.blockingRelationsRefreshIntentionNotFound,
+  BlockingRelationsRefreshFailure.unavailable =>
+    localizations.blockingRelationsRefreshUnavailable,
+  BlockingRelationsRefreshFailure.corruption =>
+    localizations.blockingRelationsRefreshCorruption,
+  BlockingRelationsRefreshFailure.unexpected =>
+    localizations.blockingRelationsRefreshUnexpected,
+};
 
 String _failureMessage(
   AppLocalizations localizations,
@@ -100,8 +189,15 @@ String _failureMessage(
   BlockingRelationsSelectionCommandFailure(:final failure) => switch (failure) {
     DeleteBlockingRelationsIntentionNotFoundFailure() =>
       localizations.blockingRelationsDeleteIntentionNotFound,
-    DeleteBlockingRelationsSelectionConflictFailure() =>
-      localizations.blockingRelationsDeleteConflict,
+    DeleteBlockingRelationsSelectionConflictFailure(:final reason) =>
+      switch (reason) {
+        BlockingRelationConflictReason.relationMissing =>
+          localizations.blockingRelationsDeleteMissing,
+        BlockingRelationConflictReason.noLongerBlocking =>
+          localizations.blockingRelationsDeleteMoved,
+        BlockingRelationConflictReason.deletionProhibited =>
+          localizations.blockingRelationsDeleteProhibited,
+      },
     DeleteBlockingRelationsUnavailableFailure() =>
       localizations.blockingRelationsDeleteUnavailable,
     DeleteBlockingRelationsCorruptionFailure() =>
@@ -111,18 +207,22 @@ String _failureMessage(
   },
 };
 
-final class _BlockingRelationsConfirmation extends StatefulWidget {
-  const _BlockingRelationsConfirmation({required this.snapshot});
+final class _BlockingRelationsConfirmation extends ConsumerStatefulWidget {
+  const _BlockingRelationsConfirmation({
+    required this.snapshot,
+    required this.provider,
+  });
 
   final BlockingRelationsPreparedSelection snapshot;
+  final BlockingRelationsSelectionViewModelProvider provider;
 
   @override
-  State<_BlockingRelationsConfirmation> createState() =>
+  ConsumerState<_BlockingRelationsConfirmation> createState() =>
       _BlockingRelationsConfirmationState();
 }
 
 final class _BlockingRelationsConfirmationState
-    extends State<_BlockingRelationsConfirmation> {
+    extends ConsumerState<_BlockingRelationsConfirmation> {
   bool _decided = false;
 
   void _finish(bool confirmed) {
@@ -136,6 +236,11 @@ final class _BlockingRelationsConfirmationState
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
+    final selection = ref.watch(widget.provider);
+    final canConfirm = selection is BlockingRelationsSelectionPrepared;
+    final snapshot = selection is BlockingRelationsSelectionPrepared
+        ? selection.snapshot
+        : widget.snapshot;
     return Dialog.fullscreen(
       child: Scaffold(
         appBar: AppBar(
@@ -144,7 +249,7 @@ final class _BlockingRelationsConfirmationState
         body: SafeArea(
           child: ListView.builder(
             key: const ValueKey('blocking-relations-confirm-list'),
-            itemCount: widget.snapshot.rows.length + 2,
+            itemCount: snapshot.rows.length + 2,
             itemBuilder: (context, index) {
               if (index == 0) {
                 return Padding(
@@ -157,10 +262,20 @@ final class _BlockingRelationsConfirmationState
                         Text(
                           localizations.blockingRelationsConfirmationWarning,
                         ),
+                        if (!canConfirm) ...[
+                          const SizedBox(height: 8),
+                          Text(switch (selection) {
+                            BlockingRelationsSelectionRefreshFailed(
+                              :final failure,
+                            ) =>
+                              _refreshFailureMessage(localizations, failure),
+                            _ => localizations.blockingRelationsDeleteConflict,
+                          }),
+                        ],
                         const SizedBox(height: 8),
                         Text(
                           localizations.blockingRelationsConfirmationCount(
-                            widget.snapshot.rows.length,
+                            snapshot.rows.length,
                           ),
                         ),
                       ],
@@ -168,10 +283,12 @@ final class _BlockingRelationsConfirmationState
                   ),
                 );
               }
-              if (index <= widget.snapshot.rows.length) {
+              if (index <= snapshot.rows.length) {
+                final row = snapshot.rows[index - 1];
                 return _ConfirmationRow(
-                  row: widget.snapshot.rows[index - 1],
-                  intentionId: widget.snapshot.command.intentionId,
+                  row: row,
+                  intentionId: snapshot.command.intentionId,
+                  description: snapshot.descriptions[row.relation.id],
                 );
               }
               return Padding(
@@ -188,7 +305,7 @@ final class _BlockingRelationsConfirmationState
                     ),
                     FilledButton(
                       key: const ValueKey('blocking-relations-confirm-delete'),
-                      onPressed: () => _finish(true),
+                      onPressed: canConfirm ? () => _finish(true) : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.error,
                         foregroundColor: Theme.of(context).colorScheme.onError,
@@ -209,10 +326,15 @@ final class _BlockingRelationsConfirmationState
 }
 
 final class _ConfirmationRow extends StatelessWidget {
-  const _ConfirmationRow({required this.row, required this.intentionId});
+  const _ConfirmationRow({
+    required this.row,
+    required this.intentionId,
+    this.description,
+  });
 
   final LongTermRelationSummary row;
   final IntentionId intentionId;
+  final String? description;
 
   @override
   Widget build(BuildContext context) {
@@ -249,7 +371,10 @@ final class _ConfirmationRow extends StatelessWidget {
           'blocking-relations-confirm-semantics-${relation.id.toCanonicalString()}',
         ),
         container: true,
-        label: '$phrase. $direction. $scope. $source. $related',
+        label:
+            '$phrase. $direction. $scope. '
+            '${localizations.relationDetailsPriorityLabel}: ${relation.priority.name.toUpperCase()}. '
+            '$source. $related. ${description ?? ''}',
         child: ExcludeSemantics(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -260,6 +385,10 @@ final class _ConfirmationRow extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(direction),
                 Text(scope),
+                Text(
+                  '${localizations.relationDetailsPriorityLabel}: ${relation.priority.name.toUpperCase()}',
+                ),
+                if (description != null) Text(description!),
                 const SizedBox(height: 8),
                 Text(
                   '${localizations.relationNeighborhoodSourceParticipant}: ${row.source.title}',
