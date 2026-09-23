@@ -27,6 +27,7 @@ import '../application/graph_change.dart';
 import '../application/graph_command_result.dart';
 import '../application/graph_revision.dart';
 import '../application/personal_graph_repository.dart';
+import '../application/selected_relations.dart';
 import 'drift_relation_count_aggregates.dart';
 
 import 'package:drift/drift.dart';
@@ -36,6 +37,7 @@ part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_blocking_relations.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
+part 'drift_personal_graph_repository_selected_relations.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -57,6 +59,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
+  final Set<_SelectedRelationsWatchRegistration> _selectedRelationsWatchers =
+      {};
   var _mutationSequence = 0;
 
   GraphRevision get _currentRevision =>
@@ -185,6 +189,16 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _watchRelation(id);
 
   @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => _readSelectedRelations(query);
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => _watchSelectedRelations(query);
+
+  @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) async* {
@@ -283,7 +297,16 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     Iterable<IntentionId> ids,
   ) async {
     final uniqueIds = ids.toSet().toList(growable: false);
-    final aggregates = await _relationCountAggregates.read(uniqueIds);
+    final aggregates = <IntentionId, RelationCountAggregate>{};
+    const batchSize = 400;
+    for (var start = 0; start < uniqueIds.length; start += batchSize) {
+      final end = start + batchSize < uniqueIds.length
+          ? start + batchSize
+          : uniqueIds.length;
+      aggregates.addAll(
+        await _relationCountAggregates.read(uniqueIds.sublist(start, end)),
+      );
+    }
     final counts = <IntentionId, RelationCounts>{};
     for (final id in uniqueIds) {
       final aggregate = aggregates[id];
@@ -418,6 +441,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final stableChanges = List<GraphChange>.unmodifiable(changes);
     _notifyIntentionWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
+    _notifySelectedRelationsWatchersFor(stableChanges);
   }
 
   Future<_CommittedIntentionCommand> _createIntention(

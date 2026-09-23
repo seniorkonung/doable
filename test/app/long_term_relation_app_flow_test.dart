@@ -1,3 +1,5 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 import 'dart:ui' show CheckedState, Tristate;
 
@@ -1877,6 +1879,16 @@ String _textByKey(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
 final class _DelayedRelationRepository implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => _inner.getSelectedRelations(query);
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => _inner.watchSelectedRelations(query);
+
   _DelayedRelationRepository(this._inner, {required bool delayCreation})
     : _heldCommandType = delayCreation ? CreateLongTermRelation : null;
 

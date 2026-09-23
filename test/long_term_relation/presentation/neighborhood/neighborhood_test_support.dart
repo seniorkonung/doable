@@ -1,3 +1,5 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -20,6 +22,20 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 /// Управляемый граф: каждое чтение группы завершается тестом вручную.
 final class ControlledNeighborhoodRepository
     implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   final queries = <RelationGroupQuery>[];
   final _requests = <Completer<RelationGroupPageResult>>[];
   final intentionIds = <IntentionId>[];

@@ -1,3 +1,5 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -791,6 +793,20 @@ IntentionCommandStart _acceptExisting(
 ) => coordinator.acceptExisting(command, presentationTitle: 'Намерение');
 
 final class _ControlledGraphRepository implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   final commands = <IntentionCommand>[];
   final _results =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
@@ -862,6 +878,20 @@ final class _ControlledGraphRepository implements PersonalGraphRepository {
 
 final class _ControlledPersonalGraphRepository
     implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   final commands = <IntentionCommand>[];
   final _results =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];

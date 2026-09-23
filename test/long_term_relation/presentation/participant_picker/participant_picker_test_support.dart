@@ -1,3 +1,5 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -19,6 +21,20 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 /// завершаются: переход к подробным данным проверяется отдельно от выбора.
 final class ControlledParticipantPickerRepository
     implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   final queries = <IntentionCatalogQuery>[];
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
   final _intentionStreams =

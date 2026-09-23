@@ -1,3 +1,5 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
@@ -64,6 +66,20 @@ final class ControlledDetailRequest {
 }
 
 final class ControlledDetailsRepository implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   ControlledDetailsRepository({this.shareSecondWatch = true});
 
   /// Страница подробностей и соседство наблюдают одно намерение параллельно.

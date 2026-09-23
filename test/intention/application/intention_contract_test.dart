@@ -1,3 +1,5 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:io';
 
 import 'package:doable/src/graph/application/graph_change.dart';
@@ -802,6 +804,20 @@ IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
 };
 
 final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,

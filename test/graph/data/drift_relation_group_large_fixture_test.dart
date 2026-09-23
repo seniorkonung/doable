@@ -9,6 +9,7 @@ import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -25,6 +26,7 @@ import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
@@ -220,6 +222,92 @@ void main() {
     expect(trace.aggregateSelects, isNotEmpty);
     expect(trace.groupRowsSelects, isEmpty);
   });
+
+  test(
+    'читает 401 и более 999 явно выбранных связей пакетно на одной ревизии',
+    () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      final trace = _RelationReadTrace();
+      final database = await harness.openReadyDatabase(observer: trace);
+      final repository = _repository(database);
+      await _populateLargeFixture(database);
+      trace.clear();
+
+      final selected401 = [
+        for (var index = 0; index < 201; index++) _decodedRelationId(index),
+        for (var index = 250; index < 450; index++) _decodedRelationId(index),
+      ];
+      final first = await repository.getSelectedRelations(
+        SelectedRelationsQuery(intentionId: _ownerId, relationIds: selected401),
+      );
+      expect(first, isA<SelectedRelationsReadSuccess>());
+      final firstSnapshot = (first as SelectedRelationsReadSuccess).value;
+      expect(firstSnapshot.value.entries.keys.toSet(), selected401.toSet());
+      expect(
+        firstSnapshot.value.entries.values,
+        everyElement(isA<SelectedRelationPresent>()),
+      );
+      expect(trace.aggregateSelects.length, lessThanOrEqualTo(5));
+      expect(trace.groupRowsSelects, isEmpty);
+      expect(trace.relationContentSelects, hasLength(2));
+      expect(
+        trace.relationContentSelects
+            .expand((select) => select.arguments)
+            .toSet(),
+        selected401.map((id) => id.toCanonicalString()).toSet(),
+      );
+      expect(
+        trace.relationContentSelects,
+        everyElement(
+          isA<_TracedSelect>().having(
+            (select) => select.arguments.length,
+            'SQL-порция',
+            lessThanOrEqualTo(400),
+          ),
+        ),
+      );
+
+      trace.clear();
+      final selected1100 = [
+        for (var index = 0; index < 1100; index++) _decodedRelationId(index),
+      ];
+      final second = await repository.getSelectedRelations(
+        SelectedRelationsQuery(
+          intentionId: _ownerId,
+          relationIds: selected1100,
+        ),
+      );
+      expect(second, isA<SelectedRelationsReadSuccess>());
+      final secondSnapshot = (second as SelectedRelationsReadSuccess).value;
+      expect(
+        secondSnapshot.revision.compareTo(firstSnapshot.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(secondSnapshot.value.entries.keys.toSet(), selected1100.toSet());
+      expect(
+        secondSnapshot.value.entries.values,
+        everyElement(isA<SelectedRelationPresent>()),
+      );
+      expect(trace.relationContentSelects, hasLength(3));
+      expect(trace.aggregateSelects, hasLength(3));
+      expect(trace.groupRowsSelects, isEmpty);
+
+      trace.failSelectedReadAt(2);
+      final interrupted = await repository.getSelectedRelations(
+        SelectedRelationsQuery(intentionId: _ownerId, relationIds: selected401),
+      );
+      expect(
+        interrupted,
+        isA<SelectedRelationsReadError>().having(
+          (error) => error.failure,
+          'отказ второй SQL-порции',
+          isA<SelectedRelationsReadUnavailableFailure>(),
+        ),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 
   test(
     'массовый выбор читает только посещённые порции и выбранные связи',
@@ -786,6 +874,7 @@ final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
   final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
   Completer<void>? _groupRowsBlocked;
   Completer<void>? _releaseGroupRows;
+  int? _selectedReadFailureCountdown;
 
   Iterable<_TracedSelect> get groupRowsSelects =>
       selects.where((select) => _isGroupRowsSelect(select.statement));
@@ -819,6 +908,10 @@ final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
 
   void clear() => selects.clear();
 
+  void failSelectedReadAt(int selectNumber) {
+    _selectedReadFailureCountdown = selectNumber;
+  }
+
   void blockNextGroupRowsSelect() {
     _groupRowsBlocked = Completer<void>();
     _releaseGroupRows = Completer<void>();
@@ -835,6 +928,18 @@ final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
   @override
   Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
+    final remaining = _selectedReadFailureCountdown;
+    if (statement.statements.single.contains('WHERE id IN (') &&
+        remaining != null) {
+      if (remaining == 1) {
+        _selectedReadFailureCountdown = null;
+        throw SqliteException(
+          extendedResultCode: SqlError.SQLITE_BUSY,
+          message: 'Временная недоступность',
+        );
+      }
+      _selectedReadFailureCountdown = remaining - 1;
+    }
     _started[statement] = Stopwatch()..start();
     final blocked = _groupRowsBlocked;
     final release = _releaseGroupRows;

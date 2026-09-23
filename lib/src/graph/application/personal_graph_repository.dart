@@ -8,6 +8,7 @@ import '../../long_term_relation/application/long_term_relation_projection.dart'
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
+import 'selected_relations.dart';
 
 abstract interface class GraphCommandRepository {
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
@@ -31,6 +32,14 @@ abstract interface class PersonalGraphRepository
   );
 
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id);
+
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  );
+
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  );
 
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,

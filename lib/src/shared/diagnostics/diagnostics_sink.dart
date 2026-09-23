@@ -127,6 +127,12 @@ final class LongTermRelationDetailReadDiagnosticsEvent
   }) : super(status);
 }
 
+final class SelectedRelationsReadDiagnosticsEvent extends DiagnosticsEvent {
+  const SelectedRelationsReadDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
+}
+
 final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
   const IntentionCommandDiagnosticsEvent({
     required this.commandType,

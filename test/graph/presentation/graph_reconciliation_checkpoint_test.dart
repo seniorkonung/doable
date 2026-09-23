@@ -1,3 +1,5 @@
+import 'package:doable/src/graph/application/selected_relations.dart';
+
 import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart'
@@ -1206,6 +1208,20 @@ final class _CheckpointHarness {
 
 /// Управляемый граф, обслуживающий все чтения и команды контрольной точки.
 final class _CheckpointGraphRepository implements PersonalGraphRepository {
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Чтение выбранных связей не используется в этом тесте.',
+  );
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => throw UnsupportedError(
+    'Наблюдение выбранных связей не используется в этом тесте.',
+  );
+
   final catalogQueries = <IntentionCatalogQuery>[];
   final _catalogRequests = <Completer<Result<IntentionCatalogPage>>>[];
   final groupQueries = <RelationGroupQuery>[];
