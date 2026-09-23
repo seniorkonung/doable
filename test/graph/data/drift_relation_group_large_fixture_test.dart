@@ -5,8 +5,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -14,10 +16,14 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:drift/drift.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_state.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -214,7 +220,208 @@ void main() {
     expect(trace.aggregateSelects, isNotEmpty);
     expect(trace.groupRowsSelects, isEmpty);
   });
+
+  test(
+    'массовый выбор читает только посещённые порции и выбранные связи',
+    () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      final trace = _RelationReadTrace();
+      final database = await harness.openReadyDatabase(observer: trace);
+      final repository = _repository(database);
+      await _populateLargeFixture(database);
+      trace.clear();
+
+      final rssBefore = ProcessInfo.currentRss;
+      final accessWatch = Stopwatch()..start();
+      final pageLatencies = <Duration>[];
+      final activeRows = <LongTermRelationSummary>[];
+      RelationGroupCursor? cursor;
+      do {
+        final pageWatch = Stopwatch()..start();
+        final page = _page(
+          await repository.getRelationGroupPage(
+            _query(RelationScope.active, cursor: cursor),
+          ),
+        );
+        pageWatch.stop();
+        pageLatencies.add(pageWatch.elapsed);
+        activeRows.addAll(page.items);
+        cursor = page.nextCursor;
+      } while (cursor != null);
+      expect(activeRows.map((row) => row.relation.id).toSet(), hasLength(250));
+
+      final archivedRows = <LongTermRelationSummary>[];
+      cursor = null;
+      for (var pageIndex = 0; pageIndex < 4; pageIndex++) {
+        final pageWatch = Stopwatch()..start();
+        final page = _page(
+          await repository.getRelationGroupPage(
+            _query(RelationScope.archived, cursor: cursor),
+          ),
+        );
+        pageWatch.stop();
+        pageLatencies.add(pageWatch.elapsed);
+        archivedRows.addAll(page.items);
+        cursor = page.nextCursor;
+        expect(cursor, isNotNull);
+      }
+      accessWatch.stop();
+      final rssAfterAccess = ProcessInfo.currentRss;
+      expect(
+        archivedRows.map((row) => row.relation.id).toSet(),
+        hasLength(200),
+      );
+      expect(trace.groupRowsSelects, hasLength(9));
+      expect(trace.relationContentSelects, hasLength(9));
+      expect(trace.groupRowsSelects.map((select) => select.arguments[2]), [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+      ]);
+      expect(
+        trace.groupRowsSelects,
+        everyElement(
+          isA<_TracedSelect>().having(
+            (select) => select.rowCount,
+            'ограничение порции SQL',
+            lessThanOrEqualTo(_pageSize + 1),
+          ),
+        ),
+      );
+      expect(trace.aggregateSelects, hasLength(11));
+      final accessAggregateQueries = trace.aggregateSelects.length;
+      final accessAggregateTime = _elapsedSelects(trace.aggregateSelects);
+
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      final provider = blockingRelationsSelectionViewModelProvider(_ownerId);
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final selection = container.read(provider.notifier);
+      final chosenRows = [...activeRows.take(201), ...archivedRows];
+      final selectionWatch = Stopwatch()..start();
+      for (final row in chosenRows) {
+        expect(selection.select(row), isTrue);
+      }
+      selectionWatch.stop();
+      final rssAfterSelection = ProcessInfo.currentRss;
+      final chosenIds = chosenRows.map((row) => row.relation.id).toSet();
+      expect(chosenIds, hasLength(401));
+      expect(container.read(provider).selected.keys.toSet(), chosenIds);
+      expect(container.read(provider).selected.length, greaterThan(_pageSize));
+
+      trace.clear();
+      final reviewWatch = Stopwatch()..start();
+      expect(await selection.refreshSelection(), isTrue);
+      expect(selection.prepare(), isTrue);
+      reviewWatch.stop();
+      final rssAfterReview = ProcessInfo.currentRss;
+      final prepared =
+          container.read(provider) as BlockingRelationsSelectionPrepared;
+      expect(
+        prepared.snapshot.rows.map((row) => row.relation.id).toSet(),
+        chosenIds,
+      );
+      expect(prepared.snapshot.command.relationIds, chosenIds);
+      expect(trace.groupRowsSelects, isEmpty);
+      expect(trace.relationContentSelects, hasLength(chosenIds.length));
+      expect(trace.selectedRelationSelects, hasLength(chosenIds.length));
+      expect(
+        trace.selectedRelationSelects
+            .map((select) => select.arguments.single)
+            .toSet(),
+        chosenIds.map((id) => id.toCanonicalString()).toSet(),
+      );
+      final reviewAggregateTime = _elapsedSelects(trace.aggregateSelects);
+      final reviewAggregateQueries = trace.aggregateSelects.length;
+
+      trace.clear();
+      final deleteWatch = Stopwatch()..start();
+      final result = await repository.execute(prepared.snapshot.command);
+      deleteWatch.stop();
+      final rssAfterDelete = ProcessInfo.currentRss;
+      expect(result, isA<GraphCommandSucceeded>());
+      final deleted =
+          (result as GraphCommandSucceeded).value.value
+              as BlockingRelationsDeleted;
+      expect(
+        deleted.deletedRelations.map((relation) => relation.id).toSet(),
+        chosenIds,
+      );
+      expect(trace.groupRowsSelects, isEmpty);
+      expect(trace.relationContentSelects, hasLength(chosenIds.length));
+      expect(trace.selectedRelationSelects, hasLength(chosenIds.length));
+      expect(
+        trace.selectedRelationSelects
+            .map((select) => select.arguments.single)
+            .toSet(),
+        chosenIds.map((id) => id.toCanonicalString()).toSet(),
+      );
+      final deleteAggregateTime = _elapsedSelects(trace.aggregateSelects);
+      final deleteAggregateQueries = trace.aggregateSelects.length;
+
+      trace.clear();
+      final reconcileWatch = Stopwatch()..start();
+      final activeAfter = _page(
+        await repository.getRelationGroupPage(_query(RelationScope.active)),
+      ) as RelationGroupFirstPage;
+      reconcileWatch.stop();
+      expect(activeAfter.counts.activeNeedOutgoing, 49);
+      expect(activeAfter.counts.archivedNeedOutgoing, 4800);
+      expect(activeAfter.items, hasLength(49));
+      expect(activeAfter.nextCursor, isNull);
+      expect(
+        activeAfter.items.map((row) => row.relation.id).toSet(),
+        activeRows.skip(201).map((row) => row.relation.id).toSet(),
+      );
+      expect(trace.groupRowsSelects, hasLength(1));
+      expect(trace.relationContentSelects, hasLength(1));
+      expect(
+        trace.groupRowsSelects.single.rowCount,
+        lessThanOrEqualTo(_pageSize + 1),
+      );
+      expect(trace.aggregateSelects, hasLength(2));
+      final reconcileAggregateTime = _elapsedSelects(trace.aggregateSelects);
+
+      stdout.writeln(
+        'Измерения OpenSpec 6.17: active=250, archived=5000, selected=401, '
+        'readPages=9, access=${accessWatch.elapsedMicroseconds}us, '
+        'p95Page=${_percentile95(pageLatencies).inMicroseconds}us, '
+        'accessAggregateQueries=$accessAggregateQueries, '
+        'accessAggregates=${accessAggregateTime.inMicroseconds}us, '
+        'selection=${selectionWatch.elapsedMicroseconds}us, '
+        'review=${reviewWatch.elapsedMicroseconds}us, '
+        'reviewAggregateQueries=$reviewAggregateQueries, '
+        'reviewAggregates=${reviewAggregateTime.inMicroseconds}us, '
+        'delete=${deleteWatch.elapsedMicroseconds}us, '
+        'deleteAggregateQueries=$deleteAggregateQueries, '
+        'deleteAggregates=${deleteAggregateTime.inMicroseconds}us, '
+        'reconcile=${reconcileWatch.elapsedMicroseconds}us, '
+        'reconcileAggregates=${reconcileAggregateTime.inMicroseconds}us, '
+        'rssAccess=${rssAfterAccess - rssBefore}B, '
+        'rssSelection=${rssAfterSelection - rssAfterAccess}B, '
+        'rssReview=${rssAfterReview - rssAfterSelection}B, '
+        'rssDelete=${rssAfterDelete - rssAfterReview}B, '
+        'rssReconcile=${ProcessInfo.currentRss - rssAfterDelete}B',
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
 }
+
+Duration _elapsedSelects(Iterable<_TracedSelect> selects) =>
+    selects.fold(Duration.zero, (total, select) => total + select.elapsed);
 
 Future<void> _populateLargeFixture(AppDatabase database) =>
     database.batch((batch) {
@@ -588,6 +795,16 @@ final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
 
   Iterable<_TracedSelect> get participantSelects =>
       selects.where((select) => _isParticipantSelect(select.statement));
+
+  Iterable<_TracedSelect> get selectedRelationSelects => selects.where(
+    (select) =>
+        select.statement.contains('FROM long_term_relations') &&
+        select.statement.contains('WHERE id = ?'),
+  );
+
+  Iterable<_TracedSelect> get relationContentSelects => selects.where(
+    (select) => select.statement.contains('FROM long_term_relations'),
+  );
 
   Iterable<_TracedSelect> get graphContentSelects => selects.where(
     (select) =>
