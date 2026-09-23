@@ -154,43 +154,56 @@ void main() {
     },
   );
 
-  test('подтверждённый успех завершает выбор без второй отправки', () async {
-    final harness = _Harness();
-    addTearDown(harness.dispose);
-    final row = testGroupRow(ownerId: harness.intentionId, index: 1);
-    harness.viewModel.select(row);
-    harness.viewModel.prepare();
-    harness.viewModel.confirm(presentationTitle: 'Намерение');
-    final command =
-        harness.repository.commands.single as DeleteBlockingRelations;
-    const revision = TestGraphRevision(5);
-    final deleted = BlockingRelationsDeleted(
-      command: command,
-      revision: revision,
-      deletedRelations: [row.relation],
-      counts: {
-        harness.intentionId: testRelationCounts(),
-        row.relation.relatedIntentionId: testRelationCounts(),
-      },
-    );
-    harness.repository.succeed(
-      0,
-      GraphCommandSucceeded<
-        BlockingRelationsDeleted,
-        DeleteBlockingRelationsFailure
-      >(ConfirmedGraphResult(revision: revision, value: deleted)),
-    );
-    await pumpEventQueue();
+  test(
+    'после успеха новый выбор пуст и требует отдельного подтверждения',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final first = testGroupRow(ownerId: harness.intentionId, index: 1);
+      final second = testGroupRow(ownerId: harness.intentionId, index: 2);
+      harness.viewModel.select(first);
+      harness.viewModel.prepare();
+      harness.viewModel.confirm(presentationTitle: 'Намерение');
+      final command =
+          harness.repository.commands.single as DeleteBlockingRelations;
+      expect(harness.viewModel.select(second), isFalse);
+      expect(harness.viewModel.prepare(), isFalse);
+      const revision = TestGraphRevision(5);
+      final deleted = BlockingRelationsDeleted(
+        command: command,
+        revision: revision,
+        deletedRelations: [first.relation],
+        counts: {
+          harness.intentionId: testRelationCounts(),
+          first.relation.relatedIntentionId: testRelationCounts(),
+        },
+      );
+      harness.repository.succeed(
+        0,
+        GraphCommandSucceeded<
+          BlockingRelationsDeleted,
+          DeleteBlockingRelationsFailure
+        >(ConfirmedGraphResult(revision: revision, value: deleted)),
+      );
+      await pumpEventQueue();
 
-    expect(harness.state, isA<BlockingRelationsSelectionSucceeded>());
-    expect(harness.viewModel.select(row), isFalse);
-    expect(
-      (harness.state as BlockingRelationsSelectionSucceeded).snapshot.command,
-      same(command),
-    );
-    harness.viewModel.confirm(presentationTitle: 'Намерение');
-    expect(harness.repository.commands, hasLength(1));
-  });
+      expect(harness.state, isA<BlockingRelationsSelectionEditing>());
+      expect(harness.state.selected, isEmpty);
+      expect(harness.viewModel.prepare(), isFalse);
+      harness.viewModel.confirm(presentationTitle: 'Намерение');
+      expect(harness.repository.commands, hasLength(1));
+
+      expect(harness.viewModel.select(second), isTrue);
+      expect(harness.viewModel.prepare(), isTrue);
+      final next =
+          (harness.state as BlockingRelationsSelectionPrepared).snapshot;
+      expect(next.command, isNot(same(command)));
+      expect(next.command.relationIds, {second.relation.id});
+      harness.viewModel.confirm(presentationTitle: 'Намерение');
+      expect(harness.repository.commands, hasLength(2));
+      expect(harness.repository.commands.last, same(next.command));
+    },
+  );
 
   test('конфликт требует чтения и явного удаления недоступной связи', () async {
     final harness = _Harness();

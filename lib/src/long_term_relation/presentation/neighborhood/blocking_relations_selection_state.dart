@@ -110,19 +110,6 @@ final class BlockingRelationsSelectionRunning
   final BlockingRelationsDeleteOperationToken token;
 }
 
-final class BlockingRelationsSelectionSucceeded
-    extends BlockingRelationsSelectionState {
-  BlockingRelationsSelectionSucceeded({
-    required super.intentionId,
-    required super.selected,
-    required this.snapshot,
-    required this.deleted,
-  });
-
-  final BlockingRelationsPreparedSelection snapshot;
-  final BlockingRelationsDeleted deleted;
-}
-
 sealed class BlockingRelationsSelectionFailure {
   const BlockingRelationsSelectionFailure();
 }
