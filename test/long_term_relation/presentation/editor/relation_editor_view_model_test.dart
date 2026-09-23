@@ -4,6 +4,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
@@ -12,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'editor_test_support.dart';
+import '../daily_path_change_test_support.dart';
 
 void main() {
   group('Черновик создания связи', () {
@@ -202,6 +204,100 @@ void main() {
   });
 
   group('Черновик изменения связи', () {
+    test('открытая форма учитывает путь и сохраняет исправимый ввод', () async {
+      final details = testEditorRelationDetails();
+      final harness = _EditorHarness.editing(details);
+      harness.viewModel
+        ..selectType(LongTermRelationType.can)
+        ..changeDescription('Мой новый текст');
+
+      final unrelated = LongTermRelation(
+        id: testRelationId(9),
+        sourceIntentionId: testEditorIntentionId(3),
+        relatedIntentionId: testEditorIntentionId(4),
+        type: LongTermRelationType.need,
+        priority: RelationPriority.p2,
+        scope: RelationScope.active,
+        creationSequence: RelationCreationSequence(9),
+      );
+      Future<void> changePath(
+        int revisionNumber, {
+        required bool created,
+        required LongTermRelationPermissions permissions,
+      }) async {
+        final commandIndex = harness.repository.commandCount;
+        final start = harness.coordinator.acceptRelationUpdate(
+          UpdateLongTermRelation(
+            relationId: unrelated.id,
+            patch: const LongTermRelationPatch(
+              priority: LongTermRelationFieldSet(RelationPriority.p1),
+            ),
+          ),
+        );
+        final revision = TestRelationEditorRevision(revisionNumber);
+        harness.repository.completeRelationUpdated(
+          commandIndex,
+          before: unrelated,
+          after: unrelated,
+          revision: revisionNumber,
+          additionalChanges: [
+            testDailyPathChange(
+              revision: revision,
+              relationId: details.relation.id,
+              sourceId: details.source.id,
+              selectedId: details.related.id,
+              choiceNumber: 1,
+              isCreated: created,
+              permissions: permissions,
+            ),
+          ],
+        );
+        await (start as LongTermRelationCommandAccepted).future;
+        await harness.settle();
+      }
+
+      await changePath(
+        2,
+        created: true,
+        permissions: const LongTermRelationPermissions.referencedByDailyPath(),
+      );
+      expect(harness.state.permissions.canChangeMeaning, isFalse);
+      expect(harness.state.canSubmit, isFalse);
+      expect(harness.state.description, 'Мой новый текст');
+      expect(harness.state.type, LongTermRelationType.can);
+      harness.viewModel.submit();
+      expect(harness.repository.commandCount, 1);
+
+      harness.viewModel.selectType(LongTermRelationType.need);
+      expect(harness.state.canSubmit, isTrue);
+      harness.viewModel.submit();
+      final allowed = harness.repository.updateCommandAt(1).patch;
+      expect(allowed.type, isA<LongTermRelationFieldUnchanged>());
+      expect(allowed.description, isA<LongTermRelationDescriptionReplaced>());
+      harness.repository.failRelationCommand(
+        1,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await harness.settle();
+
+      await changePath(
+        3,
+        created: false,
+        permissions: const LongTermRelationPermissions.unrestricted(),
+      );
+      harness.viewModel.selectType(LongTermRelationType.can);
+      expect(harness.state.permissions.canChangeMeaning, isTrue);
+      expect(harness.state.canSubmit, isTrue);
+      harness.viewModel.refreshConfirmedDetails(
+        testEditorRelationDetails(
+          permissions:
+              const LongTermRelationPermissions.referencedByDailyPath(),
+        ),
+        const TestRelationEditorRevision(2),
+      );
+      expect(harness.state.permissions.canChangeMeaning, isTrue);
+    });
+
     test('начинается с подтверждённой основы и требует явной правки', () {
       final details = testEditorRelationDetails();
       final harness = _EditorHarness.editing(details);
@@ -456,6 +552,13 @@ void main() {
             isA<RelationEditorReferencedByDailyPath>(),
           ),
         );
+        expect(harness.state.canSubmit, isFalse);
+
+        harness.viewModel.refreshConfirmedDetails(
+          testEditorRelationDetails(),
+          const TestRelationEditorRevision(0),
+        );
+        expect(harness.state.permissions.canChangeMeaning, isFalse);
         expect(harness.state.canSubmit, isFalse);
 
         harness.viewModel

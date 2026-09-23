@@ -15,6 +15,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -119,6 +120,7 @@ final class ControlledRelationEditorRepository
     required LongTermRelation after,
     LongTermRelationDescription? description,
     int revision = 1,
+    Iterable<GraphChange> additionalChanges = const [],
   }) {
     final graphRevision = TestRelationEditorRevision(revision);
     completeRelationCommand(
@@ -136,6 +138,7 @@ final class ControlledRelationEditorRepository
                 before: before,
                 after: after,
               ),
+              ...additionalChanges,
             ],
           ),
         ),
@@ -252,6 +255,8 @@ LongTermRelationDetails testEditorRelationDetails({
   RelationPriority priority = RelationPriority.p2,
   RelationScope scope = RelationScope.active,
   String? description = 'Исходное описание',
+  LongTermRelationPermissions permissions =
+      const LongTermRelationPermissions.unrestricted(),
 }) {
   final relation = LongTermRelation(
     id: testRelationId(1),
@@ -269,6 +274,7 @@ LongTermRelationDetails testEditorRelationDetails({
     description: description == null
         ? null
         : LongTermRelationDescription.fromInput(description),
+    permissions: permissions,
   );
 }
 

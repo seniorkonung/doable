@@ -70,8 +70,9 @@ final class RelationDetailsPage extends ConsumerWidget {
                           context.router.push(
                             RelationEditorRoute(
                               editorContext: RelationEditingContext(
-                                loaded.details,
+                                loaded.editingDetails,
                                 revision: loaded.revision,
+                                permissionRevision: loaded.permissionRevision,
                               ),
                             ),
                           ),
