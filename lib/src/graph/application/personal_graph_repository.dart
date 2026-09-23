@@ -24,6 +24,9 @@ abstract interface class PersonalGraphRepository
   /// Возвращает null в снимке, если выбор отсутствует на момент чтения.
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id);
 
+  /// Наблюдает выбор вместе с текущими данными участников и связей его пути.
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id);
+
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   );

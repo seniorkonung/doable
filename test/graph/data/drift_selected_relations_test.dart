@@ -1,6 +1,11 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -9,6 +14,7 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -172,6 +178,82 @@ void main() {
       1,
     );
   });
+
+  test(
+    'наблюдает разрешение ранее выбранной связи при изменении пути',
+    () async {
+      await database.customStatement(
+        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+        [_neighbor.toCanonicalString()],
+      );
+      final query = SelectedRelationsQuery(
+        intentionId: _owner,
+        relationIds: [_first, _second],
+      );
+      final events = StreamIterator(repository.watchSelectedRelations(query));
+      addTearDown(events.cancel);
+      expect(await events.moveNext(), isTrue);
+      final initial = (events.current as SelectedRelationsReadSuccess).value;
+
+      final creation = await repository.execute(
+        CreateDailyChoice(
+          sourceIntentionId: _owner,
+          selectedIntentionId: _neighbor,
+          path: ConfirmedChoicePath([
+            ConfirmedChoicePathStep(
+              relationId: _first,
+              sourceIntentionId: _owner,
+              type: LongTermRelationType.need,
+              relatedIntentionId: _neighbor,
+            ),
+          ]),
+          date: CalendarDate.fromParts(2026, 9, 23),
+          description: null,
+          isCompleted: false,
+        ),
+      );
+      final choiceId =
+          ((creation as GraphCommandSucceeded).value.value
+                  as DailyChoiceCreated)
+              .choice
+              .id;
+      expect(await events.moveNext(), isTrue);
+      final occupied = (events.current as SelectedRelationsReadSuccess).value;
+      expect(
+        occupied.revision.compareTo(initial.revision),
+        GraphRevisionOrder.newer,
+      );
+      expect(
+        (occupied.value.entries[_first] as SelectedRelationPresent)
+            .details
+            .permissions
+            .canDelete,
+        isFalse,
+      );
+      expect(
+        (occupied.value.entries[_second] as SelectedRelationPresent)
+            .details
+            .permissions
+            .canDelete,
+        isTrue,
+      );
+
+      await repository.execute(DeleteDailyChoice(choiceId));
+      expect(await events.moveNext(), isTrue);
+      final released = (events.current as SelectedRelationsReadSuccess).value;
+      expect(
+        released.revision.compareTo(occupied.revision),
+        GraphRevisionOrder.newer,
+      );
+      expect(
+        (released.value.entries[_first] as SelectedRelationPresent)
+            .details
+            .permissions
+            .canDelete,
+        isTrue,
+      );
+    },
+  );
 
   test('объединяет два инвалидирования в один новый снимок', () async {
     final query = SelectedRelationsQuery(

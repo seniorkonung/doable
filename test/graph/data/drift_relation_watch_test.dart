@@ -1,5 +1,9 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation;
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -221,6 +225,60 @@ void main() {
     expect(updated.value!.related.title, 'Переименованное намерение');
     expect(updated.value!.relation.id, relationId);
   });
+
+  test(
+    'наблюдает появление и исчезновение ссылки пути без правки связи',
+    () async {
+      await database.customStatement(
+        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+        [relatedId.toCanonicalString()],
+      );
+      final events = StreamIterator(repository.watchRelation(relationId));
+      addTearDown(events.cancel);
+      expect(await events.moveNext(), isTrue);
+      final initial = _snapshot(events.current);
+      expect(initial.value!.permissions.canDelete, isTrue);
+
+      final creation = await repository.execute(
+        CreateDailyChoice(
+          sourceIntentionId: sourceId,
+          selectedIntentionId: relatedId,
+          path: ConfirmedChoicePath([
+            ConfirmedChoicePathStep(
+              relationId: relationId,
+              sourceIntentionId: sourceId,
+              type: LongTermRelationType.need,
+              relatedIntentionId: relatedId,
+            ),
+          ]),
+          date: CalendarDate.fromParts(2026, 9, 23),
+          description: null,
+          isCompleted: false,
+        ),
+      );
+      final choiceId =
+          ((creation as GraphCommandSucceeded).value.value
+                  as DailyChoiceCreated)
+              .choice
+              .id;
+      expect(await events.moveNext(), isTrue);
+      final occupied = _snapshot(events.current);
+      expect(occupied.value!.permissions.canDelete, isFalse);
+      expect(
+        occupied.revision.compareTo(initial.revision),
+        GraphRevisionOrder.newer,
+      );
+
+      await repository.execute(DeleteDailyChoice(choiceId));
+      expect(await events.moveNext(), isTrue);
+      final released = _snapshot(events.current);
+      expect(released.value!.permissions.canDelete, isTrue);
+      expect(
+        released.revision.compareTo(occupied.revision),
+        GraphRevisionOrder.newer,
+      );
+    },
+  );
 
   test('согласованно отражает каскадное архивирование участника', () async {
     final events = StreamIterator(repository.watchRelation(relationId));

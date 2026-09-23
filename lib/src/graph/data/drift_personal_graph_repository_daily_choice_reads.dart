@@ -1,19 +1,95 @@
 part of 'drift_personal_graph_repository.dart';
 
 extension _DailyChoiceReading on DriftPersonalGraphRepository {
-  Future<DailyChoiceReadResult> _readDailyChoice(DailyChoiceId id) async {
+  Stream<DailyChoiceReadResult> _watchDailyChoice(DailyChoiceId id) {
+    final registration = _DailyChoiceWatchRegistration(id);
+    var cancelled = false;
+    void unregister() {
+      final registrations = _dailyChoiceWatchers[id];
+      registrations?.remove(registration);
+      if (registrations?.isEmpty ?? false) {
+        _dailyChoiceWatchers.remove(id);
+      }
+    }
+
+    late final StreamController<DailyChoiceReadResult> controller;
+    Future<DailyChoiceReadResult> readCurrent() async {
+      while (true) {
+        final result = await _readDailyChoice(id, registration: registration);
+        if (cancelled ||
+            result is! DailyChoiceReadSuccess ||
+            result.value.revision.compareTo(_currentRevision) !=
+                GraphRevisionOrder.older) {
+          return result;
+        }
+      }
+    }
+
+    Future<void> observe() async {
+      _dailyChoiceWatchers.putIfAbsent(id, () => {}).add(registration);
+      GraphRevision? lastSuccessfulRevision;
+      try {
+        var result = await readCurrent();
+        if (cancelled) return;
+        if (result case DailyChoiceReadSuccess(:final value)) {
+          lastSuccessfulRevision = value.revision;
+        }
+        controller.add(result);
+
+        await for (final _ in registration.invalidations.stream) {
+          if (lastSuccessfulRevision?.compareTo(_currentRevision)
+              case GraphRevisionOrder.same) {
+            continue;
+          }
+          result = await readCurrent();
+          if (cancelled) return;
+          if (result case DailyChoiceReadSuccess(:final value)) {
+            if (lastSuccessfulRevision?.compareTo(value.revision)
+                case GraphRevisionOrder.same || GraphRevisionOrder.newer) {
+              continue;
+            }
+            lastSuccessfulRevision = value.revision;
+          }
+          controller.add(result);
+        }
+      } on Object {
+        if (!cancelled) {
+          controller.add(
+            const DailyChoiceReadError(DailyChoiceReadUnexpectedFailure()),
+          );
+        }
+      } finally {
+        unregister();
+        if (!cancelled) unawaited(controller.close());
+      }
+    }
+
+    controller = StreamController<DailyChoiceReadResult>(
+      onListen: () => unawaited(observe()),
+      onCancel: () {
+        cancelled = true;
+        unregister();
+        unawaited(registration.invalidations.close());
+      },
+    );
+    return controller.stream;
+  }
+
+  Future<DailyChoiceReadResult> _readDailyChoice(
+    DailyChoiceId id, {
+    _DailyChoiceWatchRegistration? registration,
+  }) async {
     final stopwatch = Stopwatch()..start();
     _recordDiagnostics(
       const DailyChoiceReadDiagnosticsEvent(status: DiagnosticsStarted()),
     );
     try {
       final snapshot = await _sequencer.run(
-        () => _database.transaction(
-          () async => GraphSnapshot(
-            value: await _readVerifiedDailyChoice(id),
-            revision: _currentRevision,
-          ),
-        ),
+        () => _database.transaction(() async {
+          final details = await _readVerifiedDailyChoice(id);
+          registration?.setDependencies(details);
+          return GraphSnapshot(value: details, revision: _currentRevision);
+        }),
       );
       _recordDiagnostics(
         DailyChoiceReadDiagnosticsEvent(
@@ -41,6 +117,36 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
         ),
       );
       return DailyChoiceReadError(failure);
+    }
+  }
+
+  void _notifyDailyChoiceWatchersFor(Iterable<GraphChange> changes) {
+    final affectedChoices = <DailyChoiceId>{};
+    final affectedIntentions = <IntentionId>{};
+    final affectedRelations = <LongTermRelationId>{};
+    for (final change in changes) {
+      switch (change) {
+        case DailyChoiceChange(:final before, :final after):
+          affectedChoices.add((after ?? before)!.id);
+        case IntentionCatalogMutation(:final before, :final after):
+          final beforeId = before?.summary.id;
+          final afterId = after?.summary.id;
+          if (beforeId != null) affectedIntentions.add(beforeId);
+          if (afterId != null) affectedIntentions.add(afterId);
+        case LongTermRelationChange(:final id):
+          affectedRelations.add(id);
+        case GraphChange():
+          break;
+      }
+    }
+    for (final registrations in List.of(_dailyChoiceWatchers.values)) {
+      for (final registration in List.of(registrations)) {
+        if (affectedChoices.contains(registration.id) ||
+            registration.intentionIds.any(affectedIntentions.contains) ||
+            registration.relationIds.any(affectedRelations.contains)) {
+          registration.invalidations.add(null);
+        }
+      }
     }
   }
 
@@ -148,6 +254,31 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
       selected: intentions[choice.selectedIntentionId]!,
       path: path,
     );
+  }
+}
+
+final class _DailyChoiceWatchRegistration {
+  _DailyChoiceWatchRegistration(this.id);
+
+  final DailyChoiceId id;
+  final StreamController<void> invalidations = StreamController<void>();
+  Set<IntentionId> intentionIds = const {};
+  Set<LongTermRelationId> relationIds = const {};
+
+  void setDependencies(DailyChoiceDetails? details) {
+    intentionIds = details == null
+        ? const {}
+        : Set.unmodifiable({
+            details.source.id,
+            details.selected.id,
+            for (final step in details.path) ...[
+              step.source.id,
+              step.related.id,
+            ],
+          });
+    relationIds = details == null
+        ? const {}
+        : Set.unmodifiable({for (final step in details.path) step.relation.id});
   }
 }
 

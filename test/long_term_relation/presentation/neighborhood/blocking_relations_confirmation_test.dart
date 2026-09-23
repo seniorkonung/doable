@@ -610,6 +610,12 @@ final class _CommandRepository implements PersonalGraphRepository {
         'Чтение дневного выбора не используется этим тестом.',
       );
 
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
   final commands = <GraphCommand>[];
   final requests = <Completer<Object>>[];
   final rows = <LongTermRelationId, LongTermRelationSummary>{};

@@ -14,13 +14,13 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
     _relationWatchers.putIfAbsent(id, () => {}).add(registration);
 
     try {
-      final initial = await _readRelationSnapshot(registration);
+      final initial = await _readCurrentRelationSnapshot(registration);
       var lastRevision = initial.revision;
       _recordRelationReadSuccess(stopwatch.elapsed);
       yield LongTermRelationReadSuccess(initial);
 
       await for (final _ in registration.invalidations.stream) {
-        final snapshot = await _readRelationSnapshot(registration);
+        final snapshot = await _readCurrentRelationSnapshot(registration);
         if (lastRevision.compareTo(snapshot.revision) ==
             GraphRevisionOrder.same) {
           continue;
@@ -47,6 +47,18 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
         _relationWatchers.remove(id);
       }
       unawaited(registration.invalidations.close());
+    }
+  }
+
+  Future<GraphSnapshot<LongTermRelationDetails?>> _readCurrentRelationSnapshot(
+    _RelationWatchRegistration registration,
+  ) async {
+    while (true) {
+      final snapshot = await _readRelationSnapshot(registration);
+      if (snapshot.revision.compareTo(_currentRevision) !=
+          GraphRevisionOrder.older) {
+        return snapshot;
+      }
     }
   }
 
@@ -141,6 +153,13 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
               ..add(after.sourceIntentionId)
               ..add(after.relatedIntentionId);
           }
+        case DailyChoiceChange(
+          :final releasedRelationIds,
+          :final occupiedRelationIds,
+        ):
+          affectedRelationIds
+            ..addAll(releasedRelationIds)
+            ..addAll(occupiedRelationIds);
         case GraphChange():
           break;
       }
