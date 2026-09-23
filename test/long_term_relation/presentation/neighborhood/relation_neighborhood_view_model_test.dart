@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -23,8 +24,171 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'neighborhood_test_support.dart';
+import '../../../support/daily_choice_reconciliation_fixture.dart';
 
 void main() {
+  test(
+    'удаление последней дневной ссылки сохраняет другую блокирующую связь',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository);
+      addTearDown(harness.dispose);
+      final owner = harness.intentionId;
+      final row = testGroupRow(ownerId: owner, index: 1);
+      final choice = reconciliationChoice(
+        source: owner,
+        selected: testIntentionId(2),
+      );
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: [row],
+          counts: testRelationCounts(activeNeedOutgoing: 1, dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      await pumpEventQueue();
+
+      final start = harness.coordinator.acceptDailyChoiceDelete(
+        DeleteDailyChoice(choice.id),
+      ) as DailyChoiceCommandAccepted;
+      repository.completeDailyChoiceCommand(
+        0,
+        reconciliationChoiceDeleted(
+          choice: choice,
+          pathRelationId: row.relation.id,
+          revision: const TestGraphRevision(6),
+          counts: {
+            owner: testRelationCounts(activeNeedOutgoing: 1),
+            choice.selectedIntentionId: testRelationCounts(),
+          },
+        ),
+      );
+      await start.future;
+      await pumpEventQueue();
+      expect(repository.requestCount, 2);
+      expect(
+        (harness.state as RelationGroupConfirmedState).summaryFreshness,
+        RelationSummaryFreshness.refreshing,
+      );
+
+      repository.emitIntention(
+        testNeighborhoodIntention(id: owner),
+        counts: testRelationCounts(activeNeedOutgoing: 1, dailySource: 1),
+        revision: const TestGraphRevision(5),
+      );
+      await pumpEventQueue();
+      repository.completePage(
+        1,
+        RelationGroupFirstPage(
+          items: [row],
+          counts: testRelationCounts(activeNeedOutgoing: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(6),
+        ),
+      );
+      await pumpEventQueue();
+      expect(harness.loaded.revision, const TestGraphRevision(6));
+      expect(harness.loaded.counts.dailyTotal, 0);
+      expect(harness.loaded.counts.longTermTotal, 1);
+      expect(harness.relationIds, [row.relation.id]);
+    },
+  );
+
+  test(
+    'позднее отсутствие намерения не закрывает подтверждённое соседство',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository);
+      addTearDown(harness.dispose);
+      final row = testGroupRow(ownerId: harness.intentionId, index: 1);
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: [row],
+          counts: testRelationCounts(activeNeedOutgoing: 1, dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      await pumpEventQueue();
+
+      repository.emitIntentionNotFound(revision: const TestGraphRevision(3));
+      await pumpEventQueue();
+
+      expect(harness.state, isA<RelationGroupLoaded>());
+      expect(harness.loaded.counts.dailySource, 1);
+      expect(harness.relationIds, [row.relation.id]);
+      expect(repository.requestCount, 1);
+    },
+  );
+
+  for (final initiallyEmpty in [false, true]) {
+    test(
+      'дневная зависимость обновляет полную сводку с '
+      '${initiallyEmpty ? 'пустой' : 'полной'} группой одной ревизии',
+      () async {
+        final repository = ControlledNeighborhoodRepository();
+        final harness = _NeighborhoodHarness(repository);
+        addTearDown(harness.dispose);
+        final row = testGroupRow(ownerId: harness.intentionId, index: 1);
+        final items = initiallyEmpty ? <LongTermRelationSummary>[] : [row];
+        final activeCount = initiallyEmpty ? 0 : 1;
+        repository.completePage(
+          0,
+          RelationGroupFirstPage(
+            items: items,
+            counts: testRelationCounts(activeNeedOutgoing: activeCount),
+            nextCursor: null,
+            revision: const TestGraphRevision(4),
+          ),
+        );
+        await pumpEventQueue();
+
+        repository.emitIntention(
+          testNeighborhoodIntention(id: harness.intentionId),
+          counts: testRelationCounts(
+            activeNeedOutgoing: activeCount,
+            dailySource: 1,
+          ),
+          revision: const TestGraphRevision(5),
+        );
+        await pumpEventQueue();
+        final old = harness.state as RelationGroupConfirmedState;
+        expect(old.revision, const TestGraphRevision(4));
+        expect(old.counts.dailyTotal, 0);
+        expect(old.summaryFreshness, RelationSummaryFreshness.refreshing);
+        expect(repository.requestCount, 2);
+
+        repository.completePage(
+          1,
+          RelationGroupFirstPage(
+            items: items,
+            counts: testRelationCounts(
+              activeNeedOutgoing: activeCount,
+              dailySource: 1,
+            ),
+            nextCursor: null,
+            revision: const TestGraphRevision(5),
+          ),
+        );
+        await pumpEventQueue();
+        final updated = harness.state as RelationGroupConfirmedState;
+        expect(updated.revision, const TestGraphRevision(5));
+        expect(updated.counts.dailySource, 1);
+        expect(updated.totalCount, activeCount);
+        expect(updated.summaryFreshness, RelationSummaryFreshness.current);
+        expect(
+          updated,
+          initiallyEmpty
+              ? isA<RelationGroupEmpty>()
+              : isA<RelationGroupLoaded>(),
+        );
+      },
+    );
+  }
+
   test('старая первая порция не возвращает массово удалённую связь', () async {
     final repository = ControlledNeighborhoodRepository();
     final harness = _NeighborhoodHarness(repository);

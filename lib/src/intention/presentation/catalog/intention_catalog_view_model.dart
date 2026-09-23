@@ -7,6 +7,7 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../long_term_relation/application/relation_counts.dart';
 import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention_id.dart';
@@ -583,7 +584,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
-  /// Принимает подтверждённые изменения намерений и долговременных связей.
+  /// Принимает подтверждённые изменения намерений, долговременных и дневных связей.
   ///
   /// Отказ не согласует данные: подтверждённого пакета у него нет.
   void _handleCompletion(GraphCommandCompletion completion) {
@@ -697,12 +698,28 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       reconciled = next;
     }
 
-    final countedIds = <IntentionId>{};
+    final absoluteCounts = <IntentionId, RelationCounts>{};
     for (final change in package.countChanges) {
-      if (!countedIds.add(change.intentionId)) {
+      if (absoluteCounts.containsKey(change.intentionId)) {
         return null;
       }
-      reconciled = _applyCountsContent(reconciled, change);
+      absoluteCounts[change.intentionId] = change.counts;
+    }
+    for (final change in package.dailyChanges) {
+      for (final entry in change.intentionCounts.entries) {
+        final previous = absoluteCounts[entry.key];
+        if (previous != null && previous != entry.value) {
+          return null;
+        }
+        absoluteCounts[entry.key] = entry.value;
+      }
+    }
+    for (final entry in absoluteCounts.entries) {
+      reconciled = _applyCountsContent(
+        reconciled,
+        entry.key,
+        entry.value.active,
+      );
     }
 
     return _withRevision(reconciled, package.revision);
@@ -714,20 +731,19 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// у намерения вне выдачи нет строки, которую следует заменить.
   IntentionCatalogConfirmedState _applyCountsContent(
     IntentionCatalogConfirmedState confirmed,
-    IntentionRelationCountsChanged change,
+    IntentionId intentionId,
+    int activeRelationCount,
   ) {
     if (confirmed is! IntentionCatalogLoaded) {
       return confirmed;
     }
-    final index = confirmed.items.indexWhere(
-      (item) => item.id == change.intentionId,
-    );
+    final index = confirmed.items.indexWhere((item) => item.id == intentionId);
     if (index < 0) {
       return confirmed;
     }
 
     final items = [...confirmed.items];
-    items[index] = items[index].withActiveRelationCount(change.counts.active);
+    items[index] = items[index].withActiveRelationCount(activeRelationCount);
     return IntentionCatalogLoaded(
       selection: confirmed.selection,
       query: confirmed.query,
@@ -831,8 +847,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// Каталожная часть подтверждённого пакета изменений графа.
 ///
 /// Пакет применяется целиком и ровно один раз: каталожные мутации задают
-/// состав загруженной части, а изменения количеств заменяют абсолютные
-/// числа уже загруженных строк, не затрагивая их состав.
+/// состав загруженной части, а абсолютные количества, включая переданные
+/// дневной командой, заменяют числа уже загруженных строк.
 final class _CatalogChangePackage {
   _CatalogChangePackage(this.revision, Iterable<GraphChange> changes)
     : mutations = List.unmodifiable(
@@ -840,14 +856,18 @@ final class _CatalogChangePackage {
       ),
       countChanges = List.unmodifiable(
         changes.whereType<IntentionRelationCountsChanged>(),
-      );
+      ),
+      dailyChanges = List.unmodifiable(changes.whereType<DailyChoiceChange>());
 
   final GraphRevision revision;
   final List<IntentionCatalogMutation> mutations;
   final List<IntentionRelationCountsChanged> countChanges;
+  final List<DailyChoiceChange> dailyChanges;
 
   bool get hasForeignRevision =>
-      mutations.any(_isForeign) || countChanges.any(_isForeign);
+      mutations.any(_isForeign) ||
+      countChanges.any(_isForeign) ||
+      dailyChanges.any(_isForeign);
 
   bool _isForeign(GraphChange change) =>
       change.revision.compareTo(revision) != GraphRevisionOrder.same;

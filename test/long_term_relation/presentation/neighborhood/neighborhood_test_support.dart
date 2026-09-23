@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
@@ -80,6 +82,7 @@ final class ControlledNeighborhoodRepository
   final intentionCommands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
   final blockingCommands = <DeleteBlockingRelations>[];
+  final dailyChoiceCommands = <DailyChoiceCommand>[];
   final _relationRows = <LongTermRelationId, LongTermRelationSummary>{};
   RelationCounts? _latestCounts;
   GraphRevision? _latestRevision;
@@ -91,6 +94,7 @@ final class ControlledNeighborhoodRepository
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
   final _blockingRequests = <Completer<DeleteBlockingRelationsResult>>[];
+  final _dailyChoiceRequests = <Completer<DailyChoiceCommandResult>>[];
 
   int get requestCount => queries.length;
 
@@ -173,6 +177,10 @@ final class ControlledNeighborhoodRepository
     _blockingRequests[index].complete(result);
   }
 
+  void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) {
+    _dailyChoiceRequests[index].complete(result);
+  }
+
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
@@ -237,6 +245,9 @@ final class ControlledNeighborhoodRepository
         await _executeLongTermRelation(relationCommand),
       final DeleteBlockingRelations blockingCommand =>
         await _executeBlockingRelationsDelete(blockingCommand),
+      final DailyChoiceCommand choiceCommand => await _executeDailyChoice(
+        choiceCommand,
+      ),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -266,6 +277,15 @@ final class ControlledNeighborhoodRepository
     blockingCommands.add(command);
     final request = Completer<DeleteBlockingRelationsResult>();
     _blockingRequests.add(request);
+    return request.future;
+  }
+
+  Future<DailyChoiceCommandResult> _executeDailyChoice(
+    DailyChoiceCommand command,
+  ) {
+    dailyChoiceCommands.add(command);
+    final request = Completer<DailyChoiceCommandResult>();
+    _dailyChoiceRequests.add(request);
     return request.future;
   }
 
@@ -471,6 +491,8 @@ RelationCounts testRelationCounts({
   int archivedNeedOutgoing = 0,
   int archivedCanIncoming = 0,
   int archivedCanOutgoing = 0,
+  int dailySource = 0,
+  int dailySelected = 0,
 }) => RelationCounts(
   activeNeedIncoming: activeNeedIncoming,
   activeNeedOutgoing: activeNeedOutgoing,
@@ -480,6 +502,8 @@ RelationCounts testRelationCounts({
   archivedNeedOutgoing: archivedNeedOutgoing,
   archivedCanIncoming: archivedCanIncoming,
   archivedCanOutgoing: archivedCanOutgoing,
+  dailySource: dailySource,
+  dailySelected: dailySelected,
 );
 
 /// Сводка, в которой заполнена только выбранная группа.

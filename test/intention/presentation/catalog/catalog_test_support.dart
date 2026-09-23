@@ -3,6 +3,8 @@ import 'package:doable/src/graph/application/selected_relations.dart';
 import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -54,6 +56,8 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final relationCommands = <LongTermRelationCommand>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
+  final dailyChoiceCommands = <DailyChoiceCommand>[];
+  final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -82,6 +86,10 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
     LongTermRelationCommandResult result,
   ) {
     _relationCommandRequests[index].complete(result);
+  }
+
+  void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) {
+    _dailyChoiceCommandRequests[index].complete(result);
   }
 
   @override
@@ -120,6 +128,9 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
+      final DailyChoiceCommand choiceCommand => await _executeDailyChoice(
+        choiceCommand,
+      ),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -131,6 +142,15 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
     relationCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationCommandRequests.add(request);
+    return request.future;
+  }
+
+  Future<DailyChoiceCommandResult> _executeDailyChoice(
+    DailyChoiceCommand command,
+  ) {
+    dailyChoiceCommands.add(command);
+    final request = Completer<DailyChoiceCommandResult>();
+    _dailyChoiceCommandRequests.add(request);
     return request.future;
   }
 

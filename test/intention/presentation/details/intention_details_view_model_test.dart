@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -15,8 +16,158 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'details_test_support.dart';
+import '../../../support/daily_choice_reconciliation_fixture.dart';
 
 void main() {
+  test(
+    'старый снимок не снимает новую дневную блокировку удаления намерения',
+    () async {
+      final repository = ControlledDetailsRepository(shareSecondWatch: false);
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final intention = testDetailsIntention(index: 73);
+      final selected = testDetailsIntentionId(74);
+      final relation = testDetailsRelationRow(ownerId: intention.id, index: 73);
+      final choice = reconciliationChoice(
+        source: intention.id,
+        selected: selected,
+      );
+      final provider = intentionDetailsViewModelProvider(intention.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(1),
+      );
+      await pumpEventQueue();
+
+      final start =
+          container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptDailyChoiceCreation(
+                    DailyChoiceCreationFormKey(),
+                    reconciliationCreateCommand(choice, relation.relation.id),
+                  )
+              as DailyChoiceCommandAccepted;
+      repository.completeDailyChoiceCommand(
+        0,
+        reconciliationChoiceCreated(
+          choice: choice,
+          pathRelationId: relation.relation.id,
+          revision: const TestDetailsRevision(3),
+          counts: {
+            intention.id: testRelationCounts(dailySource: 1),
+            selected: testRelationCounts(dailySelected: 1),
+          },
+        ),
+      );
+      await start.future;
+      await waitForDetailRequests(repository, 2);
+
+      repository.detailRequests[1].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(2),
+      );
+      await pumpEventQueue();
+      expect(
+        (container.read(provider) as IntentionDetailsLoaded).revision,
+        const TestDetailsRevision(1),
+      );
+
+      repository.detailRequests[1].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(3),
+        relationCounts: testRelationCounts(dailySource: 1),
+      );
+      await pumpEventQueue();
+      var current = container.read(provider) as IntentionDetailsLoaded;
+      expect(current.details.relationCounts.total, 1);
+      expect(current.details.relationCounts.dailySource, 1);
+
+      repository.detailRequests[1].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(2),
+      );
+      await pumpEventQueue();
+      current = container.read(provider) as IntentionDetailsLoaded;
+      expect(current.revision, const TestDetailsRevision(3));
+      expect(current.details.relationCounts.total, 1);
+    },
+  );
+
+  test('завершение удаления дневного выбора удерживает актуальный запрет намерения', () async {
+    final repository = ControlledDetailsRepository(shareSecondWatch: false);
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final intention = testDetailsIntention(index: 71);
+    final selected = testDetailsIntentionId(72);
+    final relation = testDetailsRelationRow(ownerId: intention.id, index: 71);
+    final choice = reconciliationChoice(
+      source: intention.id,
+      selected: selected,
+    );
+    final provider = intentionDetailsViewModelProvider(intention.id);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(1),
+      relationCounts: testRelationCounts(activeNeedOutgoing: 1, dailySource: 1),
+    );
+    await pumpEventQueue();
+
+    final start =
+        container
+                .read(graphCommandCoordinatorProvider.notifier)
+                .acceptDailyChoiceDelete(DeleteDailyChoice(choice.id))
+            as DailyChoiceCommandAccepted;
+    repository.completeDailyChoiceCommand(
+      0,
+      reconciliationChoiceDeleted(
+        choice: choice,
+        pathRelationId: relation.relation.id,
+        revision: const TestDetailsRevision(3),
+        counts: {
+          intention.id: testRelationCounts(activeNeedOutgoing: 1),
+          selected: testRelationCounts(),
+        },
+      ),
+    );
+    await start.future;
+    await waitForDetailRequests(repository, 2);
+
+    repository.detailRequests[1].add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(2),
+      relationCounts: testRelationCounts(activeNeedOutgoing: 1, dailySource: 1),
+    );
+    await pumpEventQueue();
+    var current = container.read(provider) as IntentionDetailsLoaded;
+    expect(current.revision, const TestDetailsRevision(1));
+    expect(current.details.relationCounts.total, 2);
+
+    repository.detailRequests[1].add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(3),
+      relationCounts: testRelationCounts(activeNeedOutgoing: 1),
+    );
+    await pumpEventQueue();
+    current = container.read(provider) as IntentionDetailsLoaded;
+    expect(current.revision, const TestDetailsRevision(3));
+    expect(current.details.relationCounts.dailyTotal, 0);
+    expect(current.details.relationCounts.total, 1);
+  });
+
   test('различает загрузку и подтверждённое активное намерение', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);

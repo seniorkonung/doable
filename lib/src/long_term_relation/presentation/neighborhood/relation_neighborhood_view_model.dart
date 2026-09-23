@@ -563,6 +563,9 @@ final class RelationNeighborhoodViewModel
       case GraphResultSuccess(
         value: GraphSnapshot(value: null, :final revision),
       ):
+        if (_observationPrecedesKnownRevision(revision)) {
+          return;
+        }
         _requiredRevision = revision;
         _finishIntentionContext();
       case GraphResultSuccess(
@@ -645,6 +648,13 @@ final class RelationNeighborhoodViewModel
             if (activeCount != counts.active) {
               return true;
             }
+          }
+        case DailyChoiceChange(:final intentionCounts):
+          final counts = intentionCounts[_intentionId];
+          if (counts != null &&
+              (current is! RelationGroupConfirmedState ||
+                  counts != current.counts)) {
+            return true;
           }
         case LongTermRelationChange(:final id, :final before, :final after):
           if (loadedRelationIds.contains(id) ||
@@ -979,14 +989,24 @@ final class RelationNeighborhoodViewModel
 
   bool _pagePrecedesRequiredRevision(GraphRevision revision) {
     final required = _requiredRevision;
-    if (required == null) {
-      return false;
-    }
-    return switch (revision.compareTo(required)) {
-      GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch => true,
-      GraphRevisionOrder.same || GraphRevisionOrder.newer => false,
-    };
+    return required != null && _precedes(revision, required);
   }
+
+  bool _observationPrecedesKnownRevision(GraphRevision revision) {
+    final current = state;
+    if (current is RelationGroupConfirmedState &&
+        _precedes(revision, current.revision)) {
+      return true;
+    }
+    final required = _requiredRevision;
+    return required != null && _precedes(revision, required);
+  }
+
+  bool _precedes(GraphRevision revision, GraphRevision known) =>
+      switch (revision.compareTo(known)) {
+        GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch => true,
+        GraphRevisionOrder.same || GraphRevisionOrder.newer => false,
+      };
 
   RelationGroupInitialFailure _initialFailure(
     RelationGroupSelection selection,

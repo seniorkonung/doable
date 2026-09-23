@@ -1,4 +1,6 @@
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -16,8 +18,87 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
+import '../../../support/daily_choice_reconciliation_fixture.dart';
 
 void main() {
+  test(
+    'дневной пакет применяет абсолютные количества без смены состава каталога',
+    () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      addTearDown(container.dispose);
+      final provider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      final first = testSummary(index: 1, title: 'Альфа');
+      final second = testSummary(index: 2, title: 'Бета');
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [second, first],
+            totalCount: 2,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(provider.future);
+      final before = _loaded(container);
+      final choice = reconciliationChoice(
+        source: first.id,
+        selected: second.id,
+      );
+      final relation = testRelation(
+        sourceIntentionId: first.id,
+        relatedIntentionId: second.id,
+        index: 18,
+      );
+
+      final start =
+          container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptDailyChoiceDelete(DeleteDailyChoice(choice.id))
+              as DailyChoiceCommandAccepted;
+      repository.completeDailyChoiceCommand(
+        0,
+        reconciliationChoiceDeleted(
+          choice: choice,
+          pathRelationId: relation.id,
+          revision: const TestCatalogRevision(3),
+          counts: {
+            first.id: testRelationCounts(activeNeedOutgoing: 1),
+            second.id: testRelationCounts(activeNeedIncoming: 1),
+          },
+        ),
+      );
+      await start.future;
+      await Future<void>.delayed(Duration.zero);
+
+      final current = _loaded(container);
+      expect(current.revision, const TestCatalogRevision(3));
+      expect(current.items.map((item) => item.id), [second.id, first.id]);
+      expect(current.items.map((item) => item.activeRelationCount), [1, 1]);
+      expect(current.items.map((item) => item.title), ['Бета', 'Альфа']);
+      expect(
+        current.items.map((item) => item.createdAt.value),
+        before.items.map((item) => item.createdAt.value),
+      );
+      expect(
+        current.items.map((item) => item.updatedAt.value),
+        before.items.map((item) => item.updatedAt.value),
+      );
+      expect(current.totalCount, 2);
+      expect(repository.queries, hasLength(1));
+    },
+  );
+
   test(
     'создание связи обновляет количества участников без изменения состава',
     () async {
