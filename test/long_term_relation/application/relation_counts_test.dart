@@ -150,6 +150,52 @@ void main() {
       expect(confirmed.counts.total, 0);
       expect(unknown, isNot(isA<ConfirmedRelationCounts>()));
     });
+
+    test('дневные роли учитываются отдельно от восьми прежних групп', () {
+      final counts = RelationCounts(
+        activeNeedIncoming: 1,
+        activeNeedOutgoing: 0,
+        activeCanIncoming: 0,
+        activeCanOutgoing: 0,
+        archivedNeedIncoming: 0,
+        archivedNeedOutgoing: 0,
+        archivedCanIncoming: 0,
+        archivedCanOutgoing: 0,
+        dailySource: 2,
+        dailySelected: 3,
+      );
+
+      expect(counts.active, 1);
+      expect(counts.archived, 0);
+      expect(counts.dailySource, 2);
+      expect(counts.dailySelected, 3);
+      expect(counts.dailyTotal, 5);
+      expect(counts.longTermTotal, 1);
+      expect(counts.total, 6);
+    });
+
+    test('отклоняет отрицательное дневное количество в каждой роли', () {
+      for (final values in [
+        (source: -1, selected: 0),
+        (source: 0, selected: -1),
+      ]) {
+        expect(
+          () => RelationCounts(
+            activeNeedIncoming: 0,
+            activeNeedOutgoing: 0,
+            activeCanIncoming: 0,
+            activeCanOutgoing: 0,
+            archivedNeedIncoming: 0,
+            archivedNeedOutgoing: 0,
+            archivedCanIncoming: 0,
+            archivedCanOutgoing: 0,
+            dailySource: values.source,
+            dailySelected: values.selected,
+          ),
+          throwsA(isA<RelationCountsValidationException>()),
+        );
+      }
+    });
   });
 }
 

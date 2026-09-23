@@ -449,7 +449,9 @@ final class _RelationSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final totalLabel = localizations.relationNeighborhoodTotal(counts.total);
+    final totalLabel = localizations.relationNeighborhoodTotal(
+      counts.longTermTotal,
+    );
     final activeLabel = localizations.relationNeighborhoodActiveTotal(
       counts.active,
     );

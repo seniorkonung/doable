@@ -8,6 +8,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -90,6 +91,46 @@ void main() {
         diagnostics.events.whereType<SelectedRelationsReadDiagnosticsEvent>(),
         hasLength(2),
       );
+    },
+  );
+
+  test(
+    'выбранные связи получают разные разрешения из фактических шагов',
+    () async {
+      const choiceId = '018f0b5d-6b2e-7c80-8000-000000000201';
+      const stepId = '018f0b5d-6b2e-7c80-8000-000000000202';
+      await database.customStatement(
+        '''
+        INSERT INTO daily_choices
+          (id, source_intention_id, selected_intention_id, choice_date, is_completed)
+        VALUES (?, ?, ?, '2026-09-23', 0)
+      ''',
+        [choiceId, _owner.toCanonicalString(), _neighbor.toCanonicalString()],
+      );
+      await database.customStatement(
+        '''
+        INSERT INTO daily_choice_path_steps
+          (id, daily_choice_id, long_term_relation_id)
+        VALUES (?, ?, ?)
+      ''',
+        [stepId, choiceId, _first.toCanonicalString()],
+      );
+
+      final result = await repository.getSelectedRelations(
+        SelectedRelationsQuery(
+          intentionId: _owner,
+          relationIds: [_first, _second],
+        ),
+      );
+      final entries =
+          (result as SelectedRelationsReadSuccess).value.value.entries;
+      final first = entries[_first] as SelectedRelationPresent;
+      final second = entries[_second] as SelectedRelationPresent;
+      expect(
+        first.details.permissions.restriction,
+        LongTermRelationPermissionRestriction.referencedByDailyPath,
+      );
+      expect(second.details.permissions.canDelete, isTrue);
     },
   );
 
