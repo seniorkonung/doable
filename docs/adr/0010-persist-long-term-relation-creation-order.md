@@ -1,6 +1,6 @@
 # ADR-0010: Хранить порядок создания долговременных связей отдельно от идентичности
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-long-term-relations
 - Date: 2026-09-13
 

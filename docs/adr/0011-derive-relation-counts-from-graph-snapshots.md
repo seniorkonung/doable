@@ -1,6 +1,6 @@
 # ADR-0011: Вычислять счётчики связей из согласованных снимков графа
 
-- Status: proposed
+- Status: accepted
 - Originating change: manage-long-term-relations
 - Date: 2026-09-13
 
