@@ -1071,3 +1071,24 @@ Phase 1 не включает получение соседства и его с
   - **Зависимости:** 6.9, 6.11, 6.14, 6.16.
   - **Вероятные файлы:** `lib/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart`, `test/long_term_relation/presentation/neighborhood/blocking_relations_selection_test.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
   - **Размер:** M.
+
+- [ ] 6.20 Получать и наблюдать явно выбранные связи одним согласованным набором
+  - **Критерии приёмки:**
+    - Типизированный контракт репозитория возвращает один снимок с общей ревизией для каждого переданного идентификатора выбранной связи: актуальные данные и участников либо явное отсутствие/утрату принадлежности намерению. Недоступность и повреждение остаются типизированными отказами; частичный результат не выдаётся за успешный выбор.
+    - Drift читает строки только указанных связей, краткие данные уникальных участников и точные счётчики пакетными агрегатами в одной транзакции через общий последовательный исполнитель. SQL-порции при превышении лимита параметров остаются внутри этого снимка; не читаются строки невыбранных зависимостей и не вводятся сохранённые изменяемые счётчики.
+    - Одно наблюдение набора объединяет подтверждённые изменения выбранных связей и их участников, включая изменения счётчиков, без отдельной подписки и повторного расчёта агрегатов на каждую связь. Старые ревизии и объединённые инвалидирования не порождают ложный успешный снимок; диагностика не содержит идентификаторов и пользовательского текста.
+    - На файловой фикстуре 6.17 для 401 выбранной связи трасса фиксирует не более пяти запросов агрегатов при начальной актуализации вместо 402. Отдельный пример превышает лимит SQL-параметров и подтверждает полный набор на одной ревизии.
+  - **Проверка:** Расширить и выполнить контрактные тесты репозитория и `flutter test test/graph/data/drift_relation_group_large_fixture_test.dart test/long_term_relation/presentation/neighborhood`. Проверить запросы, ревизии, изменение участника/счётчика, отсутствие и отказ чтения; выполнить анализ изменённых файлов и валидацию OpenSpec.
+  - **Зависимости:** 6.13, 6.17.
+  - **Вероятные файлы:** `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_details.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart`, `test/graph/data/drift_relation_group_large_fixture_test.dart` и контрактные тесты графа.
+  - **Размер:** M.
+
+- [ ] 6.21 Ускорить подготовку подтверждения большого выбора и проверить результат
+  - **Критерии приёмки:**
+    - Актуализация перед просмотром и наблюдение открытого подтверждения используют набор из 6.20 вместо чтения и подписки на каждую связь. Выбор сохраняет исходные идентификаторы между группами и порциями; изменённые данные обновляют просмотр, а отсутствующая или переставшая блокировать связь требует явного исправления и нового подтверждения.
+    - Ошибка чтения сохраняет прежний выбор без частичного успеха и не разрешает отправку команды. Запоздалые снимки не вытесняют актуальные; подтверждённая массовая команда по-прежнему повторно проверяет точный набор в транзакции и не удаляет намерение.
+    - На одной и той же файловой фикстуре с 401 выбранной связью зафиксированы медианы не менее трёх прогонов до и после изменения: время подготовки уменьшается минимум в пять раз, а измерения памяти и стоимости агрегатов опубликованы рядом с прежним свидетельством 6.17. Проверка интерфейса охватывает просмотр всего выбора, изменения во время диалога и сохранение доступности на RU/EN.
+  - **Проверка:** Расширить и выполнить `flutter test test/long_term_relation/presentation/neighborhood test/app/long_term_relation_app_flow_test.dart test/graph/data/drift_relation_group_large_fixture_test.dart`; проверить 401 выбранный идентификатор до/после, конфликт, отказ, быстрые смены ревизий, однократное подтверждение и измерения в сопоставимом окружении. Выполнить проектные проверки и валидацию OpenSpec.
+  - **Зависимости:** 6.19, 6.20.
+  - **Вероятные файлы:** `lib/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/blocking_relations_confirmation.dart`, `test/long_term_relation/presentation/neighborhood/blocking_relations_selection_test.dart`, `test/long_term_relation/presentation/neighborhood/blocking_relations_confirmation_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/graph/data/drift_relation_group_large_fixture_test.dart`, новое `openspec/changes/manage-long-term-relations/verification-6.21.md`.
+  - **Размер:** M.
