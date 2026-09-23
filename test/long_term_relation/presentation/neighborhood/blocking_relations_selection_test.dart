@@ -183,6 +183,11 @@ void main() {
     await pumpEventQueue();
 
     expect(harness.state, isA<BlockingRelationsSelectionSucceeded>());
+    expect(harness.viewModel.select(row), isFalse);
+    expect(
+      (harness.state as BlockingRelationsSelectionSucceeded).snapshot.command,
+      same(command),
+    );
     harness.viewModel.confirm(presentationTitle: 'Намерение');
     expect(harness.repository.commands, hasLength(1));
   });

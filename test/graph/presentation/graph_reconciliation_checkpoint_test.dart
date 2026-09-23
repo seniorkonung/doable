@@ -1,14 +1,19 @@
 import 'dart:async';
 
+import 'package:doable/src/data/local/app_database.dart'
+    hide Intention, LongTermRelation;
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
+import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -27,16 +32,303 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
+import 'package:doable/src/long_term_relation/presentation/details/relation_details_state.dart';
+import 'package:doable/src/long_term_relation/presentation/details/relation_details_view_model.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/catalog/catalog_test_support.dart'
     as catalog_support;
+import '../../support/in_memory_diagnostics_sink.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
 
 /// Контрольная точка согласования: каталог, подробные данные и соседство
 /// обслуживаются одним графом, одним coordinator и одним потоком завершений.
 void main() {
+  test(
+    'массовое удаление Drift согласует все открытые представления',
+    () async {
+      final database = AppDatabase(openInMemoryLocalDatabase());
+      await database.open();
+      addTearDown(database.close);
+      final ids = [
+        for (var index = 1; index <= 4; index++) testIntentionId(index),
+      ];
+      for (var index = 0; index < ids.length; index++) {
+        await database
+            .into(database.intentions)
+            .insert(
+              IntentionsCompanion.insert(
+                id: ids[index].toCanonicalString(),
+                title: 'Намерение ${index + 1}',
+                createdAt: 1000000 + index,
+                updatedAt: 2000000 + index,
+              ),
+            );
+      }
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 23),
+        InMemoryDiagnosticsSink(),
+      );
+      Future<LongTermRelationId> create(
+        IntentionId source,
+        IntentionId related,
+        LongTermRelationType type,
+      ) async {
+        final result = await repository.execute(
+          CreateLongTermRelation(
+            sourceIntentionId: source,
+            relatedIntentionId: related,
+            type: type,
+            priority: RelationPriority.p2,
+            description: null,
+          ),
+        );
+        return ((result as GraphCommandSucceeded).value.value
+                as LongTermRelationCreated)
+            .relation
+            .id;
+      }
+
+      final selectedActive = await create(
+        ids[0],
+        ids[1],
+        LongTermRelationType.need,
+      );
+      final selectedArchived = await create(
+        ids[2],
+        ids[0],
+        LongTermRelationType.can,
+      );
+      expect(
+        await repository.execute(ArchiveLongTermRelation(selectedArchived)),
+        isA<GraphCommandSucceeded>(),
+      );
+      final untouchedOwner = await create(
+        ids[0],
+        ids[3],
+        LongTermRelationType.can,
+      );
+      final untouchedNeighbor = await create(
+        ids[1],
+        ids[2],
+        LongTermRelationType.need,
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+          catalogPagingPolicyProvider.overrideWithValue(
+            CatalogPagingPolicy(
+              pageSize: 50,
+              prefetchRemaining: 0,
+              filterDebounce: Duration.zero,
+            ),
+          ),
+        ],
+        retry: (retryCount, error) => null,
+      );
+      final catalogProvider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final filteredProvider = intentionCatalogViewModelProvider(
+        SelectRelationParticipant(
+          excludedIntentionId: ids[3],
+          selectionContext: RelationParticipantSelectionContext.activeRelation,
+        ),
+      );
+      final catalogUpdates = <IntentionCatalogLoaded>[];
+      final subscriptions = [
+        container.listen(catalogProvider, (_, next) {
+          if (next.value case final IntentionCatalogLoaded loaded) {
+            catalogUpdates.add(loaded);
+          }
+        }, fireImmediately: true),
+        container.listen(filteredProvider, (_, _) {}, fireImmediately: true),
+        for (final id in ids)
+          container.listen(
+            intentionDetailsViewModelProvider(id),
+            (_, _) {},
+            fireImmediately: true,
+          ),
+        for (final id in [ids[0], ids[1]])
+          container.listen(
+            relationNeighborhoodViewModelProvider(id),
+            (_, _) {},
+            fireImmediately: true,
+          ),
+        for (final id in [selectedActive, untouchedNeighbor])
+          container.listen(
+            relationDetailsViewModelProvider(id),
+            (_, _) {},
+            fireImmediately: true,
+          ),
+      ];
+      addTearDown(() {
+        for (final subscription in subscriptions) {
+          subscription.close();
+        }
+        container.dispose();
+      });
+      await _settleUntil(
+        () =>
+            container.read(catalogProvider).value is IntentionCatalogLoaded &&
+            container.read(filteredProvider).value is IntentionCatalogLoaded &&
+            ids.every(
+              (id) =>
+                  container.read(intentionDetailsViewModelProvider(id))
+                      is IntentionDetailsLoaded,
+            ) &&
+            [ids[0], ids[1]].every(
+              (id) =>
+                  container.read(relationNeighborhoodViewModelProvider(id))
+                      is RelationGroupLoaded,
+            ) &&
+            [selectedActive, untouchedNeighbor].every(
+              (id) =>
+                  container.read(relationDetailsViewModelProvider(id))
+                      is RelationDetailsLoaded,
+            ),
+      );
+
+      final catalogBefore =
+          container.read(catalogProvider).requireValue
+              as IntentionCatalogLoaded;
+      final stableCatalog = [
+        for (final item in catalogBefore.items)
+          (item.id, item.title, item.createdAt.value, item.updatedAt.value),
+      ];
+      final intentionsBefore = [
+        for (final row
+            in await database
+                .customSelect('SELECT * FROM intentions ORDER BY id')
+                .get())
+          row.data,
+      ];
+      container
+          .read(filteredProvider.notifier)
+          .changeTitleFilter('Намерение 1');
+      await _settleUntil(() {
+        final filtered = container.read(filteredProvider).value;
+        return filtered is IntentionCatalogLoaded &&
+            filtered.selection.titleFilterText == 'Намерение 1' &&
+            filtered.items.length == 1;
+      });
+      catalogUpdates.clear();
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final command = DeleteBlockingRelations(
+        intentionId: ids[0],
+        relationIds: [selectedActive, selectedArchived],
+      );
+      final start = coordinator.acceptBlockingRelationsDelete(
+        command,
+        presentationTitle: 'Намерение 1',
+      ) as BlockingRelationsDeleteAccepted;
+      final completion = await start.future;
+      final confirmed = (completion.result as GraphCommandSucceeded).value;
+      expect(confirmed.value, isA<BlockingRelationsDeleted>());
+      expect(
+        (confirmed.value as BlockingRelationsDeleted).deletedRelations
+            .map((relation) => relation.id)
+            .toSet(),
+        {selectedActive, selectedArchived},
+      );
+      await _settleUntil(
+        () =>
+            container.read(relationDetailsViewModelProvider(selectedActive))
+                is RelationDetailsDeleted &&
+            container.read(relationNeighborhoodViewModelProvider(ids[0]))
+                is RelationGroupEmpty &&
+            container.read(relationNeighborhoodViewModelProvider(ids[1]))
+                is RelationGroupLoaded &&
+            container.read(intentionDetailsViewModelProvider(ids[0]))
+                is IntentionDetailsLoaded &&
+            (container.read(
+                  intentionDetailsViewModelProvider(ids[0]),
+                ) as IntentionDetailsLoaded).details.relationCounts.total ==
+                1,
+      );
+
+      final catalogAfter =
+          container.read(catalogProvider).requireValue
+              as IntentionCatalogLoaded;
+      expect(catalogAfter.items.map((item) => item.activeRelationCount), [
+        1,
+        1,
+        1,
+        1,
+      ]);
+      expect(
+        catalogAfter.items.map(
+          (item) =>
+              (item.id, item.title, item.createdAt.value, item.updatedAt.value),
+        ),
+        stableCatalog,
+      );
+      expect(catalogAfter.totalCount, catalogBefore.totalCount);
+      expect(catalogAfter.nextCursor, catalogBefore.nextCursor);
+      expect(catalogUpdates, [same(catalogAfter)]);
+      final filteredAfter =
+          container.read(filteredProvider).requireValue
+              as IntentionCatalogLoaded;
+      expect(filteredAfter.selection.titleFilterText, 'Намерение 1');
+      expect(filteredAfter.items.single.id, ids[0]);
+      expect(filteredAfter.items.single.activeRelationCount, 1);
+      expect(filteredAfter.totalCount, 1);
+      for (final id in ids) {
+        final details = container.read(
+          intentionDetailsViewModelProvider(id),
+        ) as IntentionDetailsLoaded;
+        expect(details.details.relationCounts.active, 1);
+        expect(details.intention.title, 'Намерение ${ids.indexOf(id) + 1}');
+      }
+      final ownerGroup = container.read(
+        relationNeighborhoodViewModelProvider(ids[0]),
+      ) as RelationGroupEmpty;
+      expect(ownerGroup.counts.total, 1);
+      expect(ownerGroup.counts.activeCanOutgoing, 1);
+      expect(ownerGroup.counts.archivedCanIncoming, 0);
+      final neighborGroup = container.read(
+        relationNeighborhoodViewModelProvider(ids[1]),
+      ) as RelationGroupLoaded;
+      expect(neighborGroup.items.single.relation.id, untouchedNeighbor);
+      expect(neighborGroup.items.single.source.activeRelationCount, 1);
+      expect(neighborGroup.counts.total, 1);
+      final remainingDetails = container.read(
+        relationDetailsViewModelProvider(untouchedNeighbor),
+      ) as RelationDetailsLoaded;
+      expect(remainingDetails.details.source.activeRelationCount, 1);
+      expect(remainingDetails.details.relation.id, untouchedNeighbor);
+      final savedRelations = await database
+          .customSelect('SELECT id FROM long_term_relations')
+          .get();
+      expect([
+        for (final row
+            in await database
+                .customSelect('SELECT * FROM intentions ORDER BY id')
+                .get())
+          row.data,
+      ], intentionsBefore);
+      expect(savedRelations.map((row) => row.read<String>('id')).toSet(), {
+        untouchedOwner.toCanonicalString(),
+        untouchedNeighbor.toCanonicalString(),
+      });
+      final persistedCounts = (await repository.getRelationCounts(
+        ids[0],
+      ) as ResultSuccess<GraphSnapshot<RelationCounts>>).value;
+      expect(persistedCounts.value.total, 1);
+      expect(
+        persistedCounts.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
+      );
+    },
+  );
+
   test(
     'смешанный поток операций согласованно обновляет все три потребителя',
     () async {
@@ -648,6 +940,13 @@ void main() {
     expect(repository.catalogQueries, hasLength(1));
     expect(repository.groupQueries, hasLength(2));
   });
+}
+
+Future<void> _settleUntil(bool Function() condition) async {
+  for (var attempt = 0; attempt < 30 && !condition(); attempt++) {
+    await pumpEventQueue();
+  }
+  expect(condition(), isTrue);
 }
 
 /// Единая среда каталога, подробного просмотра и соседства одного намерения.

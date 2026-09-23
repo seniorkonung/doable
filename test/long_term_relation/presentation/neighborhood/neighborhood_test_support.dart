@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -24,6 +25,7 @@ final class ControlledNeighborhoodRepository
   final intentionIds = <IntentionId>[];
   final intentionCommands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
+  final blockingCommands = <DeleteBlockingRelations>[];
   final _relationRows = <LongTermRelationId, LongTermRelationSummary>{};
   RelationCounts? _latestCounts;
   GraphRevision? _latestRevision;
@@ -34,6 +36,7 @@ final class ControlledNeighborhoodRepository
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
+  final _blockingRequests = <Completer<DeleteBlockingRelationsResult>>[];
 
   int get requestCount => queries.length;
 
@@ -109,6 +112,13 @@ final class ControlledNeighborhoodRepository
     _relationCommandRequests[index].complete(result);
   }
 
+  void completeBlockingCommand(
+    int index,
+    DeleteBlockingRelationsResult result,
+  ) {
+    _blockingRequests[index].complete(result);
+  }
+
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupQuery query,
@@ -171,6 +181,8 @@ final class ControlledNeighborhoodRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
+      final DeleteBlockingRelations blockingCommand =>
+        await _executeBlockingRelationsDelete(blockingCommand),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -191,6 +203,15 @@ final class ControlledNeighborhoodRepository
     relationCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationCommandRequests.add(request);
+    return request.future;
+  }
+
+  Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
+    DeleteBlockingRelations command,
+  ) {
+    blockingCommands.add(command);
+    final request = Completer<DeleteBlockingRelationsResult>();
+    _blockingRequests.add(request);
     return request.future;
   }
 
