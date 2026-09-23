@@ -1186,4 +1186,96 @@ class AppLocalizationsEn extends AppLocalizations {
   String relationEditorPriorityOption(String priority) {
     return 'Priority $priority';
   }
+
+  @override
+  String get detailsChoosePathAction => 'Choose an action along a path';
+
+  @override
+  String get choicePathTitle => 'Choose a path to an action';
+
+  @override
+  String get choicePathDirection =>
+      'Path from the source intention to an action';
+
+  @override
+  String choicePathSource(String source) {
+    return 'Source intention: $source';
+  }
+
+  @override
+  String get choicePathSourcePending => 'Loading the source intention…';
+
+  @override
+  String choicePathReturnTo(String source) {
+    return 'Return to “$source”';
+  }
+
+  @override
+  String choicePathStepSemantics(int index, String phrase, String priority) {
+    return 'Step $index: $phrase. Priority $priority';
+  }
+
+  @override
+  String get choicePathActionSelected => 'Action selected';
+
+  @override
+  String choicePathSelectAction(String action) {
+    return 'Choose action “$action”';
+  }
+
+  @override
+  String get choicePathSelectionNotSaved =>
+      'The daily choice has not been created yet.';
+
+  @override
+  String get choicePathContinuations => 'Available continuations';
+
+  @override
+  String get choicePathLoading => 'Checking available continuations…';
+
+  @override
+  String get choicePathNoPath =>
+      'There is no valid path from this intention to another action right now.';
+
+  @override
+  String get choicePathNoFurtherPath =>
+      'There are no further valid continuations.';
+
+  @override
+  String get choicePathConflict =>
+      'The graph has changed. Refresh the path before continuing.';
+
+  @override
+  String get choicePathRefresh => 'Refresh path';
+
+  @override
+  String get choicePathNotFound =>
+      'An intention on this path no longer exists.';
+
+  @override
+  String get choicePathInvalid =>
+      'Continuations could not be checked because of an invalid request.';
+
+  @override
+  String get choicePathUnavailable =>
+      'Continuations are temporarily unavailable. Try again.';
+
+  @override
+  String get choicePathCorruption =>
+      'Saved path data is damaged. Continuation is unavailable.';
+
+  @override
+  String get choicePathUnexpected =>
+      'Continuations could not be checked because of an unexpected error.';
+
+  @override
+  String get choicePathLoadMore => 'Show more continuations';
+
+  @override
+  String get choicePathLoadingMore => 'Loading the next page…';
+
+  @override
+  String choicePathContinueSemantics(String phrase, String priority) {
+    return 'Continue along relation: $phrase. Priority $priority';
+  }
 }
