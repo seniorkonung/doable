@@ -34,7 +34,6 @@ import 'package:doable/src/long_term_relation/presentation/neighborhood/relation
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_state.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_view_model.dart';
-import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
