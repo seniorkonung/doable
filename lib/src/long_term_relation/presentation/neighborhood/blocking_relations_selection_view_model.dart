@@ -8,6 +8,7 @@ import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../graph/application/selected_relations.dart';
 import '../../../intention/application/intention_result.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -23,12 +24,11 @@ final class BlockingRelationsSelectionViewModel
   late GraphCommandCoordinator _coordinator;
   late PersonalGraphRepository _repository;
   BlockingRelationsDeleteOperationToken? _activeToken;
-  final _rowRevisions = <LongTermRelationId, GraphRevision>{};
+  GraphRevision? _selectionRevision;
   final _descriptions = <LongTermRelationId, String?>{};
   final _invalidReasons =
       <LongTermRelationId, BlockingRelationsInvalidReason>{};
-  final _preparedSubscriptions =
-      <LongTermRelationId, StreamSubscription<LongTermRelationReadResult>>{};
+  StreamSubscription<SelectedRelationsReadResult>? _preparedSubscription;
 
   @override
   BlockingRelationsSelectionState build(IntentionId intentionId) {
@@ -67,6 +67,7 @@ final class BlockingRelationsSelectionViewModel
     }
     _stopPreparedObservation();
     _releaseFailureClaim();
+    _selectionRevision = null;
     state = BlockingRelationsSelectionEditing(
       intentionId: current.intentionId,
       selected: {...current.selected, relation.id: row},
@@ -88,10 +89,10 @@ final class BlockingRelationsSelectionViewModel
     }
     _stopPreparedObservation();
     _releaseFailureClaim();
+    _selectionRevision = null;
     final updated = Map<LongTermRelationId, LongTermRelationSummary>.of(
       current.selected,
     )..remove(relationId);
-    _rowRevisions.remove(relationId);
     _descriptions.remove(relationId);
     _invalidReasons.remove(relationId);
     state = BlockingRelationsSelectionEditing(
@@ -129,37 +130,36 @@ final class BlockingRelationsSelectionViewModel
       return;
     }
     _stopPreparedObservation();
-    for (final id in current.selected.keys) {
-      _preparedSubscriptions[id] = _repository
-          .watchRelation(id)
-          .listen(
-            (result) => _handlePreparedObservation(id, result),
-            onError: (Object _) =>
-                _preparedReadFailed(BlockingRelationsRefreshFailure.unexpected),
-          );
-    }
+    final query = SelectedRelationsQuery(
+      intentionId: current.intentionId,
+      relationIds: current.selected.keys,
+    );
+    _preparedSubscription = _repository
+        .watchSelectedRelations(query)
+        .listen(
+          _handlePreparedObservation,
+          onError: (Object _) =>
+              _preparedReadFailed(BlockingRelationsRefreshFailure.unexpected),
+        );
   }
 
-  void _handlePreparedObservation(
-    LongTermRelationId id,
-    LongTermRelationReadResult result,
-  ) {
+  void _handlePreparedObservation(SelectedRelationsReadResult result) {
     if (!ref.mounted || state is! BlockingRelationsSelectionPrepared) {
       return;
     }
     final current = state as BlockingRelationsSelectionPrepared;
     switch (result) {
-      case LongTermRelationReadError(:final failure):
+      case SelectedRelationsReadError(:final failure):
         _preparedReadFailed(switch (failure) {
-          LongTermRelationReadUnavailableFailure() =>
+          SelectedRelationsReadUnavailableFailure() =>
             BlockingRelationsRefreshFailure.unavailable,
-          LongTermRelationReadCorruptionFailure() =>
+          SelectedRelationsReadCorruptionFailure() =>
             BlockingRelationsRefreshFailure.corruption,
-          LongTermRelationReadUnexpectedFailure() =>
+          SelectedRelationsReadUnexpectedFailure() =>
             BlockingRelationsRefreshFailure.unexpected,
         });
-      case LongTermRelationReadSuccess(value: final snapshot):
-        final previousRevision = _rowRevisions[id];
+      case SelectedRelationsReadSuccess(value: final snapshot):
+        final previousRevision = _selectionRevision;
         if (previousRevision != null &&
             (snapshot.revision.compareTo(previousRevision) ==
                     GraphRevisionOrder.older ||
@@ -167,38 +167,29 @@ final class BlockingRelationsSelectionViewModel
                     GraphRevisionOrder.same)) {
           return;
         }
-        _rowRevisions[id] = snapshot.revision;
-        final details = snapshot.value;
-        if (details == null ||
-            (details.relation.sourceIntentionId != current.intentionId &&
-                details.relation.relatedIntentionId != current.intentionId)) {
-          _invalidReasons[id] = details == null
-              ? BlockingRelationsInvalidReason.missing
-              : BlockingRelationsInvalidReason.noLongerBlocking;
+        final updated = _updatedSelection(current.selected, snapshot.value);
+        _selectionRevision = snapshot.revision;
+        _descriptions
+          ..clear()
+          ..addAll(updated.descriptions);
+        _invalidReasons
+          ..clear()
+          ..addAll(updated.invalidReasons);
+        if (_invalidReasons.isNotEmpty) {
           _stopPreparedObservation();
           state = BlockingRelationsSelectionEditing(
             intentionId: current.intentionId,
-            selected: current.selected,
+            selected: updated.selected,
             invalidReasons: _invalidReasons,
           );
           return;
         }
-        _descriptions[id] = details.description?.value;
-        final selected = <LongTermRelationId, LongTermRelationSummary>{
-          ...current.selected,
-          id: LongTermRelationSummary(
-            relation: details.relation,
-            source: details.source,
-            related: details.related,
-            hasDescription: details.hasDescription,
-          ),
-        };
         state = BlockingRelationsSelectionPrepared(
           intentionId: current.intentionId,
-          selected: selected,
+          selected: updated.selected,
           snapshot: BlockingRelationsPreparedSelection.fromSelected(
             intentionId: current.intentionId,
-            selected: selected,
+            selected: updated.selected,
             descriptions: _descriptions,
           ),
         );
@@ -219,10 +210,9 @@ final class BlockingRelationsSelectionViewModel
   }
 
   void _stopPreparedObservation() {
-    for (final subscription in _preparedSubscriptions.values) {
-      unawaited(subscription.cancel());
-    }
-    _preparedSubscriptions.clear();
+    final subscription = _preparedSubscription;
+    _preparedSubscription = null;
+    if (subscription != null) unawaited(subscription.cancel());
   }
 
   /// Перечитывает только явно выбранные связи перед просмотром или после конфликта.
@@ -262,78 +252,49 @@ final class BlockingRelationsSelectionViewModel
           break;
       }
 
-      final refreshed = Map<LongTermRelationId, LongTermRelationSummary>.of(
-        current.selected,
+      final result = await _repository.getSelectedRelations(
+        SelectedRelationsQuery(
+          intentionId: current.intentionId,
+          relationIds: current.selected.keys,
+        ),
       );
-      final invalidReasons =
-          Map<LongTermRelationId, BlockingRelationsInvalidReason>.of(
-            _invalidReasons,
-          );
-      final descriptions = Map<LongTermRelationId, String?>.of(_descriptions);
-      final revisions = Map<LongTermRelationId, GraphRevision>.of(
-        _rowRevisions,
-      );
-      final ids = current.selected.keys.toList(growable: false);
-      final results = await Future.wait([
-        for (final id in ids) _repository.watchRelation(id).first,
-      ]);
       if (!ref.mounted || state is! BlockingRelationsSelectionRefreshing) {
         return false;
       }
-      for (var index = 0; index < ids.length; index++) {
-        final id = ids[index];
-        final result = results[index];
-        switch (result) {
-          case LongTermRelationReadError(:final failure):
-            return _refreshFailed(current, switch (failure) {
-              LongTermRelationReadUnavailableFailure() =>
-                BlockingRelationsRefreshFailure.unavailable,
-              LongTermRelationReadCorruptionFailure() =>
-                BlockingRelationsRefreshFailure.corruption,
-              LongTermRelationReadUnexpectedFailure() =>
-                BlockingRelationsRefreshFailure.unexpected,
-            });
-          case LongTermRelationReadSuccess(value: final snapshot):
-            final previousRevision = revisions[id];
-            if (previousRevision != null &&
-                snapshot.revision.compareTo(previousRevision) ==
-                    GraphRevisionOrder.older) {
-              continue;
-            }
-            revisions[id] = snapshot.revision;
-            final details = snapshot.value;
-            if (details == null) {
-              invalidReasons[id] = BlockingRelationsInvalidReason.missing;
-            } else if (details.relation.sourceIntentionId !=
-                    current.intentionId &&
-                details.relation.relatedIntentionId != current.intentionId) {
-              invalidReasons[id] =
-                  BlockingRelationsInvalidReason.noLongerBlocking;
-            } else {
-              invalidReasons.remove(id);
-              descriptions[id] = details.description?.value;
-              refreshed[id] = LongTermRelationSummary(
-                relation: details.relation,
-                source: details.source,
-                related: details.related,
-                hasDescription: details.hasDescription,
-              );
-            }
-        }
+      if (result case SelectedRelationsReadError(:final failure)) {
+        return _refreshFailed(current, switch (failure) {
+          SelectedRelationsReadUnavailableFailure() =>
+            BlockingRelationsRefreshFailure.unavailable,
+          SelectedRelationsReadCorruptionFailure() =>
+            BlockingRelationsRefreshFailure.corruption,
+          SelectedRelationsReadUnexpectedFailure() =>
+            BlockingRelationsRefreshFailure.unexpected,
+        });
       }
-      _rowRevisions
-        ..clear()
-        ..addAll(revisions);
+      final snapshot = (result as SelectedRelationsReadSuccess).value;
+      final previousRevision = _selectionRevision;
+      if (previousRevision != null &&
+          snapshot.revision.compareTo(previousRevision) ==
+              GraphRevisionOrder.older) {
+        state = BlockingRelationsSelectionEditing(
+          intentionId: current.intentionId,
+          selected: current.selected,
+          invalidReasons: _invalidReasons,
+        );
+        return true;
+      }
+      final updated = _updatedSelection(current.selected, snapshot.value);
+      _selectionRevision = snapshot.revision;
       _descriptions
         ..clear()
-        ..addAll(descriptions);
+        ..addAll(updated.descriptions);
       _invalidReasons
         ..clear()
-        ..addAll(invalidReasons);
+        ..addAll(updated.invalidReasons);
       state = BlockingRelationsSelectionEditing(
         intentionId: current.intentionId,
-        selected: refreshed,
-        invalidReasons: invalidReasons,
+        selected: updated.selected,
+        invalidReasons: updated.invalidReasons,
       );
       return true;
     } on Object {
@@ -345,6 +306,48 @@ final class BlockingRelationsSelectionViewModel
         BlockingRelationsRefreshFailure.unexpected,
       );
     }
+  }
+
+  ({
+    Map<LongTermRelationId, LongTermRelationSummary> selected,
+    Map<LongTermRelationId, BlockingRelationsInvalidReason> invalidReasons,
+    Map<LongTermRelationId, String?> descriptions,
+  })
+  _updatedSelection(
+    Map<LongTermRelationId, LongTermRelationSummary> selected,
+    SelectedRelationsSnapshot snapshot,
+  ) {
+    final refreshed = Map<LongTermRelationId, LongTermRelationSummary>.of(
+      selected,
+    );
+    final invalidReasons =
+        Map<LongTermRelationId, BlockingRelationsInvalidReason>.of(
+          _invalidReasons,
+        );
+    final descriptions = Map<LongTermRelationId, String?>.of(_descriptions);
+    for (final entry in snapshot.entries.entries) {
+      final id = entry.key;
+      switch (entry.value) {
+        case SelectedRelationMissing():
+          invalidReasons[id] = BlockingRelationsInvalidReason.missing;
+        case SelectedRelationNoLongerBlocking():
+          invalidReasons[id] = BlockingRelationsInvalidReason.noLongerBlocking;
+        case SelectedRelationPresent(:final details):
+          invalidReasons.remove(id);
+          descriptions[id] = details.description?.value;
+          refreshed[id] = LongTermRelationSummary(
+            relation: details.relation,
+            source: details.source,
+            related: details.related,
+            hasDescription: details.hasDescription,
+          );
+      }
+    }
+    return (
+      selected: refreshed,
+      invalidReasons: invalidReasons,
+      descriptions: descriptions,
+    );
   }
 
   bool _refreshFailed(
@@ -434,7 +437,7 @@ final class BlockingRelationsSelectionViewModel
       }
       switch (completion.result) {
         case GraphResultSuccess():
-          _rowRevisions.clear();
+          _selectionRevision = null;
           _descriptions.clear();
           _invalidReasons.clear();
           _activeToken = null;

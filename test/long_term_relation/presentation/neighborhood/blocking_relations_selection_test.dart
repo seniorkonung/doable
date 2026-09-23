@@ -5,6 +5,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -20,6 +21,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'neighborhood_test_support.dart';
 
 void main() {
+  test('актуализация читает весь выбор одним согласованным запросом', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    final rows = testGroupRows(ownerId: harness.intentionId, from: 1, count: 3);
+    for (final row in rows) {
+      harness.viewModel.select(row);
+      harness.repository.queueRelation(row);
+    }
+
+    expect(await harness.viewModel.refreshSelection(), isTrue);
+    expect(harness.repository.selectedQueries, hasLength(1));
+    expect(
+      harness.repository.selectedQueries.single.relationIds,
+      rows.map((row) => row.relation.id).toSet(),
+    );
+  });
+
   test('выбор сохраняется между всеми группами и заменой порций', () {
     final harness = _Harness();
     addTearDown(harness.dispose);
@@ -320,6 +338,41 @@ void main() {
   );
 
   test(
+    'отказ пакетного чтения не публикует обновлённую часть выбора',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final original = testGroupRow(ownerId: harness.intentionId, index: 1);
+      final second = testGroupRow(ownerId: harness.intentionId, index: 2);
+      final changed = testGroupRow(
+        ownerId: harness.intentionId,
+        index: 1,
+        neighborTitle: 'Неопубликованное название',
+      );
+      harness.viewModel.select(original);
+      harness.viewModel.select(second);
+      harness.repository.queueRelation(
+        changed,
+        revision: const TestGraphRevision(5),
+      );
+      harness.repository.queueRelationFailure(
+        second.relation.id,
+        const LongTermRelationReadUnavailableFailure(),
+      );
+
+      expect(await harness.viewModel.refreshSelection(), isFalse);
+      expect(harness.state, isA<BlockingRelationsSelectionRefreshFailed>());
+      expect(harness.state.selected[original.relation.id], same(original));
+      expect(harness.state.selected.keys, {
+        original.relation.id,
+        second.relation.id,
+      });
+      expect(harness.viewModel.prepare(), isFalse);
+      expect(harness.repository.commands, isEmpty);
+    },
+  );
+
+  test(
     'перенос связи вне текущей группы сохраняет её в исправляемом выборе',
     () async {
       final harness = _Harness();
@@ -421,6 +474,7 @@ final class _Harness {
 
 final class _Repository implements PersonalGraphRepository {
   final commands = <GraphCommand>[];
+  final selectedQueries = <SelectedRelationsQuery>[];
   final _results = <Completer<Object>>[];
   final _relationReads =
       <LongTermRelationId, List<LongTermRelationReadResult>>{};
@@ -474,6 +528,52 @@ final class _Repository implements PersonalGraphRepository {
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       Stream.value(_relationReads[id]!.removeAt(0));
+
+  @override
+  Future<SelectedRelationsReadResult> getSelectedRelations(
+    SelectedRelationsQuery query,
+  ) async {
+    selectedQueries.add(query);
+    final entries = <LongTermRelationId, SelectedRelationEntry>{};
+    GraphRevision revision = const TestGraphRevision(1);
+    for (final id in query.relationIds) {
+      final result = _relationReads[id]!.removeAt(0);
+      switch (result) {
+        case LongTermRelationReadError(:final failure):
+          return SelectedRelationsReadError(switch (failure) {
+            LongTermRelationReadUnavailableFailure() =>
+              const SelectedRelationsReadUnavailableFailure(),
+            LongTermRelationReadCorruptionFailure() =>
+              const SelectedRelationsReadCorruptionFailure(),
+            LongTermRelationReadUnexpectedFailure() =>
+              const SelectedRelationsReadUnexpectedFailure(),
+          });
+        case LongTermRelationReadSuccess(value: final snapshot):
+          if (snapshot.revision.compareTo(revision) ==
+              GraphRevisionOrder.newer) {
+            revision = snapshot.revision;
+          }
+          final details = snapshot.value;
+          entries[id] = details == null
+              ? SelectedRelationMissing(id)
+              : details.relation.sourceIntentionId != query.intentionId &&
+                    details.relation.relatedIntentionId != query.intentionId
+              ? SelectedRelationNoLongerBlocking(id)
+              : SelectedRelationPresent(details);
+      }
+    }
+    return SelectedRelationsReadSuccess(
+      GraphSnapshot(
+        value: SelectedRelationsSnapshot(query: query, entries: entries),
+        revision: revision,
+      ),
+    );
+  }
+
+  @override
+  Stream<SelectedRelationsReadResult> watchSelectedRelations(
+    SelectedRelationsQuery query,
+  ) => const Stream.empty();
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(

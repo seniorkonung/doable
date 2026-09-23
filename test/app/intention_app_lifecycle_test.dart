@@ -1,5 +1,3 @@
-import 'package:doable/src/graph/application/selected_relations.dart';
-
 import 'dart:async';
 
 import 'package:doable/main.dart';
@@ -11,6 +9,7 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -708,15 +707,38 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
+  ) async => _selectedSnapshot(query);
 
   @override
   Stream<SelectedRelationsReadResult> watchSelectedRelations(
     SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
+  ) => Stream.value(_selectedSnapshot(query));
+
+  SelectedRelationsReadResult _selectedSnapshot(
+    SelectedRelationsQuery query,
+  ) => SelectedRelationsReadSuccess(
+    GraphSnapshot(
+      revision: _Revision(_revisions[query.intentionId] ?? 0),
+      value: SelectedRelationsSnapshot(
+        query: query,
+        entries: {
+          for (final id in query.relationIds)
+            id: relation == null || relation!.relation.id != id
+                ? SelectedRelationMissing(id)
+                : relation!.relation.sourceIntentionId != query.intentionId &&
+                      relation!.relation.relatedIntentionId != query.intentionId
+                ? SelectedRelationNoLongerBlocking(id)
+                : SelectedRelationPresent(
+                    LongTermRelationDetails(
+                      relation: relation!.relation,
+                      source: relation!.source,
+                      related: relation!.related,
+                      description: null,
+                    ),
+                  ),
+        },
+      ),
+    ),
   );
 
   _DelayedPersonalGraphRepository({this.relation});
