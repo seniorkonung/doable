@@ -19,12 +19,123 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/in_memory_diagnostics_sink.dart';
 
 void main() {
+  testWidgets(
+    'ошибка массового удаления после ухода из собранного экрана предъявляется один раз',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final semantics = tester.ensureSemantics();
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      final intentionA = _intention(title: 'A', description: null);
+      final intentionB = _intention(
+        uuid: '018f0000-0000-7000-8000-000000000002',
+        title: 'B',
+        description: null,
+      );
+      final repository = _DelayedPersonalGraphRepository(
+        relation: _relationSummary(intentionA, intentionB),
+      );
+      final runtime = await _pumpCatalog(tester, repository, [
+        intentionA,
+        intentionB,
+      ]);
+      await _openDetails(tester, repository, intentionA, requestIndex: 0);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('intention-details-delete')),
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-details-delete')));
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('intention-details-confirm-delete')),
+      );
+      await _pumpUntil(tester, () => repository.commands.length == 1);
+      repository.completeCommand(
+        0,
+        ResultFailure(IntentionHasBlockingRelationsFailure(intentionA.id)),
+      );
+      await _pumpUntil(
+        tester,
+        () => find
+            .byKey(const ValueKey('intention-details-show-blocking-relations'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      final showBlocking = find.byKey(
+        const ValueKey('intention-details-show-blocking-relations'),
+      );
+      await tester.ensureVisible(showBlocking);
+      await tester.tap(showBlocking);
+      await tester.pumpAndSettle();
+      final select = find.byKey(
+        ValueKey(
+          'relation-neighborhood-select-${_relationId.toCanonicalString()}',
+        ),
+      );
+      await tester.ensureVisible(select);
+      await tester.tap(select);
+      await tester.pumpAndSettle();
+      final review = find.byKey(const ValueKey('blocking-relations-review'));
+      await tester.ensureVisible(review);
+      await tester.tap(review);
+      await _pumpUntil(
+        tester,
+        () => find
+            .byKey(const ValueKey('blocking-relations-confirm-delete'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('blocking-relations-confirm-delete')),
+      );
+      await _pumpUntil(
+        tester,
+        () => repository.blockingRelationsCommands.length == 1,
+      );
+      expect(repository.blockingRelationsCommands.single.relationIds, {
+        _relationId,
+      });
+
+      await tester.pumpAndSettle();
+      await _goBack(tester);
+      await _openDetails(tester, repository, intentionB, requestIndex: 1);
+      expect(runtime.commandCoordinator.isRunning(intentionA.id), isTrue);
+      repository.completeBlockingRelationsCommand(
+        0,
+        const GraphCommandFailed<
+          BlockingRelationsDeleted,
+          DeleteBlockingRelationsFailure
+        >(DeleteBlockingRelationsUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      const message =
+          'Delete selected relations — “A”: Selected relations couldn’t be deleted. Try again.';
+      expect(find.text(message), findsOneWidget);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('graph-operation-message')),
+        ),
+        matchesSemantics(
+          label: message,
+          isLiveRegion: true,
+          textDirection: TextDirection.ltr,
+        ),
+      );
+      await _closeOperationMessage(tester);
+      expect(find.text(message), findsNothing);
+      expect(repository.blockingRelationsCommands, hasLength(1));
+      semantics.dispose();
+    },
+  );
+
   testWidgets(
     'оболочка показывает результат ушедшего экрана поверх другого намерения один раз',
     (tester) async {
@@ -592,6 +703,20 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
+  _DelayedPersonalGraphRepository({this.relation});
+
+  final LongTermRelationSummary? relation;
+
+  RelationCounts _countsFor(IntentionId id) => RelationCounts(
+    activeNeedIncoming: relation?.relation.relatedIntentionId == id ? 1 : 0,
+    activeNeedOutgoing: relation?.relation.sourceIntentionId == id ? 1 : 0,
+    activeCanIncoming: 0,
+    activeCanOutgoing: 0,
+    archivedNeedIncoming: 0,
+    archivedNeedOutgoing: 0,
+    archivedCanIncoming: 0,
+    archivedCanOutgoing: 0,
+  );
   final pageQueries = <IntentionCatalogQuery>[];
   final detailIds = <IntentionId>[];
   final detailRequests =
@@ -618,7 +743,14 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
     IntentionId intentionId,
-  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
+  ) => Future.value(
+    ResultSuccess(
+      GraphSnapshot(
+        value: _countsFor(intentionId),
+        revision: _Revision(_revisions[intentionId] ?? 0),
+      ),
+    ),
+  );
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
@@ -626,8 +758,15 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   ) => Future.value(
     GraphResultSuccess(
       RelationGroupFirstPage(
-        items: const [],
-        counts: _zeroRelationCounts,
+        items:
+            relation != null &&
+                query.intentionId == relation!.relation.sourceIntentionId &&
+                query.scope == RelationScope.active &&
+                query.type == LongTermRelationType.need &&
+                query.direction == RelationDirection.outgoing
+            ? [relation!]
+            : const [],
+        counts: _countsFor(query.intentionId),
         nextCursor: null,
         revision: _Revision(_revisions[query.intentionId] ?? 0),
       ),
@@ -636,7 +775,21 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
-      throw UnsupportedError('Связи не наблюдаются в этих тестах.');
+      Stream.value(
+        GraphResultSuccess(
+          GraphSnapshot(
+            value: relation == null || relation!.relation.id != id
+                ? null
+                : LongTermRelationDetails(
+                    relation: relation!.relation,
+                    source: relation!.source,
+                    related: relation!.related,
+                    description: null,
+                  ),
+            revision: const _Revision(0),
+          ),
+        ),
+      );
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
@@ -693,7 +846,7 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
             GraphSnapshot(
               value: IntentionDetails(
                 intention: intention,
-                relationCounts: _zeroRelationCounts,
+                relationCounts: _countsFor(intention.id),
               ),
               revision: _Revision(index),
             ),
@@ -773,17 +926,6 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   updatedAt: intention.updatedAt,
 );
 
-final _zeroRelationCounts = RelationCounts(
-  activeNeedIncoming: 0,
-  activeNeedOutgoing: 0,
-  activeCanIncoming: 0,
-  activeCanOutgoing: 0,
-  archivedNeedIncoming: 0,
-  archivedNeedOutgoing: 0,
-  archivedCanIncoming: 0,
-  archivedCanOutgoing: 0,
-);
-
 final _relationId = switch (LongTermRelationId.decode(
   '018f0000-0000-7000-8000-000000000003',
 )) {
@@ -792,6 +934,32 @@ final _relationId = switch (LongTermRelationId.decode(
     'Некорректный fixture связи.',
   ),
 };
+
+LongTermRelationSummary _relationSummary(Intention source, Intention related) =>
+    LongTermRelationSummary(
+      relation: LongTermRelation(
+        id: _relationId,
+        sourceIntentionId: source.id,
+        relatedIntentionId: related.id,
+        type: LongTermRelationType.need,
+        priority: RelationPriority.p2,
+        scope: RelationScope.active,
+        creationSequence: RelationCreationSequence(1),
+      ),
+      source: RelationParticipantSummary(
+        id: source.id,
+        title: source.title,
+        archiveState: source.archiveState,
+        activeRelationCount: 1,
+      ),
+      related: RelationParticipantSummary(
+        id: related.id,
+        title: related.title,
+        archiveState: related.archiveState,
+        activeRelationCount: 1,
+      ),
+      hasDescription: false,
+    );
 
 Result<ConfirmedGraphResult<IntentionCommandSuccess>> _saved(
   Intention intention, {
