@@ -241,6 +241,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.';
 
   @override
+  String get blockingRelationsInvalidProtected =>
+      'This relation is used in a saved daily path. It cannot be deleted with the selected relations. Remove it from the selection to confirm the others.';
+
+  @override
   String get blockingRelationsRefreshIntentionNotFound =>
       'This intention no longer exists. Its relations cannot be deleted here.';
 
@@ -266,7 +270,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get blockingRelationsDeleteProhibited =>
-      'A selected relation can no longer be deleted. Refresh the selection and confirm it again.';
+      'A selected relation is now used in a saved daily path and was not deleted. Refresh the selection and confirm the other relations again.';
 
   @override
   String get relationNeighborhoodSummaryLoading =>
@@ -853,6 +857,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'This relation is used by a saved daily path. Its type and participants can’t be changed.';
 
   @override
+  String get relationEditorPathProtection =>
+      'This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.';
+
+  @override
+  String get relationEditorPathProtectionWithDraft =>
+      'This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.';
+
+  @override
   String get relationEditorUpdateUnavailable =>
       'The relation couldn’t be updated. Try again.';
 
@@ -1019,6 +1031,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationDetailsDeleteAction => 'Delete relation permanently';
+
+  @override
+  String get relationDetailsPathProtection =>
+      'This relation is used in a saved daily path. It cannot be deleted, and its type and participants cannot be changed. Its description, priority, and archive state remain editable.';
+
+  @override
+  String get relationDetailsDeletionChecking =>
+      'Deletion is unavailable until this relation’s dependencies are confirmed.';
 
   @override
   String get relationDetailsDeleteConfirmationTitle =>

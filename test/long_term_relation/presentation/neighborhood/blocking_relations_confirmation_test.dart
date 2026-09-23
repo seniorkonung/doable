@@ -13,6 +13,7 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
@@ -27,6 +28,184 @@ import 'package:flutter_test/flutter_test.dart';
 import 'neighborhood_test_support.dart';
 
 void main() {
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    testWidgets(
+      'зависимость пути запрещает массовое удаление на ${locale.languageCode}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(
+          tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+        );
+        final harness = await _pumpAction(tester, locale);
+        final row = testGroupRow(ownerId: harness.intentionId, index: 31);
+        harness.repository.protectedIds.add(row.relation.id);
+        harness.select(row);
+        await tester.pump();
+        await tester.tap(
+          find.byKey(const ValueKey('blocking-relations-review')),
+        );
+        await tester.pumpAndSettle();
+
+        final reason = find.textContaining(
+          locale.languageCode == 'ru' ? 'дневном пути' : 'daily path',
+        );
+        expect(reason, findsOneWidget);
+        expect(
+          tester.getSemantics(reason).label,
+          contains(locale.languageCode == 'ru' ? 'дневном пути' : 'daily path'),
+        );
+        expect(
+          find.byKey(const ValueKey('blocking-relations-confirm-delete')),
+          findsNothing,
+        );
+        expect(harness.repository.commands, isEmpty);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
+  testWidgets(
+    'новая зависимость закрывает открытое подтверждение с объяснением',
+    (tester) async {
+      final harness = await _pumpAction(tester, const Locale('ru'));
+      final row = testGroupRow(ownerId: harness.intentionId, index: 32);
+      harness.select(row);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await tester.pumpAndSettle();
+      harness.repository.protectedIds.add(row.relation.id);
+      harness.repository.emitRelation(
+        row,
+        revision: const TestGraphRevision(5),
+      );
+      await tester.pumpAndSettle();
+
+      final confirm = find.byKey(
+        const ValueKey('blocking-relations-confirm-delete'),
+      );
+      await tester.scrollUntilVisible(
+        confirm,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+      expect(find.textContaining('дневном пути'), findsWidgets);
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('дневном пути'), findsOneWidget);
+      expect(harness.repository.commands, isEmpty);
+    },
+  );
+
+  testWidgets('после успеха на той же странице начинается новый пустой выбор', (
+    tester,
+  ) async {
+    final harness = await _pumpAction(tester, const Locale('ru'));
+    final first = testGroupRow(ownerId: harness.intentionId, index: 33);
+    final second = testGroupRow(ownerId: harness.intentionId, index: 34);
+    harness.select(first);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await tester.pumpAndSettle();
+    final confirm = find.byKey(
+      const ValueKey('blocking-relations-confirm-delete'),
+    );
+    await tester.scrollUntilVisible(
+      confirm,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(confirm);
+    await tester.pump();
+    final command =
+        harness.repository.commands.single as DeleteBlockingRelations;
+    harness.repository.requests.single.complete(
+      GraphCommandSucceeded<
+        BlockingRelationsDeleted,
+        DeleteBlockingRelationsFailure
+      >(
+        ConfirmedGraphResult(
+          revision: const TestGraphRevision(5),
+          value: BlockingRelationsDeleted(
+            command: command,
+            revision: const TestGraphRevision(5),
+            deletedRelations: [first.relation],
+            counts: {
+              harness.intentionId: testRelationCounts(),
+              first.relation.relatedIntentionId: testRelationCounts(),
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      harness.container
+          .read(
+            blockingRelationsSelectionViewModelProvider(harness.intentionId),
+          )
+          .selected,
+      isEmpty,
+    );
+    expect(
+      find.byKey(const ValueKey('blocking-relations-review')),
+      findsNothing,
+    );
+    harness.select(second);
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('blocking-relations-review')),
+      findsOneWidget,
+    );
+    expect(harness.repository.commands, hasLength(1));
+  });
+
+  testWidgets(
+    'конфликт пути предъявляется общим механизмом без повторной отправки',
+    (tester) async {
+      final harness = await _pumpAction(tester, const Locale('ru'));
+      final row = testGroupRow(ownerId: harness.intentionId, index: 35);
+      harness.select(row);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await tester.pumpAndSettle();
+      final confirm = find.byKey(
+        const ValueKey('blocking-relations-confirm-delete'),
+      );
+      await tester.scrollUntilVisible(
+        confirm,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(confirm);
+      await tester.pump();
+      harness.repository.protectedIds.add(row.relation.id);
+      harness.repository.requests.single.complete(
+        GraphCommandFailed<
+          BlockingRelationsDeleted,
+          DeleteBlockingRelationsFailure
+        >(
+          DeleteBlockingRelationsSelectionConflictFailure.longTerm(
+            relationId: row.relation.id,
+            reason: BlockingRelationConflictReason.deletionProhibited,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('blocking-relations-delete-failure')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('сохранённом дневном пути'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('blocking-relations-refresh-selection')),
+        findsOneWidget,
+      );
+      expect(harness.repository.commands, hasLength(1));
+    },
+  );
   testWidgets('показывает весь выбор из разных групп и порций при крупном тексте', (
     tester,
   ) async {
@@ -620,6 +799,7 @@ final class _CommandRepository implements PersonalGraphRepository {
   final requests = <Completer<Object>>[];
   final rows = <LongTermRelationId, LongTermRelationSummary>{};
   final descriptions = <LongTermRelationId, String?>{};
+  final protectedIds = <LongTermRelationId>{};
   final _selectionUpdates =
       StreamController<SelectedRelationsReadResult>.broadcast(sync: true);
   SelectedRelationsQuery? _watchedQuery;
@@ -662,6 +842,9 @@ final class _CommandRepository implements PersonalGraphRepository {
             relation: row.relation,
             source: row.source,
             related: row.related,
+            permissions: protectedIds.contains(row.relation.id)
+                ? const LongTermRelationPermissions.referencedByDailyPath()
+                : const LongTermRelationPermissions.unrestricted(),
             description: description == null
                 ? null
                 : LongTermRelationDescription.fromInput(description),
@@ -737,6 +920,9 @@ final class _CommandRepository implements PersonalGraphRepository {
                     relation: row.relation,
                     source: row.source,
                     related: row.related,
+                    permissions: protectedIds.contains(id)
+                        ? const LongTermRelationPermissions.referencedByDailyPath()
+                        : const LongTermRelationPermissions.unrestricted(),
                     description: descriptions[id] == null
                         ? null
                         : LongTermRelationDescription.fromInput(

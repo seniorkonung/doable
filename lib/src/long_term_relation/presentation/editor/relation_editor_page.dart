@@ -18,6 +18,7 @@ import '../../../intention/presentation/details/intention_details_state.dart';
 import '../../../intention/presentation/details/intention_details_view_model.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -124,6 +125,17 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     final descriptionFailure = _descriptionFailure(localizations, editor);
     final generalFailure = _generalFailure(localizations, editor);
     final occupiedPair = _occupiedPair(editor);
+    final basis = editor.editingBasis?.relation;
+    final pathProtected =
+        editor.permissions.restriction ==
+        LongTermRelationPermissionRestriction.referencedByDailyPath;
+    final meaningDraftChanged =
+        basis != null &&
+        (editor.type != basis.type ||
+            editor.sourceIntentionId != basis.sourceIntentionId ||
+            editor.relatedIntentionId != basis.relatedIntentionId);
+    final meaningControlsEnabled =
+        !isSubmitting && (!pathProtected || meaningDraftChanged);
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -139,7 +151,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
             _ParticipantSlot(
               role: RelationParticipantRole.source,
               participant: editor.sourceParticipant,
-              enabled: !isSubmitting,
+              enabled: meaningControlsEnabled,
               onSelect: () =>
                   unawaited(_selectParticipant(RelationParticipantRole.source)),
               onOpenDetails: editor.sourceParticipant == null
@@ -156,7 +168,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
             _ParticipantSlot(
               role: RelationParticipantRole.related,
               participant: editor.relatedParticipant,
-              enabled: !isSubmitting,
+              enabled: meaningControlsEnabled,
               onSelect: () => unawaited(
                 _selectParticipant(RelationParticipantRole.related),
               ),
@@ -183,10 +195,22 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
                 ),
               ),
             ],
+            if (pathProtected) ...[
+              const SizedBox(height: 16),
+              Semantics(
+                container: true,
+                child: Text(
+                  meaningDraftChanged
+                      ? localizations.relationEditorPathProtectionWithDraft
+                      : localizations.relationEditorPathProtection,
+                  key: const ValueKey('relation-editor-path-protection'),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             _TypeChoice(
               selected: editor.type,
-              enabled: !isSubmitting,
+              enabled: meaningControlsEnabled,
               onSelected: notifier.selectType,
             ),
             const SizedBox(height: 24),
