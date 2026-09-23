@@ -13,14 +13,14 @@ import 'sqlite_connection_setup.dart';
 part 'app_database.g.dart';
 part 'database_connection.dart';
 
-@DriftDatabase(include: {'schema/long_term_relation_schema.drift'})
+@DriftDatabase(include: {'schema/daily_choice_schema.drift'})
 final class AppDatabase extends _$AppDatabase {
   AppDatabase(
     ConfiguredLocalDatabaseConnection connection, {
     this.diagnosticsSink,
   }) : super(connection._executor);
 
-  static const currentSchemaVersion = 2;
+  static const currentSchemaVersion = 3;
   final DiagnosticsSink? diagnosticsSink;
 
   @override
