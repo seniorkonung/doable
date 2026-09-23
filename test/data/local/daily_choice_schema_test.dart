@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -26,12 +24,6 @@ void main() {
       setup: (connection) => raw = connection,
     );
     await database.open();
-    final fragment = File('lib/src/data/local/schema/daily_choice_schema.drift')
-        .readAsStringSync();
-    raw.execute(
-      fragment.replaceFirst("import 'long_term_relation_schema.drift';", ''),
-    );
-
     for (final (id, title) in [
       (_source, 'Исходное намерение'),
       (_selected, 'Выбранное действие'),
