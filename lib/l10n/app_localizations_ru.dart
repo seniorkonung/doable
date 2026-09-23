@@ -747,11 +747,34 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationDailyChoice => 'дневной выбор';
 
   @override
-  String get dailyChoiceOperationSucceeded =>
-      'Изменение дневного выбора сохранено.';
+  String get dailyChoiceCreated => 'Дневной выбор создан.';
 
   @override
-  String get dailyChoiceOperationInvalid => 'Проверьте данные дневного выбора.';
+  String get dailyChoiceUpdated => 'Дневной выбор изменён.';
+
+  @override
+  String get dailyChoicePathReplaced => 'Путь дневного выбора заменён.';
+
+  @override
+  String get dailyChoiceDeleted => 'Дневной выбор удалён.';
+
+  @override
+  String get dailyChoiceSourceInvalid =>
+      'Проверьте исходное намерение дневного выбора.';
+
+  @override
+  String get dailyChoiceSelectedInvalid =>
+      'Проверьте выбранное намерение дневного выбора.';
+
+  @override
+  String get dailyChoiceDateInvalid => 'Проверьте дату дневного выбора.';
+
+  @override
+  String get dailyChoiceDescriptionInvalid =>
+      'Проверьте описание дневного выбора.';
+
+  @override
+  String get dailyChoicePathInvalid => 'Проверьте путь дневного выбора.';
 
   @override
   String get dailyChoiceOperationNotFound =>
@@ -759,11 +782,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dailyChoiceOperationConflict =>
-      'Данные изменились. Обновите дневной выбор и подтвердите снова.';
+      'Данные изменились. Обновите их и подтвердите снова.';
 
   @override
   String get dailyChoiceOperationUnavailable =>
-      'Не удалось сохранить дневной выбор. Повторите попытку.';
+      'Не удалось выполнить действие с дневным выбором. Повторите попытку.';
 
   @override
   String get dailyChoiceOperationCorruption =>
@@ -771,7 +794,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dailyChoiceOperationUnexpected =>
-      'Не удалось изменить дневной выбор из-за непредвиденной ошибки.';
+      'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.';
 
   @override
   String get relationEditorCreated => 'Связь создана.';

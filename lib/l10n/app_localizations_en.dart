@@ -746,10 +746,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationDailyChoice => 'daily choice';
 
   @override
-  String get dailyChoiceOperationSucceeded => 'Daily choice change saved.';
+  String get dailyChoiceCreated => 'Daily choice created.';
 
   @override
-  String get dailyChoiceOperationInvalid => 'Check the daily choice details.';
+  String get dailyChoiceUpdated => 'Daily choice updated.';
+
+  @override
+  String get dailyChoicePathReplaced => 'Daily choice path replaced.';
+
+  @override
+  String get dailyChoiceDeleted => 'Daily choice deleted.';
+
+  @override
+  String get dailyChoiceSourceInvalid =>
+      'Check the source intention of the daily choice.';
+
+  @override
+  String get dailyChoiceSelectedInvalid =>
+      'Check the selected intention of the daily choice.';
+
+  @override
+  String get dailyChoiceDateInvalid => 'Check the daily choice date.';
+
+  @override
+  String get dailyChoiceDescriptionInvalid =>
+      'Check the daily choice description.';
+
+  @override
+  String get dailyChoicePathInvalid => 'Check the daily choice path.';
 
   @override
   String get dailyChoiceOperationNotFound =>
@@ -757,11 +781,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dailyChoiceOperationConflict =>
-      'The data changed. Refresh the daily choice and confirm again.';
+      'The data changed. Refresh it and confirm again.';
 
   @override
   String get dailyChoiceOperationUnavailable =>
-      'Could not save the daily choice. Try again.';
+      'Could not complete the daily choice operation. Try again.';
 
   @override
   String get dailyChoiceOperationCorruption =>
@@ -769,7 +793,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dailyChoiceOperationUnexpected =>
-      'Could not change the daily choice because of an unexpected error.';
+      'The daily choice operation failed because of an unexpected error.';
 
   @override
   String get relationEditorCreated => 'Relation created.';

@@ -811,31 +811,59 @@
   "@graphOperationDailyChoice": {
     "description": "Безопасное обозначение дневного выбора в сообщении операции"
   },
-  "dailyChoiceOperationSucceeded": "Daily choice change saved.",
-  "@dailyChoiceOperationSucceeded": {
-    "description": "Подтверждение сохранения изменения дневного выбора"
+  "dailyChoiceCreated": "Daily choice created.",
+  "@dailyChoiceCreated": {
+    "description": "Подтверждение создания дневного выбора"
   },
-  "dailyChoiceOperationInvalid": "Check the daily choice details.",
-  "@dailyChoiceOperationInvalid": {
-    "description": "Ошибка проверки данных дневного выбора"
+  "dailyChoiceUpdated": "Daily choice updated.",
+  "@dailyChoiceUpdated": {
+    "description": "Подтверждение изменения дневного выбора"
+  },
+  "dailyChoicePathReplaced": "Daily choice path replaced.",
+  "@dailyChoicePathReplaced": {
+    "description": "Подтверждение замены пути дневного выбора"
+  },
+  "dailyChoiceDeleted": "Daily choice deleted.",
+  "@dailyChoiceDeleted": {
+    "description": "Подтверждение удаления дневного выбора"
+  },
+  "dailyChoiceSourceInvalid": "Check the source intention of the daily choice.",
+  "@dailyChoiceSourceInvalid": {
+    "description": "Ошибка исходного намерения дневного выбора"
+  },
+  "dailyChoiceSelectedInvalid": "Check the selected intention of the daily choice.",
+  "@dailyChoiceSelectedInvalid": {
+    "description": "Ошибка выбранного намерения дневного выбора"
+  },
+  "dailyChoiceDateInvalid": "Check the daily choice date.",
+  "@dailyChoiceDateInvalid": {
+    "description": "Ошибка даты дневного выбора"
+  },
+  "dailyChoiceDescriptionInvalid": "Check the daily choice description.",
+  "@dailyChoiceDescriptionInvalid": {
+    "description": "Ошибка описания дневного выбора"
+  },
+  "dailyChoicePathInvalid": "Check the daily choice path.",
+  "@dailyChoicePathInvalid": {
+    "description": "Ошибка пути дневного выбора"
   },
   "dailyChoiceOperationNotFound": "This daily choice no longer exists.",
   "@dailyChoiceOperationNotFound": {
     "description": "Дневной выбор отсутствует при выполнении команды"
   },
-  "dailyChoiceOperationConflict": "The data changed. Refresh the daily choice and confirm again.",
+  "dailyChoiceOperationConflict": "The data changed. Refresh it and confirm again.",
   "@dailyChoiceOperationConflict": {
     "description": "Конфликт актуальности дневного выбора"
   },
-  "dailyChoiceOperationUnavailable": "Could not save the daily choice. Try again.",
+  "dailyChoiceOperationUnavailable": "Could not complete the daily choice operation. Try again.",
   "@dailyChoiceOperationUnavailable": {
-    "description": "Временная недоступность при сохранении дневного выбора"
+    "description": "Временная недоступность дневной команды"
   },
   "dailyChoiceOperationCorruption": "Stored data is damaged. The daily choice was not changed.",
   "@dailyChoiceOperationCorruption": {
     "description": "Повреждение данных дневного выбора"
   },
-  "dailyChoiceOperationUnexpected": "Could not change the daily choice because of an unexpected error.",
+  "dailyChoiceOperationUnexpected": "The daily choice operation failed because of an unexpected error.",
   "@dailyChoiceOperationUnexpected": {
     "description": "Неожиданный отказ команды дневного выбора"
   },

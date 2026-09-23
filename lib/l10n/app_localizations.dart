@@ -1334,17 +1334,59 @@ abstract class AppLocalizations {
   /// **'daily choice'**
   String get graphOperationDailyChoice;
 
-  /// Подтверждение сохранения изменения дневного выбора
+  /// Подтверждение создания дневного выбора
   ///
   /// In en, this message translates to:
-  /// **'Daily choice change saved.'**
-  String get dailyChoiceOperationSucceeded;
+  /// **'Daily choice created.'**
+  String get dailyChoiceCreated;
 
-  /// Ошибка проверки данных дневного выбора
+  /// Подтверждение изменения дневного выбора
   ///
   /// In en, this message translates to:
-  /// **'Check the daily choice details.'**
-  String get dailyChoiceOperationInvalid;
+  /// **'Daily choice updated.'**
+  String get dailyChoiceUpdated;
+
+  /// Подтверждение замены пути дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice path replaced.'**
+  String get dailyChoicePathReplaced;
+
+  /// Подтверждение удаления дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice deleted.'**
+  String get dailyChoiceDeleted;
+
+  /// Ошибка исходного намерения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the source intention of the daily choice.'**
+  String get dailyChoiceSourceInvalid;
+
+  /// Ошибка выбранного намерения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the selected intention of the daily choice.'**
+  String get dailyChoiceSelectedInvalid;
+
+  /// Ошибка даты дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the daily choice date.'**
+  String get dailyChoiceDateInvalid;
+
+  /// Ошибка описания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the daily choice description.'**
+  String get dailyChoiceDescriptionInvalid;
+
+  /// Ошибка пути дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the daily choice path.'**
+  String get dailyChoicePathInvalid;
 
   /// Дневной выбор отсутствует при выполнении команды
   ///
@@ -1355,13 +1397,13 @@ abstract class AppLocalizations {
   /// Конфликт актуальности дневного выбора
   ///
   /// In en, this message translates to:
-  /// **'The data changed. Refresh the daily choice and confirm again.'**
+  /// **'The data changed. Refresh it and confirm again.'**
   String get dailyChoiceOperationConflict;
 
-  /// Временная недоступность при сохранении дневного выбора
+  /// Временная недоступность дневной команды
   ///
   /// In en, this message translates to:
-  /// **'Could not save the daily choice. Try again.'**
+  /// **'Could not complete the daily choice operation. Try again.'**
   String get dailyChoiceOperationUnavailable;
 
   /// Повреждение данных дневного выбора
@@ -1373,7 +1415,7 @@ abstract class AppLocalizations {
   /// Неожиданный отказ команды дневного выбора
   ///
   /// In en, this message translates to:
-  /// **'Could not change the daily choice because of an unexpected error.'**
+  /// **'The daily choice operation failed because of an unexpected error.'**
   String get dailyChoiceOperationUnexpected;
 
   /// Подтверждение успешного создания долговременной связи
