@@ -12,6 +12,8 @@ import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../application/choice_path_continuations.dart';
 import '../../application/confirmed_choice_path.dart';
+import '../../domain/calendar_date.dart';
+import '../editor/daily_choice_creation_page.dart';
 import 'choice_path_state.dart';
 import 'choice_path_view_model.dart';
 
@@ -72,6 +74,33 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
                 key: const ValueKey('choice-path-selected-action'),
                 liveRegion: true,
                 child: Text(l10n.choicePathActionSelected),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                key: const ValueKey('choice-path-open-confirmation'),
+                onPressed: () async {
+                  final now = DateTime.now();
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => DailyChoiceCreationPage(
+                        path: confirmed,
+                        steps: List.unmodifiable(state.visibleSteps),
+                        initialDate: CalendarDate.fromParts(
+                          now.year,
+                          now.month,
+                          now.day,
+                        ),
+                      ),
+                    ),
+                  );
+                  if (!mounted) return;
+                  setState(() {
+                    _selectedPath = null;
+                    _selectedRevision = null;
+                  });
+                  unawaited(model.refresh());
+                },
+                child: Text(l10n.choicePathOpenConfirmation),
               ),
             ],
             if (confirmed != null && state is ChoicePathConfirmedState) ...[
