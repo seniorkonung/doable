@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/l10n/app_localizations.dart';
@@ -783,6 +785,11 @@ final class _Harness {
 }
 
 final class _CommandRepository implements PersonalGraphRepository {
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
   @override
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
       throw UnsupportedError(

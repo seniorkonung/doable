@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
@@ -241,6 +243,11 @@ final _choiceB =
     (DailyChoiceId.decode(_uuid(5)) as DailyChoiceIdDecodingSuccess).id;
 
 final class _ControlledRepository implements PersonalGraphRepository {
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
   final commands = <Object>[];
   final _results = <Completer<Object>>[];
 
