@@ -25,6 +25,7 @@ void main() {
         IntentionCommandDiagnosticsEvent,
         LongTermRelationCommandDiagnosticsEvent,
         BlockingRelationsDeleteDiagnosticsEvent,
+        SelectedRelationsReadDiagnosticsEvent,
       ]);
       expect(sink.events[0].status, isA<DiagnosticsStarted>());
       expect(sink.events[1].status, isA<DiagnosticsSucceeded>());
@@ -98,6 +99,11 @@ void main() {
           'outcome': 'failed',
           'durationMicros': 7000,
           'failureCode': 'conflict',
+        },
+        {
+          'operation': 'selectedRelationsRead',
+          'outcome': 'succeeded',
+          'durationMicros': 9000,
         },
       ]);
       for (final canary in [
@@ -188,6 +194,9 @@ List<DiagnosticsEvent> _events() => [
       duration: Duration(milliseconds: 7),
       code: DiagnosticsFailureCode.conflict,
     ),
+  ),
+  const SelectedRelationsReadDiagnosticsEvent(
+    status: DiagnosticsSucceeded(Duration(milliseconds: 9)),
   ),
 ];
 

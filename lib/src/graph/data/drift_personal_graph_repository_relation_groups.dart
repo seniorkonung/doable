@@ -258,23 +258,35 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     required Map<IntentionId, int> knownActiveCounts,
   }) async {
     if (ids.isEmpty) return const {};
-    final intentions = _database.intentions;
-    final query = _database.selectOnly(intentions)
-      ..addColumns([
-        intentions.id,
-        intentions.title,
-        intentions.description,
-        intentions.isActionReady,
-        intentions.isArchived,
-        intentions.createdAt,
-        intentions.updatedAt,
-      ])
-      ..where(
-        intentions.id.isIn([for (final id in ids) id.toCanonicalString()]),
-      );
-    final validatedRows = [
-      for (final row in await query.get()) _validateCatalogRow(row),
-    ];
+    final orderedIds = ids.toList(growable: false);
+    final validatedRows =
+        <({IntentionId intentionId, _StoredIntentionDetail stored})>[];
+    const batchSize = 400;
+    for (var start = 0; start < orderedIds.length; start += batchSize) {
+      final end = start + batchSize < orderedIds.length
+          ? start + batchSize
+          : orderedIds.length;
+      final intentions = _database.intentions;
+      final query = _database.selectOnly(intentions)
+        ..addColumns([
+          intentions.id,
+          intentions.title,
+          intentions.description,
+          intentions.isActionReady,
+          intentions.isArchived,
+          intentions.createdAt,
+          intentions.updatedAt,
+        ])
+        ..where(
+          intentions.id.isIn([
+            for (final id in orderedIds.sublist(start, end))
+              id.toCanonicalString(),
+          ]),
+        );
+      validatedRows.addAll([
+        for (final row in await query.get()) _validateCatalogRow(row),
+      ]);
+    }
     if (validatedRows.length != ids.length) {
       throw const _StoredIntentionCorruption();
     }

@@ -67,6 +67,10 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'operation': 'longTermRelationDetailRead',
     ..._encodeStatus(event.status),
   },
+  SelectedRelationsReadDiagnosticsEvent() => {
+    'operation': 'selectedRelationsRead',
+    ..._encodeStatus(event.status),
+  },
   IntentionCommandDiagnosticsEvent(:final commandType) => {
     'operation': 'intentionCommand',
     ..._encodeStatus(event.status),
