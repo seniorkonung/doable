@@ -33,6 +33,7 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../application/blocking_relation_reference.dart';
 import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
 import '../application/graph_command_result.dart';

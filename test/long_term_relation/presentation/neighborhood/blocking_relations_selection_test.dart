@@ -156,7 +156,7 @@ void main() {
       harness.viewModel.confirm(presentationTitle: 'Намерение');
       harness.repository.fail(
         0,
-        DeleteBlockingRelationsSelectionConflictFailure(
+        DeleteBlockingRelationsSelectionConflictFailure.longTerm(
           relationId: row.relation.id,
           reason: BlockingRelationConflictReason.relationMissing,
         ),
@@ -236,7 +236,7 @@ void main() {
     harness.viewModel.confirm(presentationTitle: 'Намерение');
     harness.repository.fail(
       0,
-      DeleteBlockingRelationsSelectionConflictFailure(
+      DeleteBlockingRelationsSelectionConflictFailure.longTerm(
         relationId: second.relation.id,
         reason: BlockingRelationConflictReason.relationMissing,
       ),

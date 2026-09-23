@@ -551,7 +551,7 @@ final class _FailureHarness {
       ),
     };
     final accepted = coordinator.acceptBlockingRelationsDelete(
-      DeleteBlockingRelations(
+      DeleteBlockingRelations.longTerm(
         intentionId: testDetailsIntentionId(1),
         relationIds: {relationId},
       ),

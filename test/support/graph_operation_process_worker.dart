@@ -111,7 +111,7 @@ void main() {
             DeleteLongTermRelation(_relationId(_workerRelationIdValue)),
           ),
           _GraphOperation.bulkDelete => await repository.execute(
-            DeleteBlockingRelations(
+            DeleteBlockingRelations.longTerm(
               intentionId: _intentionId(_sourceIdValue),
               relationIds: LargeBlockingRelationsFixture.selectedIds,
             ),

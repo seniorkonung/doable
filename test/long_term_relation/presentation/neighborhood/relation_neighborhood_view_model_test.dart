@@ -31,7 +31,7 @@ void main() {
     addTearDown(harness.dispose);
     final owner = harness.intentionId;
     final removed = testGroupRow(ownerId: owner, index: 1);
-    final command = DeleteBlockingRelations(
+    final command = DeleteBlockingRelations.longTerm(
       intentionId: owner,
       relationIds: [removed.relation.id],
     );
@@ -113,7 +113,7 @@ void main() {
       harness.scrollTo(1);
       expect(repository.requestCount, 2);
 
-      final command = DeleteBlockingRelations(
+      final command = DeleteBlockingRelations.longTerm(
         intentionId: owner,
         relationIds: [removed.relation.id],
       );
@@ -235,7 +235,7 @@ void main() {
         );
         await pumpEventQueue();
 
-        final command = DeleteBlockingRelations(
+        final command = DeleteBlockingRelations.longTerm(
           intentionId: owner,
           relationIds: [removed.relation.id],
         );

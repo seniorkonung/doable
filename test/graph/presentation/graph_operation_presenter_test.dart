@@ -598,7 +598,7 @@ void main() {
       final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
       harness.completeBlockingRelationsFailure(
         deletion,
-        DeleteBlockingRelationsSelectionConflictFailure(
+        DeleteBlockingRelationsSelectionConflictFailure.longTerm(
           relationId: _relationId,
           reason: BlockingRelationConflictReason.relationMissing,
         ),
@@ -1072,7 +1072,7 @@ final class _PresenterHarness {
   }) {
     final commandIndex = repository.blockingRelationsCommands.length;
     final accepted = _coordinator.acceptBlockingRelationsDelete(
-      DeleteBlockingRelations(
+      DeleteBlockingRelations.longTerm(
         intentionId: testDetailsIntentionId(1),
         relationIds: {_relationId},
       ),

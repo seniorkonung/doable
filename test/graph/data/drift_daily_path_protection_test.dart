@@ -123,7 +123,7 @@ void main() {
 
   test('массовое удаление отклоняет весь набор до первой записи', () async {
     addChoice(201);
-    final command = DeleteBlockingRelations(
+    final command = DeleteBlockingRelations.longTerm(
       intentionId: _intention(1),
       relationIds: [_relation(103), _relation(101)],
     );

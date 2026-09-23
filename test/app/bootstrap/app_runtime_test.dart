@@ -302,7 +302,7 @@ void main() {
         final intentionId = _intentionId(_relationSourceUuid);
         final relationId = _relationId(_relationRelatedUuid);
         final accepted = coordinator.acceptBlockingRelationsDelete(
-          DeleteBlockingRelations(
+          DeleteBlockingRelations.longTerm(
             intentionId: intentionId,
             relationIds: {relationId},
           ),
@@ -316,7 +316,7 @@ void main() {
         expect(closeObserver.closeCalls, 0);
         expect(
           coordinator.acceptBlockingRelationsDelete(
-            DeleteBlockingRelations(
+            DeleteBlockingRelations.longTerm(
               intentionId: _intentionId(_relationRelatedUuid),
               relationIds: {_relationId(_relationSourceUuid)},
             ),

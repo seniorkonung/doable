@@ -1,4 +1,6 @@
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
+import 'package:doable/src/graph/application/blocking_relation_reference.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -17,7 +19,7 @@ void main() {
 
   test('пустой и повторяющийся выбор не создаёт команду', () {
     expect(
-      () => DeleteBlockingRelations(
+      () => DeleteBlockingRelations.longTerm(
         intentionId: owner,
         relationIds: <LongTermRelationId>[],
       ),
@@ -30,7 +32,7 @@ void main() {
       ),
     );
     expect(
-      () => DeleteBlockingRelations(
+      () => DeleteBlockingRelations.longTerm(
         intentionId: owner,
         relationIds: [firstId, firstId],
       ),
@@ -46,7 +48,7 @@ void main() {
 
   test('подтверждённый набор не меняется вместе с исходным выбором', () {
     final selection = <LongTermRelationId>{firstId, secondId};
-    final command = DeleteBlockingRelations(
+    final command = DeleteBlockingRelations.longTerm(
       intentionId: owner,
       relationIds: selection,
     );
@@ -63,12 +65,36 @@ void main() {
     );
   });
 
+  test('смешанный набор различает виды ссылок с одинаковым UUID', () {
+    final choiceId = (DailyChoiceId.decode(
+      firstId.toCanonicalString(),
+    ) as DailyChoiceIdDecodingSuccess).id;
+    final longTerm = LongTermBlockingRelationReference(firstId);
+    final daily = DailyChoiceBlockingRelationReference(choiceId);
+    final selection = <BlockingRelationReference>[longTerm, daily];
+    final command = DeleteBlockingRelations(
+      intentionId: owner,
+      references: selection,
+    );
+    selection.clear();
+
+    expect(command.references, {longTerm, daily});
+    expect(() => command.references.add(longTerm), throwsUnsupportedError);
+    expect(
+      () => DeleteBlockingRelations(
+        intentionId: owner,
+        references: [daily, DailyChoiceBlockingRelationReference(choiceId)],
+      ),
+      throwsA(isA<DeleteBlockingRelationsValidationException>()),
+    );
+  });
+
   test('типизированные отказы сохраняют категории и идентификаторы', () {
     const unavailable = DeleteBlockingRelationsUnavailableFailure();
     const corruption = DeleteBlockingRelationsCorruptionFailure();
     const unexpected = DeleteBlockingRelationsUnexpectedFailure();
     final notFound = DeleteBlockingRelationsIntentionNotFoundFailure(owner);
-    final stale = DeleteBlockingRelationsSelectionConflictFailure(
+    final stale = DeleteBlockingRelationsSelectionConflictFailure.longTerm(
       relationId: firstId,
       reason: BlockingRelationConflictReason.noLongerBlocking,
     );
@@ -85,7 +111,7 @@ void main() {
   });
 
   test('единый результат содержит ровно удаления и счётчики участников', () {
-    final command = DeleteBlockingRelations(
+    final command = DeleteBlockingRelations.longTerm(
       intentionId: owner,
       relationIds: [firstId, secondId],
     );
@@ -136,7 +162,7 @@ void main() {
   });
 
   test('результат отклоняет неполное удаление и неполные счётчики', () {
-    final command = DeleteBlockingRelations(
+    final command = DeleteBlockingRelations.longTerm(
       intentionId: owner,
       relationIds: [firstId, secondId],
     );
@@ -153,7 +179,7 @@ void main() {
     );
     expect(
       () => BlockingRelationsDeleted(
-        command: DeleteBlockingRelations(
+        command: DeleteBlockingRelations.longTerm(
           intentionId: owner,
           relationIds: [firstId],
         ),

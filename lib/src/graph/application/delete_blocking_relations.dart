@@ -1,7 +1,10 @@
+import '../../daily_choice/domain/daily_choice.dart';
+import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/domain/long_term_relation.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
+import 'blocking_relation_reference.dart';
 import 'graph_change.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
@@ -23,34 +26,54 @@ final class DeleteBlockingRelations
         GraphCommand<BlockingRelationsDeleted, DeleteBlockingRelationsFailure> {
   factory DeleteBlockingRelations({
     required IntentionId intentionId,
-    required Iterable<LongTermRelationId> relationIds,
+    required Iterable<BlockingRelationReference> references,
   }) {
-    final selectedIds = <LongTermRelationId>{};
-    for (final id in relationIds) {
-      if (!selectedIds.add(id)) {
+    final selected = <BlockingRelationReference>{};
+    for (final reference in references) {
+      if (!selected.add(reference)) {
         throw const DeleteBlockingRelationsValidationException(
           DeleteBlockingRelationsValidationFailure.duplicateRelation,
         );
       }
     }
-    if (selectedIds.isEmpty) {
+    if (selected.isEmpty) {
       throw const DeleteBlockingRelationsValidationException(
         DeleteBlockingRelationsValidationFailure.emptySelection,
       );
     }
     return DeleteBlockingRelations._(
       intentionId: intentionId,
-      relationIds: Set<LongTermRelationId>.unmodifiable(selectedIds),
+      references: Set<BlockingRelationReference>.unmodifiable(selected),
     );
   }
 
+  factory DeleteBlockingRelations.longTerm({
+    required IntentionId intentionId,
+    required Iterable<LongTermRelationId> relationIds,
+  }) => DeleteBlockingRelations(
+    intentionId: intentionId,
+    references: relationIds.map(LongTermBlockingRelationReference.new),
+  );
+
   const DeleteBlockingRelations._({
     required this.intentionId,
-    required this.relationIds,
+    required this.references,
   });
 
   final IntentionId intentionId;
-  final Set<LongTermRelationId> relationIds;
+  final Set<BlockingRelationReference> references;
+
+  Set<LongTermRelationId> get relationIds => Set.unmodifiable(
+    references.whereType<LongTermBlockingRelationReference>().map(
+      (ref) => ref.id,
+    ),
+  );
+
+  Set<DailyChoiceId> get dailyChoiceIds => Set.unmodifiable(
+    references.whereType<DailyChoiceBlockingRelationReference>().map(
+      (ref) => ref.id,
+    ),
+  );
 }
 
 sealed class DeleteBlockingRelationsFailure implements GraphCommandFailure {
@@ -75,13 +98,26 @@ enum BlockingRelationConflictReason {
 
 final class DeleteBlockingRelationsSelectionConflictFailure
     extends DeleteBlockingRelationsFailure {
+  DeleteBlockingRelationsSelectionConflictFailure.longTerm({
+    required LongTermRelationId relationId,
+    required BlockingRelationConflictReason reason,
+  }) : this(
+         reference: LongTermBlockingRelationReference(relationId),
+         reason: reason,
+       );
+
   const DeleteBlockingRelationsSelectionConflictFailure({
-    required this.relationId,
+    required this.reference,
     required this.reason,
   });
 
-  final LongTermRelationId relationId;
+  final BlockingRelationReference reference;
   final BlockingRelationConflictReason reason;
+
+  LongTermRelationId? get relationId => switch (reference) {
+    LongTermBlockingRelationReference(:final id) => id,
+    DailyChoiceBlockingRelationReference() => null,
+  };
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.conflict;
@@ -113,6 +149,7 @@ final class DeleteBlockingRelationsUnexpectedFailure
 
 enum BlockingRelationsDeletedValidationFailure {
   relationsMismatch,
+  choicesMismatch,
   notBlockingIntention,
   countsMismatch,
 }
@@ -129,15 +166,37 @@ final class BlockingRelationsDeleted implements GraphCommandOutcome {
     required DeleteBlockingRelations command,
     required GraphRevision revision,
     required Iterable<LongTermRelation> deletedRelations,
+    Iterable<DailyChoiceChange> deletedChoiceChanges = const [],
     required Map<IntentionId, RelationCounts> counts,
   }) {
     final deleted = List<LongTermRelation>.unmodifiable(deletedRelations);
+    final choiceChanges = List<DailyChoiceChange>.unmodifiable(
+      deletedChoiceChanges,
+    );
     final deletedIds = {for (final relation in deleted) relation.id};
     if (deletedIds.length != deleted.length ||
         deletedIds.length != command.relationIds.length ||
         !deletedIds.containsAll(command.relationIds)) {
       throw const BlockingRelationsDeletedValidationException(
         BlockingRelationsDeletedValidationFailure.relationsMismatch,
+      );
+    }
+    final choiceIds = {
+      for (final change in choiceChanges)
+        if (change.before case final choice?) choice.id,
+    };
+    if (choiceIds.length != choiceChanges.length ||
+        choiceIds.length != command.dailyChoiceIds.length ||
+        !choiceIds.containsAll(command.dailyChoiceIds) ||
+        choiceChanges.any(
+          (change) =>
+              change.after != null ||
+              change.before == null ||
+              (change.before!.sourceIntentionId != command.intentionId &&
+                  change.before!.selectedIntentionId != command.intentionId),
+        )) {
+      throw const BlockingRelationsDeletedValidationException(
+        BlockingRelationsDeletedValidationFailure.choicesMismatch,
       );
     }
     if (deleted.any(
@@ -155,6 +214,7 @@ final class BlockingRelationsDeleted implements GraphCommandOutcome {
         relation.sourceIntentionId,
         relation.relatedIntentionId,
       ],
+      for (final change in choiceChanges) ...change.previousParticipants,
     };
     if (counts.length != affectedIds.length ||
         !counts.keys.toSet().containsAll(affectedIds)) {
@@ -164,9 +224,13 @@ final class BlockingRelationsDeleted implements GraphCommandOutcome {
     }
     return BlockingRelationsDeleted._(
       deletedRelations: deleted,
+      deletedDailyChoices: List<DailyChoice>.unmodifiable(
+        choiceChanges.map((change) => change.before!),
+      ),
       changes: List<GraphChange>.unmodifiable([
         for (final relation in deleted)
           LongTermRelationDeletedChange(revision: revision, relation: relation),
+        ...choiceChanges,
         for (final entry in counts.entries)
           IntentionRelationCountsChanged(
             revision: revision,
@@ -179,10 +243,12 @@ final class BlockingRelationsDeleted implements GraphCommandOutcome {
 
   const BlockingRelationsDeleted._({
     required this.deletedRelations,
+    required this.deletedDailyChoices,
     required this.changes,
   });
 
   final List<LongTermRelation> deletedRelations;
+  final List<DailyChoice> deletedDailyChoices;
 
   @override
   final List<GraphChange> changes;
