@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
 import '../../daily_choice/application/daily_choice_details.dart';
 import '../../daily_choice/application/choice_path_continuations.dart';
+import '../../daily_choice/application/choice_path_draft.dart';
 import '../../daily_choice/application/confirmed_choice_path.dart';
 import '../../daily_choice/application/daily_choice_command.dart';
 import '../../daily_choice/application/daily_choice_id_generator.dart';
@@ -54,6 +56,7 @@ part 'drift_personal_graph_repository_blocking_relations.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
 part 'drift_personal_graph_repository_selected_relations.dart';
+part 'drift_personal_graph_repository_choice_path_reads.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -98,9 +101,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,
-  ) async => const ChoicePathContinuationError(
-    ChoicePathContinuationUnexpectedFailure(),
-  );
+  ) => _readChoicePathContinuations(query);
 
   @override
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>

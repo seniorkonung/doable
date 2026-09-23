@@ -8,6 +8,31 @@ import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
   group('DiagnosticsSink', () {
+    test('событие продолжений кодирует только безопасные поля', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+      sink.record(
+        const ChoicePathContinuationReadDiagnosticsEvent(
+          pageSize: 50,
+          isContinuation: true,
+          status: DiagnosticsFailed(
+            duration: Duration(milliseconds: 4),
+            code: DiagnosticsFailureCode.conflict,
+          ),
+        ),
+      );
+      expect(messages.map(jsonDecode), [
+        {
+          'operation': 'choicePathContinuationRead',
+          'outcome': 'failed',
+          'durationMicros': 4000,
+          'failureCode': 'conflict',
+          'pageSize': 50,
+          'isContinuation': true,
+        },
+      ]);
+    });
+
     test(
       'дневные события различают чтение, проверку, запись и чтение результата',
       () {
