@@ -1276,4 +1276,48 @@ class AppLocalizationsRu extends AppLocalizations {
   String choicePathContinueSemantics(String phrase, String priority) {
     return 'Продолжить по связи: $phrase. Приоритет $priority';
   }
+
+  @override
+  String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
+
+  @override
+  String get dailyChoiceCreationPath => 'Подтверждаемый путь';
+
+  @override
+  String dailyChoiceCreationAction(String action) {
+    return 'Выбранное действие: $action';
+  }
+
+  @override
+  String get dailyChoiceCreationDate => 'Дата дневного выбора';
+
+  @override
+  String get dailyChoiceCreationDateHint =>
+      'Введите дату в формате ГГГГ-ММ-ДД (0001–9999)';
+
+  @override
+  String get dailyChoiceCreationDescription => 'Описание (необязательно)';
+
+  @override
+  String get dailyChoiceCreationCompleted => 'Уже выполнено';
+
+  @override
+  String get dailyChoiceCreationCompletedHint =>
+      'Отметьте, если действие уже выполнено для этой даты';
+
+  @override
+  String get dailyChoiceCreationSave => 'Сохранить дневной выбор';
+
+  @override
+  String get dailyChoiceCreationSaving => 'Сохраняем…';
+
+  @override
+  String get dailyChoiceCreationCancel => 'Отмена';
+
+  @override
+  String get dailyChoiceCreationRefreshPath =>
+      'Вернуться к пути и актуализировать его';
+
+  @override
+  String get choicePathOpenConfirmation => 'Перейти к подтверждению выбора';
 }

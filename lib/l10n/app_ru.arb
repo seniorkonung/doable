@@ -358,5 +358,18 @@
   "choicePathUnexpected": "Не удалось проверить продолжения из-за непредвиденной ошибки.",
   "choicePathLoadMore": "Показать ещё продолжения",
   "choicePathLoadingMore": "Загружаем следующую порцию…",
-  "choicePathContinueSemantics": "Продолжить по связи: {phrase}. Приоритет {priority}"
+  "choicePathContinueSemantics": "Продолжить по связи: {phrase}. Приоритет {priority}",
+  "dailyChoiceCreationTitle": "Подтвердить дневной выбор",
+  "dailyChoiceCreationPath": "Подтверждаемый путь",
+  "dailyChoiceCreationAction": "Выбранное действие: {action}",
+  "dailyChoiceCreationDate": "Дата дневного выбора",
+  "dailyChoiceCreationDateHint": "Введите дату в формате ГГГГ-ММ-ДД (0001–9999)",
+  "dailyChoiceCreationDescription": "Описание (необязательно)",
+  "dailyChoiceCreationCompleted": "Уже выполнено",
+  "dailyChoiceCreationCompletedHint": "Отметьте, если действие уже выполнено для этой даты",
+  "dailyChoiceCreationSave": "Сохранить дневной выбор",
+  "dailyChoiceCreationSaving": "Сохраняем…",
+  "dailyChoiceCreationCancel": "Отмена",
+  "dailyChoiceCreationRefreshPath": "Вернуться к пути и актуализировать его",
+  "choicePathOpenConfirmation": "Перейти к подтверждению выбора"
 }

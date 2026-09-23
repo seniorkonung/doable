@@ -1278,4 +1278,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String choicePathContinueSemantics(String phrase, String priority) {
     return 'Continue along relation: $phrase. Priority $priority';
   }
+
+  @override
+  String get dailyChoiceCreationTitle => 'Confirm daily choice';
+
+  @override
+  String get dailyChoiceCreationPath => 'Path to confirm';
+
+  @override
+  String dailyChoiceCreationAction(String action) {
+    return 'Selected action: $action';
+  }
+
+  @override
+  String get dailyChoiceCreationDate => 'Daily choice date';
+
+  @override
+  String get dailyChoiceCreationDateHint => 'Enter YYYY-MM-DD (0001–9999)';
+
+  @override
+  String get dailyChoiceCreationDescription => 'Description (optional)';
+
+  @override
+  String get dailyChoiceCreationCompleted => 'Already completed';
+
+  @override
+  String get dailyChoiceCreationCompletedHint =>
+      'Mark if the action was already done for this date';
+
+  @override
+  String get dailyChoiceCreationSave => 'Save daily choice';
+
+  @override
+  String get dailyChoiceCreationSaving => 'Saving…';
+
+  @override
+  String get dailyChoiceCreationCancel => 'Cancel';
+
+  @override
+  String get dailyChoiceCreationRefreshPath =>
+      'Return to the path and refresh it';
+
+  @override
+  String get choicePathOpenConfirmation => 'Continue to choice confirmation';
 }

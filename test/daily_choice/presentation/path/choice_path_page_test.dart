@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -20,6 +21,96 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'после выбора действия открывает подтверждение, отмена не пишет граф',
+    (tester) async {
+      final repository = _PathRepository();
+      addTearDown(repository.dispose);
+      await _pumpPage(tester, repository);
+      repository.complete(0, [_edge(1, 2, 1)]);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
+        ),
+      );
+      await tester.pump();
+      repository.complete(1, [], ready: true);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('choice-path-select-action')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('daily-choice-date')), findsOneWidget);
+      expect(find.textContaining('Намерение 1'), findsWidgets);
+      expect(find.textContaining('Намерение 2'), findsWidgets);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('daily-choice-cancel')),
+      );
+      await tester.tap(find.byKey(const ValueKey('daily-choice-cancel')));
+      await tester.pump();
+      expect(repository.commands, 0);
+    },
+  );
+
+  testWidgets(
+    'передаёт в подтверждение весь многошаговый путь в выбранном порядке',
+    (tester) async {
+      final repository = _PathRepository();
+      addTearDown(repository.dispose);
+      await _pumpPage(tester, repository);
+      repository.complete(0, [_edge(1, 2, 1)]);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
+        ),
+      );
+      await tester.pump();
+      repository.complete(1, [_edge(2, 3, 2)]);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          ValueKey('choice-path-continue-${_relation(2).toCanonicalString()}'),
+        ),
+      );
+      await tester.pump();
+      repository.complete(2, [], ready: true);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('choice-path-select-action')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2026-12-31',
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('daily-choice-submit')),
+      );
+      await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+      await tester.pump();
+      expect(repository.commands, 1);
+      expect(
+        repository.lastCommand!.path.steps
+            .map((step) => step.relationId)
+            .toList(),
+        [_relation(1), _relation(2)],
+      );
+      expect(repository.lastCommand!.selectedIntentionId, _intention(3));
+    },
+  );
+
   testWidgets('показывает путь, выбор действия и возврат к ветви', (
     tester,
   ) async {
@@ -183,6 +274,7 @@ final class _PathRepository implements PersonalGraphRepository {
         sync: true,
       );
   var commands = 0;
+  CreateDailyChoice? lastCommand;
 
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
@@ -250,7 +342,8 @@ final class _PathRepository implements PersonalGraphRepository {
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) {
     commands++;
-    throw UnimplementedError();
+    lastCommand = command as CreateDailyChoice;
+    return Completer<GraphCommandResult<TSuccess, TFailure>>().future;
   }
 
   @override

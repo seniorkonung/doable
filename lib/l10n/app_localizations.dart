@@ -2220,6 +2220,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue along relation: {phrase}. Priority {priority}'**
   String choicePathContinueSemantics(String phrase, String priority);
+
+  /// Заголовок подтверждения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm daily choice'**
+  String get dailyChoiceCreationTitle;
+
+  /// Заголовок подтверждаемого пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path to confirm'**
+  String get dailyChoiceCreationPath;
+
+  /// Конечное выбранное действие
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action: {action}'**
+  String dailyChoiceCreationAction(String action);
+
+  /// Подпись даты выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice date'**
+  String get dailyChoiceCreationDate;
+
+  /// Подсказка полного диапазона дат
+  ///
+  /// In en, this message translates to:
+  /// **'Enter YYYY-MM-DD (0001–9999)'**
+  String get dailyChoiceCreationDateHint;
+
+  /// Подпись необязательного описания
+  ///
+  /// In en, this message translates to:
+  /// **'Description (optional)'**
+  String get dailyChoiceCreationDescription;
+
+  /// Явная отметка выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'Already completed'**
+  String get dailyChoiceCreationCompleted;
+
+  /// Пояснение отметки выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'Mark if the action was already done for this date'**
+  String get dailyChoiceCreationCompletedHint;
+
+  /// Подтверждение сохранения выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Save daily choice'**
+  String get dailyChoiceCreationSave;
+
+  /// Сохранение выбора выполняется
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get dailyChoiceCreationSaving;
+
+  /// Отмена без изменения графа
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dailyChoiceCreationCancel;
+
+  /// Возврат к актуализации пути после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Return to the path and refresh it'**
+  String get dailyChoiceCreationRefreshPath;
+
+  /// Переход от выбранного действия к форме подтверждения
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to choice confirmation'**
+  String get choicePathOpenConfirmation;
 }
 
 class _AppLocalizationsDelegate
