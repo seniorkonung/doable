@@ -60,6 +60,7 @@ part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
 part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
+part 'drift_personal_graph_repository_choice_path_suggestions.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -101,9 +102,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,
-  ) async => const ChoicePathSuggestionsError(
-    ChoicePathSuggestionsUnexpectedFailure(),
-  );
+  ) => _readChoicePathSuggestions(query);
 
   DriftRelationCountAggregates get _relationCountAggregates =>
       DriftRelationCountAggregates(_database);

@@ -8,6 +8,28 @@ import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
   group('DiagnosticsSink', () {
+    test('событие подсказок кодирует этап и категорию без данных графа', () {
+      final messages = <String>[];
+      DeveloperDiagnosticsSink(messages.add).record(
+        const ChoicePathSuggestionReadDiagnosticsEvent(
+          stage: ChoicePathSuggestionReadStage.pathValidation,
+          status: DiagnosticsFailed(
+            duration: Duration(milliseconds: 3),
+            code: DiagnosticsFailureCode.corruption,
+          ),
+        ),
+      );
+      expect(messages.map(jsonDecode), [
+        {
+          'operation': 'choicePathSuggestionRead',
+          'stage': 'pathValidation',
+          'outcome': 'failed',
+          'durationMicros': 3000,
+          'failureCode': 'corruption',
+        },
+      ]);
+    });
+
     test('событие продолжений кодирует только безопасные поля', () {
       final messages = <String>[];
       final sink = DeveloperDiagnosticsSink(messages.add);
