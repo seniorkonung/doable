@@ -2751,6 +2751,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue to choice confirmation'**
   String get choicePathOpenConfirmation;
+
+  /// Заголовок подсказок прежних маршрутов
+  ///
+  /// In en, this message translates to:
+  /// **'Previous routes'**
+  String get choiceSuggestionTitle;
+
+  /// Начальная загрузка подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Loading previous route suggestions…'**
+  String get choiceSuggestionLoading;
+
+  /// Подтверждённо пустая выдача подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'No previous routes for this participant.'**
+  String get choiceSuggestionEmpty;
+
+  /// Обновление подсказок перед выбором
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing suggestions. Route selection is temporarily unavailable.'**
+  String get choiceSuggestionUpdating;
+
+  /// Отсутствие выбранного участника
+  ///
+  /// In en, this message translates to:
+  /// **'The selected intention no longer exists.'**
+  String get choiceSuggestionNotFound;
+
+  /// Временная недоступность подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load suggestions. Try again.'**
+  String get choiceSuggestionUnavailable;
+
+  /// Повреждение данных подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Stored suggestion data is damaged and can’t be confirmed.'**
+  String get choiceSuggestionCorruption;
+
+  /// Непредвиденная ошибка подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load suggestions because of an unexpected error.'**
+  String get choiceSuggestionUnexpected;
+
+  /// Номер подсказки в выдаче
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestion {index} of {total}'**
+  String choiceSuggestionPosition(int index, int total);
+
+  /// Исходное намерение подсказки
+  ///
+  /// In en, this message translates to:
+  /// **'Source: {source}'**
+  String choiceSuggestionSource(String source);
+
+  /// Конечное действие подсказки
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action: {action}'**
+  String choiceSuggestionAction(String action);
+
+  /// Открыть полный текущий маршрут
+  ///
+  /// In en, this message translates to:
+  /// **'View full route'**
+  String get choiceSuggestionView;
+
+  /// Выбрать допустимый маршрут
+  ///
+  /// In en, this message translates to:
+  /// **'Select route'**
+  String get choiceSuggestionSelect;
+
+  /// Причина недоступности архивного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: an intention is archived.'**
+  String get choiceSuggestionArchivedIntention;
+
+  /// Причина недоступности архивной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: a relation in the route is archived.'**
+  String get choiceSuggestionArchivedRelation;
+
+  /// Причина недоступности неготового действия
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: the final action is no longer ready for action.'**
+  String get choiceSuggestionActionNotReady;
+
+  /// Заголовок просмотра всего маршрута
+  ///
+  /// In en, this message translates to:
+  /// **'Full route'**
+  String get choiceSuggestionPreviewTitle;
+
+  /// Направление переходов в просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Route direction: from source to action'**
+  String get choiceSuggestionDirection;
+
+  /// Порядок перехода маршрута
+  ///
+  /// In en, this message translates to:
+  /// **'Step {index} of {total}'**
+  String choiceSuggestionStep(int index, int total);
 }
 
 class _AppLocalizationsDelegate

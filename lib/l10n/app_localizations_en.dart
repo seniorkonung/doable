@@ -1592,4 +1592,79 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get choicePathOpenConfirmation => 'Continue to choice confirmation';
+
+  @override
+  String get choiceSuggestionTitle => 'Previous routes';
+
+  @override
+  String get choiceSuggestionLoading => 'Loading previous route suggestions…';
+
+  @override
+  String get choiceSuggestionEmpty =>
+      'No previous routes for this participant.';
+
+  @override
+  String get choiceSuggestionUpdating =>
+      'Refreshing suggestions. Route selection is temporarily unavailable.';
+
+  @override
+  String get choiceSuggestionNotFound =>
+      'The selected intention no longer exists.';
+
+  @override
+  String get choiceSuggestionUnavailable =>
+      'Couldn’t load suggestions. Try again.';
+
+  @override
+  String get choiceSuggestionCorruption =>
+      'Stored suggestion data is damaged and can’t be confirmed.';
+
+  @override
+  String get choiceSuggestionUnexpected =>
+      'Couldn’t load suggestions because of an unexpected error.';
+
+  @override
+  String choiceSuggestionPosition(int index, int total) {
+    return 'Suggestion $index of $total';
+  }
+
+  @override
+  String choiceSuggestionSource(String source) {
+    return 'Source: $source';
+  }
+
+  @override
+  String choiceSuggestionAction(String action) {
+    return 'Selected action: $action';
+  }
+
+  @override
+  String get choiceSuggestionView => 'View full route';
+
+  @override
+  String get choiceSuggestionSelect => 'Select route';
+
+  @override
+  String get choiceSuggestionArchivedIntention =>
+      'Route unavailable: an intention is archived.';
+
+  @override
+  String get choiceSuggestionArchivedRelation =>
+      'Route unavailable: a relation in the route is archived.';
+
+  @override
+  String get choiceSuggestionActionNotReady =>
+      'Route unavailable: the final action is no longer ready for action.';
+
+  @override
+  String get choiceSuggestionPreviewTitle => 'Full route';
+
+  @override
+  String get choiceSuggestionDirection =>
+      'Route direction: from source to action';
+
+  @override
+  String choiceSuggestionStep(int index, int total) {
+    return 'Step $index of $total';
+  }
 }
