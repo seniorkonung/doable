@@ -17,6 +17,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart'
     as application;
@@ -33,6 +34,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  setUp(() {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+  });
+
   testWidgets(
     'редактор открывается из подробностей и меняет только выбранные поля',
     (tester) async {
@@ -358,6 +365,213 @@ void main() {
     );
     expect(find.textContaining('Основание'), findsNothing);
   });
+
+  for (final (locale, phrase, date, warning, action) in [
+    (
+      const Locale('ru'),
+      'Чтобы Основа, я сегодня Действие',
+      '2026-09-24',
+      'нельзя отменить',
+      'Удалить навсегда',
+    ),
+    (
+      const Locale('en'),
+      'To Основа, today I Действие',
+      '2026-09-24',
+      'cannot be undone',
+      'Delete permanently',
+    ),
+  ]) {
+    testWidgets(
+      'отмена удаления в локали ${locale.languageCode} сохраняет выбор',
+      (tester) async {
+        final repository = _Repository();
+        addTearDown(repository.dispose);
+        await tester.pumpWidget(_app(repository, locale));
+        repository.emit(_details());
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-delete-open')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.textContaining(phrase), findsWidgets);
+        expect(find.textContaining(date), findsWidgets);
+        expect(find.textContaining(warning), findsOneWidget);
+        final semantics = tester.ensureSemantics();
+        expect(
+          tester
+              .getSemantics(
+                find.byKey(const ValueKey('daily-choice-delete-confirm')),
+              )
+              .label,
+          contains(action),
+        );
+        semantics.dispose();
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-delete-cancel')),
+        );
+        await tester.pumpAndSettle();
+        expect(repository.deleteCommands, isEmpty);
+        expect(find.textContaining('Основа'), findsWidgets);
+      },
+    );
+  }
+
+  testWidgets(
+    'подтверждение удаляет только выбранную запись и блокирует повтор',
+    (tester) async {
+      final repository = _Repository();
+      addTearDown(repository.dispose);
+      await tester.pumpWidget(_app(repository, const Locale('ru')));
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-delete-confirm')),
+      );
+      await tester.pump();
+      expect(repository.deleteCommands, hasLength(1));
+      expect(repository.deleteCommands.single.choiceId, _choice(1));
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byKey(const ValueKey('daily-choice-delete-open')),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      repository.succeedDelete();
+      await tester.pumpAndSettle();
+      expect(repository.deleteCommands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'ошибка удаления сохраняет подробности и показывает безопасное сообщение',
+    (tester) async {
+      final repository = _Repository();
+      addTearDown(repository.dispose);
+      await tester.pumpWidget(_app(repository, const Locale('ru')));
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-delete-confirm')),
+      );
+      await tester.pump();
+      repository.failDelete();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Основа'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('daily-choice-delete-failure')),
+        findsOneWidget,
+      );
+      expect(repository.deleteCommands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'успех удаления закрывает подробности и показывается оболочкой один раз',
+    (tester) async {
+      final repository = _Repository();
+      final router = AppRouter();
+      addTearDown(() async {
+        router.dispose();
+        await repository.dispose();
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWith((ref) => repository),
+          ],
+          child: MaterialApp.router(
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+            builder: (context, child) => GraphOperationPresenter(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+      unawaited(router.push(DailyChoiceDetailsRoute(choiceId: _choice(1))));
+      await tester.pump();
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-delete-confirm')),
+      );
+      await tester.pump();
+      repository.succeedDelete();
+      await tester.pumpAndSettle();
+
+      expect(router.current.name, isNot(DailyChoiceDetailsRoute.name));
+      expect(repository.deleteCommands, hasLength(1));
+      expect(
+        find.text('Удаление — «дневной выбор»: Дневной выбор удалён.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('уход до отказа отдаёт сообщение оболочке без второй команды', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    final router = AppRouter();
+    addTearDown(() async {
+      router.dispose();
+      await repository.dispose();
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWith((ref) => repository),
+        ],
+        child: MaterialApp.router(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router.config(),
+          builder: (context, child) =>
+              GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
+        ),
+      ),
+    );
+    unawaited(router.push(DailyChoiceDetailsRoute(choiceId: _choice(1))));
+    await tester.pump();
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('daily-choice-delete-confirm')));
+    await tester.pump();
+    await router.maybePop();
+    await tester.pumpAndSettle();
+
+    repository.failDelete(const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+    expect(repository.deleteCommands, hasLength(1));
+    expect(
+      find.byKey(const ValueKey('graph-operation-message')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Delete — “daily choice”: Could not complete the daily choice operation. Try again.',
+      ),
+      findsOneWidget,
+    );
+  });
 }
 
 Widget _app(_Repository repository, Locale locale) => ProviderScope(
@@ -511,6 +725,8 @@ final class _Change implements GraphChange {
 final class _Repository implements PersonalGraphRepository {
   final updateCommands = <UpdateDailyChoiceFields>[];
   final updateRequests = <Completer<DailyChoiceCommandResult>>[];
+  final deleteCommands = <DeleteDailyChoice>[];
+  final deleteRequests = <Completer<DailyChoiceCommandResult>>[];
   final controller = StreamController<DailyChoiceReadResult>.broadcast(
     sync: true,
   );
@@ -523,6 +739,12 @@ final class _Repository implements PersonalGraphRepository {
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is DeleteDailyChoice) {
+      deleteCommands.add(command as DeleteDailyChoice);
+      final request = Completer<DailyChoiceCommandResult>();
+      deleteRequests.add(request);
+      return await request.future as GraphCommandResult<TSuccess, TFailure>;
+    }
     if (command is! UpdateDailyChoiceFields) throw UnimplementedError();
     updateCommands.add(command as UpdateDailyChoiceFields);
     final request = Completer<DailyChoiceCommandResult>();
@@ -546,6 +768,26 @@ final class _Repository implements PersonalGraphRepository {
         ),
       ),
     );
+  }
+
+  void succeedDelete() {
+    deleteRequests.single.complete(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: const _Revision(2),
+          value: DailyChoiceDeleted(
+            choice: _details().choice,
+            changes: const [_Change()],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void failDelete([
+    DailyChoiceCommandFailure failure = const DailyChoiceUnexpectedFailure(),
+  ]) {
+    deleteRequests.single.complete(GraphCommandFailed(failure));
   }
 
   @override
