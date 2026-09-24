@@ -299,8 +299,9 @@ void main() {
         if (find
             .byKey(const ValueKey('catalog-create-intention'))
             .evaluate()
-            .isNotEmpty)
+            .isNotEmpty) {
           break;
+        }
         await tester.binding.handlePopRoute();
         await tester.pump(const Duration(milliseconds: 350));
       }
