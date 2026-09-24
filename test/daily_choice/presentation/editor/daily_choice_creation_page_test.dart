@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
@@ -271,6 +272,83 @@ void main() {
     expect(repository.commands.single.description?.value, 'corrected');
   });
 
+  testWidgets(
+    'нижняя актуализация начинается от прежнего действия и сохраняет поля',
+    (tester) async {
+      final repository = _Repository();
+      final navigatorKey = GlobalKey<NavigatorState>();
+      final observer = _RouteObserver();
+      await _pump(
+        tester,
+        repository,
+        navigatorKey: navigatorKey,
+        navigatorObserver: observer,
+        direction: ChoicePathDraftDirection.bottomUp,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2026-09-25',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-description')),
+        'Прежнее описание',
+      );
+      await tester.tap(find.byKey(const ValueKey('daily-choice-completed')));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('daily-choice-submit')),
+      );
+      await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+      await tester.pump();
+      repository.fail(
+        0,
+        const DailyChoiceConflictFailure(
+          DailyChoiceConflictReason.confirmedPathChanged,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.text('Вернуться к пути и актуализировать его'),
+      );
+      await tester.tap(find.text('Вернуться к пути и актуализировать его'));
+      await tester.pumpAndSettle();
+      final refreshPage = tester.widget<ChoicePathPage>(
+        find.byType(ChoicePathPage),
+      );
+      expect(refreshPage.direction, ChoicePathDraftDirection.bottomUp);
+      expect(refreshPage.sourceIntentionId, _intention(2));
+      expect(repository.commands, hasLength(1));
+
+      navigatorKey.currentState!.removeRoute(observer.routes.last);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
+            .controller!
+            .text,
+        '2026-09-25',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('daily-choice-description')),
+            )
+            .controller!
+            .text,
+        'Прежнее описание',
+      );
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const ValueKey('daily-choice-completed')),
+            )
+            .value,
+        isTrue,
+      );
+      expect(repository.commands, hasLength(1));
+    },
+  );
+
   for (final olderFirst in [true, false]) {
     testWidgets(
       'два результата актуализации в порядке ${olderFirst ? 'старый–новый' : 'новый–старый'} показывают отправляемый путь',
@@ -376,6 +454,90 @@ void main() {
     );
   }
 
+  for (final olderFirst in [true, false]) {
+    testWidgets(
+      'нижняя актуализация в порядке ${olderFirst ? 'старый–новый' : 'новый–старый'} принимает только последнее основание',
+      (tester) async {
+        final repository = _Repository();
+        final navigatorKey = GlobalKey<NavigatorState>();
+        final observer = _RouteObserver();
+        await _pump(
+          tester,
+          repository,
+          navigatorKey: navigatorKey,
+          navigatorObserver: observer,
+          direction: ChoicePathDraftDirection.bottomUp,
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('daily-choice-date')),
+          '2026-09-25',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('daily-choice-description')),
+          'Сохранённое описание',
+        );
+        await tester.tap(find.byKey(const ValueKey('daily-choice-completed')));
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('daily-choice-submit')),
+        );
+        await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+        await tester.pump();
+        repository.fail(
+          0,
+          const DailyChoiceConflictFailure(
+            DailyChoiceConflictReason.confirmedPathChanged,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final refresh = tester.widget<TextButton>(
+          find.widgetWithText(
+            TextButton,
+            'Вернуться к пути и актуализировать его',
+          ),
+        );
+        refresh.onPressed!();
+        final olderRoute = observer.routes.last;
+        refresh.onPressed!();
+        final newerRoute = observer.routes.last;
+        await tester.pumpAndSettle();
+
+        final older = _bottomSelection(2, 3, 'Старое основание');
+        final newer = _bottomSelection(3, 4, 'Новое основание');
+        if (olderFirst) {
+          navigatorKey.currentState!.removeRoute(olderRoute, older);
+          await tester.pumpAndSettle();
+          navigatorKey.currentState!.removeRoute(newerRoute, newer);
+        } else {
+          navigatorKey.currentState!.removeRoute(newerRoute, newer);
+          await tester.pumpAndSettle();
+          navigatorKey.currentState!.removeRoute(olderRoute, older);
+        }
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('Новое основание'), findsWidgets);
+        expect(find.textContaining('Старое основание'), findsNothing);
+        expect(repository.commands, hasLength(1));
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('daily-choice-submit')),
+        );
+        await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
+        await tester.pump();
+        expect(repository.commands, hasLength(2));
+        expect(repository.commands.last.path, same(newer.path));
+        expect(repository.commands.last.selectedIntentionId, _intention(2));
+        expect(
+          repository.commands.last.date,
+          CalendarDate.fromParts(2026, 9, 25),
+        );
+        expect(
+          repository.commands.last.description?.value,
+          'Сохранённое описание',
+        );
+        expect(repository.commands.last.isCompleted, isTrue);
+      },
+    );
+  }
+
   testWidgets('отмена нового выбора не принимает поздний прежний путь', (
     tester,
   ) async {
@@ -430,6 +592,7 @@ Future<void> _pump(
   Locale locale = const Locale('ru'),
   GlobalKey<NavigatorState>? navigatorKey,
   NavigatorObserver? navigatorObserver,
+  ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
   double textScale = 1,
 }) async {
   final page = DailyChoiceCreationPage(
@@ -443,6 +606,7 @@ Future<void> _pump(
     ]),
     steps: [_step()],
     initialDate: CalendarDate.fromParts(2026, 9, 24),
+    direction: direction,
   );
   await tester.pumpWidget(
     ProviderScope(
@@ -608,6 +772,44 @@ ChoicePathSelection _selection(int relation, int action, String title) =>
           related: RelationParticipantSummary(
             id: _intention(action),
             title: title,
+            archiveState: IntentionArchiveState.active,
+            activeRelationCount: 0,
+          ),
+          hasDescription: false,
+        ),
+      ],
+    );
+
+ChoicePathSelection _bottomSelection(int relation, int source, String title) =>
+    ChoicePathSelection(
+      path: ConfirmedChoicePath([
+        ConfirmedChoicePathStep(
+          relationId: _relation(relation),
+          sourceIntentionId: _intention(source),
+          relatedIntentionId: _intention(2),
+          type: LongTermRelationType.need,
+        ),
+      ]),
+      steps: [
+        LongTermRelationSummary(
+          relation: LongTermRelation(
+            id: _relation(relation),
+            sourceIntentionId: _intention(source),
+            relatedIntentionId: _intention(2),
+            type: LongTermRelationType.need,
+            priority: RelationPriority.p1,
+            scope: RelationScope.active,
+            creationSequence: RelationCreationSequence(relation),
+          ),
+          source: RelationParticipantSummary(
+            id: _intention(source),
+            title: title,
+            archiveState: IntentionArchiveState.active,
+            activeRelationCount: 1,
+          ),
+          related: RelationParticipantSummary(
+            id: _intention(2),
+            title: 'Действие',
             archiveState: IntentionArchiveState.active,
             activeRelationCount: 0,
           ),

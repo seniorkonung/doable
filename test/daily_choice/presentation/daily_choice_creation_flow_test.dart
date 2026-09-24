@@ -6,12 +6,15 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/material.dart';
@@ -341,6 +344,223 @@ void main() {
         ids.last,
       );
       expect(_savedIds(harness), hasLength(2));
+    },
+  );
+
+  testWidgets(
+    'нижний конфликт актуализирует прежнее действие и сохраняет поля до явной записи',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+
+      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      await tester.runAsync(() => _seed(harness));
+      final runtime = AppRuntime(
+        connectionFactory: () =>
+            openFileBackedLocalDatabase(harness.databaseFile),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await harness.dispose();
+      });
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      final ready = await runtime.bootstrap() as AppRuntimeReady;
+      final repository = ready.container.read(personalGraphRepositoryProvider);
+
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('catalog-open-daily-choices')),
+      );
+      await tester.pumpAndSettle();
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('daily-choice-create-from-action')),
+      );
+      await tester.pumpAndSettle();
+      await _tap(tester, find.text('Продолжение действия'));
+      await tester.pumpAndSettle();
+      await _continue(tester, 102);
+      await _continue(tester, 101);
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2026-09-25',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-description')),
+        'Нижний выбор',
+      );
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
+
+      final changed = await repository.execute(
+        UpdateLongTermRelation(
+          relationId: _relation(101),
+          patch: const LongTermRelationPatch(
+            type: LongTermRelationFieldSet(LongTermRelationType.can),
+          ),
+        ),
+      );
+      expect(changed, isA<GraphCommandSucceeded>());
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('daily-choice-failure')),
+      );
+      expect(_savedIds(harness), isEmpty);
+
+      await _tap(tester, find.text('Вернуться к пути и актуализировать его'));
+      await _waitFor(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(102)}')),
+      );
+      expect(
+        tester
+            .widget<ChoicePathPage>(find.byType(ChoicePathPage).last)
+            .direction,
+        ChoicePathDraftDirection.bottomUp,
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(102)}')).last,
+      );
+      await _waitFor(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(101)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(101)}')).last,
+      );
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')).last,
+      );
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')).last,
+      );
+      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await tester.pumpAndSettle();
+      expect(_savedIds(harness), isEmpty);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
+            .controller!
+            .text,
+        '2026-09-25',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('daily-choice-description')),
+            )
+            .controller!
+            .text,
+        'Нижний выбор',
+      );
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const ValueKey('daily-choice-completed')),
+            )
+            .value,
+        isTrue,
+      );
+
+      final readinessChanged = await repository.execute(
+        DisableIntentionReadiness(_intention(3)),
+      );
+      expect(readinessChanged, isA<GraphCommandSucceeded>());
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('daily-choice-failure')),
+      );
+      expect(_savedIds(harness), isEmpty);
+      await _tap(tester, find.text('Вернуться к пути и актуализировать его'));
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('choice-path-conflict')),
+      );
+      expect(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+        findsNothing,
+      );
+      expect(_savedIds(harness), isEmpty);
+
+      final readinessRestored = await repository.execute(
+        EnableIntentionReadiness(_intention(3)),
+      );
+      expect(readinessRestored, isA<GraphCommandSucceeded>());
+      await _tap(tester, find.byKey(const ValueKey('choice-path-refresh')));
+      await _waitFor(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(102)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(102)}')).last,
+      );
+      await _waitFor(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(101)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(101)}')).last,
+      );
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')).last,
+      );
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')).last,
+      );
+      await tester.pumpAndSettle();
+      expect(_savedIds(harness), isEmpty);
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _waitFor(tester, find.textContaining('Дневной выбор создан'));
+      final saved = await _read(repository, _savedIds(harness).single);
+      expect(saved.choice.sourceIntentionId, _intention(1));
+      expect(saved.choice.selectedIntentionId, _intention(3));
+      expect(saved.choice.date, CalendarDate.fromParts(2026, 9, 25));
+      expect(saved.choice.description?.value, 'Нижний выбор');
+      expect(saved.choice.isCompleted, isTrue);
+      expect(saved.path.map((step) => step.relation.id), [
+        _relation(101),
+        _relation(102),
+      ]);
+      expect(saved.path.first.relation.type, LongTermRelationType.can);
     },
   );
 

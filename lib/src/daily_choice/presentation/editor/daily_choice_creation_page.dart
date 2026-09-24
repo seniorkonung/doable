@@ -86,12 +86,21 @@ final class _DailyChoiceCreationPageState
 
   Future<void> _refreshPath(DailyChoiceCreationViewModel model) async {
     final generation = ++_pathRefreshGeneration;
-    final sourceId = widget.path.steps.first.sourceIntentionId;
-    ref.invalidate(choicePathViewModelProvider(sourceId));
+    final startingId = switch (widget.direction) {
+      ChoicePathDraftDirection.topDown =>
+        widget.path.steps.first.sourceIntentionId,
+      ChoicePathDraftDirection.bottomUp =>
+        widget.path.steps.last.relatedIntentionId,
+    };
+    ref.invalidate(
+      choicePathViewModelProvider(startingId, direction: widget.direction),
+    );
     final selection = await Navigator.of(context).push<ChoicePathSelection>(
       MaterialPageRoute(
-        builder: (_) =>
-            ChoicePathPage.forCreationRefresh(sourceIntentionId: sourceId),
+        builder: (_) => ChoicePathPage.forCreationRefresh(
+          startingIntentionId: startingId,
+          direction: widget.direction,
+        ),
       ),
     );
     if (!mounted || generation != _pathRefreshGeneration || selection == null) {
