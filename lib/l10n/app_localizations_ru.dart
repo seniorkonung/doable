@@ -1108,6 +1108,45 @@ class AppLocalizationsRu extends AppLocalizations {
   String get participantPickerTitle => 'Выбор участника';
 
   @override
+  String get actionPickerTitle => 'Выбор действия';
+
+  @override
+  String get actionPickerCancel => 'Отменить выбор действия';
+
+  @override
+  String get actionPickerLoading => 'Загружаем действия…';
+
+  @override
+  String get actionPickerEmpty => 'Доступных активных действий нет.';
+
+  @override
+  String get actionPickerNoMatches => 'Действий с таким названием не найдено.';
+
+  @override
+  String get actionPickerUnavailable =>
+      'Не удалось загрузить действия. Повторите попытку.';
+
+  @override
+  String get actionPickerCorruption =>
+      'Сохранённые данные действий повреждены и не могут быть показаны.';
+
+  @override
+  String get actionPickerUnexpected =>
+      'Не удалось загрузить действия из-за непредвиденной ошибки.';
+
+  @override
+  String get actionPickerSelectHint =>
+      'Выбрать это действие для поиска основания';
+
+  @override
+  String get actionPickerOpenDetails => 'Открыть подробности действия';
+
+  @override
+  String actionPickerTotalCount(int count) {
+    return 'Всего действий: $count';
+  }
+
+  @override
   String get participantPickerCancel => 'Отменить выбор';
 
   @override

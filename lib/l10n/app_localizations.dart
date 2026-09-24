@@ -1919,6 +1919,72 @@ abstract class AppLocalizations {
   /// **'Select a participant'**
   String get participantPickerTitle;
 
+  /// Заголовок выбора действия для нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Select an action'**
+  String get actionPickerTitle;
+
+  /// Отмена выбора действия
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel action selection'**
+  String get actionPickerCancel;
+
+  /// Чтение первой порции действий
+  ///
+  /// In en, this message translates to:
+  /// **'Loading actions…'**
+  String get actionPickerLoading;
+
+  /// Пустой выбор активных действий
+  ///
+  /// In en, this message translates to:
+  /// **'No active actions are available.'**
+  String get actionPickerEmpty;
+
+  /// Пустой результат поиска действий по названию
+  ///
+  /// In en, this message translates to:
+  /// **'No actions match this title.'**
+  String get actionPickerNoMatches;
+
+  /// Устранимый отказ чтения действий
+  ///
+  /// In en, this message translates to:
+  /// **'Actions couldn’t be loaded. Try again.'**
+  String get actionPickerUnavailable;
+
+  /// Повреждённые данные действий
+  ///
+  /// In en, this message translates to:
+  /// **'Saved action data is damaged and can’t be shown.'**
+  String get actionPickerCorruption;
+
+  /// Непредвиденный отказ чтения действий
+  ///
+  /// In en, this message translates to:
+  /// **'Actions couldn’t be loaded because of an unexpected error.'**
+  String get actionPickerUnexpected;
+
+  /// Семантическая подсказка выбора действия
+  ///
+  /// In en, this message translates to:
+  /// **'Selects this action to find its reason'**
+  String get actionPickerSelectHint;
+
+  /// Переход к подробностям действия
+  ///
+  /// In en, this message translates to:
+  /// **'Open action details'**
+  String get actionPickerOpenDetails;
+
+  /// Точное количество доступных действий
+  ///
+  /// In en, this message translates to:
+  /// **'Total actions: {count}'**
+  String actionPickerTotalCount(int count);
+
   /// Назначение отмены выбора участника
   ///
   /// In en, this message translates to:
