@@ -7,6 +7,7 @@ import '../../data/local/sqlite_failure_classifier.dart';
 import '../../daily_choice/application/daily_choice_details.dart';
 import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../daily_choice/application/choice_path_continuations.dart';
+import '../../daily_choice/application/choice_path_suggestions.dart';
 import '../../daily_choice/application/choice_path_draft.dart';
 import '../../daily_choice/application/confirmed_choice_path.dart';
 import '../../daily_choice/application/daily_choice_command.dart';
@@ -96,6 +97,13 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
+
+  @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) async => const ChoicePathSuggestionsError(
+    ChoicePathSuggestionsUnexpectedFailure(),
+  );
 
   DriftRelationCountAggregates get _relationCountAggregates =>
       DriftRelationCountAggregates(_database);
