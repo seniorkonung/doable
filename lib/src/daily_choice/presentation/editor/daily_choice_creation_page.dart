@@ -165,6 +165,9 @@ final class _DailyChoiceCreationPageState
             TextField(
               key: const ValueKey('daily-choice-description'),
               controller: _descriptionController,
+              enabled:
+                  state.operation is! DailyChoiceCreationSubmitting &&
+                  state.operation is! DailyChoiceCreationSucceeded,
               minLines: 3,
               maxLines: 6,
               keyboardType: TextInputType.multiline,
