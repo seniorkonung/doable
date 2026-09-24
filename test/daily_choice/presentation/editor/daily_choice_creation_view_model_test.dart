@@ -227,7 +227,9 @@ void main() {
     expect(harness.repository.commands, hasLength(1));
 
     final refreshed = _path(type: LongTermRelationType.can);
-    harness.model.confirmRefreshedPath(refreshed);
+    expect(harness.model.confirmRefreshedPath(refreshed), isTrue);
+    expect(harness.model.confirmRefreshedPath(_path()), isFalse);
+    expect(harness.state.path, same(refreshed));
     expect(harness.state.canSubmit, isTrue);
     harness.model.submit();
     expect(harness.repository.commands, hasLength(2));

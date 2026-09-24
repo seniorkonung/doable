@@ -61,12 +61,14 @@ final class DailyChoiceCreationViewModel
   }
 
   /// Конфликт нельзя снять правкой даты или текста: требуется новый путь,
-  /// подтверждённый человеком после актуализации обхода.
-  void confirmRefreshedPath(ConfirmedChoicePath path) {
+  /// подтверждённый человеком после актуализации обхода. Возвращает признак
+  /// принятия пути, чтобы экран показывал только отправляемые шаги.
+  bool confirmRefreshedPath(ConfirmedChoicePath path) {
     final next = state.withRefreshedPath(path);
-    if (identical(next, state)) return;
+    if (identical(next, state)) return false;
     _releaseFailure();
     state = next;
+    return true;
   }
 
   void submit() {

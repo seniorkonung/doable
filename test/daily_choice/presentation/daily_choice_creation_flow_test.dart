@@ -246,6 +246,117 @@ void main() {
   );
 
   testWidgets(
+    'после конфликта новый показанный путь и поля попадают в сохранённый выбор',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+
+      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      await tester.runAsync(() => _seed(harness));
+      final runtime = AppRuntime(
+        connectionFactory: () =>
+            openFileBackedLocalDatabase(harness.databaseFile),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await harness.dispose();
+      });
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      final ready = await runtime.bootstrap() as AppRuntimeReady;
+      final repository = ready.container.read(personalGraphRepositoryProvider);
+
+      await _openPath(tester);
+      await _continue(tester, 101);
+      await _openConfirmation(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2026-09-25',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-description')),
+        'Описание после конфликта',
+      );
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
+
+      final archived = await repository.execute(
+        ArchiveLongTermRelation(_relation(101)),
+      );
+      expect(archived, isA<GraphCommandSucceeded>());
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('daily-choice-failure')),
+      );
+      expect(_savedIds(harness), isEmpty);
+
+      await _tap(tester, find.text('Вернуться к пути и актуализировать его'));
+      await tester.pumpAndSettle();
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(103)}')).last,
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(104)}')).last,
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-action')).last,
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')).last,
+      );
+      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      expect(find.textContaining('Другое действие'), findsWidgets);
+      expect(find.textContaining('Действие в середине'), findsNothing);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
+            .controller!
+            .text,
+        '2026-09-25',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('daily-choice-description')),
+            )
+            .controller!
+            .text,
+        'Описание после конфликта',
+      );
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const ValueKey('daily-choice-completed')),
+            )
+            .value,
+        isTrue,
+      );
+      expect(_savedIds(harness), isEmpty);
+
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _waitFor(tester, find.textContaining('Дневной выбор создан'));
+      final saved = await _read(repository, _savedIds(harness).single);
+      expect(saved.choice.sourceIntentionId, _intention(1));
+      expect(saved.choice.selectedIntentionId, _intention(5));
+      expect(saved.choice.date, CalendarDate.fromParts(2026, 9, 25));
+      expect(saved.choice.description?.value, 'Описание после конфликта');
+      expect(saved.choice.isCompleted, isTrue);
+      expect(saved.path.map((step) => step.relation.id), [
+        _relation(103),
+        _relation(104),
+      ]);
+    },
+  );
+
+  testWidgets(
     'конфликт после выбора пути не создаёт запись и не показывает успех',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
