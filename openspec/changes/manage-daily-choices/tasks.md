@@ -569,3 +569,12 @@
   - **Зависимости:** 2.30, 2.31 — актуализация после конфликта и подтверждённый сквозной цикл.
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, при необходимости `daily_choice_creation_state.dart` и `daily_choice_creation_view_model.dart` рядом с ним; указанные widget-, model- и flow-тесты.
   - **Размер:** S.
+
+- [ ] 2.33 Восстановить воспроизводимую генерацию модели создания дневного выбора
+  - **Критерии приёмки:**
+    - Отслеживаемый `daily_choice_creation_view_model.g.dart` соответствует текущему `daily_choice_creation_view_model.dart`, включая хеш исходника после изменения `confirmRefreshedPath`.
+    - Повторная генерация на чистом зафиксированном снимке не изменяет отслеживаемые файлы; пользовательское поведение создания дневного выбора остаётся прежним.
+  - **Проверка:** выполнить `mise run --skip-tools codegen`, проверить и зафиксировать только ожидаемое изменение сгенерированного файла; затем на чистом снимке выполнить `mise run --skip-tools codegen-check` и `mise exec --no-deps -- flutter test test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart test/daily_choice/presentation/daily_choice_creation_flow_test.dart test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`.
+  - **Зависимости:** 2.32 — текущий исходник модели создания.
+  - **Вероятные файлы:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.g.dart`.
+  - **Размер:** XS.
