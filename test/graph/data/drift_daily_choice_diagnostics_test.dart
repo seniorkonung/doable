@@ -1,11 +1,15 @@
 import 'dart:convert';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,6 +69,147 @@ void main() {
     },
   );
 
+  test('новые чтения различаются по операции, этапу и исходу', () async {
+    expect(
+      await repository.execute(durabilityCreate()),
+      isA<GraphCommandSucceeded>(),
+    );
+    diagnostics.events.clear();
+    diagnostics.logs.clear();
+
+    expect(
+      await repository.getDailyChoiceCatalogPage(DailyChoiceCatalogQuery()),
+      isA<DailyChoiceCatalogPageSuccess>(),
+    );
+    expect(
+      await repository.getRelationGroupPage(
+        DailyChoiceGroupQuery(
+          intentionId: durabilityIntention(1),
+          role: DailyChoiceRelationRole.source,
+          pageSize: 50,
+        ),
+      ),
+      isA<RelationGroupPageSuccess>(),
+    );
+    expect(
+      await repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: ChoicePathDraftStart(durabilityIntention(1)),
+        ),
+      ),
+      isA<ChoicePathContinuationSuccess>(),
+    );
+
+    expect(
+      diagnostics.logs.map((line) {
+        final event = jsonDecode(line) as Map<String, dynamic>;
+        return '${event['operation']}:${event['stage']}:${event['outcome']}';
+      }),
+      [
+        'dailyChoiceCatalogPageRead:read:started',
+        'dailyChoiceCatalogPageRead:read:succeeded',
+        'dailyChoiceGroupPageRead:read:started',
+        'dailyChoiceGroupPageRead:read:succeeded',
+        'choicePathContinuationRead:read:started',
+        'choicePathContinuationRead:read:succeeded',
+      ],
+    );
+    _expectSafeLogs(diagnostics.logs);
+  });
+
+  test(
+    'ошибки новых чтений сохраняют категорию без исходного исключения',
+    () async {
+      expect(
+        await repository.execute(durabilityCreate()),
+        isA<GraphCommandSucceeded>(),
+      );
+
+      for (final point in [
+        _FailurePoint.catalogRead,
+        _FailurePoint.groupRead,
+        _FailurePoint.continuationRead,
+      ]) {
+        diagnostics.events.clear();
+        diagnostics.logs.clear();
+        probe.arm(point);
+
+        final category = switch (point) {
+          _FailurePoint.catalogRead =>
+            (await repository.getDailyChoiceCatalogPage(
+              DailyChoiceCatalogQuery(),
+            ) as DailyChoiceCatalogPageError).failure.category,
+          _FailurePoint.groupRead => (await repository.getRelationGroupPage(
+            DailyChoiceGroupQuery(
+              intentionId: durabilityIntention(1),
+              role: DailyChoiceRelationRole.source,
+              pageSize: 50,
+            ),
+          ) as RelationGroupPageFailure).failure.category,
+          _FailurePoint.continuationRead =>
+            (await repository.getChoicePathContinuations(
+              ChoicePathContinuationQuery(
+                draft: ChoicePathDraftStart(durabilityIntention(1)),
+              ),
+            ) as ChoicePathContinuationError).failure.category,
+          _ => throw StateError('Неприменимая точка отказа'),
+        };
+
+        expect(probe.didFail, isTrue);
+        expect(category, GraphFailureCategory.unexpected);
+        expect(
+          diagnostics.logs.map((line) {
+            final event = jsonDecode(line) as Map<String, dynamic>;
+            return '${event['outcome']}:${event['failureCode']}';
+          }),
+          ['started:null', 'failed:unexpected'],
+        );
+        _expectSafeLogs(diagnostics.logs);
+      }
+    },
+  );
+
+  test('падающий получатель не меняет результат новых чтений', () async {
+    expect(
+      await repository.execute(durabilityCreate()),
+      isA<GraphCommandSucceeded>(),
+    );
+    final withFailure = _repository(database, _ThrowingSink());
+
+    for (final graph in [repository, withFailure]) {
+      expect(
+        await graph.getDailyChoiceCatalogPage(DailyChoiceCatalogQuery()),
+        isA<DailyChoiceCatalogPageSuccess>(),
+      );
+      expect(
+        await graph.getRelationGroupPage(
+          DailyChoiceGroupQuery(
+            intentionId: durabilityIntention(1),
+            role: DailyChoiceRelationRole.source,
+            pageSize: 50,
+          ),
+        ),
+        isA<RelationGroupPageSuccess>(),
+      );
+      expect(
+        await graph.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: ChoicePathDraftStart(durabilityIntention(1)),
+          ),
+        ),
+        isA<ChoicePathContinuationSuccess>(),
+      );
+      expect(
+        (await graph.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: ChoicePathDraftStart(durabilityIntention(999)),
+          ),
+        ) as ChoicePathContinuationError).failure.category,
+        GraphFailureCategory.notFound,
+      );
+    }
+  });
+
   test('архивированная связь диагностируется как конфликт проверки', () async {
     expect(
       await repository.execute(
@@ -90,7 +235,7 @@ void main() {
     _expectSafeLogs(diagnostics.logs);
   });
 
-  for (final point in _FailurePoint.values) {
+  for (final point in [_FailurePoint.write, _FailurePoint.resultRead]) {
     test('отказ ${point.label} сохраняет исход и безопасный этап', () async {
       final before = await durabilityState(database);
       probe.arm(point);
@@ -206,6 +351,9 @@ void _expectSafeLogs(List<String> logs) {
         'outcome',
         'durationMicros',
         'failureCode',
+        'pageSize',
+        'isContinuation',
+        'requiresNewSnapshot',
       }.containsAll(event.keys),
       isTrue,
     );
@@ -223,6 +371,7 @@ void _expectSafeLogs(List<String> logs) {
       durabilityUuid(201),
       'INSERT INTO',
       'Управляемый отказ',
+      'Секретный текст SQL',
     ]) {
       expect(line, isNot(contains(forbidden)));
     }
@@ -249,7 +398,10 @@ final class _ThrowingSink implements DiagnosticsSink {
 
 enum _FailurePoint {
   write('записи'),
-  resultRead('чтения результата');
+  resultRead('чтения результата'),
+  catalogRead('каталога'),
+  groupRead('дневной группы'),
+  continuationRead('продолжений пути');
 
   const _FailurePoint(this.label);
   final String label;
@@ -259,17 +411,31 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
   _FailurePoint? _point;
   bool didFail = false;
 
-  void arm(_FailurePoint point) => _point = point;
+  void arm(_FailurePoint point) {
+    _point = point;
+    didFail = false;
+  }
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (_point != _FailurePoint.resultRead || didFail) return;
-    if (statement.operation == LocalDatabaseSqlOperation.select &&
-        statement.statements.any(
-          (sql) => sql.contains('FROM daily_choices WHERE id = ?'),
-        )) {
+    if (didFail || statement.operation != LocalDatabaseSqlOperation.select) {
+      return;
+    }
+    final sql = statement.statements.single;
+    final targeted = switch (_point) {
+      _FailurePoint.resultRead => sql.contains(
+        'FROM daily_choices WHERE id = ?',
+      ),
+      _FailurePoint.catalogRead =>
+        sql.contains('FROM daily_choices') &&
+            sql.contains('ORDER BY choice_date'),
+      _FailurePoint.groupRead => sql.contains('FROM daily_choices INDEXED BY'),
+      _FailurePoint.continuationRead => sql.contains('WITH RECURSIVE'),
+      _ => false,
+    };
+    if (targeted) {
       didFail = true;
-      throw StateError('Управляемый отказ чтения результата.');
+      throw StateError('Управляемый отказ: Секретный текст SQL.');
     }
   }
 

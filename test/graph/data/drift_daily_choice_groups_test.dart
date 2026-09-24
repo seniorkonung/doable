@@ -297,7 +297,7 @@ void main() {
     );
     expect(
       diagnostics.events
-          .whereType<RelationGroupPageReadDiagnosticsEvent>()
+          .whereType<DailyChoiceGroupPageReadDiagnosticsEvent>()
           .last
           .requiresNewSnapshot,
       isTrue,
@@ -348,7 +348,7 @@ void main() {
     );
     expect(
       (diagnostics.events
-                  .whereType<RelationGroupPageReadDiagnosticsEvent>()
+                  .whereType<DailyChoiceGroupPageReadDiagnosticsEvent>()
                   .last
                   .status
               as DiagnosticsFailed)

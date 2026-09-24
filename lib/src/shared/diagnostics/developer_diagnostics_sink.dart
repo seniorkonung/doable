@@ -48,6 +48,7 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
   ) =>
     {
       'operation': 'choicePathContinuationRead',
+      'stage': 'read',
       ..._encodeStatus(event.status),
       'pageSize': pageSize,
       'isContinuation': isContinuation,
@@ -96,6 +97,20 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
   ) =>
     {
       'operation': 'relationGroupPageRead',
+      'stage': 'read',
+      ..._encodeStatus(event.status),
+      'pageSize': pageSize,
+      'isContinuation': isContinuation,
+      'requiresNewSnapshot': requiresNewSnapshot,
+    },
+  DailyChoiceGroupPageReadDiagnosticsEvent(
+    :final pageSize,
+    :final isContinuation,
+    :final requiresNewSnapshot,
+  ) =>
+    {
+      'operation': 'dailyChoiceGroupPageRead',
+      'stage': 'read',
       ..._encodeStatus(event.status),
       'pageSize': pageSize,
       'isContinuation': isContinuation,

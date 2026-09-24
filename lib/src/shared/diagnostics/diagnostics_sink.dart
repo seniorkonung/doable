@@ -180,6 +180,19 @@ final class RelationGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
   final bool requiresNewSnapshot;
 }
 
+final class DailyChoiceGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const DailyChoiceGroupPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required this.requiresNewSnapshot,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+  final bool requiresNewSnapshot;
+}
+
 final class LongTermRelationDetailReadDiagnosticsEvent
     extends DiagnosticsEvent {
   const LongTermRelationDetailReadDiagnosticsEvent({
