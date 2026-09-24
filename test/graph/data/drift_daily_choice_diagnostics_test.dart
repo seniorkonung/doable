@@ -99,6 +99,14 @@ void main() {
       ),
       isA<ChoicePathContinuationSuccess>(),
     );
+    expect(
+      await repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: ChoicePathDraftBottomStart(durabilityIntention(3)),
+        ),
+      ),
+      isA<ChoicePathContinuationSuccess>(),
+    );
 
     expect(
       diagnostics.logs.map((line) {
@@ -110,6 +118,12 @@ void main() {
         'dailyChoiceCatalogPageRead:read:succeeded',
         'dailyChoiceGroupPageRead:read:started',
         'dailyChoiceGroupPageRead:read:succeeded',
+        'choicePathContinuationRead:validation:started',
+        'choicePathContinuationRead:validation:succeeded',
+        'choicePathContinuationRead:read:started',
+        'choicePathContinuationRead:read:succeeded',
+        'choicePathContinuationRead:validation:started',
+        'choicePathContinuationRead:validation:succeeded',
         'choicePathContinuationRead:read:started',
         'choicePathContinuationRead:read:succeeded',
       ],
@@ -162,12 +176,39 @@ void main() {
             final event = jsonDecode(line) as Map<String, dynamic>;
             return '${event['outcome']}:${event['failureCode']}';
           }),
-          ['started:null', 'failed:unexpected'],
+          point == _FailurePoint.continuationRead
+              ? [
+                  'started:null',
+                  'succeeded:null',
+                  'started:null',
+                  'failed:unexpected',
+                ]
+              : ['started:null', 'failed:unexpected'],
         );
         _expectSafeLogs(diagnostics.logs);
       }
     },
   );
+
+  test('нижняя проверка сообщает конфликт до чтения продолжений', () async {
+    final result = await repository.getChoicePathContinuations(
+      ChoicePathContinuationQuery(
+        draft: ChoicePathDraftBottomStart(durabilityIntention(1)),
+      ),
+    );
+    expect(
+      (result as ChoicePathContinuationError).failure,
+      isA<ChoicePathContinuationSnapshotExpired>(),
+    );
+    expect(
+      diagnostics.logs.map((line) {
+        final event = jsonDecode(line) as Map<String, dynamic>;
+        return '${event['stage']}:${event['outcome']}:${event['failureCode']}';
+      }),
+      ['validation:started:null', 'validation:failed:conflict'],
+    );
+    _expectSafeLogs(diagnostics.logs);
+  });
 
   test('падающий получатель не меняет результат новых чтений', () async {
     expect(

@@ -95,6 +95,19 @@ final class _Fixture {
           ),
       ]);
 
+  ChoicePathDraftBottomProgress bottomProgress(
+    int action,
+    List<(int, int, int)> steps,
+  ) => ChoicePathDraftBottomProgress(_intention(action), [
+    for (final (id, from, to) in steps)
+      ConfirmedChoicePathStep(
+        relationId: _relation(id),
+        sourceIntentionId: _intention(from),
+        type: LongTermRelationType.need,
+        relatedIntentionId: _intention(to),
+      ),
+  ]);
+
   Future<ChoicePathContinuationsPage> page(
     ChoicePathDraft draft, {
     int pageSize = 50,
@@ -193,6 +206,353 @@ void main() {
   });
 
   tearDown(() => fixture.close());
+
+  test(
+    'нижний обход принимает неготовое основание и сохраняет действие',
+    () async {
+      fixture.intention(1);
+      fixture.intention(2, ready: true);
+      fixture.intention(3, ready: true);
+      fixture.intention(4);
+      fixture.relation(101, 1, 2);
+      fixture.relation(102, 2, 3);
+      fixture.relation(103, 4, 2, type: 'can');
+      fixture.relation(104, 3, 1);
+
+      final start = await fixture.page(
+        ChoicePathDraftBottomStart(_intention(3)),
+      );
+      expect(start.canConfirm, isFalse);
+      expect(start.items.map((item) => item.relation.id), [_relation(102)]);
+
+      final middle = await fixture.page(
+        fixture.bottomProgress(3, [(102, 2, 3)]),
+      );
+      expect(middle.canConfirm, isTrue);
+      expect(middle.current.id, _intention(2));
+      expect(middle.items.map((item) => item.relation.id), [
+        _relation(101),
+        _relation(103),
+      ]);
+
+      final end = await fixture.page(
+        fixture.bottomProgress(3, [(102, 2, 3), (101, 1, 2)]),
+      );
+      expect(end.canConfirm, isTrue);
+      expect(end.current.id, _intention(1));
+      expect(end.items, isEmpty);
+      expect(end.draft, isA<ChoicePathDraftBottomProgress>());
+      expect(
+        (end.draft as ChoicePathDraftBottomProgress).confirmedPath.steps.map(
+          (step) => step.relationId,
+        ),
+        [_relation(101), _relation(102)],
+      );
+    },
+  );
+
+  test('нижний обход исключает архивные связи, участников и циклы', () async {
+    fixture.intention(1);
+    fixture.intention(2);
+    fixture.intention(3, ready: true);
+    fixture.intention(4, archived: true);
+    fixture.intention(5);
+    fixture.relation(101, 1, 2);
+    fixture.relation(102, 2, 3);
+    fixture.relation(103, 3, 2);
+    fixture.relation(104, 4, 2, archived: true);
+    fixture.relation(105, 5, 2, archived: true);
+
+    final page = await fixture.page(fixture.bottomProgress(3, [(102, 2, 3)]));
+    expect(page.items.map((item) => item.relation.id), [_relation(101)]);
+    final noIncoming = await fixture.page(
+      fixture.bottomProgress(3, [(102, 2, 3), (101, 1, 2)]),
+    );
+    expect(noIncoming.items, isEmpty);
+    expect(noIncoming.canConfirm, isTrue);
+  });
+
+  test(
+    'нижний черновик конфликтует при изменении пути или готовности действия',
+    () async {
+      fixture.intention(1);
+      fixture.intention(2);
+      fixture.intention(3, ready: true);
+      fixture.intention(4);
+      fixture.relation(101, 1, 2);
+      fixture.relation(102, 2, 3);
+      final draft = fixture.bottomProgress(3, [(102, 2, 3), (101, 1, 2)]);
+
+      for (final (sql, args, restore) in [
+        (
+          'UPDATE long_term_relations SET type = ? WHERE id = ?',
+          <Object>['can', _uuid(101)],
+          <Object>['need', _uuid(101)],
+        ),
+        (
+          'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
+          <Object>[1, _uuid(101)],
+          <Object>[0, _uuid(101)],
+        ),
+        (
+          'UPDATE long_term_relations SET source_intention_id = ? WHERE id = ?',
+          <Object>[_uuid(4), _uuid(101)],
+          <Object>[_uuid(1), _uuid(101)],
+        ),
+        (
+          'UPDATE intentions SET is_action_ready = ? WHERE id = ?',
+          <Object>[0, _uuid(3)],
+          <Object>[1, _uuid(3)],
+        ),
+      ]) {
+        fixture.raw.execute(sql, args);
+        final result = await fixture.repository.getChoicePathContinuations(
+          ChoicePathContinuationQuery(draft: draft),
+        );
+        expect(
+          (result as ChoicePathContinuationError).failure,
+          isA<ChoicePathContinuationSnapshotExpired>(),
+          reason: sql,
+        );
+        fixture.raw.execute(sql, restore);
+      }
+
+      fixture.raw.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_uuid(101)],
+      );
+      fixture.raw.execute(
+        'UPDATE intentions SET is_archived = 1 WHERE id = ?',
+        [_uuid(1)],
+      );
+      final archived = await fixture.repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(draft: draft),
+      );
+      expect(
+        (archived as ChoicePathContinuationError).failure,
+        isA<ChoicePathContinuationSnapshotExpired>(),
+      );
+    },
+  );
+
+  test(
+    'нижние порции 1, 50 и 100 сохраняют порядок и границы курсора',
+    () async {
+      fixture.raw.execute('BEGIN');
+      fixture.intention(1, ready: true);
+      for (var id = 2; id <= 103; id++) {
+        fixture.intention(id, ready: id.isEven);
+        fixture.relation(
+          1000 + id,
+          id,
+          1,
+          type: id % 3 == 0 ? 'can' : 'need',
+          priority: (id % 4) + 1,
+        );
+      }
+      fixture.raw.execute('COMMIT');
+      final expected = [for (var id = 2; id <= 103; id++) id]
+        ..sort((left, right) {
+          final groups = (left % 3 == 0 ? 1 : 0).compareTo(
+            right % 3 == 0 ? 1 : 0,
+          );
+          if (groups != 0) return groups;
+          final priorities = (left % 4).compareTo(right % 4);
+          return priorities != 0 ? priorities : left.compareTo(right);
+        });
+      final draft = ChoicePathDraftBottomStart(_intention(1));
+      for (final size in [1, 50, 100]) {
+        final actual = <IntentionId>[];
+        ChoicePathContinuationCursor? cursor;
+        do {
+          final page = await fixture.page(
+            draft,
+            pageSize: size,
+            cursor: cursor,
+          );
+          expect(page.items.length, lessThanOrEqualTo(size));
+          actual.addAll(page.items.map((item) => item.source.id));
+          cursor = page.nextCursor;
+        } while (cursor != null);
+        expect(actual, [for (final id in expected) _intention(id)]);
+      }
+
+      final first = await fixture.page(draft, pageSize: 1);
+      for (final wrongDraft in [
+        ChoicePathDraftStart(_intention(1)),
+        fixture.bottomProgress(1, [(1002, 2, 1)]),
+      ]) {
+        final wrong = await fixture.repository.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: wrongDraft,
+            pageSize: 1,
+            cursor: first.nextCursor,
+          ),
+        );
+        expect(
+          (wrong as ChoicePathContinuationError).failure,
+          isA<ChoicePathContinuationValidationFailure>(),
+        );
+      }
+      final other = DriftPersonalGraphRepository(
+        fixture.database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 23),
+        fixture.diagnostics,
+      );
+      final foreign = await other.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: draft,
+          pageSize: 1,
+          cursor: first.nextCursor,
+        ),
+      );
+      expect(
+        (foreign as ChoicePathContinuationError).failure,
+        isA<ChoicePathContinuationValidationFailure>(),
+      );
+      expect(
+        await fixture.repository.execute(
+          EnableIntentionReadiness(_intention(3)),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      final stale = await fixture.repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: draft,
+          pageSize: 1,
+          cursor: first.nextCursor,
+        ),
+      );
+      expect(
+        (stale as ChoicePathContinuationError).failure,
+        isA<ChoicePathContinuationSnapshotExpired>(),
+      );
+    },
+  );
+
+  test(
+    'малые нижние графы совпадают с независимой проверкой простого суффикса',
+    () async {
+      for (var seed = 0; seed < 12; seed++) {
+        final base = 200 + seed * 10;
+        final action = base + 8;
+        final middle = base + 7;
+        final active = <int>{
+          for (var node = 1; node <= 8; node++)
+            if ((node + seed) % 5 != 0 || node >= 7) base + node,
+        };
+        for (var node = 1; node <= 8; node++) {
+          fixture.intention(
+            base + node,
+            ready: node == 8 || (node + seed).isEven,
+            archived: !active.contains(base + node),
+          );
+        }
+        final edges = <(int, int, bool)>[];
+        final suffixId = 60000 + seed * 100;
+        fixture.relation(suffixId, middle, action);
+        edges.add((middle, action, true));
+        for (var from = 1; from <= 8; from++) {
+          for (var to = 1; to <= 8; to++) {
+            if (from == to || (from * 13 + to * 7 + seed) % 3 != 0) {
+              continue;
+            }
+            final source = base + from;
+            final related = base + to;
+            if (source == middle && related == action) continue;
+            final edgeActive =
+                (from + to + seed) % 4 != 0 &&
+                active.contains(source) &&
+                active.contains(related);
+            fixture.relation(
+              suffixId + from * 10 + to,
+              source,
+              related,
+              archived: !edgeActive,
+            );
+            edges.add((source, related, edgeActive));
+          }
+        }
+        final expected = {
+          for (final (source, related, edgeActive) in edges)
+            if (related == middle &&
+                edgeActive &&
+                active.contains(source) &&
+                {source, middle, action}.length == 3 &&
+                edges.any(
+                  (edge) => edge.$1 == middle && edge.$2 == action && edge.$3,
+                ))
+              _intention(source),
+        };
+        final page = await fixture.page(
+          fixture.bottomProgress(action, [(suffixId, middle, action)]),
+        );
+        expect(
+          page.items.map((item) => item.source.id).toSet(),
+          expected,
+          reason: 'граф $seed',
+        );
+      }
+    },
+  );
+
+  test(
+    'неготовое или отсутствующее действие не открывает нижний обход',
+    () async {
+      fixture.intention(1);
+      final unavailable = await fixture.repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: ChoicePathDraftBottomStart(_intention(1)),
+        ),
+      );
+      expect(
+        (unavailable as ChoicePathContinuationError).failure,
+        isA<ChoicePathContinuationSnapshotExpired>(),
+      );
+      final absent = await fixture.repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: ChoicePathDraftBottomStart(_intention(2)),
+        ),
+      );
+      expect(
+        (absent as ChoicePathContinuationError).failure,
+        isA<ChoicePathContinuationIntentionNotFoundFailure>(),
+      );
+    },
+  );
+
+  test(
+    'повреждение нижнего кандидата и отказ хранилища не означают тупик',
+    () async {
+      fixture.intention(1);
+      fixture.intention(2, ready: true);
+      fixture.relation(101, 1, 2);
+      fixture.raw.execute('PRAGMA ignore_check_constraints = ON');
+      fixture.raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+        '',
+        _uuid(1),
+      ]);
+      fixture.raw.execute('PRAGMA ignore_check_constraints = OFF');
+      final corrupted = await fixture.repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: ChoicePathDraftBottomStart(_intention(2)),
+        ),
+      );
+      expect(
+        (corrupted as ChoicePathContinuationError).failure,
+        isA<ChoicePathContinuationCorruptionFailure>(),
+      );
+
+      await fixture.database.close();
+      final unavailable = await fixture.repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: ChoicePathDraftBottomStart(_intention(2)),
+        ),
+      );
+      expect(unavailable, isA<ChoicePathContinuationError>());
+    },
+  );
 
   test('цикл, тупик и возврат в префикс исключаются из продолжений', () async {
     for (var id = 1; id <= 7; id++) {
@@ -452,6 +812,12 @@ void main() {
       ]);
       final deepPage = await fixture.page(deepDraft);
       expect(deepPage.items.single.relation.id, _relation(2000 + length));
+      final bottomDraft = fixture.bottomProgress(length + 1, [
+        for (var id = length; id >= 2; id--) (2000 + id, id, id + 1),
+      ]);
+      final bottomPage = await fixture.page(bottomDraft);
+      expect(bottomPage.items.single.relation.id, _relation(2001));
+      expect(bottomPage.canConfirm, isTrue);
       expect(
         fixture.diagnostics.events
             .whereType<ChoicePathContinuationReadDiagnosticsEvent>()

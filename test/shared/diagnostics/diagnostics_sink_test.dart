@@ -13,6 +13,7 @@ void main() {
       final sink = DeveloperDiagnosticsSink(messages.add);
       sink.record(
         const ChoicePathContinuationReadDiagnosticsEvent(
+          stage: ChoicePathContinuationReadStage.read,
           pageSize: 50,
           isContinuation: true,
           status: DiagnosticsFailed(
