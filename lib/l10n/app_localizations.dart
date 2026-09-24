@@ -2213,6 +2213,60 @@ abstract class AppLocalizations {
   /// **'Choose a path to an action'**
   String get choicePathTitle;
 
+  /// Заголовок нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a source for the action'**
+  String get choicePathBottomTitle;
+
+  /// Порядок нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Exploration: from the action to a source'**
+  String get choicePathBottomTraversal;
+
+  /// Направление связей нижнего пути
+  ///
+  /// In en, this message translates to:
+  /// **'Relation direction: from the source to the action'**
+  String get choicePathBottomPathDirection;
+
+  /// Фиксированное действие нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action: {action}'**
+  String choicePathFixedAction(String action);
+
+  /// Загрузка действия нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the selected action…'**
+  String get choicePathActionPending;
+
+  /// Достигнутое основание нижнего пути
+  ///
+  /// In en, this message translates to:
+  /// **'Source: {source}'**
+  String choicePathCurrentSource(String source);
+
+  /// Состояние подтверждения основания
+  ///
+  /// In en, this message translates to:
+  /// **'Source confirmed'**
+  String get choicePathSourceSelected;
+
+  /// Явное подтверждение основания
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm source “{source}”'**
+  String choicePathSelectSource(String source);
+
+  /// У выбранного действия нет входящего пути
+  ///
+  /// In en, this message translates to:
+  /// **'There are no valid incoming relations for this action right now. Choose another action.'**
+  String get choicePathBottomNoPath;
+
   /// Направление верхнего обхода
   ///
   /// In en, this message translates to:
