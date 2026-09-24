@@ -21,12 +21,13 @@ void main() {
   late InMemoryDiagnosticsSink diagnostics;
   late DriftPersonalGraphRepository repository;
   late _SelectTrace trace;
+  late Database raw;
 
   setUp(() async {
     trace = _SelectTrace();
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
+        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
         trace,
       ),
     );
@@ -128,6 +129,99 @@ void main() {
       );
     }
   });
+
+  test(
+    'измеряет вход от действия при редкой готовности в большом каталоге',
+    () async {
+      await database.customStatement('''
+      WITH RECURSIVE ids(n) AS (
+        VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 3000
+      )
+      INSERT INTO intentions
+        (id, title, is_action_ready, is_archived, created_at, updated_at)
+      SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
+             'Действие %_ ' || n, n % 1000 = 0, 0, n, n FROM ids
+    ''');
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: '%_',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 2,
+      );
+      trace.measured.clear();
+      final firstWatch = Stopwatch()..start();
+      final first = _firstPage(await repository.getCatalogPage(query));
+      firstWatch.stop();
+      expect(first.totalCount, 3);
+      expect(first.items.map((item) => item.id), [
+        _id(_uuid(3000)),
+        _id(_uuid(2000)),
+      ]);
+      final firstQueries = List<_MeasuredSelect>.of(trace.measured);
+      expect(
+        firstQueries.map((entry) => entry.rows),
+        everyElement(lessThanOrEqualTo(3)),
+      );
+      final count = firstQueries
+          .where((entry) => _isCatalogCountStatement(entry.sql))
+          .single;
+      final page = firstQueries
+          .where((entry) => entry.sql.contains('LIMIT'))
+          .single;
+      expect(count.rows, 1);
+      expect(page.rows, 3);
+      expect(count.sql, contains('is_action_ready'));
+      expect(page.sql, contains('is_action_ready'));
+      expect(page.sql, isNot(contains('OFFSET')));
+      final countPlan = raw.select(
+        'EXPLAIN QUERY PLAN ${count.sql}',
+        count.arguments,
+      );
+      final pagePlan = raw.select(
+        'EXPLAIN QUERY PLAN ${page.sql}',
+        page.arguments,
+      );
+
+      trace.measured.clear();
+      final nextWatch = Stopwatch()..start();
+      final next = _continuationPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: query.scope,
+            readinessFilter: query.readinessFilter,
+            titleFilter: '%_',
+            order: query.order,
+            pageSize: query.pageSize,
+            cursor: first.nextCursor,
+          ),
+        ),
+      );
+      nextWatch.stop();
+      expect(next.items.map((item) => item.id), [_id(_uuid(1000))]);
+      expect(
+        trace.measured.where((entry) => _isCatalogCountStatement(entry.sql)),
+        isEmpty,
+      );
+      expect(
+        trace.measured
+            .where((entry) => entry.sql.contains('LIMIT'))
+            .single
+            .rows,
+        1,
+      );
+      // ignore: avoid_print
+      print(
+        'Вход от действия: 3000 намерений, 3 готовых, фильтр, порция 2; '
+        'первая=${firstWatch.elapsedMicroseconds} мкс, '
+        'продолжение=${nextWatch.elapsedMicroseconds} мкс, '
+        'COUNT=${count.elapsed.inMicroseconds} мкс, '
+        'SELECT=${page.elapsed.inMicroseconds} мкс; '
+        'план COUNT=${countPlan.map((row) => row['detail']).join(' | ')}; '
+        'план SELECT=${pagePlan.map((row) => row['detail']).join(' | ')}',
+      );
+    },
+  );
 
   test('курсор привязан к готовности до SQL', () async {
     for (final suffix in ['201', '202']) {
@@ -1602,6 +1696,9 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   InvalidIntentionIdDecoding() => throw ArgumentError.value(value, 'value'),
 };
 
+String _uuid(int number) =>
+    '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
+
 IntentionCatalogFirstPage _firstPage(Result<IntentionCatalogPage> result) {
   expect(result, isA<ResultSuccess<IntentionCatalogPage>>());
   final page = (result as ResultSuccess<IntentionCatalogPage>).value;
@@ -1624,6 +1721,8 @@ final class _ForeignCatalogCursor implements IntentionCatalogCursor {
 
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final List<String> statements = [];
+  final List<_MeasuredSelect> measured = [];
+  final Map<LocalDatabaseSqlStatement, Stopwatch> _started = {};
   Object? failure;
   Completer<void>? _blockedSelectStarted;
   Completer<void>? _blockedSelectRelease;
@@ -1652,6 +1751,7 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
   Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     statements.add(statement.statements.single);
+    _started[statement] = Stopwatch()..start();
     final failure = this.failure;
     if (failure != null) throw failure;
     final started = _blockedSelectStarted;
@@ -1662,4 +1762,30 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     _blockedSelectStarted = null;
     _blockedSelectRelease = null;
   }
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    final watch = _started.remove(statement)!..stop();
+    measured.add(
+      _MeasuredSelect(
+        statement.statements.single,
+        statement.arguments,
+        rows.length,
+        watch.elapsed,
+      ),
+    );
+    return rows;
+  }
+}
+
+final class _MeasuredSelect {
+  const _MeasuredSelect(this.sql, this.arguments, this.rows, this.elapsed);
+
+  final String sql;
+  final List<Object?> arguments;
+  final int rows;
+  final Duration elapsed;
 }

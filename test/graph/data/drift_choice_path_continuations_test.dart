@@ -178,9 +178,15 @@ final class _IsolateResponsivenessTrace
   bool _eventLoopAdvanced = false;
   bool? advancedBeforeReachabilityFinished;
 
+  void reset() {
+    _eventLoopAdvanced = false;
+    advancedBeforeReachabilityFinished = null;
+  }
+
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.statements.single.contains('WITH RECURSIVE')) {
+    if (statement.statements.single.contains('WITH RECURSIVE') ||
+        statement.statements.single.contains('WITH visited(id)')) {
       Timer.run(() => _eventLoopAdvanced = true);
     }
   }
@@ -190,7 +196,8 @@ final class _IsolateResponsivenessTrace
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    if (statement.statements.single.contains('WITH RECURSIVE')) {
+    if (statement.statements.single.contains('WITH RECURSIVE') ||
+        statement.statements.single.contains('WITH visited(id)')) {
       advancedBeforeReachabilityFinished = _eventLoopAdvanced;
     }
     return rows;
@@ -947,6 +954,143 @@ void main() {
     print('План достижимости: ${plan.map((row) => row['detail']).join(' | ')}');
   });
 
+  test(
+    'измеряет нижний обход на широком соседстве, циклах и длинном суффиксе',
+    () async {
+      await fixture.close();
+      final trace = _ContinuationSelectTrace();
+      fixture = _Fixture();
+      await fixture.open(observer: trace);
+
+      const action = 1200;
+      const sideCount = 160;
+      fixture.raw.execute('BEGIN');
+      for (var node = 1; node <= action + sideCount; node++) {
+        fixture.intention(node, ready: node == action);
+      }
+      for (var node = 1; node < action; node++) {
+        fixture.relation(2000 + node, node, node + 1);
+      }
+      for (var offset = 1; offset <= sideCount; offset++) {
+        final node = action + offset;
+        fixture.relation(6000 + offset, node, action);
+        fixture.relation(
+          8000 + offset,
+          node,
+          offset == sideCount ? action + 1 : node + 1,
+        );
+      }
+      fixture.relation(9999, action, 1);
+      fixture.raw.execute('COMMIT');
+
+      final draft = ChoicePathDraftBottomStart(_intention(action));
+      trace.selects.clear();
+      final firstWatch = Stopwatch()..start();
+      final first = await fixture.page(draft, pageSize: 20);
+      firstWatch.stop();
+      expect(first.items, hasLength(20));
+      expect(first.items.first.relation.id, _relation(2000 + action - 1));
+      expect(first.nextCursor, isNotNull);
+      final firstQueries = List<_MeasuredSelect>.of(trace.selects);
+      expect(
+        firstQueries.map((select) => select.rowCount),
+        everyElement(lessThanOrEqualTo(21)),
+      );
+      final firstSelect = firstQueries
+          .where((select) => select.sql.contains('WITH visited(id)'))
+          .single;
+      expect(firstSelect.rowCount, 21);
+      expect(firstSelect.sql, isNot(contains('WITH RECURSIVE')));
+      expect(firstSelect.sql, contains('LIMIT ?'));
+      expect(firstSelect.sql, contains('source.is_archived = 0'));
+      final firstPlan = fixture.raw
+          .select(
+            'EXPLAIN QUERY PLAN ${firstSelect.sql}',
+            firstSelect.arguments,
+          )
+          .map((row) => row['detail'])
+          .join(' | ');
+      expect(firstPlan, contains('long_term_relations_related_group_order'));
+
+      trace.selects.clear();
+      final nextWatch = Stopwatch()..start();
+      final next = await fixture.page(
+        draft,
+        pageSize: 20,
+        cursor: first.nextCursor,
+      );
+      nextWatch.stop();
+      expect(next.items, hasLength(20));
+      expect(
+        trace.selects
+            .where((select) => select.sql.contains('WITH visited(id)'))
+            .single
+            .rowCount,
+        21,
+      );
+
+      final deepDraft = fixture.bottomProgress(action, [
+        for (var node = action - 1; node >= 2; node--)
+          (2000 + node, node, node + 1),
+      ]);
+      trace.selects.clear();
+      final validationWatch = Stopwatch()..start();
+      final deep = await fixture.page(deepDraft, pageSize: 1);
+      validationWatch.stop();
+      expect(deep.canConfirm, isTrue);
+      expect(deep.items.single.relation.id, _relation(2001));
+      final validationRows = trace.selects
+          .where((select) => select.sql.contains('FROM intentions WHERE id IN'))
+          .single
+          .rowCount;
+      final validatedRelations = trace.selects
+          .where(
+            (select) =>
+                select.sql.contains('FROM long_term_relations') &&
+                select.sql.contains('WHERE id IN'),
+          )
+          .single
+          .rowCount;
+      expect(validationRows, action - 1);
+      expect(validatedRelations, action - 2);
+      expect(
+        trace.selects
+            .where((select) => select.sql.contains('WITH visited(id)'))
+            .single
+            .rowCount,
+        1,
+      );
+
+      final readWatch = Stopwatch()..start();
+      final pendingRead = fixture.page(draft, pageSize: 20);
+      final queueWatch = Stopwatch()..start();
+      final pendingCommand = fixture.repository.execute(
+        EnableIntentionReadiness(_intention(action + 1)),
+      );
+      await pendingRead;
+      readWatch.stop();
+      expect(await pendingCommand, isA<GraphCommandSucceeded>());
+      queueWatch.stop();
+      final sqliteVersion = fixture.raw
+          .select('SELECT sqlite_version()')
+          .single['sqlite_version()'];
+      // ignore: avoid_print
+      print(
+        'Нижний обход: 1360 намерений, 1520 связей, входящих=161, '
+        'суффикс=1198, SQLite $sqliteVersion; '
+        'первая=${firstWatch.elapsedMicroseconds} мкс, '
+        'продолжение=${nextWatch.elapsedMicroseconds} мкс, '
+        'проверка черновика=${validationWatch.elapsedMicroseconds} мкс, '
+        'ожидание команды=${queueWatch.elapsedMicroseconds} мкс, '
+        'чтение перед командой=${readWatch.elapsedMicroseconds} мкс; '
+        'материализация первой=${firstSelect.rowCount}, '
+        'проверка узлов=$validationRows, связей=$validatedRelations; '
+        'план=$firstPlan',
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
   test('изолятное соединение не удерживает цикл событий во время поиска', () async {
     await fixture.close();
     final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
@@ -995,6 +1139,14 @@ void main() {
         (result as ChoicePathContinuationSuccess).value.items,
         hasLength(3),
       );
+      expect(trace.advancedBeforeReachabilityFinished, isTrue);
+      trace.reset();
+      final bottomResult = await repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: ChoicePathDraftBottomStart(_intention(4000)),
+        ),
+      );
+      expect(bottomResult, isA<ChoicePathContinuationSuccess>());
       expect(trace.advancedBeforeReachabilityFinished, isTrue);
       // ignore: avoid_print
       print(
