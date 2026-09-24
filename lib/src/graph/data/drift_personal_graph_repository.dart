@@ -232,10 +232,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) => switch (query) {
-    RelationGroupQuery() => _readRelationGroupPage(query),
-    DailyChoiceGroupQuery() => Future.value(
-      const RelationGroupPageFailure(RelationGroupUnavailableFailure()),
-    ),
+    RelationGroupQuery() ||
+    DailyChoiceGroupQuery() => _readRelationGroupPage(query),
     _ => Future.value(
       const RelationGroupPageFailure(RelationGroupReadValidationFailure()),
     ),
