@@ -2227,6 +2227,137 @@ abstract class AppLocalizations {
   /// **'Confirm daily choice'**
   String get dailyChoiceCreationTitle;
 
+  /// Заголовок каталога дневных выборов и вход из основной навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices'**
+  String get dailyChoiceCatalogTitle;
+
+  /// Начальная загрузка дневного каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Loading daily choices…'**
+  String get dailyChoiceCatalogLoading;
+
+  /// Фильтр по календарной дате
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get dailyChoiceCatalogDateFilter;
+
+  /// Применить фильтр даты
+  ///
+  /// In en, this message translates to:
+  /// **'Apply date'**
+  String get dailyChoiceCatalogApplyDate;
+
+  /// Некорректная дата фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid date as YYYY-MM-DD.'**
+  String get dailyChoiceCatalogDateInvalid;
+
+  /// Фильтр по выполнению
+  ///
+  /// In en, this message translates to:
+  /// **'Completion'**
+  String get dailyChoiceCatalogCompletionFilter;
+
+  /// Оба состояния выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'All states'**
+  String get dailyChoiceCatalogAllStates;
+
+  /// Фильтр невыполненных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Not completed'**
+  String get dailyChoiceCatalogIncomplete;
+
+  /// Фильтр выполненных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get dailyChoiceCatalogCompleted;
+
+  /// Вернуть все даты и оба состояния выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get dailyChoiceCatalogClearFilters;
+
+  /// Полное количество подходящих дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Total daily choices: {count}'**
+  String dailyChoiceCatalogTotalCount(int count);
+
+  /// Пустой дневной каталог
+  ///
+  /// In en, this message translates to:
+  /// **'No daily choices match the filters.'**
+  String get dailyChoiceCatalogEmpty;
+
+  /// Обновление подтверждённого снимка каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing daily choices…'**
+  String get dailyChoiceCatalogRefreshing;
+
+  /// Загрузка следующей порции
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more daily choices…'**
+  String get dailyChoiceCatalogLoadingMore;
+
+  /// Открыть следующую порцию
+  ///
+  /// In en, this message translates to:
+  /// **'Show more daily choices'**
+  String get dailyChoiceCatalogLoadMore;
+
+  /// Временная ошибка чтения дневного каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load daily choices. Try again.'**
+  String get dailyChoiceCatalogUnavailable;
+
+  /// Повреждение данных дневного каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Stored daily choice data is damaged and cannot be shown.'**
+  String get dailyChoiceCatalogCorruption;
+
+  /// Устаревший снимок каталога
+  ///
+  /// In en, this message translates to:
+  /// **'The catalog changed. Refresh it to continue.'**
+  String get dailyChoiceCatalogExpired;
+
+  /// Недопустимая позиция каталога
+  ///
+  /// In en, this message translates to:
+  /// **'The catalog position is no longer valid.'**
+  String get dailyChoiceCatalogInvalid;
+
+  /// Непредвиденная ошибка чтения дневного каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load daily choices because of an unexpected error.'**
+  String get dailyChoiceCatalogUnexpected;
+
+  /// Доступная подпись строки с порядковым номером текущей выдачи
+  ///
+  /// In en, this message translates to:
+  /// **'Choice #{number}. {phrase}. {date}. {completion}'**
+  String dailyChoiceCatalogRowLabel(
+    int number,
+    String phrase,
+    String date,
+    String completion,
+  );
+
   /// Заголовок подробностей дневного выбора
   ///
   /// In en, this message translates to:

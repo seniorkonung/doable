@@ -1281,6 +1281,84 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
 
   @override
+  String get dailyChoiceCatalogTitle => 'Дневные выборы';
+
+  @override
+  String get dailyChoiceCatalogLoading => 'Загружаем дневные выборы…';
+
+  @override
+  String get dailyChoiceCatalogDateFilter => 'Дата';
+
+  @override
+  String get dailyChoiceCatalogApplyDate => 'Применить дату';
+
+  @override
+  String get dailyChoiceCatalogDateInvalid =>
+      'Введите корректную дату в формате ГГГГ-ММ-ДД.';
+
+  @override
+  String get dailyChoiceCatalogCompletionFilter => 'Выполнение';
+
+  @override
+  String get dailyChoiceCatalogAllStates => 'Все состояния';
+
+  @override
+  String get dailyChoiceCatalogIncomplete => 'Не выполненные';
+
+  @override
+  String get dailyChoiceCatalogCompleted => 'Выполненные';
+
+  @override
+  String get dailyChoiceCatalogClearFilters => 'Сбросить фильтры';
+
+  @override
+  String dailyChoiceCatalogTotalCount(int count) {
+    return 'Всего дневных выборов: $count';
+  }
+
+  @override
+  String get dailyChoiceCatalogEmpty => 'Дневных выборов по фильтрам нет.';
+
+  @override
+  String get dailyChoiceCatalogRefreshing => 'Обновляем дневные выборы…';
+
+  @override
+  String get dailyChoiceCatalogLoadingMore => 'Загружаем ещё дневные выборы…';
+
+  @override
+  String get dailyChoiceCatalogLoadMore => 'Показать ещё дневные выборы';
+
+  @override
+  String get dailyChoiceCatalogUnavailable =>
+      'Не удалось загрузить дневные выборы. Повторите попытку.';
+
+  @override
+  String get dailyChoiceCatalogCorruption =>
+      'Сохранённые данные дневных выборов повреждены и не могут быть показаны.';
+
+  @override
+  String get dailyChoiceCatalogExpired =>
+      'Каталог изменился. Обновите его, чтобы продолжить.';
+
+  @override
+  String get dailyChoiceCatalogInvalid =>
+      'Позиция каталога больше недействительна.';
+
+  @override
+  String get dailyChoiceCatalogUnexpected =>
+      'Не удалось загрузить дневные выборы из-за непредвиденной ошибки.';
+
+  @override
+  String dailyChoiceCatalogRowLabel(
+    int number,
+    String phrase,
+    String date,
+    String completion,
+  ) {
+    return 'Выбор № $number. $phrase. $date. $completion';
+  }
+
+  @override
   String get dailyChoiceDetailsTitle => 'Дневной выбор';
 
   @override

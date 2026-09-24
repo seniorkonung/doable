@@ -1283,6 +1283,84 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Confirm daily choice';
 
   @override
+  String get dailyChoiceCatalogTitle => 'Daily choices';
+
+  @override
+  String get dailyChoiceCatalogLoading => 'Loading daily choices…';
+
+  @override
+  String get dailyChoiceCatalogDateFilter => 'Date';
+
+  @override
+  String get dailyChoiceCatalogApplyDate => 'Apply date';
+
+  @override
+  String get dailyChoiceCatalogDateInvalid =>
+      'Enter a valid date as YYYY-MM-DD.';
+
+  @override
+  String get dailyChoiceCatalogCompletionFilter => 'Completion';
+
+  @override
+  String get dailyChoiceCatalogAllStates => 'All states';
+
+  @override
+  String get dailyChoiceCatalogIncomplete => 'Not completed';
+
+  @override
+  String get dailyChoiceCatalogCompleted => 'Completed';
+
+  @override
+  String get dailyChoiceCatalogClearFilters => 'Clear filters';
+
+  @override
+  String dailyChoiceCatalogTotalCount(int count) {
+    return 'Total daily choices: $count';
+  }
+
+  @override
+  String get dailyChoiceCatalogEmpty => 'No daily choices match the filters.';
+
+  @override
+  String get dailyChoiceCatalogRefreshing => 'Refreshing daily choices…';
+
+  @override
+  String get dailyChoiceCatalogLoadingMore => 'Loading more daily choices…';
+
+  @override
+  String get dailyChoiceCatalogLoadMore => 'Show more daily choices';
+
+  @override
+  String get dailyChoiceCatalogUnavailable =>
+      'Could not load daily choices. Try again.';
+
+  @override
+  String get dailyChoiceCatalogCorruption =>
+      'Stored daily choice data is damaged and cannot be shown.';
+
+  @override
+  String get dailyChoiceCatalogExpired =>
+      'The catalog changed. Refresh it to continue.';
+
+  @override
+  String get dailyChoiceCatalogInvalid =>
+      'The catalog position is no longer valid.';
+
+  @override
+  String get dailyChoiceCatalogUnexpected =>
+      'Could not load daily choices because of an unexpected error.';
+
+  @override
+  String dailyChoiceCatalogRowLabel(
+    int number,
+    String phrase,
+    String date,
+    String completion,
+  ) {
+    return 'Choice #$number. $phrase. $date. $completion';
+  }
+
+  @override
   String get dailyChoiceDetailsTitle => 'Daily choice';
 
   @override

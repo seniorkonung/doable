@@ -5,6 +5,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
@@ -176,6 +177,14 @@ void main() {
       expect(route, isA<PageRouteInfo<void>>());
       expect(router.current.name, IntentionCatalogRoute.name);
       expect(find.byType(IntentionCatalogPage), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-open-daily-choices')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(router.current.name, DailyChoiceCatalogRoute.name);
+      expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
     },
   );
 
