@@ -5,6 +5,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -269,6 +270,14 @@ void main() {
       ),
     );
     await tester.pump();
+    final firstSelection = find.byKey(
+      ValueKey(
+        'relation-neighborhood-select-daily-${first.id.toCanonicalString()}',
+      ),
+    );
+    await _scrollTo(tester, firstSelection, settle: false);
+    await tester.tap(firstSelection);
+    await tester.pump();
     final secondRow = find.byKey(
       ValueKey(
         'relation-neighborhood-daily-row-${second.id.toCanonicalString()}',
@@ -291,10 +300,11 @@ void main() {
     expect(
       container
           .read(blockingRelationsSelectionViewModelProvider(owner))
-          .selected,
-      isEmpty,
+          .selectedByReference
+          .keys,
+      {DailyChoiceBlockingRelationReference(first.id)},
     );
-    expect(find.text('Selected relations: 0'), findsOneWidget);
+    expect(find.text('Selected relations: 1'), findsOneWidget);
     final thirdRow = find.byKey(
       ValueKey(
         'relation-neighborhood-daily-row-${third.id.toCanonicalString()}',
