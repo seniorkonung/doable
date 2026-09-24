@@ -1106,6 +1106,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get participantPickerTitle => 'Select a participant';
 
   @override
+  String get actionPickerTitle => 'Select an action';
+
+  @override
+  String get actionPickerCancel => 'Cancel action selection';
+
+  @override
+  String get actionPickerLoading => 'Loading actions…';
+
+  @override
+  String get actionPickerEmpty => 'No active actions are available.';
+
+  @override
+  String get actionPickerNoMatches => 'No actions match this title.';
+
+  @override
+  String get actionPickerUnavailable =>
+      'Actions couldn’t be loaded. Try again.';
+
+  @override
+  String get actionPickerCorruption =>
+      'Saved action data is damaged and can’t be shown.';
+
+  @override
+  String get actionPickerUnexpected =>
+      'Actions couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get actionPickerSelectHint => 'Selects this action to find its reason';
+
+  @override
+  String get actionPickerOpenDetails => 'Open action details';
+
+  @override
+  String actionPickerTotalCount(int count) {
+    return 'Total actions: $count';
+  }
+
+  @override
   String get participantPickerCancel => 'Cancel the selection';
 
   @override

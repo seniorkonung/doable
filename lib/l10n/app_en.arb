@@ -1186,6 +1186,31 @@
     "description": "Переход к архивному связанному участнику, блокирующему восстановление связи"
   },
   "participantPickerTitle": "Select a participant",
+  "actionPickerTitle": "Select an action",
+  "@actionPickerTitle": {"description": "Заголовок выбора действия для нижнего обхода"},
+  "actionPickerCancel": "Cancel action selection",
+  "@actionPickerCancel": {"description": "Отмена выбора действия"},
+  "actionPickerLoading": "Loading actions…",
+  "@actionPickerLoading": {"description": "Чтение первой порции действий"},
+  "actionPickerEmpty": "No active actions are available.",
+  "@actionPickerEmpty": {"description": "Пустой выбор активных действий"},
+  "actionPickerNoMatches": "No actions match this title.",
+  "@actionPickerNoMatches": {"description": "Пустой результат поиска действий по названию"},
+  "actionPickerUnavailable": "Actions couldn’t be loaded. Try again.",
+  "@actionPickerUnavailable": {"description": "Устранимый отказ чтения действий"},
+  "actionPickerCorruption": "Saved action data is damaged and can’t be shown.",
+  "@actionPickerCorruption": {"description": "Повреждённые данные действий"},
+  "actionPickerUnexpected": "Actions couldn’t be loaded because of an unexpected error.",
+  "@actionPickerUnexpected": {"description": "Непредвиденный отказ чтения действий"},
+  "actionPickerSelectHint": "Selects this action to find its reason",
+  "@actionPickerSelectHint": {"description": "Семантическая подсказка выбора действия"},
+  "actionPickerOpenDetails": "Open action details",
+  "@actionPickerOpenDetails": {"description": "Переход к подробностям действия"},
+  "actionPickerTotalCount": "Total actions: {count}",
+  "@actionPickerTotalCount": {
+    "description": "Точное количество доступных действий",
+    "placeholders": {"count": {"type": "int"}}
+  },
   "@participantPickerTitle": {
     "description": "Заголовок выбора участника долговременной связи"
   },
