@@ -6,6 +6,8 @@ import 'title_search_key.dart';
 
 enum IntentionScope { active, archived, all }
 
+enum IntentionReadinessFilter { all, readyOnly }
+
 enum IntentionCatalogSortField { createdAt, updatedAt }
 
 enum IntentionCatalogSortDirection { ascending, descending }
@@ -65,6 +67,7 @@ final class IntentionCatalogQueryValidationException implements Exception {
 final class IntentionCatalogQuery {
   factory IntentionCatalogQuery({
     required IntentionScope scope,
+    IntentionReadinessFilter readinessFilter = IntentionReadinessFilter.all,
     required String? titleFilter,
     required IntentionCatalogOrder order,
     required int pageSize,
@@ -79,6 +82,7 @@ final class IntentionCatalogQuery {
     final normalizedFilter = _normalizeFilter(titleFilter);
     return IntentionCatalogQuery._(
       scope: scope,
+      readinessFilter: readinessFilter,
       titleFilter: normalizedFilter,
       order: order,
       pageSize: pageSize,
@@ -88,6 +92,7 @@ final class IntentionCatalogQuery {
 
   const IntentionCatalogQuery._({
     required this.scope,
+    required this.readinessFilter,
     required this.titleFilter,
     required this.order,
     required this.pageSize,
@@ -99,6 +104,7 @@ final class IntentionCatalogQuery {
   static const maxTitleFilterLength = 255;
 
   final IntentionScope scope;
+  final IntentionReadinessFilter readinessFilter;
   final IntentionTitleFilter? titleFilter;
   final IntentionCatalogOrder order;
   final int pageSize;
@@ -112,10 +118,15 @@ final class IntentionCatalogQuery {
         summary.archiveState == IntentionArchiveState.archived,
       IntentionScope.all => true,
     };
-    if (!matchesScope || titleFilter == null) {
-      return matchesScope;
+    final matchesReadiness = switch (readinessFilter) {
+      IntentionReadinessFilter.all => true,
+      IntentionReadinessFilter.readyOnly =>
+        summary.readiness == IntentionReadiness.ready,
+    };
+    if (!matchesScope || !matchesReadiness) {
+      return false;
     }
-    return titleFilter!.matchesTitle(summary.title);
+    return titleFilter?.matchesTitle(summary.title) ?? true;
   }
 
   int compare(IntentionSummary left, IntentionSummary right) {

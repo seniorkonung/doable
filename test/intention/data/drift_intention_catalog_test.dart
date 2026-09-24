@@ -43,6 +43,173 @@ void main() {
 
   tearDown(() => database.close());
 
+  test('отбирает действия в SQL до порции и считает только совпадения', () async {
+    for (var index = 1; index <= 60; index++) {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-${index.toRadixString(16).padLeft(12, '0')}',
+        title: 'Действие %_ без готовности',
+        createdAt: DateTime.utc(2026, 9, 2, 11, index),
+      );
+    }
+    for (final (suffix, createdHour, updatedHour) in [
+      ('101', 8, 12),
+      ('102', 9, 10),
+      ('103', 10, 11),
+    ]) {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000$suffix',
+        title: 'Действие %_ с одинаковым названием',
+        isActionReady: true,
+        createdAt: DateTime.utc(2026, 9, 2, createdHour),
+        updatedAt: DateTime.utc(2026, 9, 2, updatedHour),
+      );
+    }
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000104',
+      title: 'Действие %_ в архиве',
+      isActionReady: true,
+      isArchived: true,
+      createdAt: DateTime.utc(2026, 9, 2, 13),
+    );
+
+    final cases = <(IntentionCatalogOrder, List<String>)>[
+      (IntentionCatalogOrder.createdAtAscending, ['101', '102', '103']),
+      (IntentionCatalogOrder.createdAtDescending, ['103', '102', '101']),
+      (IntentionCatalogOrder.updatedAtAscending, ['102', '103', '101']),
+      (IntentionCatalogOrder.updatedAtDescending, ['101', '103', '102']),
+    ];
+    for (final (order, expectedSuffixes) in cases) {
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: '%_',
+        order: order,
+        pageSize: 1,
+      );
+      trace.statements.clear();
+      final first = _firstPage(await repository.getCatalogPage(query));
+      expect(first.totalCount, 3);
+      expect(first.items, hasLength(1));
+      expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
+      expect(
+        trace.statements.where(_isCatalogCountStatement).single,
+        contains('is_action_ready'),
+      );
+      expect(
+        trace.statements.where((sql) => sql.contains('LIMIT')).single,
+        contains('is_action_ready'),
+      );
+      final ids = [first.items.single.id.toCanonicalString()];
+      var cursor = first.nextCursor;
+      while (cursor != null) {
+        final page = _continuationPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: query.scope,
+              readinessFilter: query.readinessFilter,
+              titleFilter: '%_',
+              order: query.order,
+              pageSize: query.pageSize,
+              cursor: cursor,
+            ),
+          ),
+        );
+        ids.addAll(page.items.map((item) => item.id.toCanonicalString()));
+        cursor = page.nextCursor;
+      }
+      expect(
+        ids,
+        expectedSuffixes.map(
+          (suffix) => '018f0b5d-6b2e-7c80-8000-000000000$suffix',
+        ),
+      );
+    }
+  });
+
+  test('курсор привязан к готовности до SQL', () async {
+    for (final suffix in ['201', '202']) {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000$suffix',
+        title: 'Действие $suffix',
+        isActionReady: true,
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+    }
+    final cursor = _firstPage(
+      await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          readinessFilter: IntentionReadinessFilter.readyOnly,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtAscending,
+          pageSize: 1,
+        ),
+      ),
+    ).nextCursor!;
+    trace.statements.clear();
+
+    final result = await repository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtAscending,
+        pageSize: 1,
+        cursor: cursor,
+      ),
+    );
+
+    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+    expect(
+      (result as ResultFailure<IntentionCatalogPage>).failure,
+      isA<IntentionValidationFailure>(),
+    );
+    expect(trace.statements, isEmpty);
+  });
+
+  test(
+    'снимки изменения готовности сохраняют точную принадлежность каталогу',
+    () async {
+      const id = '018f0b5d-6b2e-7c80-8000-000000000301';
+      await _insertIntention(
+        database,
+        id: id,
+        title: 'Пройти по Straße',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: 'STRASSE',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+      );
+      expect(_firstPage(await repository.getCatalogPage(query)).totalCount, 0);
+
+      final result = await repository.execute(
+        EnableIntentionReadiness(_id(id)),
+      );
+      expect(
+        result,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      final mutation =
+          (result
+                  as ResultSuccess<
+                    ConfirmedGraphResult<IntentionCommandSuccess>
+                  >)
+              .value
+              .value
+              .catalogMutation;
+      expect(mutation.before!.matches(query), isFalse);
+      expect(mutation.after!.matches(query), isTrue);
+      expect(_firstPage(await repository.getCatalogPage(query)).totalCount, 1);
+    },
+  );
+
   test('не запрашивает SQLite для недопустимого Unicode фильтра', () {
     expect(
       () => IntentionCatalogQuery(
@@ -1392,6 +1559,7 @@ Future<void> _insertIntention(
   required String id,
   required String title,
   String? description,
+  bool isActionReady = false,
   bool isArchived = false,
   required DateTime createdAt,
   DateTime? updatedAt,
@@ -1402,6 +1570,7 @@ Future<void> _insertIntention(
         id: id,
         title: title,
         description: Value(description),
+        isActionReady: Value(isActionReady),
         isArchived: Value(isArchived),
         createdAt: createdAt.microsecondsSinceEpoch,
         updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,

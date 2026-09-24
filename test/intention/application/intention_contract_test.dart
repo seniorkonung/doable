@@ -160,6 +160,36 @@ void main() {
       );
     });
 
+    test(
+      'по умолчанию охватывает любую готовность и отбирает только действия',
+      () {
+        final action = _summary(
+          id: '00000000-0000-4000-8000-000000000011',
+          readiness: IntentionReadiness.ready,
+        );
+        final ordinary = _summary(id: '00000000-0000-4000-8000-000000000012');
+        final archivedAction = _summary(
+          id: '00000000-0000-4000-8000-000000000013',
+          readiness: IntentionReadiness.ready,
+          archiveState: IntentionArchiveState.archived,
+        );
+        final usualQuery = _query();
+        final actionQuery = IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          readinessFilter: IntentionReadinessFilter.readyOnly,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        );
+
+        expect(usualQuery.readinessFilter, IntentionReadinessFilter.all);
+        expect(usualQuery.includes(ordinary), isTrue);
+        expect(actionQuery.includes(action), isTrue);
+        expect(actionQuery.includes(ordinary), isFalse);
+        expect(actionQuery.includes(archivedAction), isFalse);
+      },
+    );
+
     test('отклоняет выходящие за границы размер порции и фильтр', () {
       expect(
         () => _query(pageSize: 0),
@@ -692,6 +722,7 @@ IntentionCatalogQuery _order(
 IntentionSummary _summary({
   required String id,
   String title = 'Здоровье',
+  IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   DateTime? createdAt,
   DateTime? updatedAt,
@@ -703,7 +734,7 @@ IntentionSummary _summary({
     id: _intentionId(id),
     title: title,
     hasDescription: false,
-    readiness: IntentionReadiness.notReady,
+    readiness: readiness,
     archiveState: archiveState,
     activeRelationCount: 0,
     createdAt: created,
