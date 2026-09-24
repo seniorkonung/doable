@@ -2227,6 +2227,126 @@ abstract class AppLocalizations {
   /// **'Confirm daily choice'**
   String get dailyChoiceCreationTitle;
 
+  /// Заголовок подробностей дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice'**
+  String get dailyChoiceDetailsTitle;
+
+  /// Загрузка подробностей дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Loading daily choice…'**
+  String get dailyChoiceDetailsLoading;
+
+  /// Дневной выбор отсутствует
+  ///
+  /// In en, this message translates to:
+  /// **'This daily choice no longer exists.'**
+  String get dailyChoiceDetailsNotFound;
+
+  /// Временный отказ чтения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this daily choice. Try again.'**
+  String get dailyChoiceDetailsUnavailable;
+
+  /// Повреждённый сохранённый путь
+  ///
+  /// In en, this message translates to:
+  /// **'The stored path is damaged and cannot be shown.'**
+  String get dailyChoiceDetailsCorruption;
+
+  /// Неизвестный отказ чтения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this daily choice because of an unexpected error.'**
+  String get dailyChoiceDetailsUnexpected;
+
+  /// Формулировка дневной связи из текущих названий
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, today I {selected}'**
+  String dailyChoiceDetailsPhrase(String source, String selected);
+
+  /// Дата дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice date: {date}'**
+  String dailyChoiceDetailsDate(String date);
+
+  /// Дневной выбор выполнен
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get dailyChoiceDetailsCompleted;
+
+  /// Дневной выбор не выполнен
+  ///
+  /// In en, this message translates to:
+  /// **'Not completed'**
+  String get dailyChoiceDetailsNotCompleted;
+
+  /// Описание дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get dailyChoiceDetailsDescription;
+
+  /// Заголовок сохранённого пути
+  ///
+  /// In en, this message translates to:
+  /// **'Stored path'**
+  String get dailyChoiceDetailsPath;
+
+  /// Роль исходного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get dailyChoiceDetailsSource;
+
+  /// Роль промежуточного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate intention'**
+  String get dailyChoiceDetailsIntermediate;
+
+  /// Роль конечного выбранного действия
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action'**
+  String get dailyChoiceDetailsSelectedAction;
+
+  /// Архивное состояние участника или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get dailyChoiceDetailsArchived;
+
+  /// Активное состояние участника или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get dailyChoiceDetailsActive;
+
+  /// Готовность конечного действия
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for action'**
+  String get dailyChoiceDetailsReady;
+
+  /// Утрата готовности конечного действия
+  ///
+  /// In en, this message translates to:
+  /// **'Not ready for action'**
+  String get dailyChoiceDetailsNotReady;
+
+  /// Порядковый номер перехода пути
+  ///
+  /// In en, this message translates to:
+  /// **'Transition {number}'**
+  String dailyChoiceDetailsStep(int number);
+
   /// Заголовок подтверждаемого пути
   ///
   /// In en, this message translates to:

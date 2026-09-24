@@ -1281,6 +1281,76 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
 
   @override
+  String get dailyChoiceDetailsTitle => 'Дневной выбор';
+
+  @override
+  String get dailyChoiceDetailsLoading => 'Загружаем дневной выбор…';
+
+  @override
+  String get dailyChoiceDetailsNotFound =>
+      'Дневной выбор больше не существует.';
+
+  @override
+  String get dailyChoiceDetailsUnavailable =>
+      'Не удалось загрузить дневной выбор. Повторите попытку.';
+
+  @override
+  String get dailyChoiceDetailsCorruption =>
+      'Сохранённый путь повреждён и не может быть показан.';
+
+  @override
+  String get dailyChoiceDetailsUnexpected =>
+      'Не удалось загрузить дневной выбор из-за непредвиденной ошибки.';
+
+  @override
+  String dailyChoiceDetailsPhrase(String source, String selected) {
+    return 'Чтобы $source, я сегодня $selected';
+  }
+
+  @override
+  String dailyChoiceDetailsDate(String date) {
+    return 'Дата дневного выбора: $date';
+  }
+
+  @override
+  String get dailyChoiceDetailsCompleted => 'Выполнено';
+
+  @override
+  String get dailyChoiceDetailsNotCompleted => 'Не выполнено';
+
+  @override
+  String get dailyChoiceDetailsDescription => 'Описание';
+
+  @override
+  String get dailyChoiceDetailsPath => 'Сохранённый путь';
+
+  @override
+  String get dailyChoiceDetailsSource => 'Основание';
+
+  @override
+  String get dailyChoiceDetailsIntermediate => 'Промежуточное намерение';
+
+  @override
+  String get dailyChoiceDetailsSelectedAction => 'Выбранное действие';
+
+  @override
+  String get dailyChoiceDetailsArchived => 'Архивировано';
+
+  @override
+  String get dailyChoiceDetailsActive => 'Активно';
+
+  @override
+  String get dailyChoiceDetailsReady => 'Готово к действию';
+
+  @override
+  String get dailyChoiceDetailsNotReady => 'Не готово к действию';
+
+  @override
+  String dailyChoiceDetailsStep(int number) {
+    return 'Переход $number';
+  }
+
+  @override
   String get dailyChoiceCreationPath => 'Подтверждаемый путь';
 
   @override

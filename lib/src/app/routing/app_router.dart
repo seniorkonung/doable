@@ -10,6 +10,7 @@ final class AppRouter extends RootStackRouter {
     AutoRoute(page: IntentionEditorRoute.page),
     AutoRoute(page: IntentionDetailsRoute.page),
     AutoRoute(page: ChoicePathRoute.page),
+    AutoRoute(page: DailyChoiceDetailsRoute.page),
     AutoRoute(page: RelationDetailsRoute.page),
     AutoRoute(page: RelationEditorRoute.page),
     AutoRoute(page: RelationParticipantPickerRoute.page),
