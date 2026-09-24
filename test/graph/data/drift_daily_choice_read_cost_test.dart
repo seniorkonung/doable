@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -274,6 +275,62 @@ _MeasuredSelect _boundedPage(
   return rows.single;
 }
 
+_MeasuredSelect _boundedSuggestions(
+  List<_MeasuredSelect> selects, {
+  required String participantColumn,
+  required String participantId,
+  required int expectedSteps,
+}) {
+  final candidates = selects
+      .where(
+        (select) =>
+            select.sql.contains('FROM daily_choices') &&
+            select.sql.contains('WHERE $participantColumn = ?'),
+      )
+      .toList();
+  expect(candidates, hasLength(1));
+  final candidate = candidates.single;
+  expect(candidate.sql, contains('ORDER BY creation_sequence DESC'));
+  expect(candidate.sql, contains('LIMIT ?'));
+  expect(candidate.arguments, [participantId, 20]);
+  expect(candidate.rows, 20);
+
+  final choices = _matching(selects, 'FROM daily_choices WHERE id = ?');
+  expect(choices, hasLength(20));
+  expect(choices.map((select) => select.rows), everyElement(1));
+  expect(
+    choices.map((select) => select.arguments.single).toSet(),
+    hasLength(20),
+  );
+  expect(
+    selects.where((select) => select.sql.contains('FROM daily_choices')),
+    hasLength(21),
+  );
+  final steps = _matching(
+    selects,
+    'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+  );
+  expect(steps, hasLength(20));
+  expect(steps.fold<int>(0, (sum, select) => sum + select.rows), expectedSteps);
+  expect(selects.indexOf(candidate), lessThan(selects.indexOf(choices.first)));
+  expect(selects.indexOf(candidate), lessThan(selects.indexOf(steps.first)));
+  final relations = selects.where(
+    (select) =>
+        select.sql.contains('FROM long_term_relations') &&
+        select.sql.contains('WHERE id IN'),
+  );
+  expect(relations, hasLength(20));
+  expect(
+    relations.fold<int>(0, (sum, select) => sum + select.rows),
+    expectedSteps,
+  );
+  expect(
+    selects.where((select) => select.sql.contains('daily_choice_path_steps')),
+    hasLength(20),
+  );
+  return candidate;
+}
+
 void main() {
   late _Fixture fixture;
 
@@ -282,6 +339,77 @@ void main() {
     await fixture.open();
   });
   tearDown(() => fixture.close());
+
+  test('подсказки обоих направлений читают только двадцать кандидатов и целый длинный путь', () async {
+    fixture.trace.clear();
+    final topWatch = Stopwatch()..start();
+    final top = (await fixture.repository.getChoicePathSuggestions(
+      ChoicePathSuggestionsForSource(_intention(1)),
+    ) as ChoicePathSuggestionsSuccess).value;
+    topWatch.stop();
+    expect(top.items, hasLength(2));
+    expect(top.items.first.originChoiceId, durabilityChoice(10400));
+    expect(top.items.first.path, hasLength(_pathLength));
+    expect(top.items.last.originChoiceId, durabilityChoice(10399));
+    expect(
+      fixture.raw
+          .select('SELECT COUNT(*) AS count FROM daily_choices')
+          .single['count'],
+      _catalogChoices + _otherGroupChoices,
+    );
+    final topCandidate = _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'source_intention_id',
+      participantId: _uuid(1),
+      expectedSteps: _pathLength + 19,
+    );
+    final topPlan = fixture.plan(topCandidate).join(' | ');
+    expect(topPlan, contains('daily_choices_source_recent'));
+
+    fixture._addRelation(902, 1, 201);
+    fixture._addChoice(12001, 1, 201, [902], stepBase: 33000);
+    for (var number = 12002; number <= 12021; number++) {
+      fixture._addChoice(number, 200, 201, [901], stepBase: number + 21000);
+    }
+    fixture.trace.clear();
+    final bottomWatch = Stopwatch()..start();
+    final bottom = (await fixture.repository.getChoicePathSuggestions(
+      ChoicePathSuggestionsForAction(_intention(201)),
+    ) as ChoicePathSuggestionsSuccess).value;
+    bottomWatch.stop();
+    expect(bottom.items, hasLength(1));
+    expect(bottom.items.single.originChoiceId, durabilityChoice(12021));
+    expect(
+      fixture.raw.select(
+        'SELECT long_term_relation_id FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [_uuid(12001)],
+      ).single['long_term_relation_id'],
+      _uuid(902),
+    );
+    final bottomCandidate = _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'selected_intention_id',
+      participantId: _uuid(201),
+      expectedSteps: 20,
+    );
+    final bottomPlan = fixture.plan(bottomCandidate).join(' | ');
+    expect(bottomPlan, contains('daily_choices_selected_recent'));
+    expect(
+      fixture.raw
+          .select('SELECT COUNT(*) AS count FROM daily_choices')
+          .single['count'],
+      _catalogChoices + _otherGroupChoices + 21,
+    );
+
+    // ignore: avoid_print
+    print(
+      'Подсказки 4.3: история=${_catalogChoices + _otherGroupChoices + 21}, '
+      'кандидатов=20, длина пути=$_pathLength; '
+      'сверху=${topWatch.elapsedMicroseconds} мкс, '
+      'снизу=${bottomWatch.elapsedMicroseconds} мкс; '
+      'план сверху=$topPlan; план снизу=$bottomPlan',
+    );
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
   test('каталог и дневная группа читают только выбранные порции и пересобирают загруженную часть', () async {
     final catalogWatch = Stopwatch()..start();
