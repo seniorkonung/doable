@@ -6,14 +6,24 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   ) async {
     final stopwatch = Stopwatch()..start();
     final isContinuation = query.cursor != null;
-    _recordDiagnostics(
-      RelationGroupPageReadDiagnosticsEvent(
-        pageSize: query.pageSize,
-        isContinuation: isContinuation,
-        requiresNewSnapshot: false,
-        status: const DiagnosticsStarted(),
-      ),
-    );
+    void record(DiagnosticsStatus status, {bool requiresNewSnapshot = false}) {
+      _recordDiagnostics(switch (query) {
+        DailyChoiceGroupQuery() => DailyChoiceGroupPageReadDiagnosticsEvent(
+          pageSize: query.pageSize,
+          isContinuation: isContinuation,
+          requiresNewSnapshot: requiresNewSnapshot,
+          status: status,
+        ),
+        _ => RelationGroupPageReadDiagnosticsEvent(
+          pageSize: query.pageSize,
+          isContinuation: isContinuation,
+          requiresNewSnapshot: requiresNewSnapshot,
+          status: status,
+        ),
+      });
+    }
+
+    record(const DiagnosticsStarted());
 
     try {
       final page = await _sequencer.run(
@@ -21,27 +31,16 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
           () => _readRelationGroupPageOnCurrentSnapshot(query),
         ),
       );
-      _recordDiagnostics(
-        RelationGroupPageReadDiagnosticsEvent(
-          pageSize: query.pageSize,
-          isContinuation: isContinuation,
-          requiresNewSnapshot: false,
-          status: DiagnosticsSucceeded(stopwatch.elapsed),
-        ),
-      );
+      record(DiagnosticsSucceeded(stopwatch.elapsed));
       return RelationGroupPageSuccess(page);
     } on Object catch (error) {
       final failure = _classifyRelationGroupReadFailure(error, query);
-      _recordDiagnostics(
-        RelationGroupPageReadDiagnosticsEvent(
-          pageSize: query.pageSize,
-          isContinuation: isContinuation,
-          requiresNewSnapshot: failure is RelationGroupSnapshotExpired,
-          status: DiagnosticsFailed(
-            duration: stopwatch.elapsed,
-            code: _relationGroupDiagnosticsFailureCode(failure),
-          ),
+      record(
+        DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: _relationGroupDiagnosticsFailureCode(failure),
         ),
+        requiresNewSnapshot: failure is RelationGroupSnapshotExpired,
       );
       return RelationGroupPageFailure(failure);
     }

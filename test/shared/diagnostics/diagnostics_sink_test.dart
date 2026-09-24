@@ -24,6 +24,7 @@ void main() {
       expect(messages.map(jsonDecode), [
         {
           'operation': 'choicePathContinuationRead',
+          'stage': 'read',
           'outcome': 'failed',
           'durationMicros': 4000,
           'failureCode': 'conflict',
@@ -49,6 +50,12 @@ void main() {
               duration: Duration(milliseconds: 1),
               code: DiagnosticsFailureCode.corruption,
             ),
+          ),
+          const DailyChoiceGroupPageReadDiagnosticsEvent(
+            pageSize: 50,
+            isContinuation: false,
+            requiresNewSnapshot: false,
+            status: DiagnosticsSucceeded(Duration(milliseconds: 2)),
           ),
           const DailyChoicePathValidationDiagnosticsEvent(
             commandType: DailyChoicePathCommandDiagnosticsType.create,
@@ -91,6 +98,15 @@ void main() {
             'outcome': 'failed',
             'durationMicros': 1000,
             'failureCode': 'corruption',
+          },
+          {
+            'operation': 'dailyChoiceGroupPageRead',
+            'stage': 'read',
+            'pageSize': 50,
+            'isContinuation': false,
+            'requiresNewSnapshot': false,
+            'outcome': 'succeeded',
+            'durationMicros': 2000,
           },
           {
             'operation': 'dailyChoicePathValidation',
@@ -205,6 +221,7 @@ void main() {
         },
         {
           'operation': 'relationGroupPageRead',
+          'stage': 'read',
           'outcome': 'failed',
           'durationMicros': 4000,
           'failureCode': 'conflict',
