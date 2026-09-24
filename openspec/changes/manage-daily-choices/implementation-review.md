@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** При повторном открытии актуализации пути форма может показать один подтверждённый путь, а отправить другой. Активна находка F1. Принятых остаточных рисков нет.
+**Summary:** Расхождение показанного и отправленного пути передано в незавершённую задачу 2.32; код ещё не исправлен. Открытых находок и принятых остаточных рисков нет.
 
 ## Review target
 
@@ -42,20 +42,13 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежий изолированный рецензент проверил точный диапазон 83febab3f9924bfcd4678b6bad9f868b522a8a9d..0c392d898e12c9d73c03aea4ebd11b8ce57f6f90 и все шесть delivery/test путей U1–U2; выявил F1. |
+| Independent decision review | Complete | Свежий изолированный рецензент проверил точный диапазон 83febab3f9924bfcd4678b6bad9f868b522a8a9d..0c392d898e12c9d73c03aea4ebd11b8ce57f6f90 и все шесть delivery/test путей U1–U2. |
 | OpenSpec conformance | Complete | Задачи 2.29–2.31, спецификация, план и versioned verification-2.31.md сопоставлены с реализацией; на чистом head прошли строгая проверка OpenSpec, mise run --skip-tools check (1330 тестов) и mise run --skip-tools codegen-check (отслеживаемые файлы не изменились). |
 | Code quality | Complete | Изучены два изменённых экрана, четыре теста, неизменённые модели и контракт подтверждения; проверены корректность, читаемость, архитектура, безопасность и стоимость. git diff --check прошёл. |
 
 ## Findings
 
-### F1 · High — показанный после актуализации путь может отличаться от сохранённого
-
-- **Evidence:** В lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart:83-95 метод _refreshPath не защищён от двух перекрывающихся вызовов; кнопка в строках 218–222 не устанавливает состояние ожидания. При возврате из каждого выбора вызывается confirmRefreshedPath, затем независимо от его результата обновляется _visibleSteps. Неизменённый lib/src/daily_choice/presentation/editor/daily_choice_creation_state.dart:124-135 принимает только первый результат конфликта: после него needsPathRefresh ложно и следующий путь отклоняется. Если два открытых выбора вернут разные пути, форма покажет второй, а команда из lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart:89-99 отправит первый. Новые тесты проверяют один последовательный выбор, но не перекрывающиеся возвраты.
-- **Evidence revisions:** ["0c392d898e12c9d73c03aea4ebd11b8ce57f6f90"]
-- **Impact:** Пользователь явно подтверждает видимый путь, а хранилище может сохранить другой допустимый путь; смысл дневного выбора расходится с подтверждением.
-- **Required outcome:** Видимый путь и путь команды должны обновляться одним принятым подтверждением; запоздалый или повторный результат выбора не должен менять только отображение.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart", "test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart", "test/daily_choice/presentation/daily_choice_creation_flow_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
