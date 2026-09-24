@@ -2812,6 +2812,66 @@ abstract class AppLocalizations {
   /// **'Return to the path and refresh it'**
   String get dailyChoiceCreationRefreshPath;
 
+  /// Заголовок отдельного подтверждения замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm path replacement'**
+  String get dailyChoiceReplaceTitle;
+
+  /// Подготовка подтверждения после чтения выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the new path confirmation…'**
+  String get dailyChoiceReplacePreparing;
+
+  /// Заменяемый дневной выбор
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice to replace'**
+  String get dailyChoiceReplaceCurrent;
+
+  /// Заголовок полного предлагаемого пути
+  ///
+  /// In en, this message translates to:
+  /// **'New path from source to action'**
+  String get dailyChoiceReplaceNewPath;
+
+  /// Пустое описание заменяемого выбора
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get dailyChoiceReplaceNoDescription;
+
+  /// Независимые поля не меняются при замене пути
+  ///
+  /// In en, this message translates to:
+  /// **'The date, description, and completion will stay unchanged when the path is replaced.'**
+  String get dailyChoiceReplaceFieldsPreserved;
+
+  /// Сохранение выполнения при смене действия
+  ///
+  /// In en, this message translates to:
+  /// **'Completion stays on even if a different action is selected.'**
+  String get dailyChoiceReplaceCompletionPreserved;
+
+  /// Явное подтверждение только замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'Replace path only'**
+  String get dailyChoiceReplaceConfirm;
+
+  /// Ожидание результата команды замены
+  ///
+  /// In en, this message translates to:
+  /// **'Replacing path…'**
+  String get dailyChoiceReplaceSubmitting;
+
+  /// Возврат к выбору нового пути после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Return to path selection'**
+  String get dailyChoiceReplaceChooseAgain;
+
   /// Переход от выбранного действия к форме подтверждения
   ///
   /// In en, this message translates to:
