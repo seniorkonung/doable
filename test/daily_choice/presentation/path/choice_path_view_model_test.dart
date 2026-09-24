@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_state.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -19,6 +20,229 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'нижний обход сохраняет действие и направляет видимый путь к нему',
+    () async {
+      final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+      addTearDown(harness.dispose);
+      expect(harness.state.draft, isA<ChoicePathDraftBottomStart>());
+      harness.repository.completePage(0, [_edge(2, 3, 1)]);
+      await pumpEventQueue();
+      expect(harness.state.confirmedPath, isNull);
+      expect(harness.model.selectContinuation(_relation(1)), isTrue);
+      harness.repository.completePage(1, [_edge(1, 2, 2)], ready: false);
+      await pumpEventQueue();
+
+      final first = harness.state as ChoicePathData;
+      expect(first.canConfirm, isTrue);
+      expect(first.confirmedPath!.steps.first.sourceIntentionId, _intention(2));
+      expect(first.confirmedPath!.steps.last.relatedIntentionId, _intention(3));
+      expect(harness.model.selectContinuation(_relation(2)), isTrue);
+      harness.repository.completePage(2, [], ready: false);
+      await pumpEventQueue();
+
+      final complete = harness.state as ChoicePathEmpty;
+      expect(complete.canConfirm, isTrue);
+      expect(complete.draft.startingIntentionId, _intention(3));
+      expect(complete.visibleSteps.map((step) => step.relation.id), [
+        _relation(2),
+        _relation(1),
+      ]);
+      expect(complete.confirmedPath!.steps.map((step) => step.relationId), [
+        _relation(2),
+        _relation(1),
+      ]);
+      expect(harness.repository.commandCount, 0);
+    },
+  );
+
+  test(
+    'нижний возврат меняет основание и отбрасывает позднюю порцию',
+    () async {
+      final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+      addTearDown(harness.dispose);
+      harness.repository.completePage(0, [_edge(2, 3, 1)]);
+      await pumpEventQueue();
+      harness.model.selectContinuation(_relation(1));
+      harness.repository.completePage(1, [_edge(1, 2, 2)], cursor: _Cursor());
+      await pumpEventQueue();
+      final latePage = harness.model.loadMore();
+      harness.model.selectContinuation(_relation(2));
+      harness.repository.completePage(3, [], ready: false);
+      await pumpEventQueue();
+      expect(harness.model.backToStep(1), isTrue);
+      harness.repository.completePage(4, [_edge(4, 2, 3)]);
+      await pumpEventQueue();
+      harness.repository.completePage(2, [_edge(5, 1, 4)]);
+      await latePage;
+      expect(harness.model.selectContinuation(_relation(4)), isFalse);
+      expect(harness.model.selectContinuation(_relation(3)), isTrue);
+      harness.repository.completePage(5, [], ready: false);
+      await pumpEventQueue();
+
+      final choice = harness.state as ChoicePathEmpty;
+      expect(choice.visibleSteps.map((step) => step.relation.id), [
+        _relation(3),
+        _relation(1),
+      ]);
+      expect(
+        choice.confirmedPath!.steps.first.sourceIntentionId,
+        _intention(4),
+      );
+      expect(
+        choice.confirmedPath!.steps.last.relatedIntentionId,
+        _intention(3),
+      );
+      expect(harness.model.backToStep(0), isTrue);
+      expect(harness.state.draft, isA<ChoicePathDraftBottomStart>());
+      expect(harness.state.confirmedPath, isNull);
+      expect(harness.state.visibleSteps, isEmpty);
+    },
+  );
+
+  test(
+    'нижний обход отклоняет повтор действия и неверное направление',
+    () async {
+      final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+      addTearDown(harness.dispose);
+      harness.repository.completePage(0, [_edge(3, 2, 1)]);
+      await pumpEventQueue();
+      expect(harness.state, isA<ChoicePathFailure>());
+      expect(harness.model.selectContinuation(_relation(1)), isFalse);
+
+      final refreshed = harness.model.refresh();
+      expect(harness.repository.queries, hasLength(1));
+      await refreshed;
+    },
+  );
+
+  test('нижний обход не возвращается к уже посещённому действию', () async {
+    final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+    addTearDown(harness.dispose);
+    harness.repository.completePage(0, [_edge(2, 3, 1)]);
+    await pumpEventQueue();
+    harness.model.selectContinuation(_relation(1));
+    harness.repository.completePage(1, [_edge(3, 2, 2)]);
+    await pumpEventQueue();
+    expect(harness.state, isA<ChoicePathFailure>());
+    expect(harness.model.selectContinuation(_relation(2)), isFalse);
+  });
+
+  test('нижний возврат к началу отбрасывает ожидаемый ответ', () async {
+    final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+    addTearDown(harness.dispose);
+    harness.repository.completePage(0, [_edge(2, 3, 1)]);
+    await pumpEventQueue();
+    harness.model.selectContinuation(_relation(1));
+    expect(harness.model.backToStep(0), isTrue);
+    harness.repository.completePage(2, [_edge(4, 3, 3)]);
+    await pumpEventQueue();
+    harness.repository.completePage(1, [_edge(1, 2, 2)]);
+    await pumpEventQueue();
+    expect(harness.state.confirmedPath, isNull);
+    expect(harness.model.selectContinuation(_relation(2)), isFalse);
+    expect(harness.model.selectContinuation(_relation(3)), isTrue);
+  });
+
+  test('нижний обход требует новой основы после изменения графа', () async {
+    final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+    addTearDown(harness.dispose);
+    harness.repository.completePage(0, [_edge(2, 3, 1)], revision: 1);
+    await pumpEventQueue();
+    harness.model.selectContinuation(_relation(1));
+    harness.repository.completePage(1, [], revision: 1);
+    await pumpEventQueue();
+    expect(harness.state.confirmedPath, isNotNull);
+
+    harness.repository.emitRevision(2, ready: true);
+    await pumpEventQueue();
+    expect(harness.state, isA<ChoicePathConflict>());
+    expect(harness.state.confirmedPath, isNull);
+    final refresh = harness.model.refresh();
+    harness.repository.completeFailure(
+      2,
+      const ChoicePathContinuationSnapshotExpired(),
+    );
+    await refresh;
+    expect(harness.state, isA<ChoicePathConflict>());
+
+    expect(harness.model.backToStep(0), isTrue);
+    harness.repository.completePage(3, [
+      _edge(4, 3, 2, type: LongTermRelationType.can),
+    ], revision: 2);
+    await pumpEventQueue();
+    expect(harness.model.selectContinuation(_relation(1)), isFalse);
+    expect(harness.model.selectContinuation(_relation(2)), isTrue);
+    harness.repository.completePage(4, [], revision: 2);
+    await pumpEventQueue();
+    expect(
+      harness.state.confirmedPath!.steps.single.type,
+      LongTermRelationType.can,
+    );
+  });
+
+  test(
+    'утрата готовности фиксированного действия запрещает подтверждение',
+    () async {
+      final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+      addTearDown(harness.dispose);
+      harness.repository.completePage(0, [_edge(2, 3, 1)]);
+      await pumpEventQueue();
+      harness.model.selectContinuation(_relation(1));
+      harness.repository.completePage(1, []);
+      await pumpEventQueue();
+      expect(harness.state.confirmedPath, isNotNull);
+
+      harness.repository.emitRevision(1, ready: false);
+      await pumpEventQueue();
+      expect(harness.state, isA<ChoicePathConflict>());
+      expect(harness.state.confirmedPath, isNull);
+    },
+  );
+
+  test(
+    'нижний обход различает пустое начало, отсутствие и ошибку чтения',
+    () async {
+      final empty = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+      addTearDown(empty.dispose);
+      expect(empty.state, isA<ChoicePathLoading>());
+      empty.repository.completePage(0, []);
+      await pumpEventQueue();
+      expect(empty.state, isA<ChoicePathEmpty>());
+      expect(empty.state.confirmedPath, isNull);
+
+      final missing = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+      addTearDown(missing.dispose);
+      missing.repository.completeFailure(
+        0,
+        const ChoicePathContinuationIntentionNotFoundFailure(),
+      );
+      await pumpEventQueue();
+      expect(missing.state, isA<ChoicePathNotFound>());
+
+      final unavailable = _Harness(
+        direction: ChoicePathDraftDirection.bottomUp,
+      );
+      addTearDown(unavailable.dispose);
+      unavailable.repository.completeFailure(
+        0,
+        const ChoicePathContinuationUnavailableFailure(),
+      );
+      await pumpEventQueue();
+      expect(unavailable.state, isA<ChoicePathFailure>());
+      expect((unavailable.state as ChoicePathFailure).canRetry, isTrue);
+    },
+  );
+
+  test('закрытая нижняя сессия не принимает поздний ответ', () async {
+    final harness = _Harness(direction: ChoicePathDraftDirection.bottomUp);
+    final repository = harness.repository;
+    harness.dispose();
+    repository.completePage(0, [_edge(2, 3, 1)]);
+    await pumpEventQueue();
+    expect(repository.commandCount, 0);
+  });
+
   test(
     'возврат сохраняет префикс и поздний ответ старой ветви не применяется',
     () async {
@@ -252,7 +476,7 @@ void main() {
 }
 
 final class _Harness {
-  _Harness() {
+  _Harness({this.direction = ChoicePathDraftDirection.topDown}) {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
@@ -260,20 +484,32 @@ final class _Harness {
       retry: (_, _) => null,
     );
     subscription = container.listen(
-      choicePathViewModelProvider(_intention(1)),
+      choicePathViewModelProvider(
+        _intention(direction == ChoicePathDraftDirection.bottomUp ? 3 : 1),
+        direction: direction,
+      ),
       (_, _) {},
       fireImmediately: true,
     );
   }
 
   final repository = _Repository();
+  final ChoicePathDraftDirection direction;
   late final ProviderContainer container;
   late final ProviderSubscription<ChoicePathState> subscription;
 
-  ChoicePathViewModel get model =>
-      container.read(choicePathViewModelProvider(_intention(1)).notifier);
-  ChoicePathState get state =>
-      container.read(choicePathViewModelProvider(_intention(1)));
+  ChoicePathViewModel get model => container.read(
+    choicePathViewModelProvider(
+      _intention(direction == ChoicePathDraftDirection.bottomUp ? 3 : 1),
+      direction: direction,
+    ).notifier,
+  );
+  ChoicePathState get state => container.read(
+    choicePathViewModelProvider(
+      _intention(direction == ChoicePathDraftDirection.bottomUp ? 3 : 1),
+      direction: direction,
+    ),
+  );
 
   void dispose() {
     subscription.close();
@@ -326,12 +562,12 @@ final class _Repository implements PersonalGraphRepository {
     _requests[index].complete(ChoicePathContinuationError(failure));
   }
 
-  void emitRevision(int revision) {
+  void emitRevision(int revision, {bool ready = false}) {
     _observations.add(
       ResultSuccess(
         GraphSnapshot(
           value: IntentionDetails(
-            intention: _current(_intention(1)),
+            intention: _current(observedId, ready: ready),
             relationCounts: RelationCounts(
               activeNeedIncoming: 0,
               activeNeedOutgoing: 0,
@@ -352,7 +588,12 @@ final class _Repository implements PersonalGraphRepository {
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
-  ) => _observations.stream;
+  ) {
+    observedId = id;
+    return _observations.stream;
+  }
+
+  late IntentionId observedId;
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
