@@ -22,8 +22,8 @@ import 'choice_path_state.dart';
 
 part 'choice_path_view_model.g.dart';
 
-/// Управляет одним верхним обходом. Ответы принимаются только поколением
-/// текущего префикса и ревизией подтверждённого снимка.
+/// Управляет одним обходом. Ответы принимаются только поколением текущего
+/// черновика, экранной сессией и ревизией подтверждённого снимка.
 @riverpod
 final class ChoicePathViewModel extends _$ChoicePathViewModel {
   late PersonalGraphRepository _repository;
@@ -36,13 +36,23 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
   Object _session = Object();
 
   @override
-  ChoicePathState build(IntentionId sourceIntentionId) {
+  ChoicePathState build(
+    IntentionId startingIntentionId, {
+    ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
+  }) {
     _repository = ref.watch(personalGraphRepositoryProvider);
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     _knownRevision = null;
     final session = _session = Object();
-    final draft = ChoicePathDraftStart(sourceIntentionId);
-    _subscribeToChanges(sourceIntentionId, session);
+    final ChoicePathDraft draft = switch (direction) {
+      ChoicePathDraftDirection.topDown => ChoicePathDraftStart(
+        startingIntentionId,
+      ),
+      ChoicePathDraftDirection.bottomUp => ChoicePathDraftBottomStart(
+        startingIntentionId,
+      ),
+    };
+    _subscribeToChanges(startingIntentionId, session);
     final intentionSubscription = _intentionSubscription;
     final completionSubscription = _completionSubscription;
     ref.onDispose(() {
@@ -67,16 +77,28 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
     }
     if (selected == null) return false;
     final relation = selected.relation;
-    final draft = ChoicePathDraftProgress(current.draft.startingIntentionId, [
-      ...current.draft.steps,
-      ConfirmedChoicePathStep(
-        relationId: relation.id,
-        sourceIntentionId: relation.sourceIntentionId,
-        type: relation.type,
-        relatedIntentionId: relation.relatedIntentionId,
+    final step = ConfirmedChoicePathStep(
+      relationId: relation.id,
+      sourceIntentionId: relation.sourceIntentionId,
+      type: relation.type,
+      relatedIntentionId: relation.relatedIntentionId,
+    );
+    final steps = [...current.draft.steps, step];
+    final ChoicePathDraft draft = switch (current.draft.direction) {
+      ChoicePathDraftDirection.topDown => ChoicePathDraftProgress(
+        current.draft.startingIntentionId,
+        steps,
       ),
-    ]);
-    _restart(draft, [...current.visibleSteps, selected]);
+      ChoicePathDraftDirection.bottomUp => ChoicePathDraftBottomProgress(
+        current.draft.startingIntentionId,
+        steps,
+      ),
+    };
+    final visibleSteps = switch (draft.direction) {
+      ChoicePathDraftDirection.topDown => [...current.visibleSteps, selected],
+      ChoicePathDraftDirection.bottomUp => [selected, ...current.visibleSteps],
+    };
+    _restart(draft, visibleSteps);
     return true;
   }
 
@@ -84,13 +106,29 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
   bool backToStep(int stepCount) {
     final current = state.draft;
     if (stepCount < 0 || stepCount >= current.steps.length) return false;
-    final draft = stepCount == 0
-        ? ChoicePathDraftStart(current.startingIntentionId)
-        : ChoicePathDraftProgress(
-            current.startingIntentionId,
-            current.steps.take(stepCount),
-          );
-    _restart(draft, state.visibleSteps.take(stepCount));
+    final ChoicePathDraft draft = switch (current.direction) {
+      ChoicePathDraftDirection.topDown =>
+        stepCount == 0
+            ? ChoicePathDraftStart(current.startingIntentionId)
+            : ChoicePathDraftProgress(
+                current.startingIntentionId,
+                current.steps.take(stepCount),
+              ),
+      ChoicePathDraftDirection.bottomUp =>
+        stepCount == 0
+            ? ChoicePathDraftBottomStart(current.startingIntentionId)
+            : ChoicePathDraftBottomProgress(
+                current.startingIntentionId,
+                current.steps.take(stepCount),
+              ),
+    };
+    final visibleSteps = switch (current.direction) {
+      ChoicePathDraftDirection.topDown => state.visibleSteps.take(stepCount),
+      ChoicePathDraftDirection.bottomUp => state.visibleSteps.skip(
+        current.steps.length - stepCount,
+      ),
+    };
+    _restart(draft, visibleSteps);
     return true;
   }
 
@@ -309,7 +347,9 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
           ++_generation;
           state = ChoicePathNotFound(state.draft, state.visibleSteps);
         } else if (details.intention.archiveState !=
-            IntentionArchiveState.active) {
+                IntentionArchiveState.active ||
+            (state.draft.direction == ChoicePathDraftDirection.bottomUp &&
+                details.intention.readiness != IntentionReadiness.ready)) {
           _conflict();
         }
       case GraphResultFailure(:final failure):
@@ -388,17 +428,31 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
     if (page.items.isEmpty && page.nextCursor != null) return false;
     final visited = {
       page.draft.startingIntentionId,
-      for (final step in page.draft.steps) step.relatedIntentionId,
+      for (final step in page.draft.steps)
+        switch (page.draft.direction) {
+          ChoicePathDraftDirection.topDown => step.relatedIntentionId,
+          ChoicePathDraftDirection.bottomUp => step.sourceIntentionId,
+        },
     };
     final ids = <LongTermRelationId>{};
     for (final item in page.items) {
       final relation = item.relation;
+      final nextIntentionId = switch (page.draft.direction) {
+        ChoicePathDraftDirection.topDown => relation.relatedIntentionId,
+        ChoicePathDraftDirection.bottomUp => relation.sourceIntentionId,
+      };
+      final touchesCurrent = switch (page.draft.direction) {
+        ChoicePathDraftDirection.topDown =>
+          relation.sourceIntentionId == page.draft.currentIntentionId,
+        ChoicePathDraftDirection.bottomUp =>
+          relation.relatedIntentionId == page.draft.currentIntentionId,
+      };
       if (!ids.add(relation.id) ||
-          relation.sourceIntentionId != page.draft.currentIntentionId ||
+          !touchesCurrent ||
           relation.scope != RelationScope.active ||
           item.source.archiveState != IntentionArchiveState.active ||
           item.related.archiveState != IntentionArchiveState.active ||
-          visited.contains(relation.relatedIntentionId)) {
+          visited.contains(nextIntentionId)) {
         return false;
       }
     }

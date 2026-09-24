@@ -5,7 +5,7 @@ import '../../application/choice_path_continuations.dart';
 import '../../application/choice_path_draft.dart';
 import '../../application/confirmed_choice_path.dart';
 
-/// Состояние верхнего обхода всегда сохраняет видимый пользователю префикс.
+/// Состояние обхода сохраняет видимый путь от основания к действию.
 sealed class ChoicePathState {
   ChoicePathState(this.draft, Iterable<LongTermRelationSummary> visibleSteps)
     : visibleSteps = List<LongTermRelationSummary>.unmodifiable(visibleSteps);
@@ -32,16 +32,22 @@ sealed class ChoicePathConfirmedState extends ChoicePathState {
   final Intention current;
   final GraphRevision revision;
 
-  bool get canConfirm =>
-      draft is ChoicePathDraftProgress &&
-      current.readiness == IntentionReadiness.ready;
+  bool get canConfirm => switch (draft) {
+    ChoicePathDraftProgress() => current.readiness == IntentionReadiness.ready,
+    ChoicePathDraftBottomProgress() => true,
+    ChoicePathDraftStart() || ChoicePathDraftBottomStart() => false,
+  };
 
   @override
-  ConfirmedChoicePath? get confirmedPath =>
-      canConfirm ? (draft as ChoicePathDraftProgress).confirmedPath : null;
+  ConfirmedChoicePath? get confirmedPath => switch (draft) {
+    ChoicePathDraftProgress(:final confirmedPath) when canConfirm =>
+      confirmedPath,
+    ChoicePathDraftBottomProgress(:final confirmedPath) => confirmedPath,
+    _ => null,
+  };
 }
 
-/// Продолжений на текущем шаге нет; достигнутое действие всё ещё можно выбрать.
+/// Продолжений нет; достигнутое действие или основание можно подтвердить.
 final class ChoicePathEmpty extends ChoicePathConfirmedState {
   ChoicePathEmpty({
     required super.draft,
