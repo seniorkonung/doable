@@ -80,6 +80,48 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
       }
     }
 
+    final selectedChoices = <DailyChoiceId, DailyChoiceCatalogItem>{};
+    final choiceIds = query.dailyChoiceIds.toList(growable: false);
+    for (var start = 0; start < choiceIds.length; start += batchSize) {
+      final batch = choiceIds
+          .skip(start)
+          .take(batchSize)
+          .toList(growable: false);
+      final rows = await _database
+          .customSelect(
+            '''SELECT creation_sequence, id, source_intention_id,
+                  selected_intention_id, choice_date, description, is_completed
+               FROM daily_choices
+               WHERE id IN (${List.filled(batch.length, '?').join(', ')})''',
+            variables: [
+              for (final id in batch) Variable<String>(id.toCanonicalString()),
+            ],
+            readsFrom: {_database.dailyChoices},
+          )
+          .get();
+      final choices = <DailyChoice>[];
+      for (final row in rows) {
+        final id = switch (DailyChoiceId.decode(
+          _requiredStoredString(row.data, 'id'),
+        )) {
+          DailyChoiceIdDecodingSuccess(:final id) => id,
+          InvalidDailyChoiceIdDecoding() =>
+            throw const _StoredIntentionCorruption(),
+        };
+        if (!query.dailyChoiceIds.contains(id) ||
+            selectedChoices.containsKey(id)) {
+          throw const _StoredIntentionCorruption();
+        }
+        choices.add(_decodeStoredDailyChoice(row, id));
+      }
+      for (final item in await _verifyDailyChoiceCatalogItems(choices)) {
+        if (selectedChoices.containsKey(item.id)) {
+          throw const _StoredIntentionCorruption();
+        }
+        selectedChoices[item.id] = item;
+      }
+    }
+
     final present = <LongTermRelationId, _StoredRelationGroupRow>{};
     final participantIds = <IntentionId>{};
     for (final entry in selected.entries) {
@@ -96,6 +138,14 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
       participantIds,
       knownActiveCounts: const {},
     );
+    for (final item in selectedChoices.values) {
+      if (item.source.id == query.intentionId ||
+          item.selected.id == query.intentionId) {
+        participantIds
+          ..add(item.source.id)
+          ..add(item.selected.id);
+      }
+    }
     final permissions = <LongTermRelationId, LongTermRelationPermissions>{};
     const permissionBatchSize = 400;
     final presentIds = present.keys.toList(growable: false);
@@ -113,34 +163,48 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
         ),
       );
     }
-    final entries = <LongTermRelationId, SelectedRelationEntry>{};
-    for (final id in query.relationIds) {
-      final row = present[id];
-      if (row == null) {
-        entries[id] = selected.containsKey(id)
-            ? SelectedRelationNoLongerBlocking(id)
-            : SelectedRelationMissing(id);
-        continue;
+    final entries = <BlockingRelationReference, SelectedRelationEntry>{};
+    for (final reference in query.references) {
+      switch (reference) {
+        case LongTermBlockingRelationReference(:final id):
+          final row = present[id];
+          if (row == null) {
+            entries[reference] = selected.containsKey(id)
+                ? SelectedRelationNoLongerBlocking(id)
+                : SelectedRelationMissing(id);
+            continue;
+          }
+          final relation = row.toDomain();
+          entries[reference] = SelectedRelationPresent(
+            LongTermRelationDetails(
+              relation: relation,
+              source:
+                  participants[relation.sourceIntentionId] ??
+                  (throw const _StoredIntentionCorruption()),
+              related:
+                  participants[relation.relatedIntentionId] ??
+                  (throw const _StoredIntentionCorruption()),
+              description: row.description,
+              permissions:
+                  permissions[id] ?? (throw const _StoredIntentionCorruption()),
+            ),
+          );
+        case DailyChoiceBlockingRelationReference(:final id):
+          final item = selectedChoices[id];
+          entries[reference] = item == null
+              ? SelectedDailyChoiceMissing(id)
+              : item.source.id == query.intentionId ||
+                    item.selected.id == query.intentionId
+              ? SelectedDailyChoicePresent(item)
+              : SelectedDailyChoiceNoLongerBlocking(id);
       }
-      final relation = row.toDomain();
-      entries[id] = SelectedRelationPresent(
-        LongTermRelationDetails(
-          relation: relation,
-          source:
-              participants[relation.sourceIntentionId] ??
-              (throw const _StoredIntentionCorruption()),
-          related:
-              participants[relation.relatedIntentionId] ??
-              (throw const _StoredIntentionCorruption()),
-          description: row.description,
-          permissions:
-              permissions[id] ?? (throw const _StoredIntentionCorruption()),
-        ),
-      );
     }
     registration?.participantIds = Set.unmodifiable(participantIds);
     return GraphSnapshot(
-      value: SelectedRelationsSnapshot(query: query, entries: entries),
+      value: SelectedRelationsSnapshot.mixed(
+        query: query,
+        entriesByReference: entries,
+      ),
       revision: _currentRevision,
     );
   }
@@ -148,7 +212,10 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
   Stream<SelectedRelationsReadResult> _watchSelectedRelations(
     SelectedRelationsQuery query,
   ) async* {
-    final registration = _SelectedRelationsWatchRegistration(query.relationIds);
+    final registration = _SelectedRelationsWatchRegistration(
+      query.relationIds,
+      query.dailyChoiceIds,
+    );
     _selectedRelationsWatchers.add(registration);
     GraphRevision? lastSuccessfulRevision;
     try {
@@ -204,6 +271,7 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
 
   void _notifySelectedRelationsWatchersFor(Iterable<GraphChange> changes) {
     final affectedRelations = <LongTermRelationId>{};
+    final affectedChoices = <DailyChoiceId>{};
     final affectedParticipants = <IntentionId>{};
     for (final change in changes) {
       switch (change) {
@@ -217,9 +285,12 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
         case LongTermRelationChange(:final id):
           affectedRelations.add(id);
         case DailyChoiceChange(
+          :final before,
+          :final after,
           :final releasedRelationIds,
           :final occupiedRelationIds,
         ):
+          affectedChoices.add((after ?? before)!.id);
           affectedRelations
             ..addAll(releasedRelationIds)
             ..addAll(occupiedRelationIds);
@@ -229,6 +300,7 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
     }
     for (final registration in List.of(_selectedRelationsWatchers)) {
       if (registration.relationIds.any(affectedRelations.contains) ||
+          registration.dailyChoiceIds.any(affectedChoices.contains) ||
           registration.participantIds.any(affectedParticipants.contains)) {
         registration.invalidations.add(null);
       }
@@ -237,9 +309,10 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
 }
 
 final class _SelectedRelationsWatchRegistration {
-  _SelectedRelationsWatchRegistration(this.relationIds);
+  _SelectedRelationsWatchRegistration(this.relationIds, this.dailyChoiceIds);
 
   final Set<LongTermRelationId> relationIds;
+  final Set<DailyChoiceId> dailyChoiceIds;
   final StreamController<void> invalidations = StreamController<void>();
   Set<IntentionId> participantIds = const {};
 }
