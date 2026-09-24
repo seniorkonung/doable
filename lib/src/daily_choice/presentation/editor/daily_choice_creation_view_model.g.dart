@@ -72,7 +72,7 @@ final class DailyChoiceCreationViewModelProvider
 }
 
 String _$dailyChoiceCreationViewModelHash() =>
-    r'47f89ec2f727d53d04eb12c4351af1f1e2192169';
+    r'ca6a6dd5d69e61be37be504f4dd46a95967efc04';
 
 /// Собирает одну явную команду создания и оставляет её coordinator после ухода
 /// формы. Второе подтверждение той же формы не создаёт самостоятельный выбор.

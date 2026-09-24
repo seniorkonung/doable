@@ -570,7 +570,7 @@
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, при необходимости `daily_choice_creation_state.dart` и `daily_choice_creation_view_model.dart` рядом с ним; указанные widget-, model- и flow-тесты.
   - **Размер:** S.
 
-- [ ] 2.33 Восстановить воспроизводимую генерацию модели создания дневного выбора
+- [x] 2.33 Восстановить воспроизводимую генерацию модели создания дневного выбора
   - **Критерии приёмки:**
     - Отслеживаемый `daily_choice_creation_view_model.g.dart` соответствует текущему `daily_choice_creation_view_model.dart`, включая хеш исходника после изменения `confirmRefreshedPath`.
     - Повторная генерация на чистом зафиксированном снимке не изменяет отслеживаемые файлы; пользовательское поведение создания дневного выбора остаётся прежним.
