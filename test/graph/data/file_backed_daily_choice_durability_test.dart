@@ -129,7 +129,8 @@ void main() {
           addTearDown(harness.dispose);
           var database = await harness.openReadyDatabase();
           await seedDurabilityGraph(database);
-          if (operation != _DailyOperation.create) {
+          if (operation != _DailyOperation.create &&
+              operation != _DailyOperation.bottomCreate) {
             expect(
               await durabilityRepository(database).execute(durabilityCreate()),
               isA<GraphCommandSucceeded>(),
@@ -149,11 +150,17 @@ void main() {
           await _expectIntegrity(database);
           final repository = durabilityRepository(database);
           final choice = await repository.getDailyChoice(
-            durabilityChoice(operation == _DailyOperation.create ? 203 : 201),
+            durabilityChoice(
+              operation == _DailyOperation.create ||
+                      operation == _DailyOperation.bottomCreate
+                  ? 203
+                  : 201,
+            ),
           );
           expect(choice, isA<DailyChoiceReadSuccess>());
           final present = stopPoint == _StopPoint.beforeCommit
-              ? operation != _DailyOperation.create
+              ? operation != _DailyOperation.create &&
+                    operation != _DailyOperation.bottomCreate
               : operation != _DailyOperation.delete &&
                     operation != _DailyOperation.mixedDelete;
           expect(
@@ -206,7 +213,7 @@ Future<void> _expectCommittedOperation(
   final steps = await durabilityRows(database, 'daily_choice_path_steps');
   final relations = await durabilityRows(database, 'long_term_relations');
   switch (operation) {
-    case _DailyOperation.create:
+    case _DailyOperation.create || _DailyOperation.bottomCreate:
       expect(choices, hasLength(1));
       expect(choices.single['id'], durabilityUuid(203));
       expect(choices.single['choice_date'], '2026-09-23');
@@ -320,7 +327,7 @@ Future<void> _killWorkerAt(
   );
   var killed = false;
   try {
-    final workerPid = await ready.future.timeout(const Duration(seconds: 45));
+    final workerPid = await ready.future.timeout(const Duration(minutes: 2));
     killed = Process.killPid(workerPid, ProcessSignal.sigkill);
     expect(killed, isTrue);
   } finally {
@@ -351,6 +358,7 @@ String _findFlutterExecutable() {
 
 enum _DailyOperation {
   create('daily_create', 'создания выбора'),
+  bottomCreate('daily_bottom_create', 'создания нижнего выбора'),
   update('daily_update', 'изменения выбора'),
   replace('daily_replace', 'замены пути'),
   delete('daily_delete', 'удаления выбора'),

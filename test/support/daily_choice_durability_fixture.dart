@@ -1,4 +1,5 @@
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
@@ -138,6 +139,22 @@ CreateDailyChoice durabilityCreate({
       : DailyChoiceDescription.fromInput(description),
   isCompleted: completed,
 );
+
+CreateDailyChoice durabilityBottomCreate({List<int> path = const [101, 102]}) {
+  final top = durabilityCreate(path: path);
+  final draft = ChoicePathDraftBottomProgress(
+    top.selectedIntentionId,
+    top.path.steps.reversed,
+  );
+  return CreateDailyChoice(
+    sourceIntentionId: draft.currentIntentionId,
+    selectedIntentionId: draft.selectedActionId,
+    path: draft.confirmedPath,
+    date: top.date,
+    description: top.description,
+    isCompleted: top.isCompleted,
+  );
+}
 
 UpdateDailyChoiceFields durabilityUpdate(int choiceNumber) =>
     UpdateDailyChoiceFields(
