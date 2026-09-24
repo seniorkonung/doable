@@ -264,6 +264,25 @@ void main() {
         final suggestion = find.byKey(
           const ValueKey('choice-suggestion-select-0'),
         );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-suggestion-view-0')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining(
+            'Нужно: Чтобы Основание, нужно Действие в середине',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining(
+            'Можно: Чтобы Действие в середине, можно Продолжение действия',
+          ),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
         await _tap(tester, suggestion);
         await _waitFor(tester, find.byType(DailyChoiceCreationPage));
         expect(
@@ -375,6 +394,53 @@ void main() {
           _relation(101),
           _relation(102),
         ]);
+
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        if (!bottomUp) {
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await _tap(
+            tester,
+            find.byKey(const ValueKey('catalog-open-daily-choices')),
+          );
+        }
+        await _waitFor(
+          tester,
+          find.byKey(const ValueKey('daily-choice-row-2')),
+        );
+        final expectedOrder = bottomUp
+            ? [ids.last, ids.first]
+            : [ids.first, ids.last];
+        for (var index = 0; index < expectedOrder.length; index += 1) {
+          await _tap(
+            tester,
+            find.byKey(ValueKey('daily-choice-row-${index + 1}')),
+          );
+          await _waitFor(
+            tester,
+            find.byKey(const ValueKey('daily-choice-edit-open')),
+          );
+          expect(
+            tester
+                .widget<DailyChoiceDetailsPage>(
+                  find.byType(DailyChoiceDetailsPage),
+                )
+                .choiceId,
+            expectedOrder[index],
+          );
+          expect(
+            find.byKey(const ValueKey('daily-choice-relation-1')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('daily-choice-relation-2')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
       },
     );
   }

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -1884,6 +1885,11 @@ String _textByKey(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
 final class _DelayedRelationRepository implements PersonalGraphRepository {
+  @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) => throw UnimplementedError();
+
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,
