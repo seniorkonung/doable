@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../daily_choice/application/daily_choice_catalog.dart';
 import '../../../daily_choice/domain/daily_choice_id.dart';
+import '../../../graph/application/blocking_relation_reference.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -116,6 +117,7 @@ final class _RelationNeighborhoodSliverState
             state: state,
             intentionId: widget.intentionId,
             intentionTitle: widget.intentionTitle,
+            onOpenDailyChoice: widget.onOpenDailyChoice,
             onSelectGroup: viewModel.selectGroup,
             onSelectDailyGroup: viewModel.selectDailyGroup,
             onSelectScope: viewModel.selectScope,
@@ -123,7 +125,7 @@ final class _RelationNeighborhoodSliverState
             onSelectDirection: viewModel.selectDirection,
             onCreateRelation: widget.onCreateRelation,
             onRetryRefresh: onRetryRefresh,
-            selectedCount: selection?.selected.length,
+            selectedCount: selection?.selectedByReference.length,
           );
         }
         return _buildBodyChild(context, state, index - 1, viewModel, selection);
@@ -181,7 +183,7 @@ final class _RelationNeighborhoodSliverState
           : null,
     ),
     final DailyChoiceGroupLoaded loaded when index < loaded.items.length =>
-      _buildDailyChoiceRow(loaded, index, viewModel),
+      _buildDailyChoiceRow(loaded, index, viewModel, selection),
     final DailyChoiceGroupLoaded loaded => _LoadedGroupFooter(
       state: loaded,
       onRetryLoadMore:
@@ -202,6 +204,7 @@ final class _RelationNeighborhoodSliverState
     DailyChoiceGroupLoaded state,
     int index,
     RelationNeighborhoodViewModel viewModel,
+    BlockingRelationsSelectionState? selection,
   ) {
     _scheduleLoadMore(index, viewModel);
     final item = state.items[index];
@@ -214,6 +217,24 @@ final class _RelationNeighborhoodSliverState
         item: item,
         role: (state.group as DailyChoiceRelationGroup).role,
         onOpen: widget.onOpenDailyChoice,
+        isSelected: selection?.selectedByReference.containsKey(
+          DailyChoiceBlockingRelationReference(item.id),
+        ),
+        onToggleSelection: selection is BlockingRelationsSelectionEditing
+            ? () {
+                final editor = ref.read(
+                  blockingRelationsSelectionViewModelProvider(
+                    widget.intentionId,
+                  ).notifier,
+                );
+                final reference = DailyChoiceBlockingRelationReference(item.id);
+                if (selection.selectedByReference.containsKey(reference)) {
+                  editor.unselectReference(reference);
+                } else {
+                  editor.selectDailyChoice(item);
+                }
+              }
+            : null,
       ),
     );
   }
@@ -374,6 +395,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
     required this.state,
     required this.intentionId,
     required this.intentionTitle,
+    required this.onOpenDailyChoice,
     required this.onSelectGroup,
     required this.onSelectDailyGroup,
     required this.onSelectScope,
@@ -387,6 +409,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
   final RelationNeighborhoodState state;
   final IntentionId intentionId;
   final String intentionTitle;
+  final ValueChanged<DailyChoiceId> onOpenDailyChoice;
   final ValueChanged<RelationGroupSelection> onSelectGroup;
   final ValueChanged<DailyChoiceRelationRole> onSelectDailyGroup;
   final ValueChanged<RelationScope> onSelectScope;
@@ -430,6 +453,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
             BlockingRelationsConfirmationAction(
               intentionId: intentionId,
               intentionTitle: intentionTitle,
+              onOpenDailyChoice: onOpenDailyChoice,
             ),
             const SizedBox(height: 12),
           ],
@@ -1121,12 +1145,16 @@ final class _DailyChoiceRow extends StatelessWidget {
     required this.item,
     required this.role,
     required this.onOpen,
+    this.isSelected,
+    this.onToggleSelection,
     super.key,
   });
 
   final DailyChoiceCatalogItem item;
   final DailyChoiceRelationRole role;
   final ValueChanged<DailyChoiceId> onOpen;
+  final bool? isSelected;
+  final VoidCallback? onToggleSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -1141,41 +1169,71 @@ final class _DailyChoiceRow extends StatelessWidget {
         ? l10n.dailyChoiceDetailsCompleted
         : l10n.dailyChoiceDetailsNotCompleted;
     void open() => onOpen(item.id);
-    return Semantics(
-      button: true,
-      label: [
-        l10n.dailyChoiceDetailsTitle,
-        roleLabel,
-        phrase,
-        date,
-        completion,
-      ].join('. '),
-      hint: l10n.relationNeighborhoodOpenDailyChoice,
-      onTap: open,
-      child: ExcludeSemantics(
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
+    final selectionAction = isSelected == true
+        ? l10n.relationNeighborhoodRemoveFromSelection
+        : l10n.relationNeighborhoodAddToSelection;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Semantics(
+            button: true,
+            label: [
+              l10n.dailyChoiceDetailsTitle,
+              roleLabel,
+              phrase,
+              date,
+              completion,
+            ].join('. '),
+            hint: l10n.relationNeighborhoodOpenDailyChoice,
             onTap: open,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    roleLabel,
-                    style: Theme.of(context).textTheme.labelLarge,
+            child: ExcludeSemantics(
+              child: InkWell(
+                onTap: open,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        roleLabel,
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        phrase,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(date),
+                      Text(completion),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(phrase, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Text(date),
-                  Text(completion),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          if (isSelected case final checked?)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Checkbox(
+                    key: ValueKey(
+                      'relation-neighborhood-select-daily-${item.id.toCanonicalString()}',
+                    ),
+                    value: checked,
+                    onChanged: onToggleSelection == null
+                        ? null
+                        : (_) => onToggleSelection!(),
+                    semanticLabel:
+                        '$selectionAction: $phrase. $date. $completion',
+                  ),
+                  Expanded(child: Text(selectionAction)),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

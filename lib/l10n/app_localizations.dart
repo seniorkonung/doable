@@ -497,7 +497,7 @@ abstract class AppLocalizations {
   /// Защита выбранной связи сохранённым дневным путём
   ///
   /// In en, this message translates to:
-  /// **'This relation is used in a saved daily path. It cannot be deleted with the selected relations. Remove it from the selection to confirm the others.'**
+  /// **'This relation is used in a saved daily path. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again. The entire selected set remains unchanged.'**
   String get blockingRelationsInvalidProtected;
 
   /// Безопасное отсутствие намерения при проверке выбора
@@ -539,7 +539,7 @@ abstract class AppLocalizations {
   /// Конфликт массового удаления: связь заблокирована
   ///
   /// In en, this message translates to:
-  /// **'A selected relation is now used in a saved daily path and was not deleted. Refresh the selection and confirm the other relations again.'**
+  /// **'A selected relation is now used in a saved daily path. The entire set remains unchanged. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again.'**
   String get blockingRelationsDeleteProhibited;
 
   /// Первоначальная загрузка соседства и полной сводки

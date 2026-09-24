@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -14,6 +17,7 @@ import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
@@ -30,6 +34,155 @@ import 'package:flutter_test/flutter_test.dart';
 import 'neighborhood_test_support.dart';
 
 void main() {
+  testWidgets(
+    'смешанное подтверждение показывает оба вида и фиксирует только их',
+    (tester) async {
+      final opened = <DailyChoiceId>[];
+      final harness = await _pumpAction(
+        tester,
+        const Locale('ru'),
+        onOpenDailyChoice: opened.add,
+      );
+      final relation = testGroupRow(ownerId: harness.intentionId, index: 1);
+      final daily = _dailyItem(ownerId: harness.intentionId, index: 1);
+      harness.select(relation);
+      harness.selectDaily(daily);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await tester.pumpAndSettle();
+      expect(find.text('К удалению: 2'), findsOneWidget);
+      expect(
+        find.byKey(
+          ValueKey(
+            'blocking-relations-confirm-daily-${daily.id.toCanonicalString()}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
+      expect(find.text('Дата дневного выбора: 2026-09-24'), findsOneWidget);
+      final openDaily = find.byKey(
+        ValueKey(
+          'blocking-relations-open-daily-${daily.id.toCanonicalString()}',
+        ),
+      );
+      await tester.ensureVisible(openDaily);
+      await tester.pumpAndSettle();
+      await tester.tap(openDaily);
+      expect(opened, [daily.id]);
+      await tester.pumpAndSettle();
+      expect(harness.repository.commands, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('blocking-relations-cancel')),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-cancel')));
+      await tester.pumpAndSettle();
+      expect(harness.repository.commands, isEmpty);
+
+      await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+      await tester.pumpAndSettle();
+      final confirm = find.byKey(
+        const ValueKey('blocking-relations-confirm-delete'),
+      );
+      await tester.scrollUntilVisible(
+        confirm,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(confirm);
+      await tester.pump();
+      final command =
+          harness.repository.commands.single as DeleteBlockingRelations;
+      expect(command.references, {
+        LongTermBlockingRelationReference(relation.relation.id),
+        DailyChoiceBlockingRelationReference(daily.id),
+      });
+    },
+  );
+
+  testWidgets('дневной выбор и переход к пути доступны при крупном тексте', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    tester.view.physicalSize = const Size(480, 720);
+    tester.view.devicePixelRatio = 1;
+    tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.binding.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+    final harness = await _pumpAction(tester, const Locale('en'));
+    final daily = _dailyItem(ownerId: harness.intentionId, index: 10);
+    harness.selectDaily(daily);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
+    await tester.pumpAndSettle();
+    final dailySummary = find.byKey(
+      ValueKey(
+        'blocking-relations-confirm-daily-semantics-${daily.id.toCanonicalString()}',
+      ),
+    );
+    await tester.ensureVisible(dailySummary);
+    expect(tester.getSemantics(dailySummary).label, contains('Daily choice'));
+    expect(tester.getSemantics(dailySummary).label, contains('2026-09-24'));
+    final openDaily = find.byKey(
+      ValueKey('blocking-relations-open-daily-${daily.id.toCanonicalString()}'),
+    );
+    await tester.ensureVisible(openDaily);
+    expect(openDaily, findsOneWidget);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    testWidgets(
+      'защищённая связь блокирует смешанный набор на ${locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpAction(tester, locale);
+        final relation = testGroupRow(ownerId: harness.intentionId, index: 2);
+        final daily = _dailyItem(ownerId: harness.intentionId, index: 3);
+        harness.repository.protectedIds.add(relation.relation.id);
+        harness.select(relation);
+        harness.selectDaily(daily);
+        await tester.pump();
+        await tester.tap(
+          find.byKey(const ValueKey('blocking-relations-review')),
+        );
+        await tester.pumpAndSettle();
+        expect(harness.repository.commands, isEmpty);
+        expect(
+          find.byKey(const ValueKey('blocking-relations-confirm-delete')),
+          findsNothing,
+        );
+        expect(
+          find.textContaining(
+            locale.languageCode == 'ru'
+                ? 'отдельно удалите дневной выбор'
+                : 'delete the daily choice separately',
+          ),
+          findsWidgets,
+        );
+        expect(
+          harness.container
+              .read(
+                blockingRelationsSelectionViewModelProvider(
+                  harness.intentionId,
+                ),
+              )
+              .selectedByReference
+              .length,
+          2,
+        );
+      },
+    );
+  }
+
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     testWidgets(
       'зависимость пути запрещает массовое удаление на ${locale.languageCode}',
@@ -169,7 +322,9 @@ void main() {
     (tester) async {
       final harness = await _pumpAction(tester, const Locale('ru'));
       final row = testGroupRow(ownerId: harness.intentionId, index: 35);
+      final daily = _dailyItem(ownerId: harness.intentionId, index: 36);
       harness.select(row);
+      harness.selectDaily(daily);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('blocking-relations-review')));
       await tester.pumpAndSettle();
@@ -183,6 +338,14 @@ void main() {
       );
       await tester.tap(confirm);
       await tester.pump();
+      expect(
+        (harness.repository.commands.single as DeleteBlockingRelations)
+            .references,
+        {
+          LongTermBlockingRelationReference(row.relation.id),
+          DailyChoiceBlockingRelationReference(daily.id),
+        },
+      );
       harness.repository.protectedIds.add(row.relation.id);
       harness.repository.requests.single.complete(
         GraphCommandFailed<
@@ -206,6 +369,15 @@ void main() {
         findsOneWidget,
       );
       expect(harness.repository.commands, hasLength(1));
+      expect(
+        harness.container
+            .read(
+              blockingRelationsSelectionViewModelProvider(harness.intentionId),
+            )
+            .selectedByReference
+            .length,
+        2,
+      );
     },
   );
   testWidgets('показывает весь выбор из разных групп и порций при крупном тексте', (
@@ -725,7 +897,11 @@ void main() {
   });
 }
 
-Future<_Harness> _pumpAction(WidgetTester tester, Locale locale) async {
+Future<_Harness> _pumpAction(
+  WidgetTester tester,
+  Locale locale, {
+  ValueChanged<DailyChoiceId>? onOpenDailyChoice,
+}) async {
   final harness = _Harness();
   await tester.pumpWidget(
     ProviderScope(
@@ -741,6 +917,7 @@ Future<_Harness> _pumpAction(WidgetTester tester, Locale locale) async {
             child: BlockingRelationsConfirmationAction(
               intentionId: harness.intentionId,
               intentionTitle: 'Намерение-владелец',
+              onOpenDailyChoice: onOpenDailyChoice ?? (_) {},
             ),
           ),
         ),
@@ -782,6 +959,36 @@ final class _Harness {
   bool select(LongTermRelationSummary row) => container
       .read(blockingRelationsSelectionViewModelProvider(intentionId).notifier)
       .select(repository.rows[row.relation.id] = row);
+
+  bool selectDaily(DailyChoiceCatalogItem item) => container
+      .read(blockingRelationsSelectionViewModelProvider(intentionId).notifier)
+      .selectDailyChoice(repository.dailyRows[item.id] = item);
+}
+
+DailyChoiceCatalogItem _dailyItem({
+  required IntentionId ownerId,
+  required int index,
+}) {
+  final id = (DailyChoiceId.decode(
+    testRelationId(index).toCanonicalString(),
+  ) as DailyChoiceIdDecodingSuccess).id;
+  return DailyChoiceCatalogItem(
+    id: id,
+    source: DailyChoiceCatalogParticipant(
+      id: ownerId,
+      title: 'Основание',
+      archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.notReady,
+    ),
+    selected: DailyChoiceCatalogParticipant(
+      id: testIntentionId(2000 + index),
+      title: 'Действие',
+      archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.ready,
+    ),
+    date: CalendarDate.fromParts(2026, 9, 24),
+    isCompleted: true,
+  );
 }
 
 final class _CommandRepository implements PersonalGraphRepository {
@@ -805,6 +1012,7 @@ final class _CommandRepository implements PersonalGraphRepository {
   final commands = <GraphCommand>[];
   final requests = <Completer<Object>>[];
   final rows = <LongTermRelationId, LongTermRelationSummary>{};
+  final dailyRows = <DailyChoiceId, DailyChoiceCatalogItem>{};
   final descriptions = <LongTermRelationId, String?>{};
   final protectedIds = <LongTermRelationId>{};
   final _selectionUpdates =
@@ -912,11 +1120,11 @@ final class _CommandRepository implements PersonalGraphRepository {
     return SelectedRelationsReadSuccess(
       GraphSnapshot(
         revision: _revision,
-        value: SelectedRelationsSnapshot(
+        value: SelectedRelationsSnapshot.mixed(
           query: query,
-          entries: {
+          entriesByReference: {
             for (final id in query.relationIds)
-              id: switch (rows[id]) {
+              LongTermBlockingRelationReference(id): switch (rows[id]) {
                 null => SelectedRelationMissing(id),
                 final row
                     when row.relation.sourceIntentionId != query.intentionId &&
@@ -937,6 +1145,11 @@ final class _CommandRepository implements PersonalGraphRepository {
                           ),
                   ),
                 ),
+              },
+            for (final id in query.dailyChoiceIds)
+              DailyChoiceBlockingRelationReference(id): switch (dailyRows[id]) {
+                null => SelectedDailyChoiceMissing(id),
+                final item => SelectedDailyChoicePresent(item),
               },
           },
         ),
