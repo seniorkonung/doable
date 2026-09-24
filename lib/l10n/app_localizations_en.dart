@@ -1283,6 +1283,76 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Confirm daily choice';
 
   @override
+  String get dailyChoiceDetailsTitle => 'Daily choice';
+
+  @override
+  String get dailyChoiceDetailsLoading => 'Loading daily choice…';
+
+  @override
+  String get dailyChoiceDetailsNotFound =>
+      'This daily choice no longer exists.';
+
+  @override
+  String get dailyChoiceDetailsUnavailable =>
+      'Could not load this daily choice. Try again.';
+
+  @override
+  String get dailyChoiceDetailsCorruption =>
+      'The stored path is damaged and cannot be shown.';
+
+  @override
+  String get dailyChoiceDetailsUnexpected =>
+      'Could not load this daily choice because of an unexpected error.';
+
+  @override
+  String dailyChoiceDetailsPhrase(String source, String selected) {
+    return 'To $source, today I $selected';
+  }
+
+  @override
+  String dailyChoiceDetailsDate(String date) {
+    return 'Daily choice date: $date';
+  }
+
+  @override
+  String get dailyChoiceDetailsCompleted => 'Completed';
+
+  @override
+  String get dailyChoiceDetailsNotCompleted => 'Not completed';
+
+  @override
+  String get dailyChoiceDetailsDescription => 'Description';
+
+  @override
+  String get dailyChoiceDetailsPath => 'Stored path';
+
+  @override
+  String get dailyChoiceDetailsSource => 'Source intention';
+
+  @override
+  String get dailyChoiceDetailsIntermediate => 'Intermediate intention';
+
+  @override
+  String get dailyChoiceDetailsSelectedAction => 'Selected action';
+
+  @override
+  String get dailyChoiceDetailsArchived => 'Archived';
+
+  @override
+  String get dailyChoiceDetailsActive => 'Active';
+
+  @override
+  String get dailyChoiceDetailsReady => 'Ready for action';
+
+  @override
+  String get dailyChoiceDetailsNotReady => 'Not ready for action';
+
+  @override
+  String dailyChoiceDetailsStep(int number) {
+    return 'Transition $number';
+  }
+
+  @override
   String get dailyChoiceCreationPath => 'Path to confirm';
 
   @override

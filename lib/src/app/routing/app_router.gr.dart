@@ -10,37 +10,40 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'package:auto_route/auto_route.dart' as _i8;
+import 'package:auto_route/auto_route.dart' as _i9;
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart' as _i12;
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart'
+    as _i2;
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart'
     as _i1;
-import 'package:doable/src/intention/domain/intention_id.dart' as _i9;
+import 'package:doable/src/intention/domain/intention_id.dart' as _i10;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
-    as _i2;
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart'
-    as _i13;
-import 'package:doable/src/intention/presentation/details/intention_details_page.dart'
     as _i3;
-import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart'
+    as _i15;
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart'
     as _i4;
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
-    as _i11;
-import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart'
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
     as _i5;
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart'
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
+    as _i13;
+import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart'
     as _i6;
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart'
-    as _i12;
-import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart'
     as _i7;
-import 'package:flutter/material.dart' as _i10;
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart'
+    as _i14;
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
+    as _i8;
+import 'package:flutter/material.dart' as _i11;
 
 /// generated route for
 /// [_i1.ChoicePathPage]
-class ChoicePathRoute extends _i8.PageRouteInfo<ChoicePathRouteArgs> {
+class ChoicePathRoute extends _i9.PageRouteInfo<ChoicePathRouteArgs> {
   ChoicePathRoute({
-    required _i9.IntentionId sourceIntentionId,
-    _i10.Key? key,
-    List<_i8.PageRouteInfo>? children,
+    required _i10.IntentionId sourceIntentionId,
+    _i11.Key? key,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          ChoicePathRoute.name,
          args: ChoicePathRouteArgs(
@@ -52,7 +55,7 @@ class ChoicePathRoute extends _i8.PageRouteInfo<ChoicePathRouteArgs> {
 
   static const String name = 'ChoicePathRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<ChoicePathRouteArgs>();
@@ -67,9 +70,9 @@ class ChoicePathRoute extends _i8.PageRouteInfo<ChoicePathRouteArgs> {
 class ChoicePathRouteArgs {
   const ChoicePathRouteArgs({required this.sourceIntentionId, this.key});
 
-  final _i9.IntentionId sourceIntentionId;
+  final _i10.IntentionId sourceIntentionId;
 
-  final _i10.Key? key;
+  final _i11.Key? key;
 
   @override
   String toString() {
@@ -88,29 +91,77 @@ class ChoicePathRouteArgs {
 }
 
 /// generated route for
-/// [_i2.IntentionCatalogPage]
-class IntentionCatalogRoute extends _i8.PageRouteInfo<void> {
-  const IntentionCatalogRoute({List<_i8.PageRouteInfo>? children})
+/// [_i2.DailyChoiceDetailsPage]
+class DailyChoiceDetailsRoute
+    extends _i9.PageRouteInfo<DailyChoiceDetailsRouteArgs> {
+  DailyChoiceDetailsRoute({
+    required _i12.DailyChoiceId choiceId,
+    _i11.Key? key,
+    List<_i9.PageRouteInfo>? children,
+  }) : super(
+         DailyChoiceDetailsRoute.name,
+         args: DailyChoiceDetailsRouteArgs(choiceId: choiceId, key: key),
+         initialChildren: children,
+       );
+
+  static const String name = 'DailyChoiceDetailsRoute';
+
+  static _i9.PageInfo page = _i9.PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<DailyChoiceDetailsRouteArgs>();
+      return _i2.DailyChoiceDetailsPage(choiceId: args.choiceId, key: args.key);
+    },
+  );
+}
+
+class DailyChoiceDetailsRouteArgs {
+  const DailyChoiceDetailsRouteArgs({required this.choiceId, this.key});
+
+  final _i12.DailyChoiceId choiceId;
+
+  final _i11.Key? key;
+
+  @override
+  String toString() {
+    return 'DailyChoiceDetailsRouteArgs{choiceId: $choiceId, key: $key}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! DailyChoiceDetailsRouteArgs) return false;
+    return choiceId == other.choiceId && key == other.key;
+  }
+
+  @override
+  int get hashCode => choiceId.hashCode ^ key.hashCode;
+}
+
+/// generated route for
+/// [_i3.IntentionCatalogPage]
+class IntentionCatalogRoute extends _i9.PageRouteInfo<void> {
+  const IntentionCatalogRoute({List<_i9.PageRouteInfo>? children})
     : super(IntentionCatalogRoute.name, initialChildren: children);
 
   static const String name = 'IntentionCatalogRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
-      return const _i2.IntentionCatalogPage();
+      return const _i3.IntentionCatalogPage();
     },
   );
 }
 
 /// generated route for
-/// [_i3.IntentionDetailsPage]
+/// [_i4.IntentionDetailsPage]
 class IntentionDetailsRoute
-    extends _i8.PageRouteInfo<IntentionDetailsRouteArgs> {
+    extends _i9.PageRouteInfo<IntentionDetailsRouteArgs> {
   IntentionDetailsRoute({
-    required _i9.IntentionId intentionId,
-    _i10.Key? key,
-    List<_i8.PageRouteInfo>? children,
+    required _i10.IntentionId intentionId,
+    _i11.Key? key,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          IntentionDetailsRoute.name,
          args: IntentionDetailsRouteArgs(intentionId: intentionId, key: key),
@@ -119,11 +170,11 @@ class IntentionDetailsRoute
 
   static const String name = 'IntentionDetailsRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<IntentionDetailsRouteArgs>();
-      return _i3.IntentionDetailsPage(
+      return _i4.IntentionDetailsPage(
         intentionId: args.intentionId,
         key: args.key,
       );
@@ -134,9 +185,9 @@ class IntentionDetailsRoute
 class IntentionDetailsRouteArgs {
   const IntentionDetailsRouteArgs({required this.intentionId, this.key});
 
-  final _i9.IntentionId intentionId;
+  final _i10.IntentionId intentionId;
 
-  final _i10.Key? key;
+  final _i11.Key? key;
 
   @override
   String toString() {
@@ -155,28 +206,28 @@ class IntentionDetailsRouteArgs {
 }
 
 /// generated route for
-/// [_i4.IntentionEditorPage]
-class IntentionEditorRoute extends _i8.PageRouteInfo<void> {
-  const IntentionEditorRoute({List<_i8.PageRouteInfo>? children})
+/// [_i5.IntentionEditorPage]
+class IntentionEditorRoute extends _i9.PageRouteInfo<void> {
+  const IntentionEditorRoute({List<_i9.PageRouteInfo>? children})
     : super(IntentionEditorRoute.name, initialChildren: children);
 
   static const String name = 'IntentionEditorRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
-      return const _i4.IntentionEditorPage();
+      return const _i5.IntentionEditorPage();
     },
   );
 }
 
 /// generated route for
-/// [_i5.RelationDetailsPage]
-class RelationDetailsRoute extends _i8.PageRouteInfo<RelationDetailsRouteArgs> {
+/// [_i6.RelationDetailsPage]
+class RelationDetailsRoute extends _i9.PageRouteInfo<RelationDetailsRouteArgs> {
   RelationDetailsRoute({
-    required _i11.LongTermRelationId relationId,
-    _i10.Key? key,
-    List<_i8.PageRouteInfo>? children,
+    required _i13.LongTermRelationId relationId,
+    _i11.Key? key,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          RelationDetailsRoute.name,
          args: RelationDetailsRouteArgs(relationId: relationId, key: key),
@@ -185,11 +236,11 @@ class RelationDetailsRoute extends _i8.PageRouteInfo<RelationDetailsRouteArgs> {
 
   static const String name = 'RelationDetailsRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<RelationDetailsRouteArgs>();
-      return _i5.RelationDetailsPage(
+      return _i6.RelationDetailsPage(
         relationId: args.relationId,
         key: args.key,
       );
@@ -200,9 +251,9 @@ class RelationDetailsRoute extends _i8.PageRouteInfo<RelationDetailsRouteArgs> {
 class RelationDetailsRouteArgs {
   const RelationDetailsRouteArgs({required this.relationId, this.key});
 
-  final _i11.LongTermRelationId relationId;
+  final _i13.LongTermRelationId relationId;
 
-  final _i10.Key? key;
+  final _i11.Key? key;
 
   @override
   String toString() {
@@ -221,12 +272,12 @@ class RelationDetailsRouteArgs {
 }
 
 /// generated route for
-/// [_i6.RelationEditorPage]
-class RelationEditorRoute extends _i8.PageRouteInfo<RelationEditorRouteArgs> {
+/// [_i7.RelationEditorPage]
+class RelationEditorRoute extends _i9.PageRouteInfo<RelationEditorRouteArgs> {
   RelationEditorRoute({
-    required _i12.RelationEditorContext editorContext,
-    _i10.Key? key,
-    List<_i8.PageRouteInfo>? children,
+    required _i14.RelationEditorContext editorContext,
+    _i11.Key? key,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          RelationEditorRoute.name,
          args: RelationEditorRouteArgs(editorContext: editorContext, key: key),
@@ -235,11 +286,11 @@ class RelationEditorRoute extends _i8.PageRouteInfo<RelationEditorRouteArgs> {
 
   static const String name = 'RelationEditorRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<RelationEditorRouteArgs>();
-      return _i6.RelationEditorPage(
+      return _i7.RelationEditorPage(
         editorContext: args.editorContext,
         key: args.key,
       );
@@ -250,9 +301,9 @@ class RelationEditorRoute extends _i8.PageRouteInfo<RelationEditorRouteArgs> {
 class RelationEditorRouteArgs {
   const RelationEditorRouteArgs({required this.editorContext, this.key});
 
-  final _i12.RelationEditorContext editorContext;
+  final _i14.RelationEditorContext editorContext;
 
-  final _i10.Key? key;
+  final _i11.Key? key;
 
   @override
   String toString() {
@@ -271,14 +322,14 @@ class RelationEditorRouteArgs {
 }
 
 /// generated route for
-/// [_i7.RelationParticipantPickerPage]
+/// [_i8.RelationParticipantPickerPage]
 class RelationParticipantPickerRoute
-    extends _i8.PageRouteInfo<RelationParticipantPickerRouteArgs> {
+    extends _i9.PageRouteInfo<RelationParticipantPickerRouteArgs> {
   RelationParticipantPickerRoute({
-    required _i9.IntentionId excludedIntentionId,
-    required _i13.RelationParticipantSelectionContext selectionContext,
-    _i10.Key? key,
-    List<_i8.PageRouteInfo>? children,
+    required _i10.IntentionId excludedIntentionId,
+    required _i15.RelationParticipantSelectionContext selectionContext,
+    _i11.Key? key,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          RelationParticipantPickerRoute.name,
          args: RelationParticipantPickerRouteArgs(
@@ -291,11 +342,11 @@ class RelationParticipantPickerRoute
 
   static const String name = 'RelationParticipantPickerRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<RelationParticipantPickerRouteArgs>();
-      return _i7.RelationParticipantPickerPage(
+      return _i8.RelationParticipantPickerPage(
         excludedIntentionId: args.excludedIntentionId,
         selectionContext: args.selectionContext,
         key: args.key,
@@ -311,11 +362,11 @@ class RelationParticipantPickerRouteArgs {
     this.key,
   });
 
-  final _i9.IntentionId excludedIntentionId;
+  final _i10.IntentionId excludedIntentionId;
 
-  final _i13.RelationParticipantSelectionContext selectionContext;
+  final _i15.RelationParticipantSelectionContext selectionContext;
 
-  final _i10.Key? key;
+  final _i11.Key? key;
 
   @override
   String toString() {
