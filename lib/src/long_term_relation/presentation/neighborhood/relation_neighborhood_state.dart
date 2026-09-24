@@ -1,4 +1,5 @@
 import '../../../graph/application/graph_revision.dart';
+import '../../../daily_choice/application/daily_choice_catalog.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_counts.dart';
@@ -52,10 +53,12 @@ sealed class RelationNeighborhoodState {
   const RelationNeighborhoodState({
     required this.intentionId,
     required this.selection,
+    required this.group,
   });
 
   final IntentionId intentionId;
   final RelationGroupSelection selection;
+  final RelationGroup group;
 }
 
 /// Актуальность сохранённой сводки, предъявляемой вместе с её числами.
@@ -114,6 +117,7 @@ final class RelationGroupInitialLoad extends RelationNeighborhoodState {
   const RelationGroupInitialLoad({
     required super.intentionId,
     required super.selection,
+    required super.group,
   });
 }
 
@@ -124,6 +128,7 @@ final class RelationGroupInitialFailure extends RelationNeighborhoodState {
   const RelationGroupInitialFailure({
     required super.intentionId,
     required super.selection,
+    required super.group,
     required this.failure,
   });
 
@@ -138,6 +143,7 @@ final class RelationNeighborhoodIntentionNotFound
   const RelationNeighborhoodIntentionNotFound({
     required super.intentionId,
     required super.selection,
+    required super.group,
   });
 }
 
@@ -160,12 +166,13 @@ sealed class RelationGroupConfirmedState extends RelationNeighborhoodState {
   const RelationGroupConfirmedState({
     required super.intentionId,
     required super.selection,
+    required super.group,
     required this.counts,
     required this.revision,
     this.summaryStatus = const RelationSummaryCurrent(),
   });
 
-  /// Полная сводка восьми групп, полученная вместе с первой порцией.
+  /// Полная сводка десяти групп, полученная вместе с первой порцией.
   final RelationCounts counts;
   final GraphRevision revision;
   final RelationSummaryStatus summaryStatus;
@@ -176,11 +183,7 @@ sealed class RelationGroupConfirmedState extends RelationNeighborhoodState {
   RelationSummaryFreshness get summaryFreshness => summaryStatus.freshness;
 
   /// Полное количество связей выбранной группы.
-  int get totalCount => counts.forGroup(
-    scope: selection.scope,
-    type: selection.type,
-    direction: selection.direction,
-  );
+  int get totalCount => counts.forSelection(group);
 }
 
 /// Успешное получение выбранной группы без связей.
@@ -188,6 +191,7 @@ final class RelationGroupEmpty extends RelationGroupConfirmedState {
   const RelationGroupEmpty({
     required super.intentionId,
     required super.selection,
+    required super.group,
     required super.counts,
     required super.revision,
     super.summaryStatus,
@@ -205,6 +209,7 @@ final class RelationGroupEmpty extends RelationGroupConfirmedState {
       RelationGroupEmpty(
         intentionId: intentionId,
         selection: selection,
+        group: group,
         counts: counts,
         revision: revision,
         summaryStatus: summaryStatus,
@@ -216,6 +221,7 @@ final class RelationGroupEmpty extends RelationGroupConfirmedState {
       RelationGroupEmpty(
         intentionId: intentionId,
         selection: selection,
+        group: group,
         counts: counts,
         revision: revision,
         summaryStatus: value,
@@ -228,6 +234,7 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
   RelationGroupLoaded({
     required super.intentionId,
     required super.selection,
+    required super.group,
     required super.counts,
     required super.revision,
     super.summaryStatus,
@@ -258,6 +265,7 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
       RelationGroupLoaded(
         intentionId: intentionId,
         selection: selection,
+        group: group,
         counts: counts,
         revision: revision,
         summaryStatus: summaryStatus,
@@ -271,6 +279,7 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
       RelationGroupLoaded(
         intentionId: intentionId,
         selection: selection,
+        group: group,
         counts: counts,
         revision: revision,
         summaryStatus: value,
@@ -278,6 +287,58 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
         nextCursor: nextCursor,
         progress: progress,
         scrollAnchor: scrollAnchor,
+      );
+}
+
+/// Подтверждённая загруженная часть одной дневной роли.
+final class DailyChoiceGroupLoaded extends RelationGroupConfirmedState {
+  DailyChoiceGroupLoaded({
+    required super.intentionId,
+    required super.selection,
+    required DailyChoiceRelationGroup super.group,
+    required super.counts,
+    required super.revision,
+    super.summaryStatus,
+    required List<DailyChoiceCatalogItem> items,
+    required this.nextCursor,
+    this.progress = const RelationGroupIdle(),
+  }) : items = List.unmodifiable(items);
+
+  final List<DailyChoiceCatalogItem> items;
+  final RelationGroupCursor? nextCursor;
+  @override
+  final RelationGroupProgress progress;
+  @override
+  RelationGroupScrollAnchor? get scrollAnchor => null;
+
+  bool get hasConfirmedEnd =>
+      nextCursor == null &&
+      summaryFreshness == RelationSummaryFreshness.current;
+
+  DailyChoiceGroupLoaded withProgress(RelationGroupProgress value) =>
+      DailyChoiceGroupLoaded(
+        intentionId: intentionId,
+        selection: selection,
+        group: group as DailyChoiceRelationGroup,
+        counts: counts,
+        revision: revision,
+        summaryStatus: summaryStatus,
+        items: items,
+        nextCursor: nextCursor,
+        progress: value,
+      );
+
+  DailyChoiceGroupLoaded withSummaryStatus(RelationSummaryStatus value) =>
+      DailyChoiceGroupLoaded(
+        intentionId: intentionId,
+        selection: selection,
+        group: group as DailyChoiceRelationGroup,
+        counts: counts,
+        revision: revision,
+        summaryStatus: value,
+        items: items,
+        nextCursor: nextCursor,
+        progress: progress,
       );
 }
 

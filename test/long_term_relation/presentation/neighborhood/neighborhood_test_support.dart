@@ -85,6 +85,7 @@ final class ControlledNeighborhoodRepository
   );
 
   final queries = <RelationGroupQuery>[];
+  final pageQueries = <RelationGroupPageQuery>[];
   final _requests = <Completer<RelationGroupPageResult>>[];
   final intentionIds = <IntentionId>[];
   final intentionCommands = <IntentionCommand>[];
@@ -104,9 +105,12 @@ final class ControlledNeighborhoodRepository
   final _blockingRequests = <Completer<DeleteBlockingRelationsResult>>[];
   final _dailyChoiceRequests = <Completer<DailyChoiceCommandResult>>[];
 
-  int get requestCount => queries.length;
+  int get requestCount => _requests.length;
 
-  RelationGroupQuery queryAt(int index) => queries[index];
+  RelationGroupQuery queryAt(int index) =>
+      pageQueries[index] as RelationGroupQuery;
+
+  RelationGroupPageQuery pageQueryAt(int index) => pageQueries[index];
 
   void complete(int index, RelationGroupPageResult result) {
     _requests[index].complete(result);
@@ -116,14 +120,18 @@ final class ControlledNeighborhoodRepository
     final rows = switch (page) {
       RelationGroupFirstPage(:final items) ||
       RelationGroupContinuationPage(:final items) => items,
-      DailyChoiceGroupFirstPage() || DailyChoiceGroupContinuationPage() =>
-        throw StateError('Ожидалась группа долговременных связей.'),
+      DailyChoiceGroupFirstPage() ||
+      DailyChoiceGroupContinuationPage() => <LongTermRelationSummary>[],
     };
     for (final row in rows) {
       _relationRows[row.relation.id] = row;
     }
-    if (page is RelationGroupFirstPage) {
-      _latestCounts = page.counts;
+    if (page is RelationGroupFirstPage || page is DailyChoiceGroupFirstPage) {
+      _latestCounts = switch (page) {
+        RelationGroupFirstPage(:final counts) ||
+        DailyChoiceGroupFirstPage(:final counts) => counts,
+        _ => throw StateError('Ожидалась первая порция.'),
+      };
       _latestRevision = page.revision;
     }
     complete(index, GraphResultSuccess(page));
@@ -206,7 +214,8 @@ final class ControlledNeighborhoodRepository
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) {
-    queries.add(query as RelationGroupQuery);
+    pageQueries.add(query);
+    if (query is RelationGroupQuery) queries.add(query);
     final request = Completer<RelationGroupPageResult>();
     _requests.add(request);
     return request.future;
