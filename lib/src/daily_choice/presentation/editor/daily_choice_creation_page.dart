@@ -10,6 +10,7 @@ import '../../../long_term_relation/application/long_term_relation_projection.da
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../application/choice_path_draft.dart';
+import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
@@ -18,6 +19,33 @@ import '../path/choice_path_page.dart';
 import '../path/choice_path_view_model.dart';
 import 'daily_choice_creation_state.dart';
 import 'daily_choice_creation_view_model.dart';
+
+/// Данные шага, которые нужны форме для показа подтверждаемого маршрута.
+final class DailyChoiceCreationStep {
+  const DailyChoiceCreationStep({
+    required this.relation,
+    required this.sourceTitle,
+    required this.relatedTitle,
+  });
+
+  DailyChoiceCreationStep.fromSummary(LongTermRelationSummary step)
+    : this(
+        relation: step.relation,
+        sourceTitle: step.source.title,
+        relatedTitle: step.related.title,
+      );
+
+  DailyChoiceCreationStep.fromSuggestion(DailyChoicePathStepDetails step)
+    : this(
+        relation: step.relation,
+        sourceTitle: step.source.title,
+        relatedTitle: step.related.title,
+      );
+
+  final LongTermRelation relation;
+  final String sourceTitle;
+  final String relatedTitle;
+}
 
 /// Подтверждение одного видимого пути. Экран не меняет граф до нажатия кнопки.
 final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
@@ -30,7 +58,7 @@ final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
   }) : assert(steps.length > 0);
 
   final ConfirmedChoicePath path;
-  final List<LongTermRelationSummary> steps;
+  final List<DailyChoiceCreationStep> steps;
   final CalendarDate initialDate;
   final ChoicePathDraftDirection direction;
 
@@ -45,7 +73,7 @@ final class _DailyChoiceCreationPageState
   final _dateController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _scrollController = ScrollController();
-  late List<LongTermRelationSummary> _visibleSteps;
+  late List<DailyChoiceCreationStep> _visibleSteps;
   var _pathRefreshGeneration = 0;
   var _dateInvalid = false;
 
@@ -166,7 +194,7 @@ final class _DailyChoiceCreationPageState
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Text(l10n.choicePathSource(steps.first.source.title)),
+            Text(l10n.choicePathSource(steps.first.sourceTitle)),
             for (var index = 0; index < steps.length; index++)
               Semantics(
                 label: l10n.choicePathStepSemantics(
@@ -179,7 +207,7 @@ final class _DailyChoiceCreationPageState
                   child: Text(_phrase(l10n, steps[index])),
                 ),
               ),
-            Text(l10n.dailyChoiceCreationAction(steps.last.related.title)),
+            Text(l10n.dailyChoiceCreationAction(steps.last.relatedTitle)),
             const SizedBox(height: 24),
             TextField(
               key: const ValueKey('daily-choice-date'),
@@ -266,10 +294,10 @@ final class _DailyChoiceCreationPageState
   }
 }
 
-String _phrase(AppLocalizations l10n, LongTermRelationSummary step) =>
+String _phrase(AppLocalizations l10n, DailyChoiceCreationStep step) =>
     step.relation.type == LongTermRelationType.need
-    ? l10n.relationNeighborhoodNeedPhrase(step.source.title, step.related.title)
-    : l10n.relationNeighborhoodCanPhrase(step.source.title, step.related.title);
+    ? l10n.relationNeighborhoodNeedPhrase(step.sourceTitle, step.relatedTitle)
+    : l10n.relationNeighborhoodCanPhrase(step.sourceTitle, step.relatedTitle);
 
 String? _descriptionFailure(
   AppLocalizations l10n,

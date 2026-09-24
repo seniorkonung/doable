@@ -143,6 +143,41 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
   await harness.closePersistenceObjectGraph();
 }
 
+Future<void> _seedPreviousChoice(LocalDatabaseHarness harness) async {
+  final database = await harness.openReadyDatabase();
+  await database.customInsert(
+    '''INSERT INTO daily_choices
+       (id, source_intention_id, selected_intention_id, choice_date,
+        description, is_completed) VALUES (?, ?, ?, ?, ?, 1)''',
+    variables: [
+      Variable.withString(_uuid(201)),
+      Variable.withString(_uuid(1)),
+      Variable.withString(_uuid(3)),
+      Variable.withString('2030-09-24'),
+      Variable.withString('Описание источника'),
+    ],
+  );
+  for (final (step, relation, previous) in [
+    (301, 101, null),
+    (302, 102, 301),
+  ]) {
+    await database.customInsert(
+      '''INSERT INTO daily_choice_path_steps
+         (id, daily_choice_id, long_term_relation_id, previous_step_id)
+         VALUES (?, ?, ?, ?)''',
+      variables: [
+        Variable.withString(_uuid(step)),
+        Variable.withString(_uuid(201)),
+        Variable.withString(_uuid(relation)),
+        previous == null
+            ? const Variable<String>(null)
+            : Variable.withString(_uuid(previous)),
+      ],
+    );
+  }
+  await harness.closePersistenceObjectGraph();
+}
+
 List<DailyChoiceId> _savedIds(LocalDatabaseHarness harness) {
   final raw = sqlite.sqlite3.open(harness.databaseFile.path);
   try {
@@ -174,6 +209,175 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  for (final bottomUp in [false, true]) {
+    testWidgets(
+      'подсказка ${bottomUp ? 'снизу' : 'сверху'} создаёт отдельный выбор без наследования полей',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 2400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        tester.binding.platformDispatcher.localesTestValue = const [
+          Locale('ru'),
+        ];
+        addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+
+        final harness = (await tester.runAsync(
+          LocalDatabaseHarness.fileBacked,
+        ))!;
+        await tester.runAsync(() async {
+          await _seed(harness);
+          await _seedPreviousChoice(harness);
+        });
+        final runtime = AppRuntime(
+          connectionFactory: () =>
+              openFileBackedLocalDatabase(harness.databaseFile),
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+        );
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await runtime.shutdown();
+          await harness.dispose();
+        });
+        await tester.pumpWidget(MainApp(runtime: runtime));
+        final ready = await runtime.bootstrap() as AppRuntimeReady;
+        final repository = ready.container.read(
+          personalGraphRepositoryProvider,
+        );
+
+        if (bottomUp) {
+          await _tap(
+            tester,
+            find.byKey(const ValueKey('catalog-open-daily-choices')),
+          );
+          await tester.pumpAndSettle();
+          await _tap(
+            tester,
+            find.byKey(const ValueKey('daily-choice-create-from-action')),
+          );
+          await tester.pumpAndSettle();
+          await _tap(tester, find.text('Продолжение действия'));
+        } else {
+          await _openPath(tester);
+        }
+
+        final suggestion = find.byKey(
+          const ValueKey('choice-suggestion-select-0'),
+        );
+        await _tap(tester, suggestion);
+        await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+        expect(
+          tester
+              .widget<DailyChoiceCreationPage>(
+                find.byType(DailyChoiceCreationPage),
+              )
+              .direction,
+          bottomUp
+              ? ChoicePathDraftDirection.bottomUp
+              : ChoicePathDraftDirection.topDown,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(DailyChoiceCreationPage),
+            matching: find.text('Чтобы Основание, нужно Действие в середине'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(DailyChoiceCreationPage),
+            matching: find.text(
+              'Чтобы Действие в середине, можно Продолжение действия',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const ValueKey('daily-choice-description')),
+              )
+              .controller!
+              .text,
+          isEmpty,
+        );
+        expect(
+          tester
+              .widget<SwitchListTile>(
+                find.byKey(const ValueKey('daily-choice-completed')),
+              )
+              .value,
+          isFalse,
+        );
+        final today = DateTime.now();
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const ValueKey('daily-choice-date')),
+              )
+              .controller!
+              .text,
+          CalendarDate.fromParts(
+            today.year,
+            today.month,
+            today.day,
+          ).toCanonicalString(),
+        );
+        expect(_savedIds(harness), hasLength(1));
+
+        if (!bottomUp) {
+          await _tap(tester, find.byKey(const ValueKey('daily-choice-cancel')));
+          await tester.pumpAndSettle();
+          expect(_savedIds(harness), hasLength(1));
+          await _tap(tester, suggestion);
+          await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+        }
+
+        await tester.enterText(
+          find.byKey(const ValueKey('daily-choice-date')),
+          bottomUp ? '2030-09-24' : '2024-09-24',
+        );
+        if (bottomUp) {
+          await tester.enterText(
+            find.byKey(const ValueKey('daily-choice-description')),
+            'Описание источника',
+          );
+          await _tap(
+            tester,
+            find.byKey(const ValueKey('daily-choice-completed')),
+          );
+        }
+        final submit = find.byKey(const ValueKey('daily-choice-submit'));
+        await tester.ensureVisible(submit);
+        await tester.tap(submit);
+        await tester.tap(submit);
+        await tester.pump();
+        await _waitFor(tester, find.textContaining('Дневной выбор создан'));
+
+        final ids = _savedIds(harness);
+        expect(ids, hasLength(2));
+        expect(ids.toSet(), hasLength(2));
+        final source = await _read(repository, ids.first);
+        final created = await _read(repository, ids.last);
+        expect(source.choice.date, CalendarDate.fromParts(2030, 9, 24));
+        expect(source.choice.description?.value, 'Описание источника');
+        expect(source.choice.isCompleted, isTrue);
+        expect(
+          created.choice.date,
+          CalendarDate.fromParts(bottomUp ? 2030 : 2024, 9, 24),
+        );
+        expect(
+          created.choice.description?.value,
+          bottomUp ? 'Описание источника' : null,
+        );
+        expect(created.choice.isCompleted, bottomUp);
+        expect(created.path.map((step) => step.relation.id), [
+          _relation(101),
+          _relation(102),
+        ]);
+      },
+    );
+  }
 
   testWidgets(
     'из дневного каталога сохраняет нижний путь через общую форму и открывает самостоятельные записи',
@@ -733,7 +937,7 @@ void main() {
   );
 
   testWidgets(
-    'после конфликта новый показанный путь и поля попадают в сохранённый выбор',
+    'после конфликта подсказки новый путь и поля попадают в отдельный выбор',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1;
@@ -742,7 +946,10 @@ void main() {
       addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
 
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
-      await tester.runAsync(() => _seed(harness));
+      await tester.runAsync(() async {
+        await _seed(harness);
+        await _seedPreviousChoice(harness);
+      });
       final runtime = AppRuntime(
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
@@ -758,8 +965,11 @@ void main() {
       final repository = ready.container.read(personalGraphRepositoryProvider);
 
       await _openPath(tester);
-      await _continue(tester, 101);
-      await _openConfirmation(tester);
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-suggestion-select-0')),
+      );
+      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-date')),
         '2026-09-25',
@@ -779,7 +989,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-failure')),
       );
-      expect(_savedIds(harness), isEmpty);
+      expect(_savedIds(harness), hasLength(1));
 
       await _tap(tester, find.text('Вернуться к пути и актуализировать его'));
       await tester.pumpAndSettle();
@@ -826,11 +1036,16 @@ void main() {
             .value,
         isTrue,
       );
-      expect(_savedIds(harness), isEmpty);
+      expect(_savedIds(harness), hasLength(1));
 
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
       await _waitFor(tester, find.textContaining('Дневной выбор создан'));
-      final saved = await _read(repository, _savedIds(harness).single);
+      final ids = _savedIds(harness);
+      expect(ids, hasLength(2));
+      final saved = await _read(repository, ids.last);
+      final source = await _read(repository, ids.first);
+      expect(source.choice.isCompleted, isTrue);
+      expect(source.choice.description?.value, 'Описание источника');
       expect(saved.choice.sourceIntentionId, _intention(1));
       expect(saved.choice.selectedIntentionId, _intention(5));
       expect(saved.choice.date, CalendarDate.fromParts(2026, 9, 25));
