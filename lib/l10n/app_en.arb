@@ -1211,6 +1211,31 @@
     "description": "Точное количество доступных действий",
     "placeholders": {"count": {"type": "int"}}
   },
+  "sourcePickerTitle": "Select a reason",
+  "@sourcePickerTitle": {"description": "Заголовок выбора нового основания"},
+  "sourcePickerCancel": "Cancel reason selection",
+  "@sourcePickerCancel": {"description": "Отмена выбора основания"},
+  "sourcePickerLoading": "Loading intentions…",
+  "@sourcePickerLoading": {"description": "Чтение первой порции намерений"},
+  "sourcePickerEmpty": "No active intentions are available.",
+  "@sourcePickerEmpty": {"description": "Пустой выбор активных оснований"},
+  "sourcePickerNoMatches": "No intentions match this title.",
+  "@sourcePickerNoMatches": {"description": "Пустой результат буквального фильтра"},
+  "sourcePickerUnavailable": "Intentions couldn’t be loaded. Try again.",
+  "@sourcePickerUnavailable": {"description": "Устранимый отказ чтения намерений"},
+  "sourcePickerCorruption": "Saved intention data is damaged and can’t be shown.",
+  "@sourcePickerCorruption": {"description": "Повреждённые данные намерений"},
+  "sourcePickerUnexpected": "Intentions couldn’t be loaded because of an unexpected error.",
+  "@sourcePickerUnexpected": {"description": "Непредвиденный отказ чтения намерений"},
+  "sourcePickerSelectHint": "Selects this intention as the new reason",
+  "@sourcePickerSelectHint": {"description": "Семантическая подсказка выбора основания"},
+  "sourcePickerOpenDetails": "Open intention details",
+  "@sourcePickerOpenDetails": {"description": "Переход к подробностям намерения"},
+  "sourcePickerTotalCount": "Total intentions: {count}",
+  "@sourcePickerTotalCount": {
+    "description": "Число доступных активных намерений",
+    "placeholders": {"count": {"type": "int"}}
+  },
   "@participantPickerTitle": {
     "description": "Заголовок выбора участника долговременной связи"
   },

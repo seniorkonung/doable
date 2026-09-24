@@ -322,6 +322,20 @@
   "@actionPickerTotalCount": {
     "placeholders": {"count": {"type": "int"}}
   },
+  "sourcePickerTitle": "Выбор основания",
+  "sourcePickerCancel": "Отменить выбор основания",
+  "sourcePickerLoading": "Загружаем намерения…",
+  "sourcePickerEmpty": "Доступных активных намерений нет.",
+  "sourcePickerNoMatches": "Намерений с таким названием не найдено.",
+  "sourcePickerUnavailable": "Не удалось загрузить намерения. Повторите попытку.",
+  "sourcePickerCorruption": "Сохранённые данные намерений повреждены и не могут быть показаны.",
+  "sourcePickerUnexpected": "Не удалось загрузить намерения из-за непредвиденной ошибки.",
+  "sourcePickerSelectHint": "Выбрать это намерение как новое основание",
+  "sourcePickerOpenDetails": "Открыть подробности намерения",
+  "sourcePickerTotalCount": "Всего намерений: {count}",
+  "@sourcePickerTotalCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
   "participantPickerCancel": "Отменить выбор",
   "participantPickerEmpty": "Других намерений для выбора нет.",
   "participantPickerSelectHint": "Выбирает это намерение участником связи",

@@ -1147,6 +1147,45 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get sourcePickerTitle => 'Выбор основания';
+
+  @override
+  String get sourcePickerCancel => 'Отменить выбор основания';
+
+  @override
+  String get sourcePickerLoading => 'Загружаем намерения…';
+
+  @override
+  String get sourcePickerEmpty => 'Доступных активных намерений нет.';
+
+  @override
+  String get sourcePickerNoMatches => 'Намерений с таким названием не найдено.';
+
+  @override
+  String get sourcePickerUnavailable =>
+      'Не удалось загрузить намерения. Повторите попытку.';
+
+  @override
+  String get sourcePickerCorruption =>
+      'Сохранённые данные намерений повреждены и не могут быть показаны.';
+
+  @override
+  String get sourcePickerUnexpected =>
+      'Не удалось загрузить намерения из-за непредвиденной ошибки.';
+
+  @override
+  String get sourcePickerSelectHint =>
+      'Выбрать это намерение как новое основание';
+
+  @override
+  String get sourcePickerOpenDetails => 'Открыть подробности намерения';
+
+  @override
+  String sourcePickerTotalCount(int count) {
+    return 'Всего намерений: $count';
+  }
+
+  @override
   String get participantPickerCancel => 'Отменить выбор';
 
   @override

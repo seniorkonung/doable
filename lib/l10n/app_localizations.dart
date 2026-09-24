@@ -1985,6 +1985,72 @@ abstract class AppLocalizations {
   /// **'Total actions: {count}'**
   String actionPickerTotalCount(int count);
 
+  /// Заголовок выбора нового основания
+  ///
+  /// In en, this message translates to:
+  /// **'Select a reason'**
+  String get sourcePickerTitle;
+
+  /// Отмена выбора основания
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel reason selection'**
+  String get sourcePickerCancel;
+
+  /// Чтение первой порции намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading intentions…'**
+  String get sourcePickerLoading;
+
+  /// Пустой выбор активных оснований
+  ///
+  /// In en, this message translates to:
+  /// **'No active intentions are available.'**
+  String get sourcePickerEmpty;
+
+  /// Пустой результат буквального фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions match this title.'**
+  String get sourcePickerNoMatches;
+
+  /// Устранимый отказ чтения намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions couldn’t be loaded. Try again.'**
+  String get sourcePickerUnavailable;
+
+  /// Повреждённые данные намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Saved intention data is damaged and can’t be shown.'**
+  String get sourcePickerCorruption;
+
+  /// Непредвиденный отказ чтения намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions couldn’t be loaded because of an unexpected error.'**
+  String get sourcePickerUnexpected;
+
+  /// Семантическая подсказка выбора основания
+  ///
+  /// In en, this message translates to:
+  /// **'Selects this intention as the new reason'**
+  String get sourcePickerSelectHint;
+
+  /// Переход к подробностям намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Open intention details'**
+  String get sourcePickerOpenDetails;
+
+  /// Число доступных активных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Total intentions: {count}'**
+  String sourcePickerTotalCount(int count);
+
   /// Назначение отмены выбора участника
   ///
   /// In en, this message translates to:
