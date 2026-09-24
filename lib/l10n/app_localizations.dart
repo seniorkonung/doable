@@ -596,6 +596,30 @@ abstract class AppLocalizations {
   /// **'Can: {count}'**
   String relationNeighborhoodCanTotal(int count);
 
+  /// No description provided for @relationNeighborhoodDailyTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices: {count}'**
+  String relationNeighborhoodDailyTotal(int count);
+
+  /// Роль намерения как источника дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get relationNeighborhoodDailySourceRole;
+
+  /// Роль намерения как выбранного действия
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action'**
+  String get relationNeighborhoodDailySelectedRole;
+
+  /// Подпись групп долговременных связей в соседстве
+  ///
+  /// In en, this message translates to:
+  /// **'Long-term relations'**
+  String get relationNeighborhoodLongTermGroups;
+
   /// Подпись выбора активных или архивных связей
   ///
   /// In en, this message translates to:
@@ -1715,6 +1739,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opens the relation details'**
   String get relationNeighborhoodOpenRelation;
+
+  /// Назначение перехода к полному пути дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Open the full saved daily path'**
+  String get relationNeighborhoodOpenDailyChoice;
 
   /// Заголовок подробного просмотра связи
   ///

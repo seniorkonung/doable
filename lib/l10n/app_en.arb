@@ -286,6 +286,14 @@
     "placeholders": {"count": {"type": "int"}}
   },
   "relationNeighborhoodCanTotal": "Can: {count}",
+  "relationNeighborhoodDailyTotal": "Daily choices: {count}",
+  "@relationNeighborhoodDailyTotal": {"placeholders": {"count": {"type": "int"}}},
+  "relationNeighborhoodDailySourceRole": "Source intention",
+  "@relationNeighborhoodDailySourceRole": {"description": "Роль намерения как источника дневного выбора"},
+  "relationNeighborhoodDailySelectedRole": "Selected action",
+  "@relationNeighborhoodDailySelectedRole": {"description": "Роль намерения как выбранного действия"},
+  "relationNeighborhoodLongTermGroups": "Long-term relations",
+  "@relationNeighborhoodLongTermGroups": {"description": "Подпись групп долговременных связей в соседстве"},
   "@relationNeighborhoodCanTotal": {
     "placeholders": {"count": {"type": "int"}}
   },
@@ -1062,6 +1070,8 @@
     "description": "Терминальная непредвиденная ошибка удаления связи"
   },
   "relationNeighborhoodOpenRelation": "Opens the relation details",
+  "relationNeighborhoodOpenDailyChoice": "Open the full saved daily path",
+  "@relationNeighborhoodOpenDailyChoice": {"description": "Назначение перехода к полному пути дневного выбора"},
   "@relationNeighborhoodOpenRelation": {
     "description": "Назначение перехода из строки соседства в подробный просмотр связи"
   },

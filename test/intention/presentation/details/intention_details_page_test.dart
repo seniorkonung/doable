@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -31,6 +35,107 @@ void main() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
     );
+  });
+
+  testWidgets('дневная зависимость намерения открывает свой полный путь', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    repository.catalogResult = ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: const [],
+        totalCount: 0,
+        nextCursor: null,
+        revision: const TestDetailsRevision(0),
+      ),
+    );
+    final intention = testDetailsIntention(index: 120, title: 'Основание');
+    final action = testDetailsIntention(index: 121, title: 'Действие');
+    final choiceId = (DailyChoiceId.decode(
+      '00000000-0000-4000-8000-000000000120',
+    ) as DailyChoiceIdDecodingSuccess).id;
+    final counts = testRelationCounts(dailySource: 1);
+    repository.onRelationGroupPage = (_) => GraphResultSuccess(
+      RelationGroupFirstPage(
+        items: const [],
+        counts: counts,
+        nextCursor: null,
+        revision: const TestDetailsRevision(0),
+      ),
+    );
+    repository.onDailyChoiceGroupPage = (_) => GraphResultSuccess(
+      DailyChoiceGroupFirstPage(
+        items: [
+          DailyChoiceCatalogItem(
+            id: choiceId,
+            source: DailyChoiceCatalogParticipant(
+              id: intention.id,
+              title: intention.title,
+              archiveState: IntentionArchiveState.active,
+              readiness: IntentionReadiness.notReady,
+            ),
+            selected: DailyChoiceCatalogParticipant(
+              id: action.id,
+              title: action.title,
+              archiveState: IntentionArchiveState.active,
+              readiness: IntentionReadiness.ready,
+            ),
+            date: CalendarDate.fromParts(2026, 9, 24),
+            isCompleted: false,
+          ),
+        ],
+        counts: counts,
+        nextCursor: null,
+        revision: const TestDetailsRevision(0),
+      ),
+    );
+    final router = AppRouter();
+    final container = _detailsContainer(repository);
+    addTearDown(router.dispose);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router.config(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(
+      ResultSuccess(intention),
+      relationCounts: counts,
+    );
+    await tester.pumpAndSettle();
+    final dailyGroup = find.byKey(
+      const ValueKey('relation-neighborhood-daily-source'),
+    );
+    await Scrollable.ensureVisible(tester.element(dailyGroup), alignment: 0.3);
+    await tester.pumpAndSettle();
+    await tester.tap(dailyGroup);
+    await tester.pumpAndSettle();
+    expect(
+      repository.dailyChoiceGroupQueries.single.role,
+      DailyChoiceRelationRole.source,
+    );
+    final row = find.byKey(
+      ValueKey(
+        'relation-neighborhood-daily-row-${choiceId.toCanonicalString()}',
+      ),
+    );
+    await Scrollable.ensureVisible(tester.element(row), alignment: 0.3);
+    await tester.pumpAndSettle();
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(router.current.name, DailyChoiceDetailsRoute.name);
+    expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
   });
 
   testWidgets(

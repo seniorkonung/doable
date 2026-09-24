@@ -129,10 +129,13 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
 
   /// Запросы порций соседства в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
+  final dailyChoiceGroupQueries = <DailyChoiceGroupQuery>[];
 
   /// Ответ соседства на конкретный запрос; по умолчанию группа пуста.
   RelationGroupPageResult Function(RelationGroupQuery query)?
   onRelationGroupPage;
+  RelationGroupPageResult Function(DailyChoiceGroupQuery query)?
+  onDailyChoiceGroupPage;
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -169,8 +172,23 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) {
-    relationGroupQueries.add(query as RelationGroupQuery);
-    final result = onRelationGroupPage?.call(query);
+    if (query is DailyChoiceGroupQuery) {
+      dailyChoiceGroupQueries.add(query);
+      return Future.value(
+        onDailyChoiceGroupPage?.call(query) ??
+            GraphResultSuccess(
+              DailyChoiceGroupFirstPage(
+                items: const [],
+                counts: testRelationCounts(),
+                nextCursor: null,
+                revision: const TestDetailsRevision(0),
+              ),
+            ),
+      );
+    }
+    final relationQuery = query as RelationGroupQuery;
+    relationGroupQueries.add(relationQuery);
+    final result = onRelationGroupPage?.call(relationQuery);
     return Future.value(
       result ??
           GraphResultSuccess(

@@ -314,6 +314,20 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String relationNeighborhoodDailyTotal(int count) {
+    return 'Daily choices: $count';
+  }
+
+  @override
+  String get relationNeighborhoodDailySourceRole => 'Source intention';
+
+  @override
+  String get relationNeighborhoodDailySelectedRole => 'Selected action';
+
+  @override
+  String get relationNeighborhoodLongTermGroups => 'Long-term relations';
+
+  @override
   String get relationNeighborhoodScopeLabel => 'Relation state';
 
   @override
@@ -983,6 +997,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationNeighborhoodOpenRelation => 'Opens the relation details';
+
+  @override
+  String get relationNeighborhoodOpenDailyChoice =>
+      'Open the full saved daily path';
 
   @override
   String get relationDetailsTitle => 'Relation';
