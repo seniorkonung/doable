@@ -1269,6 +1269,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choicePathTitle => 'Choose a path to an action';
 
   @override
+  String get choicePathBottomTitle => 'Choose a source for the action';
+
+  @override
+  String get choicePathBottomTraversal =>
+      'Exploration: from the action to a source';
+
+  @override
+  String get choicePathBottomPathDirection =>
+      'Relation direction: from the source to the action';
+
+  @override
+  String choicePathFixedAction(String action) {
+    return 'Selected action: $action';
+  }
+
+  @override
+  String get choicePathActionPending => 'Loading the selected action…';
+
+  @override
+  String choicePathCurrentSource(String source) {
+    return 'Source: $source';
+  }
+
+  @override
+  String get choicePathSourceSelected => 'Source confirmed';
+
+  @override
+  String choicePathSelectSource(String source) {
+    return 'Confirm source “$source”';
+  }
+
+  @override
+  String get choicePathBottomNoPath =>
+      'There are no valid incoming relations for this action right now. Choose another action.';
+
+  @override
   String get choicePathDirection =>
       'Path from the source intention to an action';
 

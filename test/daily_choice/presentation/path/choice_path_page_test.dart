@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -242,6 +243,215 @@ void main() {
     );
     semantics.dispose();
   });
+
+  testWidgets(
+    'нижний обход показывает направление связей и подтверждает основание',
+    (tester) async {
+      final repository = _PathRepository();
+      addTearDown(repository.dispose);
+      await _pumpPage(
+        tester,
+        repository,
+        direction: ChoicePathDraftDirection.bottomUp,
+        startingId: 3,
+      );
+      expect(
+        repository.queries[0].draft.direction,
+        ChoicePathDraftDirection.bottomUp,
+      );
+      repository.complete(0, [_edge(2, 3, 1)]);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('choice-path-select-action')),
+        findsNothing,
+      );
+      await tester.tap(
+        find.byKey(
+          ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
+        ),
+      );
+      await tester.pump();
+      repository.complete(1, [_edge(1, 2, 2)], ready: true);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Выбранное действие: Намерение 3'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Основание: Намерение 2'), findsOneWidget);
+      expect(find.textContaining('от действия к основанию'), findsWidgets);
+      expect(find.textContaining('от основания к действию'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('choice-path-select-source')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey('choice-path-continue-${_relation(2).toCanonicalString()}'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('choice-path-select-source')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('choice-path-selected-source')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+        findsOneWidget,
+      );
+      expect(repository.commands, 0);
+
+      final nextStep = find.byKey(
+        ValueKey('choice-path-continue-${_relation(2).toCanonicalString()}'),
+      );
+      await tester.scrollUntilVisible(nextStep, 180);
+      await tester.drag(find.byType(ListView), const Offset(0, -200));
+      await tester.pumpAndSettle();
+      await tester.tap(nextStep);
+      await tester.pump();
+      repository.complete(2, []);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('choice-path-selected-source')),
+        findsNothing,
+      );
+      expect(find.textContaining('Основание: Намерение 1'), findsOneWidget);
+      expect(
+        find.textContaining('Выбранное действие: Намерение 3'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('choice-path-back-1')), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('choice-path-back-1')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('choice-path-back-1')));
+      await tester.pump();
+      repository.complete(3, [_edge(4, 2, 3, type: LongTermRelationType.can)]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Основание: Намерение 2'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('choice-path-select-source')),
+        findsOneWidget,
+      );
+      final alternateStep = find.byKey(
+        ValueKey('choice-path-continue-${_relation(3).toCanonicalString()}'),
+      );
+      await tester.scrollUntilVisible(alternateStep, 150);
+      await tester.drag(find.byType(ListView), const Offset(0, -200));
+      await tester.pumpAndSettle();
+      await tester.tap(alternateStep);
+      await tester.pump();
+      repository.complete(4, []);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Основание: Намерение 4'), findsOneWidget);
+      expect(
+        find.textContaining('Выбранное действие: Намерение 3'),
+        findsOneWidget,
+      );
+      final semantics = tester.ensureSemantics();
+      expect(
+        find.bySemanticsLabel(RegExp('Шаг 1:.*можно.*P1')),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    },
+  );
+
+  testWidgets('нижний нулевой путь и ошибка не выглядят подтверждением', (
+    tester,
+  ) async {
+    final repository = _PathRepository();
+    addTearDown(repository.dispose);
+    await _pumpPage(
+      tester,
+      repository,
+      direction: ChoicePathDraftDirection.bottomUp,
+      startingId: 3,
+    );
+    repository.complete(0, []);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('choice-path-select-source')),
+      findsNothing,
+    );
+    expect(
+      find.textContaining('Выбранное действие: Намерение 3'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('нет допустимых входящих связей'),
+      findsOneWidget,
+    );
+    repository.emitRevision(2);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('choice-path-refresh')));
+    await tester.pump();
+    repository.fail(1, const ChoicePathContinuationUnavailableFailure());
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('choice-path-select-source')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('choice-path-retry')), findsOneWidget);
+  });
+
+  testWidgets('нижний обход доступен по-английски при крупном тексте', (
+    tester,
+  ) async {
+    final repository = _PathRepository();
+    addTearDown(repository.dispose);
+    await _pumpPage(
+      tester,
+      repository,
+      direction: ChoicePathDraftDirection.bottomUp,
+      startingId: 3,
+      locale: const Locale('en'),
+      textScale: 2,
+    );
+    repository.complete(0, [_edge(2, 3, 1)], cursor: _Cursor());
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Selected action: Намерение 3'), findsOneWidget);
+    expect(find.byKey(const ValueKey('choice-path-load-more')), findsOneWidget);
+    final loadMore = find.byKey(const ValueKey('choice-path-load-more'));
+    await tester.scrollUntilVisible(loadMore, 150);
+    await tester.pumpAndSettle();
+    await tester.tap(loadMore);
+    await tester.pump();
+    repository.complete(1, [_edge(4, 3, 2, type: LongTermRelationType.can)]);
+    await tester.pumpAndSettle();
+    final loadedStep = find.byKey(
+      ValueKey('choice-path-continue-${_relation(2).toCanonicalString()}'),
+    );
+    await tester.scrollUntilVisible(loadedStep, 150);
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    await tester.tap(loadedStep);
+    await tester.pump();
+    repository.complete(2, []);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Source: Намерение 4'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('choice-path-select-source')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('choice-path-back-0')), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('choice-path-back-0')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('choice-path-back-0')));
+    await tester.pump();
+    repository.complete(3, []);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('choice-path-select-source')),
+      findsNothing,
+    );
+  });
 }
 
 Future<void> _pumpPage(
@@ -249,6 +459,8 @@ Future<void> _pumpPage(
   _PathRepository repository, {
   Locale locale = const Locale('ru'),
   double textScale = 1,
+  ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
+  int startingId = 1,
 }) => tester.pumpWidget(
   ProviderScope(
     overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
@@ -261,7 +473,11 @@ Future<void> _pumpPage(
             .copyWith(textScaler: TextScaler.linear(textScale)),
         child: child!,
       ),
-      home: ChoicePathPage(sourceIntentionId: _intention(1)),
+      home: direction == ChoicePathDraftDirection.topDown
+          ? ChoicePathPage(sourceIntentionId: _intention(startingId))
+          : ChoicePathPage.fromAction(
+              actionIntentionId: _intention(startingId),
+            ),
     ),
   ),
 );

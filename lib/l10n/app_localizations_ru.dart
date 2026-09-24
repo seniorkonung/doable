@@ -1271,6 +1271,41 @@ class AppLocalizationsRu extends AppLocalizations {
   String get choicePathTitle => 'Выбор пути к действию';
 
   @override
+  String get choicePathBottomTitle => 'Выбор основания для действия';
+
+  @override
+  String get choicePathBottomTraversal => 'Обход: от действия к основанию';
+
+  @override
+  String get choicePathBottomPathDirection =>
+      'Направление связей: от основания к действию';
+
+  @override
+  String choicePathFixedAction(String action) {
+    return 'Выбранное действие: $action';
+  }
+
+  @override
+  String get choicePathActionPending => 'Загружаем выбранное действие…';
+
+  @override
+  String choicePathCurrentSource(String source) {
+    return 'Основание: $source';
+  }
+
+  @override
+  String get choicePathSourceSelected => 'Основание подтверждено';
+
+  @override
+  String choicePathSelectSource(String source) {
+    return 'Подтвердить основание «$source»';
+  }
+
+  @override
+  String get choicePathBottomNoPath =>
+      'Для этого действия сейчас нет допустимых входящих связей. Выберите другое действие.';
+
+  @override
   String get choicePathDirection => 'Путь от исходного намерения к действию';
 
   @override

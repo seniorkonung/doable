@@ -11,6 +11,7 @@ import '../../../long_term_relation/application/long_term_relation_projection.da
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../application/choice_path_continuations.dart';
+import '../../application/choice_path_draft.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../domain/calendar_date.dart';
 import '../editor/daily_choice_creation_page.dart';
@@ -20,14 +21,24 @@ import 'choice_path_view_model.dart';
 @RoutePage()
 final class ChoicePathPage extends ConsumerStatefulWidget {
   const ChoicePathPage({required this.sourceIntentionId, super.key})
-    : returnsSelection = false;
+    : direction = ChoicePathDraftDirection.topDown,
+      returnsSelection = false;
+
+  const ChoicePathPage.fromAction({
+    required IntentionId actionIntentionId,
+    super.key,
+  }) : sourceIntentionId = actionIntentionId,
+       direction = ChoicePathDraftDirection.bottomUp,
+       returnsSelection = false;
 
   const ChoicePathPage.forCreationRefresh({
     required this.sourceIntentionId,
     super.key,
-  }) : returnsSelection = true;
+  }) : direction = ChoicePathDraftDirection.topDown,
+       returnsSelection = true;
 
   final IntentionId sourceIntentionId;
+  final ChoicePathDraftDirection direction;
   final bool returnsSelection;
 
   @override
@@ -51,7 +62,10 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final provider = choicePathViewModelProvider(widget.sourceIntentionId);
+    final provider = choicePathViewModelProvider(
+      widget.sourceIntentionId,
+      direction: widget.direction,
+    );
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
     final confirmed = state.confirmedPath;
@@ -65,16 +79,28 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
         _samePath(confirmed, _selectedPath!);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.choicePathTitle)),
+      appBar: AppBar(
+        title: Text(
+          widget.direction == ChoicePathDraftDirection.bottomUp
+              ? l10n.choicePathBottomTitle
+              : l10n.choicePathTitle,
+        ),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             Text(
-              l10n.choicePathDirection,
+              widget.direction == ChoicePathDraftDirection.bottomUp
+                  ? l10n.choicePathBottomTraversal
+                  : l10n.choicePathDirection,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
+            if (widget.direction == ChoicePathDraftDirection.bottomUp) ...[
+              Text(l10n.choicePathBottomPathDirection),
+              const SizedBox(height: 12),
+            ],
             _PathPrefix(
               state: state,
               onBack: (stepCount) {
@@ -88,9 +114,17 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
             if (selected) ...[
               const SizedBox(height: 16),
               Semantics(
-                key: const ValueKey('choice-path-selected-action'),
+                key: ValueKey(
+                  widget.direction == ChoicePathDraftDirection.bottomUp
+                      ? 'choice-path-selected-source'
+                      : 'choice-path-selected-action',
+                ),
                 liveRegion: true,
-                child: Text(l10n.choicePathActionSelected),
+                child: Text(
+                  widget.direction == ChoicePathDraftDirection.bottomUp
+                      ? l10n.choicePathSourceSelected
+                      : l10n.choicePathActionSelected,
+                ),
               ),
               const SizedBox(height: 8),
               FilledButton(
@@ -132,13 +166,21 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
             if (confirmed != null && state is ChoicePathConfirmedState) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
-                key: const ValueKey('choice-path-select-action'),
+                key: ValueKey(
+                  widget.direction == ChoicePathDraftDirection.bottomUp
+                      ? 'choice-path-select-source'
+                      : 'choice-path-select-action',
+                ),
                 onPressed: () => setState(() {
                   _selectedPath = confirmed;
                   _selectedRevision = state.revision;
                 }),
                 icon: const Icon(Icons.check_circle_outline),
-                label: Text(l10n.choicePathSelectAction(state.current.title)),
+                label: Text(
+                  widget.direction == ChoicePathDraftDirection.bottomUp
+                      ? l10n.choicePathSelectSource(state.current.title)
+                      : l10n.choicePathSelectAction(state.current.title),
+                ),
               ),
               const SizedBox(height: 8),
               Text(l10n.choicePathSelectionNotSaved),
@@ -157,7 +199,9 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
               ChoicePathEmpty() => _Status(
                 key: const ValueKey('choice-path-empty'),
                 message: state.draft.steps.isEmpty
-                    ? l10n.choicePathNoPath
+                    ? widget.direction == ChoicePathDraftDirection.bottomUp
+                          ? l10n.choicePathBottomNoPath
+                          : l10n.choicePathNoPath
                     : l10n.choicePathNoFurtherPath,
               ),
               ChoicePathData() => _ContinuationList(
@@ -205,21 +249,47 @@ final class _PathPrefix extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final steps = state.visibleSteps;
+    final bottomUp = state.draft.direction == ChoicePathDraftDirection.bottomUp;
     final current = state is ChoicePathConfirmedState
         ? (state as ChoicePathConfirmedState).current.title
         : null;
-    final source = steps.isNotEmpty ? steps.first.source.title : current;
+    final source = steps.isNotEmpty
+        ? steps.first.source.title
+        : bottomUp
+        ? null
+        : current;
+    final action = bottomUp
+        ? steps.isNotEmpty
+              ? steps.last.related.title
+              : current
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (bottomUp) ...[
+          if (action != null)
+            _PathNode(
+              label: l10n.choicePathFixedAction(action),
+              backLabel: steps.isNotEmpty
+                  ? l10n.choicePathReturnTo(action)
+                  : null,
+              backKey: const ValueKey('choice-path-back-0'),
+              onBack: steps.isNotEmpty ? () => onBack(0) : null,
+            )
+          else
+            Text(l10n.choicePathActionPending),
+          if (steps.isNotEmpty) const SizedBox(height: 8),
+        ],
         if (source != null)
           _PathNode(
-            label: l10n.choicePathSource(source),
-            backLabel: steps.isNotEmpty
+            label: bottomUp
+                ? l10n.choicePathCurrentSource(source)
+                : l10n.choicePathSource(source),
+            backLabel: !bottomUp && steps.isNotEmpty
                 ? l10n.choicePathReturnTo(source)
                 : null,
             backKey: const ValueKey('choice-path-back-0'),
-            onBack: steps.isNotEmpty ? () => onBack(0) : null,
+            onBack: !bottomUp && steps.isNotEmpty ? () => onBack(0) : null,
           ),
         for (var index = 0; index < steps.length; index++) ...[
           const Icon(Icons.arrow_downward, semanticLabel: null),
@@ -236,12 +306,18 @@ final class _PathPrefix extends StatelessWidget {
               backLabel: index + 1 < steps.length
                   ? l10n.choicePathReturnTo(steps[index].related.title)
                   : null,
-              backKey: ValueKey('choice-path-back-${index + 1}'),
-              onBack: index + 1 < steps.length ? () => onBack(index + 1) : null,
+              backKey: ValueKey(
+                'choice-path-back-${bottomUp ? steps.length - index - 1 : index + 1}',
+              ),
+              onBack: index + 1 < steps.length
+                  ? () =>
+                        onBack(bottomUp ? steps.length - index - 1 : index + 1)
+                  : null,
             ),
           ),
         ],
-        if (source == null && steps.isEmpty) Text(l10n.choicePathSourcePending),
+        if (!bottomUp && source == null && steps.isEmpty)
+          Text(l10n.choicePathSourcePending),
       ],
     );
   }
