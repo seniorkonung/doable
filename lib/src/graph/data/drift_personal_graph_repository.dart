@@ -892,9 +892,16 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       IntentionScope.archived => intentions.isArchived.equals(true),
       IntentionScope.all => const Constant(true),
     };
+    final readinessCondition = switch (query.readinessFilter) {
+      IntentionReadinessFilter.all => const Constant(true),
+      IntentionReadinessFilter.readyOnly => intentions.isActionReady.equals(
+        true,
+      ),
+    };
+    final condition = scopeCondition & readinessCondition;
     final filter = query.titleFilter;
-    if (filter == null) return scopeCondition;
-    return scopeCondition &
+    if (filter == null) return condition;
+    return condition &
         LocalIntentionTitleSearch(filter).conditionFor(intentions);
   }
 
@@ -1016,6 +1023,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   ) => _DriftIntentionCatalogCursor(
     epoch: _epoch,
     scope: query.scope,
+    readinessFilter: query.readinessFilter,
     normalizedTitleFilter: query.titleFilter?.map((value) => value),
     order: query.order,
     boundaryTimestamp: switch (query.order.field) {
@@ -1330,7 +1338,12 @@ final class _DriftIntentionCatalogEntrySnapshot
         summary.archiveState == domain.IntentionArchiveState.archived,
       IntentionScope.all => true,
     };
-    if (!matchesScope) return false;
+    final matchesReadiness = switch (query.readinessFilter) {
+      IntentionReadinessFilter.all => true,
+      IntentionReadinessFilter.readyOnly =>
+        summary.readiness == domain.IntentionReadiness.ready,
+    };
+    if (!matchesScope || !matchesReadiness) return false;
 
     final filter = query.titleFilter;
     return filter == null ||
@@ -1456,6 +1469,7 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   const _DriftIntentionCatalogCursor({
     required this.epoch,
     required this.scope,
+    required this.readinessFilter,
     required this.normalizedTitleFilter,
     required this.order,
     required this.boundaryTimestamp,
@@ -1464,6 +1478,7 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
 
   final _GraphEpoch epoch;
   final IntentionScope scope;
+  final IntentionReadinessFilter readinessFilter;
   final String? normalizedTitleFilter;
   final IntentionCatalogOrder order;
   final domain.IntentionTimestamp boundaryTimestamp;
@@ -1473,6 +1488,7 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
 
   bool matches(IntentionCatalogQuery query) =>
       scope == query.scope &&
+      readinessFilter == query.readinessFilter &&
       normalizedTitleFilter == query.titleFilter?.map((value) => value) &&
       order == query.order;
 }
