@@ -3,55 +3,54 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
+**Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Расхождение показанного и отправленного пути передано в незавершённую задачу 2.32; код ещё не исправлен. Открытых находок и принятых остаточных рисков нет.
+**Summary:** Задача 2.32 согласует показанный и отправляемый путь после повторной актуализации; независимая оценка и поведенческие проверки не выявили расхождения. Повторная генерация обнаружила устаревший отслеживаемый файл модели, поэтому проверка codegen-check завершается ошибкой. Принятых остаточных рисков нет.
 
 ## Review target
 
-- **Baseline ref:** 83febab3f9924bfcd4678b6bad9f868b522a8a9d
-- **Base commit:** 83febab3f9924bfcd4678b6bad9f868b522a8a9d
-- **Reviewed head:** 0c392d898e12c9d73c03aea4ebd11b8ce57f6f90
-- **Target commits:** ["dce247201057f0827fce9869922d01522120282b", "d99f320778e5173c83cd6c53292c4742600fc9d1", "0c392d898e12c9d73c03aea4ebd11b8ce57f6f90"]
-- **Reviewable paths:** ["lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart", "lib/src/daily_choice/presentation/path/choice_path_page.dart", "openspec/changes/manage-daily-choices/tasks.md", "openspec/changes/manage-daily-choices/verification-2.31.md", "test/app/daily_choice_app_flow_test.dart", "test/daily_choice/presentation/daily_choice_creation_flow_test.dart", "test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart", "test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart"]
+- **Baseline ref:** ded1b44f41e465e9d8238682aa0e8e2b0ddd0a9e
+- **Base commit:** ded1b44f41e465e9d8238682aa0e8e2b0ddd0a9e
+- **Reviewed head:** 6e15b6c60f8f1f77160b572988890f9d241b0e92
+- **Target commits:** ["6e15b6c60f8f1f77160b572988890f9d241b0e92"]
+- **Reviewable paths:** ["lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart", "lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart", "openspec/changes/manage-daily-choices/tasks.md", "test/daily_choice/presentation/daily_choice_creation_flow_test.dart", "test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart", "test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart"]
 - **OpenSpec change:** manage-daily-choices
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
 - **Baseline freshness:** Local ref state; no fetch performed
-- **Planning evidence paths:** ["openspec/changes/manage-daily-choices/tasks.md", "openspec/changes/manage-daily-choices/verification-2.31.md"]
+- **Planning evidence paths:** ["openspec/changes/manage-daily-choices/tasks.md"]
 
 ## Reviewed increment
 
-### U1 · Согласованное описание при повторе создания
+### U1 · Согласование показанного и отправляемого пути
 
-- **Work items:** ["2.29"]
-- **Requirements and scenarios:** ["daily-choice-management: Подтверждённые результаты и безопасные ошибки дневного выбора — Повторное нажатие не создаёт дубликат", "daily-choice-management: Самостоятельный датированный дневной выбор — описание подтверждённой записи"]
-- **Affected boundary:** Форма создания, принятая команда и предъявление временного отказа.
-- **Implementation target:** ["lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart", "test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart", "test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart"]
-- **Applicable constraints and non-goals:** Показанное описание должно совпадать с отправленным текстом; один принятый запрос не должен создавать дубликат. Отдельное создание полного дубликата остаётся допустимым.
-
-### U2 · Актуализация конфликтного пути и проверка готовности
-
-- **Work items:** ["2.30", "2.31"]
-- **Requirements and scenarios:** ["daily-choice-management: Допустимость и целостность пути выбора — Состояние изменилось до подтверждения", "daily-choice-management: Календарная дата и независимое выполнение", "daily-choice-management: Пошаговый выбор сверху вниз — Смена ветви после возврата", "daily-choice-management: Подтверждённые результаты и безопасные ошибки дневного выбора"]
-- **Affected boundary:** Форма создания, повторный выбор пути и сквозной пользовательский цикл с постоянным хранилищем.
-- **Implementation target:** ["lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart", "lib/src/daily_choice/presentation/path/choice_path_page.dart", "test/app/daily_choice_app_flow_test.dart", "test/daily_choice/presentation/daily_choice_creation_flow_test.dart", "test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart"]
-- **Applicable constraints and non-goals:** После конфликта сохраняются независимые поля, но новый путь требует отдельного подтверждения и повторной атомарной проверки при записи. Вход снизу вверх, подсказки прежних маршрутов и замена пути сохранённого выбора относятся к будущим фазам.
+- **Work items:** ["57 / 2.32"]
+- **Requirements and scenarios:** ["daily-choice-management: Допустимость и целостность пути выбора — Состояние изменилось до подтверждения", "daily-choice-management: Подтверждённые результаты и безопасные ошибки дневного выбора — Конфликт пути сохраняет независимые поля создания"]
+- **Affected boundary:** Пользователь формы создания, экран повторного выбора пути, модель черновика и команда создания дневного выбора.
+- **Implementation target:** ["lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart", "lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart", "test/daily_choice/presentation/daily_choice_creation_flow_test.dart", "test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart", "test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart"]
+- **Applicable constraints and non-goals:** После конфликта новый путь требует явного подтверждения, затем отдельного подтверждения создания. Дата, описание и выполнение сохраняются в черновике; поздний или отменённый выбор не меняет подтверждённый путь. Иные способы построения пути и изменения хранилища не входят в эту задачу.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежий изолированный рецензент проверил точный диапазон 83febab3f9924bfcd4678b6bad9f868b522a8a9d..0c392d898e12c9d73c03aea4ebd11b8ce57f6f90 и все шесть delivery/test путей U1–U2. |
-| OpenSpec conformance | Complete | Задачи 2.29–2.31, спецификация, план и versioned verification-2.31.md сопоставлены с реализацией; на чистом head прошли строгая проверка OpenSpec, mise run --skip-tools check (1330 тестов) и mise run --skip-tools codegen-check (отслеживаемые файлы не изменились). |
-| Code quality | Complete | Изучены два изменённых экрана, четыре теста, неизменённые модели и контракт подтверждения; проверены корректность, читаемость, архитектура, безопасность и стоимость. git diff --check прошёл. |
+| Independent decision review | Complete | Свежий изолированный рецензент проверил пять delivery/test путей U1 в точном диапазоне ded1b44f41e465e9d8238682aa0e8e2b0ddd0a9e..6e15b6c60f8f1f77160b572988890f9d241b0e92, без доступа к плану и прежнему отчёту; существенных замечаний нет. |
+| OpenSpec conformance | Complete | Задача 2.32 и соответствующие сценарии сопоставлены с кодом и тестами. На чистом reviewed head прошли 25 целевых тестов, mise run --skip-tools check (форматирование, анализ, 1334 теста) и строгая проверка OpenSpec; повторная генерация завершилась обнаруженным расхождением F1. |
+| Code quality | Complete | Проверены корректность гонок ответов, читаемость, границы экрана и модели, безопасность и стоимость; изучены изменённые файлы и неизменённые контракты состояния и команды. git diff --check прошёл; codegen-check выявил F1. |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F1 · Medium — Сгенерированный файл модели не соответствует исходному коду
+
+- **Evidence:** В reviewed head lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart:63-71 изменён контракт метода confirmRefreshedPath, но lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.g.dart:74-75 сохраняет прежний хеш 47f89ec2…. Команда mise run --skip-tools codegen-check на чистом head завершилась с кодом 1: генератор заменил хеш на ca6a6dd5…, после чего проверка сообщила об изменённом tracked-файле. Сгенерированное изменение убрано из рабочей копии после проверки.
+- **Evidence revisions:** ["6e15b6c60f8f1f77160b572988890f9d241b0e92"]
+- **Impact:** Воспроизводимая проверка генерации не проходит; коммит не содержит согласованного с исходником сгенерированного артефакта.
+- **Required outcome:** Отслеживаемые сгенерированные файлы должны соответствовать исходному коду, а codegen-check должен завершаться успешно на чистом снимке.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart", "lib/src/daily_choice/presentation/editor/daily_choice_creation_view_model.g.dart"]
 
 ## Review coverage
 
-Точный диапазон включает три целевых коммита: dce247201057f0827fce9869922d01522120282b → U1, d99f320778e5173c83cd6c53292c4742600fc9d1 → U2, 0c392d898e12c9d73c03aea4ebd11b8ce57f6f90 → U2. Все восемь reviewable paths учтены: шесть delivery/test путей в U1–U2 и два planning evidence пути. До записи отчёта дерево было чистым; прежний отчёт не содержал активных находок или принятых остаточных рисков.
+Единственный целевой коммит 6e15b6c60f8f1f77160b572988890f9d241b0e92 сопоставлен с U1 и задачей 57 / 2.32. Все шесть reviewable paths учтены: пять delivery/test путей в U1 и tasks.md как плановое свидетельство. Прежний отчёт не содержал открытых находок или принятых остаточных рисков; переданное задаче 2.32 расхождение показанного и отправляемого пути проверено в текущем диапазоне. Другая реализация изменения и будущие задачи не входят в целевой диапазон.
 
-Проверены сохранение видимого описания при временном отказе, повторная отправка, конфликт пути, сохранность даты, описания и выполнения, отмена, отдельное подтверждение создания и сквозное сохранение на файловом хранилище. На head 0c392d898e12c9d73c03aea4ebd11b8ce57f6f90 прошли mise exec --no-deps -- openspec validate manage-daily-choices --strict --no-interactive, mise run --skip-tools check (форматирование: 285 файлов, 0 изменений; анализ без ошибок; 1330 тестов), mise run --skip-tools codegen-check (код 0, tracked-файлы не изменились) и git diff --check. Документ verification-2.31.md дополнительно фиксирует release APK, packaged privacy gate и отсутствие запущенного приложения для живой runtime-проверки в сессии реализации; эти действия в данном ревью повторно не выполнялись. Незавершённая независимая оценка прежнего диапазона не переносится как находка этого ограниченного ревью; неизменённые пути того диапазона здесь не переоценивались.
+На head 6e15b6c60f8f1f77160b572988890f9d241b0e92 проверены оба порядка ответов при двух открытых актуализациях, отмена нового выбора и поздний ответ старого, сохранность независимых полей, повторный конфликт, отсутствие записи до отдельного подтверждения и сквозное сохранение показанного пути на файловом хранилище. Прошли целевые Flutter-тесты (25), mise run --skip-tools check (1334 теста), mise exec --no-deps -- openspec validate manage-daily-choices --json, строгая проверка OpenSpec и git diff --check. mise run --skip-tools codegen-check воспроизвёл F1; после восстановления порождённого ею локального изменения рабочее дерево снова соответствовало reviewed head.
