@@ -67,7 +67,7 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
     }
     if (selected == null) return false;
     final relation = selected.relation;
-    final draft = ChoicePathDraftProgress(current.draft.sourceIntentionId, [
+    final draft = ChoicePathDraftProgress(current.draft.startingIntentionId, [
       ...current.draft.steps,
       ConfirmedChoicePathStep(
         relationId: relation.id,
@@ -85,9 +85,9 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
     final current = state.draft;
     if (stepCount < 0 || stepCount >= current.steps.length) return false;
     final draft = stepCount == 0
-        ? ChoicePathDraftStart(current.sourceIntentionId)
+        ? ChoicePathDraftStart(current.startingIntentionId)
         : ChoicePathDraftProgress(
-            current.sourceIntentionId,
+            current.startingIntentionId,
             current.steps.take(stepCount),
           );
     _restart(draft, state.visibleSteps.take(stepCount));
@@ -366,7 +366,8 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
   bool _isCurrent(int generation) => ref.mounted && _generation == generation;
 
   bool _sameDraft(ChoicePathDraft left, ChoicePathDraft right) {
-    if (left.sourceIntentionId != right.sourceIntentionId ||
+    if (left.direction != right.direction ||
+        left.startingIntentionId != right.startingIntentionId ||
         left.steps.length != right.steps.length) {
       return false;
     }
@@ -386,7 +387,7 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
   bool _validPage(ChoicePathContinuationsPage page) {
     if (page.items.isEmpty && page.nextCursor != null) return false;
     final visited = {
-      page.draft.sourceIntentionId,
+      page.draft.startingIntentionId,
       for (final step in page.draft.steps) step.relatedIntentionId,
     };
     final ids = <LongTermRelationId>{};

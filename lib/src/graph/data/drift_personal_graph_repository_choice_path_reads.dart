@@ -49,8 +49,12 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     }
 
     final draft = query.draft;
+    if (draft.direction == ChoicePathDraftDirection.bottomUp) {
+      // Чтение входящих продолжений добавляется отдельной задачей 3.2.
+      throw UnsupportedError('Нижний обход пока не подключён к хранилищу.');
+    }
     final visited = <IntentionId>[
-      draft.sourceIntentionId,
+      draft.startingIntentionId,
       for (final step in draft.steps) step.relatedIntentionId,
     ];
     final visitedJson = jsonEncode([
@@ -70,7 +74,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
       final intention = _rehydrateDetailRow(row);
       intentions[intention.id] = intention;
     }
-    if (!intentions.containsKey(draft.sourceIntentionId) ||
+    if (!intentions.containsKey(draft.startingIntentionId) ||
         !intentions.containsKey(draft.currentIntentionId)) {
       throw const _ChoicePathIntentionNotFound();
     }
@@ -244,7 +248,8 @@ final class _DriftChoicePathCursor implements ChoicePathContinuationCursor {
 
   bool matches(ChoicePathContinuationQuery query) {
     if (pageSize != query.pageSize ||
-        draft.sourceIntentionId != query.draft.sourceIntentionId ||
+        draft.direction != query.draft.direction ||
+        draft.startingIntentionId != query.draft.startingIntentionId ||
         draft.steps.length != query.draft.steps.length) {
       return false;
     }

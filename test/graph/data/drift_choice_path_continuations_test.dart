@@ -343,6 +343,29 @@ void main() {
         (wrong as ChoicePathContinuationError).failure,
         isA<ChoicePathContinuationValidationFailure>(),
       );
+      final otherDirection = await fixture.repository
+          .getChoicePathContinuations(
+            ChoicePathContinuationQuery(
+              draft: ChoicePathDraftBottomStart(_intention(1)),
+              pageSize: 1,
+              cursor: first.nextCursor,
+            ),
+          );
+      expect(
+        (otherDirection as ChoicePathContinuationError).failure,
+        isA<ChoicePathContinuationValidationFailure>(),
+      );
+      final otherDraft = await fixture.repository.getChoicePathContinuations(
+        ChoicePathContinuationQuery(
+          draft: fixture.progress(1, [(101, 1, 2)]),
+          pageSize: 1,
+          cursor: first.nextCursor,
+        ),
+      );
+      expect(
+        (otherDraft as ChoicePathContinuationError).failure,
+        isA<ChoicePathContinuationValidationFailure>(),
+      );
       final other = DriftPersonalGraphRepository(
         fixture.database,
         UuidV7IntentionIdGenerator(),
