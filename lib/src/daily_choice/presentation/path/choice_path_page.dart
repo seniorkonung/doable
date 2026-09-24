@@ -19,12 +19,29 @@ import 'choice_path_view_model.dart';
 
 @RoutePage()
 final class ChoicePathPage extends ConsumerStatefulWidget {
-  const ChoicePathPage({required this.sourceIntentionId, super.key});
+  const ChoicePathPage({required this.sourceIntentionId, super.key})
+    : returnsSelection = false;
+
+  const ChoicePathPage.forCreationRefresh({
+    required this.sourceIntentionId,
+    super.key,
+  }) : returnsSelection = true;
 
   final IntentionId sourceIntentionId;
+  final bool returnsSelection;
 
   @override
   ConsumerState<ChoicePathPage> createState() => _ChoicePathPageState();
+}
+
+final class ChoicePathSelection {
+  ChoicePathSelection({
+    required this.path,
+    required Iterable<LongTermRelationSummary> steps,
+  }) : steps = List<LongTermRelationSummary>.unmodifiable(steps);
+
+  final ConfirmedChoicePath path;
+  final List<LongTermRelationSummary> steps;
 }
 
 final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
@@ -79,6 +96,15 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
               FilledButton(
                 key: const ValueKey('choice-path-open-confirmation'),
                 onPressed: () async {
+                  if (widget.returnsSelection) {
+                    Navigator.of(context).pop(
+                      ChoicePathSelection(
+                        path: confirmed,
+                        steps: state.visibleSteps,
+                      ),
+                    );
+                    return;
+                  }
                   final now = DateTime.now();
                   await Navigator.of(context).push<void>(
                     MaterialPageRoute(

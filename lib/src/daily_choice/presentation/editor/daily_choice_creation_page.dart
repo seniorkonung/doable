@@ -13,6 +13,8 @@ import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
 import '../daily_choice_command_failure_message.dart';
+import '../path/choice_path_page.dart';
+import '../path/choice_path_view_model.dart';
 import 'daily_choice_creation_state.dart';
 import 'daily_choice_creation_view_model.dart';
 
@@ -40,12 +42,14 @@ final class _DailyChoiceCreationPageState
   final _dateController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _scrollController = ScrollController();
+  late List<LongTermRelationSummary> _visibleSteps;
   var _dateInvalid = false;
 
   @override
   void initState() {
     super.initState();
     _dateController.text = widget.initialDate.toCanonicalString();
+    _visibleSteps = widget.steps;
   }
 
   @override
@@ -74,6 +78,20 @@ final class _DailyChoiceCreationPageState
       setState(() => _dateInvalid = true);
       _revealFailure();
     }
+  }
+
+  Future<void> _refreshPath(DailyChoiceCreationViewModel model) async {
+    final sourceId = widget.path.steps.first.sourceIntentionId;
+    ref.invalidate(choicePathViewModelProvider(sourceId));
+    final selection = await Navigator.of(context).push<ChoicePathSelection>(
+      MaterialPageRoute(
+        builder: (_) =>
+            ChoicePathPage.forCreationRefresh(sourceIntentionId: sourceId),
+      ),
+    );
+    if (!mounted || selection == null) return;
+    model.confirmRefreshedPath(selection.path);
+    setState(() => _visibleSteps = selection.steps);
   }
 
   void _revealFailure() {
@@ -119,7 +137,7 @@ final class _DailyChoiceCreationPageState
         (_dateInvalid ? l10n.dailyChoiceDateInvalid : dateFailure) ??
         descriptionFailure ??
         generalFailure;
-    final steps = widget.steps;
+    final steps = _visibleSteps;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.dailyChoiceCreationTitle)),
       body: SafeArea(
@@ -199,7 +217,7 @@ final class _DailyChoiceCreationPageState
               ),
               if (state.needsPathRefresh)
                 TextButton(
-                  onPressed: () => unawaited(Navigator.of(context).maybePop()),
+                  onPressed: () => unawaited(_refreshPath(model)),
                   child: Text(l10n.dailyChoiceCreationRefreshPath),
                 ),
             ],

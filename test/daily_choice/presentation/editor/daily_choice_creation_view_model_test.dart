@@ -233,6 +233,37 @@ void main() {
     expect(harness.repository.commands, hasLength(2));
     expect(harness.repository.commands.last.path, same(refreshed));
     expect(harness.repository.commands.last.description?.value, 'Моё описание');
+    expect(
+      harness.repository.commands.last.date,
+      CalendarDate.fromParts(2024, 3, 2),
+    );
+    expect(harness.repository.commands.last.isCompleted, isTrue);
+
+    harness.repository.fail(
+      1,
+      const DailyChoiceConflictFailure(
+        DailyChoiceConflictReason.confirmedPathChanged,
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.state.needsPathRefresh, isTrue);
+    expect(harness.state.description, 'Моё описание');
+    expect(harness.state.isCompleted, isTrue);
+    expect(harness.state.date, CalendarDate.fromParts(2024, 3, 2));
+    harness.model.changeDescription('После второго конфликта');
+    harness.model.confirmRefreshedPath(_path());
+    expect(harness.repository.commands, hasLength(2));
+    harness.model.submit();
+    expect(harness.repository.commands, hasLength(3));
+    expect(
+      harness.repository.commands.last.description?.value,
+      'После второго конфликта',
+    );
+    expect(harness.repository.commands.last.isCompleted, isTrue);
+    expect(
+      harness.repository.commands.last.date,
+      CalendarDate.fromParts(2024, 3, 2),
+    );
   });
 
   test(
