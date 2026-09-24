@@ -51,6 +51,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 part 'drift_daily_choice_path_validation.dart';
 part 'drift_personal_graph_repository_daily_choice_reads.dart';
+part 'drift_personal_graph_repository_daily_choice_catalog.dart';
 part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_blocking_relations.dart';
@@ -115,8 +116,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
-  ) async =>
-      const DailyChoiceCatalogPageError(DailyChoiceCatalogUnavailableFailure());
+  ) => _readDailyChoiceCatalogPage(query);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

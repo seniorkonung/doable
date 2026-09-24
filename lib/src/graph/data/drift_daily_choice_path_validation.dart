@@ -8,9 +8,41 @@ List<DailyChoicePathStepDetails> _validateStoredChoicePath({
   required Map<LongTermRelationId, _StoredRelationGroupRow> relations,
   required Map<IntentionId, domain.Intention> intentions,
 }) {
+  final orderedSteps = _validateStoredChoicePathLinks(
+    choice: choice,
+    steps: steps,
+    relations: {
+      for (final relation in relations.values)
+        relation.id: (
+          source: relation.sourceIntentionId,
+          related: relation.relatedIntentionId,
+        ),
+    },
+    intentionIds: intentions.keys.toSet(),
+  );
+  return List.unmodifiable([
+    for (final step in orderedSteps)
+      DailyChoicePathStepDetails(
+        step: step,
+        relation: relations[step.relationId]!.toDomain(),
+        description: relations[step.relationId]!.description,
+        source: intentions[relations[step.relationId]!.sourceIntentionId]!,
+        related: intentions[relations[step.relationId]!.relatedIntentionId]!,
+      ),
+  ]);
+}
+
+/// Общая проверка цепочки; для каталога достаточно только ссылок её порции.
+List<ChoicePathStep> _validateStoredChoicePathLinks({
+  required DailyChoice choice,
+  required List<ChoicePathStep> steps,
+  required Map<LongTermRelationId, ({IntentionId source, IntentionId related})>
+  relations,
+  required Set<IntentionId> intentionIds,
+}) {
   if (steps.isEmpty ||
-      !intentions.containsKey(choice.sourceIntentionId) ||
-      !intentions.containsKey(choice.selectedIntentionId)) {
+      !intentionIds.contains(choice.sourceIntentionId) ||
+      !intentionIds.contains(choice.selectedIntentionId)) {
     throw const _StoredIntentionCorruption();
   }
 
@@ -34,7 +66,7 @@ List<DailyChoicePathStepDetails> _validateStoredChoicePath({
   }
   if (root == null) throw const _StoredIntentionCorruption();
 
-  final ordered = <DailyChoicePathStepDetails>[];
+  final ordered = <ChoicePathStep>[];
   final seenSteps = <ChoicePathStepId>{};
   final seenIntentions = <IntentionId>{choice.sourceIntentionId};
   var currentIntentionId = choice.sourceIntentionId;
@@ -45,25 +77,16 @@ List<DailyChoicePathStepDetails> _validateStoredChoicePath({
     }
     final storedRelation = relations[currentStep.relationId];
     if (storedRelation == null ||
-        storedRelation.sourceIntentionId != currentIntentionId ||
-        !seenIntentions.add(storedRelation.relatedIntentionId)) {
+        storedRelation.source != currentIntentionId ||
+        !seenIntentions.add(storedRelation.related)) {
       throw const _StoredIntentionCorruption();
     }
-    final source = intentions[currentIntentionId];
-    final related = intentions[storedRelation.relatedIntentionId];
-    if (source == null || related == null) {
+    if (!intentionIds.contains(currentIntentionId) ||
+        !intentionIds.contains(storedRelation.related)) {
       throw const _StoredIntentionCorruption();
     }
-    ordered.add(
-      DailyChoicePathStepDetails(
-        step: currentStep,
-        relation: storedRelation.toDomain(),
-        description: storedRelation.description,
-        source: source,
-        related: related,
-      ),
-    );
-    currentIntentionId = storedRelation.relatedIntentionId;
+    ordered.add(currentStep);
+    currentIntentionId = storedRelation.related;
     currentStep = successors[currentStep.id];
   }
   if (seenSteps.length != steps.length ||

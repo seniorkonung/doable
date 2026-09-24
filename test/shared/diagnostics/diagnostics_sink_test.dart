@@ -42,6 +42,14 @@ void main() {
           const DailyChoiceReadDiagnosticsEvent(
             status: DiagnosticsSucceeded(Duration(milliseconds: 2)),
           ),
+          const DailyChoiceCatalogPageReadDiagnosticsEvent(
+            pageSize: 50,
+            isContinuation: true,
+            status: DiagnosticsFailed(
+              duration: Duration(milliseconds: 1),
+              code: DiagnosticsFailureCode.corruption,
+            ),
+          ),
           const DailyChoicePathValidationDiagnosticsEvent(
             commandType: DailyChoicePathCommandDiagnosticsType.create,
             status: DiagnosticsFailed(
@@ -74,6 +82,15 @@ void main() {
             'stage': 'read',
             'outcome': 'succeeded',
             'durationMicros': 2000,
+          },
+          {
+            'operation': 'dailyChoiceCatalogPageRead',
+            'stage': 'read',
+            'pageSize': 50,
+            'isContinuation': true,
+            'outcome': 'failed',
+            'durationMicros': 1000,
+            'failureCode': 'corruption',
           },
           {
             'operation': 'dailyChoicePathValidation',
