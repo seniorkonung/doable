@@ -806,7 +806,7 @@ final class _Repository implements PersonalGraphRepository {
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => Future.error(StateError('Нет данных соседства в этом тесте'));
   void emit(DailyChoiceDetails details, {int revision = 1}) => controller.add(
     DailyChoiceReadSuccess(

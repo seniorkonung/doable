@@ -113,7 +113,13 @@ final class ControlledNeighborhoodRepository
   }
 
   void completePage(int index, RelationGroupPage page) {
-    for (final row in page.items) {
+    final rows = switch (page) {
+      RelationGroupFirstPage(:final items) ||
+      RelationGroupContinuationPage(:final items) => items,
+      DailyChoiceGroupFirstPage() || DailyChoiceGroupContinuationPage() =>
+        throw StateError('Ожидалась группа долговременных связей.'),
+    };
+    for (final row in rows) {
       _relationRows[row.relation.id] = row;
     }
     if (page is RelationGroupFirstPage) {
@@ -198,9 +204,9 @@ final class ControlledNeighborhoodRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) {
-    queries.add(query);
+    queries.add(query as RelationGroupQuery);
     final request = Completer<RelationGroupPageResult>();
     _requests.add(request);
     return request.future;

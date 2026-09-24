@@ -167,9 +167,9 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) {
-    relationGroupQueries.add(query);
+    relationGroupQueries.add(query as RelationGroupQuery);
     final result = onRelationGroupPage?.call(query);
     return Future.value(
       result ??

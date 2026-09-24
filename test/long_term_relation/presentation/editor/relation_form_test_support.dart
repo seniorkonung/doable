@@ -226,7 +226,7 @@ final class ControlledRelationFormRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => Completer<RelationGroupPageResult>().future;
 
   @override

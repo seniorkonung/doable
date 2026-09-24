@@ -1952,7 +1952,7 @@ final class _DelayedRelationRepository implements PersonalGraphRepository {
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => _inner.getRelationGroupPage(query);
 
   @override

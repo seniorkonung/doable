@@ -1,9 +1,13 @@
+import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../../intention/domain/intention_id.dart';
 import '../domain/long_term_relation.dart';
 import 'long_term_relation_projection.dart';
 import 'relation_counts.dart';
+import 'relation_group.dart';
+
+export 'relation_group.dart';
 
 enum RelationGroupQueryValidationFailure { pageSizeOutOfRange }
 
@@ -16,7 +20,14 @@ final class RelationGroupQueryValidationException implements Exception {
 /// Непрозрачное продолжение одной согласованной группы связей.
 abstract interface class RelationGroupCursor {}
 
-final class RelationGroupQuery {
+abstract interface class RelationGroupPageQuery {
+  IntentionId get intentionId;
+  RelationGroup get group;
+  int get pageSize;
+  RelationGroupCursor? get cursor;
+}
+
+final class RelationGroupQuery implements RelationGroupPageQuery {
   factory RelationGroupQuery({
     required IntentionId intentionId,
     required LongTermRelationType type,
@@ -52,43 +63,107 @@ final class RelationGroupQuery {
   static const minPageSize = 1;
   static const maxPageSize = 100;
 
+  @override
   final IntentionId intentionId;
   final LongTermRelationType type;
   final RelationDirection direction;
   final RelationScope scope;
+  @override
   final int pageSize;
+  @override
   final RelationGroupCursor? cursor;
+
+  @override
+  RelationGroup get group =>
+      LongTermRelationGroup(type: type, direction: direction, scope: scope);
 }
 
-sealed class RelationGroupPage {
-  RelationGroupPage({
-    required List<LongTermRelationSummary> items,
-    required this.nextCursor,
-    required this.revision,
-  }) : items = List.unmodifiable(items);
+final class DailyChoiceGroupQuery implements RelationGroupPageQuery {
+  factory DailyChoiceGroupQuery({
+    required IntentionId intentionId,
+    required DailyChoiceRelationRole role,
+    required int pageSize,
+    RelationGroupCursor? cursor,
+  }) {
+    if (pageSize < RelationGroupQuery.minPageSize ||
+        pageSize > RelationGroupQuery.maxPageSize) {
+      throw const RelationGroupQueryValidationException(
+        RelationGroupQueryValidationFailure.pageSizeOutOfRange,
+      );
+    }
+    return DailyChoiceGroupQuery._(intentionId, role, pageSize, cursor);
+  }
 
-  final List<LongTermRelationSummary> items;
+  const DailyChoiceGroupQuery._(
+    this.intentionId,
+    this.role,
+    this.pageSize,
+    this.cursor,
+  );
+
+  @override
+  final IntentionId intentionId;
+  final DailyChoiceRelationRole role;
+  @override
+  final int pageSize;
+  @override
+  final RelationGroupCursor? cursor;
+
+  @override
+  RelationGroup get group => DailyChoiceRelationGroup(role: role);
+}
+
+/// Первая порция содержит полную сводку десяти групп на своей ревизии.
+/// Продолжение сохраняет привязку к запросу через непрозрачный курсор.
+sealed class RelationGroupPage {
+  const RelationGroupPage({required this.nextCursor, required this.revision});
+
   final RelationGroupCursor? nextCursor;
   final GraphRevision revision;
 }
 
 final class RelationGroupFirstPage extends RelationGroupPage {
   RelationGroupFirstPage({
-    required super.items,
+    required List<LongTermRelationSummary> items,
     required this.counts,
     required super.nextCursor,
     required super.revision,
-  });
+  }) : items = List.unmodifiable(items);
 
+  final List<LongTermRelationSummary> items;
   final RelationCounts counts;
 }
 
 final class RelationGroupContinuationPage extends RelationGroupPage {
   RelationGroupContinuationPage({
-    required super.items,
+    required List<LongTermRelationSummary> items,
     required super.nextCursor,
     required super.revision,
-  });
+  }) : items = List.unmodifiable(items);
+
+  final List<LongTermRelationSummary> items;
+}
+
+final class DailyChoiceGroupFirstPage extends RelationGroupPage {
+  DailyChoiceGroupFirstPage({
+    required List<DailyChoiceCatalogItem> items,
+    required this.counts,
+    required super.nextCursor,
+    required super.revision,
+  }) : items = List.unmodifiable(items);
+
+  final List<DailyChoiceCatalogItem> items;
+  final RelationCounts counts;
+}
+
+final class DailyChoiceGroupContinuationPage extends RelationGroupPage {
+  DailyChoiceGroupContinuationPage({
+    required List<DailyChoiceCatalogItem> items,
+    required super.nextCursor,
+    required super.revision,
+  }) : items = List.unmodifiable(items);
+
+  final List<DailyChoiceCatalogItem> items;
 }
 
 sealed class RelationGroupReadFailure implements GraphCommandFailure {

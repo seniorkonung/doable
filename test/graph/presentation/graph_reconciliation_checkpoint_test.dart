@@ -1401,9 +1401,9 @@ final class _CheckpointGraphRepository implements PersonalGraphRepository {
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) {
-    groupQueries.add(query);
+    groupQueries.add(query as RelationGroupQuery);
     final request = Completer<RelationGroupPageResult>();
     _groupRequests.add(request);
     return request.future;

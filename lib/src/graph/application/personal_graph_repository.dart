@@ -59,16 +59,22 @@ abstract interface class PersonalGraphRepository
     IntentionId intentionId,
   );
 
+  /// Читает одну прямую группу намерения: долговременную либо дневную.
+  /// Первая порция и полная сводка получены на одной ревизии; продолжение
+  /// относится к той же группе, размеру порции и снимку графа.
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   );
 
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id);
 
+  /// Возвращает ровно явно выбранные ссылки обоих видов на одном снимке.
+  /// Отсутствие и утрата прямой принадлежности остаются отдельными записями.
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
   );
 
+  /// Наблюдает тот же полный набор до отдельного подтверждения удаления.
   Stream<SelectedRelationsReadResult> watchSelectedRelations(
     SelectedRelationsQuery query,
   );

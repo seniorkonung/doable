@@ -821,16 +821,19 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => Future.value(
     GraphResultSuccess(
       RelationGroupFirstPage(
         items:
             relation != null &&
                 query.intentionId == relation!.relation.sourceIntentionId &&
-                query.scope == RelationScope.active &&
-                query.type == LongTermRelationType.need &&
-                query.direction == RelationDirection.outgoing
+                query.group ==
+                    const LongTermRelationGroup(
+                      scope: RelationScope.active,
+                      type: LongTermRelationType.need,
+                      direction: RelationDirection.outgoing,
+                    )
             ? [relation!]
             : const [],
         counts: _countsFor(query.intentionId),
