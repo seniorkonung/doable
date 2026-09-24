@@ -43,12 +43,13 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
       ..._encodeStatus(event.status),
     },
   ChoicePathContinuationReadDiagnosticsEvent(
+    :final stage,
     :final pageSize,
     :final isContinuation,
   ) =>
     {
       'operation': 'choicePathContinuationRead',
-      'stage': 'read',
+      'stage': stage.name,
       ..._encodeStatus(event.status),
       'pageSize': pageSize,
       'isContinuation': isContinuation,

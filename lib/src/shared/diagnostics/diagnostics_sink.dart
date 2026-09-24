@@ -96,14 +96,18 @@ final class DailyChoiceCatalogPageReadDiagnosticsEvent
   final bool isContinuation;
 }
 
+enum ChoicePathContinuationReadStage { validation, read }
+
 final class ChoicePathContinuationReadDiagnosticsEvent
     extends DiagnosticsEvent {
   const ChoicePathContinuationReadDiagnosticsEvent({
+    required this.stage,
     required this.pageSize,
     required this.isContinuation,
     required DiagnosticsStatus status,
   }) : super(status);
 
+  final ChoicePathContinuationReadStage stage;
   final int pageSize;
   final bool isContinuation;
 }

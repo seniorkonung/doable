@@ -5,8 +5,10 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     ChoicePathContinuationQuery query,
   ) async {
     final stopwatch = Stopwatch()..start();
+    var stage = ChoicePathContinuationReadStage.validation;
     void record(DiagnosticsStatus status) => _recordDiagnostics(
       ChoicePathContinuationReadDiagnosticsEvent(
+        stage: stage,
         pageSize: query.pageSize,
         isContinuation: query.cursor != null,
         status: status,
@@ -16,7 +18,14 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     record(const DiagnosticsStarted());
     try {
       final page = await _sequencer.run(
-        () => _database.transaction(() => _readChoicePathPageOnSnapshot(query)),
+        () => _database.transaction(
+          () => _readChoicePathPageOnSnapshot(query, () {
+            record(DiagnosticsSucceeded(stopwatch.elapsed));
+            stopwatch.reset();
+            stage = ChoicePathContinuationReadStage.read;
+            record(const DiagnosticsStarted());
+          }),
+        ),
       );
       record(DiagnosticsSucceeded(stopwatch.elapsed));
       return ChoicePathContinuationSuccess(page);
@@ -34,6 +43,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
 
   Future<ChoicePathContinuationsPage> _readChoicePathPageOnSnapshot(
     ChoicePathContinuationQuery query,
+    void Function() onValidated,
   ) async {
     final cursor = query.cursor;
     if (cursor != null &&
@@ -49,13 +59,11 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     }
 
     final draft = query.draft;
-    if (draft.direction == ChoicePathDraftDirection.bottomUp) {
-      // Чтение входящих продолжений добавляется отдельной задачей 3.2.
-      throw UnsupportedError('Нижний обход пока не подключён к хранилищу.');
-    }
+    final isBottomUp = draft.direction == ChoicePathDraftDirection.bottomUp;
     final visited = <IntentionId>[
       draft.startingIntentionId,
-      for (final step in draft.steps) step.relatedIntentionId,
+      for (final step in draft.steps)
+        isBottomUp ? step.sourceIntentionId : step.relatedIntentionId,
     ];
     final visitedJson = jsonEncode([
       for (final id in visited) id.toCanonicalString(),
@@ -83,6 +91,11 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
           (intention) =>
               intention.archiveState != domain.IntentionArchiveState.active,
         )) {
+      throw const _ChoicePathSnapshotHasExpired();
+    }
+    if (isBottomUp &&
+        intentions[draft.startingIntentionId]!.readiness !=
+            domain.IntentionReadiness.ready) {
       throw const _ChoicePathSnapshotHasExpired();
     }
 
@@ -125,15 +138,25 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
       }
     }
 
-    // Рекурсивный набор хранит только вершины: UNION завершает циклы без
-    // перечисления путей. Посещённый префикс исключён до поиска ветвей.
+    onValidated();
+
+    // Рекурсивный набор верхнего обхода хранит только вершины: UNION
+    // завершает циклы без перечисления путей.
     final boundary = cursor is _DriftChoicePathCursor
         ? '''AND (CASE WHEN r.type = 'need' THEN 0 ELSE 1 END,
                    r.priority, r.creation_sequence) > (?, ?, ?)'''
         : '';
-    final rawRows = await _database
-        .customSelect(
-          '''WITH RECURSIVE
+    final candidatesSql = isBottomUp
+        ? '''WITH visited(id) AS (SELECT value FROM json_each(?))
+             SELECT r.creation_sequence, r.id, r.source_intention_id,
+                    r.related_intention_id, r.type, r.priority,
+                    r.description, r.is_archived
+             FROM long_term_relations r
+             JOIN intentions source ON source.id = r.source_intention_id
+             WHERE r.related_intention_id = ? AND r.is_archived = 0
+               AND source.is_archived = 0
+               AND r.source_intention_id NOT IN (SELECT id FROM visited)'''
+        : '''WITH RECURSIVE
                visited(id) AS (SELECT value FROM json_each(?)),
                reachable(id) AS (
                  SELECT id FROM intentions
@@ -152,8 +175,11 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
                     r.description, r.is_archived
              FROM long_term_relations r
              JOIN reachable ON reachable.id = r.related_intention_id
-             WHERE r.source_intention_id = ? AND r.is_archived = 0
-               $boundary
+             WHERE r.source_intention_id = ? AND r.is_archived = 0''';
+    final rawRows = await _database
+        .customSelect(
+          '''$candidatesSql
+             $boundary
              ORDER BY CASE WHEN r.type = 'need' THEN 0 ELSE 1 END,
                       r.priority, r.creation_sequence
              LIMIT ?''',
@@ -175,9 +201,13 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     ];
     if (stored.any(
       (row) =>
-          row.sourceIntentionId != draft.currentIntentionId ||
+          (isBottomUp
+              ? row.relatedIntentionId != draft.currentIntentionId ||
+                    visited.contains(row.sourceIntentionId)
+              : row.sourceIntentionId != draft.currentIntentionId ||
+                    visited.contains(row.relatedIntentionId)) ||
           row.scope != relation_domain.RelationScope.active ||
-          visited.contains(row.relatedIntentionId),
+          row.sourceIntentionId == row.relatedIntentionId,
     )) {
       throw const _StoredIntentionCorruption();
     }
@@ -203,7 +233,8 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     ];
     if (items.any(
       (item) =>
-          item.related.archiveState != domain.IntentionArchiveState.active,
+          (isBottomUp ? item.source : item.related).archiveState !=
+          domain.IntentionArchiveState.active,
     )) {
       throw const _StoredIntentionCorruption();
     }
