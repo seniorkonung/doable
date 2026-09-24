@@ -65,7 +65,7 @@ final class ChoicePathViewModelProvider
 }
 
 String _$choicePathViewModelHash() =>
-    r'dc5ee20c7d8646b3e768c1fe184844d999ff56d3';
+    r'472bb8297c9d2f0071957db3cdfe37c17d209b75';
 
 /// Управляет одним верхним обходом. Ответы принимаются только поколением
 /// текущего префикса и ревизией подтверждённого снимка.

@@ -128,6 +128,98 @@ void main() {
     expect(page(IntentionReadiness.notReady).canConfirm, isFalse);
   });
 
+  test('нижний черновик различает действие и достигнутое основание', () {
+    final draft = ChoicePathDraftBottomStart(_intention(3));
+    expect(draft.direction, ChoicePathDraftDirection.bottomUp);
+    expect(draft.startingIntentionId, _intention(3));
+    expect(draft.currentIntentionId, _intention(3));
+    expect(draft.steps, isEmpty);
+    expect(() => ConfirmedChoicePath(draft.steps), throwsArgumentError);
+
+    final page = ChoicePathContinuationsPage(
+      draft: draft,
+      current: _current(_intention(3), IntentionReadiness.ready),
+      items: const [],
+      nextCursor: null,
+      revision: const _Revision(),
+    );
+    expect(
+      ChoicePathContinuationQuery(draft: draft).direction,
+      ChoicePathDraftDirection.bottomUp,
+    );
+    expect(page.direction, ChoicePathDraftDirection.bottomUp);
+    expect(page.canConfirm, isFalse);
+  });
+
+  test('нижний черновик нормализует одношаговый путь от основания', () {
+    final draft = ChoicePathDraftBottomProgress(_intention(3), [
+      _step(2, 2, 3),
+    ]);
+    expect(draft.currentIntentionId, _intention(2));
+    expect(draft.confirmedPath.steps.single.sourceIntentionId, _intention(2));
+    final page = ChoicePathContinuationsPage(
+      draft: draft,
+      current: _current(_intention(2), IntentionReadiness.notReady),
+      items: const [],
+      nextCursor: null,
+      revision: const _Revision(),
+    );
+    expect(page.canConfirm, isTrue);
+  });
+
+  test('нижний многошаговый черновик нормализует путь и показанные шаги', () {
+    final input = [
+      _step(2, 2, 3, type: LongTermRelationType.can),
+      _step(1, 1, 2),
+    ];
+    final draft = ChoicePathDraftBottomProgress(_intention(3), input);
+    input.clear();
+    expect(draft.steps.map((step) => step.relationId), [
+      _relation(2),
+      _relation(1),
+    ]);
+    expect(draft.confirmedPath.steps.map((step) => step.relationId), [
+      _relation(1),
+      _relation(2),
+    ]);
+    expect(draft.pathOrder([_relation(2), _relation(1)]), [
+      _relation(1),
+      _relation(2),
+    ]);
+    expect(() => draft.steps.clear(), throwsUnsupportedError);
+    expect(() => draft.confirmedPath.steps.clear(), throwsUnsupportedError);
+    expect(() => draft.pathOrder([_relation(1)]), throwsArgumentError);
+
+    final top = ChoicePathDraftProgress(_intention(1), [
+      _step(1, 1, 2),
+      _step(2, 2, 3, type: LongTermRelationType.can),
+    ]);
+    expect(
+      draft.confirmedPath.steps.map(_stepIdentity),
+      top.confirmedPath.steps.map(_stepIdentity),
+    );
+    expect(top.direction, ChoicePathDraftDirection.topDown);
+  });
+
+  test('нижний черновик отклоняет разрыв и повтор намерения', () {
+    expect(
+      () => ChoicePathDraftBottomProgress(_intention(3), const []),
+      throwsArgumentError,
+    );
+    expect(
+      () => ChoicePathDraftBottomProgress(_intention(3), [_step(1, 1, 2)]),
+      throwsArgumentError,
+    );
+    expect(
+      () => ChoicePathDraftBottomProgress(_intention(3), [
+        _step(2, 2, 3),
+        _step(1, 1, 2),
+        _step(3, 3, 1),
+      ]),
+      throwsArgumentError,
+    );
+  });
+
   test('контракт различает ввод, отсутствие, конфликт и ошибки чтения', () {
     const failures = <ChoicePathContinuationFailure>[
       ChoicePathContinuationValidationFailure(),
@@ -143,6 +235,26 @@ void main() {
     );
   });
 }
+
+ConfirmedChoicePathStep _step(
+  int relation,
+  int source,
+  int related, {
+  LongTermRelationType type = LongTermRelationType.need,
+}) => ConfirmedChoicePathStep(
+  relationId: _relation(relation),
+  sourceIntentionId: _intention(source),
+  type: type,
+  relatedIntentionId: _intention(related),
+);
+
+(LongTermRelationId, IntentionId, LongTermRelationType, IntentionId)
+_stepIdentity(ConfirmedChoicePathStep step) => (
+  step.relationId,
+  step.sourceIntentionId,
+  step.type,
+  step.relatedIntentionId,
+);
 
 IntentionId _intention(int value) => (IntentionId.decode(
   '00000000-0000-4000-8000-${value.toString().padLeft(12, '0')}',

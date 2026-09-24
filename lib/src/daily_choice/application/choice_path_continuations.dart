@@ -14,7 +14,7 @@ final class ChoicePathContinuationQueryValidationException
 }
 
 /// Непрозрачное продолжение одной порции. Репозиторий привязывает его к своему
-/// экземпляру, полному префиксу, размеру порции, ревизии и последнему ключу.
+/// экземпляру, направлению, полному черновику, размеру порции, ревизии и ключу.
 abstract interface class ChoicePathContinuationCursor {}
 
 final class ChoicePathContinuationQuery {
@@ -40,6 +40,8 @@ final class ChoicePathContinuationQuery {
   final ChoicePathDraft draft;
   final int pageSize;
   final ChoicePathContinuationCursor? cursor;
+
+  ChoicePathDraftDirection get direction => draft.direction;
 }
 
 /// Подтверждённый снимок текущего шага и одной порции допустимых переходов.
@@ -67,10 +69,15 @@ final class ChoicePathContinuationsPage {
   final ChoicePathContinuationCursor? nextCursor;
   final GraphRevision revision;
 
-  /// Готовое исходное намерение без перехода нельзя выбрать для себя самого.
-  bool get canConfirm =>
-      draft is ChoicePathDraftProgress &&
-      current.readiness == IntentionReadiness.ready;
+  ChoicePathDraftDirection get direction => draft.direction;
+
+  /// После перехода верхний обход требует готового конца, а нижний допускает
+  /// основание любой готовности. Репозиторий проверяет фиксированное действие.
+  bool get canConfirm => switch (draft) {
+    ChoicePathDraftProgress() => current.readiness == IntentionReadiness.ready,
+    ChoicePathDraftBottomProgress() => true,
+    ChoicePathDraftStart() || ChoicePathDraftBottomStart() => false,
+  };
 }
 
 int _compareContinuations(
