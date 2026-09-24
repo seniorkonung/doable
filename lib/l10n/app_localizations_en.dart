@@ -1364,6 +1364,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceDetailsTitle => 'Daily choice';
 
   @override
+  String get dailyChoiceEditTitle => 'Edit daily choice';
+
+  @override
+  String get dailyChoiceEditSave => 'Save changes';
+
+  @override
+  String get dailyChoiceEditRefresh => 'Return to details and refresh';
+
+  @override
   String get dailyChoiceDetailsLoading => 'Loading daily choice…';
 
   @override

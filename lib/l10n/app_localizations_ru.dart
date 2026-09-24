@@ -1362,6 +1362,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceDetailsTitle => 'Дневной выбор';
 
   @override
+  String get dailyChoiceEditTitle => 'Редактировать дневной выбор';
+
+  @override
+  String get dailyChoiceEditSave => 'Сохранить изменения';
+
+  @override
+  String get dailyChoiceEditRefresh =>
+      'Вернуться к подробностям и обновить данные';
+
+  @override
   String get dailyChoiceDetailsLoading => 'Загружаем дневной выбор…';
 
   @override
