@@ -4,11 +4,13 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -112,6 +114,142 @@ Future<void> _edit(
 }
 
 void main() {
+  testWidgets(
+    'после конфликта новый путь сохраняет поля только по подтверждению',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      tester.view.physicalSize = const Size(1200, 4000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      final seeded = await harness.openReadyDatabase();
+      await seedDurabilityGraph(seeded);
+      await harness.closePersistenceObjectGraph();
+      final runtime = AppRuntime(
+        connectionFactory: () =>
+            openFileBackedLocalDatabase(harness.databaseFile),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await harness.dispose();
+      });
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await _until(tester, find.text('Намерение 1'));
+      final repository = (await runtime.bootstrap() as AppRuntimeReady)
+          .container
+          .read(personalGraphRepositoryProvider);
+
+      await _tap(tester, find.text('Намерение 1').first);
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('intention-details-choose-path')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-action')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await _until(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2027-01-02',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-description')),
+        '  После конфликта  ',
+      );
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
+
+      expect(
+        await repository.execute(
+          ArchiveLongTermRelation(durabilityRelation(101)),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _until(tester, find.byKey(const ValueKey('daily-choice-failure')));
+      expect(_savedIds(harness), isEmpty);
+      expect(find.textContaining('Дневной выбор создан'), findsNothing);
+      await _tap(tester, find.text('Вернуться к пути и актуализировать его'));
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(103)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-action')),
+      );
+      expect(_savedIds(harness), isEmpty);
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+
+      expect(_savedIds(harness), isEmpty);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
+            .controller!
+            .text,
+        '2027-01-02',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('daily-choice-description')),
+            )
+            .controller!
+            .text,
+        '  После конфликта  ',
+      );
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const ValueKey('daily-choice-completed')),
+            )
+            .value,
+        isTrue,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2028-02-03',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-description')),
+        '  Подтверждённый текст  ',
+      );
+      expect(_savedIds(harness), isEmpty);
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _until(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-action')),
+      );
+      final saved = await _read(repository, _savedIds(harness).single);
+      expect(saved.choice.date, CalendarDate.fromParts(2028, 2, 3));
+      expect(saved.choice.description?.value, '  Подтверждённый текст  ');
+      expect(saved.choice.isCompleted, isTrue);
+      expect(saved.path.map((step) => step.relation.id), [
+        durabilityRelation(103),
+      ]);
+    },
+  );
+
   testWidgets(
     'полный путь через экраны переживает перезапуск, правки и удаление дубликата',
     (tester) async {

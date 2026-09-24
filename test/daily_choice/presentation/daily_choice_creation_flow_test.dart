@@ -304,8 +304,60 @@ void main() {
       );
       expect(find.textContaining('Daily choice created'), findsNothing);
       expect(_savedIds(harness), isEmpty);
+      await _tap(tester, find.text('Return to the path and refresh it'));
+      await tester.pumpAndSettle();
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(103)}')).last,
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${_uuid(104)}')).last,
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-action')).last,
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')).last,
+      );
+      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      expect(_savedIds(harness), isEmpty);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-cancel')));
+      await tester.pumpAndSettle();
       await _waitFor(tester, find.text('Choose a path to an action'));
+      expect(_savedIds(harness), isEmpty);
+      expect(
+        find.byKey(const ValueKey('choice-path-select-action')),
+        findsOneWidget,
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-action')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('daily-choice-description')),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const ValueKey('daily-choice-completed')),
+            )
+            .value,
+        isFalse,
+      );
       expect(_savedIds(harness), isEmpty);
       semantics.dispose();
     },
