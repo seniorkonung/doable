@@ -6,11 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
+import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_details.dart';
+import '../../application/daily_choice_result.dart';
 import '../../domain/daily_choice_id.dart';
+import '../daily_choice_command_failure_message.dart';
+import 'daily_choice_delete_confirmation.dart';
 import 'daily_choice_details_state.dart';
 import 'daily_choice_details_view_model.dart';
 
@@ -28,10 +35,19 @@ final class DailyChoiceDetailsPage extends ConsumerStatefulWidget {
 final class _DailyChoiceDetailsPageState
     extends ConsumerState<DailyChoiceDetailsPage> {
   late DailyChoiceDetailsViewModel _model;
+  late GraphCommandCoordinator _coordinator;
+  DailyChoiceOperationToken? _activeDeleteToken;
+  DailyChoiceOperationToken? _failureToken;
+  GraphInitiatorPresentationClaim? _failureClaim;
+  DailyChoiceCommandFailure? _deleteFailure;
+  bool _confirmationOpen = false;
+  bool _deleting = false;
+  bool _deleted = false;
 
   @override
   void initState() {
     super.initState();
+    _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
     _model = DailyChoiceDetailsViewModel(
       ref.read(personalGraphRepositoryProvider),
       widget.choiceId,
@@ -42,6 +58,12 @@ final class _DailyChoiceDetailsPageState
   void didUpdateWidget(covariant DailyChoiceDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.choiceId != widget.choiceId) {
+      _releasePresentation();
+      _activeDeleteToken = null;
+      _confirmationOpen = false;
+      _deleting = false;
+      _deleted = false;
+      _deleteFailure = null;
       _model.dispose();
       _model = DailyChoiceDetailsViewModel(
         ref.read(personalGraphRepositoryProvider),
@@ -52,8 +74,105 @@ final class _DailyChoiceDetailsPageState
 
   @override
   void dispose() {
+    _releasePresentation();
     _model.dispose();
     super.dispose();
+  }
+
+  void _releasePresentation() {
+    final active = _activeDeleteToken;
+    if (active != null) _coordinator.releaseInitiatorPresentation(active);
+    final failed = _failureToken;
+    if (failed != null) _coordinator.releaseInitiatorPresentation(failed);
+    _failureToken = null;
+    _failureClaim = null;
+  }
+
+  Future<void> _confirmDelete(DailyChoiceDetails details) async {
+    if (_confirmationOpen || _deleting || _deleted) return;
+    setState(() => _confirmationOpen = true);
+    final confirmed = await confirmDailyChoiceDeletion(context, details);
+    if (!mounted) return;
+    setState(() => _confirmationOpen = false);
+    if (!confirmed ||
+        widget.choiceId != details.choice.id ||
+        _model.state is! DailyChoiceDetailsLoaded) {
+      return;
+    }
+    _startDelete();
+  }
+
+  void _startDelete() {
+    if (_deleting || _deleted) return;
+    _releasePresentation();
+    final start = _coordinator.acceptDailyChoiceDelete(
+      DeleteDailyChoice(widget.choiceId),
+    );
+    switch (start) {
+      case DailyChoiceCommandAccepted(:final token, :final future):
+        setState(() {
+          _activeDeleteToken = token;
+          _deleteFailure = null;
+          _deleting = true;
+        });
+        unawaited(_finishDelete(token, future));
+      case DailyChoiceCommandAlreadyRunning():
+        setState(
+          () => _deleteFailure = const DailyChoiceConflictFailure(
+            DailyChoiceConflictReason.dependencyChanged,
+          ),
+        );
+      case GraphCommandCoordinatorDraining():
+        setState(() => _deleteFailure = const DailyChoiceUnexpectedFailure());
+    }
+  }
+
+  Future<void> _finishDelete(
+    DailyChoiceOperationToken token,
+    Future<DailyChoiceCommandCompletion> future,
+  ) async {
+    try {
+      final completion = await future;
+      if (!mounted || !identical(_activeDeleteToken, token)) return;
+      _activeDeleteToken = null;
+      switch (completion.result) {
+        case GraphResultSuccess(value: DailyChoiceDeleted(:final choice))
+            when choice.id == widget.choiceId:
+          setState(() {
+            _deleting = false;
+            _deleted = true;
+          });
+          if (ModalRoute.of(context)?.isCurrent ?? false) {
+            unawaited(Navigator.of(context).maybePop());
+          }
+        case GraphResultFailure(:final failure):
+          final canPresentHere = ModalRoute.of(context)?.isCurrent ?? false;
+          if (!canPresentHere) {
+            _coordinator.releaseInitiatorPresentation(token);
+          }
+          setState(() {
+            _deleting = false;
+            _deleteFailure = failure;
+            _failureToken = canPresentHere ? token : null;
+            _failureClaim = canPresentHere
+                ? _coordinator.claimInitiatorFailure(token)
+                : null;
+          });
+        case GraphResultSuccess():
+          setState(() {
+            _deleting = false;
+            _deleteFailure = const DailyChoiceUnexpectedFailure();
+          });
+      }
+    } on Object {
+      if (!mounted || !identical(_activeDeleteToken, token)) return;
+      _coordinator.releaseInitiatorPresentation(token);
+      setState(() {
+        _activeDeleteToken = null;
+        _deleting = false;
+        _deleteFailure = const DailyChoiceUnexpectedFailure();
+      });
+    }
   }
 
   @override
@@ -65,7 +184,8 @@ final class _DailyChoiceDetailsPageState
         appBar: AppBar(
           title: Text(l10n.dailyChoiceDetailsTitle),
           actions: [
-            if (_model.state case DailyChoiceDetailsLoaded(:final details))
+            if (_model.state case DailyChoiceDetailsLoaded(:final details)
+                when !_deleted && !_deleting && !_confirmationOpen)
               IconButton(
                 key: const ValueKey('daily-choice-edit-open'),
                 tooltip: l10n.dailyChoiceEditTitle,
@@ -74,32 +194,60 @@ final class _DailyChoiceDetailsPageState
                   context.router.push(DailyChoiceEditRoute(details: details)),
                 ),
               ),
+            if (_model.state case DailyChoiceDetailsLoaded(:final details)
+                when !_deleted)
+              IconButton(
+                key: const ValueKey('daily-choice-delete-open'),
+                tooltip: l10n.dailyChoiceDeleteAction,
+                icon: const Icon(Icons.delete_outline),
+                onPressed: _deleting || _confirmationOpen
+                    ? null
+                    : () => unawaited(_confirmDelete(details)),
+              ),
           ],
         ),
         body: SafeArea(
-          child: switch (_model.state) {
-            DailyChoiceDetailsLoading() => _Status(
-              l10n.dailyChoiceDetailsLoading,
-              isLoading: true,
-            ),
-            DailyChoiceDetailsNotFound() => _Status(
-              l10n.dailyChoiceDetailsNotFound,
-            ),
-            DailyChoiceDetailsUnavailable() => _Status(
-              l10n.dailyChoiceDetailsUnavailable,
-              onRetry: _model.retry,
-            ),
-            DailyChoiceDetailsCorruption() => _Status(
-              l10n.dailyChoiceDetailsCorruption,
-            ),
-            DailyChoiceDetailsUnexpected() => _Status(
-              l10n.dailyChoiceDetailsUnexpected,
-            ),
-            DailyChoiceDetailsLoaded(:final details) =>
-              details.path.isEmpty
-                  ? _Status(l10n.dailyChoiceDetailsCorruption)
-                  : _ChoicePath(details: details),
-          },
+          child: Column(
+            children: [
+              if (_deleting) const LinearProgressIndicator(),
+              if (_deleteFailure case final failure?)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: OperationFailurePresentation(
+                    claim: _failureClaim,
+                    message: dailyChoiceCommandFailureMessage(l10n, failure),
+                    messageKey: const ValueKey('daily-choice-delete-failure'),
+                  ),
+                ),
+              Expanded(
+                child: _deleted
+                    ? _Status(l10n.dailyChoiceDetailsNotFound)
+                    : switch (_model.state) {
+                        DailyChoiceDetailsLoading() => _Status(
+                          l10n.dailyChoiceDetailsLoading,
+                          isLoading: true,
+                        ),
+                        DailyChoiceDetailsNotFound() => _Status(
+                          l10n.dailyChoiceDetailsNotFound,
+                        ),
+                        DailyChoiceDetailsUnavailable() => _Status(
+                          l10n.dailyChoiceDetailsUnavailable,
+                          onRetry: _model.retry,
+                        ),
+                        DailyChoiceDetailsCorruption() => _Status(
+                          l10n.dailyChoiceDetailsCorruption,
+                        ),
+                        DailyChoiceDetailsUnexpected() => _Status(
+                          l10n.dailyChoiceDetailsUnexpected,
+                        ),
+                        DailyChoiceDetailsLoaded(:final details) =>
+                          details.path.isEmpty
+                              ? _Status(l10n.dailyChoiceDetailsCorruption)
+                              : _ChoicePath(details: details),
+                      },
+              ),
+            ],
+          ),
         ),
       ),
     );

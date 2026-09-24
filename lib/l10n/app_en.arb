@@ -829,6 +829,27 @@
   "@dailyChoiceDeleted": {
     "description": "Подтверждение удаления дневного выбора"
   },
+  "dailyChoiceDeleteAction": "Delete daily choice permanently",
+  "@dailyChoiceDeleteAction": {
+    "description": "Открытие отдельного подтверждения удаления дневного выбора"
+  },
+  "dailyChoiceDeleteConfirmationTitle": "Delete daily choice permanently?",
+  "@dailyChoiceDeleteConfirmationTitle": {
+    "description": "Заголовок отдельного подтверждения удаления дневного выбора"
+  },
+  "dailyChoiceDeleteConfirmationMessage": "Choice: {phrase}\nDate: {date}\nChoice ID: {choiceId}\n\nThis cannot be undone. Intentions, long-term relations, and other daily choices will remain.",
+  "@dailyChoiceDeleteConfirmationMessage": {
+    "description": "Конкретный выбор, дата, идентификатор и необратимость удаления",
+    "placeholders": {
+      "phrase": {"type": "String"},
+      "date": {"type": "String"},
+      "choiceId": {"type": "String"}
+    }
+  },
+  "dailyChoiceDeleteConfirmAction": "Delete permanently",
+  "@dailyChoiceDeleteConfirmAction": {
+    "description": "Отправить подтверждённое удаление дневного выбора"
+  },
   "dailyChoiceSourceInvalid": "Check the source intention of the daily choice.",
   "@dailyChoiceSourceInvalid": {
     "description": "Ошибка исходного намерения дневного выбора"
