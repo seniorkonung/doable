@@ -153,9 +153,14 @@ void main() {
           ),
         );
         reads++;
-        items.addAll(
-          page.items.map((item) => item.relation.creationSequence.value),
-        );
+        items.addAll(switch (page) {
+          RelationGroupFirstPage(:final items) ||
+          RelationGroupContinuationPage(
+            :final items,
+          ) => items.map((item) => item.relation.creationSequence.value),
+          DailyChoiceGroupFirstPage() || DailyChoiceGroupContinuationPage() =>
+            throw StateError('Ожидалась группа долговременных связей.'),
+        });
         if (reads == 1) {
           expect((page as RelationGroupFirstPage).counts.activeNeedOutgoing, 5);
         } else {

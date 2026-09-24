@@ -504,7 +504,7 @@ final class _ControlledPersonalGraphRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
 
   @override

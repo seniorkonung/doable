@@ -1,4 +1,5 @@
 import '../domain/long_term_relation.dart';
+import 'relation_group.dart';
 
 enum RelationCountsValidationFailure { negativeCount }
 
@@ -125,6 +126,15 @@ final class RelationCounts {
   int get longTermTotal => active + archived;
 
   int get total => longTermTotal + dailyTotal;
+
+  int forSelection(RelationGroup group) => switch (group) {
+    LongTermRelationGroup(:final scope, :final type, :final direction) =>
+      forGroup(scope: scope, type: type, direction: direction),
+    DailyChoiceRelationGroup(role: DailyChoiceRelationRole.source) =>
+      dailySource,
+    DailyChoiceRelationGroup(role: DailyChoiceRelationRole.selected) =>
+      dailySelected,
+  };
 
   int forGroup({
     required RelationScope scope,

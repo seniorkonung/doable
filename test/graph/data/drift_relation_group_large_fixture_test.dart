@@ -334,7 +334,7 @@ void main() {
         );
         pageWatch.stop();
         pageLatencies.add(pageWatch.elapsed);
-        activeRows.addAll(page.items);
+        activeRows.addAll(_longTermItems(page));
         cursor = page.nextCursor;
       } while (cursor != null);
       expect(activeRows.map((row) => row.relation.id).toSet(), hasLength(250));
@@ -350,7 +350,7 @@ void main() {
         );
         pageWatch.stop();
         pageLatencies.add(pageWatch.elapsed);
-        archivedRows.addAll(page.items);
+        archivedRows.addAll(_longTermItems(page));
         cursor = page.nextCursor;
         expect(cursor, isNotNull);
       }
@@ -590,7 +590,7 @@ Future<_TraversalMeasurements> _traverseGroup(
     pageStopwatch.stop();
     pageLatencies.add(pageStopwatch.elapsed);
     pageCount++;
-    expect(page.items, hasLength(lessThanOrEqualTo(_pageSize)));
+    expect(_longTermItems(page), hasLength(lessThanOrEqualTo(_pageSize)));
     final establishedRevision = revision;
     if (establishedRevision == null) {
       revision = page.revision;
@@ -625,7 +625,7 @@ Future<_TraversalMeasurements> _traverseGroup(
       expect(page, isA<RelationGroupContinuationPage>());
     }
 
-    for (final summary in page.items) {
+    for (final summary in _longTermItems(page)) {
       final relation = summary.relation;
       final priority = relation.priority.index + 1;
       final sequence = relation.creationSequence.value;
@@ -823,6 +823,14 @@ RelationGroupPage _page(RelationGroupPageResult result) {
   expect(result, isA<RelationGroupPageSuccess>());
   return (result as RelationGroupPageSuccess).value;
 }
+
+List<LongTermRelationSummary> _longTermItems(RelationGroupPage page) =>
+    switch (page) {
+      RelationGroupFirstPage(:final items) ||
+      RelationGroupContinuationPage(:final items) => items,
+      DailyChoiceGroupFirstPage() || DailyChoiceGroupContinuationPage() =>
+        throw StateError('Ожидалась группа долговременных связей.'),
+    };
 
 Future<void> _expectCommandSuccess(
   Future<LongTermRelationCommandResult> result,

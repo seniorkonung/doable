@@ -348,6 +348,10 @@ final class BlockingRelationsSelectionViewModel
             related: details.related,
             hasDescription: details.hasDescription,
           );
+        case SelectedDailyChoicePresent() ||
+            SelectedDailyChoiceMissing() ||
+            SelectedDailyChoiceNoLongerBlocking():
+          break;
       }
     }
     return (

@@ -124,7 +124,7 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) =>
       throw UnsupportedError('Группы связей не используются в тесте каталога.');
 

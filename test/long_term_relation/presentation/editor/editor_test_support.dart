@@ -196,7 +196,7 @@ final class ControlledRelationEditorRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => throw UnsupportedError('Группы связей не читаются черновиком формы.');
 
   @override

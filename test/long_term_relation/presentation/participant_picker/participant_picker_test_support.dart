@@ -108,7 +108,7 @@ final class ControlledParticipantPickerRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => Completer<RelationGroupPageResult>().future;
 
   @override

@@ -872,7 +872,7 @@ final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) async => const RelationGroupPageFailure(RelationGroupUnavailableFailure());
 
   @override
