@@ -19,8 +19,8 @@ part 'intention_catalog_view_model.g.dart';
 
 /// Ограниченный каталог намерений для одного назначения.
 ///
-/// Назначение задаёт отдельное состояние просмотра: выбор участника связи и
-/// открытый каталог намерений не разделяют охват, фильтр и загруженную часть.
+/// Назначение задаёт отдельное состояние просмотра: общий каталог, выбор
+/// участника связи и выбор действия не разделяют фильтр и загруженную часть.
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   late IntentionCatalogPurpose _purpose;
@@ -42,6 +42,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     scope: switch (_purpose) {
       BrowseIntentionCatalog() => _scope,
       SelectRelationParticipant(:final scope) => scope,
+      SelectDailyChoiceAction() => IntentionScope.active,
     },
     titleFilterText: _titleFilterText,
     order: _order,
@@ -74,6 +75,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     try {
       query = IntentionCatalogQuery(
         scope: catalogScope,
+        readinessFilter: switch (purpose) {
+          SelectDailyChoiceAction() => IntentionReadinessFilter.readyOnly,
+          BrowseIntentionCatalog() ||
+          SelectRelationParticipant() => IntentionReadinessFilter.all,
+        },
         titleFilter: _titleFilterText,
         order: _order,
         pageSize: _policy.pageSize,
@@ -102,7 +108,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   void changeScope(IntentionScope scope) {
-    if (_purpose is SelectRelationParticipant || _scope == scope) {
+    if (_purpose is! BrowseIntentionCatalog || _scope == scope) {
       return;
     }
     _scope = scope;
@@ -540,6 +546,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionCatalogQuery _continuationQuery(IntentionCatalogLoaded confirmed) =>
       IntentionCatalogQuery(
         scope: confirmed.query.scope,
+        readinessFilter: confirmed.query.readinessFilter,
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
@@ -549,6 +556,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionCatalogQuery _firstPageQuery(IntentionCatalogLoaded confirmed) =>
       IntentionCatalogQuery(
         scope: confirmed.query.scope,
+        readinessFilter: confirmed.query.readinessFilter,
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
