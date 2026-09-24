@@ -31,6 +31,17 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': 'read',
     ..._encodeStatus(event.status),
   },
+  DailyChoiceCatalogPageReadDiagnosticsEvent(
+    :final pageSize,
+    :final isContinuation,
+  ) =>
+    {
+      'operation': 'dailyChoiceCatalogPageRead',
+      'stage': 'read',
+      'pageSize': pageSize,
+      'isContinuation': isContinuation,
+      ..._encodeStatus(event.status),
+    },
   ChoicePathContinuationReadDiagnosticsEvent(
     :final pageSize,
     :final isContinuation,

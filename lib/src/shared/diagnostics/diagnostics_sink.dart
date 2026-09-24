@@ -84,6 +84,18 @@ final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
     : super(status);
 }
 
+final class DailyChoiceCatalogPageReadDiagnosticsEvent
+    extends DiagnosticsEvent {
+  const DailyChoiceCatalogPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+}
+
 final class ChoicePathContinuationReadDiagnosticsEvent
     extends DiagnosticsEvent {
   const ChoicePathContinuationReadDiagnosticsEvent({
