@@ -1,5 +1,10 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
@@ -27,6 +32,774 @@ import 'neighborhood_test_support.dart';
 import '../../../support/daily_choice_reconciliation_fixture.dart';
 
 void main() {
+  test('дневная группа источника сохраняет строки и десять количеств одной ревизии', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = _NeighborhoodHarness(repository);
+    addTearDown(harness.dispose);
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: testRelationCounts(dailySource: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(1),
+      ),
+    );
+    await pumpEventQueue();
+
+    harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+    expect(repository.pageQueryAt(1), isA<DailyChoiceGroupQuery>());
+    final choice = reconciliationChoice(
+      source: harness.intentionId,
+      selected: testIntentionId(2),
+    );
+    final item = DailyChoiceCatalogItem(
+      id: choice.id,
+      source: DailyChoiceCatalogParticipant(
+        id: choice.sourceIntentionId,
+        title: 'Источник',
+        archiveState: IntentionArchiveState.active,
+        readiness: IntentionReadiness.notReady,
+      ),
+      selected: DailyChoiceCatalogParticipant(
+        id: choice.selectedIntentionId,
+        title: 'Действие',
+        archiveState: IntentionArchiveState.active,
+        readiness: IntentionReadiness.ready,
+      ),
+      date: choice.date,
+      isCompleted: choice.isCompleted,
+    );
+    repository.completePage(
+      1,
+      DailyChoiceGroupFirstPage(
+        items: [item],
+        counts: testRelationCounts(dailySource: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(1),
+      ),
+    );
+    await pumpEventQueue();
+
+    final state = harness.state as DailyChoiceGroupLoaded;
+    expect(
+      state.group,
+      const DailyChoiceRelationGroup(role: DailyChoiceRelationRole.source),
+    );
+    expect(state.items.single.id, choice.id);
+    expect(state.counts.total, 1);
+    expect(state.revision, const TestGraphRevision(1));
+  });
+
+  test('поздний ответ дневной роли не заменяет новую выбранную роль', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = _NeighborhoodHarness(repository);
+    addTearDown(harness.dispose);
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: testRelationCounts(dailySource: 1, dailySelected: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(1),
+      ),
+    );
+    await pumpEventQueue();
+    harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+    harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.selected);
+    expect(
+      (repository.pageQueryAt(2) as DailyChoiceGroupQuery).role,
+      DailyChoiceRelationRole.selected,
+    );
+    repository.completePage(
+      2,
+      DailyChoiceGroupFirstPage(
+        items: [
+          _dailyCatalogItem(
+            source: testIntentionId(2),
+            selected: harness.intentionId,
+          ),
+        ],
+        counts: testRelationCounts(dailySource: 1, dailySelected: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(2),
+      ),
+    );
+    await pumpEventQueue();
+    repository.completePage(
+      1,
+      DailyChoiceGroupFirstPage(
+        items: [
+          _dailyCatalogItem(
+            source: harness.intentionId,
+            selected: testIntentionId(2),
+          ),
+        ],
+        counts: testRelationCounts(dailySource: 1, dailySelected: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(1),
+      ),
+    );
+    await pumpEventQueue();
+    final state = harness.state as DailyChoiceGroupLoaded;
+    expect(
+      (state.group as DailyChoiceRelationGroup).role,
+      DailyChoiceRelationRole.selected,
+    );
+    expect(state.items.single.selected.id, harness.intentionId);
+    expect(state.revision, const TestGraphRevision(2));
+  });
+
+  test(
+    'изменение показанного дневного выбора сохраняет старую пару до замены',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository);
+      addTearDown(harness.dispose);
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+      repository.completePage(
+        1,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: testIntentionId(2),
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      repository.emitIntention(
+        testNeighborhoodIntention(id: harness.intentionId),
+        counts: testRelationCounts(dailySource: 1),
+        revision: const TestGraphRevision(2),
+      );
+      await pumpEventQueue();
+      final refreshing = harness.state as DailyChoiceGroupLoaded;
+      expect(refreshing.items.single.isCompleted, isFalse);
+      expect(refreshing.revision, const TestGraphRevision(1));
+      expect(refreshing.summaryFreshness, RelationSummaryFreshness.refreshing);
+      repository.completePage(
+        2,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: testIntentionId(2),
+              isCompleted: true,
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(2),
+        ),
+      );
+      await pumpEventQueue();
+      final updated = harness.state as DailyChoiceGroupLoaded;
+      expect(updated.items.single.isCompleted, isTrue);
+      expect(updated.revision, const TestGraphRevision(2));
+      expect(updated.summaryFreshness, RelationSummaryFreshness.current);
+    },
+  );
+
+  test(
+    'ошибка замены дневной группы оставляет согласованные строки и числа',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository);
+      addTearDown(harness.dispose);
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+      repository.completePage(
+        1,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: testIntentionId(2),
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      repository.emitIntention(
+        testNeighborhoodIntention(id: harness.intentionId),
+        counts: testRelationCounts(),
+        revision: const TestGraphRevision(2),
+      );
+      await pumpEventQueue();
+      repository.failRead(2, const RelationGroupUnavailableFailure());
+      await pumpEventQueue();
+      final stale = harness.state as DailyChoiceGroupLoaded;
+      expect(stale.items, hasLength(1));
+      expect(stale.counts.dailySource, 1);
+      expect(stale.revision, const TestGraphRevision(1));
+      expect(stale.summaryFreshness, RelationSummaryFreshness.stale);
+      expect(repository.requestCount, 3);
+    },
+  );
+
+  test(
+    'подтверждённое изменение даты и выполнения пересобирает дневную строку',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository);
+      addTearDown(harness.dispose);
+      final choice = reconciliationChoice(
+        source: harness.intentionId,
+        selected: testIntentionId(2),
+      );
+      final pathRelationId = testRelationId(1);
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+      repository.completePage(
+        1,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: testIntentionId(2),
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+
+      final start = harness.coordinator.acceptDailyChoiceUpdate(
+        UpdateDailyChoiceFields(
+          choiceId: choice.id,
+          patch: DailyChoiceFieldsPatch(
+            date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 9, 24)),
+            isCompleted: const DailyChoiceFieldSet(true),
+          ),
+        ),
+      ) as DailyChoiceCommandAccepted;
+      final updatedChoice = DailyChoice(
+        id: choice.id,
+        sourceIntentionId: choice.sourceIntentionId,
+        selectedIntentionId: choice.selectedIntentionId,
+        date: CalendarDate.fromParts(2026, 9, 24),
+        description: choice.description,
+        isCompleted: true,
+      );
+      final created = reconciliationChoiceCreated(
+        choice: choice,
+        pathRelationId: pathRelationId,
+        revision: const TestGraphRevision(1),
+        counts: {
+          harness.intentionId: testRelationCounts(dailySource: 1),
+          testIntentionId(2): testRelationCounts(dailySelected: 1),
+        },
+      );
+      final path = switch (created) {
+        GraphResultSuccess(
+          value: ConfirmedGraphResult(value: DailyChoiceCreated(:final path)),
+        ) =>
+          path,
+        _ => throw StateError('Ожидался подтверждённый путь.'),
+      };
+      repository.completeDailyChoiceCommand(
+        0,
+        GraphCommandSucceeded<
+          DailyChoiceCommandSuccess,
+          DailyChoiceCommandFailure
+        >(
+          ConfirmedGraphResult(
+            revision: const TestGraphRevision(2),
+            value: DailyChoiceFieldsUpdated(
+              before: choice,
+              choice: updatedChoice,
+              path: path,
+              changes: [
+                DailyChoiceChange(
+                  revision: const TestGraphRevision(2),
+                  before: choice,
+                  after: updatedChoice,
+                  releasedRelationIds: const [],
+                  occupiedRelationIds: const [],
+                  intentionCounts: {
+                    harness.intentionId: testRelationCounts(dailySource: 1),
+                    testIntentionId(2): testRelationCounts(dailySelected: 1),
+                  },
+                  relationPermissions: const {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await start.future;
+      await pumpEventQueue();
+      expect(
+        (harness.state as DailyChoiceGroupLoaded).summaryFreshness,
+        RelationSummaryFreshness.refreshing,
+      );
+      expect(repository.requestCount, 3);
+      repository.completePage(
+        2,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: testIntentionId(2),
+              date: CalendarDate.fromParts(2026, 9, 24),
+              isCompleted: true,
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(2),
+        ),
+      );
+      await pumpEventQueue();
+      final item = (harness.state as DailyChoiceGroupLoaded).items.single;
+      expect(item.isCompleted, isTrue);
+      expect(item.date, CalendarDate.fromParts(2026, 9, 24));
+    },
+  );
+
+  test('удаление последнего выбора заменяет дневную группу пустой на новой ревизии', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = _NeighborhoodHarness(repository);
+    addTearDown(harness.dispose);
+    final choice = reconciliationChoice(
+      source: harness.intentionId,
+      selected: testIntentionId(2),
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: testRelationCounts(dailySource: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(1),
+      ),
+    );
+    await pumpEventQueue();
+    harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+    repository.completePage(
+      1,
+      DailyChoiceGroupFirstPage(
+        items: [
+          _dailyCatalogItem(
+            source: harness.intentionId,
+            selected: testIntentionId(2),
+          ),
+        ],
+        counts: testRelationCounts(dailySource: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(1),
+      ),
+    );
+    await pumpEventQueue();
+    final start = harness.coordinator.acceptDailyChoiceDelete(
+      DeleteDailyChoice(choice.id),
+    ) as DailyChoiceCommandAccepted;
+    repository.completeDailyChoiceCommand(
+      0,
+      reconciliationChoiceDeleted(
+        choice: choice,
+        pathRelationId: testRelationId(1),
+        revision: const TestGraphRevision(2),
+        counts: {
+          harness.intentionId: testRelationCounts(),
+          testIntentionId(2): testRelationCounts(),
+        },
+      ),
+    );
+    await start.future;
+    await pumpEventQueue();
+    expect(
+      (harness.state as DailyChoiceGroupLoaded).summaryFreshness,
+      RelationSummaryFreshness.refreshing,
+    );
+    repository.completePage(
+      2,
+      DailyChoiceGroupFirstPage(
+        items: const [],
+        counts: testRelationCounts(),
+        nextCursor: null,
+        revision: const TestGraphRevision(2),
+      ),
+    );
+    await pumpEventQueue();
+    final empty = harness.state as RelationGroupEmpty;
+    expect(
+      empty.group,
+      const DailyChoiceRelationGroup(role: DailyChoiceRelationRole.source),
+    );
+    expect(empty.counts.total, 0);
+    expect(empty.revision, const TestGraphRevision(2));
+  });
+
+  test(
+    'поздняя дневная порция уступает новой основе перед подгрузкой',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository, pageSize: 1);
+      addTearDown(harness.dispose);
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(dailySource: 2),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+      repository.completePage(
+        1,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: testIntentionId(2),
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 2),
+          nextCursor: const TestRelationGroupCursor(1),
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      harness.scrollTo(0);
+      expect(
+        repository.pageQueryAt(2).cursor,
+        const TestRelationGroupCursor(1),
+      );
+      repository.emitIntention(
+        testNeighborhoodIntention(id: harness.intentionId),
+        counts: testRelationCounts(dailySource: 1),
+        revision: const TestGraphRevision(2),
+      );
+      await pumpEventQueue();
+      expect(
+        (harness.state as DailyChoiceGroupLoaded).summaryFreshness,
+        RelationSummaryFreshness.refreshing,
+      );
+      repository.completePage(
+        2,
+        DailyChoiceGroupContinuationPage(
+          items: const [],
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      repository.completePage(
+        3,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: testIntentionId(2),
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(2),
+        ),
+      );
+      await pumpEventQueue();
+      final current = harness.state as DailyChoiceGroupLoaded;
+      expect(current.items, hasLength(1));
+      expect(current.counts.dailySource, 1);
+      expect(current.revision, const TestGraphRevision(2));
+      expect(current.hasConfirmedEnd, isTrue);
+      expect(repository.requestCount, 4);
+    },
+  );
+
+  test('посторонняя ревизия требует новой основы дневной группы', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = _NeighborhoodHarness(repository, pageSize: 1);
+    addTearDown(harness.dispose);
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: testRelationCounts(dailySource: 2),
+        nextCursor: null,
+        revision: const TestGraphRevision(1),
+      ),
+    );
+    await pumpEventQueue();
+    harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+    repository.completePage(
+      1,
+      DailyChoiceGroupFirstPage(
+        items: [
+          _dailyCatalogItem(
+            source: harness.intentionId,
+            selected: testIntentionId(2),
+          ),
+        ],
+        counts: testRelationCounts(dailySource: 2),
+        nextCursor: const TestRelationGroupCursor(1),
+        revision: const TestGraphRevision(1),
+      ),
+    );
+    await pumpEventQueue();
+    harness.scrollTo(0);
+    repository.failRead(2, const RelationGroupSnapshotExpired());
+    await pumpEventQueue();
+    expect(repository.pageQueryAt(3).cursor, isNull);
+    expect(
+      (harness.state as DailyChoiceGroupLoaded).summaryFreshness,
+      RelationSummaryFreshness.refreshing,
+    );
+    repository.completePage(
+      3,
+      DailyChoiceGroupFirstPage(
+        items: [
+          _dailyCatalogItem(
+            source: harness.intentionId,
+            selected: testIntentionId(2),
+          ),
+        ],
+        counts: testRelationCounts(dailySource: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(2),
+      ),
+    );
+    await pumpEventQueue();
+    final current = harness.state as DailyChoiceGroupLoaded;
+    expect(current.revision, const TestGraphRevision(2));
+    expect(current.counts.dailySource, 1);
+    expect(current.hasConfirmedEnd, isTrue);
+  });
+
+  test(
+    'новая дата незагруженного выбора перестраивает видимую часть роли',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository, pageSize: 1);
+      addTearDown(harness.dispose);
+      final unseenId = switch (DailyChoiceId.decode(
+        '018f0002-0000-7000-8000-000000000002',
+      )) {
+        DailyChoiceIdDecodingSuccess(:final id) => id,
+        InvalidDailyChoiceIdDecoding() => throw StateError('Некорректный ID.'),
+      };
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(dailySource: 2),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+      repository.completePage(
+        1,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: testIntentionId(2),
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 2),
+          nextCursor: const TestRelationGroupCursor(1),
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      final before = DailyChoice(
+        id: unseenId,
+        sourceIntentionId: harness.intentionId,
+        selectedIntentionId: testIntentionId(3),
+        date: CalendarDate.fromParts(2026, 9, 22),
+        description: null,
+        isCompleted: false,
+      );
+      final after = DailyChoice(
+        id: unseenId,
+        sourceIntentionId: harness.intentionId,
+        selectedIntentionId: testIntentionId(3),
+        date: CalendarDate.fromParts(2026, 9, 24),
+        description: null,
+        isCompleted: false,
+      );
+      final start = harness.coordinator.acceptDailyChoiceUpdate(
+        UpdateDailyChoiceFields(
+          choiceId: unseenId,
+          patch: DailyChoiceFieldsPatch(date: DailyChoiceFieldSet(after.date)),
+        ),
+      ) as DailyChoiceCommandAccepted;
+      repository.completeDailyChoiceCommand(
+        0,
+        _dailyFieldsUpdatedResult(
+          before: before,
+          after: after,
+          counts: {
+            harness.intentionId: testRelationCounts(dailySource: 2),
+            testIntentionId(3): testRelationCounts(dailySelected: 1),
+          },
+        ),
+      );
+      await start.future;
+      await pumpEventQueue();
+      expect(
+        (harness.state as DailyChoiceGroupLoaded).summaryFreshness,
+        RelationSummaryFreshness.refreshing,
+      );
+      expect(repository.requestCount, 3);
+      repository.completePage(
+        2,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              id: unseenId,
+              source: harness.intentionId,
+              selected: testIntentionId(3),
+              date: after.date,
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 2),
+          nextCursor: const TestRelationGroupCursor(1),
+          revision: const TestGraphRevision(2),
+        ),
+      );
+      await pumpEventQueue();
+      final visible = harness.state as DailyChoiceGroupLoaded;
+      expect(visible.items.single.id, unseenId);
+      expect(visible.counts.dailySource, 2);
+      expect(visible.revision, const TestGraphRevision(2));
+    },
+  );
+
+  test(
+    'переименование показанного участника пересобирает дневную группу',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _NeighborhoodHarness(repository);
+      addTearDown(harness.dispose);
+      final participantId = testIntentionId(2);
+      repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      harness.viewModel.selectDailyGroup(DailyChoiceRelationRole.source);
+      repository.completePage(
+        1,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: participantId,
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await pumpEventQueue();
+      final before = testNeighborhoodIntention(
+        id: participantId,
+        title: 'Действие',
+      );
+      final after = testNeighborhoodIntention(
+        id: participantId,
+        title: 'Новое действие',
+      );
+      final start = harness.coordinator.acceptExisting(
+        UpdateIntention(
+          id: participantId,
+          title: after.title,
+          description: after.description,
+        ),
+        presentationTitle: before.title,
+      ) as IntentionCommandAccepted;
+      repository.completeIntentionCommand(
+        0,
+        testNeighborhoodSavedResult(
+          before: before,
+          after: after,
+          revision: const TestGraphRevision(2),
+        ),
+      );
+      await start.future;
+      await pumpEventQueue();
+      expect(
+        (harness.state as DailyChoiceGroupLoaded).summaryFreshness,
+        RelationSummaryFreshness.refreshing,
+      );
+      expect(
+        (harness.state as DailyChoiceGroupLoaded).items.single.selected.title,
+        'Действие',
+      );
+      repository.completePage(
+        2,
+        DailyChoiceGroupFirstPage(
+          items: [
+            _dailyCatalogItem(
+              source: harness.intentionId,
+              selected: participantId,
+              selectedTitle: 'Новое действие',
+            ),
+          ],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(2),
+        ),
+      );
+      await pumpEventQueue();
+      expect(
+        (harness.state as DailyChoiceGroupLoaded).items.single.selected.title,
+        'Новое действие',
+      );
+    },
+  );
+
   test(
     'удаление последней дневной ссылки сохраняет другую блокирующую связь',
     () async {
@@ -2773,6 +3546,78 @@ LongTermRelationSummary _summaryForRelation(LongTermRelation relation) =>
       related: testParticipant(relation.relatedIntentionId),
       hasDescription: false,
     );
+
+DailyChoiceCatalogItem _dailyCatalogItem({
+  required IntentionId source,
+  required IntentionId selected,
+  DailyChoiceId? id,
+  CalendarDate? date,
+  String selectedTitle = 'Действие',
+  bool isCompleted = false,
+}) {
+  final choice = reconciliationChoice(source: source, selected: selected);
+  return DailyChoiceCatalogItem(
+    id: id ?? choice.id,
+    source: DailyChoiceCatalogParticipant(
+      id: source,
+      title: 'Источник',
+      archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.notReady,
+    ),
+    selected: DailyChoiceCatalogParticipant(
+      id: selected,
+      title: selectedTitle,
+      archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.ready,
+    ),
+    date: date ?? choice.date,
+    isCompleted: isCompleted,
+  );
+}
+
+DailyChoiceCommandResult _dailyFieldsUpdatedResult({
+  required DailyChoice before,
+  required DailyChoice after,
+  required Map<IntentionId, RelationCounts> counts,
+}) {
+  final created = reconciliationChoiceCreated(
+    choice: before,
+    pathRelationId: testRelationId(3),
+    revision: const TestGraphRevision(1),
+    counts: counts,
+  );
+  final path = switch (created) {
+    GraphResultSuccess(
+      value: ConfirmedGraphResult(value: DailyChoiceCreated(:final path)),
+    ) =>
+      path,
+    _ => throw StateError('Ожидался подтверждённый путь.'),
+  };
+  return GraphCommandSucceeded<
+    DailyChoiceCommandSuccess,
+    DailyChoiceCommandFailure
+  >(
+    ConfirmedGraphResult(
+      revision: const TestGraphRevision(2),
+      value: DailyChoiceFieldsUpdated(
+        before: before,
+        choice: after,
+        path: path,
+        changes: [
+          DailyChoiceChange(
+            revision: const TestGraphRevision(2),
+            before: before,
+            after: after,
+            releasedRelationIds: const [],
+            occupiedRelationIds: const [],
+            intentionCounts: counts,
+            relationPermissions: const {},
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 final class _NeighborhoodHarness {
   _NeighborhoodHarness(

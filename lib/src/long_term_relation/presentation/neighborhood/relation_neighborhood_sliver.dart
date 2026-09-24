@@ -129,6 +129,7 @@ final class _RelationNeighborhoodSliverState
     RelationGroupInitialLoad() ||
     RelationGroupInitialFailure() ||
     RelationNeighborhoodIntentionNotFound() ||
+    DailyChoiceGroupLoaded() ||
     RelationGroupEmpty() => 1,
   };
 
@@ -172,6 +173,7 @@ final class _RelationNeighborhoodSliverState
           ? viewModel.retryRefresh
           : null,
     ),
+    DailyChoiceGroupLoaded() => const SizedBox.shrink(),
   };
 
   Widget _buildRelationRow(
@@ -237,6 +239,7 @@ final class _RelationNeighborhoodSliverState
       RelationGroupInitialLoad() ||
       RelationGroupInitialFailure() ||
       RelationNeighborhoodIntentionNotFound() ||
+      DailyChoiceGroupLoaded() ||
       RelationGroupEmpty() => <LongTermRelationId>{},
     };
     _rowKeys.removeWhere((id, _) => !retained.contains(id));
