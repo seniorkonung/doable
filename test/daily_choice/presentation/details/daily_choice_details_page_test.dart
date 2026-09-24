@@ -4,13 +4,17 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
+import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -29,6 +33,168 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'редактор открывается из подробностей и меняет только выбранные поля',
+    (tester) async {
+      final repository = _Repository();
+      final router = AppRouter();
+      addTearDown(() async {
+        router.dispose();
+        await repository.dispose();
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWith((ref) => repository),
+          ],
+          child: MaterialApp.router(
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+          ),
+        ),
+      );
+      unawaited(router.push(DailyChoiceDetailsRoute(choiceId: _choice(1))));
+      await tester.pump();
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('daily-choice-edit-open')));
+      await tester.pumpAndSettle();
+      expect(router.current.name, DailyChoiceEditRoute.name);
+      expect(find.textContaining('Основа'), findsWidgets);
+      expect(find.text('2026-09-24'), findsOneWidget);
+      expect(find.text('Пояснение'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-edit-date')),
+        '0001-01-01',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-edit-description')),
+        ' \n ',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-edit-completed')),
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('daily-choice-edit-submit')),
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const ValueKey('daily-choice-edit-submit')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      await tester.tap(find.byKey(const ValueKey('daily-choice-edit-submit')));
+      await tester.pump();
+      expect(repository.updateCommands, hasLength(1));
+      final command = repository.updateCommands.single;
+      expect(command.choiceId, _choice(1));
+      expect(
+        (command.patch.date as DailyChoiceFieldSet<CalendarDate>).value,
+        CalendarDate.fromParts(1, 1, 1),
+      );
+      expect(command.patch.description, isA<DailyChoiceDescriptionCleared>());
+      expect(
+        (command.patch.isCompleted as DailyChoiceFieldSet<bool>).value,
+        isFalse,
+      );
+      repository.succeedUpdate();
+      await tester.pumpAndSettle();
+      expect(router.current.name, DailyChoiceDetailsRoute.name);
+    },
+  );
+
+  testWidgets('отмена и неверный ввод не отправляют правку', (tester) async {
+    final repository = _Repository();
+    final router = AppRouter();
+    addTearDown(() async {
+      router.dispose();
+      await repository.dispose();
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWith((ref) => repository),
+        ],
+        child: MaterialApp.router(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router.config(),
+        ),
+      ),
+    );
+    unawaited(router.push(DailyChoiceDetailsRoute(choiceId: _choice(1))));
+    await tester.pump();
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('daily-choice-edit-open')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('daily-choice-edit-date')),
+      '9999-02-30',
+    );
+    await tester.pump();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('daily-choice-edit-submit')),
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('daily-choice-edit-submit')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('daily-choice-edit-submit')));
+    await tester.pump();
+    expect(repository.updateCommands, isEmpty);
+    expect(find.text('9999-02-30'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('daily-choice-edit-date')),
+          )
+          .decoration
+          ?.errorText,
+      'Check the daily choice date.',
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('daily-choice-edit-date')),
+      '9999-12-31',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('daily-choice-edit-description')),
+      'е\u0301' * 4097,
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('daily-choice-edit-submit')),
+    );
+    await tester.tap(find.byKey(const ValueKey('daily-choice-edit-submit')));
+    await tester.pump();
+    expect(repository.updateCommands, isEmpty);
+    expect(find.text('е\u0301' * 4097), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('daily-choice-edit-cancel')),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(DailyChoiceEditPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(find.byKey(const ValueKey('daily-choice-edit-cancel')));
+    await tester.pumpAndSettle();
+    expect(router.current.name, DailyChoiceDetailsRoute.name);
+    expect(repository.updateCommands, isEmpty);
+  });
+
   testWidgets(
     'каждый участник и связь открываются по сохранённому идентификатору',
     (tester) async {
@@ -336,13 +502,51 @@ final class _Revision implements GraphRevision {
   }
 }
 
+final class _Change implements GraphChange {
+  const _Change();
+  @override
+  GraphRevision get revision => const _Revision(2);
+}
+
 final class _Repository implements PersonalGraphRepository {
+  final updateCommands = <UpdateDailyChoiceFields>[];
+  final updateRequests = <Completer<DailyChoiceCommandResult>>[];
   final controller = StreamController<DailyChoiceReadResult>.broadcast(
     sync: true,
   );
   @override
   Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
       controller.stream;
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is! UpdateDailyChoiceFields) throw UnimplementedError();
+    updateCommands.add(command as UpdateDailyChoiceFields);
+    final request = Completer<DailyChoiceCommandResult>();
+    updateRequests.add(request);
+    return await request.future as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  void succeedUpdate() {
+    final details = _details();
+    final choice = details.choice;
+    updateRequests.single.complete(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: const _Revision(2),
+          value: DailyChoiceFieldsUpdated(
+            before: choice,
+            choice: choice,
+            path: StoredChoicePath(details.path.map((step) => step.step)),
+            changes: const [_Change()],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

@@ -59,12 +59,25 @@ final class _DailyChoiceDetailsPageState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.dailyChoiceDetailsTitle)),
-      body: SafeArea(
-        child: ListenableBuilder(
-          listenable: _model,
-          builder: (context, _) => switch (_model.state) {
+    return ListenableBuilder(
+      listenable: _model,
+      builder: (context, _) => Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.dailyChoiceDetailsTitle),
+          actions: [
+            if (_model.state case DailyChoiceDetailsLoaded(:final details))
+              IconButton(
+                key: const ValueKey('daily-choice-edit-open'),
+                tooltip: l10n.dailyChoiceEditTitle,
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () => unawaited(
+                  context.router.push(DailyChoiceEditRoute(details: details)),
+                ),
+              ),
+          ],
+        ),
+        body: SafeArea(
+          child: switch (_model.state) {
             DailyChoiceDetailsLoading() => _Status(
               l10n.dailyChoiceDetailsLoading,
               isLoading: true,

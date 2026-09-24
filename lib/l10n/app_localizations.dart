@@ -2364,6 +2364,24 @@ abstract class AppLocalizations {
   /// **'Daily choice'**
   String get dailyChoiceDetailsTitle;
 
+  /// Заголовок редактора дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Edit daily choice'**
+  String get dailyChoiceEditTitle;
+
+  /// Сохранение правок дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get dailyChoiceEditSave;
+
+  /// Возврат к актуальным подробностям после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Return to details and refresh'**
+  String get dailyChoiceEditRefresh;
+
   /// Загрузка подробностей дневного выбора
   ///
   /// In en, this message translates to:
