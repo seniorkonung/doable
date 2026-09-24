@@ -8,6 +8,8 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
@@ -132,6 +134,140 @@ void main() {
   });
 
   test(
+    'нижний вход различает чтение, проверку и создание без данных графа',
+    () async {
+      final catalog = await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          readinessFilter: IntentionReadinessFilter.readyOnly,
+          titleFilter: 'Намерение',
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+        ),
+      );
+      expect(catalog, isA<ResultSuccess<IntentionCatalogPage>>());
+      expect(
+        await repository.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: ChoicePathDraftBottomStart(durabilityIntention(3)),
+            pageSize: 1,
+          ),
+        ),
+        isA<ChoicePathContinuationSuccess>(),
+      );
+      expect(
+        await repository.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: ChoicePathDraftBottomProgress(
+              durabilityIntention(3),
+              durabilityPath([101, 102]).steps.reversed,
+            ),
+            pageSize: 1,
+          ),
+        ),
+        isA<ChoicePathContinuationSuccess>(),
+      );
+      expect(
+        await repository.execute(durabilityBottomCreate()),
+        isA<GraphCommandSucceeded>(),
+      );
+
+      expect(
+        diagnostics.logs.map((line) {
+          final event = jsonDecode(line) as Map<String, dynamic>;
+          return '${event['operation']}:${event['stage']}:${event['outcome']}';
+        }),
+        [
+          'catalogPageRead:null:started',
+          'catalogPageRead:null:succeeded',
+          for (var read = 0; read < 2; read++) ...[
+            'choicePathContinuationRead:validation:started',
+            'choicePathContinuationRead:validation:succeeded',
+            'choicePathContinuationRead:read:started',
+            'choicePathContinuationRead:read:succeeded',
+          ],
+          'dailyChoiceCommand:validation:started',
+          'dailyChoicePathValidation:validation:started',
+          'dailyChoicePathValidation:validation:succeeded',
+          'dailyChoiceCommand:validation:succeeded',
+          'dailyChoiceCommand:write:started',
+          'dailyChoiceCommand:write:succeeded',
+          'dailyChoiceCommand:resultRead:started',
+          'dailyChoiceCommand:resultRead:succeeded',
+        ],
+      );
+      _expectSafeLogs(diagnostics.logs);
+    },
+  );
+
+  test('нижний отказ различает проверку и чтение без исходного исключения', () async {
+    final invalid = await repository.getChoicePathContinuations(
+      ChoicePathContinuationQuery(
+        draft: ChoicePathDraftBottomStart(durabilityIntention(1)),
+      ),
+    );
+    expect(
+      (invalid as ChoicePathContinuationError).failure.category,
+      GraphFailureCategory.conflict,
+    );
+    expect(
+      diagnostics.logs.map((line) {
+        final event = jsonDecode(line) as Map<String, dynamic>;
+        return '${event['stage']}:${event['outcome']}:${event['failureCode']}';
+      }),
+      ['validation:started:null', 'validation:failed:conflict'],
+    );
+    _expectSafeLogs(diagnostics.logs);
+
+    diagnostics.events.clear();
+    diagnostics.logs.clear();
+    probe.arm(_FailurePoint.continuationRead);
+    final failed = await repository.getChoicePathContinuations(
+      ChoicePathContinuationQuery(
+        draft: ChoicePathDraftBottomStart(durabilityIntention(3)),
+      ),
+    );
+    expect(probe.didFail, isTrue);
+    expect(
+      (failed as ChoicePathContinuationError).failure.category,
+      GraphFailureCategory.unexpected,
+    );
+    expect(
+      diagnostics.logs.map((line) {
+        final event = jsonDecode(line) as Map<String, dynamic>;
+        return '${event['stage']}:${event['outcome']}:${event['failureCode']}';
+      }),
+      [
+        'validation:started:null',
+        'validation:succeeded:null',
+        'read:started:null',
+        'read:failed:unexpected',
+      ],
+    );
+    _expectSafeLogs(diagnostics.logs);
+
+    expect(
+      await repository.execute(
+        ArchiveLongTermRelation(durabilityRelation(102)),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    diagnostics.events.clear();
+    diagnostics.logs.clear();
+    final rejected = await repository.execute(durabilityBottomCreate());
+    expect(
+      (rejected as GraphCommandFailed).failure.category,
+      GraphFailureCategory.conflict,
+    );
+    expect(_commandStages(diagnostics.events), [
+      'validation:started',
+      'validation:failed:conflict',
+    ]);
+    expect(_pathStatuses(diagnostics.events), ['started', 'failed:conflict']);
+    _expectSafeLogs(diagnostics.logs);
+  });
+
+  test(
     'ошибки новых чтений сохраняют категорию без исходного исключения',
     () async {
       expect(
@@ -241,6 +377,22 @@ void main() {
         isA<ChoicePathContinuationSuccess>(),
       );
       expect(
+        await graph.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: ChoicePathDraftBottomStart(durabilityIntention(3)),
+          ),
+        ),
+        isA<ChoicePathContinuationSuccess>(),
+      );
+      expect(
+        (await graph.getChoicePathContinuations(
+          ChoicePathContinuationQuery(
+            draft: ChoicePathDraftBottomStart(durabilityIntention(1)),
+          ),
+        ) as ChoicePathContinuationError).failure.category,
+        GraphFailureCategory.conflict,
+      );
+      expect(
         (await graph.getChoicePathContinuations(
           ChoicePathContinuationQuery(
             draft: ChoicePathDraftStart(durabilityIntention(999)),
@@ -281,7 +433,7 @@ void main() {
       final before = await durabilityState(database);
       probe.arm(point);
 
-      final result = await repository.execute(durabilityCreate());
+      final result = await repository.execute(durabilityBottomCreate());
 
       expect(probe.didFail, isTrue);
       expect(
@@ -322,13 +474,15 @@ void main() {
         await local.open();
         await seedDurabilityGraph(local);
         final graph = _repository(local, sink);
-        final success = await graph.execute(durabilityCreate());
+        final success = await graph.execute(durabilityBottomCreate());
         expect(success, isA<GraphCommandSucceeded>());
         expect(
           await graph.execute(ArchiveLongTermRelation(durabilityRelation(103))),
           isA<GraphCommandSucceeded>(),
         );
-        final failure = await graph.execute(durabilityCreate(path: [103]));
+        final failure = await graph.execute(
+          durabilityBottomCreate(path: [103]),
+        );
         final rejected = (failure as GraphCommandFailed).failure;
         return (
           await durabilityState(local),
@@ -471,7 +625,8 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
         sql.contains('FROM daily_choices') &&
             sql.contains('ORDER BY choice_date'),
       _FailurePoint.groupRead => sql.contains('FROM daily_choices INDEXED BY'),
-      _FailurePoint.continuationRead => sql.contains('WITH RECURSIVE'),
+      _FailurePoint.continuationRead =>
+        sql.contains('WITH RECURSIVE') || sql.contains('WITH visited(id)'),
       _ => false,
     };
     if (targeted) {
