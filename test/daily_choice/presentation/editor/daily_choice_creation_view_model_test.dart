@@ -257,6 +257,53 @@ void main() {
     },
   );
 
+  test(
+    'повтор передаёт исправленное описание после временного отказа',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final presenter = harness.coordinator.registerAppPresentation();
+      addTearDown(presenter.release);
+
+      harness.model
+        ..changeDescription('Первый текст')
+        ..submit()
+        ..submit()
+        ..changeDescription('Недопустимая правка');
+      expect(harness.repository.commands, hasLength(1));
+      expect(harness.state.description, 'Первый текст');
+      expect(
+        harness.repository.commands.single.description?.value,
+        'Первый текст',
+      );
+
+      harness.repository.fail(0, const DailyChoiceUnavailableFailure());
+      await pumpEventQueue();
+      expect(harness.state.description, 'Первый текст');
+      expect(harness.state.canRetry, isTrue);
+      expect(
+        harness.state.failurePresentation,
+        isA<GraphInitiatorPresentationClaim>(),
+      );
+
+      harness.model.changeDescription('Исправленный текст');
+      expect(harness.state.description, 'Исправленный текст');
+      harness.model.submit();
+      expect(harness.repository.commands, hasLength(2));
+      expect(
+        harness.repository.commands.last.description?.value,
+        'Исправленный текст',
+      );
+      harness.repository.succeed(1);
+      await pumpEventQueue();
+      expect(harness.state.operation, isA<DailyChoiceCreationSucceeded>());
+      final claim = await presenter.nextClaim();
+      expect(claim?.completion, isA<DailyChoiceCommandCompletion>());
+      harness.coordinator.confirmPresentation(claim!);
+      expect(harness.repository.commands, hasLength(2));
+    },
+  );
+
   test('ошибка поля даты допускает исправление без потери описания', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);

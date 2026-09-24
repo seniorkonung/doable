@@ -137,6 +137,62 @@ void main() {
     expect(find.byKey(const ValueKey('daily-choice-submit')), findsOneWidget);
   });
 
+  testWidgets('описание блокируется при записи и обновляется перед повтором', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await _pump(tester, repository, navigatorKey: navigatorKey);
+    const descriptionKey = ValueKey('daily-choice-description');
+    const submitKey = ValueKey('daily-choice-submit');
+
+    await tester.enterText(find.byKey(descriptionKey), 'Первый текст');
+    await tester.ensureVisible(find.byKey(submitKey));
+    await tester.tap(find.byKey(submitKey));
+    await tester.pump();
+
+    expect(repository.commands, hasLength(1));
+    expect(repository.commands.single.description?.value, 'Первый текст');
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
+      isFalse,
+    );
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).controller!.text,
+      'Первый текст',
+    );
+    expect(
+      tester.widget<FilledButton>(find.byKey(submitKey)).onPressed,
+      isNull,
+    );
+
+    repository.fail(0, const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
+      isTrue,
+    );
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).controller!.text,
+      'Первый текст',
+    );
+
+    await tester.enterText(find.byKey(descriptionKey), 'Исправленный текст');
+    await tester.ensureVisible(find.byKey(submitKey));
+    await tester.tap(find.byKey(submitKey));
+    await tester.pump();
+    expect(repository.commands, hasLength(2));
+    expect(repository.commands.last.description?.value, 'Исправленный текст');
+    expect(
+      tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
+      isFalse,
+    );
+    repository.succeed(1);
+    await tester.pumpAndSettle();
+    expect(find.text('Домашний экран'), findsOneWidget);
+    expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
+  });
+
   testWidgets('подтверждение явно сохраняет показанный путь и поля', (
     tester,
   ) async {
