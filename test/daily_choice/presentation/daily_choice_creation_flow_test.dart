@@ -332,6 +332,98 @@ void main() {
         _relation(102),
       ]);
 
+      await tester.pumpAndSettle();
+      await _tap(tester, find.byKey(const ValueKey('choice-path-back-1')));
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      expect(
+        find.descendant(
+          of: find.byType(DailyChoiceCreationPage),
+          matching: find.text(
+            'Чтобы Действие в середине, можно Продолжение действия',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(DailyChoiceCreationPage),
+          matching: find.text('Чтобы Основание, нужно Действие в середине'),
+        ),
+        findsNothing,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2030-09-24',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-description')),
+        'Одно звено',
+      );
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await tester.pumpAndSettle();
+      final oneStepId = _savedIds(harness).last;
+      final oneStep = await _read(repository, oneStepId);
+      expect(oneStep.choice.sourceIntentionId, _intention(2));
+      expect(oneStep.choice.selectedIntentionId, _intention(3));
+      expect(oneStep.choice.date, CalendarDate.fromParts(2030, 9, 24));
+      expect(oneStep.choice.description?.value, 'Одно звено');
+      expect(oneStep.choice.isCompleted, isTrue);
+      expect(oneStep.path.map((step) => step.relation.id), [_relation(102)]);
+
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2030-09-24',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-description')),
+        'Одно звено',
+      );
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+      await _waitFor(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      final allIds = _savedIds(harness);
+      expect(allIds, hasLength(4));
+      expect(allIds.toSet(), hasLength(4));
+      final duplicate = await _read(repository, allIds.last);
+      expect(
+        duplicate.choice.sourceIntentionId,
+        oneStep.choice.sourceIntentionId,
+      );
+      expect(
+        duplicate.choice.selectedIntentionId,
+        oneStep.choice.selectedIntentionId,
+      );
+      expect(duplicate.choice.date, oneStep.choice.date);
+      expect(duplicate.choice.description, oneStep.choice.description);
+      expect(duplicate.choice.isCompleted, oneStep.choice.isCompleted);
+      expect(duplicate.path.map((step) => step.relation.id), [_relation(102)]);
+      expect((await _read(repository, oneStepId)).path, hasLength(1));
+
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await _waitFor(tester, find.byKey(const ValueKey('daily-choice-row-1')));
@@ -341,9 +433,9 @@ void main() {
         tester
             .widget<DailyChoiceDetailsPage>(find.byType(DailyChoiceDetailsPage))
             .choiceId,
-        ids.last,
+        allIds.last,
       );
-      expect(_savedIds(harness), hasLength(2));
+      expect(_savedIds(harness), hasLength(4));
     },
   );
 
