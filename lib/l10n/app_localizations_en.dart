@@ -1397,6 +1397,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCatalogTitle => 'Daily choices';
 
   @override
+  String get dailyChoiceCreateFromAction => 'Create a choice from an action';
+
+  @override
   String get dailyChoiceCatalogLoading => 'Loading daily choices…';
 
   @override

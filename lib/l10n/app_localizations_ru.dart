@@ -1395,6 +1395,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCatalogTitle => 'Дневные выборы';
 
   @override
+  String get dailyChoiceCreateFromAction => 'Создать выбор от действия';
+
+  @override
   String get dailyChoiceCatalogLoading => 'Загружаем дневные выборы…';
 
   @override

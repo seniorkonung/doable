@@ -2411,6 +2411,12 @@ abstract class AppLocalizations {
   /// **'Daily choices'**
   String get dailyChoiceCatalogTitle;
 
+  /// Вход в создание дневного выбора от действия
+  ///
+  /// In en, this message translates to:
+  /// **'Create a choice from an action'**
+  String get dailyChoiceCreateFromAction;
+
   /// Начальная загрузка дневного каталога
   ///
   /// In en, this message translates to:

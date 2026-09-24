@@ -9,6 +9,7 @@ import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../application/confirmed_choice_path.dart';
+import '../../application/choice_path_draft.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
@@ -24,12 +25,14 @@ final class DailyChoiceCreationPage extends ConsumerStatefulWidget {
     required this.path,
     required this.steps,
     required this.initialDate,
+    this.direction = ChoicePathDraftDirection.topDown,
     super.key,
   }) : assert(steps.length > 0);
 
   final ConfirmedChoicePath path;
   final List<LongTermRelationSummary> steps;
   final CalendarDate initialDate;
+  final ChoicePathDraftDirection direction;
 
   @override
   ConsumerState<DailyChoiceCreationPage> createState() =>

@@ -393,6 +393,7 @@
   "choicePathContinueSemantics": "Продолжить по связи: {phrase}. Приоритет {priority}",
   "dailyChoiceCreationTitle": "Подтвердить дневной выбор",
   "dailyChoiceCatalogTitle": "Дневные выборы",
+  "dailyChoiceCreateFromAction": "Создать выбор от действия",
   "dailyChoiceCatalogLoading": "Загружаем дневные выборы…",
   "dailyChoiceCatalogDateFilter": "Дата",
   "dailyChoiceCatalogApplyDate": "Применить дату",

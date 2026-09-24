@@ -19,6 +19,38 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  for (final (locale, label) in [
+    (const Locale('ru'), 'Создать выбор от действия'),
+    (const Locale('en'), 'Create a choice from an action'),
+  ]) {
+    testWidgets(
+      'вход в нижний выбор доступен на языке ${locale.languageCode}',
+      (tester) async {
+        final repository = _Repository();
+        final router = await _open(tester, repository, locale: locale);
+        await tester.pump(const Duration(milliseconds: 400));
+        final entry = find.byKey(
+          const ValueKey('daily-choice-create-from-action'),
+        );
+        expect(find.text(label), findsOneWidget);
+        final semantics = tester.ensureSemantics();
+        expect(find.bySemanticsLabel(label), findsOneWidget);
+        await tester.tap(entry);
+        await tester.pumpAndSettle();
+        expect(router.current.name, DailyChoiceActionPickerRoute.name);
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-action-cancel')),
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(router.current.name, DailyChoiceCatalogRoute.name);
+        repository.completeFirst([], total: 0);
+        await tester.pump();
+        expect(entry, findsOneWidget);
+        semantics.dispose();
+      },
+    );
+  }
+
   testWidgets('показывает все записи, количество и открывает дубликат по id', (
     tester,
   ) async {

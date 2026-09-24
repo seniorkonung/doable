@@ -145,6 +145,7 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
                       builder: (_) => DailyChoiceCreationPage(
                         path: confirmed,
                         steps: List.unmodifiable(state.visibleSteps),
+                        direction: widget.direction,
                         initialDate: CalendarDate.fromParts(
                           now.year,
                           now.month,

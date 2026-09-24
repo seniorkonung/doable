@@ -1431,6 +1431,8 @@
   "@choicePathContinueSemantics": {"description": "Доступная связь для следующего шага", "placeholders": {"phrase": {"type": "String"}, "priority": {"type": "String"}}},
   "dailyChoiceCreationTitle": "Confirm daily choice",
   "dailyChoiceCatalogTitle": "Daily choices",
+  "dailyChoiceCreateFromAction": "Create a choice from an action",
+  "@dailyChoiceCreateFromAction": {"description": "Вход в создание дневного выбора от действия"},
   "@dailyChoiceCatalogTitle": {"description": "Заголовок каталога дневных выборов и вход из основной навигации"},
   "dailyChoiceCatalogLoading": "Loading daily choices…",
   "@dailyChoiceCatalogLoading": {"description": "Начальная загрузка дневного каталога"},
