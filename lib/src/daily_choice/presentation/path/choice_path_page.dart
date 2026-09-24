@@ -32,9 +32,10 @@ final class ChoicePathPage extends ConsumerStatefulWidget {
        returnsSelection = false;
 
   const ChoicePathPage.forCreationRefresh({
-    required this.sourceIntentionId,
+    required IntentionId startingIntentionId,
+    required this.direction,
     super.key,
-  }) : direction = ChoicePathDraftDirection.topDown,
+  }) : sourceIntentionId = startingIntentionId,
        returnsSelection = true;
 
   final IntentionId sourceIntentionId;
