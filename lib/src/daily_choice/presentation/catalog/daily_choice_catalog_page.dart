@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../intention/domain/intention_id.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
+import '../path/choice_path_page.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
 
@@ -36,6 +40,12 @@ final class _DailyChoiceCatalogPageState
     final model = ref.read(dailyChoiceCatalogViewModelProvider.notifier);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.dailyChoiceCatalogTitle)),
+      floatingActionButton: FloatingActionButton.extended(
+        key: const ValueKey('daily-choice-create-from-action'),
+        onPressed: () => unawaited(_chooseAction()),
+        icon: const Icon(Icons.add),
+        label: Text(l10n.dailyChoiceCreateFromAction),
+      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => Column(
@@ -117,6 +127,18 @@ final class _DailyChoiceCatalogPageState
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _chooseAction() async {
+    final actionId = await context.router.push<IntentionId>(
+      const DailyChoiceActionPickerRoute(),
+    );
+    if (!mounted || actionId == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ChoicePathPage.fromAction(actionIntentionId: actionId),
       ),
     );
   }
