@@ -27,29 +27,38 @@ import 'choice_path_view_model.dart';
 final class ChoicePathPage extends ConsumerStatefulWidget {
   const ChoicePathPage({required this.sourceIntentionId, super.key})
     : direction = ChoicePathDraftDirection.topDown,
-      returnsSelection = false;
+      purpose = ChoicePathPurpose.create;
 
   const ChoicePathPage.fromAction({
     required IntentionId actionIntentionId,
     super.key,
   }) : sourceIntentionId = actionIntentionId,
        direction = ChoicePathDraftDirection.bottomUp,
-       returnsSelection = false;
+       purpose = ChoicePathPurpose.create;
 
   const ChoicePathPage.forCreationRefresh({
     required IntentionId startingIntentionId,
     required this.direction,
     super.key,
   }) : sourceIntentionId = startingIntentionId,
-       returnsSelection = true;
+       purpose = ChoicePathPurpose.refreshCreation;
+
+  const ChoicePathPage.forReplacement({
+    required IntentionId startingIntentionId,
+    required this.direction,
+    super.key,
+  }) : sourceIntentionId = startingIntentionId,
+       purpose = ChoicePathPurpose.replace;
 
   final IntentionId sourceIntentionId;
   final ChoicePathDraftDirection direction;
-  final bool returnsSelection;
+  final ChoicePathPurpose purpose;
 
   @override
   ConsumerState<ChoicePathPage> createState() => _ChoicePathPageState();
 }
+
+enum ChoicePathPurpose { create, refreshCreation, replace }
 
 final class ChoicePathSelection {
   ChoicePathSelection({
@@ -93,7 +102,7 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
   Future<void> _openConfirmation(ChoicePathSelection selection) async {
     if (_openingConfirmation) return;
     _openingConfirmation = true;
-    if (widget.returnsSelection) {
+    if (widget.purpose != ChoicePathPurpose.create) {
       Navigator.of(context).pop(selection);
       return;
     }
@@ -168,7 +177,9 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.direction == ChoicePathDraftDirection.bottomUp
+          widget.purpose == ChoicePathPurpose.replace
+              ? l10n.dailyChoiceReplaceSelectPath
+              : widget.direction == ChoicePathDraftDirection.bottomUp
               ? l10n.choicePathBottomTitle
               : l10n.choicePathTitle,
         ),
@@ -237,7 +248,11 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
                     ),
                   ),
                 ),
-                child: Text(l10n.choicePathOpenConfirmation),
+                child: Text(
+                  widget.purpose == ChoicePathPurpose.replace
+                      ? l10n.dailyChoiceReplaceOpenConfirmation
+                      : l10n.choicePathOpenConfirmation,
+                ),
               ),
             ],
             if (confirmed != null && state is ChoicePathConfirmedState) ...[

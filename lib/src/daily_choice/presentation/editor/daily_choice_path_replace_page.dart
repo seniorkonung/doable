@@ -110,7 +110,7 @@ final class _DailyChoicePathReplacePageState
           if (mounted &&
               (ModalRoute.of(context)?.isCurrent ?? false) &&
               Navigator.of(context).canPop()) {
-            unawaited(Navigator.of(context).maybePop());
+            Navigator.of(context).pop(widget.choiceId);
           }
         });
       case DailyChoicePathReplaceRejected():

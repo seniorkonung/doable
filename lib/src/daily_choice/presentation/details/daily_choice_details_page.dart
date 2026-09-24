@@ -17,6 +17,7 @@ import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/daily_choice_id.dart';
 import '../daily_choice_command_failure_message.dart';
+import '../editor/daily_choice_path_replacement_flow.dart';
 import 'daily_choice_delete_confirmation.dart';
 import 'daily_choice_details_state.dart';
 import 'daily_choice_details_view_model.dart';
@@ -192,6 +193,22 @@ final class _DailyChoiceDetailsPageState
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () => unawaited(
                   context.router.push(DailyChoiceEditRoute(details: details)),
+                ),
+              ),
+            if (_model.state case DailyChoiceDetailsLoaded()
+                when !_deleted && !_deleting && !_confirmationOpen)
+              IconButton(
+                key: const ValueKey('daily-choice-replace-open'),
+                tooltip: l10n.dailyChoiceReplaceOpen,
+                icon: const Icon(Icons.alt_route),
+                onPressed: () => unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => DailyChoicePathReplacementFlow(
+                        choiceId: widget.choiceId,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             if (_model.state case DailyChoiceDetailsLoaded(:final details)

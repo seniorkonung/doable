@@ -1663,6 +1663,29 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceReplaceChooseAgain => 'Вернуться к выбору пути';
 
   @override
+  String get dailyChoiceReplaceOpen => 'Заменить путь';
+
+  @override
+  String get dailyChoiceReplaceChooseDirection =>
+      'Выбрать направление нового пути';
+
+  @override
+  String get dailyChoiceReplaceChooseDirectionDescription =>
+      'Выберите новое основание или действие для замены сохранённого пути.';
+
+  @override
+  String get dailyChoiceReplaceFromSource => 'Начать с нового основания';
+
+  @override
+  String get dailyChoiceReplaceFromAction => 'Начать с нового действия';
+
+  @override
+  String get dailyChoiceReplaceSelectPath => 'Выбрать путь для замены';
+
+  @override
+  String get dailyChoiceReplaceOpenConfirmation => 'Подтвердить замену пути';
+
+  @override
   String get choicePathOpenConfirmation => 'Перейти к подтверждению выбора';
 
   @override

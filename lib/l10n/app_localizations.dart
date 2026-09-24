@@ -2872,6 +2872,48 @@ abstract class AppLocalizations {
   /// **'Return to path selection'**
   String get dailyChoiceReplaceChooseAgain;
 
+  /// Открыть замену из подробностей
+  ///
+  /// In en, this message translates to:
+  /// **'Replace path'**
+  String get dailyChoiceReplaceOpen;
+
+  /// Заголовок выбора направления замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the new path direction'**
+  String get dailyChoiceReplaceChooseDirection;
+
+  /// Описание выбора направления замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new source or action to replace the saved path.'**
+  String get dailyChoiceReplaceChooseDirectionDescription;
+
+  /// Верхний обход замены
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a new source'**
+  String get dailyChoiceReplaceFromSource;
+
+  /// Нижний обход замены
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a new action'**
+  String get dailyChoiceReplaceFromAction;
+
+  /// Заголовок обхода для замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a replacement path'**
+  String get dailyChoiceReplaceSelectPath;
+
+  /// Подтверждение выбора пути для замены
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm path replacement'**
+  String get dailyChoiceReplaceOpenConfirmation;
+
   /// Переход от выбранного действия к форме подтверждения
   ///
   /// In en, this message translates to:

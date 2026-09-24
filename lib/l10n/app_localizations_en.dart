@@ -1663,6 +1663,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceReplaceChooseAgain => 'Return to path selection';
 
   @override
+  String get dailyChoiceReplaceOpen => 'Replace path';
+
+  @override
+  String get dailyChoiceReplaceChooseDirection =>
+      'Choose the new path direction';
+
+  @override
+  String get dailyChoiceReplaceChooseDirectionDescription =>
+      'Choose a new source or action to replace the saved path.';
+
+  @override
+  String get dailyChoiceReplaceFromSource => 'Start from a new source';
+
+  @override
+  String get dailyChoiceReplaceFromAction => 'Start from a new action';
+
+  @override
+  String get dailyChoiceReplaceSelectPath => 'Choose a replacement path';
+
+  @override
+  String get dailyChoiceReplaceOpenConfirmation => 'Confirm path replacement';
+
+  @override
   String get choicePathOpenConfirmation => 'Continue to choice confirmation';
 
   @override
