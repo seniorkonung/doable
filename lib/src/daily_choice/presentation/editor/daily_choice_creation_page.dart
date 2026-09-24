@@ -43,6 +43,7 @@ final class _DailyChoiceCreationPageState
   final _descriptionController = TextEditingController();
   final _scrollController = ScrollController();
   late List<LongTermRelationSummary> _visibleSteps;
+  var _pathRefreshGeneration = 0;
   var _dateInvalid = false;
 
   @override
@@ -81,6 +82,7 @@ final class _DailyChoiceCreationPageState
   }
 
   Future<void> _refreshPath(DailyChoiceCreationViewModel model) async {
+    final generation = ++_pathRefreshGeneration;
     final sourceId = widget.path.steps.first.sourceIntentionId;
     ref.invalidate(choicePathViewModelProvider(sourceId));
     final selection = await Navigator.of(context).push<ChoicePathSelection>(
@@ -89,8 +91,10 @@ final class _DailyChoiceCreationPageState
             ChoicePathPage.forCreationRefresh(sourceIntentionId: sourceId),
       ),
     );
-    if (!mounted || selection == null) return;
-    model.confirmRefreshedPath(selection.path);
+    if (!mounted || generation != _pathRefreshGeneration || selection == null) {
+      return;
+    }
+    if (!model.confirmRefreshedPath(selection.path)) return;
     setState(() => _visibleSteps = selection.steps);
   }
 
