@@ -249,6 +249,46 @@ void main() {
     }
   }
 
+  for (final choiceFirst in [false, true]) {
+    test('нижний путь и удаление последней связи: '
+        '${choiceFirst ? 'выбор первым' : 'удаление первым'}', () async {
+      Future<Object> save() => repository.execute(durabilityBottomCreate());
+      Future<Object> delete() =>
+          repository.execute(DeleteLongTermRelation(durabilityRelation(102)));
+      final (first, second) = choiceFirst
+          ? await overlap(save, delete)
+          : await overlap(delete, save);
+      expect(first, isA<GraphCommandSucceeded>());
+      expect(
+        (second as GraphCommandFailed).failure.category,
+        GraphFailureCategory.conflict,
+      );
+      final choice = await repository.getDailyChoice(durabilityChoice(202));
+      expect(choice, isA<DailyChoiceReadSuccess>());
+      expect(
+        (choice as DailyChoiceReadSuccess).value.value?.path.map(
+          (step) => step.relation.id,
+        ),
+        choiceFirst ? [durabilityRelation(101), durabilityRelation(102)] : null,
+      );
+      expect(
+        (await durabilityRows(database, 'daily_choice_path_steps')).length,
+        choiceFirst ? 2 : 0,
+      );
+      expect(
+        (await durabilityRows(
+          database,
+          'long_term_relations',
+        )).any((row) => row['id'] == durabilityUuid(102)),
+        choiceFirst,
+      );
+      expect(
+        await database.customSelect('PRAGMA foreign_key_check').get(),
+        isEmpty,
+      );
+    });
+  }
+
   for (final dailyFirst in [false, true]) {
     test('замена и устаревшее смешанное подтверждение: '
         '${dailyFirst ? 'замена первой' : 'удаление первым'}', () async {

@@ -11,6 +11,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -456,6 +457,206 @@ void main() {
       expect(
         (await reopened.getDailyChoice(
           editedId,
+        ) as DailyChoiceReadSuccess).value.value,
+        isNull,
+      );
+    },
+  );
+
+  testWidgets(
+    'нижний выбор проходит общий жизненный цикл после полного перезапуска',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      tester.view.physicalSize = const Size(1200, 4000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      final seeded = await harness.openReadyDatabase();
+      await seedDurabilityGraph(seeded);
+      await harness.closePersistenceObjectGraph();
+      AppRuntime start() => AppRuntime(
+        connectionFactory: () =>
+            openFileBackedLocalDatabase(harness.databaseFile),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      var runtime = start();
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await harness.dispose();
+      });
+
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('catalog-open-daily-choices')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('daily-choice-create-from-action')),
+      );
+      await _tap(tester, find.text('Намерение 3'));
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+      );
+
+      for (var index = 0; index < 2; index++) {
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-select-source')),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-open-confirmation')),
+        );
+        final date = find.byKey(const ValueKey('daily-choice-date'));
+        await _until(tester, date);
+        await tester.enterText(date, '2026-09-24');
+        await tester.enterText(
+          find.byKey(const ValueKey('daily-choice-description')),
+          'Нижний выбор',
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-completed')),
+        );
+        await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
+        await _until(
+          tester,
+          find.byKey(const ValueKey('choice-path-select-source')),
+        );
+      }
+      final ids = _savedIds(harness);
+      expect(ids, hasLength(2));
+      expect(ids.toSet(), hasLength(2));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+      runtime = start();
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await _until(
+        tester,
+        find.byKey(const ValueKey('catalog-open-daily-choices')),
+      );
+      final repository = (await runtime.bootstrap() as AppRuntimeReady)
+          .container
+          .read(personalGraphRepositoryProvider);
+      final persisted = await _read(repository, ids.last);
+      expect(persisted.choice.sourceIntentionId, durabilityIntention(1));
+      expect(persisted.choice.selectedIntentionId, durabilityIntention(3));
+      expect(persisted.choice.date, CalendarDate.fromParts(2026, 9, 24));
+      expect(persisted.choice.description?.value, 'Нижний выбор');
+      expect(persisted.choice.isCompleted, isTrue);
+      expect(persisted.path.map((step) => step.relation.id), [
+        durabilityRelation(101),
+        durabilityRelation(102),
+      ]);
+      final stepIds = persisted.path.map((step) => step.step.id).toList();
+      expect(stepIds.toSet(), hasLength(2));
+      final firstStepIds = (await _read(
+        repository,
+        ids.first,
+      )).path.map((step) => step.step.id).toList();
+      expect(firstStepIds.toSet().intersection(stepIds.toSet()), isEmpty);
+
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('catalog-open-daily-choices')),
+      );
+      await _until(tester, find.byKey(const ValueKey('daily-choice-row-2')));
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      await _until(
+        tester,
+        find.byKey(const ValueKey('daily-choice-edit-open')),
+      );
+      expect(find.textContaining('Чтобы Намерение 1'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('daily-choice-relation-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('daily-choice-relation-2')),
+        findsOneWidget,
+      );
+
+      expect(
+        await repository.execute(ArchiveIntention(durabilityIntention(2))),
+        isA<ResultSuccess>(),
+      );
+      await _until(tester, find.text('Архивировано'));
+      expect(
+        await repository.execute(
+          DisableIntentionReadiness(durabilityIntention(3)),
+        ),
+        isA<ResultSuccess>(),
+      );
+      await _until(tester, find.textContaining('Не готово к действию'));
+      await _edit(tester, date: '2027-01-02');
+      await _edit(tester, description: 'После архивирования');
+      await _edit(tester, toggleCompletion: true);
+      final edited = await _read(repository, ids.last);
+      expect(edited.choice.id, ids.last);
+      expect(edited.choice.date, CalendarDate.fromParts(2027, 1, 2));
+      expect(edited.choice.description?.value, 'После архивирования');
+      expect(edited.choice.isCompleted, isFalse);
+      expect(edited.path.map((step) => step.step.id), stepIds);
+      expect(edited.path.map((step) => step.relation.scope), [
+        RelationScope.archived,
+        RelationScope.archived,
+      ]);
+      expect(edited.selected.readiness, IntentionReadiness.notReady);
+
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('daily-choice-delete-open')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('daily-choice-delete-confirm')),
+      );
+      await _until(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      expect(_savedIds(harness), [ids.first]);
+      expect(find.byKey(const ValueKey('daily-choice-row-2')), findsNothing);
+      final relation = await repository
+          .watchRelation(durabilityRelation(101))
+          .first;
+      expect(
+        (relation as LongTermRelationReadSuccess)
+            .value
+            .value!
+            .permissions
+            .canDelete,
+        isFalse,
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+      runtime = start();
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await _until(
+        tester,
+        find.byKey(const ValueKey('catalog-open-daily-choices')),
+      );
+      final reopened = (await runtime.bootstrap() as AppRuntimeReady).container
+          .read(personalGraphRepositoryProvider);
+      final remaining = await _read(reopened, ids.first);
+      expect(remaining.choice.id, ids.first);
+      expect(remaining.path.map((step) => step.step.id), firstStepIds);
+      expect(remaining.path.map((step) => step.relation.id), [
+        durabilityRelation(101),
+        durabilityRelation(102),
+      ]);
+      expect(
+        (await reopened.getDailyChoice(
+          ids.last,
         ) as DailyChoiceReadSuccess).value.value,
         isNull,
       );

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -55,17 +56,25 @@ Set<String> _storedIds(LocalDatabaseHarness harness, String table) {
   }
 }
 
-final class _ChoiceUpdateGate extends LocalDatabaseConnectionObserver {
+final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
   Completer<void>? _entered;
   Completer<void>? _released;
   bool _fail = false;
+  LocalDatabaseSqlOperation _operation = LocalDatabaseSqlOperation.update;
+  String _table = 'daily_choices';
 
   bool get hasEntered => _entered?.isCompleted ?? false;
 
-  void arm({required bool fail}) {
+  void arm({
+    required bool fail,
+    LocalDatabaseSqlOperation operation = LocalDatabaseSqlOperation.update,
+    String table = 'daily_choices',
+  }) {
     _entered = Completer<void>();
     _released = Completer<void>();
     _fail = fail;
+    _operation = operation;
+    _table = table;
   }
 
   void release() {
@@ -80,8 +89,8 @@ final class _ChoiceUpdateGate extends LocalDatabaseConnectionObserver {
     if (entered == null ||
         released == null ||
         entered.isCompleted ||
-        statement.operation != LocalDatabaseSqlOperation.update ||
-        !statement.statements.any((sql) => sql.contains('daily_choices'))) {
+        statement.operation != _operation ||
+        !statement.statements.any((sql) => sql.contains(_table))) {
       return;
     }
     entered.complete();
@@ -121,7 +130,7 @@ void main() {
       }
       await harness.closePersistenceObjectGraph();
 
-      final gate = _ChoiceUpdateGate();
+      final gate = _ChoiceSqlGate();
       final runtime = AppRuntime(
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openFileBackedLocalDatabase(harness.databaseFile),
@@ -372,6 +381,148 @@ void main() {
         isNot(contains(durabilityUuid(104))),
       );
       expect(_storedIds(harness, 'intentions'), hasLength(5));
+    },
+  );
+
+  testWidgets(
+    'принятый нижний выбор завершается после ухода и предъявляется один раз',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      tester.view.physicalSize = const Size(1200, 4000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      final seeded = await harness.openReadyDatabase();
+      await seedDurabilityGraph(seeded);
+      await harness.closePersistenceObjectGraph();
+      final gate = _ChoiceSqlGate();
+      AppRuntime start() => AppRuntime(
+        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+          openFileBackedLocalDatabase(harness.databaseFile),
+          gate,
+        ),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      var runtime = start();
+      addTearDown(() async {
+        gate.release();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await harness.dispose();
+      });
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('catalog-open-daily-choices')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('daily-choice-create-from-action')),
+      );
+      await _tap(tester, find.text('Намерение 3'));
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-select-source')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+      );
+      await _until(
+        tester,
+        () => find
+            .byKey(const ValueKey('daily-choice-date'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2027-01-02',
+      );
+      gate.arm(
+        fail: false,
+        operation: LocalDatabaseSqlOperation.insert,
+        table: 'daily_choice_path_steps',
+      );
+      final submit = find.byKey(const ValueKey('daily-choice-submit'));
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pump();
+      await _until(tester, () => gate.hasEntered);
+      expect(_storedIds(harness, 'daily_choices'), isEmpty);
+      expect(_storedIds(harness, 'daily_choice_path_steps'), isEmpty);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 350));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      gate.release();
+      await _until(
+        tester,
+        () => _storedIds(harness, 'daily_choices').length == 1,
+      );
+      expect(_storedIds(harness, 'daily_choice_path_steps'), hasLength(2));
+      expect(
+        find.byKey(const ValueKey('graph-operation-message')),
+        findsNothing,
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _until(
+        tester,
+        () => find
+            .byKey(const ValueKey('graph-operation-message'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      expect(find.textContaining('Дневной выбор создан'), findsWidgets);
+      await tester.pumpAndSettle();
+      ScaffoldMessenger.of(
+        tester.element(
+          find.byKey(const ValueKey('graph-operation-message')).first,
+        ),
+      ).hideCurrentSnackBar();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('graph-operation-message')),
+        findsNothing,
+      );
+
+      final id = (DailyChoiceId.decode(
+        _storedIds(harness, 'daily_choices').single,
+      ) as DailyChoiceIdDecodingSuccess).id;
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+      runtime = start();
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await _until(
+        tester,
+        () => find
+            .byKey(const ValueKey('catalog-open-daily-choices'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      final repository = (await runtime.bootstrap() as AppRuntimeReady)
+          .container
+          .read(personalGraphRepositoryProvider);
+      final saved = await repository.getDailyChoice(id);
+      expect(saved, isA<DailyChoiceReadSuccess>());
+      expect(
+        (saved as DailyChoiceReadSuccess).value.value!.path.map(
+          (step) => step.relation.id,
+        ),
+        [durabilityRelation(101), durabilityRelation(102)],
+      );
+      expect(saved.value.value!.choice.date.toCanonicalString(), '2027-01-02');
     },
   );
 }

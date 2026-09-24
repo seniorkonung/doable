@@ -74,6 +74,11 @@ void main() {
             choiceNumber: 203,
             firstStepNumber: 311,
           ).execute(durabilityCreate()),
+          _GraphOperation.dailyBottomCreate => await durabilityRepository(
+            database,
+            choiceNumber: 203,
+            firstStepNumber: 311,
+          ).execute(durabilityBottomCreate()),
           _GraphOperation.dailyUpdate => await repository.execute(
             durabilityUpdate(201),
           ),
@@ -145,6 +150,7 @@ void main() {
           _GraphOperation.delete => result is GraphCommandSucceeded,
           _GraphOperation.bulkDelete => result is GraphCommandSucceeded,
           _GraphOperation.dailyCreate ||
+          _GraphOperation.dailyBottomCreate ||
           _GraphOperation.dailyUpdate ||
           _GraphOperation.dailyReplace ||
           _GraphOperation.dailyDelete ||
@@ -199,7 +205,7 @@ final class _GraphOperationStopObserver
       _stepInserts++;
     }
     final matches = switch (operation) {
-      _GraphOperation.dailyCreate =>
+      _GraphOperation.dailyCreate || _GraphOperation.dailyBottomCreate =>
         _stepInserts == 2 &&
             statement.operation == LocalDatabaseSqlOperation.insert &&
             statement.statements.any(
@@ -260,6 +266,7 @@ Future<Never> _reportReadyAndWait() async {
 
 enum _GraphOperation {
   dailyCreate,
+  dailyBottomCreate,
   dailyUpdate,
   dailyReplace,
   dailyDelete,
@@ -274,6 +281,7 @@ enum _GraphOperation {
 
   static _GraphOperation parse(String? value) => switch (value) {
     'daily_create' => dailyCreate,
+    'daily_bottom_create' => dailyBottomCreate,
     'daily_update' => dailyUpdate,
     'daily_replace' => dailyReplace,
     'daily_delete' => dailyDelete,
