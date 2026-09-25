@@ -277,6 +277,7 @@ final class _CatalogControls extends StatelessWidget {
         children: [
           DropdownButtonFormField<IntentionScope>(
             key: const ValueKey('catalog-scope-control'),
+            isExpanded: true,
             initialValue: selection.scope,
             decoration: InputDecoration(
               labelText: localizations.catalogScopeLabel,
@@ -307,6 +308,7 @@ final class _CatalogControls extends StatelessWidget {
           const SizedBox(height: 12),
           DropdownButtonFormField<IntentionCatalogOrder>(
             key: const ValueKey('catalog-order-control'),
+            isExpanded: true,
             initialValue: selection.order,
             decoration: InputDecoration(
               labelText: localizations.catalogOrderLabel,
