@@ -813,6 +813,70 @@ class AppLocalizationsEn extends AppLocalizations {
       'More tags couldn’t be loaded because of an unexpected error.';
 
   @override
+  String get tagCatalogCreate => 'Create tag';
+
+  @override
+  String get tagCatalogRename => 'Rename tag';
+
+  @override
+  String get tagCatalogSelected => 'Selected tag';
+
+  @override
+  String get tagEditorCreateTitle => 'New tag';
+
+  @override
+  String get tagEditorRenameTitle => 'Rename tag';
+
+  @override
+  String get tagEditorNameLabel => 'Tag name';
+
+  @override
+  String get tagEditorNameLimit => 'No more than 255 visible characters.';
+
+  @override
+  String get tagEditorCreateAction => 'Create tag';
+
+  @override
+  String get tagEditorRenameAction => 'Save name';
+
+  @override
+  String get tagEditorSaving => 'Saving tag…';
+
+  @override
+  String get tagEditorCancel => 'Cancel';
+
+  @override
+  String get tagEditorUseExisting => 'Use existing tag';
+
+  @override
+  String get tagEditorReadingCommitted => 'Tag saved. Refreshing its details…';
+
+  @override
+  String get tagEditorCommittedReadFailed =>
+      'Tag saved, but its details couldn’t be refreshed.';
+
+  @override
+  String get tagEditorCommittedMissing =>
+      'Tag saved, but is no longer found. Refresh the catalog.';
+
+  @override
+  String get tagEditorReadingExisting => 'Checking existing tag…';
+
+  @override
+  String get tagEditorExistingMissing =>
+      'The existing tag is gone. Correct the name or refresh the catalog.';
+
+  @override
+  String get tagEditorReadUnavailable => 'Tag couldn’t be read. Try again.';
+
+  @override
+  String get tagEditorReadCorruption => 'Stored tag data is damaged.';
+
+  @override
+  String get tagEditorReadUnexpected =>
+      'Tag couldn’t be read because of an unexpected error.';
+
+  @override
   String get tagCreated => 'Tag created.';
 
   @override

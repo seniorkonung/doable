@@ -3,21 +3,52 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/routing/app_router.gr.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../application/tag_catalog.dart' hide TagCatalogPage;
+import '../../domain/tag.dart';
+import '../editor/tag_editor_state.dart';
 import 'tag_catalog_state.dart';
 import 'tag_catalog_view_model.dart';
 
 @RoutePage()
-final class TagCatalogPage extends ConsumerWidget {
+final class TagCatalogPage extends ConsumerStatefulWidget {
   const TagCatalogPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TagCatalogPage> createState() => _TagCatalogPageState();
+}
+
+final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
+  final _creationKey = TagCreationFormKey();
+  Tag? _selectedTag;
+
+  Future<void> _openEditor(TagEditorContext editorContext) async {
+    final selected = await context.router.push<Tag>(
+      TagEditorRoute(editorContext: editorContext),
+    );
+    if (mounted && selected != null) {
+      setState(() => _selectedTag = selected);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final state = ref.watch(tagCatalogViewModelProvider);
     final model = ref.read(tagCatalogViewModelProvider.notifier);
     return Scaffold(
-      appBar: AppBar(title: Text(localizations.tagCatalogTitle)),
+      appBar: AppBar(
+        title: Text(localizations.tagCatalogTitle),
+        actions: [
+          IconButton(
+            key: const ValueKey('tag-catalog-create'),
+            tooltip: localizations.tagCatalogCreate,
+            onPressed: () => _openEditor(TagEditorCreating(_creationKey)),
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ),
       body: switch (state) {
         TagCatalogInitialLoading() => _CatalogStatus(
           message: localizations.tagCatalogLoading,
@@ -28,24 +59,39 @@ final class TagCatalogPage extends ConsumerWidget {
             message: _readFailure(localizations, failure),
             onRetry: canRetry ? model.retryFirstPage : null,
           ),
-        TagCatalogLoaded loaded => _LoadedCatalog(state: loaded, model: model),
+        TagCatalogLoaded loaded => _LoadedCatalog(
+          state: loaded,
+          model: model,
+          selectedTag: _selectedTag,
+          onRename: (tag) => _openEditor(TagEditorRenaming(tag)),
+        ),
       },
     );
   }
 }
 
 final class _LoadedCatalog extends StatelessWidget {
-  const _LoadedCatalog({required this.state, required this.model});
+  const _LoadedCatalog({
+    required this.state,
+    required this.model,
+    required this.selectedTag,
+    required this.onRename,
+  });
 
   final TagCatalogLoaded state;
   final TagCatalogViewModel model;
+  final Tag? selectedTag;
+  final ValueChanged<Tag> onRename;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    if (state.isEmpty && state.canUseCurrentItems) {
+    if (state.isEmpty && state.canUseCurrentItems && selectedTag == null) {
       return _CatalogStatus(message: localizations.tagCatalogEmpty);
     }
+    final selected = selectedTag;
+    final selectedInPage =
+        selected != null && state.items.any((tag) => tag.id == selected.id);
     return Column(
       children: [
         if (state.freshness == TagCatalogFreshness.refreshing)
@@ -60,6 +106,20 @@ final class _LoadedCatalog extends StatelessWidget {
                 ? model.retryRefresh
                 : null,
           ),
+        if (selected != null && !selectedInPage && state.canUseCurrentItems)
+          Semantics(
+            container: true,
+            selected: true,
+            child: ListTile(
+              title: Text(selected.name.value),
+              subtitle: Text(localizations.tagCatalogSelected),
+              trailing: IconButton(
+                tooltip: localizations.tagCatalogRename,
+                onPressed: () => onRename(selected),
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            ),
+          ),
         Expanded(
           child: ListView.builder(
             key: const ValueKey('tag-catalog-list'),
@@ -69,12 +129,16 @@ final class _LoadedCatalog extends StatelessWidget {
               return Semantics(
                 key: ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'),
                 container: true,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  child: Text(tag.name.value),
+                selected: tag.id == selected?.id,
+                child: ListTile(
+                  title: Text(tag.name.value),
+                  trailing: state.canUseCurrentItems
+                      ? IconButton(
+                          tooltip: localizations.tagCatalogRename,
+                          onPressed: () => onRename(tag),
+                          icon: const Icon(Icons.edit_outlined),
+                        )
+                      : null,
                 ),
               );
             },

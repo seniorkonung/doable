@@ -1454,6 +1454,126 @@ abstract class AppLocalizations {
   /// **'More tags couldn’t be loaded because of an unexpected error.'**
   String get tagCatalogLoadMoreUnexpected;
 
+  /// Создать тег из каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Create tag'**
+  String get tagCatalogCreate;
+
+  /// Переименовать выбранный тег
+  ///
+  /// In en, this message translates to:
+  /// **'Rename tag'**
+  String get tagCatalogRename;
+
+  /// Тег выбран после завершения формы
+  ///
+  /// In en, this message translates to:
+  /// **'Selected tag'**
+  String get tagCatalogSelected;
+
+  /// Заголовок формы создания тега
+  ///
+  /// In en, this message translates to:
+  /// **'New tag'**
+  String get tagEditorCreateTitle;
+
+  /// Заголовок формы переименования тега
+  ///
+  /// In en, this message translates to:
+  /// **'Rename tag'**
+  String get tagEditorRenameTitle;
+
+  /// Подпись поля названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name'**
+  String get tagEditorNameLabel;
+
+  /// Ограничение длины названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'No more than 255 visible characters.'**
+  String get tagEditorNameLimit;
+
+  /// Подтвердить создание тега
+  ///
+  /// In en, this message translates to:
+  /// **'Create tag'**
+  String get tagEditorCreateAction;
+
+  /// Подтвердить переименование тега
+  ///
+  /// In en, this message translates to:
+  /// **'Save name'**
+  String get tagEditorRenameAction;
+
+  /// Выполняется запись тега
+  ///
+  /// In en, this message translates to:
+  /// **'Saving tag…'**
+  String get tagEditorSaving;
+
+  /// Уйти с формы без новой команды
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get tagEditorCancel;
+
+  /// Выбрать тег при конфликте названия
+  ///
+  /// In en, this message translates to:
+  /// **'Use existing tag'**
+  String get tagEditorUseExisting;
+
+  /// Чтение после подтверждённой записи
+  ///
+  /// In en, this message translates to:
+  /// **'Tag saved. Refreshing its details…'**
+  String get tagEditorReadingCommitted;
+
+  /// Ошибка чтения после подтверждённой записи
+  ///
+  /// In en, this message translates to:
+  /// **'Tag saved, but its details couldn’t be refreshed.'**
+  String get tagEditorCommittedReadFailed;
+
+  /// Тег исчез после подтверждённой записи
+  ///
+  /// In en, this message translates to:
+  /// **'Tag saved, but is no longer found. Refresh the catalog.'**
+  String get tagEditorCommittedMissing;
+
+  /// Повторная проверка существующего тега по id
+  ///
+  /// In en, this message translates to:
+  /// **'Checking existing tag…'**
+  String get tagEditorReadingExisting;
+
+  /// Конфликтный тег исчез до выбора
+  ///
+  /// In en, this message translates to:
+  /// **'The existing tag is gone. Correct the name or refresh the catalog.'**
+  String get tagEditorExistingMissing;
+
+  /// Временный отказ чтения одного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag couldn’t be read. Try again.'**
+  String get tagEditorReadUnavailable;
+
+  /// Повреждение чтения одного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Stored tag data is damaged.'**
+  String get tagEditorReadCorruption;
+
+  /// Неизвестный отказ чтения одного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag couldn’t be read because of an unexpected error.'**
+  String get tagEditorReadUnexpected;
+
   /// Подтверждение создания тега
   ///
   /// In en, this message translates to:

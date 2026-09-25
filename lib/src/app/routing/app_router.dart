@@ -8,6 +8,7 @@ final class AppRouter extends RootStackRouter {
   List<AutoRoute> get routes => [
     AutoRoute(page: IntentionCatalogRoute.page, initial: true),
     AutoRoute(page: TagCatalogRoute.page),
+    AutoRoute(page: TagEditorRoute.page),
     AutoRoute(page: DailyChoiceCatalogRoute.page),
     AutoRoute(page: DailyChoiceActionPickerRoute.page),
     AutoRoute(page: DailyChoiceSourcePickerRoute.page),

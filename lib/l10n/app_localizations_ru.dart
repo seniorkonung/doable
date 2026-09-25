@@ -816,6 +816,71 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить следующие теги из-за непредвиденной ошибки.';
 
   @override
+  String get tagCatalogCreate => 'Создать тег';
+
+  @override
+  String get tagCatalogRename => 'Переименовать тег';
+
+  @override
+  String get tagCatalogSelected => 'Выбранный тег';
+
+  @override
+  String get tagEditorCreateTitle => 'Новый тег';
+
+  @override
+  String get tagEditorRenameTitle => 'Переименование тега';
+
+  @override
+  String get tagEditorNameLabel => 'Название тега';
+
+  @override
+  String get tagEditorNameLimit => 'Не более 255 отображаемых символов.';
+
+  @override
+  String get tagEditorCreateAction => 'Создать тег';
+
+  @override
+  String get tagEditorRenameAction => 'Сохранить название';
+
+  @override
+  String get tagEditorSaving => 'Сохраняем тег…';
+
+  @override
+  String get tagEditorCancel => 'Отмена';
+
+  @override
+  String get tagEditorUseExisting => 'Использовать существующий тег';
+
+  @override
+  String get tagEditorReadingCommitted => 'Тег сохранён. Обновляем его данные…';
+
+  @override
+  String get tagEditorCommittedReadFailed =>
+      'Тег сохранён, но данные не удалось обновить.';
+
+  @override
+  String get tagEditorCommittedMissing =>
+      'Тег сохранён, но больше не найден. Обновите каталог.';
+
+  @override
+  String get tagEditorReadingExisting => 'Проверяем существующий тег…';
+
+  @override
+  String get tagEditorExistingMissing =>
+      'Существующего тега больше нет. Исправьте название или обновите каталог.';
+
+  @override
+  String get tagEditorReadUnavailable =>
+      'Не удалось прочитать тег. Повторите попытку.';
+
+  @override
+  String get tagEditorReadCorruption => 'Сохранённые данные тега повреждены.';
+
+  @override
+  String get tagEditorReadUnexpected =>
+      'Не удалось прочитать тег из-за непредвиденной ошибки.';
+
+  @override
   String get tagCreated => 'Тег создан.';
 
   @override
