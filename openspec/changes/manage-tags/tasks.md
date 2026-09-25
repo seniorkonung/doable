@@ -150,7 +150,7 @@
   - **Вероятные файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 1.16 Подтвердить жизненный цикл тега через реальное хранилище и общий канал изменений
+- [x] 1.16 Подтвердить жизненный цикл тега через реальное хранилище и общий канал изменений
   - **Критерии приёмки:**
     - Создание → чтение → переименование → удаление → новое создание имени работает через координатор и Drift-адаптер; ревизии, наблюдение, ошибки и сохранность остального графа соответствуют контрактам.
     - Проверки диагностики охватывают реальные успехи, конфликт, сбой записи, повреждение чтения и отказ самого приёмника; в событиях и логах нет контрольных личных данных.
