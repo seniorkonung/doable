@@ -9,6 +9,7 @@ import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/tag_catalog.dart';
 import '../../application/tag_change.dart';
+import '../../application/tag_read_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
 import 'tag_catalog_state.dart';
@@ -21,6 +22,10 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
 
   late PersonalGraphRepository _repository;
   StreamSubscription<GraphCommandCompletion>? _completions;
+  StreamSubscription<TagReadResult>? _selectedReads;
+  TagCatalogSelection _selection = const TagCatalogNoSelection();
+  GraphRevision? _selectedRevision;
+  int _selectionGeneration = 0;
   GraphRevision? _requiredRevision;
   Future<void>? _activeRequest;
   bool _refreshNeeded = false;
@@ -30,15 +35,22 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   @override
   TagCatalogState build() {
     unawaited(_completions?.cancel());
+    unawaited(_selectedReads?.cancel());
     _repository = ref.watch(personalGraphRepositoryProvider);
     final coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     _requiredRevision = null;
+    _selection = const TagCatalogNoSelection();
+    _selectedRevision = null;
+    _selectionGeneration++;
     _activeRequest = null;
     _refreshNeeded = false;
     _generation++;
     _staleReadAttempts = 0;
     _completions = coordinator.completions.listen(_onCompletion);
-    ref.onDispose(() => unawaited(_completions?.cancel()));
+    ref.onDispose(() {
+      unawaited(_completions?.cancel());
+      unawaited(_selectedReads?.cancel());
+    });
     unawaited(_startFirst());
     return const TagCatalogInitialLoading();
   }
@@ -51,6 +63,101 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     state = const TagCatalogInitialLoading();
     _staleReadAttempts = 0;
     return _startFirst();
+  }
+
+  void selectTag(TagId id) {
+    _selectionGeneration++;
+    final generation = _selectionGeneration;
+    unawaited(_selectedReads?.cancel());
+    _selectedReads = null;
+    _selectedRevision = null;
+    _publishSelection(TagCatalogSelectionLoading(id));
+    try {
+      _selectedReads = _repository
+          .watchTag(id)
+          .listen(
+            (result) => _onSelectedRead(id, generation, result),
+            onError: (Object _) => _selectedReadFailed(
+              id,
+              generation,
+              const TagReadUnexpectedFailure(),
+            ),
+            onDone: () {
+              if (_selection is TagCatalogSelectionLoading) {
+                _selectedReadFailed(
+                  id,
+                  generation,
+                  const TagReadUnexpectedFailure(),
+                );
+              }
+            },
+          );
+    } on Object {
+      _selectedReadFailed(id, generation, const TagReadUnexpectedFailure());
+    }
+  }
+
+  void retrySelectedTag() {
+    final selection = _selection;
+    if (selection is TagCatalogSelectionFailure && selection.canRetry) {
+      selectTag(selection.id);
+    }
+  }
+
+  bool canActOn(TagId id) {
+    final current = state;
+    if (current is! TagCatalogLoaded || !current.canUseCurrentItems) {
+      return false;
+    }
+    final selection = _selection;
+    if (selection.id == id) {
+      return selection is TagCatalogSelectionReady;
+    }
+    return current.items.any((tag) => tag.id == id);
+  }
+
+  void _onSelectedRead(TagId id, int generation, TagReadResult result) {
+    if (!ref.mounted || generation != _selectionGeneration) return;
+    switch (result) {
+      case TagReadSuccess(:final value):
+        final required = _selectedRevision;
+        if (required != null &&
+            value.revision.compareTo(required) != GraphRevisionOrder.same &&
+            value.revision.compareTo(required) != GraphRevisionOrder.newer) {
+          return;
+        }
+        final tag = value.value;
+        if (tag == null) {
+          _clearSelection();
+        } else if (tag.id != id) {
+          _selectedReadFailed(id, generation, const TagReadCorruptionFailure());
+        } else {
+          _selectedRevision = value.revision;
+          _publishSelection(TagCatalogSelectionReady(tag));
+        }
+      case TagReadError(:final failure):
+        _selectedReadFailed(id, generation, failure);
+    }
+  }
+
+  void _selectedReadFailed(TagId id, int generation, TagReadFailure failure) {
+    if (!ref.mounted || generation != _selectionGeneration) return;
+    _publishSelection(TagCatalogSelectionFailure(id, failure));
+  }
+
+  void _clearSelection() {
+    _selectionGeneration++;
+    unawaited(_selectedReads?.cancel());
+    _selectedReads = null;
+    _selectedRevision = null;
+    _publishSelection(const TagCatalogNoSelection());
+  }
+
+  void _publishSelection(TagCatalogSelection selection) {
+    _selection = selection;
+    if (state case TagCatalogLoaded loaded) {
+      state = loaded.withSelection(selection);
+    }
   }
 
   Future<void> loadMore() {
@@ -132,6 +239,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
           items: value.items,
           nextCursor: value.nextCursor,
           revision: value.revision,
+          selection: _selection,
         );
       case GraphResultFailure(:final failure):
         _refreshNeeded = false;
@@ -172,6 +280,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
           items: [...base.items, ...value.items],
           nextCursor: value.nextCursor,
           revision: base.revision,
+          selection: _selection,
         );
       case GraphResultFailure(failure: TagCatalogSnapshotExpired()):
         _beginRefresh(current);
@@ -201,28 +310,40 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     _requiredRevision = package.revision;
     _staleReadAttempts = 0;
     final current = state;
-    if (current is TagCatalogLoaded) {
-      var items = current.items;
-      for (final change in package.changes) {
-        switch (change) {
-          case TagRenamedChange(:final after):
-            items = [
-              for (final tag in items)
-                if (tag.id == after.id) after else tag,
-            ];
-          case TagDeletedChange(:final tagId):
-            items = [
-              for (final tag in items)
-                if (tag.id != tagId) tag,
-            ];
-          case TagChange():
-            break;
-          case GraphChange():
-            break;
-        }
+    var items = current is TagCatalogLoaded ? current.items : <Tag>[];
+    for (final change in package.changes) {
+      switch (change) {
+        case TagRenamedChange(:final after):
+          items = [
+            for (final tag in items)
+              if (tag.id == after.id) after else tag,
+          ];
+          if (_selection.id == after.id) {
+            _selection = TagCatalogSelectionReady(after);
+            _selectedRevision = package.revision;
+          }
+        case TagDeletedChange(:final tagId):
+          items = [
+            for (final tag in items)
+              if (tag.id != tagId) tag,
+          ];
+          if (_selection.id == tagId) {
+            _selectionGeneration++;
+            unawaited(_selectedReads?.cancel());
+            _selectedReads = null;
+            _selectedRevision = null;
+            _selection = const TagCatalogNoSelection();
+          }
+        case TagChange():
+          break;
+        case GraphChange():
+          break;
       }
+    }
+    if (current is TagCatalogLoaded) {
       state = current.withStatus(
         items: items,
+        selection: _selection,
         freshness: TagCatalogFreshness.refreshing,
         pageStatus: const TagCatalogPageIdle(),
       );

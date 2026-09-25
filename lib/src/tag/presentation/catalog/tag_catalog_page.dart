@@ -12,6 +12,7 @@ import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/tag_catalog.dart' hide TagCatalogPage;
 import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
+import '../../application/tag_read_result.dart';
 import '../../domain/tag.dart';
 import '../editor/tag_editor_state.dart';
 import '../tag_failure_message.dart';
@@ -30,7 +31,6 @@ final class TagCatalogPage extends ConsumerStatefulWidget {
 final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
   final _creationKey = TagCreationFormKey();
   late final GraphCommandCoordinator _coordinator;
-  Tag? _selectedTag;
   TagOperationToken? _activeDeleteToken;
   TagOperationToken? _failureToken;
   GraphInitiatorPresentationClaim? _failureClaim;
@@ -62,12 +62,19 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
   }
 
   Future<void> _confirmDelete(Tag tag) async {
-    if (_confirmationOpen || _activeDeleteToken != null) return;
+    if (_confirmationOpen ||
+        _activeDeleteToken != null ||
+        !ref.read(tagCatalogViewModelProvider.notifier).canActOn(tag.id)) {
+      return;
+    }
     setState(() => _confirmationOpen = true);
     final confirmed = await confirmTagDeletion(context, tag);
     if (!mounted) return;
     setState(() => _confirmationOpen = false);
     if (!confirmed) return;
+    if (!ref.read(tagCatalogViewModelProvider.notifier).canActOn(tag.id)) {
+      return;
+    }
     _releasePresentation();
     final start = _coordinator.acceptTagDelete(DeleteTag(tag.id));
     switch (start) {
@@ -104,7 +111,6 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
             when tagId == tag.id:
           setState(() {
             _activeDeleteToken = null;
-            if (_selectedTag?.id == tagId) _selectedTag = null;
           });
         case GraphResultFailure(:final failure):
           final canPresentHere = ModalRoute.of(context)?.isCurrent ?? false;
@@ -141,7 +147,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
       TagEditorRoute(editorContext: editorContext),
     );
     if (mounted && selected != null) {
-      setState(() => _selectedTag = selected);
+      ref.read(tagCatalogViewModelProvider.notifier).selectTag(selected.id);
     }
   }
 
@@ -199,8 +205,12 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
               TagCatalogLoaded loaded => _LoadedCatalog(
                 state: loaded,
                 model: model,
-                selectedTag: _selectedTag,
-                onRename: (tag) => _openEditor(TagEditorRenaming(tag)),
+                selection: loaded.selection,
+                onRename: (tag) {
+                  if (model.canActOn(tag.id)) {
+                    unawaited(_openEditor(TagEditorRenaming(tag)));
+                  }
+                },
                 onDelete: (tag) => unawaited(_confirmDelete(tag)),
                 canDelete: !_confirmationOpen && _activeDeleteToken == null,
               ),
@@ -216,7 +226,7 @@ final class _LoadedCatalog extends StatelessWidget {
   const _LoadedCatalog({
     required this.state,
     required this.model,
-    required this.selectedTag,
+    required this.selection,
     required this.onRename,
     required this.onDelete,
     required this.canDelete,
@@ -224,7 +234,7 @@ final class _LoadedCatalog extends StatelessWidget {
 
   final TagCatalogLoaded state;
   final TagCatalogViewModel model;
-  final Tag? selectedTag;
+  final TagCatalogSelection selection;
   final ValueChanged<Tag> onRename;
   final ValueChanged<Tag> onDelete;
   final bool canDelete;
@@ -232,12 +242,18 @@ final class _LoadedCatalog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    if (state.isEmpty && state.canUseCurrentItems && selectedTag == null) {
+    if (state.isEmpty &&
+        state.canUseCurrentItems &&
+        selection is TagCatalogNoSelection) {
       return _CatalogStatus(message: localizations.tagCatalogEmpty);
     }
-    final selected = selectedTag;
+    final selected = switch (selection) {
+      TagCatalogSelectionReady(:final tag) => tag,
+      _ => null,
+    };
     final selectedInPage =
         selected != null && state.items.any((tag) => tag.id == selected.id);
+    final selectedOutsidePage = selected != null && !selectedInPage;
     return Column(
       children: [
         if (state.freshness == TagCatalogFreshness.refreshing)
@@ -252,34 +268,56 @@ final class _LoadedCatalog extends StatelessWidget {
                 ? model.retryRefresh
                 : null,
           ),
-        if (selected != null && !selectedInPage && state.canUseCurrentItems)
-          Semantics(
-            container: true,
-            selected: true,
-            child: ListTile(
-              title: Text(selected.name.value),
-              subtitle: Text(localizations.tagCatalogSelected),
-              trailing: _TagActions(
-                tag: selected,
-                onRename: onRename,
-                onDelete: onDelete,
-                canDelete: canDelete,
-              ),
-            ),
+        if (selection is TagCatalogSelectionLoading)
+          _CatalogInlineStatus(
+            message: localizations.tagCatalogLoading,
+            loading: true,
+          ),
+        if (selection case TagCatalogSelectionFailure(
+          :final failure,
+          :final canRetry,
+        ))
+          _CatalogInlineStatus(
+            message: _selectedReadFailure(localizations, failure),
+            onRetry: canRetry ? model.retrySelectedTag : null,
           ),
         Expanded(
           child: ListView.builder(
             key: const ValueKey('tag-catalog-list'),
-            itemCount: state.items.length,
+            itemCount: state.items.length + (selectedOutsidePage ? 1 : 0),
             itemBuilder: (context, index) {
-              final tag = state.items[index];
+              if (selectedOutsidePage && index == 0) {
+                final selectedTag = selected;
+                return Semantics(
+                  container: true,
+                  selected: true,
+                  child: ListTile(
+                    title: Text(selectedTag.name.value),
+                    subtitle: Text(localizations.tagCatalogSelected),
+                    trailing: state.canUseCurrentItems
+                        ? _TagActions(
+                            tag: selectedTag,
+                            onRename: onRename,
+                            onDelete: onDelete,
+                            canDelete: canDelete,
+                          )
+                        : null,
+                  ),
+                );
+              }
+              final item = state.items[index - (selectedOutsidePage ? 1 : 0)];
+              final tag = item.id == selected?.id ? selected! : item;
+              final selectedId = selection.id;
               return Semantics(
                 key: ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'),
                 container: true,
-                selected: tag.id == selected?.id,
+                selected: tag.id == selectedId,
                 child: ListTile(
                   title: Text(tag.name.value),
-                  trailing: state.canUseCurrentItems
+                  trailing:
+                      state.canUseCurrentItems &&
+                          (tag.id != selectedId ||
+                              selection is TagCatalogSelectionReady)
                       ? _TagActions(
                           tag: tag,
                           onRename: onRename,
@@ -474,4 +512,13 @@ String _pageFailure(
   TagCatalogInvalidCursor() ||
   TagCatalogSnapshotExpired() ||
   TagCatalogUnexpectedFailure() => localizations.tagCatalogLoadMoreUnexpected,
+};
+
+String _selectedReadFailure(
+  AppLocalizations localizations,
+  TagReadFailure failure,
+) => switch (failure) {
+  TagReadUnavailableFailure() => localizations.tagEditorReadUnavailable,
+  TagReadCorruptionFailure() => localizations.tagEditorReadCorruption,
+  TagReadUnexpectedFailure() => localizations.tagEditorReadUnexpected,
 };

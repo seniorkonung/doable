@@ -42,7 +42,7 @@ final class TagCatalogViewModelProvider
 }
 
 String _$tagCatalogViewModelHash() =>
-    r'9d004aa706e9fed6790b99ebe451a07cd8004bb9';
+    r'dfbec0b64f35b2e1dab0678c687ea1ea67f95ef5';
 
 abstract class _$TagCatalogViewModel extends $Notifier<TagCatalogState> {
   TagCatalogState build();

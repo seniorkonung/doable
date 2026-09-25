@@ -42,6 +42,91 @@ Future<void> _tap(WidgetTester tester, String key) async {
 }
 
 void main() {
+  testWidgets('выбранный тег обновляется после ухода с формы переименования', (
+    tester,
+  ) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    late sqlite.Database raw;
+    late _ControlledRepository repository;
+    final diagnostics = InMemoryDiagnosticsSink();
+    final runtime = AppRuntime(
+      connectionFactory: () =>
+          openInMemoryLocalDatabase(setup: (database) => raw = database),
+      diagnosticsSink: diagnostics,
+      repositoryFactory: (database) => repository = _ControlledRepository(
+        DriftPersonalGraphRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026, 9, 25),
+          diagnostics,
+        ),
+      ),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+    });
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await _until(
+      tester,
+      () =>
+          find.byKey(const ValueKey('catalog-open-tags')).evaluate().isNotEmpty,
+    );
+    const tagIdText = '018f0b5d-6b2e-7c80-8000-000000000001';
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      tagIdText,
+      'Дом',
+    ]);
+    await _tap(tester, 'catalog-open-tags');
+    await _tap(tester, 'tag-catalog-create');
+    await _until(
+      tester,
+      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isNotEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-editor-name')),
+      'дом',
+    );
+    await _tap(tester, 'tag-editor-submit');
+    await _tap(tester, 'tag-editor-use-existing');
+    await _until(
+      tester,
+      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
+    );
+    final row = find.byKey(const ValueKey('tag-catalog-row-$tagIdText'));
+    await _until(
+      tester,
+      () => tester.widget<Semantics>(row).properties.selected == true,
+    );
+    await tester.tap(find.byTooltip('Переименовать тег').first);
+    await _until(
+      tester,
+      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isNotEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-editor-name')),
+      'Быт',
+    );
+    repository.holdNextRename();
+    await _tap(tester, 'tag-editor-submit');
+    await _until(tester, () => repository.renameAttempts == 1);
+    await _tap(tester, 'tag-editor-cancel');
+    await _until(
+      tester,
+      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
+    );
+    repository.releaseRename();
+    await _until(tester, () => find.text('Быт').evaluate().isNotEmpty);
+    expect(tester.widget<Semantics>(row).properties.selected, isTrue);
+    expect(find.text('Дом'), findsNothing);
+    expect(repository.renameAttempts, 1);
+  });
+
   testWidgets('повтор, уход, фон и очередь результатов не повторяют запись', (
     tester,
   ) async {
@@ -248,12 +333,16 @@ final class _ControlledRepository extends Fake
 
   final PersonalGraphRepository delegate;
   Completer<void>? _heldCreate;
+  Completer<void>? _heldRename;
   bool failNextTagRead = false;
   bool failNextCatalogRead = false;
   int createAttempts = 0;
+  int renameAttempts = 0;
 
   void holdNextCreate() => _heldCreate = Completer<void>();
   void releaseCreate() => _heldCreate!.complete();
+  void holdNextRename() => _heldRename = Completer<void>();
+  void releaseRename() => _heldRename!.complete();
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -291,6 +380,14 @@ final class _ControlledRepository extends Fake
       if (gate != null) {
         await gate.future;
         _heldCreate = null;
+      }
+    }
+    if (command is RenameTag) {
+      renameAttempts++;
+      final gate = _heldRename;
+      if (gate != null) {
+        await gate.future;
+        _heldRename = null;
       }
     }
     return delegate.execute(command);

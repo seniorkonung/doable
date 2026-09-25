@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -13,6 +14,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart'
 import 'package:doable/src/tag/application/tag_catalog.dart'
     as data
     show TagCatalogPage;
+import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -28,6 +30,95 @@ String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
 void main() {
+  testWidgets('выбор вне первой порции следует внешним изменениям тега', (
+    tester,
+  ) async {
+    late sqlite.Database raw;
+    final database = AppDatabase(
+      openInMemoryLocalDatabase(setup: (db) => raw = db),
+    );
+    await database.open();
+    addTearDown(database.close);
+    for (var number = 1; number <= 51; number++) {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _id(number),
+        'Тег $number',
+      ]);
+    }
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(52), 'Дом']);
+    final repository = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 9, 25),
+      InMemoryDiagnosticsSink(),
+    );
+    final router = AppRouter();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp.router(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router.config(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-editor-name')),
+      'дом',
+    );
+    await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+    for (
+      var attempt = 0;
+      attempt < 30 &&
+          find
+              .byKey(const ValueKey('tag-editor-use-existing'))
+              .evaluate()
+              .isEmpty;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
+    await _waitForEditorToClose(tester);
+    expect(find.text('Дом'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsOneWidget);
+
+    final coordinator = ProviderScope.containerOf(
+      tester.element(find.byKey(const ValueKey('tag-catalog-create'))),
+    ).read(graphCommandCoordinatorProvider.notifier);
+    final tagId = (TagId.decode(_id(52)) as TagIdDecodingSuccess).id;
+    final rename = coordinator.acceptTagRename(
+      RenameTag(tagId: tagId, name: TagName.fromInput('Быт')),
+    ) as TagCommandAccepted;
+    await rename.future;
+    await tester.pumpAndSettle();
+    expect(find.text('Быт'), findsOneWidget);
+    expect(find.text('Дом'), findsNothing);
+    expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsOneWidget);
+
+    final deletion =
+        coordinator.acceptTagDelete(DeleteTag(tagId)) as TagCommandAccepted;
+    await deletion.future;
+    await tester.pumpAndSettle();
+    expect(find.text('Быт'), findsNothing);
+    expect(find.byKey(ValueKey('tag-catalog-delete-${_id(52)}')), findsNothing);
+    expect(raw.select('SELECT id FROM tags WHERE id = ?', [_id(52)]), isEmpty);
+  });
+
   testWidgets('конфликт сохраняет ввод и выбирает существующий тег по id', (
     tester,
   ) async {

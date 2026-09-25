@@ -8,6 +8,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -18,6 +19,114 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'выбор вне порции следует подтверждённому переименованию и удалению',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, [_tag(1, 'Дом')], cursor: _Cursor());
+      await pumpEventQueue();
+
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Старое имя'));
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogSelectionReady>().having(
+          (value) => value.tag.name.value,
+          'название',
+          'Старое имя',
+        ),
+      );
+
+      await h.renamed(
+        _tag(52, 'Старое имя'),
+        _tag(52, 'Новое имя'),
+        revision: 2,
+      );
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogSelectionReady>().having(
+          (value) => value.tag.name.value,
+          'название',
+          'Новое имя',
+        ),
+      );
+      h.repository.tagRead(_tag(52, 'Старое имя'));
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogSelectionReady>().having(
+          (value) => value.tag.name.value,
+          'название',
+          'Новое имя',
+        ),
+      );
+
+      h.repository.page(1, [_tag(1, 'Дом')]);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogSelectionReady>().having(
+          (value) => value.tag.name.value,
+          'название',
+          'Новое имя',
+        ),
+      );
+      expect(h.repository.queries, hasLength(3));
+
+      await h.deleted(_id(52), revision: 3);
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogNoSelection>(),
+      );
+      h.repository.page(2, [_tag(1, 'Дом')]);
+      await pumpEventQueue();
+      h.repository.page(3, [_tag(1, 'Дом')], revision: 3);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogNoSelection>(),
+      );
+      expect(
+        h.repository.queries.every((query) => query.pageSize <= 100),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'отказ чтения выбранного тега запрещает действия до нового чтения',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, [_tag(52, 'Старое имя')]);
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Старое имя'));
+      await pumpEventQueue();
+      expect(h.model.canActOn(_id(52)), isTrue);
+      h.repository.tagReadError(const TagReadUnavailableFailure());
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogSelectionFailure>(),
+      );
+      expect(h.model.canActOn(_id(52)), isFalse);
+      h.model.retrySelectedTag();
+      h.repository.tagRead(_tag(52, 'Актуальное имя'));
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogSelectionReady>().having(
+          (value) => value.tag.name.value,
+          'название',
+          'Актуальное имя',
+        ),
+      );
+    },
+  );
+
   test(
     'подгрузка запрашивается один раз и повторяет сохранённый курсор',
     () async {
@@ -265,6 +374,21 @@ final class _Repository extends Fake implements PersonalGraphRepository {
   final queries = <TagCatalogQuery>[];
   final pages = <Completer<TagCatalogPageResult>>[];
   final commands = <Completer<TagCommandResult>>[];
+  final tagReads = <StreamController<TagReadResult>>[];
+
+  @override
+  Stream<TagReadResult> watchTag(TagId id) {
+    final controller = StreamController<TagReadResult>.broadcast();
+    tagReads.add(controller);
+    return controller.stream;
+  }
+
+  void tagRead(Tag? tag, {int revision = 1}) => tagReads.last.add(
+    TagReadSuccess(GraphSnapshot(value: tag, revision: _Revision(revision))),
+  );
+
+  void tagReadError(TagReadFailure failure) =>
+      tagReads.last.add(TagReadError(failure));
 
   @override
   Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) {
