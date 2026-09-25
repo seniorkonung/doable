@@ -85,10 +85,17 @@ void main() {
         [_uuid(number), 'Намерение $number', number >= 3 ? 1 : 0],
       );
     }
+    await database.customStatement(
+      '''INSERT INTO intentions
+         (id, title, is_action_ready, is_archived, created_at, updated_at)
+         VALUES (?, 'Новое основание', 0, 0, 1, 1)''',
+      [_uuid(5)],
+    );
     for (final (number, source, target) in [
       (101, 1, 2),
       (102, 2, 3),
       (103, 1, 4),
+      (104, 5, 4),
     ]) {
       await database.customStatement(
         '''INSERT INTO long_term_relations
@@ -349,5 +356,138 @@ void main() {
       snapshot.revision.compareTo(confirmedRevision),
       GraphRevisionOrder.same,
     );
+  });
+
+  test(
+    'замена обоих участников переключает наблюдение на новый путь',
+    () async {
+      await create();
+      final events = <GraphSnapshot<DailyChoiceDetails?>>[];
+      final subscription = repository
+          .watchDailyChoice(_choice(201))
+          .listen((result) => events.add(_snapshot(result)));
+      addTearDown(subscription.cancel);
+
+      Future<void> waitFor(int count) async {
+        for (
+          var attempt = 0;
+          attempt < 100 && events.length < count;
+          attempt++
+        ) {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+        }
+        expect(events, hasLength(count));
+      }
+
+      await waitFor(1);
+      final replaced = await repository.execute(
+        ReplaceDailyChoicePath(
+          choiceId: _choice(201),
+          sourceIntentionId: _intention(5),
+          selectedIntentionId: _intention(4),
+          path: path([(104, 5, 4)]),
+        ),
+      );
+      expect(replaced, isA<GraphCommandSucceeded>());
+      await waitFor(2);
+      final replacementRevision =
+          (replaced as GraphCommandSucceeded).value.revision;
+      expect(
+        events.last.revision.compareTo(replacementRevision),
+        GraphRevisionOrder.same,
+      );
+      expect(events.last.value!.source.id, _intention(5));
+      expect(events.last.value!.selected.id, _intention(4));
+      expect(events.last.value!.path.single.relation.id, _relation(104));
+
+      for (final number in [1, 2, 3]) {
+        expect(
+          await repository.execute(
+            UpdateIntention(
+              id: _intention(number),
+              title: 'Прежний участник $number',
+              description: null,
+            ),
+          ),
+          isA<GraphCommandSucceeded>(),
+        );
+      }
+      await pumpEventQueue();
+      expect(events, hasLength(2));
+
+      expect(
+        await repository.execute(
+          UpdateIntention(
+            id: _intention(5),
+            title: 'Актуальное основание',
+            description: null,
+          ),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      await waitFor(3);
+      expect(events.last.value!.source.title, 'Актуальное основание');
+      expect(
+        events.last.value!.path.single.source.title,
+        'Актуальное основание',
+      );
+
+      expect(
+        await repository.execute(ArchiveLongTermRelation(_relation(104))),
+        isA<GraphCommandSucceeded>(),
+      );
+      await waitFor(4);
+      expect(
+        events.last.value!.path.single.relation.scope,
+        RelationScope.archived,
+      );
+    },
+  );
+
+  test('чтение до замены не выдаётся за снимок нового пути', () async {
+    await create();
+    final queued = Completer<void>();
+    late Future<Object> replacement;
+    readObserver.onPathRead = () {
+      readObserver.onPathRead = null;
+      replacement = Zone.root.run(
+        () => repository.execute(
+          ReplaceDailyChoicePath(
+            choiceId: _choice(201),
+            sourceIntentionId: _intention(5),
+            selectedIntentionId: _intention(4),
+            path: path([(104, 5, 4)]),
+          ),
+        ),
+      );
+      queued.complete();
+    };
+
+    final events = StreamIterator(repository.watchDailyChoice(_choice(201)));
+    addTearDown(events.cancel);
+    final pendingRead = events.moveNext();
+    await queued.future;
+    final result = await replacement;
+    expect(result, isA<GraphCommandSucceeded>());
+    final confirmedRevision = (result as GraphCommandSucceeded).value.revision;
+    expect(await pendingRead, isTrue);
+    var snapshot = _snapshot(events.current);
+    if (snapshot.value!.path.first.relation.id == _relation(101)) {
+      expect(
+        snapshot.revision.compareTo(confirmedRevision),
+        GraphRevisionOrder.older,
+      );
+      expect(await events.moveNext(), isTrue);
+      snapshot = _snapshot(events.current);
+    }
+    expect(
+      snapshot.revision.compareTo(confirmedRevision),
+      GraphRevisionOrder.same,
+    );
+    expect(snapshot.value!.source.id, _intention(5));
+    expect(snapshot.value!.selected.id, _intention(4));
+    expect(snapshot.value!.path.map((step) => step.relation.id), [
+      _relation(104),
+    ]);
   });
 }

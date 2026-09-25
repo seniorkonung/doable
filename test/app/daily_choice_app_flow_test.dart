@@ -1,9 +1,13 @@
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -115,6 +119,116 @@ Future<void> _edit(
 }
 
 void main() {
+  testWidgets('открытые подробности и каталог показывают повтор и новый путь', (
+    tester,
+  ) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+    final seeded = await harness.openReadyDatabase();
+    await seedDurabilityGraph(seeded);
+    await seeded.customStatement(
+      '''INSERT INTO long_term_relations
+           (id, source_intention_id, related_intention_id,
+            type, priority, is_archived)
+           VALUES (?, ?, ?, 'need', 2, 0)''',
+      [durabilityUuid(105), durabilityUuid(5), durabilityUuid(4)],
+    );
+    await harness.closePersistenceObjectGraph();
+    final runtime = AppRuntime(
+      connectionFactory: () =>
+          openFileBackedLocalDatabase(harness.databaseFile),
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+      await harness.dispose();
+    });
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await _until(tester, find.text('Намерение 1'));
+    final container = (await runtime.bootstrap() as AppRuntimeReady).container;
+    final repository = container.read(personalGraphRepositoryProvider);
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final created = await repository.execute(durabilityCreate());
+    expect(created, isA<GraphCommandSucceeded>());
+    final originalId =
+        ((created as GraphCommandSucceeded).value.value as DailyChoiceCreated)
+            .choice
+            .id;
+
+    await _tap(
+      tester,
+      find.byKey(const ValueKey('catalog-open-daily-choices')),
+    );
+    await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+    await _until(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+    expect(find.textContaining('Чтобы Намерение 1'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('daily-choice-relation-2')),
+      findsOneWidget,
+    );
+
+    final repeat = coordinator.acceptDailyChoiceCreation(
+      DailyChoiceCreationFormKey(),
+      durabilityCreate(),
+    );
+    expect(repeat, isA<DailyChoiceCommandAccepted>());
+    expect(
+      (await (repeat as DailyChoiceCommandAccepted).future).isFailure,
+      isFalse,
+    );
+    expect(_savedIds(harness), hasLength(2));
+    expect(
+      find.byKey(const ValueKey('daily-choice-relation-2')),
+      findsOneWidget,
+    );
+
+    final replacement = coordinator.acceptDailyChoiceReplace(
+      ReplaceDailyChoicePath(
+        choiceId: originalId,
+        sourceIntentionId: durabilityIntention(5),
+        selectedIntentionId: durabilityIntention(4),
+        path: ConfirmedChoicePath([
+          ConfirmedChoicePathStep(
+            relationId: durabilityRelation(105),
+            sourceIntentionId: durabilityIntention(5),
+            type: LongTermRelationType.need,
+            relatedIntentionId: durabilityIntention(4),
+          ),
+        ]),
+      ),
+    );
+    expect(replacement, isA<DailyChoiceCommandAccepted>());
+    expect(
+      (await (replacement as DailyChoiceCommandAccepted).future).isFailure,
+      isFalse,
+    );
+    await _until(tester, find.textContaining('Чтобы Намерение 5'));
+    expect(
+      find.byKey(const ValueKey('daily-choice-relation-1')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('daily-choice-relation-2')), findsNothing);
+    expect(
+      (await _read(repository, originalId)).path.single.relation.id,
+      durabilityRelation(105),
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await _until(tester, find.byKey(const ValueKey('daily-choice-row-2')));
+    expect(find.textContaining('Чтобы Намерение 5'), findsWidgets);
+    expect(_savedIds(harness), hasLength(2));
+  });
+
   testWidgets(
     'после конфликта новый путь сохраняет поля только по подтверждению',
     (tester) async {
