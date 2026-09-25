@@ -10,16 +10,16 @@ part of 'intention_catalog_view_model.dart';
 // ignore_for_file: type=lint, type=warning
 /// Ограниченный каталог намерений для одного назначения.
 ///
-/// Назначение задаёт отдельное состояние просмотра: общий каталог, выбор
-/// участника связи и выбор действия не разделяют фильтр и загруженную часть.
+/// Назначение задаёт отдельное состояние просмотра: общий каталог и режимы
+/// выбора участников не разделяют фильтр и загруженную часть.
 
 @ProviderFor(IntentionCatalogViewModel)
 final intentionCatalogViewModelProvider = IntentionCatalogViewModelFamily._();
 
 /// Ограниченный каталог намерений для одного назначения.
 ///
-/// Назначение задаёт отдельное состояние просмотра: общий каталог, выбор
-/// участника связи и выбор действия не разделяют фильтр и загруженную часть.
+/// Назначение задаёт отдельное состояние просмотра: общий каталог и режимы
+/// выбора участников не разделяют фильтр и загруженную часть.
 final class IntentionCatalogViewModelProvider
     extends
         $AsyncNotifierProvider<
@@ -28,8 +28,8 @@ final class IntentionCatalogViewModelProvider
         > {
   /// Ограниченный каталог намерений для одного назначения.
   ///
-  /// Назначение задаёт отдельное состояние просмотра: общий каталог, выбор
-  /// участника связи и выбор действия не разделяют фильтр и загруженную часть.
+  /// Назначение задаёт отдельное состояние просмотра: общий каталог и режимы
+  /// выбора участников не разделяют фильтр и загруженную часть.
   IntentionCatalogViewModelProvider._({
     required IntentionCatalogViewModelFamily super.from,
     required IntentionCatalogPurpose super.argument,
@@ -68,12 +68,12 @@ final class IntentionCatalogViewModelProvider
 }
 
 String _$intentionCatalogViewModelHash() =>
-    r'4c3b094f89ac32820f1128a0d632899e7025d77f';
+    r'279e1ebca562283a9d4e0670d312aad48aeee847';
 
 /// Ограниченный каталог намерений для одного назначения.
 ///
-/// Назначение задаёт отдельное состояние просмотра: общий каталог, выбор
-/// участника связи и выбор действия не разделяют фильтр и загруженную часть.
+/// Назначение задаёт отдельное состояние просмотра: общий каталог и режимы
+/// выбора участников не разделяют фильтр и загруженную часть.
 
 final class IntentionCatalogViewModelFamily extends $Family
     with
@@ -95,8 +95,8 @@ final class IntentionCatalogViewModelFamily extends $Family
 
   /// Ограниченный каталог намерений для одного назначения.
   ///
-  /// Назначение задаёт отдельное состояние просмотра: общий каталог, выбор
-  /// участника связи и выбор действия не разделяют фильтр и загруженную часть.
+  /// Назначение задаёт отдельное состояние просмотра: общий каталог и режимы
+  /// выбора участников не разделяют фильтр и загруженную часть.
 
   IntentionCatalogViewModelProvider call(IntentionCatalogPurpose purpose) =>
       IntentionCatalogViewModelProvider._(argument: purpose, from: this);
@@ -107,8 +107,8 @@ final class IntentionCatalogViewModelFamily extends $Family
 
 /// Ограниченный каталог намерений для одного назначения.
 ///
-/// Назначение задаёт отдельное состояние просмотра: общий каталог, выбор
-/// участника связи и выбор действия не разделяют фильтр и загруженную часть.
+/// Назначение задаёт отдельное состояние просмотра: общий каталог и режимы
+/// выбора участников не разделяют фильтр и загруженную часть.
 
 abstract class _$IntentionCatalogViewModel
     extends $AsyncNotifier<IntentionCatalogState> {

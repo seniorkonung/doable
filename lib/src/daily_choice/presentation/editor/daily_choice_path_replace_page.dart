@@ -101,7 +101,7 @@ final class _DailyChoicePathReplacePageState
   void _onModelChanged() {
     switch (_model.state) {
       case DailyChoicePathReplaceChoosing():
-        if (_initialSelectionPending)
+        if (_initialSelectionPending) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted &&
                 _initialSelectionPending &&
@@ -110,6 +110,7 @@ final class _DailyChoicePathReplacePageState
               _model.selectPath(widget.path);
             }
           });
+        }
       case DailyChoicePathReplaceSucceeded():
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted &&
