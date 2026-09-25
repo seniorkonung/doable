@@ -767,6 +767,52 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationTag => 'tag';
 
   @override
+  String get tagCatalogTitle => 'Tags';
+
+  @override
+  String get tagCatalogLoading => 'Loading tags…';
+
+  @override
+  String get tagCatalogEmpty => 'No tags yet.';
+
+  @override
+  String get tagCatalogUnavailable => 'Tags couldn’t be loaded. Try again.';
+
+  @override
+  String get tagCatalogCorruption =>
+      'Stored tag data is damaged and can’t be shown.';
+
+  @override
+  String get tagCatalogUnexpected =>
+      'Tags couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get tagCatalogRefreshing => 'Refreshing tags…';
+
+  @override
+  String get tagCatalogMoreAvailable => 'More tags are available.';
+
+  @override
+  String get tagCatalogLoadMore => 'Show more tags';
+
+  @override
+  String get tagCatalogLoadingMore => 'Loading more tags…';
+
+  @override
+  String get tagCatalogAllShown => 'All tags are shown.';
+
+  @override
+  String get tagCatalogLoadMoreUnavailable => 'More tags couldn’t be loaded.';
+
+  @override
+  String get tagCatalogLoadMoreCorruption =>
+      'Stored data is damaged; no more tags can be shown.';
+
+  @override
+  String get tagCatalogLoadMoreUnexpected =>
+      'More tags couldn’t be loaded because of an unexpected error.';
+
+  @override
   String get tagCreated => 'Tag created.';
 
   @override

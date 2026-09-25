@@ -1370,6 +1370,90 @@ abstract class AppLocalizations {
   /// **'tag'**
   String get graphOperationTag;
 
+  /// Заголовок каталога тегов и переход к нему
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get tagCatalogTitle;
+
+  /// Начальная загрузка каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Loading tags…'**
+  String get tagCatalogLoading;
+
+  /// Подтверждённо пустой каталог тегов
+  ///
+  /// In en, this message translates to:
+  /// **'No tags yet.'**
+  String get tagCatalogEmpty;
+
+  /// Временная ошибка чтения каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Tags couldn’t be loaded. Try again.'**
+  String get tagCatalogUnavailable;
+
+  /// Повреждение данных при чтении каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Stored tag data is damaged and can’t be shown.'**
+  String get tagCatalogCorruption;
+
+  /// Непредвиденная ошибка чтения каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Tags couldn’t be loaded because of an unexpected error.'**
+  String get tagCatalogUnexpected;
+
+  /// Актуализация каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing tags…'**
+  String get tagCatalogRefreshing;
+
+  /// У каталога есть следующая порция
+  ///
+  /// In en, this message translates to:
+  /// **'More tags are available.'**
+  String get tagCatalogMoreAvailable;
+
+  /// Загрузить следующую порцию каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Show more tags'**
+  String get tagCatalogLoadMore;
+
+  /// Загрузка следующей порции каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more tags…'**
+  String get tagCatalogLoadingMore;
+
+  /// Достигнут конец каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'All tags are shown.'**
+  String get tagCatalogAllShown;
+
+  /// Временная ошибка чтения следующей порции тегов
+  ///
+  /// In en, this message translates to:
+  /// **'More tags couldn’t be loaded.'**
+  String get tagCatalogLoadMoreUnavailable;
+
+  /// Повреждение при чтении следующей порции тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged; no more tags can be shown.'**
+  String get tagCatalogLoadMoreCorruption;
+
+  /// Непредвиденная ошибка чтения следующей порции тегов
+  ///
+  /// In en, this message translates to:
+  /// **'More tags couldn’t be loaded because of an unexpected error.'**
+  String get tagCatalogLoadMoreUnexpected;
+
   /// Подтверждение создания тега
   ///
   /// In en, this message translates to:

@@ -42,12 +42,14 @@ void main() {
 
       expect(find.text('Preparing local data…'), findsOneWidget);
       expect(find.byType(IntentionCatalogPage), findsNothing);
+      expect(find.byKey(const ValueKey('catalog-open-tags')), findsNothing);
 
       allowOpening.complete();
       await tester.pumpAndSettle();
 
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final featureContext = tester.element(find.byType(IntentionCatalogPage));
+      expect(find.byKey(const ValueKey('catalog-open-tags')), findsOneWidget);
       expect(
         ProviderScope.containerOf(featureContext, listen: false),
         same(ready.container),

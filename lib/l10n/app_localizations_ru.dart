@@ -768,6 +768,54 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationTag => 'тег';
 
   @override
+  String get tagCatalogTitle => 'Теги';
+
+  @override
+  String get tagCatalogLoading => 'Загружаем теги…';
+
+  @override
+  String get tagCatalogEmpty => 'Тегов пока нет.';
+
+  @override
+  String get tagCatalogUnavailable =>
+      'Не удалось загрузить теги. Повторите попытку.';
+
+  @override
+  String get tagCatalogCorruption =>
+      'Сохранённые данные тегов повреждены и не могут быть показаны.';
+
+  @override
+  String get tagCatalogUnexpected =>
+      'Не удалось загрузить теги из-за непредвиденной ошибки.';
+
+  @override
+  String get tagCatalogRefreshing => 'Обновляем каталог тегов…';
+
+  @override
+  String get tagCatalogMoreAvailable => 'Есть ещё теги.';
+
+  @override
+  String get tagCatalogLoadMore => 'Показать ещё теги';
+
+  @override
+  String get tagCatalogLoadingMore => 'Загружаем ещё теги…';
+
+  @override
+  String get tagCatalogAllShown => 'Все теги показаны.';
+
+  @override
+  String get tagCatalogLoadMoreUnavailable =>
+      'Не удалось загрузить следующие теги.';
+
+  @override
+  String get tagCatalogLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующие теги нельзя показать.';
+
+  @override
+  String get tagCatalogLoadMoreUnexpected =>
+      'Не удалось загрузить следующие теги из-за непредвиденной ошибки.';
+
+  @override
   String get tagCreated => 'Тег создан.';
 
   @override

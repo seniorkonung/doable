@@ -63,6 +63,12 @@ final class _IntentionCatalogPageState
         title: Text(localizations.catalogTitle),
         actions: [
           IconButton(
+            key: const ValueKey('catalog-open-tags'),
+            tooltip: localizations.tagCatalogTitle,
+            onPressed: () => context.router.push(const TagCatalogRoute()),
+            icon: const Icon(Icons.label_outline),
+          ),
+          IconButton(
             key: const ValueKey('catalog-open-daily-choices'),
             tooltip: localizations.dailyChoiceCatalogTitle,
             onPressed: () =>
