@@ -26,6 +26,22 @@ final class DeveloperDiagnosticsSink implements DiagnosticsSink {
 }
 
 Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
+  TagCommandDiagnosticsEvent(:final commandType, :final stage) => {
+    'operation': 'tagCommand',
+    'commandType': commandType.name,
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
+  TagCatalogPageReadDiagnosticsEvent(:final stage) => {
+    'operation': 'tagCatalogPageRead',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
+  TagDetailReadDiagnosticsEvent(:final stage) => {
+    'operation': 'tagDetailRead',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
   DailyChoiceReadDiagnosticsEvent() => {
     'operation': 'dailyChoiceDetailRead',
     'stage': 'read',

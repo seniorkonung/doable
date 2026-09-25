@@ -79,6 +79,41 @@ enum DailyChoiceCommandDiagnosticsType {
 
 enum DailyChoiceCommandDiagnosticsStage { validation, write, resultRead }
 
+enum TagCommandDiagnosticsType { create, rename, delete }
+
+enum TagCommandDiagnosticsStage { validation, write, resultRead }
+
+enum TagReadDiagnosticsStage { validation, read }
+
+final class TagCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const TagCommandDiagnosticsEvent({
+    required this.commandType,
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final TagCommandDiagnosticsType commandType;
+  final TagCommandDiagnosticsStage stage;
+}
+
+final class TagCatalogPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const TagCatalogPageReadDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final TagReadDiagnosticsStage stage;
+}
+
+final class TagDetailReadDiagnosticsEvent extends DiagnosticsEvent {
+  const TagDetailReadDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final TagReadDiagnosticsStage stage;
+}
+
 final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
   const DailyChoiceReadDiagnosticsEvent({required DiagnosticsStatus status})
     : super(status);
