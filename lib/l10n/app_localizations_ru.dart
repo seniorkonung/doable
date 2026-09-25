@@ -765,6 +765,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationDailyChoice => 'дневной выбор';
 
   @override
+  String get graphOperationTag => 'тег';
+
+  @override
+  String get tagOperationSucceeded => 'Операция с тегом выполнена.';
+
+  @override
+  String get tagOperationFailed => 'Не удалось выполнить операцию с тегом.';
+
+  @override
   String get dailyChoiceCreated => 'Дневной выбор создан.';
 
   @override

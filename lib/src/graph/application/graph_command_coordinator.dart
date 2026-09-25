@@ -11,6 +11,9 @@ import '../../intention/application/intention_result.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
+import '../../tag/application/tag_command.dart';
+import '../../tag/application/tag_result.dart';
+import '../../tag/domain/tag_id.dart';
 import 'blocking_relation_reference.dart';
 import 'delete_blocking_relations.dart';
 import 'graph_command_result.dart';
@@ -85,6 +88,23 @@ final class ExistingDailyChoiceKey extends GraphCommandKey {
   int get hashCode => Object.hash(ExistingDailyChoiceKey, choiceId);
 }
 
+final class TagCreationFormKey extends GraphCommandKey {
+  TagCreationFormKey();
+}
+
+final class ExistingTagKey extends GraphCommandKey {
+  const ExistingTagKey(this.tagId);
+
+  final TagId tagId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ExistingTagKey && other.tagId == tagId;
+
+  @override
+  int get hashCode => Object.hash(ExistingTagKey, tagId);
+}
+
 sealed class GraphOperationToken {
   const GraphOperationToken();
 }
@@ -115,6 +135,13 @@ final class DailyChoiceOperationToken extends GraphOperationToken {
 
   @override
   String toString() => 'DailyChoiceOperationToken';
+}
+
+final class TagOperationToken extends GraphOperationToken {
+  TagOperationToken._();
+
+  @override
+  String toString() => 'TagOperationToken';
 }
 
 sealed class GraphCommandCompletion {
@@ -265,6 +292,36 @@ final class DailyChoiceCommandCompletion extends GraphCommandCompletion {
   bool get isFailure => confirmedResult is GraphResultFailure;
 }
 
+enum TagCommandKind { create, rename, delete }
+
+final class TagCommandCompletion extends GraphCommandCompletion {
+  const TagCommandCompletion._({
+    required this.token,
+    required this.kind,
+    required this.confirmedResult,
+  });
+
+  @override
+  final TagOperationToken token;
+  final TagCommandKind kind;
+  final TagCommandResult confirmedResult;
+
+  GraphResult<TagCommandSuccess, TagCommandFailure> get result =>
+      switch (confirmedResult) {
+        GraphResultSuccess(:final value) => GraphResultSuccess(value.value),
+        GraphResultFailure(:final failure) => GraphResultFailure(failure),
+      };
+
+  @override
+  ConfirmedGraphChangePackage? get confirmedChange => switch (confirmedResult) {
+    GraphResultSuccess(:final value) => value,
+    GraphResultFailure() => null,
+  };
+
+  @override
+  bool get isFailure => confirmedResult is GraphResultFailure;
+}
+
 sealed class IntentionOperationTarget {
   const IntentionOperationTarget();
 }
@@ -353,6 +410,21 @@ final class DailyChoiceCommandAlreadyRunning extends DailyChoiceCommandStart {
   const DailyChoiceCommandAlreadyRunning();
 }
 
+sealed class TagCommandStart {
+  const TagCommandStart();
+}
+
+final class TagCommandAccepted extends TagCommandStart {
+  const TagCommandAccepted({required this.token, required this.future});
+
+  final TagOperationToken token;
+  final Future<TagCommandCompletion> future;
+}
+
+final class TagCommandAlreadyRunning extends TagCommandStart {
+  const TagCommandAlreadyRunning();
+}
+
 final class BlockingRelationsDeleteAccepted
     extends BlockingRelationsDeleteStart {
   const BlockingRelationsDeleteAccepted({
@@ -373,7 +445,8 @@ final class GraphCommandCoordinatorDraining extends IntentionCommandStart
     implements
         LongTermRelationCommandStart,
         BlockingRelationsDeleteStart,
-        DailyChoiceCommandStart {
+        DailyChoiceCommandStart,
+        TagCommandStart {
   const GraphCommandCoordinatorDraining();
 }
 
@@ -470,6 +543,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   bool isDailyChoiceRunning(DailyChoiceId choiceId) =>
       isKeyRunning(ExistingDailyChoiceKey(choiceId));
 
+  bool isTagRunning(TagId tagId) => isKeyRunning(ExistingTagKey(tagId));
+
   bool isKeyRunning(GraphCommandKey key) => _gates.containsKey(key);
 
   IntentionCommandStart acceptCreation(
@@ -562,6 +637,42 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         command,
         DailyChoiceCommandKind.delete,
       );
+
+  TagCommandStart acceptTagCreation(
+    TagCreationFormKey formKey,
+    CreateTag command,
+  ) => _acceptTag(formKey, command, TagCommandKind.create);
+
+  TagCommandStart acceptTagRename(RenameTag command) =>
+      _acceptTag(ExistingTagKey(command.tagId), command, TagCommandKind.rename);
+
+  TagCommandStart acceptTagDelete(DeleteTag command) =>
+      _acceptTag(ExistingTagKey(command.tagId), command, TagCommandKind.delete);
+
+  TagCommandStart _acceptTag(
+    GraphCommandKey key,
+    TagCommand command,
+    TagCommandKind kind,
+  ) {
+    final token = TagOperationToken._();
+    final acceptance = _acceptOperation(
+      keys: {key},
+      entry: _PresentationEntry(token),
+      execute: () async => TagCommandCompletion._(
+        token: token,
+        kind: kind,
+        confirmedResult: await _executeTag(command),
+      ),
+    );
+    return switch (acceptance) {
+      _GraphCommandAccepted(:final future) => TagCommandAccepted(
+        token: token,
+        future: future.then((completion) => completion as TagCommandCompletion),
+      ),
+      _GraphCommandAlreadyRunning() => const TagCommandAlreadyRunning(),
+      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
+    };
+  }
 
   DailyChoiceCommandStart _acceptDailyChoice(
     GraphCommandKey key,
@@ -967,6 +1078,14 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         DailyChoiceCommandSuccess,
         DailyChoiceCommandFailure
       >(DailyChoiceUnexpectedFailure());
+    }
+  }
+
+  Future<TagCommandResult> _executeTag(TagCommand command) async {
+    try {
+      return await _repository.execute(command);
+    } on Object {
+      return const TagCommandFailed(TagUnexpectedFailure());
     }
   }
 

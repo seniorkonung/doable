@@ -764,6 +764,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationDailyChoice => 'daily choice';
 
   @override
+  String get graphOperationTag => 'tag';
+
+  @override
+  String get tagOperationSucceeded => 'Tag operation completed.';
+
+  @override
+  String get tagOperationFailed => 'Could not complete the tag operation.';
+
+  @override
   String get dailyChoiceCreated => 'Daily choice created.';
 
   @override

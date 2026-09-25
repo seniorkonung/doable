@@ -821,6 +821,18 @@
   "@graphOperationDailyChoice": {
     "description": "Безопасное обозначение дневного выбора в сообщении операции"
   },
+  "graphOperationTag": "tag",
+  "@graphOperationTag": {
+    "description": "Обозначение тега в общем сообщении операции"
+  },
+  "tagOperationSucceeded": "Tag operation completed.",
+  "@tagOperationSucceeded": {
+    "description": "Общее подтверждение операции с тегом"
+  },
+  "tagOperationFailed": "Could not complete the tag operation.",
+  "@tagOperationFailed": {
+    "description": "Общий отказ операции с тегом"
+  },
   "dailyChoiceCreated": "Daily choice created.",
   "@dailyChoiceCreated": {
     "description": "Подтверждение создания дневного выбора"

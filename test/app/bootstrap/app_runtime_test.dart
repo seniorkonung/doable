@@ -37,6 +37,9 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -389,6 +392,41 @@ void main() {
         >(DailyChoiceUnavailableFailure()),
       );
       await accepted.future;
+      await shutdown;
+      expect(closeObserver.closeCalls, 1);
+    });
+
+    test('shutdown дожидается команды тега до закрытия базы', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final closeObserver = _CloseTrackingObserver();
+      final runtime = AppRuntime(
+        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          closeObserver,
+        ),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+        repositoryFactory: (_) => repository,
+      );
+      addTearDown(runtime.shutdown);
+      await runtime.bootstrap();
+      final coordinator = runtime.commandCoordinator;
+      final tagId =
+          (TagId.decode(_relationSourceUuid) as TagIdDecodingSuccess).id;
+      final accepted =
+          coordinator.acceptTagDelete(DeleteTag(tagId)) as TagCommandAccepted;
+      coordinator.releaseInitiatorPresentation(accepted.token);
+
+      final shutdown = runtime.shutdown();
+      expect(coordinator.isTagRunning(tagId), isTrue);
+      expect(closeObserver.closeCalls, 0);
+      expect(
+        coordinator.acceptTagDelete(DeleteTag(tagId)),
+        isA<GraphCommandCoordinatorDraining>(),
+      );
+
+      repository.complete(const TagCommandFailed(TagUnavailableFailure()));
+      final completion = await accepted.future;
+      expect(completion.isFailure, isTrue);
       await shutdown;
       expect(closeObserver.closeCalls, 1);
     });

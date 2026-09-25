@@ -198,6 +198,17 @@ String _messageFor(
     localizations,
     completion,
   ),
+  TagCommandCompletion() => localizations.graphOperationMessage(
+    switch (completion.kind) {
+      TagCommandKind.create => localizations.graphOperationCreate,
+      TagCommandKind.rename => localizations.graphOperationUpdate,
+      TagCommandKind.delete => localizations.graphOperationDelete,
+    },
+    localizations.graphOperationTag,
+    completion.isFailure
+        ? localizations.tagOperationFailed
+        : localizations.tagOperationSucceeded,
+  ),
 };
 
 String _dailyChoiceMessage(

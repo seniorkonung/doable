@@ -1364,6 +1364,24 @@ abstract class AppLocalizations {
   /// **'daily choice'**
   String get graphOperationDailyChoice;
 
+  /// Обозначение тега в общем сообщении операции
+  ///
+  /// In en, this message translates to:
+  /// **'tag'**
+  String get graphOperationTag;
+
+  /// Общее подтверждение операции с тегом
+  ///
+  /// In en, this message translates to:
+  /// **'Tag operation completed.'**
+  String get tagOperationSucceeded;
+
+  /// Общий отказ операции с тегом
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the tag operation.'**
+  String get tagOperationFailed;
+
   /// Подтверждение создания дневного выбора
   ///
   /// In en, this message translates to:
