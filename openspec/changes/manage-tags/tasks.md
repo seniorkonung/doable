@@ -82,7 +82,7 @@
   - **Вероятные файлы:** `test/data/local/migrations/migration_test.dart`, `test/data/local/migrations/file_backed_migration_test.dart`, `test/data/local/migrations/fault_injection_test.dart`, `test/support/migration_process_worker.dart`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 1.9 Подтвердить готовность общих типов и локального хранения к реализации каталога
+- [x] 1.9 Подтвердить готовность общих типов и локального хранения к реализации каталога
   - **Критерии приёмки:**
     - Результаты 1.1–1.8 подтверждены; новая и обновлённая базы одинаково защищают теги и назначения, функции доступны во всех путях открытия, прежний граф сохранён.
     - Генерация воспроизводима; для дальнейшей работы достаточно контрактов типов, чтений и команд без знания устройства SQLite.

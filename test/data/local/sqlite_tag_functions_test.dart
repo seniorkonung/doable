@@ -152,12 +152,12 @@ void main() {
 
     for (final point in expectedTrimmed) {
       final character = String.fromCharCode(point);
-      expect(TagName.fromInput('${character}Дом$character').value, 'Дом');
+      expect(TagName.fromInput('$characterДом$character').value, 'Дом');
       if (point == 0xfeff) continue;
       final row = database.select(
         'SELECT $tagNameValidFunctionName(?) AS valid, '
         '$tagNameKeyFunctionName(?) AS name_key',
-        ['${character}Дом', '${character}Дом'],
+        ['$characterДом', '$characterДом'],
       ).single;
       expect(row['valid'], 0, reason: 'U+${point.toRadixString(16)}');
       expect(row['name_key'], isNull);
