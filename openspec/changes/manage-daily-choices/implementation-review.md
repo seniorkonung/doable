@@ -3,44 +3,45 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
-**Coverage status:** Complete
-**Summary:** Задача 94 / 4.20 реализует отбор только допустимых прежних маршрутов в обоих направлениях и при замене; предметные тесты и OpenSpec-валидация прошли. Устранение двух предупреждений `flutter analyze` передано в незавершённую задачу 4.21; проверка пока не проходит. Сохраняются ранее принятые AR1 и AR2; они не относятся к целевому коммиту.
+**Result:** Incomplete
+**Coverage status:** Incomplete
+**Coverage limitations:** По просьбе пользователя повторная независимая оценка решений реализации не проводилась; текущий диапазон меняет только тесты и отметку задачи.
+**Summary:** Задача 95 / 4.21 удаляет два лишних приведения типов в тестах. Статический анализ, 18 предметных тестов и проверка OpenSpec прошли. Новых подтверждённых замечаний нет; ранее принятые риски AR1 и AR2 сохраняются вне текущего диапазона.
 
 ## Review target
 
-- **Baseline ref:** efc654279e5867897ca49b401919c54a3012e8d3
-- **Base commit:** efc654279e5867897ca49b401919c54a3012e8d3
-- **Reviewed head:** 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8
-- **Target commits:** ["0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8"]
-- **Reviewable paths:** ["lib/src/daily_choice/application/choice_path_suggestions.dart", "lib/src/daily_choice/presentation/path/choice_path_suggestions_state.dart", "lib/src/daily_choice/presentation/path/choice_path_suggestions_view.dart", "lib/src/daily_choice/presentation/path/choice_path_suggestions_view_model.dart", "lib/src/graph/data/drift_personal_graph_repository_choice_path_suggestions.dart", "openspec/changes/manage-daily-choices/evidence/4.18.md", "openspec/changes/manage-daily-choices/tasks.md", "test/daily_choice/application/choice_path_suggestions_test.dart", "test/daily_choice/presentation/path/choice_path_suggestions_view_model_test.dart", "test/daily_choice/presentation/path/choice_path_suggestions_view_test.dart", "test/graph/data/drift_choice_path_suggestions_test.dart", "test/graph/data/drift_daily_choice_read_cost_test.dart"]
+- **Baseline ref:** f8c92a13aa1c526bb6db869bf582ebcd574d7ce6
+- **Base commit:** f8c92a13aa1c526bb6db869bf582ebcd574d7ce6
+- **Reviewed head:** 7979bcb0a4a70abc320997dff8f3458984ff939b
+- **Target commits:** ["7979bcb0a4a70abc320997dff8f3458984ff939b"]
+- **Reviewable paths:** ["openspec/changes/manage-daily-choices/tasks.md", "test/graph/data/drift_choice_path_suggestions_test.dart", "test/graph/data/drift_daily_choice_read_cost_test.dart"]
 - **OpenSpec change:** manage-daily-choices
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
 - **Baseline freshness:** Local ref state; no fetch performed
-- **Planning evidence paths:** ["openspec/changes/manage-daily-choices/evidence/4.18.md", "openspec/changes/manage-daily-choices/tasks.md"]
+- **Planning evidence paths:** ["openspec/changes/manage-daily-choices/tasks.md"]
 
 ## Reviewed increment
 
-### U1 · Только допустимые прежние маршруты в подсказках
+### U1 · Восстановление статического анализа тестов подсказок
 
-- **Work items:** ["94 / 4.20"]
-- **Requirements and scenarios:** ["daily-choice-management: Повтор прежнего маршрута / Недоступные маршруты не вытесняют пригодный; Все прежние маршруты недоступны; Подсказка устарела перед сохранением", "daily-choice-management: Атомарная замена участников и пути", "design.md: раздел 7 / отбор подсказок"]
-- **Affected boundary:** Пользователь создания или замены дневного выбора в обоих направлениях; прикладной снимок, чтение локального графа и экран подсказок.
-- **Implementation target:** ["lib/src/daily_choice/application/choice_path_suggestions.dart", "lib/src/daily_choice/presentation/path/choice_path_suggestions_state.dart", "lib/src/daily_choice/presentation/path/choice_path_suggestions_view.dart", "lib/src/daily_choice/presentation/path/choice_path_suggestions_view_model.dart", "lib/src/graph/data/drift_personal_graph_repository_choice_path_suggestions.dart", "test/daily_choice/application/choice_path_suggestions_test.dart", "test/daily_choice/presentation/path/choice_path_suggestions_view_model_test.dart", "test/daily_choice/presentation/path/choice_path_suggestions_view_test.dart", "test/graph/data/drift_choice_path_suggestions_test.dart", "test/graph/data/drift_daily_choice_read_cost_test.dart"]
-- **Applicable constraints and non-goals:** Проверяются все последние 20 выборов участника, до пяти различных допустимых путей показываются по новизне; недоступные пути не занимают места, повреждение любого прочитанного кандидата прерывает чтение. Исторический выбор не меняется; 21-й и более старые выборы не читаются для добора, а подтверждение повторно проверяет текущий путь.
+- **Work items:** ["95 / 4.21"]
+- **Requirements and scenarios:** ["tasks.md: 4.21 / статический анализ и сохранение проверок подсказок"]
+- **Affected boundary:** Статический анализ и тесты чтения подсказок и стоимости чтения локального графа.
+- **Implementation target:** ["test/graph/data/drift_choice_path_suggestions_test.dart", "test/graph/data/drift_daily_choice_read_cost_test.dart"]
+- **Applicable constraints and non-goals:** Удалены только два избыточных приведения к `AvailableChoicePathSuggestion`; проверки подтверждённого пути сохранены, поведение приложения не меняется.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежий изолированный рецензент прочитал все десять назначенных путей из 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 и их diff от efc654279e5867897ca49b401919c54a3012e8d3. Он отметил случай 21-го доступного маршрута; пункт не сохранён как дефект: `design.md:170–172,233` и `tasks.md:931–934` ограничивают подсказки последними 20 выборами, спецификация говорит о рассмотренных выборах, а более старый путь остаётся доступен через каталог и пошаговый обход. |
-| OpenSpec conformance | Complete | На чистом checkout с HEAD 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 прошли `mise exec --no-deps -- openspec validate manage-daily-choices --json`, `mise exec --no-deps -- openspec validate manage-daily-choices --strict --no-interactive`, заданный задачей Flutter-набор подсказок и стоимости (69 тестов), а также сквозные тесты создания и замены (14 тестов). Проверены оба направления, пять недоступных перед допустимым, пустая выдача, предел 20, повтор, повреждение и конфликт подтверждения. |
-| Code quality | Complete | Проверены типы снимка, фильтрация и дедупликация после валидации всех кандидатов, наблюдение скрытых путей, состояние экрана, SQL-стоимость, безопасность отказа и тесты. `mise exec --no-deps -- flutter analyze` на 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 завершился с кодом 1 из-за двух `unnecessary_cast`; исправление и повторная проверка закреплены задачей 4.21. |
+| Independent decision review | Incomplete | Повторная независимая оценка по просьбе пользователя пропущена; целевой коммит не меняет код приложения или решения реализации. |
+| OpenSpec conformance | Complete | На чистом рабочем дереве с HEAD 7979bcb0a4a70abc320997dff8f3458984ff939b прошли `mise exec --no-deps -- openspec validate manage-daily-choices --strict --no-interactive`, `mise exec --no-deps -- flutter analyze` и указанный в задаче 4.21 запуск двух тестовых файлов (18 тестов). |
+| Code quality | Complete | Разница f8c92a13aa1c526bb6db869bf582ebcd574d7ce6..7979bcb0a4a70abc320997dff8f3458984ff939b содержит только два удаления лишних приведений и отметку задачи. Обращения к `confirmedPath` и проверки ожидаемых значений сохранены. |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+No findings confirmed; review incomplete.
 
 ## Accepted risks
 
@@ -73,4 +74,4 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Единственный целевой коммит 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 целиком отнесён к U1 и задаче 94 / 4.20. Все 12 путей диапазона учтены: десять путей реализации и тестов входят в U1, `tasks.md` и `evidence/4.18.md` служат плановым и измерительным свидетельством; непокрытых и посторонних путей нет. Снимок в рабочем дереве был чистым и совпадал с reviewed head. Проверены сценарии требований и граница в 20 кандидатов; позднее изменение проверяется атомарной командой. AR1 и AR2 перенесены из предыдущего отчёта без повторной оценки, поскольку выбор исходного намерения и действия не менялся в этом диапазоне. Повторный экранный диктор и устройство не проверялись; доступность оценена по коду и widget-тестам.
+Единственный целевой коммит 7979bcb0a4a70abc320997dff8f3458984ff939b отнесён к U1 и задаче 95 / 4.21. Оба изменённых тестовых файла входят в U1; `tasks.md` содержит отметку выполнения и служит плановым свидетельством. Других путей в диапазоне нет. Перед проверками рабочее дерево было чистым, а HEAD совпадал с reviewed head. Прежние риски AR1 и AR2 перенесены без переоценки: выбор действия и основания в этом коммите не менялся. Независимая повторная оценка реализации сознательно не проводилась по просьбе пользователя.
