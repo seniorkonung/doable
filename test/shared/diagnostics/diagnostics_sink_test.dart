@@ -8,6 +8,140 @@ import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
   group('DiagnosticsSink', () {
+    test(
+      'операции и этапы тегов кодируются закрытым набором безопасных полей',
+      () {
+        final messages = <String>[];
+        final sink = DeveloperDiagnosticsSink(messages.add);
+
+        for (final commandType in TagCommandDiagnosticsType.values) {
+          for (final stage in TagCommandDiagnosticsStage.values) {
+            sink.record(
+              TagCommandDiagnosticsEvent(
+                commandType: commandType,
+                stage: stage,
+                status: const DiagnosticsFailed(
+                  duration: Duration(microseconds: 17),
+                  code: DiagnosticsFailureCode.conflict,
+                ),
+              ),
+            );
+          }
+        }
+        for (final stage in TagReadDiagnosticsStage.values) {
+          sink.record(
+            TagCatalogPageReadDiagnosticsEvent(
+              stage: stage,
+              status: const DiagnosticsSucceeded(Duration(microseconds: 23)),
+            ),
+          );
+          sink.record(
+            TagDetailReadDiagnosticsEvent(
+              stage: stage,
+              status: const DiagnosticsStarted(),
+            ),
+          );
+        }
+
+        expect(messages.map((message) => jsonDecode(message)), [
+          for (final commandType in TagCommandDiagnosticsType.values)
+            for (final stage in TagCommandDiagnosticsStage.values)
+              {
+                'operation': 'tagCommand',
+                'commandType': commandType.name,
+                'stage': stage.name,
+                'outcome': 'failed',
+                'durationMicros': 17,
+                'failureCode': 'conflict',
+              },
+          for (final stage in TagReadDiagnosticsStage.values) ...[
+            {
+              'operation': 'tagCatalogPageRead',
+              'stage': stage.name,
+              'outcome': 'succeeded',
+              'durationMicros': 23,
+            },
+            {
+              'operation': 'tagDetailRead',
+              'stage': stage.name,
+              'outcome': 'started',
+            },
+          ],
+        ]);
+        for (final canary in [
+          'CANARY-название-тега',
+          'c0ffee00-cafe-4bad-8ace-0123456789ab',
+          'CANARY-name-key',
+          'CANARY-assignment',
+          'CANARY-SQL-PARAMETER',
+          'CANARY-database-exception',
+        ]) {
+          expect(messages.join(), isNot(contains(canary)));
+        }
+      },
+    );
+
+    test(
+      'отказ диагностики не меняет подтверждённый результат команды тега',
+      () {
+        final sink = _ThrowingDiagnosticsSink();
+        const event = TagCommandDiagnosticsEvent(
+          commandType: TagCommandDiagnosticsType.delete,
+          stage: TagCommandDiagnosticsStage.write,
+          status: DiagnosticsSucceeded(Duration(microseconds: 7)),
+        );
+
+        String confirmedResult() {
+          recordDiagnosticsSafely(sink, event);
+          return 'подтверждено';
+        }
+
+        expect(confirmedResult(), 'подтверждено');
+        expect(sink.attemptedEvents, [same(event)]);
+      },
+    );
+
+    test('миграция тегов использует общий канал без нового вида события', () {
+      final messages = <String>[];
+      DeveloperDiagnosticsSink(messages.add).record(
+        const MigrationDiagnosticsEvent(
+          fromSchemaVersion: 3,
+          toSchemaVersion: 4,
+          status: DiagnosticsSucceeded(Duration(microseconds: 29)),
+        ),
+      );
+
+      expect(jsonDecode(messages.single), {
+        'operation': 'migration',
+        'fromSchemaVersion': 3,
+        'toSchemaVersion': 4,
+        'outcome': 'succeeded',
+        'durationMicros': 29,
+      });
+    });
+
+    test('падающий писатель не повторяет диагностическое событие тега', () {
+      var attempts = 0;
+      final sink = DeveloperDiagnosticsSink((_) {
+        attempts += 1;
+        throw StateError('CANARY-личные-данные');
+      });
+
+      expect(
+        () => sink.record(
+          const TagDetailReadDiagnosticsEvent(
+            stage: TagReadDiagnosticsStage.read,
+            status: DiagnosticsFailed(
+              duration: Duration(microseconds: 5),
+              code: DiagnosticsFailureCode.notFound,
+            ),
+          ),
+        ),
+        returnsNormally,
+      );
+      expect(attempts, 1);
+    });
+
     test('событие подсказок кодирует этап и категорию без данных графа', () {
       final messages = <String>[];
       DeveloperDiagnosticsSink(messages.add).record(

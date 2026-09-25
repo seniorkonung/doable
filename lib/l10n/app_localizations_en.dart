@@ -764,6 +764,192 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationDailyChoice => 'daily choice';
 
   @override
+  String get graphOperationTag => 'tag';
+
+  @override
+  String get tagCatalogTitle => 'Tags';
+
+  @override
+  String get tagCatalogLoading => 'Loading tags…';
+
+  @override
+  String get tagCatalogEmpty => 'No tags yet.';
+
+  @override
+  String get tagCatalogUnavailable => 'Tags couldn’t be loaded. Try again.';
+
+  @override
+  String get tagCatalogCorruption =>
+      'Stored tag data is damaged and can’t be shown.';
+
+  @override
+  String get tagCatalogUnexpected =>
+      'Tags couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get tagCatalogRefreshing => 'Refreshing tags…';
+
+  @override
+  String get tagCatalogMoreAvailable => 'More tags are available.';
+
+  @override
+  String get tagCatalogLoadMore => 'Show more tags';
+
+  @override
+  String get tagCatalogLoadingMore => 'Loading more tags…';
+
+  @override
+  String get tagCatalogAllShown => 'All tags are shown.';
+
+  @override
+  String get tagCatalogLoadMoreUnavailable => 'More tags couldn’t be loaded.';
+
+  @override
+  String get tagCatalogLoadMoreCorruption =>
+      'Stored data is damaged; no more tags can be shown.';
+
+  @override
+  String get tagCatalogLoadMoreUnexpected =>
+      'More tags couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get tagCatalogCreate => 'Create tag';
+
+  @override
+  String get tagCatalogRename => 'Rename tag';
+
+  @override
+  String get tagCatalogDelete => 'Delete tag';
+
+  @override
+  String tagDeleteConfirmationTitle(String tagName) {
+    return 'Delete tag “$tagName”?';
+  }
+
+  @override
+  String get tagDeleteConfirmationScope =>
+      'This permanently deletes the tag and all its assignments to active and archived intentions and long-term relations, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.';
+
+  @override
+  String get tagDeleteCancel => 'Cancel';
+
+  @override
+  String get tagDeleteConfirm => 'Delete tag and assignments';
+
+  @override
+  String get tagDeleteAlreadyRunning =>
+      'An operation on this tag is already in progress. Wait for its result.';
+
+  @override
+  String get tagDeleteSaving => 'Deleting tag and assignments…';
+
+  @override
+  String get tagCatalogSelected => 'Selected tag';
+
+  @override
+  String get tagEditorCreateTitle => 'New tag';
+
+  @override
+  String get tagEditorRenameTitle => 'Rename tag';
+
+  @override
+  String get tagEditorNameLabel => 'Tag name';
+
+  @override
+  String get tagEditorNameLimit => 'No more than 255 visible characters.';
+
+  @override
+  String get tagEditorCreateAction => 'Create tag';
+
+  @override
+  String get tagEditorRenameAction => 'Save name';
+
+  @override
+  String get tagEditorSaving => 'Saving tag…';
+
+  @override
+  String get tagEditorAlreadyRunning =>
+      'Saving this tag is already in progress. Wait for its result.';
+
+  @override
+  String get tagEditorCancel => 'Cancel';
+
+  @override
+  String get tagEditorUseExisting => 'Use existing tag';
+
+  @override
+  String get tagEditorReadingCommitted => 'Tag saved. Refreshing its details…';
+
+  @override
+  String get tagEditorCommittedReadFailed =>
+      'Tag saved, but its details couldn’t be refreshed.';
+
+  @override
+  String get tagEditorCommittedMissing =>
+      'Tag saved, but is no longer found. Refresh the catalog.';
+
+  @override
+  String get tagEditorReadingExisting => 'Checking existing tag…';
+
+  @override
+  String get tagEditorExistingMissing =>
+      'The existing tag is gone. Correct the name or refresh the catalog.';
+
+  @override
+  String get tagEditorReadUnavailable => 'Tag couldn’t be read. Try again.';
+
+  @override
+  String get tagEditorReadCorruption => 'Stored tag data is damaged.';
+
+  @override
+  String get tagEditorReadUnexpected =>
+      'Tag couldn’t be read because of an unexpected error.';
+
+  @override
+  String get tagCreated => 'Tag created.';
+
+  @override
+  String get tagRenamed => 'Tag renamed.';
+
+  @override
+  String get tagUnchanged => 'Tag name unchanged.';
+
+  @override
+  String get tagDeleted => 'Tag deleted with all its assignments.';
+
+  @override
+  String get tagNameInvalidUnicode => 'Tag name contains invalid characters.';
+
+  @override
+  String get tagNameEmpty => 'Enter a tag name.';
+
+  @override
+  String get tagNameTooLong =>
+      'Tag name must contain no more than 255 visible characters.';
+
+  @override
+  String get tagNameNonCanonical => 'Remove whitespace around the tag name.';
+
+  @override
+  String get tagNameOccupied =>
+      'A tag with this name already exists. Choose another name or use the existing tag.';
+
+  @override
+  String get tagNotFound => 'This tag no longer exists. Refresh the catalog.';
+
+  @override
+  String get tagUnavailable =>
+      'Could not complete the tag operation. Try again.';
+
+  @override
+  String get tagCorruption =>
+      'Stored tag data is damaged. The tag was not changed.';
+
+  @override
+  String get tagUnexpected =>
+      'The tag operation failed because of an unexpected error.';
+
+  @override
   String get dailyChoiceCreated => 'Daily choice created.';
 
   @override

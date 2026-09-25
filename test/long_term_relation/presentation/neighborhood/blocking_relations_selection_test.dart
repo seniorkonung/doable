@@ -30,6 +30,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'neighborhood_test_support.dart';
+import '../../../support/tag_read_contract_test_fallback.dart';
 
 void main() {
   test('смешанный выбор сохраняет виды, порции и совпадающие UUID', () {
@@ -809,7 +810,9 @@ final class _Harness {
   }
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,

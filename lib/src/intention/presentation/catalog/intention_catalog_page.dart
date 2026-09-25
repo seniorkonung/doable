@@ -63,6 +63,12 @@ final class _IntentionCatalogPageState
         title: Text(localizations.catalogTitle),
         actions: [
           IconButton(
+            key: const ValueKey('catalog-open-tags'),
+            tooltip: localizations.tagCatalogTitle,
+            onPressed: () => context.router.push(const TagCatalogRoute()),
+            icon: const Icon(Icons.label_outline),
+          ),
+          IconButton(
             key: const ValueKey('catalog-open-daily-choices'),
             tooltip: localizations.dailyChoiceCatalogTitle,
             onPressed: () =>
@@ -271,6 +277,7 @@ final class _CatalogControls extends StatelessWidget {
         children: [
           DropdownButtonFormField<IntentionScope>(
             key: const ValueKey('catalog-scope-control'),
+            isExpanded: true,
             initialValue: selection.scope,
             decoration: InputDecoration(
               labelText: localizations.catalogScopeLabel,
@@ -301,6 +308,7 @@ final class _CatalogControls extends StatelessWidget {
           const SizedBox(height: 12),
           DropdownButtonFormField<IntentionCatalogOrder>(
             key: const ValueKey('catalog-order-control'),
+            isExpanded: true,
             initialValue: selection.order,
             decoration: InputDecoration(
               labelText: localizations.catalogOrderLabel,

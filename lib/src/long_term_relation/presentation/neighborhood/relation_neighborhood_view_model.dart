@@ -16,6 +16,7 @@ import '../../../intention/application/intention_details.dart'
 import '../../../intention/application/intention_result.dart'
     as intention_result;
 import '../../../intention/domain/intention_id.dart';
+import '../../../tag/application/tag_change.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_group_page.dart';
 import '../../domain/long_term_relation.dart';
@@ -314,6 +315,9 @@ final class RelationNeighborhoodViewModel
     final cursor = _cursorOf(confirmed);
     if (_activeRequest != null || cursor == null) {
       return;
+    }
+    if (_pagePrecedesRequiredRevision(confirmed.revision)) {
+      return _refresh(confirmed, includeRequestedPage: true);
     }
     final request = Object();
     final generation = _generation;
@@ -793,6 +797,34 @@ final class RelationNeighborhoodViewModel
     }
     if (_changesAffectObservedState(confirmedChange.changes)) {
       _requestReconciliation(confirmedChange.revision);
+    } else if (confirmedChange.changes.any((change) => change is TagChange)) {
+      _noteUnrelatedTagRevision(confirmedChange.revision);
+    }
+  }
+
+  void _noteUnrelatedTagRevision(GraphRevision revision) {
+    final current = state;
+    if (current is RelationGroupConfirmedState) {
+      final order = revision.compareTo(current.revision);
+      if (order == GraphRevisionOrder.older ||
+          order == GraphRevisionOrder.same) {
+        return;
+      }
+    }
+    final required = _requiredRevision;
+    if (required != null) {
+      final order = revision.compareTo(required);
+      if (order == GraphRevisionOrder.older ||
+          order == GraphRevisionOrder.same) {
+        return;
+      }
+    }
+    _requiredRevision = revision;
+    _invalidation += 1;
+    if (current is RelationGroupConfirmedState &&
+        current.progress is RelationGroupLoadingMore) {
+      _activeRequest = null;
+      unawaited(_refresh(current, includeRequestedPage: true));
     }
   }
 

@@ -8,6 +8,8 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   test('запрос по умолчанию охватывает все даты и оба состояния', () {
     final query = DailyChoiceCatalogQuery();
@@ -207,7 +209,9 @@ final class _Revision implements GraphRevision {
   };
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   const _Repository(this.result);
 
   final DailyChoiceCatalogPageResult result;

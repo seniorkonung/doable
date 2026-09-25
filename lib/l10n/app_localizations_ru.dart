@@ -765,6 +765,196 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationDailyChoice => 'дневной выбор';
 
   @override
+  String get graphOperationTag => 'тег';
+
+  @override
+  String get tagCatalogTitle => 'Теги';
+
+  @override
+  String get tagCatalogLoading => 'Загружаем теги…';
+
+  @override
+  String get tagCatalogEmpty => 'Тегов пока нет.';
+
+  @override
+  String get tagCatalogUnavailable =>
+      'Не удалось загрузить теги. Повторите попытку.';
+
+  @override
+  String get tagCatalogCorruption =>
+      'Сохранённые данные тегов повреждены и не могут быть показаны.';
+
+  @override
+  String get tagCatalogUnexpected =>
+      'Не удалось загрузить теги из-за непредвиденной ошибки.';
+
+  @override
+  String get tagCatalogRefreshing => 'Обновляем каталог тегов…';
+
+  @override
+  String get tagCatalogMoreAvailable => 'Есть ещё теги.';
+
+  @override
+  String get tagCatalogLoadMore => 'Показать ещё теги';
+
+  @override
+  String get tagCatalogLoadingMore => 'Загружаем ещё теги…';
+
+  @override
+  String get tagCatalogAllShown => 'Все теги показаны.';
+
+  @override
+  String get tagCatalogLoadMoreUnavailable =>
+      'Не удалось загрузить следующие теги.';
+
+  @override
+  String get tagCatalogLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующие теги нельзя показать.';
+
+  @override
+  String get tagCatalogLoadMoreUnexpected =>
+      'Не удалось загрузить следующие теги из-за непредвиденной ошибки.';
+
+  @override
+  String get tagCatalogCreate => 'Создать тег';
+
+  @override
+  String get tagCatalogRename => 'Переименовать тег';
+
+  @override
+  String get tagCatalogDelete => 'Удалить тег';
+
+  @override
+  String tagDeleteConfirmationTitle(String tagName) {
+    return 'Удалить тег «$tagName»?';
+  }
+
+  @override
+  String get tagDeleteConfirmationScope =>
+      'Тег и все его назначения активным и архивированным намерениям и долговременным связям будут удалены необратимо, включая незагруженные назначения. Сами намерения, связи, дневные выборы и их пути сохраняются.';
+
+  @override
+  String get tagDeleteCancel => 'Отмена';
+
+  @override
+  String get tagDeleteConfirm => 'Удалить тег и назначения';
+
+  @override
+  String get tagDeleteAlreadyRunning =>
+      'Изменение этого тега уже выполняется. Дождитесь результата.';
+
+  @override
+  String get tagDeleteSaving => 'Удаляем тег и назначения…';
+
+  @override
+  String get tagCatalogSelected => 'Выбранный тег';
+
+  @override
+  String get tagEditorCreateTitle => 'Новый тег';
+
+  @override
+  String get tagEditorRenameTitle => 'Переименование тега';
+
+  @override
+  String get tagEditorNameLabel => 'Название тега';
+
+  @override
+  String get tagEditorNameLimit => 'Не более 255 отображаемых символов.';
+
+  @override
+  String get tagEditorCreateAction => 'Создать тег';
+
+  @override
+  String get tagEditorRenameAction => 'Сохранить название';
+
+  @override
+  String get tagEditorSaving => 'Сохраняем тег…';
+
+  @override
+  String get tagEditorAlreadyRunning =>
+      'Сохранение этого тега уже выполняется. Дождитесь результата.';
+
+  @override
+  String get tagEditorCancel => 'Отмена';
+
+  @override
+  String get tagEditorUseExisting => 'Использовать существующий тег';
+
+  @override
+  String get tagEditorReadingCommitted => 'Тег сохранён. Обновляем его данные…';
+
+  @override
+  String get tagEditorCommittedReadFailed =>
+      'Тег сохранён, но данные не удалось обновить.';
+
+  @override
+  String get tagEditorCommittedMissing =>
+      'Тег сохранён, но больше не найден. Обновите каталог.';
+
+  @override
+  String get tagEditorReadingExisting => 'Проверяем существующий тег…';
+
+  @override
+  String get tagEditorExistingMissing =>
+      'Существующего тега больше нет. Исправьте название или обновите каталог.';
+
+  @override
+  String get tagEditorReadUnavailable =>
+      'Не удалось прочитать тег. Повторите попытку.';
+
+  @override
+  String get tagEditorReadCorruption => 'Сохранённые данные тега повреждены.';
+
+  @override
+  String get tagEditorReadUnexpected =>
+      'Не удалось прочитать тег из-за непредвиденной ошибки.';
+
+  @override
+  String get tagCreated => 'Тег создан.';
+
+  @override
+  String get tagRenamed => 'Тег переименован.';
+
+  @override
+  String get tagUnchanged => 'Название тега не изменилось.';
+
+  @override
+  String get tagDeleted => 'Тег удалён вместе со всеми назначениями.';
+
+  @override
+  String get tagNameInvalidUnicode =>
+      'Название тега содержит недопустимые символы.';
+
+  @override
+  String get tagNameEmpty => 'Введите название тега.';
+
+  @override
+  String get tagNameTooLong =>
+      'Название тега должно содержать не более 255 отображаемых символов.';
+
+  @override
+  String get tagNameNonCanonical => 'Удалите пробелы по краям названия тега.';
+
+  @override
+  String get tagNameOccupied =>
+      'Тег с таким названием уже есть. Выберите другое название или используйте существующий тег.';
+
+  @override
+  String get tagNotFound => 'Этого тега больше нет. Обновите каталог.';
+
+  @override
+  String get tagUnavailable =>
+      'Не удалось выполнить действие с тегом. Повторите попытку.';
+
+  @override
+  String get tagCorruption =>
+      'Сохранённые данные тега повреждены. Тег не изменён.';
+
+  @override
+  String get tagUnexpected =>
+      'Действие с тегом не выполнено из-за непредвиденной ошибки.';
+
+  @override
   String get dailyChoiceCreated => 'Дневной выбор создан.';
 
   @override

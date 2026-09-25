@@ -3,7 +3,7 @@ library;
 
 import 'dart:io';
 
-import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';

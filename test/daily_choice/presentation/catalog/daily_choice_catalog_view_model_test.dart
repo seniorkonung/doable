@@ -25,8 +25,16 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_per
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/tag_read_contract_test_fallback.dart';
 
 void main() {
   test('фильтр меняет поколение и отклоняет позднюю первую порцию', () async {
@@ -325,6 +333,98 @@ void main() {
       GraphRevisionOrder.same,
     );
   });
+
+  test('тег обновляет основу перед продолжением, совпадение имени не повторяет чтение', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.repository.first(0, [_item(1)], total: 2, cursor: _Cursor());
+    await pumpEventQueue();
+
+    final tag = Tag(id: _tagId(), name: TagName.fromInput('Дом'));
+    const revision = _Revision(2);
+    final creation = harness.coordinator.acceptTagCreation(
+      TagCreationFormKey(),
+      CreateTag(tag.name),
+    ) as TagCommandAccepted;
+    harness.repository.completeTag(
+      0,
+      TagCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: TagCreated(TagCreatedChange(revision: revision, after: tag)),
+        ),
+      ),
+    );
+    await creation.future;
+    await pumpEventQueue();
+    final old = harness.state as DailyChoiceCatalogLoaded;
+    expect(old.needsRebase, isTrue);
+    expect(old.items.map((item) => item.id), [_choiceId(1)]);
+
+    final load = harness.model.loadMore();
+    expect(harness.repository.queries[1].cursor, isNull);
+    harness.repository.first(
+      1,
+      [_item(1)],
+      total: 2,
+      cursor: _Cursor(),
+      revision: 2,
+    );
+    await pumpEventQueue();
+    harness.repository.more(2, [_item(2)], revision: 2);
+    await load;
+    final current = harness.state as DailyChoiceCatalogLoaded;
+    expect(current.revision.compareTo(revision), GraphRevisionOrder.same);
+    expect(current.items.map((item) => item.id), [_choiceId(1), _choiceId(2)]);
+
+    final unchanged = harness.coordinator.acceptTagRename(
+      RenameTag(tagId: tag.id, name: tag.name),
+    ) as TagCommandAccepted;
+    harness.repository.completeTag(
+      1,
+      TagCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: TagUnchanged(TagUnchangedChange(revision: revision, tag: tag)),
+        ),
+      ),
+    );
+    await unchanged.future;
+    await pumpEventQueue();
+    expect(harness.state, same(current));
+    expect(harness.repository.queries, hasLength(3));
+  });
+
+  test('пакет тега другой эпохи не принимает старую первую страницу', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    final accepted = harness.coordinator.acceptTagDelete(
+      DeleteTag(_tagId()),
+    ) as TagCommandAccepted;
+    const revision = _Revision(1, epoch: 1);
+    harness.repository.completeTag(
+      0,
+      TagCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: TagDeleted(
+            TagDeletedChange(revision: revision, tagId: _tagId()),
+          ),
+        ),
+      ),
+    );
+    await accepted.future;
+    await pumpEventQueue();
+    harness.repository.first(0, [_item(1)], total: 1);
+    await pumpEventQueue();
+    expect(harness.state, isA<DailyChoiceCatalogInitialLoad>());
+    expect(harness.repository.queries, hasLength(2));
+    harness.repository.first(1, [_item(2)], total: 1, revision: 1, epoch: 1);
+    await pumpEventQueue();
+    final current = harness.state as DailyChoiceCatalogLoaded;
+    expect(current.revision.compareTo(revision), GraphRevisionOrder.same);
+    expect(current.items.map((item) => item.id), [_choiceId(2)]);
+  });
 }
 
 final class _Harness {
@@ -375,12 +475,15 @@ final class _Harness {
   }
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <DailyChoiceCatalogQuery>[];
   final _pages = <Completer<DailyChoiceCatalogPageResult>>[];
   final _commands = <Completer<DailyChoiceCommandResult>>[];
   final _intentionCommands =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
+  final _tagCommands = <Completer<TagCommandResult>>[];
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
@@ -431,6 +534,11 @@ final class _Repository implements PersonalGraphRepository {
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command is TagCommand) {
+      final request = Completer<TagCommandResult>();
+      _tagCommands.add(request);
+      return await request.future as GraphCommandResult<TSuccess, TFailure>;
+    }
     if (command is UpdateIntention) {
       final request =
           Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
@@ -441,6 +549,9 @@ final class _Repository implements PersonalGraphRepository {
     _commands.add(request);
     return await request.future as GraphCommandResult<TSuccess, TFailure>;
   }
+
+  void completeTag(int index, TagCommandResult result) =>
+      _tagCommands[index].complete(result);
 
   void succeedCreation(
     int index,
@@ -707,6 +818,11 @@ IntentionId _intentionId(int value) => switch (IntentionId.decode(
   IntentionIdDecodingSuccess(:final id) => id,
   _ => throw StateError('ID'),
 };
+TagId _tagId() =>
+    switch (TagId.decode('018f1400-0000-7000-8000-000000000001')) {
+      TagIdDecodingSuccess(:final id) => id,
+      InvalidTagIdDecoding() => throw StateError('ID тега'),
+    };
 LongTermRelationId _relationId(int value) => switch (LongTermRelationId.decode(
   '018f1300-0000-7000-8000-${value.toString().padLeft(12, '0')}',
 )) {

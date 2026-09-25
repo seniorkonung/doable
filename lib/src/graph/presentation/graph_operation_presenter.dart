@@ -12,6 +12,8 @@ import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/presentation/relation_command_failure_message.dart';
 import '../../shared/presentation/presentation_frame_evidence.dart';
+import '../../tag/application/tag_result.dart';
+import '../../tag/presentation/tag_failure_message.dart';
 import '../application/graph_command_coordinator.dart';
 import '../application/graph_command_result.dart';
 
@@ -198,7 +200,33 @@ String _messageFor(
     localizations,
     completion,
   ),
+  TagCommandCompletion() => _tagMessage(localizations, completion),
 };
+
+String _tagMessage(
+  AppLocalizations localizations,
+  TagCommandCompletion completion,
+) => localizations.graphOperationMessage(
+  switch (completion.kind) {
+    TagCommandKind.create => localizations.graphOperationCreate,
+    TagCommandKind.rename => localizations.graphOperationUpdate,
+    TagCommandKind.delete => localizations.graphOperationDelete,
+  },
+  localizations.graphOperationTag,
+  switch (completion.result) {
+    GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
+      (TagCommandKind.create, TagCreated()) => localizations.tagCreated,
+      (TagCommandKind.rename, TagRenamed()) => localizations.tagRenamed,
+      (TagCommandKind.rename, TagUnchanged()) => localizations.tagUnchanged,
+      (TagCommandKind.delete, TagDeleted()) => localizations.tagDeleted,
+      _ => localizations.tagUnexpected,
+    },
+    GraphResultFailure(:final failure) => tagFailureMessage(
+      localizations,
+      failure,
+    ),
+  },
+);
 
 String _dailyChoiceMessage(
   AppLocalizations localizations,

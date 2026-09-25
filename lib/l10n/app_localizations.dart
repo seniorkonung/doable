@@ -1364,6 +1364,342 @@ abstract class AppLocalizations {
   /// **'daily choice'**
   String get graphOperationDailyChoice;
 
+  /// Обозначение тега в общем сообщении операции
+  ///
+  /// In en, this message translates to:
+  /// **'tag'**
+  String get graphOperationTag;
+
+  /// Заголовок каталога тегов и переход к нему
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get tagCatalogTitle;
+
+  /// Начальная загрузка каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Loading tags…'**
+  String get tagCatalogLoading;
+
+  /// Подтверждённо пустой каталог тегов
+  ///
+  /// In en, this message translates to:
+  /// **'No tags yet.'**
+  String get tagCatalogEmpty;
+
+  /// Временная ошибка чтения каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Tags couldn’t be loaded. Try again.'**
+  String get tagCatalogUnavailable;
+
+  /// Повреждение данных при чтении каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Stored tag data is damaged and can’t be shown.'**
+  String get tagCatalogCorruption;
+
+  /// Непредвиденная ошибка чтения каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Tags couldn’t be loaded because of an unexpected error.'**
+  String get tagCatalogUnexpected;
+
+  /// Актуализация каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing tags…'**
+  String get tagCatalogRefreshing;
+
+  /// У каталога есть следующая порция
+  ///
+  /// In en, this message translates to:
+  /// **'More tags are available.'**
+  String get tagCatalogMoreAvailable;
+
+  /// Загрузить следующую порцию каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Show more tags'**
+  String get tagCatalogLoadMore;
+
+  /// Загрузка следующей порции каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more tags…'**
+  String get tagCatalogLoadingMore;
+
+  /// Достигнут конец каталога тегов
+  ///
+  /// In en, this message translates to:
+  /// **'All tags are shown.'**
+  String get tagCatalogAllShown;
+
+  /// Временная ошибка чтения следующей порции тегов
+  ///
+  /// In en, this message translates to:
+  /// **'More tags couldn’t be loaded.'**
+  String get tagCatalogLoadMoreUnavailable;
+
+  /// Повреждение при чтении следующей порции тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged; no more tags can be shown.'**
+  String get tagCatalogLoadMoreCorruption;
+
+  /// Непредвиденная ошибка чтения следующей порции тегов
+  ///
+  /// In en, this message translates to:
+  /// **'More tags couldn’t be loaded because of an unexpected error.'**
+  String get tagCatalogLoadMoreUnexpected;
+
+  /// Создать тег из каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Create tag'**
+  String get tagCatalogCreate;
+
+  /// Переименовать выбранный тег
+  ///
+  /// In en, this message translates to:
+  /// **'Rename tag'**
+  String get tagCatalogRename;
+
+  /// Удалить выбранный тег
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tag'**
+  String get tagCatalogDelete;
+
+  /// Заголовок подтверждения удаления конкретного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tag “{tagName}”?'**
+  String tagDeleteConfirmationTitle(String tagName);
+
+  /// Полный охват удаления тега независимо от загруженной порции
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes the tag and all its assignments to active and archived intentions and long-term relations, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.'**
+  String get tagDeleteConfirmationScope;
+
+  /// Отменить удаление тега
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get tagDeleteCancel;
+
+  /// Подтвердить удаление тега и всех назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tag and assignments'**
+  String get tagDeleteConfirm;
+
+  /// Повторный вход во время команды того же тега
+  ///
+  /// In en, this message translates to:
+  /// **'An operation on this tag is already in progress. Wait for its result.'**
+  String get tagDeleteAlreadyRunning;
+
+  /// Ожидание подтверждения удаления тега
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting tag and assignments…'**
+  String get tagDeleteSaving;
+
+  /// Тег выбран после завершения формы
+  ///
+  /// In en, this message translates to:
+  /// **'Selected tag'**
+  String get tagCatalogSelected;
+
+  /// Заголовок формы создания тега
+  ///
+  /// In en, this message translates to:
+  /// **'New tag'**
+  String get tagEditorCreateTitle;
+
+  /// Заголовок формы переименования тега
+  ///
+  /// In en, this message translates to:
+  /// **'Rename tag'**
+  String get tagEditorRenameTitle;
+
+  /// Подпись поля названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name'**
+  String get tagEditorNameLabel;
+
+  /// Ограничение длины названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'No more than 255 visible characters.'**
+  String get tagEditorNameLimit;
+
+  /// Подтвердить создание тега
+  ///
+  /// In en, this message translates to:
+  /// **'Create tag'**
+  String get tagEditorCreateAction;
+
+  /// Подтвердить переименование тега
+  ///
+  /// In en, this message translates to:
+  /// **'Save name'**
+  String get tagEditorRenameAction;
+
+  /// Выполняется запись тега
+  ///
+  /// In en, this message translates to:
+  /// **'Saving tag…'**
+  String get tagEditorSaving;
+
+  /// Повторное сохранение при занятом ключе формы тега
+  ///
+  /// In en, this message translates to:
+  /// **'Saving this tag is already in progress. Wait for its result.'**
+  String get tagEditorAlreadyRunning;
+
+  /// Уйти с формы без новой команды
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get tagEditorCancel;
+
+  /// Выбрать тег при конфликте названия
+  ///
+  /// In en, this message translates to:
+  /// **'Use existing tag'**
+  String get tagEditorUseExisting;
+
+  /// Чтение после подтверждённой записи
+  ///
+  /// In en, this message translates to:
+  /// **'Tag saved. Refreshing its details…'**
+  String get tagEditorReadingCommitted;
+
+  /// Ошибка чтения после подтверждённой записи
+  ///
+  /// In en, this message translates to:
+  /// **'Tag saved, but its details couldn’t be refreshed.'**
+  String get tagEditorCommittedReadFailed;
+
+  /// Тег исчез после подтверждённой записи
+  ///
+  /// In en, this message translates to:
+  /// **'Tag saved, but is no longer found. Refresh the catalog.'**
+  String get tagEditorCommittedMissing;
+
+  /// Повторная проверка существующего тега по id
+  ///
+  /// In en, this message translates to:
+  /// **'Checking existing tag…'**
+  String get tagEditorReadingExisting;
+
+  /// Конфликтный тег исчез до выбора
+  ///
+  /// In en, this message translates to:
+  /// **'The existing tag is gone. Correct the name or refresh the catalog.'**
+  String get tagEditorExistingMissing;
+
+  /// Временный отказ чтения одного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag couldn’t be read. Try again.'**
+  String get tagEditorReadUnavailable;
+
+  /// Повреждение чтения одного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Stored tag data is damaged.'**
+  String get tagEditorReadCorruption;
+
+  /// Неизвестный отказ чтения одного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag couldn’t be read because of an unexpected error.'**
+  String get tagEditorReadUnexpected;
+
+  /// Подтверждение создания тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag created.'**
+  String get tagCreated;
+
+  /// Подтверждение переименования тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag renamed.'**
+  String get tagRenamed;
+
+  /// Подтверждение неизменного названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name unchanged.'**
+  String get tagUnchanged;
+
+  /// Подтверждение удаления тега и назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Tag deleted with all its assignments.'**
+  String get tagDeleted;
+
+  /// Недопустимые символы в названии тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name contains invalid characters.'**
+  String get tagNameInvalidUnicode;
+
+  /// Пустое название тега
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a tag name.'**
+  String get tagNameEmpty;
+
+  /// Превышена длина названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name must contain no more than 255 visible characters.'**
+  String get tagNameTooLong;
+
+  /// Неканоничное название тега
+  ///
+  /// In en, this message translates to:
+  /// **'Remove whitespace around the tag name.'**
+  String get tagNameNonCanonical;
+
+  /// Название тега уже занято
+  ///
+  /// In en, this message translates to:
+  /// **'A tag with this name already exists. Choose another name or use the existing tag.'**
+  String get tagNameOccupied;
+
+  /// Тег отсутствует при изменении
+  ///
+  /// In en, this message translates to:
+  /// **'This tag no longer exists. Refresh the catalog.'**
+  String get tagNotFound;
+
+  /// Временная недоступность команды тега
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the tag operation. Try again.'**
+  String get tagUnavailable;
+
+  /// Повреждение сохранённых данных тега
+  ///
+  /// In en, this message translates to:
+  /// **'Stored tag data is damaged. The tag was not changed.'**
+  String get tagCorruption;
+
+  /// Неизвестный отказ команды тега
+  ///
+  /// In en, this message translates to:
+  /// **'The tag operation failed because of an unexpected error.'**
+  String get tagUnexpected;
+
   /// Подтверждение создания дневного выбора
   ///
   /// In en, this message translates to:

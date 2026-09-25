@@ -38,6 +38,15 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../tag/application/tag_catalog.dart';
+import '../../tag/application/tag_change.dart';
+import '../../tag/application/tag_command.dart';
+import '../../tag/application/tag_id_generator.dart';
+import '../../tag/application/tag_read_result.dart';
+import '../../tag/application/tag_result.dart';
+import '../../tag/domain/tag.dart' as tag_domain;
+import '../../tag/domain/tag_id.dart';
+import '../../tag/domain/tag_name.dart';
 import '../application/blocking_relation_reference.dart';
 import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
@@ -61,6 +70,8 @@ part 'drift_personal_graph_repository_relation_groups.dart';
 part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_choice_path_suggestions.dart';
+part 'drift_personal_graph_repository_tag_reads.dart';
+part 'drift_personal_graph_repository_tag_commands.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -71,12 +82,14 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     LongTermRelationIdGenerator? relationIdGenerator,
     DailyChoiceIdGenerator? dailyChoiceIdGenerator,
     ChoicePathStepIdGenerator? choicePathStepIdGenerator,
+    TagIdGenerator? tagIdGenerator,
   }) : _relationIdGenerator =
            relationIdGenerator ?? UuidV7LongTermRelationIdGenerator(),
        _dailyChoiceIdGenerator =
            dailyChoiceIdGenerator ?? UuidV7DailyChoiceIdGenerator(),
        _choicePathStepIdGenerator =
-           choicePathStepIdGenerator ?? UuidV7ChoicePathStepIdGenerator();
+           choicePathStepIdGenerator ?? UuidV7ChoicePathStepIdGenerator(),
+       _tagIdGenerator = tagIdGenerator ?? UuidV7TagIdGenerator();
 
   final local.AppDatabase _database;
   final IntentionIdGenerator _idGenerator;
@@ -85,6 +98,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   final LongTermRelationIdGenerator _relationIdGenerator;
   final DailyChoiceIdGenerator _dailyChoiceIdGenerator;
   final ChoicePathStepIdGenerator _choicePathStepIdGenerator;
+  final TagIdGenerator _tagIdGenerator;
   final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
@@ -98,6 +112,13 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
+
+  @override
+  Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) =>
+      _readTagCatalogPage(query);
+
+  @override
+  Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);
 
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
@@ -402,6 +423,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       final DailyChoiceCommand dailyChoiceCommand => await _executeDailyChoice(
         dailyChoiceCommand,
       ),
+      final CreateTag createTag => await _executeTag(createTag),
+      final RenameTag renameTag => await _executeTag(renameTag),
+      final DeleteTag deleteTag => await _executeTag(deleteTag),
       _ => throw UnsupportedError(
         'Команда не поддерживается модулем личного графа.',
       ),

@@ -26,6 +26,10 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+
+import '../../../support/tag_read_contract_test_fallback.dart';
 
 final class ControlledDetailRequest {
   ControlledDetailRequest({bool broadcast = false}) {
@@ -73,7 +77,9 @@ final class ControlledDetailRequest {
   Future<void> close() => controller.close();
 }
 
-final class ControlledDetailsRepository implements PersonalGraphRepository {
+final class ControlledDetailsRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,
@@ -122,12 +128,14 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   final relationCommands = <LongTermRelationCommand>[];
   final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
+  final tagCommands = <TagCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
   final _blockingRelationsCommandRequests =
       <Completer<DeleteBlockingRelationsResult>>[];
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
+  final _tagCommandRequests = <Completer<TagCommandResult>>[];
   var _watchCallCount = 0;
 
   Result<IntentionCatalogPage>? catalogResult;
@@ -242,6 +250,7 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
       final DeleteBlockingRelations deletion =>
         await _executeBlockingRelationsDelete(deletion),
       final DailyChoiceCommand choice => await _executeDailyChoice(choice),
+      final TagCommand tag => await _executeTag(tag),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -267,6 +276,19 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
 
   void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) =>
       _dailyChoiceCommandRequests[index].complete(result);
+
+  Future<TagCommandResult> _executeTag(TagCommand command) {
+    tagCommands.add(command);
+    final request = Completer<TagCommandResult>();
+    _tagCommandRequests.add(request);
+    return request.future;
+  }
+
+  void completeTagCommand(int index, TagCommandResult result) =>
+      _tagCommandRequests[index].complete(result);
+
+  void failTagCommand(int index, Object error) =>
+      _tagCommandRequests[index].completeError(error);
 
   Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
     DeleteBlockingRelations command,

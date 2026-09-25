@@ -706,9 +706,390 @@ i1.GeneratedColumn<String> _column_22(String aliasedName) =>
       type: i1.DriftSqlType.string,
       $customConstraints: '',
     );
+
+final class Schema4 extends i0.VersionedSchema {
+  Schema4({required super.database}) : super(version: 4);
+  @override
+  late final List<i1.DatabaseSchemaEntity> entities = [
+    tags,
+    tagsImmutableIdentity,
+    intentions,
+    longTermRelations,
+    tagAssignments,
+    tagAssignmentsTagOrder,
+    tagAssignmentsIntention,
+    tagAssignmentsLongTermRelation,
+    tagAssignmentsImmutableIdentity,
+    dailyChoices,
+    dailyChoicesDateCreationOrder,
+    dailyChoicesSourceDateCreationOrder,
+    dailyChoicesSelectedDateCreationOrder,
+    dailyChoicesSourceRecent,
+    dailyChoicesSelectedRecent,
+    dailyChoicesImmutableIdentity,
+    dailyChoicePathSteps,
+    dailyChoicePathStepsOneRoot,
+    dailyChoicePathStepsOneSuccessor,
+    dailyChoicePathStepsRelation,
+    longTermRelationsProtectDailyChoicePath,
+    longTermRelationsSourceGroupOrder,
+    longTermRelationsRelatedGroupOrder,
+    longTermRelationsImmutableIdentity,
+    longTermRelationsActiveParticipantsAfterInsert,
+    longTermRelationsActiveParticipantsAfterUpdate,
+    intentionsArchiveRequiresNoActiveRelations,
+    intentionTitlesFts,
+    intentionsFtsAfterInsert,
+    intentionsFtsAfterUpdateSearchContent,
+    intentionsFtsAfterDelete,
+    intentionsActiveCreatedAtAscIdAsc,
+    intentionsActiveCreatedAtDescIdAsc,
+    intentionsActiveUpdatedAtAscIdAsc,
+    intentionsActiveUpdatedAtDescIdAsc,
+    intentionsArchivedCreatedAtAscIdAsc,
+    intentionsArchivedCreatedAtDescIdAsc,
+    intentionsArchivedUpdatedAtAscIdAsc,
+    intentionsArchivedUpdatedAtDescIdAsc,
+    intentionsAllCreatedAtAscIdAsc,
+    intentionsAllCreatedAtDescIdAsc,
+    intentionsAllUpdatedAtAscIdAsc,
+    intentionsAllUpdatedAtDescIdAsc,
+  ];
+  late final Shape5 tags = Shape5(
+    source: i0.VersionedTable(
+      entityName: 'tags',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [_column_8, _column_9, _column_23, _column_24],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Trigger tagsImmutableIdentity = i1.Trigger(
+    'CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'tag identity is immutable\');END',
+    'tags_immutable_identity',
+  );
+  late final Shape0 intentions = Shape0(
+    source: i0.VersionedTable(
+      entityName: 'intentions',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+        _column_6,
+        _column_7,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape1 longTermRelations = Shape1(
+    source: i0.VersionedTable(
+      entityName: 'long_term_relations',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'UNIQUE(source_intention_id, related_intention_id)',
+        'CHECK(source_intention_id <> related_intention_id)',
+      ],
+      columns: [
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+        _column_15,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape6 tagAssignments = Shape6(
+    source: i0.VersionedTable(
+      entityName: 'tag_assignments',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'CHECK((intention_id IS NOT NULL)<>(long_term_relation_id IS NOT NULL))',
+        'UNIQUE(tag_id, intention_id)',
+        'UNIQUE(tag_id, long_term_relation_id)',
+      ],
+      columns: [_column_8, _column_25, _column_26, _column_27],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index tagAssignmentsTagOrder = i1.Index(
+    'tag_assignments_tag_order',
+    'CREATE INDEX tag_assignments_tag_order ON tag_assignments (tag_id, creation_sequence)',
+  );
+  final i1.Index tagAssignmentsIntention = i1.Index(
+    'tag_assignments_intention',
+    'CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)',
+  );
+  final i1.Index tagAssignmentsLongTermRelation = i1.Index(
+    'tag_assignments_long_term_relation',
+    'CREATE INDEX tag_assignments_long_term_relation ON tag_assignments (long_term_relation_id, tag_id)',
+  );
+  final i1.Trigger tagAssignmentsImmutableIdentity = i1.Trigger(
+    'CREATE TRIGGER tag_assignments_immutable_identity AFTER UPDATE OF creation_sequence, tag_id, intention_id, long_term_relation_id ON tag_assignments WHEN new.creation_sequence <> old.creation_sequence OR new.tag_id <> old.tag_id OR new.intention_id IS NOT old.intention_id OR new.long_term_relation_id IS NOT old.long_term_relation_id BEGIN SELECT RAISE (ABORT, \'tag assignment identity is immutable\');END',
+    'tag_assignments_immutable_identity',
+  );
+  late final Shape3 dailyChoices = Shape3(
+    source: i0.VersionedTable(
+      entityName: 'daily_choices',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['CHECK(source_intention_id <> selected_intention_id)'],
+      columns: [
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_17,
+        _column_18,
+        _column_14,
+        _column_19,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index dailyChoicesDateCreationOrder = i1.Index(
+    'daily_choices_date_creation_order',
+    'CREATE INDEX daily_choices_date_creation_order ON daily_choices (choice_date, creation_sequence)',
+  );
+  final i1.Index dailyChoicesSourceDateCreationOrder = i1.Index(
+    'daily_choices_source_date_creation_order',
+    'CREATE INDEX daily_choices_source_date_creation_order ON daily_choices (source_intention_id, choice_date, creation_sequence)',
+  );
+  final i1.Index dailyChoicesSelectedDateCreationOrder = i1.Index(
+    'daily_choices_selected_date_creation_order',
+    'CREATE INDEX daily_choices_selected_date_creation_order ON daily_choices (selected_intention_id, choice_date, creation_sequence)',
+  );
+  final i1.Index dailyChoicesSourceRecent = i1.Index(
+    'daily_choices_source_recent',
+    'CREATE INDEX daily_choices_source_recent ON daily_choices (source_intention_id, creation_sequence DESC)',
+  );
+  final i1.Index dailyChoicesSelectedRecent = i1.Index(
+    'daily_choices_selected_recent',
+    'CREATE INDEX daily_choices_selected_recent ON daily_choices (selected_intention_id, creation_sequence DESC)',
+  );
+  final i1.Trigger dailyChoicesImmutableIdentity = i1.Trigger(
+    'CREATE TRIGGER daily_choices_immutable_identity AFTER UPDATE OF creation_sequence, id ON daily_choices WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'daily choice identity is immutable\');END',
+    'daily_choices_immutable_identity',
+  );
+  late final Shape4 dailyChoicePathSteps = Shape4(
+    source: i0.VersionedTable(
+      entityName: 'daily_choice_path_steps',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'UNIQUE(daily_choice_id, id)',
+        'FOREIGN KEY(daily_choice_id, previous_step_id)REFERENCES daily_choice_path_steps(daily_choice_id, id)ON UPDATE NO ACTION ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED',
+        'CHECK(previous_step_id IS NULL OR previous_step_id <> id)',
+      ],
+      columns: [_column_0, _column_20, _column_21, _column_22],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index dailyChoicePathStepsOneRoot = i1.Index(
+    'daily_choice_path_steps_one_root',
+    'CREATE UNIQUE INDEX daily_choice_path_steps_one_root ON daily_choice_path_steps (daily_choice_id) WHERE previous_step_id IS NULL',
+  );
+  final i1.Index dailyChoicePathStepsOneSuccessor = i1.Index(
+    'daily_choice_path_steps_one_successor',
+    'CREATE UNIQUE INDEX daily_choice_path_steps_one_successor ON daily_choice_path_steps (daily_choice_id, previous_step_id) WHERE previous_step_id IS NOT NULL',
+  );
+  final i1.Index dailyChoicePathStepsRelation = i1.Index(
+    'daily_choice_path_steps_relation',
+    'CREATE INDEX daily_choice_path_steps_relation ON daily_choice_path_steps (long_term_relation_id)',
+  );
+  final i1.Trigger longTermRelationsProtectDailyChoicePath = i1.Trigger(
+    'CREATE TRIGGER long_term_relations_protect_daily_choice_path BEFORE UPDATE OF type, source_intention_id, related_intention_id ON long_term_relations WHEN(new.type <> old.type OR new.source_intention_id <> old.source_intention_id OR new.related_intention_id <> old.related_intention_id)AND EXISTS (SELECT 1 FROM daily_choice_path_steps WHERE long_term_relation_id = old.id) BEGIN SELECT RAISE (ABORT, \'long-term relation is used by a daily choice path\');END',
+    'long_term_relations_protect_daily_choice_path',
+  );
+  final i1.Index longTermRelationsSourceGroupOrder = i1.Index(
+    'long_term_relations_source_group_order',
+    'CREATE INDEX long_term_relations_source_group_order ON long_term_relations (source_intention_id, type, is_archived, priority, creation_sequence)',
+  );
+  final i1.Index longTermRelationsRelatedGroupOrder = i1.Index(
+    'long_term_relations_related_group_order',
+    'CREATE INDEX long_term_relations_related_group_order ON long_term_relations (related_intention_id, type, is_archived, priority, creation_sequence)',
+  );
+  final i1.Trigger longTermRelationsImmutableIdentity = i1.Trigger(
+    'CREATE TRIGGER long_term_relations_immutable_identity AFTER UPDATE OF creation_sequence, id ON long_term_relations WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'long-term relation identity is immutable\');END',
+    'long_term_relations_immutable_identity',
+  );
+  final i1.Trigger longTermRelationsActiveParticipantsAfterInsert = i1.Trigger(
+    'CREATE TRIGGER long_term_relations_active_participants_after_insert AFTER INSERT ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, \'active relation requires active intentions\');END',
+    'long_term_relations_active_participants_after_insert',
+  );
+  final i1.Trigger longTermRelationsActiveParticipantsAfterUpdate = i1.Trigger(
+    'CREATE TRIGGER long_term_relations_active_participants_after_update AFTER UPDATE OF source_intention_id, related_intention_id, is_archived ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, \'active relation requires active intentions\');END',
+    'long_term_relations_active_participants_after_update',
+  );
+  final i1.Trigger intentionsArchiveRequiresNoActiveRelations = i1.Trigger(
+    'CREATE TRIGGER intentions_archive_requires_no_active_relations AFTER UPDATE OF is_archived ON intentions WHEN old.is_archived = 0 AND new.is_archived = 1 AND EXISTS (SELECT 1 FROM long_term_relations WHERE is_archived = 0 AND(source_intention_id = new.id OR related_intention_id = new.id)) BEGIN SELECT RAISE (ABORT, \'active relations must be archived first\');END',
+    'intentions_archive_requires_no_active_relations',
+  );
+  late final Shape2 intentionTitlesFts = Shape2(
+    source: i0.VersionedVirtualTable(
+      entityName: 'intention_titles_fts',
+      moduleAndArgs: 'fts5(title_search_key, content = \'intentions\', content_rowid = \'rowid\', tokenize = \'trigram case_sensitive 0 remove_diacritics 0\')',
+      columns: [_column_16],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Trigger intentionsFtsAfterInsert = i1.Trigger(
+    'CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
+    'intentions_fts_after_insert',
+  );
+  final i1.Trigger intentionsFtsAfterUpdateSearchContent = i1.Trigger(
+    'CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
+    'intentions_fts_after_update_search_content',
+  );
+  final i1.Trigger intentionsFtsAfterDelete = i1.Trigger(
+    'CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);END',
+    'intentions_fts_after_delete',
+  );
+  final i1.Index intentionsActiveCreatedAtAscIdAsc = i1.Index(
+    'intentions_active_created_at_asc_id_asc',
+    'CREATE INDEX intentions_active_created_at_asc_id_asc ON intentions (created_at ASC, id ASC) WHERE is_archived = 0',
+  );
+  final i1.Index intentionsActiveCreatedAtDescIdAsc = i1.Index(
+    'intentions_active_created_at_desc_id_asc',
+    'CREATE INDEX intentions_active_created_at_desc_id_asc ON intentions (created_at DESC, id ASC) WHERE is_archived = 0',
+  );
+  final i1.Index intentionsActiveUpdatedAtAscIdAsc = i1.Index(
+    'intentions_active_updated_at_asc_id_asc',
+    'CREATE INDEX intentions_active_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC) WHERE is_archived = 0',
+  );
+  final i1.Index intentionsActiveUpdatedAtDescIdAsc = i1.Index(
+    'intentions_active_updated_at_desc_id_asc',
+    'CREATE INDEX intentions_active_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC) WHERE is_archived = 0',
+  );
+  final i1.Index intentionsArchivedCreatedAtAscIdAsc = i1.Index(
+    'intentions_archived_created_at_asc_id_asc',
+    'CREATE INDEX intentions_archived_created_at_asc_id_asc ON intentions (created_at ASC, id ASC) WHERE is_archived = 1',
+  );
+  final i1.Index intentionsArchivedCreatedAtDescIdAsc = i1.Index(
+    'intentions_archived_created_at_desc_id_asc',
+    'CREATE INDEX intentions_archived_created_at_desc_id_asc ON intentions (created_at DESC, id ASC) WHERE is_archived = 1',
+  );
+  final i1.Index intentionsArchivedUpdatedAtAscIdAsc = i1.Index(
+    'intentions_archived_updated_at_asc_id_asc',
+    'CREATE INDEX intentions_archived_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC) WHERE is_archived = 1',
+  );
+  final i1.Index intentionsArchivedUpdatedAtDescIdAsc = i1.Index(
+    'intentions_archived_updated_at_desc_id_asc',
+    'CREATE INDEX intentions_archived_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC) WHERE is_archived = 1',
+  );
+  final i1.Index intentionsAllCreatedAtAscIdAsc = i1.Index(
+    'intentions_all_created_at_asc_id_asc',
+    'CREATE INDEX intentions_all_created_at_asc_id_asc ON intentions (created_at ASC, id ASC)',
+  );
+  final i1.Index intentionsAllCreatedAtDescIdAsc = i1.Index(
+    'intentions_all_created_at_desc_id_asc',
+    'CREATE INDEX intentions_all_created_at_desc_id_asc ON intentions (created_at DESC, id ASC)',
+  );
+  final i1.Index intentionsAllUpdatedAtAscIdAsc = i1.Index(
+    'intentions_all_updated_at_asc_id_asc',
+    'CREATE INDEX intentions_all_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC)',
+  );
+  final i1.Index intentionsAllUpdatedAtDescIdAsc = i1.Index(
+    'intentions_all_updated_at_desc_id_asc',
+    'CREATE INDEX intentions_all_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC)',
+  );
+}
+
+class Shape5 extends i0.VersionedTable {
+  Shape5({required super.source, required super.alias}) : super.aliased();
+  i1.GeneratedColumn<int> get creationSequence =>
+      columnsByName['creation_sequence']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get id =>
+      columnsByName['id']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get name =>
+      columnsByName['name']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get nameKey =>
+      columnsByName['name_key']! as i1.GeneratedColumn<String>;
+}
+
+i1.GeneratedColumn<String> _column_23(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'name',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      $customConstraints: 'NOT NULL CHECK (typeof(name) = \'text\' AND instr(CAST(name AS BLOB), X\'00\') = 0 AND substr(name, 1, 1) <> char(65279) AND doable_tag_name_valid_v1(name) = 1)',
+    );
+i1.GeneratedColumn<String> _column_24(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'name_key',
+      aliasedName,
+      false,
+      generatedAs: i1.GeneratedAs(
+        const i1.CustomExpression('doable_tag_name_key_v1(name)'),
+        true,
+      ),
+      type: i1.DriftSqlType.string,
+      $customConstraints: 'NOT NULL COLLATE BINARY UNIQUE GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED',
+    );
+
+class Shape6 extends i0.VersionedTable {
+  Shape6({required super.source, required super.alias}) : super.aliased();
+  i1.GeneratedColumn<int> get creationSequence =>
+      columnsByName['creation_sequence']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get tagId =>
+      columnsByName['tag_id']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get intentionId =>
+      columnsByName['intention_id']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get longTermRelationId =>
+      columnsByName['long_term_relation_id']! as i1.GeneratedColumn<String>;
+}
+
+i1.GeneratedColumn<String> _column_25(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'tag_id',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      $customConstraints:
+          'NOT NULL REFERENCES tags(id)ON UPDATE RESTRICT ON DELETE CASCADE',
+    );
+i1.GeneratedColumn<String> _column_26(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'intention_id',
+      aliasedName,
+      true,
+      type: i1.DriftSqlType.string,
+      $customConstraints:
+          'REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE CASCADE',
+    );
+i1.GeneratedColumn<String> _column_27(
+  String aliasedName,
+) => i1.GeneratedColumn<String>(
+  'long_term_relation_id',
+  aliasedName,
+  true,
+  type: i1.DriftSqlType.string,
+  $customConstraints:
+      'REFERENCES long_term_relations(id)ON UPDATE RESTRICT ON DELETE CASCADE',
+);
 i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
   required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
+  required Future<void> Function(i1.Migrator m, Schema4 schema) from3To4,
 }) {
   return (currentVersion, database) async {
     switch (currentVersion) {
@@ -722,6 +1103,11 @@ i0.MigrationStepWithVersion migrationSteps({
         final migrator = i1.Migrator(database, schema);
         await from2To3(migrator, schema);
         return 3;
+      case 3:
+        final schema = Schema4(database: database);
+        final migrator = i1.Migrator(database, schema);
+        await from3To4(migrator, schema);
+        return 4;
       default:
         throw ArgumentError.value('Unknown migration from $currentVersion');
     }
@@ -731,6 +1117,11 @@ i0.MigrationStepWithVersion migrationSteps({
 i1.OnUpgrade stepByStep({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
   required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
+  required Future<void> Function(i1.Migrator m, Schema4 schema) from3To4,
 }) => i0.VersionedSchema.stepByStepHelper(
-  step: migrationSteps(from1To2: from1To2, from2To3: from2To3),
+  step: migrationSteps(
+    from1To2: from1To2,
+    from2To3: from2To3,
+    from3To4: from3To4,
+  ),
 );

@@ -50,6 +50,12 @@ import 'package:doable/src/long_term_relation/presentation/details/relation_deta
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart' as tag_domain;
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -58,6 +64,7 @@ import '../../intention/presentation/catalog/catalog_test_support.dart'
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
+import '../../support/tag_read_contract_test_fallback.dart';
 
 /// Контрольная точка согласования: каталог, подробные данные и соседство
 /// обслуживаются одним графом, одним coordinator и одним потоком завершений.
@@ -1351,6 +1358,266 @@ void main() {
     expect(repository.catalogQueries, hasLength(1));
     expect(repository.groupQueries, hasLength(2));
   });
+
+  test(
+    'пакет только тега сохраняет каталог и обновляет группу перед продолжением',
+    () async {
+      final repository = _CheckpointGraphRepository();
+      final harness = _CheckpointHarness(repository, neighborhoodPageSize: 1);
+      addTearDown(harness.dispose);
+      await harness.loadInitialSurfaces(
+        groupPage: RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+          counts: testRelationCounts(activeNeedOutgoing: 2),
+          nextCursor: const TestRelationGroupCursor(1),
+          revision: const TestGraphRevision(4),
+        ),
+      );
+
+      final beforeCatalog = harness.catalog;
+      final beforeGroup = harness.neighborhood;
+      final accepted = harness.coordinator.acceptTagCreation(
+        TagCreationFormKey(),
+        CreateTag(TagName.fromInput('Дом')),
+      ) as TagCommandAccepted;
+      const revision = TestGraphRevision(5);
+      final tag = tag_domain.Tag(
+        id: switch (TagId.decode('018f0000-0000-7000-8000-000000000001')) {
+          TagIdDecodingSuccess(:final id) => id,
+          InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
+        },
+        name: TagName.fromInput('Дом'),
+      );
+      repository.completeTagCommand(
+        0,
+        TagCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: revision,
+            value: TagCreated(TagCreatedChange(revision: revision, after: tag)),
+          ),
+        ),
+      );
+      await accepted.future;
+      await pumpEventQueue();
+
+      expect(harness.catalog.revision, revision);
+      expect(harness.catalog.items, beforeCatalog.items);
+      expect(harness.catalog.totalCount, beforeCatalog.totalCount);
+      expect(harness.neighborhood, same(beforeGroup));
+      expect(repository.catalogQueries, hasLength(1));
+      expect(repository.groupQueries, hasLength(1));
+
+      harness.scrollNeighborhoodTo(0);
+      await pumpEventQueue();
+      expect(repository.groupQueries, hasLength(2));
+      expect(repository.groupQueries[1].cursor, isNull);
+      repository.completeGroupPage(
+        1,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+          counts: testRelationCounts(activeNeedOutgoing: 2),
+          nextCursor: const TestRelationGroupCursor(1),
+          revision: revision,
+        ),
+      );
+      await pumpEventQueue();
+      expect(repository.groupQueries, hasLength(3));
+      repository.completeGroupPage(
+        2,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 2, count: 1),
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await pumpEventQueue();
+      expect(harness.neighborhood.revision, revision);
+      expect(harness.neighborhood.items, hasLength(2));
+      expect(harness.neighborhood.counts.activeNeedOutgoing, 2);
+
+      final currentCatalog = harness.catalog;
+      final currentGroup = harness.neighborhood;
+      final unchanged = harness.coordinator.acceptTagRename(
+        RenameTag(tagId: tag.id, name: tag.name),
+      ) as TagCommandAccepted;
+      repository.completeTagCommand(
+        1,
+        TagCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: revision,
+            value: TagUnchanged(
+              TagUnchangedChange(revision: revision, tag: tag),
+            ),
+          ),
+        ),
+      );
+      await unchanged.future;
+      await pumpEventQueue();
+      expect(harness.catalog, same(currentCatalog));
+      expect(harness.neighborhood, same(currentGroup));
+      expect(repository.catalogQueries, hasLength(1));
+      expect(repository.groupQueries, hasLength(3));
+    },
+  );
+
+  test(
+    'завершение тега до страниц не публикует снимки прежней эпохи',
+    () async {
+      final repository = _CheckpointGraphRepository();
+      final harness = _CheckpointHarness(repository);
+      addTearDown(harness.dispose);
+      final tagId = switch (TagId.decode(
+        '018f0000-0000-7000-8000-000000000001',
+      )) {
+        TagIdDecodingSuccess(:final id) => id,
+        InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
+      };
+      const revision = TestGraphRevision(1, epoch: 1);
+      final accepted = harness.coordinator.acceptTagDelete(
+        DeleteTag(tagId),
+      ) as TagCommandAccepted;
+      repository.completeTagCommand(
+        0,
+        TagCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: revision,
+            value: TagDeleted(
+              TagDeletedChange(revision: revision, tagId: tagId),
+            ),
+          ),
+        ),
+      );
+      await accepted.future;
+      await pumpEventQueue();
+
+      repository.completeCatalogPage(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [catalog_support.testSummary(index: 1, title: 'Старое')],
+            totalCount: 1,
+            nextCursor: null,
+            revision: const TestGraphRevision(4),
+          ),
+        ),
+      );
+      repository.completeGroupPage(
+        0,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(),
+          nextCursor: null,
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      await pumpEventQueue();
+      expect(repository.catalogQueries, hasLength(2));
+      expect(repository.groupQueries, hasLength(2));
+
+      repository.completeCatalogPage(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [catalog_support.testSummary(index: 1, title: 'Новое')],
+            totalCount: 1,
+            nextCursor: null,
+            revision: revision,
+          ),
+        ),
+      );
+      repository.completeGroupPage(
+        1,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(),
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await pumpEventQueue();
+      expect(harness.catalog.revision, revision);
+      expect(harness.catalog.items.single.title, 'Новое');
+      final group = harness._container.read(
+        relationNeighborhoodViewModelProvider(harness.ownerId),
+      ) as RelationGroupEmpty;
+      expect(group.revision, revision);
+    },
+  );
+
+  test('позднее продолжение группы не смешивается с пакетом тега', () async {
+    final repository = _CheckpointGraphRepository();
+    final harness = _CheckpointHarness(repository, neighborhoodPageSize: 1);
+    addTearDown(harness.dispose);
+    await harness.loadInitialSurfaces(
+      groupPage: RelationGroupFirstPage(
+        items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+        counts: testRelationCounts(activeNeedOutgoing: 2),
+        nextCursor: const TestRelationGroupCursor(1),
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    harness.scrollNeighborhoodTo(0);
+    expect(repository.groupQueries[1].cursor, isNotNull);
+
+    final tagId = switch (TagId.decode(
+      '018f0000-0000-7000-8000-000000000001',
+    )) {
+      TagIdDecodingSuccess(:final id) => id,
+      InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
+    };
+    const revision = TestGraphRevision(5);
+    final accepted = harness.coordinator.acceptTagDelete(
+      DeleteTag(tagId),
+    ) as TagCommandAccepted;
+    repository.completeTagCommand(
+      0,
+      TagCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: TagDeleted(TagDeletedChange(revision: revision, tagId: tagId)),
+        ),
+      ),
+    );
+    await accepted.future;
+    await pumpEventQueue();
+    expect(repository.groupQueries, hasLength(3));
+    expect(repository.groupQueries[2].cursor, isNull);
+
+    repository.completeGroupPage(
+      1,
+      RelationGroupContinuationPage(
+        items: testGroupRows(ownerId: harness.ownerId, from: 2, count: 1),
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.neighborhood.items, hasLength(1));
+    expect(harness.neighborhood.revision, const TestGraphRevision(4));
+
+    repository.completeGroupPage(
+      2,
+      RelationGroupFirstPage(
+        items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+        counts: testRelationCounts(activeNeedOutgoing: 2),
+        nextCursor: const TestRelationGroupCursor(1),
+        revision: revision,
+      ),
+    );
+    await pumpEventQueue();
+    repository.completeGroupPage(
+      3,
+      RelationGroupContinuationPage(
+        items: testGroupRows(ownerId: harness.ownerId, from: 2, count: 1),
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.neighborhood.revision, revision);
+    expect(harness.neighborhood.items, hasLength(2));
+    expect(harness.catalog.revision, revision);
+  });
 }
 
 Future<void> _settleUntil(
@@ -1627,7 +1894,9 @@ final class _CheckpointHarness {
 }
 
 /// Управляемый граф, обслуживающий все чтения и команды контрольной точки.
-final class _CheckpointGraphRepository implements PersonalGraphRepository {
+final class _CheckpointGraphRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,
@@ -1673,6 +1942,7 @@ final class _CheckpointGraphRepository implements PersonalGraphRepository {
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final relationCommands = <LongTermRelationCommand>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
+  final _tagCommandRequests = <Completer<TagCommandResult>>[];
   final _observations = <IntentionId, int>{};
   final _intentionControllers =
       <
@@ -1714,6 +1984,10 @@ final class _CheckpointGraphRepository implements PersonalGraphRepository {
     LongTermRelationCommandResult result,
   ) {
     _relationCommandRequests[index].complete(result);
+  }
+
+  void completeTagCommand(int index, TagCommandResult result) {
+    _tagCommandRequests[index].complete(result);
   }
 
   void emitIntention(
@@ -1789,6 +2063,7 @@ final class _CheckpointGraphRepository implements PersonalGraphRepository {
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
+      final TagCommand tagCommand => await _executeTag(tagCommand),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -1809,6 +2084,12 @@ final class _CheckpointGraphRepository implements PersonalGraphRepository {
     relationCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationCommandRequests.add(request);
+    return request.future;
+  }
+
+  Future<TagCommandResult> _executeTag(TagCommand command) {
+    final request = Completer<TagCommandResult>();
+    _tagCommandRequests.add(request);
     return request.future;
   }
 

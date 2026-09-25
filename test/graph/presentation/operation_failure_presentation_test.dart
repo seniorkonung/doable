@@ -17,6 +17,10 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/tag_failure_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -415,6 +419,88 @@ void main() {
     },
   );
 
+  for (final scenario in <({Locale locale, String message})>[
+    (locale: const Locale('en'), message: 'Enter a tag name.'),
+    (locale: const Locale('ru'), message: 'Введите название тега.'),
+  ]) {
+    testWidgets(
+      'ошибка тега предъявляется своим инлайн-сообщением для ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = _FailureHarness();
+        addTearDown(harness.dispose);
+        final claim = await harness.createTagClaim();
+
+        await tester.pumpWidget(
+          harness.app(
+            Builder(
+              builder: (context) => OperationFailurePresentation(
+                claim: claim,
+                message: tagFailureMessage(
+                  AppLocalizations.of(context),
+                  const TagNameInputFailure(TagNameFailureReason.empty),
+                ),
+                messageKey: const ValueKey('tag-failure-message'),
+              ),
+            ),
+            locale: scenario.locale,
+          ),
+        );
+
+        expect(find.text(scenario.message), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('tag-failure-message')),
+          ),
+          matchesSemantics(
+            label: scenario.message,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        expect(harness.claimAgain(claim), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'исчезнувшая до кадра ошибка тега передаёт право общей поверхности',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createTagClaim();
+      final showError = ValueNotifier(true);
+      addTearDown(showError.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<bool>(
+            valueListenable: showError,
+            builder: (context, visible, _) => visible
+                ? OperationFailurePresentation(
+                    claim: claim,
+                    message: 'Введите название тега.',
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(harness.claimAgain(claim), same(claim));
+      expect(fallback, isNull);
+
+      showError.value = false;
+      await tester.pump();
+      await tester.pump();
+      expect(fallback?.token, same(claim.token));
+      expect(fallback?.completion, isA<TagCommandCompletion>());
+    },
+  );
+
   testWidgets('массовый отказ подтверждается кадром инлайн-renderer', (
     tester,
   ) async {
@@ -679,6 +765,19 @@ final class _FailureHarness {
         LongTermRelationCommandSuccess,
         LongTermRelationCommandFailure
       >(LongTermRelationUnavailableFailure()),
+    );
+    await accepted.future;
+    return coordinator.claimInitiatorFailure(accepted.token)!;
+  }
+
+  Future<GraphInitiatorPresentationClaim> createTagClaim() async {
+    final accepted = coordinator.acceptTagCreation(
+      TagCreationFormKey(),
+      CreateTag(TagName.fromInput('Планы')),
+    ) as TagCommandAccepted;
+    repository.completeTagCommand(
+      repository.tagCommands.length - 1,
+      const TagCommandFailed(TagNameInputFailure(TagNameFailureReason.empty)),
     );
     await accepted.future;
     return coordinator.claimInitiatorFailure(accepted.token)!;

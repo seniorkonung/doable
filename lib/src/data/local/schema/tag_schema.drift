@@ -1,0 +1,61 @@
+import 'daily_choice_schema.drift';
+
+CREATE TABLE tags (
+  creation_sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
+    CHECK (creation_sequence > 0),
+  id TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL CHECK (
+    typeof(name) = 'text' AND
+    instr(CAST(name AS BLOB), x'00') = 0 AND
+    substr(name, 1, 1) <> char(65279) AND
+    doable_tag_name_valid_v1(name) = 1
+  ),
+  name_key TEXT NOT NULL COLLATE BINARY UNIQUE
+    GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED
+);
+
+CREATE TRIGGER tags_immutable_identity
+AFTER UPDATE OF creation_sequence, id ON tags
+WHEN
+  new.creation_sequence <> old.creation_sequence OR
+  new.id <> old.id
+BEGIN
+  SELECT RAISE(ABORT, 'tag identity is immutable');
+END;
+
+CREATE TABLE tag_assignments (
+  creation_sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
+    CHECK (creation_sequence > 0),
+  tag_id TEXT NOT NULL
+    REFERENCES tags(id) ON UPDATE RESTRICT ON DELETE CASCADE,
+  intention_id TEXT
+    REFERENCES intentions(id) ON UPDATE RESTRICT ON DELETE CASCADE,
+  long_term_relation_id TEXT
+    REFERENCES long_term_relations(id) ON UPDATE RESTRICT ON DELETE CASCADE,
+  CHECK (
+    (intention_id IS NOT NULL) <> (long_term_relation_id IS NOT NULL)
+  ),
+  UNIQUE (tag_id, intention_id),
+  UNIQUE (tag_id, long_term_relation_id)
+);
+
+CREATE INDEX tag_assignments_tag_order
+  ON tag_assignments (tag_id, creation_sequence);
+
+CREATE INDEX tag_assignments_intention
+  ON tag_assignments (intention_id, tag_id);
+
+CREATE INDEX tag_assignments_long_term_relation
+  ON tag_assignments (long_term_relation_id, tag_id);
+
+CREATE TRIGGER tag_assignments_immutable_identity
+AFTER UPDATE OF creation_sequence, tag_id, intention_id, long_term_relation_id
+ON tag_assignments
+WHEN
+  new.creation_sequence <> old.creation_sequence OR
+  new.tag_id <> old.tag_id OR
+  new.intention_id IS NOT old.intention_id OR
+  new.long_term_relation_id IS NOT old.long_term_relation_id
+BEGIN
+  SELECT RAISE(ABORT, 'tag assignment identity is immutable');
+END;

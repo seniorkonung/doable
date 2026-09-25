@@ -20,12 +20,15 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 /// Репозиторий графа, управляемый тестом выбора участника.
 ///
 /// Каталожные порции остаются единственным источником списка намерений.
 /// Подробные чтения намерения и его соседства только открываются и не
 /// завершаются: переход к подробным данным проверяется отдельно от выбора.
 final class ControlledParticipantPickerRepository
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
