@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -132,6 +133,156 @@ void main() {
     );
     _expectSafeLogs(diagnostics.logs);
   });
+
+  test('подсказка, создание и замена различаются безопасными типизированными событиями', () async {
+    expect(
+      await repository.execute(durabilityCreate()),
+      isA<GraphCommandSucceeded>(),
+    );
+
+    final suggestions = await repository.getChoicePathSuggestions(
+      ChoicePathSuggestionsForSource(durabilityIntention(1)),
+    );
+    expect(suggestions, isA<ChoicePathSuggestionsSuccess>());
+    expect(
+      await repository.execute(durabilityReplace(201)),
+      isA<GraphCommandSucceeded>(),
+    );
+
+    expect(
+      diagnostics.events
+          .whereType<ChoicePathSuggestionReadDiagnosticsEvent>()
+          .map((event) => '${event.stage.name}:${_status(event.status)}'),
+      [
+        'candidateSelection:started',
+        'candidateSelection:succeeded',
+        'pathValidation:started',
+        'pathValidation:succeeded',
+      ],
+    );
+    expect(
+      diagnostics.events
+          .whereType<DailyChoicePathValidationDiagnosticsEvent>()
+          .map((event) => '${event.commandType.name}:${_status(event.status)}'),
+      [
+        'create:started',
+        'create:succeeded',
+        'replacePath:started',
+        'replacePath:succeeded',
+      ],
+    );
+    expect(
+      diagnostics.events.whereType<DailyChoiceCommandDiagnosticsEvent>().map(
+        (event) =>
+            '${event.commandType.name}:${event.stage.name}:${_status(event.status)}',
+      ),
+      [
+        'create:validation:started',
+        'create:validation:succeeded',
+        'create:write:started',
+        'create:write:succeeded',
+        'create:resultRead:started',
+        'create:resultRead:succeeded',
+        'replacePath:validation:started',
+        'replacePath:validation:succeeded',
+        'replacePath:write:started',
+        'replacePath:write:succeeded',
+        'replacePath:resultRead:started',
+        'replacePath:resultRead:succeeded',
+      ],
+    );
+    expect(
+      diagnostics.logs.map(
+        (line) => (jsonDecode(line) as Map<String, dynamic>)['operation'],
+      ),
+      containsAllInOrder([
+        'dailyChoiceCommand',
+        'dailyChoicePathValidation',
+        'choicePathSuggestionRead',
+        'dailyChoiceCommand',
+        'dailyChoicePathValidation',
+      ]),
+    );
+    _expectSafeLogs(diagnostics.logs);
+  });
+
+  test(
+    'отказы чтения подсказок и замены раскрывают только этап и категорию',
+    () async {
+      expect(
+        await repository.execute(durabilityCreate()),
+        isA<GraphCommandSucceeded>(),
+      );
+      diagnostics.events.clear();
+      diagnostics.logs.clear();
+      probe.arm(_FailurePoint.suggestionSelection);
+      final failedSelection = await repository.getChoicePathSuggestions(
+        ChoicePathSuggestionsForSource(durabilityIntention(1)),
+      );
+      expect(probe.didFail, isTrue);
+      expect(
+        (failedSelection as ChoicePathSuggestionsError).failure.category,
+        GraphFailureCategory.unexpected,
+      );
+      expect(
+        diagnostics.events
+            .whereType<ChoicePathSuggestionReadDiagnosticsEvent>()
+            .map((event) => '${event.stage.name}:${_status(event.status)}'),
+        ['candidateSelection:started', 'candidateSelection:failed:unexpected'],
+      );
+      _expectSafeLogs(diagnostics.logs);
+
+      diagnostics.events.clear();
+      diagnostics.logs.clear();
+      probe.arm(_FailurePoint.suggestionPath);
+      final failedPath = await repository.getChoicePathSuggestions(
+        ChoicePathSuggestionsForSource(durabilityIntention(1)),
+      );
+      expect(probe.didFail, isTrue);
+      expect(
+        (failedPath as ChoicePathSuggestionsError).failure.category,
+        GraphFailureCategory.unexpected,
+      );
+      expect(
+        diagnostics.events
+            .whereType<ChoicePathSuggestionReadDiagnosticsEvent>()
+            .map((event) => '${event.stage.name}:${_status(event.status)}'),
+        [
+          'candidateSelection:started',
+          'candidateSelection:succeeded',
+          'pathValidation:started',
+          'pathValidation:failed:unexpected',
+        ],
+      );
+      _expectSafeLogs(diagnostics.logs);
+
+      expect(
+        await repository.execute(
+          ArchiveLongTermRelation(durabilityRelation(103)),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      diagnostics.events.clear();
+      diagnostics.logs.clear();
+      final rejected = await repository.execute(durabilityReplace(201));
+      expect(
+        (rejected as GraphCommandFailed).failure.category,
+        GraphFailureCategory.conflict,
+      );
+      expect(_commandStages(diagnostics.events), [
+        'validation:started',
+        'validation:failed:conflict',
+      ]);
+      expect(
+        diagnostics.events.whereType<DailyChoiceCommandDiagnosticsEvent>().map(
+          (event) => event.commandType,
+        ),
+        everyElement(DailyChoiceCommandDiagnosticsType.replacePath),
+      );
+      expect(_pathStatuses(diagnostics.events), ['started', 'failed:conflict']);
+      _expectSafeLogs(diagnostics.logs);
+    },
+  );
 
   test(
     'нижний вход различает чтение, проверку и создание без данных графа',
@@ -477,8 +628,30 @@ void main() {
         final success = await graph.execute(durabilityBottomCreate());
         expect(success, isA<GraphCommandSucceeded>());
         expect(
+          await graph.getChoicePathSuggestions(
+            ChoicePathSuggestionsForSource(durabilityIntention(1)),
+          ),
+          isA<ChoicePathSuggestionsSuccess>(),
+        );
+        expect(
+          await graph.execute(durabilityReplace(201)),
+          isA<GraphCommandSucceeded>(),
+        );
+        expect(
+          await graph.getChoicePathSuggestions(
+            ChoicePathSuggestionsForAction(durabilityIntention(4)),
+          ),
+          isA<ChoicePathSuggestionsSuccess>(),
+        );
+        expect(
           await graph.execute(ArchiveLongTermRelation(durabilityRelation(103))),
           isA<GraphCommandSucceeded>(),
+        );
+        expect(
+          (await graph.execute(
+            durabilityReplace(201),
+          ) as GraphCommandFailed).failure.category,
+          GraphFailureCategory.conflict,
         );
         final failure = await graph.execute(
           durabilityBottomCreate(path: [103]),
@@ -567,6 +740,8 @@ void _expectSafeLogs(List<String> logs) {
       'INSERT INTO',
       'Управляемый отказ',
       'Секретный текст SQL',
+      for (final id in [1, 2, 3, 4, 5, 101, 102, 103, 104, 202, 301, 302])
+        durabilityUuid(id),
     ]) {
       expect(line, isNot(contains(forbidden)));
     }
@@ -596,7 +771,9 @@ enum _FailurePoint {
   resultRead('чтения результата'),
   catalogRead('каталога'),
   groupRead('дневной группы'),
-  continuationRead('продолжений пути');
+  continuationRead('продолжений пути'),
+  suggestionSelection('отбора подсказок'),
+  suggestionPath('проверки подсказки');
 
   const _FailurePoint(this.label);
   final String label;
@@ -627,6 +804,12 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
       _FailurePoint.groupRead => sql.contains('FROM daily_choices INDEXED BY'),
       _FailurePoint.continuationRead =>
         sql.contains('WITH RECURSIVE') || sql.contains('WITH visited(id)'),
+      _FailurePoint.suggestionSelection =>
+        sql.contains('FROM daily_choices') &&
+            sql.contains('ORDER BY creation_sequence DESC'),
+      _FailurePoint.suggestionPath => sql.contains(
+        'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+      ),
       _ => false,
     };
     if (targeted) {

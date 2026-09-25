@@ -1,3 +1,6 @@
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -23,6 +26,9 @@ IntentionId _intention(int number) =>
 LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
   _uuid(number),
 ) as LongTermRelationIdDecodingSuccess).id;
+
+DailyChoiceId _choice(int number) =>
+    (DailyChoiceId.decode(_uuid(number)) as DailyChoiceIdDecodingSuccess).id;
 
 void main() {
   late AppDatabase database;
@@ -272,5 +278,83 @@ void main() {
     );
     expect(count('intentions'), 5);
     expect(count('daily_choices'), 1);
+  });
+
+  test('замена и удаление дубликата снимают только последние ссылки', () async {
+    addChoice(201);
+    addChoice(202);
+    raw.execute('UPDATE intentions SET is_action_ready = 1 WHERE id = ?', [
+      _uuid(4),
+    ]);
+    raw.execute(
+      '''INSERT INTO long_term_relations
+         (id, source_intention_id, related_intention_id, type, priority,
+          is_archived) VALUES (?, ?, ?, 'can', 2, 0)''',
+      [_uuid(104), _uuid(5), _uuid(4)],
+    );
+
+    final replacement = await repository.execute(
+      ReplaceDailyChoicePath(
+        choiceId: _choice(201),
+        sourceIntentionId: _intention(5),
+        selectedIntentionId: _intention(4),
+        path: ConfirmedChoicePath([
+          ConfirmedChoicePathStep(
+            relationId: _relation(104),
+            sourceIntentionId: _intention(5),
+            type: LongTermRelationType.can,
+            relatedIntentionId: _intention(4),
+          ),
+        ]),
+      ),
+    );
+    expect(replacement, isA<GraphCommandSucceeded>());
+    expect(
+      raw.select(
+        'SELECT long_term_relation_id FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [_uuid(201)],
+      ).single['long_term_relation_id'],
+      _uuid(104),
+    );
+    expect(count('daily_choice_path_steps'), 3);
+
+    for (final number in [101, 102, 104]) {
+      final blocked = await repository.execute(
+        DeleteLongTermRelation(_relation(number)),
+      );
+      expect(
+        (blocked as GraphCommandFailed).failure,
+        isA<LongTermRelationReferencedByDailyPathFailure>(),
+      );
+    }
+    expect(
+      await repository.execute(DeleteDailyChoice(_choice(202))),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(count('daily_choice_path_steps'), 1);
+    expect(
+      await repository.execute(DeleteLongTermRelation(_relation(101))),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await repository.execute(DeleteLongTermRelation(_relation(102))),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      (await repository.execute(
+        DeleteLongTermRelation(_relation(104)),
+      ) as GraphCommandFailed).failure,
+      isA<LongTermRelationReferencedByDailyPathFailure>(),
+    );
+    expect(
+      await repository.execute(DeleteIntention(_intention(2))),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      (await repository.execute(
+        DeleteIntention(_intention(5)),
+      ) as GraphCommandFailed).failure,
+      isA<IntentionHasBlockingRelationsFailure>(),
+    );
   });
 }

@@ -84,6 +84,17 @@ final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
     : super(status);
 }
 
+enum ChoicePathSuggestionReadStage { candidateSelection, pathValidation }
+
+final class ChoicePathSuggestionReadDiagnosticsEvent extends DiagnosticsEvent {
+  const ChoicePathSuggestionReadDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final ChoicePathSuggestionReadStage stage;
+}
+
 final class DailyChoiceCatalogPageReadDiagnosticsEvent
     extends DiagnosticsEvent {
   const DailyChoiceCatalogPageReadDiagnosticsEvent({

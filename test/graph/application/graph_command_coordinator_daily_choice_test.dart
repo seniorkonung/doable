@@ -21,6 +21,48 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
+    'замена удерживает ключ выбора после ухода формы до конечного отказа',
+    () async {
+      final repository = _ControlledRepository();
+      final coordinator = _coordinator(repository);
+      final accepted = coordinator.acceptDailyChoiceReplace(
+        _replace(_choiceA),
+      ) as DailyChoiceCommandAccepted;
+      coordinator.releaseInitiatorPresentation(accepted.token);
+      final registration = coordinator.registerAppPresentation();
+      final claimFuture = registration.nextClaim();
+
+      expect(coordinator.isDailyChoiceRunning(_choiceA), isTrue);
+      expect(
+        coordinator.acceptDailyChoiceReplace(_replace(_choiceA)),
+        isA<DailyChoiceCommandAlreadyRunning>(),
+      );
+      expect(
+        coordinator.acceptDailyChoiceUpdate(
+          UpdateDailyChoiceFields(
+            choiceId: _choiceA,
+            patch: const DailyChoiceFieldsPatch(
+              isCompleted: DailyChoiceFieldSet(true),
+            ),
+          ),
+        ),
+        isA<DailyChoiceCommandAlreadyRunning>(),
+      );
+      expect(repository.commands, hasLength(1));
+      repository.completeDailyFailure(0);
+      final completion = await accepted.future;
+      final claim = await claimFuture;
+      expect(completion.kind, DailyChoiceCommandKind.replace);
+      expect(claim?.completion, same(completion));
+      expect(coordinator.isDailyChoiceRunning(_choiceA), isFalse);
+      coordinator.confirmPresentation(claim!);
+      expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+      registration.release();
+      await coordinator.shutdown();
+    },
+  );
+
+  test(
     'форма удерживает подтверждение, а новая форма допускает дубликат',
     () async {
       final repository = _ControlledRepository();

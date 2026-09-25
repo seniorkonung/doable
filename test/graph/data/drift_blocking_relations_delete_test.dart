@@ -1,8 +1,10 @@
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation;
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/blocking_relation_reference.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -961,6 +963,119 @@ void main() {
       GraphRevisionOrder.same,
     );
   });
+
+  test(
+    'замена требует нового набора, а совместный выбор не обходит путь',
+    () async {
+      final oldSource = intentions[0];
+      final oldAction = intentions[1];
+      final newSource = intentions[3];
+      final newAction = intentions[4];
+      final oldPath = await _create(repository, oldSource, oldAction);
+      final free = await _create(repository, oldSource, intentions[2]);
+      final newPath = await _create(repository, newSource, newAction);
+      await database.customStatement(
+        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+        [newAction.toCanonicalString()],
+      );
+      final choice = _dailyChoiceId(905);
+      await _insertChoice(database, choice, oldSource, oldAction, oldPath);
+      final stale = DeleteBlockingRelations(
+        intentionId: oldSource,
+        references: [
+          LongTermBlockingRelationReference(free),
+          DailyChoiceBlockingRelationReference(choice),
+        ],
+      );
+
+      final replacement = await repository.execute(
+        ReplaceDailyChoicePath(
+          choiceId: choice,
+          sourceIntentionId: newSource,
+          selectedIntentionId: newAction,
+          path: ConfirmedChoicePath([
+            ConfirmedChoicePathStep(
+              relationId: newPath,
+              sourceIntentionId: newSource,
+              type: LongTermRelationType.need,
+              relatedIntentionId: newAction,
+            ),
+          ]),
+        ),
+      );
+      expect(replacement, isA<GraphCommandSucceeded>());
+      final revision = await _revision(repository, newSource);
+      deleteObserver.clear();
+
+      final staleFailure = _failure(await repository.execute(stale));
+      expect(
+        staleFailure,
+        isA<DeleteBlockingRelationsSelectionConflictFailure>()
+            .having(
+              (value) => value.reference,
+              'ссылка',
+              DailyChoiceBlockingRelationReference(choice),
+            )
+            .having(
+              (value) => value.reason,
+              'причина',
+              BlockingRelationConflictReason.noLongerBlocking,
+            ),
+      );
+      expect(deleteObserver.batchSizes, isEmpty);
+      expect(await _relation(database, free), isNotNull);
+      expect(await _choice(database, choice), isNotNull);
+
+      final jointlySelected = _failure(
+        await repository.execute(
+          DeleteBlockingRelations(
+            intentionId: newSource,
+            references: [
+              DailyChoiceBlockingRelationReference(choice),
+              LongTermBlockingRelationReference(newPath),
+            ],
+          ),
+        ),
+      );
+      expect(
+        jointlySelected,
+        isA<DeleteBlockingRelationsSelectionConflictFailure>()
+            .having(
+              (value) => value.reference,
+              'ссылка',
+              LongTermBlockingRelationReference(newPath),
+            )
+            .having(
+              (value) => value.reason,
+              'причина',
+              BlockingRelationConflictReason.deletionProhibited,
+            ),
+      );
+      expect(deleteObserver.batchSizes, isEmpty);
+      expect(await _choice(database, choice), isNotNull);
+      expect(await _relation(database, newPath), isNotNull);
+      expect(
+        (await _revision(repository, newSource)).compareTo(revision),
+        GraphRevisionOrder.same,
+      );
+
+      expect(
+        await repository.execute(DeleteDailyChoice(choice)),
+        isA<GraphCommandSucceeded>(),
+      );
+      expect(
+        await repository.execute(
+          DeleteBlockingRelations.longTerm(
+            intentionId: newSource,
+            relationIds: [newPath],
+          ),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      expect(await _relation(database, newPath), isNull);
+      expect(await _relation(database, oldPath), isNotNull);
+    },
+  );
 }
 
 DailyChoiceId _dailyChoiceId(int value) =>

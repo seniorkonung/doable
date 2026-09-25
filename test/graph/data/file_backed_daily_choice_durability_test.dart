@@ -120,6 +120,135 @@ void main() {
     },
   );
 
+  test(
+    'повтор и замена переживают завершение процесса без потери источника',
+    () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      var database = await harness.openReadyDatabase();
+      await seedDurabilityGraph(database);
+      expect(
+        await durabilityRepository(database).execute(durabilityCreate()),
+        isA<GraphCommandSucceeded>(),
+      );
+      final sourceRow = (await durabilityRows(
+        database,
+        'daily_choices',
+      )).single;
+      final sourceSteps = await durabilityRows(
+        database,
+        'daily_choice_path_steps',
+      );
+      await harness.closePersistenceObjectGraph();
+
+      await _killWorkerAt(
+        harness,
+        _DailyOperation.create,
+        _StopPoint.afterCommit,
+      );
+      database = await harness.openReadyDatabase();
+      final repeatedRows = await durabilityRows(database, 'daily_choices');
+      expect(repeatedRows.map((row) => row['id']), [
+        durabilityUuid(201),
+        durabilityUuid(203),
+      ]);
+      expect(repeatedRows.first, sourceRow);
+      expect(repeatedRows.last['creation_sequence'], 2);
+      expect(
+        Map<String, Object?>.of(repeatedRows.last)
+          ..remove('id')
+          ..remove('creation_sequence'),
+        Map<String, Object?>.of(sourceRow)
+          ..remove('id')
+          ..remove('creation_sequence'),
+      );
+      final repeatedSteps = await durabilityRows(
+        database,
+        'daily_choice_path_steps',
+      );
+      expect(repeatedSteps.take(2), sourceSteps);
+      expect(repeatedSteps.map((row) => row['id']), [
+        durabilityUuid(301),
+        durabilityUuid(302),
+        durabilityUuid(311),
+        durabilityUuid(312),
+      ]);
+      expect(repeatedSteps.map((row) => row['daily_choice_id']), [
+        durabilityUuid(201),
+        durabilityUuid(201),
+        durabilityUuid(203),
+        durabilityUuid(203),
+      ]);
+      expect(repeatedSteps.map((row) => row['previous_step_id']), [
+        null,
+        durabilityUuid(301),
+        null,
+        durabilityUuid(311),
+      ]);
+      expect(repeatedSteps.map((row) => row['long_term_relation_id']), [
+        durabilityUuid(101),
+        durabilityUuid(102),
+        durabilityUuid(101),
+        durabilityUuid(102),
+      ]);
+      await _expectIntegrity(database);
+      await harness.closePersistenceObjectGraph();
+
+      await _killWorkerAt(
+        harness,
+        _DailyOperation.replace,
+        _StopPoint.afterCommit,
+      );
+      database = await harness.openReadyDatabase();
+      final replacedRows = await durabilityRows(database, 'daily_choices');
+      expect(replacedRows.map((row) => row['id']), [
+        durabilityUuid(201),
+        durabilityUuid(203),
+      ]);
+      expect(replacedRows.first['creation_sequence'], 1);
+      expect(replacedRows.first['choice_date'], '2026-09-23');
+      expect(replacedRows.first['description'], '  Выбор\nдня  ');
+      expect(replacedRows.first['is_completed'], 1);
+      expect(replacedRows.first['selected_intention_id'], durabilityUuid(4));
+      expect(replacedRows.last, repeatedRows.last);
+      final replacedSteps = await durabilityRows(
+        database,
+        'daily_choice_path_steps',
+      );
+      expect(replacedSteps.map((row) => row['id']), [
+        durabilityUuid(311),
+        durabilityUuid(312),
+        durabilityUuid(313),
+      ]);
+      expect(replacedSteps.map((row) => row['daily_choice_id']), [
+        durabilityUuid(203),
+        durabilityUuid(203),
+        durabilityUuid(201),
+      ]);
+      expect(replacedSteps.take(2), repeatedSteps.skip(2));
+      expect(replacedSteps.last['previous_step_id'], isNull);
+      expect(replacedSteps.last['long_term_relation_id'], durabilityUuid(103));
+      final repository = durabilityRepository(database);
+      expect(await _sourceChoiceCount(repository), 2);
+      for (final number in [101, 102, 103, 104]) {
+        final relation = await repository
+            .watchRelation(durabilityRelation(number))
+            .first;
+        expect(relation, isA<LongTermRelationReadSuccess>());
+        expect(
+          (relation as LongTermRelationReadSuccess)
+              .value
+              .value!
+              .permissions
+              .canDelete,
+          number == 104,
+        );
+      }
+      await _expectIntegrity(database);
+    },
+    timeout: Timeout.none,
+  );
+
   for (final operation in _DailyOperation.values) {
     for (final stopPoint in _StopPoint.values) {
       test(

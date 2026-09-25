@@ -320,6 +320,73 @@ void main() {
     },
   );
 
+  for (final (name, statement, value, target) in [
+    (
+      'типа',
+      'UPDATE long_term_relations SET type = ? WHERE id = ?',
+      'can',
+      104,
+    ),
+    (
+      'исходного намерения',
+      'UPDATE long_term_relations SET source_intention_id = ? WHERE id = ?',
+      _uuid(3),
+      104,
+    ),
+    (
+      'связанного намерения',
+      'UPDATE long_term_relations SET related_intention_id = ? WHERE id = ?',
+      _uuid(3),
+      104,
+    ),
+    (
+      'архивности',
+      'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
+      1,
+      104,
+    ),
+    (
+      'готовности действия',
+      'UPDATE intentions SET is_action_ready = ? WHERE id = ?',
+      0,
+      4,
+    ),
+  ]) {
+    test('изменение $name до замены не повреждает прежний выбор', () async {
+      final id = await createChoice();
+      raw.execute(
+        'UPDATE daily_choices SET choice_date = ?, description = ?, is_completed = 0 WHERE id = ?',
+        ['2026-09-25', 'Новые независимые поля', id.toCanonicalString()],
+      );
+      final before = (await read(id)).value!;
+      raw.execute(statement, [value, _uuid(target)]);
+
+      final result = await repository.execute(replace(id));
+
+      expect(
+        (result as GraphCommandFailed).failure,
+        isA<DailyChoiceConflictFailure>(),
+      );
+      final after = (await read(id)).value!;
+      expect(after.choice.sourceIntentionId, before.choice.sourceIntentionId);
+      expect(
+        after.choice.selectedIntentionId,
+        before.choice.selectedIntentionId,
+      );
+      expect(after.choice.date, CalendarDate.fromParts(2026, 9, 25));
+      expect(after.choice.description?.value, 'Новые независимые поля');
+      expect(after.choice.isCompleted, isFalse);
+      expect(
+        after.path.map((step) => step.step.id),
+        before.path.map((step) => step.step.id),
+      );
+      expect(
+        after.path.map((step) => step.relation.id),
+        before.path.map((step) => step.relation.id),
+      );
+    });
+  }
+
   test('сбой после удаления прежних шагов откатывает всю замену', () async {
     final id = await createChoice();
     final before = await read(id);

@@ -4,6 +4,7 @@ import 'package:doable/src/graph/application/selected_relations.dart';
 import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -34,6 +35,11 @@ import '../details/relation_details_test_support.dart';
 /// каталога и наблюдает выбранные на замену намерения до сохранения связи.
 final class ControlledRelationFormRepository
     implements PersonalGraphRepository {
+  @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) => throw UnimplementedError();
+
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,

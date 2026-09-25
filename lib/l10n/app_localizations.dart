@@ -1985,6 +1985,72 @@ abstract class AppLocalizations {
   /// **'Total actions: {count}'**
   String actionPickerTotalCount(int count);
 
+  /// Заголовок выбора нового основания
+  ///
+  /// In en, this message translates to:
+  /// **'Select a reason'**
+  String get sourcePickerTitle;
+
+  /// Отмена выбора основания
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel reason selection'**
+  String get sourcePickerCancel;
+
+  /// Чтение первой порции намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading intentions…'**
+  String get sourcePickerLoading;
+
+  /// Пустой выбор активных оснований
+  ///
+  /// In en, this message translates to:
+  /// **'No active intentions are available.'**
+  String get sourcePickerEmpty;
+
+  /// Пустой результат буквального фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions match this title.'**
+  String get sourcePickerNoMatches;
+
+  /// Устранимый отказ чтения намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions couldn’t be loaded. Try again.'**
+  String get sourcePickerUnavailable;
+
+  /// Повреждённые данные намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Saved intention data is damaged and can’t be shown.'**
+  String get sourcePickerCorruption;
+
+  /// Непредвиденный отказ чтения намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions couldn’t be loaded because of an unexpected error.'**
+  String get sourcePickerUnexpected;
+
+  /// Семантическая подсказка выбора основания
+  ///
+  /// In en, this message translates to:
+  /// **'Selects this intention as the new reason'**
+  String get sourcePickerSelectHint;
+
+  /// Переход к подробностям намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Open intention details'**
+  String get sourcePickerOpenDetails;
+
+  /// Число доступных активных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Total intentions: {count}'**
+  String sourcePickerTotalCount(int count);
+
   /// Назначение отмены выбора участника
   ///
   /// In en, this message translates to:
@@ -2746,11 +2812,227 @@ abstract class AppLocalizations {
   /// **'Return to the path and refresh it'**
   String get dailyChoiceCreationRefreshPath;
 
+  /// Заголовок отдельного подтверждения замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm path replacement'**
+  String get dailyChoiceReplaceTitle;
+
+  /// Подготовка подтверждения после чтения выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the new path confirmation…'**
+  String get dailyChoiceReplacePreparing;
+
+  /// Заменяемый дневной выбор
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice to replace'**
+  String get dailyChoiceReplaceCurrent;
+
+  /// Заголовок полного предлагаемого пути
+  ///
+  /// In en, this message translates to:
+  /// **'New path from source to action'**
+  String get dailyChoiceReplaceNewPath;
+
+  /// Пустое описание заменяемого выбора
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get dailyChoiceReplaceNoDescription;
+
+  /// Независимые поля не меняются при замене пути
+  ///
+  /// In en, this message translates to:
+  /// **'The date, description, and completion will stay unchanged when the path is replaced.'**
+  String get dailyChoiceReplaceFieldsPreserved;
+
+  /// Сохранение выполнения при смене действия
+  ///
+  /// In en, this message translates to:
+  /// **'Completion stays on even if a different action is selected.'**
+  String get dailyChoiceReplaceCompletionPreserved;
+
+  /// Явное подтверждение только замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'Replace path only'**
+  String get dailyChoiceReplaceConfirm;
+
+  /// Ожидание результата команды замены
+  ///
+  /// In en, this message translates to:
+  /// **'Replacing path…'**
+  String get dailyChoiceReplaceSubmitting;
+
+  /// Возврат к выбору нового пути после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Return to path selection'**
+  String get dailyChoiceReplaceChooseAgain;
+
+  /// Открыть замену из подробностей
+  ///
+  /// In en, this message translates to:
+  /// **'Replace path'**
+  String get dailyChoiceReplaceOpen;
+
+  /// Заголовок выбора направления замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the new path direction'**
+  String get dailyChoiceReplaceChooseDirection;
+
+  /// Описание выбора направления замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new source or action to replace the saved path.'**
+  String get dailyChoiceReplaceChooseDirectionDescription;
+
+  /// Верхний обход замены
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a new source'**
+  String get dailyChoiceReplaceFromSource;
+
+  /// Нижний обход замены
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a new action'**
+  String get dailyChoiceReplaceFromAction;
+
+  /// Заголовок обхода для замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a replacement path'**
+  String get dailyChoiceReplaceSelectPath;
+
+  /// Подтверждение выбора пути для замены
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm path replacement'**
+  String get dailyChoiceReplaceOpenConfirmation;
+
   /// Переход от выбранного действия к форме подтверждения
   ///
   /// In en, this message translates to:
   /// **'Continue to choice confirmation'**
   String get choicePathOpenConfirmation;
+
+  /// Заголовок подсказок прежних маршрутов
+  ///
+  /// In en, this message translates to:
+  /// **'Previous routes'**
+  String get choiceSuggestionTitle;
+
+  /// Начальная загрузка подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Loading previous route suggestions…'**
+  String get choiceSuggestionLoading;
+
+  /// Подтверждённо пустая выдача подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'No previous routes for this participant.'**
+  String get choiceSuggestionEmpty;
+
+  /// Обновление подсказок перед выбором
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing suggestions. Route selection is temporarily unavailable.'**
+  String get choiceSuggestionUpdating;
+
+  /// Отсутствие выбранного участника
+  ///
+  /// In en, this message translates to:
+  /// **'The selected intention no longer exists.'**
+  String get choiceSuggestionNotFound;
+
+  /// Временная недоступность подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load suggestions. Try again.'**
+  String get choiceSuggestionUnavailable;
+
+  /// Повреждение данных подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Stored suggestion data is damaged and can’t be confirmed.'**
+  String get choiceSuggestionCorruption;
+
+  /// Непредвиденная ошибка подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load suggestions because of an unexpected error.'**
+  String get choiceSuggestionUnexpected;
+
+  /// Номер подсказки в выдаче
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestion {index} of {total}'**
+  String choiceSuggestionPosition(int index, int total);
+
+  /// Исходное намерение подсказки
+  ///
+  /// In en, this message translates to:
+  /// **'Source: {source}'**
+  String choiceSuggestionSource(String source);
+
+  /// Конечное действие подсказки
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action: {action}'**
+  String choiceSuggestionAction(String action);
+
+  /// Открыть полный текущий маршрут
+  ///
+  /// In en, this message translates to:
+  /// **'View full route'**
+  String get choiceSuggestionView;
+
+  /// Выбрать допустимый маршрут
+  ///
+  /// In en, this message translates to:
+  /// **'Select route'**
+  String get choiceSuggestionSelect;
+
+  /// Причина недоступности архивного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: an intention is archived.'**
+  String get choiceSuggestionArchivedIntention;
+
+  /// Причина недоступности архивной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: a relation in the route is archived.'**
+  String get choiceSuggestionArchivedRelation;
+
+  /// Причина недоступности неготового действия
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: the final action is no longer ready for action.'**
+  String get choiceSuggestionActionNotReady;
+
+  /// Заголовок просмотра всего маршрута
+  ///
+  /// In en, this message translates to:
+  /// **'Full route'**
+  String get choiceSuggestionPreviewTitle;
+
+  /// Направление переходов в просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Route direction: from source to action'**
+  String get choiceSuggestionDirection;
+
+  /// Порядок перехода маршрута
+  ///
+  /// In en, this message translates to:
+  /// **'Step {index} of {total}'**
+  String choiceSuggestionStep(int index, int total);
 }
 
 class _AppLocalizationsDelegate

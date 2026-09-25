@@ -333,6 +333,146 @@ void main() {
     });
   }
 
+  for (final archive in [false, true]) {
+    for (final repeatFirst in [false, true]) {
+      test('повтор и ${archive ? 'архивирование пути' : 'утрата готовности'}: '
+          '${repeatFirst ? 'повтор первым' : 'граф первым'}', () async {
+        expect(
+          await durabilityRepository(database).execute(durabilityCreate()),
+          isA<GraphCommandSucceeded>(),
+        );
+        Future<Object> repeat() => repository.execute(durabilityCreate());
+        Future<Object> changeGraph() => archive
+            ? repository.execute(
+                ArchiveLongTermRelation(durabilityRelation(101)),
+              )
+            : repository.execute(
+                DisableIntentionReadiness(durabilityIntention(3)),
+              );
+        final (first, second) = repeatFirst
+            ? await overlap(repeat, changeGraph)
+            : await overlap(changeGraph, repeat);
+        expect(first, isA<GraphCommandSucceeded>());
+        if (repeatFirst) {
+          expect(second, isA<GraphCommandSucceeded>());
+        } else {
+          expect(
+            (second as GraphCommandFailed).failure.category,
+            GraphFailureCategory.conflict,
+          );
+        }
+        final choices = await durabilityRows(database, 'daily_choices');
+        expect(
+          choices.map((row) => row['id']),
+          repeatFirst
+              ? [durabilityUuid(201), durabilityUuid(202)]
+              : [durabilityUuid(201)],
+        );
+        expect(
+          (await durabilityRows(
+            database,
+            'daily_choice_path_steps',
+          )).map((row) => row['daily_choice_id']),
+          repeatFirst
+              ? [
+                  durabilityUuid(201),
+                  durabilityUuid(201),
+                  durabilityUuid(202),
+                  durabilityUuid(202),
+                ]
+              : [durabilityUuid(201), durabilityUuid(201)],
+        );
+        final source = await repository.getDailyChoice(durabilityChoice(201));
+        expect(source, isA<DailyChoiceReadSuccess>());
+        expect(
+          (source as DailyChoiceReadSuccess).value.value!.path.map(
+            (step) => step.relation.id,
+          ),
+          [durabilityRelation(101), durabilityRelation(102)],
+        );
+      });
+    }
+  }
+
+  for (final repeatFirst in [false, true]) {
+    test('повтор и замена источника подсказки: '
+        '${repeatFirst ? 'повтор первым' : 'замена первой'}', () async {
+      expect(
+        await durabilityRepository(database).execute(durabilityCreate()),
+        isA<GraphCommandSucceeded>(),
+      );
+      Future<Object> repeat() => repository.execute(durabilityCreate());
+      Future<Object> replaceSource() =>
+          repository.execute(durabilityReplace(201));
+      final (first, second) = repeatFirst
+          ? await overlap(repeat, replaceSource)
+          : await overlap(replaceSource, repeat);
+      expect(first, isA<GraphCommandSucceeded>());
+      expect(second, isA<GraphCommandSucceeded>());
+      final source = await repository.getDailyChoice(durabilityChoice(201));
+      final repeated = await repository.getDailyChoice(durabilityChoice(202));
+      expect(source, isA<DailyChoiceReadSuccess>());
+      expect(repeated, isA<DailyChoiceReadSuccess>());
+      expect(
+        (source as DailyChoiceReadSuccess).value.value!.path.map(
+          (step) => step.relation.id,
+        ),
+        [durabilityRelation(103)],
+      );
+      expect(
+        (repeated as DailyChoiceReadSuccess).value.value!.path.map(
+          (step) => step.relation.id,
+        ),
+        [durabilityRelation(101), durabilityRelation(102)],
+      );
+      expect(
+        (await durabilityRows(
+          database,
+          'daily_choices',
+        )).map((row) => row['creation_sequence']),
+        [1, 2],
+      );
+      expect(
+        await database.customSelect('PRAGMA foreign_key_check').get(),
+        isEmpty,
+      );
+    });
+  }
+
+  for (final replaceFirst in [false, true]) {
+    test('замена и удаление заменяемого выбора: '
+        '${replaceFirst ? 'замена первой' : 'удаление первым'}', () async {
+      expect(
+        await durabilityRepository(database).execute(durabilityCreate()),
+        isA<GraphCommandSucceeded>(),
+      );
+      Future<Object> replace() => repository.execute(durabilityReplace(201));
+      Future<Object> delete() =>
+          repository.execute(DeleteDailyChoice(durabilityChoice(201)));
+      final (first, second) = replaceFirst
+          ? await overlap(replace, delete)
+          : await overlap(delete, replace);
+      expect(first, isA<GraphCommandSucceeded>());
+      if (replaceFirst) {
+        expect(second, isA<GraphCommandSucceeded>());
+      } else {
+        expect(
+          (second as GraphCommandFailed).failure.category,
+          GraphFailureCategory.notFound,
+        );
+      }
+      expect(await durabilityRows(database, 'daily_choices'), isEmpty);
+      expect(
+        await durabilityRows(database, 'daily_choice_path_steps'),
+        isEmpty,
+      );
+      expect(
+        await database.customSelect('PRAGMA foreign_key_check').get(),
+        isEmpty,
+      );
+    });
+  }
+
   test(
     'непоследняя ссылка сохраняет блокировку, последняя снимает её',
     () async {

@@ -6,6 +6,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
@@ -185,6 +186,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(router.current.name, DailyChoiceCatalogRoute.name);
       expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
+
+      unawaited(router.push<IntentionId>(const DailyChoiceSourcePickerRoute()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(router.current.name, DailyChoiceSourcePickerRoute.name);
+      expect(find.byType(DailyChoiceSourcePickerPage), findsOneWidget);
+      expect(repository.queryAt(1).scope, IntentionScope.active);
+      expect(
+        repository.queryAt(1).readinessFilter,
+        IntentionReadinessFilter.all,
+      );
     },
   );
 

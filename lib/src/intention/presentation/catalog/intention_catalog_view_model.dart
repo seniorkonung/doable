@@ -19,8 +19,8 @@ part 'intention_catalog_view_model.g.dart';
 
 /// Ограниченный каталог намерений для одного назначения.
 ///
-/// Назначение задаёт отдельное состояние просмотра: общий каталог, выбор
-/// участника связи и выбор действия не разделяют фильтр и загруженную часть.
+/// Назначение задаёт отдельное состояние просмотра: общий каталог и режимы
+/// выбора участников не разделяют фильтр и загруженную часть.
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   late IntentionCatalogPurpose _purpose;
@@ -43,6 +43,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       BrowseIntentionCatalog() => _scope,
       SelectRelationParticipant(:final scope) => scope,
       SelectDailyChoiceAction() => IntentionScope.active,
+      SelectDailyChoiceSource() => IntentionScope.active,
     },
     titleFilterText: _titleFilterText,
     order: _order,
@@ -78,7 +79,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         readinessFilter: switch (purpose) {
           SelectDailyChoiceAction() => IntentionReadinessFilter.readyOnly,
           BrowseIntentionCatalog() ||
-          SelectRelationParticipant() => IntentionReadinessFilter.all,
+          SelectRelationParticipant() ||
+          SelectDailyChoiceSource() => IntentionReadinessFilter.all,
         },
         titleFilter: _titleFilterText,
         order: _order,

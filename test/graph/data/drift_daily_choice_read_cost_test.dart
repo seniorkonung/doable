@@ -2,9 +2,11 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -38,11 +40,17 @@ LongTermRelationId _relation(int number) => durabilityRelation(number);
 
 final class _ReadTrace extends LocalDatabaseConnectionObserver {
   final selects = <_MeasuredSelect>[];
+  final statements = <String>[];
   final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
   Completer<void>? _reachabilityStarted;
   Completer<void>? _releaseReachability;
+  Completer<void>? _suggestionsStarted;
+  Completer<void>? _releaseSuggestions;
 
-  void clear() => selects.clear();
+  void clear() {
+    selects.clear();
+    statements.clear();
+  }
 
   void blockNextReachability() {
     _reachabilityStarted = Completer<void>();
@@ -53,10 +61,30 @@ final class _ReadTrace extends LocalDatabaseConnectionObserver {
 
   void releaseReachability() => _releaseReachability!.complete();
 
+  void blockNextSuggestions() {
+    _suggestionsStarted = Completer<void>();
+    _releaseSuggestions = Completer<void>();
+  }
+
+  Future<void> get waitForSuggestions => _suggestionsStarted!.future;
+
+  void releaseSuggestions() => _releaseSuggestions!.complete();
+
   @override
   Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
+    statements.addAll(statement.statements);
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     _started[statement] = Stopwatch()..start();
+    final suggestionsStarted = _suggestionsStarted;
+    if (statement.statements.single.contains('FROM daily_choices') &&
+        statement.statements.single.contains(
+          'ORDER BY creation_sequence DESC',
+        ) &&
+        suggestionsStarted != null &&
+        !suggestionsStarted.isCompleted) {
+      suggestionsStarted.complete();
+      await _releaseSuggestions!.future;
+    }
     final started = _reachabilityStarted;
     if (statement.statements.single.contains('WITH RECURSIVE') &&
         started != null &&
@@ -99,19 +127,30 @@ final class _MeasuredSelect {
 }
 
 final class _Fixture {
+  _Fixture({this.file});
+
+  final File? file;
   final trace = _ReadTrace();
+  late final List<String> bootstrapStatements;
   late final sqlite.Database raw;
   late final AppDatabase database;
   late final DriftPersonalGraphRepository repository;
+  bool _closed = false;
 
-  Future<void> open() async {
+  Future<void> open({bool seed = true}) async {
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
+        file == null
+            ? openInMemoryLocalDatabase(setup: (connection) => raw = connection)
+            : openFileBackedLocalDatabase(
+                file!,
+                setup: (connection) => raw = connection,
+              ),
         trace,
       ),
     );
     await database.open();
+    bootstrapStatements = List.of(trace.statements);
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -120,6 +159,10 @@ final class _Fixture {
       dailyChoiceIdGenerator: FixedChoiceIds(durabilityChoice(12000)),
       choicePathStepIdGenerator: SequentialStepIds(32000),
     );
+    if (!seed) {
+      trace.clear();
+      return;
+    }
     raw.execute('BEGIN');
     try {
       for (var number = 1; number <= _pathLength + 1; number++) {
@@ -153,7 +196,11 @@ final class _Fixture {
     trace.clear();
   }
 
-  Future<void> close() => database.close();
+  Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
+    await database.close();
+  }
 
   void _addIntention(int id, {bool ready = false}) => raw.execute(
     '''INSERT INTO intentions
@@ -274,6 +321,77 @@ _MeasuredSelect _boundedPage(
   return rows.single;
 }
 
+_MeasuredSelect _boundedSuggestions(
+  List<_MeasuredSelect> selects, {
+  required String participantColumn,
+  required String participantId,
+  required int expectedSteps,
+}) {
+  final candidates = selects
+      .where(
+        (select) =>
+            select.sql.contains('FROM daily_choices') &&
+            select.sql.contains('WHERE $participantColumn = ?'),
+      )
+      .toList();
+  expect(candidates, hasLength(1));
+  final candidate = candidates.single;
+  expect(candidate.sql, contains('ORDER BY creation_sequence DESC'));
+  expect(candidate.sql, contains('LIMIT ?'));
+  expect(candidate.arguments, [participantId, 20]);
+  expect(candidate.rows, 20);
+
+  final choices = _matching(selects, 'FROM daily_choices WHERE id = ?');
+  expect(choices, hasLength(20));
+  expect(choices.map((select) => select.rows), everyElement(1));
+  expect(
+    choices.map((select) => select.arguments.single).toSet(),
+    hasLength(20),
+  );
+  expect(
+    selects.where((select) => select.sql.contains('FROM daily_choices')),
+    hasLength(21),
+  );
+  final steps = _matching(
+    selects,
+    'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+  );
+  expect(steps, hasLength(20));
+  expect(steps.fold<int>(0, (sum, select) => sum + select.rows), expectedSteps);
+  expect(selects.indexOf(candidate), lessThan(selects.indexOf(choices.first)));
+  expect(selects.indexOf(candidate), lessThan(selects.indexOf(steps.first)));
+  final relations = selects.where(
+    (select) =>
+        select.sql.contains('FROM long_term_relations') &&
+        select.sql.contains('WHERE id IN'),
+  );
+  expect(relations, hasLength(20));
+  expect(
+    relations.fold<int>(0, (sum, select) => sum + select.rows),
+    expectedSteps,
+  );
+  expect(
+    selects.where((select) => select.sql.contains('daily_choice_path_steps')),
+    hasLength(20),
+  );
+  expect(
+    selects.where((select) => select.sql.contains('FROM long_term_relations')),
+    hasLength(20),
+  );
+  expect(
+    selects.where((select) => select.sql.contains('FROM intentions')),
+    everyElement(
+      isA<_MeasuredSelect>().having(
+        (select) => select.sql,
+        'чтение конкретных намерений',
+        contains('WHERE id'),
+      ),
+    ),
+  );
+  expect(_matching(selects, 'WITH RECURSIVE'), isEmpty);
+  return candidate;
+}
+
 void main() {
   late _Fixture fixture;
 
@@ -282,6 +400,348 @@ void main() {
     await fixture.open();
   });
   tearDown(() => fixture.close());
+
+  test('недоступные повторы не занимают выдачу при ограниченном чтении', () async {
+    fixture.raw.execute(
+      'UPDATE intentions SET is_action_ready = 0 WHERE id = ?',
+      [_uuid(2)],
+    );
+    final query = ChoicePathSuggestionsForSource(_intention(1));
+    fixture.trace.clear();
+    final firstWatch = Stopwatch()..start();
+    final first = (await fixture.repository.getChoicePathSuggestions(
+      query,
+    ) as ChoicePathSuggestionsSuccess).value;
+    firstWatch.stop();
+    expect(first.items, hasLength(1));
+    expect(first.items.single.path, hasLength(_pathLength));
+    final firstCandidate = _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'source_intention_id',
+      participantId: _uuid(1),
+      expectedSteps: _pathLength + 19,
+    );
+    final plan = fixture.plan(firstCandidate).join(' | ');
+    expect(plan, contains('daily_choices_source_recent'));
+
+    fixture.trace.clear();
+    final refreshWatch = Stopwatch()..start();
+    final refreshed = (await fixture.repository.getChoicePathSuggestions(
+      query,
+    ) as ChoicePathSuggestionsSuccess).value;
+    refreshWatch.stop();
+    expect(refreshed.items, hasLength(1));
+    _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'source_intention_id',
+      participantId: _uuid(1),
+      expectedSteps: _pathLength + 19,
+    );
+    expect(
+      fixture.raw
+          .select('SELECT COUNT(*) AS count FROM daily_choices')
+          .single['count'],
+      _catalogChoices + _otherGroupChoices,
+    );
+
+    // ignore: avoid_print
+    print(
+      'Фильтрация 4.20: SQLite=${fixture.raw.select('SELECT sqlite_version() AS version').single['version']}, '
+      'история=${_catalogChoices + _otherGroupChoices}, '
+      'кандидатов=20, проверено шагов=${_pathLength + 19}, '
+      'показано=${first.items.length}, длина показанного пути=$_pathLength; '
+      'первое чтение=${firstWatch.elapsedMicroseconds} мкс, '
+      'актуализация=${refreshWatch.elapsedMicroseconds} мкс; план=$plan',
+    );
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test('подсказки обоих направлений читают только двадцать кандидатов и целый длинный путь', () async {
+    fixture.trace.clear();
+    final topWatch = Stopwatch()..start();
+    final top = (await fixture.repository.getChoicePathSuggestions(
+      ChoicePathSuggestionsForSource(_intention(1)),
+    ) as ChoicePathSuggestionsSuccess).value;
+    topWatch.stop();
+    expect(top.items, hasLength(2));
+    expect(top.items.first.originChoiceId, durabilityChoice(10400));
+    expect(top.items.first.path, hasLength(_pathLength));
+    fixture.raw.execute('BEGIN IMMEDIATE');
+    fixture.raw.execute('ROLLBACK');
+    expect(top.items.last.originChoiceId, durabilityChoice(10399));
+    expect(
+      fixture.raw
+          .select('SELECT COUNT(*) AS count FROM daily_choices')
+          .single['count'],
+      _catalogChoices + _otherGroupChoices,
+    );
+    final topCandidate = _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'source_intention_id',
+      participantId: _uuid(1),
+      expectedSteps: _pathLength + 19,
+    );
+    final topPlan = fixture.plan(topCandidate).join(' | ');
+    expect(topPlan, contains('daily_choices_source_recent'));
+
+    fixture._addRelation(902, 1, 201);
+    fixture._addChoice(12001, 1, 201, [902], stepBase: 33000);
+    for (var number = 12002; number <= 12021; number++) {
+      fixture._addChoice(number, 200, 201, [901], stepBase: number + 21000);
+    }
+    fixture.trace.clear();
+    final bottomWatch = Stopwatch()..start();
+    final bottom = (await fixture.repository.getChoicePathSuggestions(
+      ChoicePathSuggestionsForAction(_intention(201)),
+    ) as ChoicePathSuggestionsSuccess).value;
+    bottomWatch.stop();
+    expect(bottom.items, hasLength(1));
+    expect(bottom.items.single.originChoiceId, durabilityChoice(12021));
+    expect(
+      fixture.raw.select(
+        'SELECT long_term_relation_id FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [_uuid(12001)],
+      ).single['long_term_relation_id'],
+      _uuid(902),
+    );
+    final bottomCandidate = _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'selected_intention_id',
+      participantId: _uuid(201),
+      expectedSteps: 20,
+    );
+    final bottomPlan = fixture.plan(bottomCandidate).join(' | ');
+    expect(bottomPlan, contains('daily_choices_selected_recent'));
+    expect(
+      fixture.raw
+          .select('SELECT COUNT(*) AS count FROM daily_choices')
+          .single['count'],
+      _catalogChoices + _otherGroupChoices + 21,
+    );
+
+    // ignore: avoid_print
+    print(
+      'Подсказки 4.3: история=${_catalogChoices + _otherGroupChoices + 21}, '
+      'кандидатов=20, длина пути=$_pathLength; '
+      'сверху=${topWatch.elapsedMicroseconds} мкс, '
+      'снизу=${bottomWatch.elapsedMicroseconds} мкс; '
+      'план сверху=$topPlan; план снизу=$bottomPlan',
+    );
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test('полный цикл подсказки измеряет актуализацию, повтор, замену и очередь команд', () async {
+    final topQuery = ChoicePathSuggestionsForSource(_intention(1));
+    final bottomQuery = ChoicePathSuggestionsForAction(_intention(201));
+    final topWatch = Stopwatch()..start();
+    final top = (await fixture.repository.getChoicePathSuggestions(
+      topQuery,
+    ) as ChoicePathSuggestionsSuccess).value;
+    topWatch.stop();
+    expect(top.items.first.path, hasLength(_pathLength));
+    final topPlan = fixture
+        .plan(
+          _boundedSuggestions(
+            fixture.trace.selects,
+            participantColumn: 'source_intention_id',
+            participantId: _uuid(1),
+            expectedSteps: _pathLength + 19,
+          ),
+        )
+        .join(' | ');
+
+    fixture.trace.clear();
+    final bottomWatch = Stopwatch()..start();
+    final bottom = (await fixture.repository.getChoicePathSuggestions(
+      bottomQuery,
+    ) as ChoicePathSuggestionsSuccess).value;
+    bottomWatch.stop();
+    expect(bottom.items, hasLength(1));
+    final bottomPlan = fixture
+        .plan(
+          _boundedSuggestions(
+            fixture.trace.selects,
+            participantColumn: 'selected_intention_id',
+            participantId: _uuid(201),
+            expectedSteps: 20,
+          ),
+        )
+        .join(' | ');
+
+    fixture.trace.clear();
+    final refreshWatch = Stopwatch()..start();
+    final refreshed = (await fixture.repository.getChoicePathSuggestions(
+      topQuery,
+    ) as ChoicePathSuggestionsSuccess).value;
+    refreshWatch.stop();
+    expect(
+      refreshed.items.first.originChoiceId,
+      top.items.first.originChoiceId,
+    );
+    _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'source_intention_id',
+      participantId: _uuid(1),
+      expectedSteps: _pathLength + 19,
+    );
+
+    final longPath = refreshed.items.first.confirmedPath;
+    fixture.trace.clear();
+    final repeatWatch = Stopwatch()..start();
+    expect(
+      await fixture.repository.execute(
+        CreateDailyChoice(
+          sourceIntentionId: _intention(1),
+          selectedIntentionId: _intention(151),
+          path: longPath,
+          date: CalendarDate.fromParts(2026, 9, 25),
+          description: null,
+          isCompleted: false,
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    repeatWatch.stop();
+    expect(
+      await fixture.repository.getDailyChoice(durabilityChoice(12000)),
+      isA<DailyChoiceReadSuccess>(),
+    );
+    expect(top.items.first.originChoiceId, durabilityChoice(10400));
+    expect(
+      _matching(
+        fixture.trace.selects,
+        'FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+      ).every((select) => select.rows <= _pathLength),
+      isTrue,
+    );
+
+    fixture.trace.clear();
+    final replaceWatch = Stopwatch()..start();
+    expect(
+      await fixture.repository.execute(
+        ReplaceDailyChoicePath(
+          choiceId: durabilityChoice(10399),
+          sourceIntentionId: _intention(1),
+          selectedIntentionId: _intention(151),
+          path: longPath,
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    replaceWatch.stop();
+    final replaced = await fixture.repository.getDailyChoice(
+      durabilityChoice(10399),
+    );
+    expect(replaced, isA<DailyChoiceReadSuccess>());
+    expect(
+      (replaced as DailyChoiceReadSuccess).value.value!.path,
+      hasLength(_pathLength),
+    );
+
+    fixture.trace.clear();
+    fixture.trace.blockNextSuggestions();
+    final queuedReadWatch = Stopwatch()..start();
+    final pendingRead = fixture.repository.getChoicePathSuggestions(topQuery);
+    await fixture.trace.waitForSuggestions;
+    var commandCompleted = false;
+    final queueWatch = Stopwatch()..start();
+    final command = fixture.repository
+        .execute(EnableIntentionReadiness(_intention(150)))
+        .whenComplete(() => commandCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    expect(commandCompleted, isFalse);
+    fixture.trace.releaseSuggestions();
+    expect(await pendingRead, isA<ChoicePathSuggestionsSuccess>());
+    queuedReadWatch.stop();
+    expect(await command, isA<GraphCommandSucceeded>());
+    queueWatch.stop();
+    expect(
+      fixture.trace.selects.any(
+        (select) => select.sql.contains('WITH RECURSIVE'),
+      ),
+      isFalse,
+    );
+
+    // ignore: avoid_print
+    print(
+      'Полный цикл 4.18: SQLite=${fixture.raw.select('SELECT sqlite_version() AS version').single['version']}, '
+      'история=${_catalogChoices + _otherGroupChoices}, '
+      'повторы=${_catalogChoices - 1}, путь=$_pathLength, кандидатов=20, подсказок<=5; '
+      'сверху=${topWatch.elapsedMicroseconds} мкс, '
+      'снизу=${bottomWatch.elapsedMicroseconds} мкс, '
+      'актуализация=${refreshWatch.elapsedMicroseconds} мкс, '
+      'повтор=${repeatWatch.elapsedMicroseconds} мкс, '
+      'замена=${replaceWatch.elapsedMicroseconds} мкс, '
+      'чтение с барьером=${queuedReadWatch.elapsedMicroseconds} мкс, '
+      'ожидание команды=${queueWatch.elapsedMicroseconds} мкс; '
+      'план сверху=$topPlan; план снизу=$bottomPlan',
+    );
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test(
+    'повторный bootstrap большой истории не читает сохранённые пути',
+    () async {
+      await fixture.close();
+      final directory = await Directory.systemTemp.createTemp(
+        'doable-choice-cost-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/choices.sqlite');
+      final seeded = _Fixture(file: file);
+      await seeded.open();
+      await seeded.close();
+
+      final reopened = _Fixture(file: file);
+      await reopened.open(seed: false);
+      addTearDown(reopened.close);
+      expect(
+        reopened.raw
+            .select('SELECT COUNT(*) AS count FROM daily_choices')
+            .single['count'],
+        _catalogChoices + _otherGroupChoices,
+      );
+      expect(
+        reopened.bootstrapStatements.where(
+          (sql) =>
+              sql.contains('FROM daily_choices') ||
+              sql.contains('FROM daily_choice_path_steps') ||
+              sql.contains('FROM long_term_relations') ||
+              sql.contains('FROM intentions'),
+        ),
+        isEmpty,
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test('долгий SQLite запрос на рабочем isolate не останавливает цикл UI', () async {
+    await fixture.close();
+    final worker = await spawnConfiguredInMemoryLocalDatabaseIsolate();
+    final database = AppDatabase(await worker.connect());
+    try {
+      await database.open();
+      var ticks = 0;
+      final timer = Timer.periodic(
+        const Duration(milliseconds: 1),
+        (_) => ticks++,
+      );
+      final watch = Stopwatch()..start();
+      final result = await database.customSelect('''
+        WITH RECURSIVE counter(value) AS (
+          SELECT 1 UNION ALL SELECT value + 1 FROM counter WHERE value < 500000
+        ) SELECT COUNT(*) AS total FROM counter
+      ''').getSingle();
+      watch.stop();
+      timer.cancel();
+      expect(result.read<int>('total'), 500000);
+      expect(ticks, greaterThan(0));
+      // ignore: avoid_print
+      print(
+        'Рабочий SQLite isolate 4.18: запрос=${watch.elapsedMicroseconds} мкс, тактов UI=$ticks',
+      );
+    } finally {
+      await database.close();
+      await worker.shutdownAll();
+    }
+  });
 
   test('каталог и дневная группа читают только выбранные порции и пересобирают загруженную часть', () async {
     final catalogWatch = Stopwatch()..start();

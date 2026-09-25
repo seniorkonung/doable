@@ -1144,6 +1144,45 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sourcePickerTitle => 'Select a reason';
+
+  @override
+  String get sourcePickerCancel => 'Cancel reason selection';
+
+  @override
+  String get sourcePickerLoading => 'Loading intentions…';
+
+  @override
+  String get sourcePickerEmpty => 'No active intentions are available.';
+
+  @override
+  String get sourcePickerNoMatches => 'No intentions match this title.';
+
+  @override
+  String get sourcePickerUnavailable =>
+      'Intentions couldn’t be loaded. Try again.';
+
+  @override
+  String get sourcePickerCorruption =>
+      'Saved intention data is damaged and can’t be shown.';
+
+  @override
+  String get sourcePickerUnexpected =>
+      'Intentions couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get sourcePickerSelectHint =>
+      'Selects this intention as the new reason';
+
+  @override
+  String get sourcePickerOpenDetails => 'Open intention details';
+
+  @override
+  String sourcePickerTotalCount(int count) {
+    return 'Total intentions: $count';
+  }
+
+  @override
   String get participantPickerCancel => 'Cancel the selection';
 
   @override
@@ -1591,5 +1630,136 @@ class AppLocalizationsEn extends AppLocalizations {
       'Return to the path and refresh it';
 
   @override
+  String get dailyChoiceReplaceTitle => 'Confirm path replacement';
+
+  @override
+  String get dailyChoiceReplacePreparing =>
+      'Preparing the new path confirmation…';
+
+  @override
+  String get dailyChoiceReplaceCurrent => 'Daily choice to replace';
+
+  @override
+  String get dailyChoiceReplaceNewPath => 'New path from source to action';
+
+  @override
+  String get dailyChoiceReplaceNoDescription => 'No description';
+
+  @override
+  String get dailyChoiceReplaceFieldsPreserved =>
+      'The date, description, and completion will stay unchanged when the path is replaced.';
+
+  @override
+  String get dailyChoiceReplaceCompletionPreserved =>
+      'Completion stays on even if a different action is selected.';
+
+  @override
+  String get dailyChoiceReplaceConfirm => 'Replace path only';
+
+  @override
+  String get dailyChoiceReplaceSubmitting => 'Replacing path…';
+
+  @override
+  String get dailyChoiceReplaceChooseAgain => 'Return to path selection';
+
+  @override
+  String get dailyChoiceReplaceOpen => 'Replace path';
+
+  @override
+  String get dailyChoiceReplaceChooseDirection =>
+      'Choose the new path direction';
+
+  @override
+  String get dailyChoiceReplaceChooseDirectionDescription =>
+      'Choose a new source or action to replace the saved path.';
+
+  @override
+  String get dailyChoiceReplaceFromSource => 'Start from a new source';
+
+  @override
+  String get dailyChoiceReplaceFromAction => 'Start from a new action';
+
+  @override
+  String get dailyChoiceReplaceSelectPath => 'Choose a replacement path';
+
+  @override
+  String get dailyChoiceReplaceOpenConfirmation => 'Confirm path replacement';
+
+  @override
   String get choicePathOpenConfirmation => 'Continue to choice confirmation';
+
+  @override
+  String get choiceSuggestionTitle => 'Previous routes';
+
+  @override
+  String get choiceSuggestionLoading => 'Loading previous route suggestions…';
+
+  @override
+  String get choiceSuggestionEmpty =>
+      'No previous routes for this participant.';
+
+  @override
+  String get choiceSuggestionUpdating =>
+      'Refreshing suggestions. Route selection is temporarily unavailable.';
+
+  @override
+  String get choiceSuggestionNotFound =>
+      'The selected intention no longer exists.';
+
+  @override
+  String get choiceSuggestionUnavailable =>
+      'Couldn’t load suggestions. Try again.';
+
+  @override
+  String get choiceSuggestionCorruption =>
+      'Stored suggestion data is damaged and can’t be confirmed.';
+
+  @override
+  String get choiceSuggestionUnexpected =>
+      'Couldn’t load suggestions because of an unexpected error.';
+
+  @override
+  String choiceSuggestionPosition(int index, int total) {
+    return 'Suggestion $index of $total';
+  }
+
+  @override
+  String choiceSuggestionSource(String source) {
+    return 'Source: $source';
+  }
+
+  @override
+  String choiceSuggestionAction(String action) {
+    return 'Selected action: $action';
+  }
+
+  @override
+  String get choiceSuggestionView => 'View full route';
+
+  @override
+  String get choiceSuggestionSelect => 'Select route';
+
+  @override
+  String get choiceSuggestionArchivedIntention =>
+      'Route unavailable: an intention is archived.';
+
+  @override
+  String get choiceSuggestionArchivedRelation =>
+      'Route unavailable: a relation in the route is archived.';
+
+  @override
+  String get choiceSuggestionActionNotReady =>
+      'Route unavailable: the final action is no longer ready for action.';
+
+  @override
+  String get choiceSuggestionPreviewTitle => 'Full route';
+
+  @override
+  String get choiceSuggestionDirection =>
+      'Route direction: from source to action';
+
+  @override
+  String choiceSuggestionStep(int index, int total) {
+    return 'Step $index of $total';
+  }
 }

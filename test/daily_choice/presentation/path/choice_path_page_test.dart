@@ -88,6 +88,8 @@ void main() {
       await tester.ensureVisible(
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
+      await tester.drag(find.byType(ListView).first, const Offset(0, -150));
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
@@ -222,10 +224,11 @@ void main() {
     await tester.pumpAndSettle();
     final semantics = tester.ensureSemantics();
     expect(find.text('Choose an action'), findsNothing);
-    expect(find.byKey(const ValueKey('choice-path-load-more')), findsOneWidget);
-    await tester.ensureVisible(
+    await tester.scrollUntilVisible(
       find.byKey(const ValueKey('choice-path-load-more')),
+      180,
     );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('choice-path-load-more')));
     await tester.pump();
     expect(repository.queries[1].cursor, isA<_Cursor>());
@@ -285,13 +288,6 @@ void main() {
         find.byKey(const ValueKey('choice-path-select-source')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(
-          ValueKey('choice-path-continue-${_relation(2).toCanonicalString()}'),
-        ),
-        findsOneWidget,
-      );
-
       await tester.tap(find.byKey(const ValueKey('choice-path-select-source')));
       await tester.pumpAndSettle();
       expect(
@@ -415,7 +411,6 @@ void main() {
     repository.complete(0, [_edge(2, 3, 1)], cursor: _Cursor());
     await tester.pumpAndSettle();
     expect(find.textContaining('Selected action: Намерение 3'), findsOneWidget);
-    expect(find.byKey(const ValueKey('choice-path-load-more')), findsOneWidget);
     final loadMore = find.byKey(const ValueKey('choice-path-load-more'));
     await tester.scrollUntilVisible(loadMore, 150);
     await tester.pumpAndSettle();

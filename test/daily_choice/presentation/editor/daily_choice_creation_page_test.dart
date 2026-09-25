@@ -633,7 +633,7 @@ Future<void> _pump(
         type: LongTermRelationType.need,
       ),
     ]),
-    steps: [_step()],
+    steps: [DailyChoiceCreationStep.fromSummary(_step())],
     initialDate: CalendarDate.fromParts(2026, 9, 24),
     direction: direction,
   );
@@ -782,7 +782,7 @@ ChoicePathSelection _selection(int relation, int action, String title) =>
         ),
       ]),
       steps: [
-        LongTermRelationSummary(
+        DailyChoiceCreationStep(
           relation: LongTermRelation(
             id: _relation(relation),
             sourceIntentionId: _intention(1),
@@ -792,19 +792,8 @@ ChoicePathSelection _selection(int relation, int action, String title) =>
             scope: RelationScope.active,
             creationSequence: RelationCreationSequence(relation),
           ),
-          source: RelationParticipantSummary(
-            id: _intention(1),
-            title: 'Основание',
-            archiveState: IntentionArchiveState.active,
-            activeRelationCount: 1,
-          ),
-          related: RelationParticipantSummary(
-            id: _intention(action),
-            title: title,
-            archiveState: IntentionArchiveState.active,
-            activeRelationCount: 0,
-          ),
-          hasDescription: false,
+          sourceTitle: 'Основание',
+          relatedTitle: title,
         ),
       ],
     );
@@ -820,7 +809,7 @@ ChoicePathSelection _bottomSelection(int relation, int source, String title) =>
         ),
       ]),
       steps: [
-        LongTermRelationSummary(
+        DailyChoiceCreationStep(
           relation: LongTermRelation(
             id: _relation(relation),
             sourceIntentionId: _intention(source),
@@ -830,19 +819,8 @@ ChoicePathSelection _bottomSelection(int relation, int source, String title) =>
             scope: RelationScope.active,
             creationSequence: RelationCreationSequence(relation),
           ),
-          source: RelationParticipantSummary(
-            id: _intention(source),
-            title: title,
-            archiveState: IntentionArchiveState.active,
-            activeRelationCount: 1,
-          ),
-          related: RelationParticipantSummary(
-            id: _intention(2),
-            title: 'Действие',
-            archiveState: IntentionArchiveState.active,
-            activeRelationCount: 0,
-          ),
-          hasDescription: false,
+          sourceTitle: title,
+          relatedTitle: 'Действие',
         ),
       ],
     );

@@ -36,6 +36,10 @@ void main() {
 
       expect(observer.didFail, isTrue);
       expect(result, isA<GraphCommandFailed>());
+      expect(
+        (result as GraphCommandFailed).failure.category,
+        GraphFailureCategory.unexpected,
+      );
       expect(await durabilityState(database), before);
       expect(
         (await _revision(repository)).compareTo(revisionBefore),
@@ -55,6 +59,10 @@ void main() {
         (choice as GraphResultSuccess).value.value != null,
         scenario.operation != _Operation.create,
       );
+      if (scenario.operation == _Operation.repeat) {
+        final repeated = await reopened.getDailyChoice(durabilityChoice(203));
+        expect((repeated as GraphResultSuccess).value.value, isNull);
+      }
     });
   }
 }
@@ -64,6 +72,7 @@ Future<Object> _execute(
   _Operation operation,
 ) => switch (operation) {
   _Operation.create => repository.execute(durabilityCreate()),
+  _Operation.repeat => repository.execute(durabilityCreate()),
   _Operation.update => repository.execute(durabilityUpdate(201)),
   _Operation.replace => repository.execute(durabilityReplace(201)),
   _Operation.delete => repository.execute(
@@ -80,6 +89,7 @@ Future<GraphRevision> _revision(
 
 enum _Operation {
   create('Создание'),
+  repeat('Повтор маршрута'),
   update('Изменение'),
   replace('Замена пути'),
   delete('Удаление'),
@@ -113,6 +123,14 @@ const _scenarios = <_Scenario>[
   (operation: _Operation.create, point: _FaultPoint.stepInsert, occurrence: 1),
   (operation: _Operation.create, point: _FaultPoint.stepInsert, occurrence: 2),
   (operation: _Operation.create, point: _FaultPoint.resultRead, occurrence: 1),
+  (
+    operation: _Operation.repeat,
+    point: _FaultPoint.choiceInsert,
+    occurrence: 1,
+  ),
+  (operation: _Operation.repeat, point: _FaultPoint.stepInsert, occurrence: 1),
+  (operation: _Operation.repeat, point: _FaultPoint.stepInsert, occurrence: 2),
+  (operation: _Operation.repeat, point: _FaultPoint.resultRead, occurrence: 1),
   (
     operation: _Operation.update,
     point: _FaultPoint.choiceUpdate,

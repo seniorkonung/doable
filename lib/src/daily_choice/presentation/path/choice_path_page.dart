@@ -5,60 +5,155 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
+import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../application/choice_path_continuations.dart';
 import '../../application/choice_path_draft.dart';
+import '../../application/choice_path_suggestions.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../domain/calendar_date.dart';
 import '../editor/daily_choice_creation_page.dart';
 import 'choice_path_state.dart';
+import 'choice_path_suggestions_view.dart';
+import 'choice_path_suggestions_view_model.dart';
 import 'choice_path_view_model.dart';
 
 @RoutePage()
 final class ChoicePathPage extends ConsumerStatefulWidget {
   const ChoicePathPage({required this.sourceIntentionId, super.key})
     : direction = ChoicePathDraftDirection.topDown,
-      returnsSelection = false;
+      purpose = ChoicePathPurpose.create;
 
   const ChoicePathPage.fromAction({
     required IntentionId actionIntentionId,
     super.key,
   }) : sourceIntentionId = actionIntentionId,
        direction = ChoicePathDraftDirection.bottomUp,
-       returnsSelection = false;
+       purpose = ChoicePathPurpose.create;
 
   const ChoicePathPage.forCreationRefresh({
     required IntentionId startingIntentionId,
     required this.direction,
     super.key,
   }) : sourceIntentionId = startingIntentionId,
-       returnsSelection = true;
+       purpose = ChoicePathPurpose.refreshCreation;
+
+  const ChoicePathPage.forReplacement({
+    required IntentionId startingIntentionId,
+    required this.direction,
+    super.key,
+  }) : sourceIntentionId = startingIntentionId,
+       purpose = ChoicePathPurpose.replace;
 
   final IntentionId sourceIntentionId;
   final ChoicePathDraftDirection direction;
-  final bool returnsSelection;
+  final ChoicePathPurpose purpose;
 
   @override
   ConsumerState<ChoicePathPage> createState() => _ChoicePathPageState();
 }
 
+enum ChoicePathPurpose { create, refreshCreation, replace }
+
 final class ChoicePathSelection {
   ChoicePathSelection({
     required this.path,
-    required Iterable<LongTermRelationSummary> steps,
-  }) : steps = List<LongTermRelationSummary>.unmodifiable(steps);
+    required Iterable<DailyChoiceCreationStep> steps,
+  }) : steps = List<DailyChoiceCreationStep>.unmodifiable(steps);
 
   final ConfirmedChoicePath path;
-  final List<LongTermRelationSummary> steps;
+  final List<DailyChoiceCreationStep> steps;
 }
 
 final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
+  late final ChoicePathSuggestionsViewModel _suggestions;
   ConfirmedChoicePath? _selectedPath;
   GraphRevision? _selectedRevision;
+  bool _openingConfirmation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _suggestions = ChoicePathSuggestionsViewModel.fromCoordinator(
+      ref.read(personalGraphRepositoryProvider),
+      ref.read(graphCommandCoordinatorProvider.notifier),
+      switch (widget.direction) {
+        ChoicePathDraftDirection.topDown => ChoicePathSuggestionsForSource(
+          widget.sourceIntentionId,
+        ),
+        ChoicePathDraftDirection.bottomUp => ChoicePathSuggestionsForAction(
+          widget.sourceIntentionId,
+        ),
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _suggestions.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openConfirmation(ChoicePathSelection selection) async {
+    if (_openingConfirmation) return;
+    _openingConfirmation = true;
+    if (widget.purpose != ChoicePathPurpose.create) {
+      Navigator.of(context).pop(selection);
+      return;
+    }
+    final now = DateTime.now();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => DailyChoiceCreationPage(
+          path: selection.path,
+          steps: selection.steps,
+          direction: widget.direction,
+          initialDate: CalendarDate.fromParts(now.year, now.month, now.day),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _openingConfirmation = false;
+    setState(() {
+      _selectedPath = null;
+      _selectedRevision = null;
+    });
+    unawaited(
+      ref
+          .read(
+            choicePathViewModelProvider(
+              widget.sourceIntentionId,
+              direction: widget.direction,
+            ).notifier,
+          )
+          .refresh(),
+    );
+  }
+
+  void _selectSuggestion(AvailableChoicePathSuggestion suggestion) {
+    if (!identical(
+      _suggestions.confirmable(suggestion.originChoiceId),
+      suggestion,
+    )) {
+      return;
+    }
+    unawaited(
+      _openConfirmation(
+        ChoicePathSelection(
+          path: suggestion.confirmedPath,
+          steps: [
+            for (final step in suggestion.path)
+              DailyChoiceCreationStep.fromSuggestion(step),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +177,9 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.direction == ChoicePathDraftDirection.bottomUp
+          widget.purpose == ChoicePathPurpose.replace
+              ? l10n.dailyChoiceReplaceSelectPath
+              : widget.direction == ChoicePathDraftDirection.bottomUp
               ? l10n.choicePathBottomTitle
               : l10n.choicePathTitle,
         ),
@@ -102,6 +199,16 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
               Text(l10n.choicePathBottomPathDirection),
               const SizedBox(height: 12),
             ],
+            ListenableBuilder(
+              listenable: _suggestions,
+              builder: (context, _) => ChoicePathSuggestionsView(
+                state: _suggestions.state,
+                onSelected: _selectSuggestion,
+                onRetry: _suggestions.retry,
+                onRefresh: _suggestions.refresh,
+              ),
+            ),
+            const SizedBox(height: 16),
             _PathPrefix(
               state: state,
               onBack: (stepCount) {
@@ -130,39 +237,22 @@ final class _ChoicePathPageState extends ConsumerState<ChoicePathPage> {
               const SizedBox(height: 8),
               FilledButton(
                 key: const ValueKey('choice-path-open-confirmation'),
-                onPressed: () async {
-                  if (widget.returnsSelection) {
-                    Navigator.of(context).pop(
-                      ChoicePathSelection(
-                        path: confirmed,
-                        steps: state.visibleSteps,
-                      ),
-                    );
-                    return;
-                  }
-                  final now = DateTime.now();
-                  await Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => DailyChoiceCreationPage(
-                        path: confirmed,
-                        steps: List.unmodifiable(state.visibleSteps),
-                        direction: widget.direction,
-                        initialDate: CalendarDate.fromParts(
-                          now.year,
-                          now.month,
-                          now.day,
-                        ),
-                      ),
+                onPressed: () => unawaited(
+                  _openConfirmation(
+                    ChoicePathSelection(
+                      path: confirmed,
+                      steps: [
+                        for (final step in state.visibleSteps)
+                          DailyChoiceCreationStep.fromSummary(step),
+                      ],
                     ),
-                  );
-                  if (!mounted) return;
-                  setState(() {
-                    _selectedPath = null;
-                    _selectedRevision = null;
-                  });
-                  unawaited(model.refresh());
-                },
-                child: Text(l10n.choicePathOpenConfirmation),
+                  ),
+                ),
+                child: Text(
+                  widget.purpose == ChoicePathPurpose.replace
+                      ? l10n.dailyChoiceReplaceOpenConfirmation
+                      : l10n.choicePathOpenConfirmation,
+                ),
               ),
             ],
             if (confirmed != null && state is ChoicePathConfirmedState) ...[
