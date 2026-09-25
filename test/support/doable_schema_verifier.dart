@@ -1,6 +1,7 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:doable/src/data/local/sqlite_relation_integrity_functions.dart';
+import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -48,6 +49,30 @@ readDoableVerifierReferenceRelationValidation(AppDatabase database) async {
       result = (
         validId: row['valid_id']! as int,
         malformedDescription: row['malformed_description']! as int,
+      );
+    },
+  );
+  return result;
+}
+
+Future<({int valid, String key, int invalid, Object? invalidKey})>
+readDoableVerifierReferenceTagNameFunctions(AppDatabase database) async {
+  late ({int valid, String key, int invalid, Object? invalidKey}) result;
+  await _verifyDoableDatabaseSchema(
+    database,
+    onReferenceConnection: (reference) {
+      final row = reference.select('''
+        SELECT
+          $tagNameValidFunctionName('Straße') AS valid,
+          $tagNameKeyFunctionName('Straße') AS name_key,
+          $tagNameValidFunctionName(' Straße') AS invalid,
+          $tagNameKeyFunctionName(' Straße') AS invalid_key
+      ''').single;
+      result = (
+        valid: row['valid']! as int,
+        key: row['name_key']! as String,
+        invalid: row['invalid']! as int,
+        invalidKey: row['invalid_key'],
       );
     },
   );

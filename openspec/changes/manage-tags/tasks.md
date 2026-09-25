@@ -52,11 +52,11 @@
   - **Вероятные файлы:** новые `lib/src/tag/application/tag_command.dart`, `lib/src/tag/application/tag_result.dart`, `lib/src/tag/application/tag_change.dart`, `test/tag/application/tag_command_contract_test.dart`; при необходимости `lib/src/graph/application/graph_revision.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 1.6 Зарегистрировать долговечные SQLite-функции допустимости и ключа названия тега
+- [x] 1.6 Зарегистрировать долговечные SQLite-функции допустимости и ключа названия тега
   - **Критерии приёмки:**
-    - `doable_tag_name_valid_v1` и `doable_tag_name_key_v1` чистые, детерминированные и безопасны для аргументов любого SQLite-типа; недопустимый ключ возвращает NULL, валидатор принимает только каноничное название.
+    - `doable_tag_name_valid_v1` и `doable_tag_name_key_v1` чистые и детерминированные: для декодируемого SQLite `TEXT` валидатор проверяет каноничное название, недопустимый ключ возвращает NULL; для остальных SQLite-типов возвращаются 0 и NULL. Недекодируемый `TEXT` безопасно отклоняется ошибкой SQL до вызова функций.
     - Канонический setup регистрирует функции до обращения к схеме на каждом физическом соединении, включая фоновое и соединения проверяющего миграции адаптера. Дополнительный fixture setup не подменяет окончательную регистрацию.
-    - Проверки фиксируют совместимость folding, обрезки пробелов и сегментации графем для `v1`; изменение SDK или `characters` не может молча изменить этот контракт. Существующие функции сохраняют семантику.
+    - Проверки фиксируют совместимость folding, обрезки пробелов и сегментации графем для `v1`; изменение SDK или `characters` не может молча изменить этот контракт. Проверка на синтетической схеме подтверждает отдельное отклонение исходного `TEXT` с начальным `U+FEFF`, которое потребуется схеме версии 4. Существующие функции сохраняют семантику.
   - **Проверка:** `mise exec --no-deps -- flutter test test/data/local/database_connection_test.dart test/data/local/schema_verifier_test.dart test/data/local/sqlite_tag_functions_test.dart`; проверить все типы SQLite-аргументов и совместимость с 1.2.
   - **Зависимости:** 1.1, 1.2.
   - **Вероятные файлы:** `lib/src/data/local/sqlite_connection_setup.dart`, `build.yaml`, новые `lib/src/data/local/sqlite_tag_functions.dart` и `test/data/local/sqlite_tag_functions_test.dart`, `test/data/local/database_connection_test.dart`.

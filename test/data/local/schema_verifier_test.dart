@@ -23,10 +23,16 @@ void main() {
       );
       final relationValidation =
           await readDoableVerifierReferenceRelationValidation(database);
+      final tagNameFunctions =
+          await readDoableVerifierReferenceTagNameFunctions(database);
 
       expect(referenceSearchKey, titleSearchKey('Straße'));
       expect(relationValidation.validId, 1);
       expect(relationValidation.malformedDescription, 0);
+      expect(tagNameFunctions.valid, 1);
+      expect(tagNameFunctions.key, 'strasse');
+      expect(tagNameFunctions.invalid, 0);
+      expect(tagNameFunctions.invalidKey, isNull);
     },
   );
 
