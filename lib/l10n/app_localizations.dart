@@ -1370,17 +1370,83 @@ abstract class AppLocalizations {
   /// **'tag'**
   String get graphOperationTag;
 
-  /// Общее подтверждение операции с тегом
+  /// Подтверждение создания тега
   ///
   /// In en, this message translates to:
-  /// **'Tag operation completed.'**
-  String get tagOperationSucceeded;
+  /// **'Tag created.'**
+  String get tagCreated;
 
-  /// Общий отказ операции с тегом
+  /// Подтверждение переименования тега
   ///
   /// In en, this message translates to:
-  /// **'Could not complete the tag operation.'**
-  String get tagOperationFailed;
+  /// **'Tag renamed.'**
+  String get tagRenamed;
+
+  /// Подтверждение неизменного названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name unchanged.'**
+  String get tagUnchanged;
+
+  /// Подтверждение удаления тега и назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Tag deleted with all its assignments.'**
+  String get tagDeleted;
+
+  /// Недопустимые символы в названии тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name contains invalid characters.'**
+  String get tagNameInvalidUnicode;
+
+  /// Пустое название тега
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a tag name.'**
+  String get tagNameEmpty;
+
+  /// Превышена длина названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name must contain no more than 255 visible characters.'**
+  String get tagNameTooLong;
+
+  /// Неканоничное название тега
+  ///
+  /// In en, this message translates to:
+  /// **'Remove whitespace around the tag name.'**
+  String get tagNameNonCanonical;
+
+  /// Название тега уже занято
+  ///
+  /// In en, this message translates to:
+  /// **'A tag with this name already exists. Choose another name or use the existing tag.'**
+  String get tagNameOccupied;
+
+  /// Тег отсутствует при изменении
+  ///
+  /// In en, this message translates to:
+  /// **'This tag no longer exists. Refresh the catalog.'**
+  String get tagNotFound;
+
+  /// Временная недоступность команды тега
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the tag operation. Try again.'**
+  String get tagUnavailable;
+
+  /// Повреждение сохранённых данных тега
+  ///
+  /// In en, this message translates to:
+  /// **'Stored tag data is damaged. The tag was not changed.'**
+  String get tagCorruption;
+
+  /// Неизвестный отказ команды тега
+  ///
+  /// In en, this message translates to:
+  /// **'The tag operation failed because of an unexpected error.'**
+  String get tagUnexpected;
 
   /// Подтверждение создания дневного выбора
   ///

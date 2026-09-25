@@ -18,6 +18,12 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -102,6 +108,218 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     },
   );
+
+  for (final scenario
+      in <({TagCommandKind kind, bool unchanged, String en, String ru})>[
+        (
+          kind: TagCommandKind.create,
+          unchanged: false,
+          en: 'Tag created.',
+          ru: 'Тег создан.',
+        ),
+        (
+          kind: TagCommandKind.rename,
+          unchanged: false,
+          en: 'Tag renamed.',
+          ru: 'Тег переименован.',
+        ),
+        (
+          kind: TagCommandKind.rename,
+          unchanged: true,
+          en: 'Tag name unchanged.',
+          ru: 'Название тега не изменилось.',
+        ),
+        (
+          kind: TagCommandKind.delete,
+          unchanged: false,
+          en: 'Tag deleted with all its assignments.',
+          ru: 'Тег удалён вместе со всеми назначениями.',
+        ),
+      ]) {
+    for (final locale in const [Locale('en'), Locale('ru')]) {
+      testWidgets(
+        'успех тега ${scenario.kind.name}, без изменения: ${scenario.unchanged}, ${locale.languageCode}',
+        (tester) async {
+          final harness = await _pumpPresenterApp(tester, locale: locale);
+          final accepted = harness.startTag(scenario.kind);
+          harness.completeTagSuccess(
+            accepted,
+            scenario.kind,
+            unchanged: scenario.unchanged,
+          );
+          await tester.pumpAndSettle();
+
+          final operation = locale.languageCode == 'ru'
+              ? switch (scenario.kind) {
+                  TagCommandKind.create => 'Создание',
+                  TagCommandKind.rename => 'Изменение',
+                  TagCommandKind.delete => 'Удаление',
+                }
+              : switch (scenario.kind) {
+                  TagCommandKind.create => 'Create',
+                  TagCommandKind.rename => 'Edit',
+                  TagCommandKind.delete => 'Delete',
+                };
+          final message = locale.languageCode == 'ru'
+              ? '$operation — «тег»: ${scenario.ru}'
+              : '$operation — “tag”: ${scenario.en}';
+          expect(find.text(message), findsOneWidget);
+          expect(
+            tester.getSemantics(
+              find.byKey(const ValueKey('graph-operation-message')),
+            ),
+            matchesSemantics(
+              label: message,
+              isLiveRegion: true,
+              textDirection: TextDirection.ltr,
+            ),
+          );
+          await _closeMessage(tester);
+          expect(find.byType(SnackBar), findsNothing);
+        },
+      );
+    }
+  }
+
+  testWidgets('несогласованный результат тега не объявляется успехом', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final accepted = harness.startTag(TagCommandKind.create);
+    harness.completeTagSuccess(accepted, TagCommandKind.rename);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Create — “tag”: The tag operation failed because of an unexpected error.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Create — “tag”: Tag renamed.'), findsNothing);
+    await _closeMessage(tester);
+  });
+
+  for (final scenario in <({TagCommandFailure failure, String en, String ru})>[
+    (
+      failure: const TagNameInputFailure(
+        TagNameFailureReason.invalidUnicodeRepertoire,
+      ),
+      en: 'Tag name contains invalid characters.',
+      ru: 'Название тега содержит недопустимые символы.',
+    ),
+    (
+      failure: const TagNameInputFailure(TagNameFailureReason.empty),
+      en: 'Enter a tag name.',
+      ru: 'Введите название тега.',
+    ),
+    (
+      failure: const TagNameInputFailure(TagNameFailureReason.tooLong),
+      en: 'Tag name must contain no more than 255 visible characters.',
+      ru: 'Название тега должно содержать не более 255 отображаемых символов.',
+    ),
+    (
+      failure: const TagNameInputFailure(TagNameFailureReason.nonCanonical),
+      en: 'Remove whitespace around the tag name.',
+      ru: 'Удалите пробелы по краям названия тега.',
+    ),
+    (
+      failure: TagNameOccupiedFailure(_tagId),
+      en: 'A tag with this name already exists. Choose another name or use the existing tag.',
+      ru: 'Тег с таким названием уже есть. Выберите другое название или используйте существующий тег.',
+    ),
+    (
+      failure: TagNotFoundFailure(_tagId),
+      en: 'This tag no longer exists. Refresh the catalog.',
+      ru: 'Этого тега больше нет. Обновите каталог.',
+    ),
+    (
+      failure: const TagUnavailableFailure(),
+      en: 'Could not complete the tag operation. Try again.',
+      ru: 'Не удалось выполнить действие с тегом. Повторите попытку.',
+    ),
+    (
+      failure: const TagCorruptionFailure(),
+      en: 'Stored tag data is damaged. The tag was not changed.',
+      ru: 'Сохранённые данные тега повреждены. Тег не изменён.',
+    ),
+    (
+      failure: const TagUnexpectedFailure(),
+      en: 'The tag operation failed because of an unexpected error.',
+      ru: 'Действие с тегом не выполнено из-за непредвиденной ошибки.',
+    ),
+  ]) {
+    for (final locale in const [Locale('en'), Locale('ru')]) {
+      testWidgets(
+        'отказ тега ${scenario.failure.runtimeType} безопасен для ${locale.languageCode}',
+        (tester) async {
+          final harness = await _pumpPresenterApp(tester, locale: locale);
+          final accepted = harness.startTag(TagCommandKind.create);
+          harness.completeTagFailure(accepted, scenario.failure);
+          await tester.pumpAndSettle();
+
+          final message = locale.languageCode == 'ru'
+              ? 'Создание — «тег»: ${scenario.ru}'
+              : 'Create — “tag”: ${scenario.en}';
+          expect(find.text(message), findsOneWidget);
+          await _closeMessage(tester);
+          expect(find.byType(SnackBar), findsNothing);
+        },
+      );
+    }
+  }
+
+  testWidgets('исключение хранилища тега не попадает в сообщение', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final accepted = harness.startTag(TagCommandKind.create);
+    harness.failTagWithException(accepted, StateError('личные данные'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Create — “tag”: The tag operation failed because of an unexpected error.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('личные данные'), findsNothing);
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  for (final locale in const [Locale('en'), Locale('ru')]) {
+    testWidgets(
+      'тег ждёт сообщения графа и передаёт отказ оболочке после закрытия формы, ${locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester, locale: locale);
+        final intention = harness.startDelete(index: 1, title: 'Граф');
+        final tag = harness.startTag(
+          TagCommandKind.create,
+          releaseInitiator: false,
+        );
+        harness.completeDeleted(intention);
+        harness.completeTagFailure(tag, const TagUnavailableFailure());
+        await tester.pumpAndSettle();
+
+        final first = locale.languageCode == 'ru'
+            ? 'Удаление — «Граф»: Намерение удалено.'
+            : _deleted('Граф');
+        expect(find.text(first), findsOneWidget);
+        expect(harness.claimInitiatorFailure(tag.token), isNotNull);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+
+        harness.releaseInitiatorPresentation(tag.token);
+        await tester.pumpAndSettle();
+        final fallback = locale.languageCode == 'ru'
+            ? 'Создание — «тег»: Не удалось выполнить действие с тегом. Повторите попытку.'
+            : 'Create — “tag”: Could not complete the tag operation. Try again.';
+        expect(find.text(fallback), findsOneWidget);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
 
   for (final scenario
       in <({DailyChoiceValidationField field, String en, String ru})>[
@@ -1287,6 +1505,11 @@ final _dailyChoiceId = switch (DailyChoiceId.decode(
   ),
 };
 
+final _tagId = switch (TagId.decode('018f1400-0000-7000-8000-000000000003')) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
+};
+
 final _choicePathStepId = switch (ChoicePathStepId.decode(
   '018f1400-0000-7000-8000-000000000002',
 )) {
@@ -1319,9 +1542,76 @@ final class _PresenterHarness {
   final _relationIndexes = <LongTermRelationCommandAccepted, int>{};
   final _blockingIndexes = <BlockingRelationsDeleteAccepted, int>{};
   final _dailyChoiceIndexes = <DailyChoiceCommandAccepted, int>{};
+  final _tagIndexes = <TagCommandAccepted, int>{};
 
   GraphCommandCoordinator get _coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
+
+  TagCommandAccepted startTag(
+    TagCommandKind kind, {
+    bool releaseInitiator = true,
+  }) {
+    final commandIndex = repository.tagCommands.length;
+    final accepted = switch (kind) {
+      TagCommandKind.create => _coordinator.acceptTagCreation(
+        TagCreationFormKey(),
+        CreateTag(TagName.fromInput('Планы')),
+      ),
+      TagCommandKind.rename => _coordinator.acceptTagRename(
+        RenameTag(tagId: _tagId, name: TagName.fromInput('Новое имя')),
+      ),
+      TagCommandKind.delete => _coordinator.acceptTagDelete(DeleteTag(_tagId)),
+    } as TagCommandAccepted;
+    if (releaseInitiator) {
+      _coordinator.releaseInitiatorPresentation(accepted.token);
+    }
+    _tagIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  void completeTagSuccess(
+    TagCommandAccepted accepted,
+    TagCommandKind kind, {
+    bool unchanged = false,
+  }) {
+    const revision = TestDetailsRevision(8);
+    final before = Tag(id: _tagId, name: TagName.fromInput('Планы'));
+    final after = Tag(id: _tagId, name: TagName.fromInput('Новое имя'));
+    final success = switch (kind) {
+      TagCommandKind.create => TagCreated(
+        TagCreatedChange(revision: revision, after: before),
+      ),
+      TagCommandKind.rename when unchanged => TagUnchanged(
+        TagUnchangedChange(revision: revision, tag: before),
+      ),
+      TagCommandKind.rename => TagRenamed(
+        TagRenamedChange(revision: revision, before: before, after: after),
+      ),
+      TagCommandKind.delete => TagDeleted(
+        TagDeletedChange(revision: revision, tagId: _tagId),
+      ),
+    };
+    repository.completeTagCommand(
+      _tagIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(revision: revision, value: success),
+      ),
+    );
+  }
+
+  void completeTagFailure(
+    TagCommandAccepted accepted,
+    TagCommandFailure failure,
+  ) => repository.completeTagCommand(
+    _tagIndexes[accepted]!,
+    TagCommandFailed(failure),
+  );
+
+  void failTagWithException(TagCommandAccepted accepted, Object error) =>
+      repository.failTagCommand(_tagIndexes[accepted]!, error);
+
+  void releaseInitiatorPresentation(GraphOperationToken token) =>
+      _coordinator.releaseInitiatorPresentation(token);
 
   DailyChoiceCommandAccepted startDailyChoice(DailyChoiceCommandKind kind) =>
       switch (kind) {

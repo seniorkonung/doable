@@ -767,10 +767,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationTag => 'tag';
 
   @override
-  String get tagOperationSucceeded => 'Tag operation completed.';
+  String get tagCreated => 'Tag created.';
 
   @override
-  String get tagOperationFailed => 'Could not complete the tag operation.';
+  String get tagRenamed => 'Tag renamed.';
+
+  @override
+  String get tagUnchanged => 'Tag name unchanged.';
+
+  @override
+  String get tagDeleted => 'Tag deleted with all its assignments.';
+
+  @override
+  String get tagNameInvalidUnicode => 'Tag name contains invalid characters.';
+
+  @override
+  String get tagNameEmpty => 'Enter a tag name.';
+
+  @override
+  String get tagNameTooLong =>
+      'Tag name must contain no more than 255 visible characters.';
+
+  @override
+  String get tagNameNonCanonical => 'Remove whitespace around the tag name.';
+
+  @override
+  String get tagNameOccupied =>
+      'A tag with this name already exists. Choose another name or use the existing tag.';
+
+  @override
+  String get tagNotFound => 'This tag no longer exists. Refresh the catalog.';
+
+  @override
+  String get tagUnavailable =>
+      'Could not complete the tag operation. Try again.';
+
+  @override
+  String get tagCorruption =>
+      'Stored tag data is damaged. The tag was not changed.';
+
+  @override
+  String get tagUnexpected =>
+      'The tag operation failed because of an unexpected error.';
 
   @override
   String get dailyChoiceCreated => 'Daily choice created.';

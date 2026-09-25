@@ -825,14 +825,32 @@
   "@graphOperationTag": {
     "description": "Обозначение тега в общем сообщении операции"
   },
-  "tagOperationSucceeded": "Tag operation completed.",
-  "@tagOperationSucceeded": {
-    "description": "Общее подтверждение операции с тегом"
-  },
-  "tagOperationFailed": "Could not complete the tag operation.",
-  "@tagOperationFailed": {
-    "description": "Общий отказ операции с тегом"
-  },
+  "tagCreated": "Tag created.",
+  "@tagCreated": { "description": "Подтверждение создания тега" },
+  "tagRenamed": "Tag renamed.",
+  "@tagRenamed": { "description": "Подтверждение переименования тега" },
+  "tagUnchanged": "Tag name unchanged.",
+  "@tagUnchanged": { "description": "Подтверждение неизменного названия тега" },
+  "tagDeleted": "Tag deleted with all its assignments.",
+  "@tagDeleted": { "description": "Подтверждение удаления тега и назначений" },
+  "tagNameInvalidUnicode": "Tag name contains invalid characters.",
+  "@tagNameInvalidUnicode": { "description": "Недопустимые символы в названии тега" },
+  "tagNameEmpty": "Enter a tag name.",
+  "@tagNameEmpty": { "description": "Пустое название тега" },
+  "tagNameTooLong": "Tag name must contain no more than 255 visible characters.",
+  "@tagNameTooLong": { "description": "Превышена длина названия тега" },
+  "tagNameNonCanonical": "Remove whitespace around the tag name.",
+  "@tagNameNonCanonical": { "description": "Неканоничное название тега" },
+  "tagNameOccupied": "A tag with this name already exists. Choose another name or use the existing tag.",
+  "@tagNameOccupied": { "description": "Название тега уже занято" },
+  "tagNotFound": "This tag no longer exists. Refresh the catalog.",
+  "@tagNotFound": { "description": "Тег отсутствует при изменении" },
+  "tagUnavailable": "Could not complete the tag operation. Try again.",
+  "@tagUnavailable": { "description": "Временная недоступность команды тега" },
+  "tagCorruption": "Stored tag data is damaged. The tag was not changed.",
+  "@tagCorruption": { "description": "Повреждение сохранённых данных тега" },
+  "tagUnexpected": "The tag operation failed because of an unexpected error.",
+  "@tagUnexpected": { "description": "Неизвестный отказ команды тега" },
   "dailyChoiceCreated": "Daily choice created.",
   "@dailyChoiceCreated": {
     "description": "Подтверждение создания дневного выбора"

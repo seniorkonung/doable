@@ -768,10 +768,49 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationTag => 'тег';
 
   @override
-  String get tagOperationSucceeded => 'Операция с тегом выполнена.';
+  String get tagCreated => 'Тег создан.';
 
   @override
-  String get tagOperationFailed => 'Не удалось выполнить операцию с тегом.';
+  String get tagRenamed => 'Тег переименован.';
+
+  @override
+  String get tagUnchanged => 'Название тега не изменилось.';
+
+  @override
+  String get tagDeleted => 'Тег удалён вместе со всеми назначениями.';
+
+  @override
+  String get tagNameInvalidUnicode =>
+      'Название тега содержит недопустимые символы.';
+
+  @override
+  String get tagNameEmpty => 'Введите название тега.';
+
+  @override
+  String get tagNameTooLong =>
+      'Название тега должно содержать не более 255 отображаемых символов.';
+
+  @override
+  String get tagNameNonCanonical => 'Удалите пробелы по краям названия тега.';
+
+  @override
+  String get tagNameOccupied =>
+      'Тег с таким названием уже есть. Выберите другое название или используйте существующий тег.';
+
+  @override
+  String get tagNotFound => 'Этого тега больше нет. Обновите каталог.';
+
+  @override
+  String get tagUnavailable =>
+      'Не удалось выполнить действие с тегом. Повторите попытку.';
+
+  @override
+  String get tagCorruption =>
+      'Сохранённые данные тега повреждены. Тег не изменён.';
+
+  @override
+  String get tagUnexpected =>
+      'Действие с тегом не выполнено из-за непредвиденной ошибки.';
 
   @override
   String get dailyChoiceCreated => 'Дневной выбор создан.';
