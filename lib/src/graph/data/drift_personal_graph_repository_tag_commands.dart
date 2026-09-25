@@ -32,31 +32,34 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
                 command,
                 onStage: (value) => stage = value,
               ),
-              DeleteTag() => throw UnsupportedError(
-                'Удаление тега пока не реализовано.',
+              DeleteTag() => _deleteTag(
+                command,
+                onStage: (value) => stage = value,
               ),
             },
           );
         } on Object catch (error) {
           // После отката индекс имени остаётся окончательным арбитром гонки.
-          if (classifySqliteFailure(error) case SqliteConstraintFailure(
-            extendedResultCode: SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
-          )) {
-            stage = TagCommandDiagnosticsStage.resultRead;
-            final occupied = await _findTagByNameKey(switch (command) {
-              CreateTag(:final name) ||
-              RenameTag(:final name) => name.matchingKey,
-              DeleteTag() => throw UnsupportedError(
-                'Удаление тега пока не реализовано.',
-              ),
-            });
-            if (occupied != null &&
-                switch (command) {
-                  CreateTag() => true,
-                  RenameTag(:final tagId) => occupied.id != tagId,
-                  DeleteTag() => false,
-                }) {
-              throw _TagNameOccupied(occupied.id);
+          final conflictingName = switch (command) {
+            CreateTag(:final name) || RenameTag(:final name) => name,
+            DeleteTag() => null,
+          };
+          if (conflictingName != null) {
+            if (classifySqliteFailure(error) case SqliteConstraintFailure(
+              extendedResultCode: SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE,
+            )) {
+              stage = TagCommandDiagnosticsStage.resultRead;
+              final occupied = await _findTagByNameKey(
+                conflictingName.matchingKey,
+              );
+              if (occupied != null &&
+                  switch (command) {
+                    CreateTag() => true,
+                    RenameTag(:final tagId) => occupied.id != tagId,
+                    DeleteTag() => false,
+                  }) {
+                throw _TagNameOccupied(occupied.id);
+              }
             }
           }
           rethrow;
@@ -128,6 +131,21 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     return _CommittedTagRenamed(before: before, after: after);
   }
 
+  Future<_CommittedTagCommand> _deleteTag(
+    DeleteTag command, {
+    required void Function(TagCommandDiagnosticsStage) onStage,
+  }) async {
+    if (await _findTagById(command.tagId) == null) {
+      throw _TagMissing(command.tagId);
+    }
+    onStage(TagCommandDiagnosticsStage.write);
+    final rows = await (_database.delete(
+      _database.tags,
+    )..where((row) => row.id.equals(command.tagId.toCanonicalString()))).go();
+    if (rows != 1) throw _TagMissing(command.tagId);
+    return _CommittedTagDeleted(command.tagId);
+  }
+
   Future<tag_domain.Tag?> _findTagById(TagId id) async {
     final row = await _database
         .customSelect(
@@ -197,6 +215,17 @@ final class _CommittedTagUnchanged extends _CommittedTagCommand {
   @override
   TagCommandSuccess toSuccess(GraphRevision revision) =>
       TagUnchanged(TagUnchangedChange(revision: revision, tag: tag));
+}
+
+final class _CommittedTagDeleted extends _CommittedTagCommand {
+  const _CommittedTagDeleted(this.id);
+  final TagId id;
+
+  @override
+  bool get didMutate => true;
+  @override
+  TagCommandSuccess toSuccess(GraphRevision revision) =>
+      TagDeleted(TagDeletedChange(revision: revision, tagId: id));
 }
 
 final class _TagMissing implements Exception {

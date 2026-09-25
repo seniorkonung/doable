@@ -425,6 +425,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       ),
       final CreateTag createTag => await _executeTag(createTag),
       final RenameTag renameTag => await _executeTag(renameTag),
+      final DeleteTag deleteTag => await _executeTag(deleteTag),
       _ => throw UnsupportedError(
         'Команда не поддерживается модулем личного графа.',
       ),
