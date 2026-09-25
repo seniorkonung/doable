@@ -56,8 +56,10 @@ extension _ChoicePathSuggestionsReading on DriftPersonalGraphRepository {
           stage = ChoicePathSuggestionReadStage.pathValidation;
           record(const DiagnosticsStarted());
 
-          final suggestions = <ChoicePathSuggestion>[];
+          final suggestions = <AvailableChoicePathSuggestion>[];
           final seenPaths = <List<LongTermRelationId>>[];
+          final observedIntentionIds = <IntentionId>{};
+          final observedRelationIds = <LongTermRelationId>{};
           for (final row in candidateRows) {
             final id = switch (DailyChoiceId.decode(
               _requiredStoredString(row.data, 'id'),
@@ -69,6 +71,12 @@ extension _ChoicePathSuggestionsReading on DriftPersonalGraphRepository {
             final details = await _readVerifiedDailyChoice(id);
             if (details == null) throw const _StoredIntentionCorruption();
             final suggestion = ChoicePathSuggestion.fromDetails(details);
+            observedIntentionIds.add(suggestion.source.id);
+            for (final step in suggestion.path) {
+              observedIntentionIds.add(step.related.id);
+              observedRelationIds.add(step.relation.id);
+            }
+            if (suggestion is! AvailableChoicePathSuggestion) continue;
             if (suggestions.length >=
                 ChoicePathSuggestionsSnapshot.maxSuggestions) {
               continue;
@@ -84,6 +92,8 @@ extension _ChoicePathSuggestionsReading on DriftPersonalGraphRepository {
             query: query,
             items: suggestions,
             revision: _currentRevision,
+            observedIntentionIds: observedIntentionIds,
+            observedRelationIds: observedRelationIds,
           );
         }),
       );

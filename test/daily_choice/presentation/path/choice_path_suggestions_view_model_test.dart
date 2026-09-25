@@ -93,13 +93,9 @@ void main() {
     await pumpEventQueue();
     expect(fixture.model.state, isA<ChoicePathSuggestionsUpdating>());
     expect(fixture.model.confirmable(_choiceId(1)), isNull);
-    fixture.complete(1, [_suggestion(1, archived: true)], revision: 2);
+    fixture.complete(1, [], revision: 2);
     await pumpEventQueue();
-    expect(fixture.model.state, isA<ChoicePathSuggestionsReady>());
-    expect(
-      fixture.model.state.items.single,
-      isA<UnavailableChoicePathSuggestion>(),
-    );
+    expect(fixture.model.state, isA<ChoicePathSuggestionsEmpty>());
     expect(fixture.model.confirmable(_choiceId(1)), isNull);
   });
 
@@ -213,27 +209,20 @@ void main() {
 
     fixture.relationChanged(2);
     expect(fixture.model.confirmable(_choiceId(1)), isNull);
-    fixture.complete(1, [_suggestion(1, archived: true)], revision: 2);
+    fixture.complete(1, [], revision: 2, observedRelationIds: {_relationId(1)});
     await pumpEventQueue();
-    expect(
-      fixture.model.state.items.single,
-      isA<UnavailableChoicePathSuggestion>(),
-    );
+    expect(fixture.model.state, isA<ChoicePathSuggestionsEmpty>());
 
     fixture.relationChanged(3);
     fixture.complete(2, [_suggestion(1)], revision: 3);
     await pumpEventQueue();
     expect(fixture.model.confirmable(_choiceId(1)), isNotNull);
 
-    fixture.repository.candidateRevision(1, 4);
+    fixture.revision(4);
     expect(fixture.model.confirmable(_choiceId(1)), isNull);
-    fixture.complete(3, [_suggestion(1, ready: false)], revision: 4);
+    fixture.complete(3, [], revision: 4);
     await pumpEventQueue();
-    expect(
-      (fixture.model.state.items.single as UnavailableChoicePathSuggestion)
-          .reason,
-      ChoicePathSuggestionUnavailableReason.actionNotReady,
-    );
+    expect(fixture.model.state, isA<ChoicePathSuggestionsEmpty>());
   });
 
   test('постороннее изменение не перечитывает подсказки', () async {
@@ -276,10 +265,16 @@ final class _Fixture {
 
   void complete(
     int index,
-    List<ChoicePathSuggestion> items, {
+    List<AvailableChoicePathSuggestion> items, {
     int revision = 1,
+    Set<LongTermRelationId> observedRelationIds = const {},
   }) {
-    repository.complete(index, items, revision: revision);
+    repository.complete(
+      index,
+      items,
+      revision: revision,
+      observedRelationIds: observedRelationIds,
+    );
   }
 
   void fail(int index, ChoicePathSuggestionsFailure failure) =>
@@ -361,9 +356,10 @@ final class _Repository implements PersonalGraphRepository {
 
   void complete(
     int index,
-    List<ChoicePathSuggestion> items, {
+    List<AvailableChoicePathSuggestion> items, {
     int revision = 1,
     int epoch = 1,
+    Set<LongTermRelationId> observedRelationIds = const {},
   }) {
     requests[index].complete(
       ChoicePathSuggestionsSuccess(
@@ -371,6 +367,7 @@ final class _Repository implements PersonalGraphRepository {
           query: queries[index],
           items: items,
           revision: _Revision(revision, epoch: epoch),
+          observedRelationIds: observedRelationIds,
         ),
       ),
     );
@@ -505,19 +502,10 @@ DailyChoice _choice(int value, {int source = 1}) => DailyChoice(
   isCompleted: false,
 );
 
-ChoicePathSuggestion _suggestion(
-  int value, {
-  bool archived = false,
-  bool ready = true,
-  int? relationNumber,
-}) => ChoicePathSuggestion.fromDetails(
-  _details(
-    value,
-    archived: archived,
-    ready: ready,
-    relationNumber: relationNumber,
-  ),
-);
+AvailableChoicePathSuggestion _suggestion(int value, {int? relationNumber}) =>
+    ChoicePathSuggestion.fromDetails(
+      _details(value, relationNumber: relationNumber),
+    ) as AvailableChoicePathSuggestion;
 
 DailyChoiceDetails _details(
   int value, {

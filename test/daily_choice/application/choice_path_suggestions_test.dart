@@ -88,7 +88,9 @@ void main() {
   });
 
   test('снимок копирует подсказки, ограничивает их и проверяет вход', () {
-    final one = ChoicePathSuggestion.fromDetails(_details());
+    final one = ChoicePathSuggestion.fromDetails(
+      _details(),
+    ) as AvailableChoicePathSuggestion;
     final input = [one];
     final snapshot = ChoicePathSuggestionsSnapshot(
       query: ChoicePathSuggestionsForSource(_intention(1)),
@@ -120,7 +122,8 @@ void main() {
         query: ChoicePathSuggestionsForSource(_intention(1)),
         items: [
           one,
-          ChoicePathSuggestion.fromDetails(_details(choiceNumber: 2)),
+          ChoicePathSuggestion.fromDetails(_details(choiceNumber: 2))
+              as AvailableChoicePathSuggestion,
         ],
         revision: const _Revision(),
       ),
@@ -133,7 +136,7 @@ void main() {
           for (var number = 1; number <= 6; number++)
             ChoicePathSuggestion.fromDetails(
               _details(choiceNumber: number, firstRelation: number * 2),
-            ),
+            ) as AvailableChoicePathSuggestion,
         ],
         revision: const _Revision(),
       ),

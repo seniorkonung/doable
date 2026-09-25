@@ -289,8 +289,11 @@ final class ChoicePathSuggestionsViewModel extends ChangeNotifier {
     final snapshot = _visibleSnapshot;
     if (snapshot == null) return true;
     final choiceIds = {for (final item in snapshot.items) item.originChoiceId};
-    final intentionIds = <IntentionId>{_query.participantId};
-    final relationIds = <LongTermRelationId>{};
+    final intentionIds = <IntentionId>{
+      _query.participantId,
+      ...snapshot.observedIntentionIds,
+    };
+    final relationIds = <LongTermRelationId>{...snapshot.observedRelationIds};
     for (final item in snapshot.items) {
       intentionIds.add(item.source.id);
       intentionIds.add(item.action.id);

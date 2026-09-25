@@ -7,7 +7,7 @@ sealed class ChoicePathSuggestionsState {
   const ChoicePathSuggestionsState(this.query);
 
   final ChoicePathSuggestionsQuery query;
-  List<ChoicePathSuggestion> get items => const [];
+  List<AvailableChoicePathSuggestion> get items => const [];
 }
 
 final class ChoicePathSuggestionsLoading extends ChoicePathSuggestionsState {
@@ -21,7 +21,7 @@ sealed class ChoicePathSuggestionsCurrent extends ChoicePathSuggestionsState {
   GraphRevision get revision => snapshot.revision;
 
   @override
-  List<ChoicePathSuggestion> get items => snapshot.items;
+  List<AvailableChoicePathSuggestion> get items => snapshot.items;
 }
 
 final class ChoicePathSuggestionsEmpty extends ChoicePathSuggestionsCurrent {
@@ -33,7 +33,7 @@ final class ChoicePathSuggestionsReady extends ChoicePathSuggestionsCurrent {
 
   AvailableChoicePathSuggestion? confirmable(DailyChoiceId id) {
     for (final item in items) {
-      if (item.originChoiceId == id && item is AvailableChoicePathSuggestion) {
+      if (item.originChoiceId == id) {
         return item;
       }
     }
@@ -48,7 +48,7 @@ final class ChoicePathSuggestionsUpdating extends ChoicePathSuggestionsState {
   final ChoicePathSuggestionsSnapshot snapshot;
 
   @override
-  List<ChoicePathSuggestion> get items => snapshot.items;
+  List<AvailableChoicePathSuggestion> get items => snapshot.items;
 }
 
 final class ChoicePathSuggestionsRefreshFailure
@@ -61,7 +61,7 @@ final class ChoicePathSuggestionsRefreshFailure
   bool get canRetry => failure is ChoicePathSuggestionsUnavailableFailure;
 
   @override
-  List<ChoicePathSuggestion> get items => snapshot.items;
+  List<AvailableChoicePathSuggestion> get items => snapshot.items;
 }
 
 final class ChoicePathSuggestionsNotFound extends ChoicePathSuggestionsState {

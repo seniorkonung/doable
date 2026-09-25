@@ -153,16 +153,25 @@ ChoicePathSuggestionUnavailableReason? _unavailableReason(
 }
 
 /// Репозиторий берёт последние 20 выборов участника по creation_sequence
-/// DESC до устранения повторов. До пяти разных текущих цепочек упорядочены
+/// DESC до проверки доступности и устранения повторов. До пяти допустимых
+/// разных текущих цепочек упорядочены
 /// по той же последовательности, представитель повтора — самый новый выбор.
 /// Равенство цепочек определяется только порядком LongTermRelationId.
 /// Технический ключ и SQL не входят в прикладной ответ.
 final class ChoicePathSuggestionsSnapshot {
   ChoicePathSuggestionsSnapshot({
     required this.query,
-    required Iterable<ChoicePathSuggestion> items,
+    required Iterable<AvailableChoicePathSuggestion> items,
     required this.revision,
-  }) : items = List<ChoicePathSuggestion>.unmodifiable(items) {
+    Iterable<IntentionId> observedIntentionIds = const [],
+    Iterable<LongTermRelationId> observedRelationIds = const [],
+  }) : items = List<AvailableChoicePathSuggestion>.unmodifiable(items),
+       observedIntentionIds = Set<IntentionId>.unmodifiable(
+         observedIntentionIds,
+       ),
+       observedRelationIds = Set<LongTermRelationId>.unmodifiable(
+         observedRelationIds,
+       ) {
     if (this.items.length > maxSuggestions) {
       throw ArgumentError.value(this.items, 'items');
     }
@@ -187,8 +196,13 @@ final class ChoicePathSuggestionsSnapshot {
   static const maxSuggestions = 5;
 
   final ChoicePathSuggestionsQuery query;
-  final List<ChoicePathSuggestion> items;
+  final List<AvailableChoicePathSuggestion> items;
   final GraphRevision revision;
+
+  /// Участники и связи всех проверенных кандидатов, включая исключённые из
+  /// выдачи. Нужны для актуализации, если скрытый путь вновь станет допустимым.
+  final Set<IntentionId> observedIntentionIds;
+  final Set<LongTermRelationId> observedRelationIds;
 }
 
 bool _samePath(List<LongTermRelationId> left, List<LongTermRelationId> right) {

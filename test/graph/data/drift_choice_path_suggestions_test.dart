@@ -1,4 +1,6 @@
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -130,10 +132,7 @@ void main() {
         result.items.map((item) => item.originChoiceId.toCanonicalString()),
         [for (var index = 21; index >= 17; index--) _uuid(1000 + index)],
       );
-      expect(
-        result.items.every((item) => item is AvailableChoicePathSuggestion),
-        isTrue,
-      );
+      expect(result.items, everyElement(isA<AvailableChoicePathSuggestion>()));
       expect(
         probe.selects.where(
           (sql) => sql.contains('FROM daily_choices WHERE id = ?'),
@@ -164,6 +163,119 @@ void main() {
       expect(
         bottom.items.single.originChoiceId,
         top.items.single.originChoiceId,
+      );
+    },
+  );
+
+  test('пять новых недоступных путей не вытесняют шестой допустимый', () async {
+    addIntention(1);
+    for (var action = 2; action <= 7; action++) {
+      addIntention(action, ready: 1);
+      addRelation(100 + action, 1, action);
+      addChoice(1000 + action, 1, action, 100 + action);
+    }
+    for (var action = 3; action <= 7; action++) {
+      raw.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_uuid(100 + action)],
+      );
+    }
+
+    final top = await read(ChoicePathSuggestionsForSource(_intention(1)));
+    expect(top.items.map((item) => item.originChoiceId.toCanonicalString()), [
+      _uuid(1002),
+    ]);
+
+    addIntention(20, ready: 1);
+    for (var source = 21; source <= 26; source++) {
+      addIntention(source);
+      addRelation(100 + source, source, 20);
+      addChoice(2000 + source, source, 20, 100 + source);
+    }
+    for (var source = 22; source <= 26; source++) {
+      raw.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_uuid(100 + source)],
+      );
+      raw.execute('UPDATE intentions SET is_archived = 1 WHERE id = ?', [
+        _uuid(source),
+      ]);
+    }
+    final bottom = await read(ChoicePathSuggestionsForAction(_intention(20)));
+    expect(
+      bottom.items.map((item) => item.originChoiceId.toCanonicalString()),
+      [_uuid(2021)],
+    );
+    expect(bottom.observedIntentionIds, contains(_intention(26)));
+    expect(
+      top.observedRelationIds.map((id) => id.toCanonicalString()),
+      contains(_uuid(107)),
+    );
+  });
+
+  test('двадцать недоступных записей не открывают двадцать первую', () async {
+    addIntention(1);
+    addIntention(2, ready: 1);
+    addIntention(3, ready: 1);
+    addRelation(101, 1, 2);
+    addRelation(102, 1, 3);
+    addChoice(1001, 1, 2, 101);
+    for (var number = 1002; number <= 1021; number++) {
+      addChoice(number, 1, 3, 102);
+    }
+    raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
+      _uuid(3),
+    ]);
+    probe.selects.clear();
+
+    final result = await read(ChoicePathSuggestionsForSource(_intention(1)));
+    expect(result.items, isEmpty);
+    expect(
+      probe.selects.where(
+        (sql) => sql.contains('FROM daily_choices WHERE id = ?'),
+      ),
+      hasLength(20),
+    );
+    expect(result.observedIntentionIds, contains(_intention(3)));
+  });
+
+  test(
+    'подтверждение устаревшей подсказки даёт конфликт без новой записи',
+    () async {
+      addIntention(1);
+      addIntention(2, ready: 1);
+      addRelation(101, 1, 2);
+      addChoice(1001, 1, 2, 101);
+      final suggestion = (await read(
+        ChoicePathSuggestionsForSource(_intention(1)),
+      )).items.single;
+      raw.execute('UPDATE intentions SET is_action_ready = 0 WHERE id = ?', [
+        _uuid(2),
+      ]);
+
+      final result = await repository.execute(
+        CreateDailyChoice(
+          sourceIntentionId: suggestion.source.id,
+          selectedIntentionId: suggestion.action.id,
+          path: suggestion.confirmedPath,
+          date: CalendarDate.fromParts(2026, 9, 25),
+          description: null,
+          isCompleted: false,
+        ),
+      );
+      expect(
+        result,
+        isA<GraphCommandFailed>().having(
+          (failure) => failure.failure.category,
+          'категория',
+          GraphFailureCategory.conflict,
+        ),
+      );
+      expect(
+        raw
+            .select('SELECT COUNT(*) AS count FROM daily_choices')
+            .single['count'],
+        1,
       );
     },
   );
@@ -205,7 +317,7 @@ void main() {
     );
   });
 
-  test('показывает текущие данные и причины недоступности без смены порядка', () async {
+  test('исключает архивные пути и действия без готовности, сохраняя выборы', () async {
     addIntention(1);
     addIntention(2, ready: 1);
     addIntention(3, ready: 1);
@@ -229,27 +341,16 @@ void main() {
     ]);
 
     final result = await read(ChoicePathSuggestionsForSource(_intention(1)));
-    expect(
-      result.items.map((item) => item.originChoiceId.toCanonicalString()),
-      [_uuid(1002), _uuid(1001)],
-    );
-    expect(
-      (result.items.first as UnavailableChoicePathSuggestion).reason,
-      ChoicePathSuggestionUnavailableReason.actionNotReady,
-    );
-    expect(
-      (result.items.last as UnavailableChoicePathSuggestion).reason,
-      ChoicePathSuggestionUnavailableReason.archivedRelation,
-    );
-    expect(result.items.last.action.title, 'Новое название');
+    expect(result.items, isEmpty);
 
     raw.execute('UPDATE intentions SET is_archived = 1 WHERE id = ?', [
       _uuid(2),
     ]);
     final archived = await read(ChoicePathSuggestionsForAction(_intention(2)));
+    expect(archived.items, isEmpty);
     expect(
-      (archived.items.single as UnavailableChoicePathSuggestion).reason,
-      ChoicePathSuggestionUnavailableReason.archivedIntention,
+      raw.select('SELECT COUNT(*) AS count FROM daily_choices').single['count'],
+      2,
     );
   });
 
@@ -284,6 +385,35 @@ void main() {
       DiagnosticsFailureCode.corruption,
     );
   });
+
+  test(
+    'повреждённый кандидат после пяти подсказок отклоняет всё чтение',
+    () async {
+      addIntention(1);
+      for (var action = 2; action <= 7; action++) {
+        addIntention(action, ready: 1);
+        addRelation(100 + action, 1, action);
+        addChoice(1000 + action, 1, action, 100 + action);
+      }
+      raw.execute('PRAGMA ignore_check_constraints = ON');
+      raw.execute('UPDATE daily_choices SET choice_date = ? WHERE id = ?', [
+        'некорректная дата',
+        _uuid(1002),
+      ]);
+
+      final result = await repository.getChoicePathSuggestions(
+        ChoicePathSuggestionsForSource(_intention(1)),
+      );
+      expect(
+        result,
+        isA<ChoicePathSuggestionsError>().having(
+          (value) => value.failure.category,
+          'категория',
+          GraphFailureCategory.corruption,
+        ),
+      );
+    },
+  );
 
   test(
     'различает временный и неизвестный отказ и безопасно диагностирует этап',

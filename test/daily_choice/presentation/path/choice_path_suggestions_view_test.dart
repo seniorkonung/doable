@@ -73,53 +73,19 @@ void main() {
     expect(selected, same(second));
   });
 
-  testWidgets('недоступный путь остаётся видимым с причиной и архивом', (
+  testWidgets('пустая выдача не показывает недоступные маршруты', (
     tester,
   ) async {
-    var selected = false;
-    await _pump(
-      tester,
-      _ready(_suggestion(archivedRelation: true)),
-      onSelected: (_) => selected = true,
+    await _pump(tester, ChoicePathSuggestionsEmpty(_snapshot([])));
+    expect(find.textContaining('Прежних маршрутов'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('choice-suggestion-view-0')),
+      findsNothing,
     );
-
-    expect(find.textContaining('архивирована'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('choice-suggestion-select-0')),
       findsNothing,
     );
-    await tester.tap(find.byKey(const ValueKey('choice-suggestion-view-0')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Архивировано'), findsWidgets);
-    expect(find.textContaining('связь пути архивирована'), findsOneWidget);
-    expect(selected, isFalse);
-  });
-
-  testWidgets('объясняет архив намерения и утрату готовности действия', (
-    tester,
-  ) async {
-    await _pump(tester, _ready(_suggestion(archivedIntention: true)));
-    expect(find.textContaining('намерений архивировано'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('choice-suggestion-select-0')),
-      findsNothing,
-    );
-    await tester.tap(find.byKey(const ValueKey('choice-suggestion-view-0')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Архивировано'), findsWidgets);
-    await tester.tap(find.byType(BackButton));
-    await tester.pumpAndSettle();
-
-    await _pump(tester, _ready(_suggestion(actionReady: false)));
-    expect(find.textContaining('больше не готово'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('choice-suggestion-select-0')),
-      findsNothing,
-    );
-    await tester.tap(find.byKey(const ValueKey('choice-suggestion-view-0')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Не готово к действию'), findsWidgets);
-    expect(find.textContaining('больше не готово'), findsOneWidget);
   });
 
   testWidgets('различает загрузку, пустую выдачу и устранимую ошибку', (
@@ -156,6 +122,10 @@ void main() {
     await _pump(tester, ChoicePathSuggestionsUpdating(snapshot));
     expect(find.textContaining('Обновляем подсказки'), findsOneWidget);
     expect(
+      find.byKey(const ValueKey('choice-suggestion-view-0')),
+      findsNothing,
+    );
+    expect(
       find.byKey(const ValueKey('choice-suggestion-select-0')),
       findsNothing,
     );
@@ -174,7 +144,7 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('choice-suggestion-view-0')),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
@@ -253,15 +223,16 @@ Future<void> _pump(
   }
 }
 
-ChoicePathSuggestionsReady _ready(ChoicePathSuggestion item) =>
+ChoicePathSuggestionsReady _ready(AvailableChoicePathSuggestion item) =>
     ChoicePathSuggestionsReady(_snapshot([item]));
 
-ChoicePathSuggestionsSnapshot _snapshot(List<ChoicePathSuggestion> items) =>
-    ChoicePathSuggestionsSnapshot(
-      query: ChoicePathSuggestionsForSource(_id(1)),
-      items: items,
-      revision: const _Revision(),
-    );
+ChoicePathSuggestionsSnapshot _snapshot(
+  List<AvailableChoicePathSuggestion> items,
+) => ChoicePathSuggestionsSnapshot(
+  query: ChoicePathSuggestionsForSource(_id(1)),
+  items: items,
+  revision: const _Revision(),
+);
 
 final class _Revision implements GraphRevision {
   const _Revision();
@@ -270,13 +241,10 @@ final class _Revision implements GraphRevision {
   GraphRevisionOrder compareTo(GraphRevision other) => GraphRevisionOrder.same;
 }
 
-ChoicePathSuggestion _suggestion({
+AvailableChoicePathSuggestion _suggestion({
   int choiceValue = 1,
   int length = 1,
   bool sameTitles = false,
-  bool archivedRelation = false,
-  bool archivedIntention = false,
-  bool actionReady = true,
 }) {
   final intentions = [
     for (var i = 1; i <= length + 1; i++)
@@ -284,12 +252,8 @@ ChoicePathSuggestion _suggestion({
         id: _id(i),
         title: sameTitles ? 'Повтор' : 'Намерение $i',
         description: null,
-        readiness: i == length + 1 && !actionReady
-            ? IntentionReadiness.notReady
-            : IntentionReadiness.ready,
-        archiveState: i == 1 && archivedIntention
-            ? IntentionArchiveState.archived
-            : IntentionArchiveState.active,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026)),
       ),
@@ -311,9 +275,7 @@ ChoicePathSuggestion _suggestion({
       relatedIntentionId: intentions[i + 1].id,
       type: i == 1 ? LongTermRelationType.can : LongTermRelationType.need,
       priority: RelationPriority.p1,
-      scope: archivedRelation && i == 0
-          ? RelationScope.archived
-          : RelationScope.active,
+      scope: RelationScope.active,
       creationSequence: RelationCreationSequence(i + 1),
     );
     final step = ChoicePathStep(
@@ -340,7 +302,7 @@ ChoicePathSuggestion _suggestion({
       selected: intentions.last,
       path: path,
     ),
-  );
+  ) as AvailableChoicePathSuggestion;
 }
 
 IntentionId _id(int value) => (IntentionId.decode(

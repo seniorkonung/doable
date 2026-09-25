@@ -401,6 +401,60 @@ void main() {
   });
   tearDown(() => fixture.close());
 
+  test('недоступные повторы не занимают выдачу при ограниченном чтении', () async {
+    fixture.raw.execute(
+      'UPDATE intentions SET is_action_ready = 0 WHERE id = ?',
+      [_uuid(2)],
+    );
+    final query = ChoicePathSuggestionsForSource(_intention(1));
+    fixture.trace.clear();
+    final firstWatch = Stopwatch()..start();
+    final first = (await fixture.repository.getChoicePathSuggestions(
+      query,
+    ) as ChoicePathSuggestionsSuccess).value;
+    firstWatch.stop();
+    expect(first.items, hasLength(1));
+    expect(first.items.single.path, hasLength(_pathLength));
+    final firstCandidate = _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'source_intention_id',
+      participantId: _uuid(1),
+      expectedSteps: _pathLength + 19,
+    );
+    final plan = fixture.plan(firstCandidate).join(' | ');
+    expect(plan, contains('daily_choices_source_recent'));
+
+    fixture.trace.clear();
+    final refreshWatch = Stopwatch()..start();
+    final refreshed = (await fixture.repository.getChoicePathSuggestions(
+      query,
+    ) as ChoicePathSuggestionsSuccess).value;
+    refreshWatch.stop();
+    expect(refreshed.items, hasLength(1));
+    _boundedSuggestions(
+      fixture.trace.selects,
+      participantColumn: 'source_intention_id',
+      participantId: _uuid(1),
+      expectedSteps: _pathLength + 19,
+    );
+    expect(
+      fixture.raw
+          .select('SELECT COUNT(*) AS count FROM daily_choices')
+          .single['count'],
+      _catalogChoices + _otherGroupChoices,
+    );
+
+    // ignore: avoid_print
+    print(
+      'Фильтрация 4.20: SQLite=${fixture.raw.select('SELECT sqlite_version() AS version').single['version']}, '
+      'история=${_catalogChoices + _otherGroupChoices}, '
+      'кандидатов=20, проверено шагов=${_pathLength + 19}, '
+      'показано=${first.items.length}, длина показанного пути=$_pathLength; '
+      'первое чтение=${firstWatch.elapsedMicroseconds} мкс, '
+      'актуализация=${refreshWatch.elapsedMicroseconds} мкс; план=$plan',
+    );
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
   test('подсказки обоих направлений читают только двадцать кандидатов и целый длинный путь', () async {
     fixture.trace.clear();
     final topWatch = Stopwatch()..start();

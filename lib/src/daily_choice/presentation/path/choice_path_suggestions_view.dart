@@ -25,8 +25,10 @@ final class ChoicePathSuggestionsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final items = state.items;
     final canSelect = state is ChoicePathSuggestionsReady;
+    final items = canSelect
+        ? state.items
+        : const <AvailableChoicePathSuggestion>[];
     final message = switch (state) {
       ChoicePathSuggestionsLoading() => l10n.choiceSuggestionLoading,
       ChoicePathSuggestionsEmpty() => l10n.choiceSuggestionEmpty,
@@ -78,17 +80,11 @@ final class ChoicePathSuggestionsView extends StatelessWidget {
             index: index,
             total: items.length,
             suggestion: items[index],
-            onSelected: canSelect ? _selectionAction(items[index]) : null,
+            onSelected: () => onSelected(items[index]),
           ),
       ],
     );
   }
-
-  VoidCallback? _selectionAction(ChoicePathSuggestion suggestion) =>
-      switch (suggestion) {
-        AvailableChoicePathSuggestion item => () => onSelected(item),
-        UnavailableChoicePathSuggestion() => null,
-      };
 }
 
 String _failureMessage(
@@ -112,19 +108,12 @@ final class _SuggestionCard extends StatelessWidget {
 
   final int index;
   final int total;
-  final ChoicePathSuggestion suggestion;
-  final VoidCallback? onSelected;
+  final AvailableChoicePathSuggestion suggestion;
+  final VoidCallback onSelected;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final reason = switch (suggestion) {
-      UnavailableChoicePathSuggestion(:final reason) => _reasonMessage(
-        l10n,
-        reason,
-      ),
-      AvailableChoicePathSuggestion() => null,
-    };
     final position = l10n.choiceSuggestionPosition(index + 1, total);
     void openPreview() => Navigator.of(context).push<void>(
       MaterialPageRoute(builder: (_) => _SuggestionPreview(suggestion)),
@@ -139,11 +128,6 @@ final class _SuggestionCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(l10n.choiceSuggestionSource(suggestion.source.title)),
             Text(l10n.choiceSuggestionAction(suggestion.action.title)),
-            if (reason != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(reason),
-              ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -161,19 +145,18 @@ final class _SuggestionCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (onSelected != null)
-                  Semantics(
-                    button: true,
-                    label: '${l10n.choiceSuggestionSelect}. $position',
-                    onTap: onSelected,
-                    child: ExcludeSemantics(
-                      child: FilledButton(
-                        key: ValueKey('choice-suggestion-select-$index'),
-                        onPressed: onSelected,
-                        child: Text(l10n.choiceSuggestionSelect),
-                      ),
+                Semantics(
+                  button: true,
+                  label: '${l10n.choiceSuggestionSelect}. $position',
+                  onTap: onSelected,
+                  child: ExcludeSemantics(
+                    child: FilledButton(
+                      key: ValueKey('choice-suggestion-select-$index'),
+                      onPressed: onSelected,
+                      child: Text(l10n.choiceSuggestionSelect),
                     ),
                   ),
+                ),
               ],
             ),
           ],
@@ -183,34 +166,15 @@ final class _SuggestionCard extends StatelessWidget {
   }
 }
 
-String _reasonMessage(
-  AppLocalizations l10n,
-  ChoicePathSuggestionUnavailableReason reason,
-) => switch (reason) {
-  ChoicePathSuggestionUnavailableReason.archivedIntention =>
-    l10n.choiceSuggestionArchivedIntention,
-  ChoicePathSuggestionUnavailableReason.archivedRelation =>
-    l10n.choiceSuggestionArchivedRelation,
-  ChoicePathSuggestionUnavailableReason.actionNotReady =>
-    l10n.choiceSuggestionActionNotReady,
-};
-
 final class _SuggestionPreview extends StatelessWidget {
   const _SuggestionPreview(this.suggestion);
 
-  final ChoicePathSuggestion suggestion;
+  final AvailableChoicePathSuggestion suggestion;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final path = suggestion.path;
-    final reason = switch (suggestion) {
-      UnavailableChoicePathSuggestion(:final reason) => _reasonMessage(
-        l10n,
-        reason,
-      ),
-      AvailableChoicePathSuggestion() => null,
-    };
     return Scaffold(
       appBar: AppBar(title: Text(l10n.choiceSuggestionPreviewTitle)),
       body: SafeArea(
@@ -229,11 +193,6 @@ final class _SuggestionPreview extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  if (reason != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(reason),
-                    ),
                 ],
               );
             }
