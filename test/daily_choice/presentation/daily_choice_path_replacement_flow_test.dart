@@ -155,6 +155,21 @@ int _creationSequence(LocalDatabaseHarness harness) {
   }
 }
 
+List<String> _storedStepRelations(LocalDatabaseHarness harness) {
+  final database = sqlite.sqlite3.open(harness.databaseFile.path);
+  try {
+    return database
+        .select(
+          'SELECT long_term_relation_id FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+          [_uuid(201)],
+        )
+        .map((row) => row['long_term_relation_id'] as String)
+        .toList();
+  } finally {
+    database.close();
+  }
+}
+
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
@@ -250,7 +265,7 @@ void main() {
           'UPDATE daily_choices SET choice_date = ?, description = ?, is_completed = 0 WHERE id = ?',
           ['2026-09-25', 'Актуальное описание', _uuid(201)],
         );
-        database.dispose();
+        database.close();
         await _tap(
           tester,
           find.byKey(const ValueKey('daily-choice-replace-confirm')),
@@ -353,15 +368,14 @@ void main() {
 
   for (final bottomUp in [false, true]) {
     for (final suggestion in [false, true]) {
+      final locale = bottomUp == suggestion ? 'ru' : 'en';
       testWidgets(
-        'замена ${bottomUp ? 'снизу' : 'сверху'} ${suggestion ? 'по подсказке' : 'по шагам'} сохраняет идентичность и поля',
+        'замена ${bottomUp ? 'снизу' : 'сверху'} ${suggestion ? 'по подсказке' : 'по шагам'} сохраняет идентичность и поля ($locale)',
         (tester) async {
           tester.view.physicalSize = const Size(1200, 2400);
           tester.view.devicePixelRatio = 1;
           addTearDown(tester.view.reset);
-          tester.binding.platformDispatcher.localesTestValue = const [
-            Locale('ru'),
-          ];
+          tester.binding.platformDispatcher.localesTestValue = [Locale(locale)];
           addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
           final harness = (await tester.runAsync(
             LocalDatabaseHarness.fileBacked,
@@ -384,6 +398,10 @@ void main() {
           );
           final before = await _read(repository);
           final originalSequence = _creationSequence(harness);
+          expect(
+            _storedStepRelations(harness),
+            containsAll([_uuid(101), _uuid(102)]),
+          );
 
           await _tap(
             tester,
@@ -408,7 +426,11 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(
-            find.text(bottomUp ? 'Выбор действия' : 'Выбор основания'),
+            find.text(
+              locale == 'ru'
+                  ? (bottomUp ? 'Выбор действия' : 'Выбор основания')
+                  : (bottomUp ? 'Select an action' : 'Select a reason'),
+            ),
             findsOneWidget,
           );
           await _tap(
@@ -442,6 +464,43 @@ void main() {
             );
           }
           await _waitFor(tester, find.byType(DailyChoicePathReplacePage));
+          await _waitFor(
+            tester,
+            find.byKey(const ValueKey('daily-choice-replace-confirm')),
+          );
+          expect(
+            find.text(
+              locale == 'ru'
+                  ? 'Подтвердить замену пути'
+                  : 'Confirm path replacement',
+            ),
+            findsWidgets,
+          );
+          expect(
+            find.text(
+              locale == 'ru'
+                  ? 'Исходное намерение: Новое основание'
+                  : 'Source intention: Новое основание',
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.text(
+              locale == 'ru'
+                  ? 'Выбранное действие: Новое действие'
+                  : 'Selected action: Новое действие',
+            ),
+            findsOneWidget,
+          );
+          final semantics = tester.ensureSemantics();
+          await tester.pump();
+          expect(
+            find.bySemanticsLabel(
+              RegExp(locale == 'ru' ? 'Шаг 1:' : 'Step 1:'),
+            ),
+            findsOneWidget,
+          );
+          semantics.dispose();
           expect(find.byType(DailyChoiceCreationPage), findsNothing);
           expect(_choiceCount(harness), 2);
           expect(
@@ -459,7 +518,9 @@ void main() {
           await _waitFor(
             tester,
             find.textContaining(
-              'Чтобы Новое основание, я сегодня Новое действие',
+              locale == 'ru'
+                  ? 'Чтобы Новое основание, я сегодня Новое действие'
+                  : 'To Новое основание, today I Новое действие',
             ),
           );
           expect(
@@ -486,6 +547,7 @@ void main() {
             [_uuid(103)],
           );
           expect(_choiceCount(harness), 2);
+          expect(_storedStepRelations(harness), [_uuid(103)]);
         },
       );
     }
