@@ -16,7 +16,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart'
 import 'package:doable/src/tag/application/tag_catalog.dart'
     as data
     show TagCatalogPage;
-import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -36,6 +36,12 @@ TagId _tagId(int number) =>
     (TagId.decode(_id(number)) as TagIdDecodingSuccess).id;
 
 void main() {
+  setUp(() {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+  });
+
   testWidgets(
     'отмена не удаляет; подтверждение охватывает незагруженные назначения и сохраняет граф',
     (tester) async {
@@ -261,39 +267,105 @@ void main() {
     expect(raw.select('SELECT id FROM tags').single['id'], _id(302));
   });
 
-  testWidgets('повторный вход не обходит занятый ключ тега', (tester) async {
-    final repository = _PendingRepository();
-    final container = ProviderContainer(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWithValue(repository),
-      ],
-    );
-    addTearDown(container.dispose);
-    final first = container
-        .read(graphCommandCoordinatorProvider.notifier)
-        .acceptTagDelete(DeleteTag(_tagId(301)));
-    expect(first, isA<TagCommandAccepted>());
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          locale: const Locale('ru'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const TagCatalogPage(),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
-    await tester.pumpAndSettle();
-    expect(repository.commands, 1);
-    expect(find.textContaining('уже выполняется'), findsWidgets);
-    repository.finish();
-    await tester.pumpAndSettle();
-  });
+  for (final (locale, busyMessage, resultMessage) in [
+    (
+      const Locale('ru'),
+      'Изменение этого тега уже выполняется. Дождитесь результата.',
+      'Тег удалён вместе со всеми назначениями.',
+    ),
+    (
+      const Locale('en'),
+      'An operation on this tag is already in progress. Wait for its result.',
+      'Tag deleted with all its assignments.',
+    ),
+  ]) {
+    for (final succeeds in [true, false]) {
+      testWidgets(
+        'занятое удаление исчезает после ${succeeds ? 'успеха' : 'отказа'}: ${locale.languageCode}',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final repository = _PendingRepository();
+          final container = ProviderContainer(
+            overrides: [
+              personalGraphRepositoryProvider.overrideWithValue(repository),
+            ],
+          );
+          addTearDown(container.dispose);
+          final completions = <GraphCommandCompletion>[];
+          final subscription = container
+              .read(graphCommandCoordinatorProvider.notifier)
+              .completions
+              .listen(completions.add);
+          addTearDown(subscription.cancel);
+
+          Widget host(Widget child) => UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              locale: locale,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: GraphOperationPresenter(child: child),
+            ),
+          );
+
+          await tester.pumpWidget(host(const TagCatalogPage()));
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
+          await tester.pump();
+          expect(repository.commands, 1);
+
+          await tester.pumpWidget(host(const SizedBox.shrink()));
+          await tester.pumpWidget(host(const TagCatalogPage()));
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
+          await tester.pumpAndSettle();
+
+          final notice = find.byKey(
+            const ValueKey('tag-delete-already-running'),
+          );
+          expect(find.text(busyMessage), findsOneWidget);
+          expect(
+            tester.widget<Semantics>(notice).properties.liveRegion,
+            isTrue,
+          );
+          expect(
+            tester.widget<Semantics>(notice).properties.label,
+            busyMessage,
+          );
+          expect(find.bySemanticsLabel(busyMessage), findsOneWidget);
+          expect(repository.commands, 1);
+
+          repository.finish(succeeds: succeeds);
+          await tester.pumpAndSettle();
+          expect(notice, findsNothing);
+          final result = find.byKey(const ValueKey('graph-operation-message'));
+          expect(result, findsOneWidget);
+          final expectedResult = succeeds
+              ? resultMessage
+              : locale.languageCode == 'ru'
+              ? 'Не удалось выполнить действие с тегом.'
+              : 'Could not complete the tag operation.';
+          expect(find.textContaining(expectedResult), findsOneWidget);
+          expect(
+            tester.widget<Semantics>(result).properties.label,
+            contains(expectedResult),
+          );
+          expect(repository.commands, 1);
+          expect(completions, hasLength(1));
+          expect(completions.single, isA<TagCommandCompletion>());
+          semantics.dispose();
+        },
+      );
+    }
+  }
 }
 
 Future<void> _openRealCatalog(
@@ -335,12 +407,15 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
 final class _PendingRepository extends Fake implements PersonalGraphRepository {
   final _pending = Completer<TagCommandResult>();
   int commands = 0;
+  bool deleted = false;
 
   @override
   Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) async =>
       TagCatalogPageSuccess(
         data.TagCatalogPage(
-          items: [Tag(id: _tagId(301), name: TagName.fromInput('Дом'))],
+          items: deleted
+              ? []
+              : [Tag(id: _tagId(301), name: TagName.fromInput('Дом'))],
           pageSize: TagCatalogQuery.defaultPageSize,
           nextCursor: null,
           revision: const _Revision(),
@@ -356,8 +431,23 @@ final class _PendingRepository extends Fake implements PersonalGraphRepository {
     return await _pending.future as GraphCommandResult<TSuccess, TFailure>;
   }
 
-  void finish() =>
+  void finish({required bool succeeds}) {
+    if (succeeds) {
+      deleted = true;
+      _pending.complete(
+        TagCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: const _Revision(),
+            value: TagDeleted(
+              TagDeletedChange(revision: const _Revision(), tagId: _tagId(301)),
+            ),
+          ),
+        ),
+      );
+    } else {
       _pending.complete(const TagCommandFailed(TagUnavailableFailure()));
+    }
+  }
 }
 
 final class _Revision implements GraphRevision {

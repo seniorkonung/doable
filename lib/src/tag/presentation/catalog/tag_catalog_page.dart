@@ -37,6 +37,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
   TagCommandFailure? _deleteFailure;
   bool _confirmationOpen = false;
   bool _deleteBusy = false;
+  StreamSubscription<GraphCommandCompletion>? _busyDeleteSubscription;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
 
   @override
   void dispose() {
+    unawaited(_busyDeleteSubscription?.cancel());
     _releasePresentation();
     super.dispose();
   }
@@ -76,6 +78,8 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
       return;
     }
     _releasePresentation();
+    unawaited(_busyDeleteSubscription?.cancel());
+    _busyDeleteSubscription = null;
     final start = _coordinator.acceptTagDelete(DeleteTag(tag.id));
     switch (start) {
       case TagCommandAccepted(:final token, :final future):
@@ -89,6 +93,14 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
         setState(() {
           _deleteBusy = true;
           _deleteFailure = null;
+        });
+        _busyDeleteSubscription = _coordinator.completions.listen((_) {
+          if (_coordinator.isTagRunning(tag.id)) return;
+          unawaited(_busyDeleteSubscription?.cancel());
+          _busyDeleteSubscription = null;
+          if (mounted && _deleteBusy) {
+            setState(() => _deleteBusy = false);
+          }
         });
       case GraphCommandCoordinatorDraining():
         setState(() {
@@ -179,8 +191,20 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
               ),
             ),
           if (_deleteBusy)
-            _CatalogInlineStatus(
-              message: localizations.tagDeleteAlreadyRunning,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Semantics(
+                key: const ValueKey('tag-delete-already-running'),
+                container: true,
+                liveRegion: true,
+                label: localizations.tagDeleteAlreadyRunning,
+                child: ExcludeSemantics(
+                  child: Text(
+                    localizations.tagDeleteAlreadyRunning,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
             ),
           if (_deleteFailure case final failure?)
             Padding(
