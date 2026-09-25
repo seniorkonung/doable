@@ -583,8 +583,7 @@ void main() {
       expectedSteps: _pathLength + 19,
     );
 
-    final longPath =
-        (refreshed.items.first as AvailableChoicePathSuggestion).confirmedPath;
+    final longPath = refreshed.items.first.confirmedPath;
     fixture.trace.clear();
     final repeatWatch = Stopwatch()..start();
     expect(

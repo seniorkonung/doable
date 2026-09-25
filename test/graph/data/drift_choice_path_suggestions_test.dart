@@ -307,11 +307,7 @@ void main() {
     );
     expect(replaced.items.last.action.id, _intention(3));
     expect(
-      (replaced.items.last as AvailableChoicePathSuggestion)
-          .confirmedPath
-          .steps
-          .single
-          .relationId
+      replaced.items.last.confirmedPath.steps.single.relationId
           .toCanonicalString(),
       _uuid(102),
     );
