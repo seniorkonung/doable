@@ -1,11 +1,13 @@
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_path_replace_page.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -32,6 +34,7 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
     (4, 'Новое основание', false),
     (5, 'Новое действие', true),
     (6, 'Другое действие', true),
+    (7, 'Другое основание', false),
   ]) {
     await database.customInsert(
       '''INSERT INTO intentions
@@ -52,6 +55,7 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
     (102, 2, 3, 'can', 0),
     (103, 4, 5, 'need', 0),
     (104, 4, 6, 'can', 0),
+    (105, 7, 5, 'can', 0),
   ]) {
     await database.customInsert(
       '''INSERT INTO long_term_relations
@@ -157,6 +161,195 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  for (final bottomUp in [false, true]) {
+    testWidgets(
+      'конфликтная замена ${bottomUp ? 'снизу' : 'сверху'} актуализирует путь и сохраняет новые независимые поля',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 2400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        tester.binding.platformDispatcher.localesTestValue = const [
+          Locale('ru'),
+        ];
+        addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+        final harness = (await tester.runAsync(
+          LocalDatabaseHarness.fileBacked,
+        ))!;
+        await tester.runAsync(() => _seed(harness));
+        final runtime = AppRuntime(
+          connectionFactory: () =>
+              openFileBackedLocalDatabase(harness.databaseFile),
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+        );
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await runtime.shutdown();
+          await harness.dispose();
+        });
+        await tester.pumpWidget(MainApp(runtime: runtime));
+        final ready = await runtime.bootstrap() as AppRuntimeReady;
+        final repository = ready.container.read(
+          personalGraphRepositoryProvider,
+        );
+        final oldPath = (await _read(repository)).path
+            .map((step) => step.relation.id)
+            .toList();
+
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('catalog-open-daily-choices')),
+        );
+        await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
+        await tester.pumpAndSettle();
+        await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-open')),
+        );
+        await _tap(
+          tester,
+          find.byKey(
+            ValueKey(
+              bottomUp
+                  ? 'daily-choice-replace-bottom-up'
+                  : 'daily-choice-replace-top-down',
+            ),
+          ),
+        );
+        await _tap(
+          tester,
+          find.text(bottomUp ? 'Новое действие' : 'Новое основание'),
+        );
+        await _tap(
+          tester,
+          find.byKey(ValueKey('choice-path-continue-${_uuid(103)}')),
+        );
+        await _tap(
+          tester,
+          find.byKey(
+            ValueKey(
+              bottomUp
+                  ? 'choice-path-select-source'
+                  : 'choice-path-select-action',
+            ),
+          ),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-open-confirmation')),
+        );
+        await _waitFor(tester, find.byType(DailyChoicePathReplacePage));
+
+        final database = sqlite.sqlite3.open(harness.databaseFile.path);
+        database.execute(
+          'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+          [_uuid(103)],
+        );
+        database.execute(
+          'UPDATE daily_choices SET choice_date = ?, description = ?, is_completed = 0 WHERE id = ?',
+          ['2026-09-25', 'Актуальное описание', _uuid(201)],
+        );
+        database.dispose();
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-confirm')),
+        );
+        await _waitFor(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-refresh-path')),
+        );
+        final afterConflict = await _read(repository);
+        expect(afterConflict.path.map((step) => step.relation.id), oldPath);
+        expect(afterConflict.choice.description?.value, 'Актуальное описание');
+
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-refresh-path')),
+        );
+        await _waitFor(tester, find.byType(ChoicePathPage));
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('daily-choice-replace-refresh-path')),
+          findsOneWidget,
+        );
+        expect(
+          (await _read(repository)).path.map((step) => step.relation.id),
+          oldPath,
+        );
+
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-refresh-path')),
+        );
+        await _tap(
+          tester,
+          find.byKey(
+            ValueKey('choice-path-continue-${_uuid(bottomUp ? 105 : 104)}'),
+          ),
+        );
+        await _tap(
+          tester,
+          find.byKey(
+            ValueKey(
+              bottomUp
+                  ? 'choice-path-select-source'
+                  : 'choice-path-select-action',
+            ),
+          ),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-open-confirmation')),
+        );
+        await tester.pumpAndSettle();
+        await _waitFor(tester, find.text('Актуальное описание'));
+        expect(find.textContaining('2026-09-25'), findsWidgets);
+        expect(
+          find.textContaining(
+            bottomUp ? 'Другое основание' : 'Другое действие',
+          ),
+          findsWidgets,
+        );
+        expect(
+          (await _read(repository)).path.map((step) => step.relation.id),
+          oldPath,
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-confirm')),
+        );
+        await _waitFor(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-open')),
+        );
+        final after = await _read(repository);
+        expect(after.choice.id, _choice(201));
+        expect(after.choice.date, CalendarDate.fromParts(2026, 9, 25));
+        expect(after.choice.description?.value, 'Актуальное описание');
+        expect(after.choice.isCompleted, isFalse);
+        expect(after.path.map((step) => step.relation.id.toCanonicalString()), [
+          _uuid(bottomUp ? 105 : 104),
+        ]);
+        expect(_choiceCount(harness), 2);
+        final suggestions = await repository.getChoicePathSuggestions(
+          ChoicePathSuggestionsForSource(after.choice.sourceIntentionId),
+        );
+        expect(suggestions, isA<ChoicePathSuggestionsSuccess>());
+        final updatedSuggestion = (suggestions as ChoicePathSuggestionsSuccess)
+            .value
+            .items
+            .singleWhere((item) => item.originChoiceId == _choice(201));
+        expect(
+          updatedSuggestion.path.map(
+            (step) => step.relation.id.toCanonicalString(),
+          ),
+          [_uuid(bottomUp ? 105 : 104)],
+        );
+      },
+    );
+  }
 
   for (final bottomUp in [false, true]) {
     for (final suggestion in [false, true]) {

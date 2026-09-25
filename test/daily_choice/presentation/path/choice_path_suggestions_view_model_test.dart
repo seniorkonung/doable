@@ -162,6 +162,26 @@ void main() {
     expect(fixture.model.state, isA<ChoicePathSuggestionsEmpty>());
   });
 
+  test('замена пути источника показывает текущую цепочку подсказки', () async {
+    final fixture = _Fixture();
+    addTearDown(fixture.dispose);
+    fixture.complete(0, [_suggestion(1)]);
+    await pumpEventQueue();
+    expect(
+      fixture.model.confirmable(_choiceId(1))!.path.single.relation.id,
+      _relationId(1),
+    );
+
+    fixture.change(2, before: _choice(1), after: _choice(1));
+    expect(fixture.model.confirmable(_choiceId(1)), isNull);
+    fixture.complete(1, [_suggestion(1, relationNumber: 2)], revision: 2);
+    await pumpEventQueue();
+    expect(
+      fixture.model.confirmable(_choiceId(1))!.path.single.relation.id,
+      _relationId(2),
+    );
+  });
+
   test('связь маршрута и готовность действия меняют доступность', () async {
     final fixture = _Fixture();
     addTearDown(fixture.dispose);
@@ -466,19 +486,26 @@ ChoicePathSuggestion _suggestion(
   int value, {
   bool archived = false,
   bool ready = true,
+  int? relationNumber,
 }) => ChoicePathSuggestion.fromDetails(
-  _details(value, archived: archived, ready: ready),
+  _details(
+    value,
+    archived: archived,
+    ready: ready,
+    relationNumber: relationNumber,
+  ),
 );
 
 DailyChoiceDetails _details(
   int value, {
   bool archived = false,
   bool ready = true,
+  int? relationNumber,
 }) {
   final source = _intention(1);
   final selected = _intention(2, ready: ready);
   final relation = LongTermRelation(
-    id: _relationId(value),
+    id: _relationId(relationNumber ?? value),
     sourceIntentionId: source.id,
     relatedIntentionId: selected.id,
     type: LongTermRelationType.need,

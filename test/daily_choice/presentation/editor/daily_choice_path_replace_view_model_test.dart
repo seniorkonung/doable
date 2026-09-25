@@ -191,6 +191,10 @@ void main() {
     conflict.model.confirm();
     expect(conflict.repository.commands, hasLength(1));
     conflict.model.selectPath(_anotherPath());
+    expect(conflict.model.state, isA<DailyChoicePathReplaceLoading>());
+    expect(conflict.repository.reads, hasLength(2));
+    conflict.repository.completeRead(conflict.repository.details);
+    await pumpEventQueue();
     expect(conflict.model.state, isA<DailyChoicePathReplaceReady>());
     conflict.model.confirm();
     expect(
@@ -216,6 +220,144 @@ void main() {
     unknown.model.confirm();
     expect(unknown.repository.commands, hasLength(1));
   });
+
+  test('актуализация конфликта не возвращает старые поля и игнорирует два поздних чтения', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.repository.completeRead(harness.repository.details);
+    await pumpEventQueue();
+    harness.model
+      ..selectPath(_newPath())
+      ..confirm();
+    harness.repository.fail(
+      const DailyChoiceConflictFailure(
+        DailyChoiceConflictReason.confirmedPathChanged,
+      ),
+    );
+    await pumpEventQueue();
+
+    harness.model.selectPath(_anotherPath());
+    harness.model.selectPath(_newPath());
+    expect(harness.repository.reads, hasLength(3));
+    expect(harness.model.state, isA<DailyChoicePathReplaceLoading>());
+    final changedChoice = DailyChoice(
+      id: harness.repository.choice.id,
+      sourceIntentionId: harness.repository.choice.sourceIntentionId,
+      selectedIntentionId: harness.repository.choice.selectedIntentionId,
+      date: CalendarDate.fromParts(2026, 9, 25),
+      description: DailyChoiceDescription.fromInput('Актуальное описание'),
+      isCompleted: false,
+    );
+    final details = harness.repository.details;
+    harness.repository.completeReadAt(
+      2,
+      DailyChoiceDetails(
+        choice: changedChoice,
+        source: details.source,
+        selected: details.selected,
+        path: details.path,
+      ),
+    );
+    await pumpEventQueue();
+    final ready = harness.model.state as DailyChoicePathReplaceReady;
+    expect(ready.details.choice.date, CalendarDate.fromParts(2026, 9, 25));
+    expect(ready.details.choice.description?.value, 'Актуальное описание');
+    expect(ready.details.choice.isCompleted, isFalse);
+    expect(ready.path.steps.single.relationId, _relationId(2));
+    harness.repository.completeReadAt(1, details);
+    await pumpEventQueue();
+    expect(identical(harness.model.state, ready), isTrue);
+    harness.model.confirm();
+    expect(harness.repository.commands, hasLength(2));
+    expect(
+      harness.repository.commands.last.path.steps.single.relationId,
+      _relationId(2),
+    );
+    harness.repository.fail(const DailyChoiceUnavailableFailure());
+    await pumpEventQueue();
+  });
+
+  test(
+    'исчезновение записи и повреждение при актуализации не допускают замены',
+    () async {
+      final missing = _Harness();
+      addTearDown(missing.dispose);
+      missing.repository.completeRead(missing.repository.details);
+      await pumpEventQueue();
+      missing.model
+        ..selectPath(_newPath())
+        ..confirm();
+      missing.repository.fail(
+        const DailyChoiceConflictFailure(
+          DailyChoiceConflictReason.relationArchived,
+        ),
+      );
+      await pumpEventQueue();
+      missing.model.selectPath(_anotherPath());
+      missing.repository.completeRead(null);
+      await pumpEventQueue();
+      expect(missing.model.state, isA<DailyChoicePathReplaceNotFound>());
+      missing.model.confirm();
+      expect(missing.repository.commands, hasLength(1));
+
+      final corrupted = _Harness();
+      addTearDown(corrupted.dispose);
+      corrupted.repository.completeRead(corrupted.repository.details);
+      await pumpEventQueue();
+      corrupted.model
+        ..selectPath(_newPath())
+        ..confirm();
+      corrupted.repository.fail(
+        const DailyChoiceConflictFailure(
+          DailyChoiceConflictReason.relationArchived,
+        ),
+      );
+      await pumpEventQueue();
+      corrupted.model.selectPath(_anotherPath());
+      corrupted.repository.failRead(const DailyChoiceReadCorruptionFailure());
+      await pumpEventQueue();
+      expect(
+        (corrupted.model.state as DailyChoicePathReplaceReadFailed).canRetry,
+        isFalse,
+      );
+      corrupted.model.confirm();
+      expect(corrupted.repository.commands, hasLength(1));
+    },
+  );
+
+  test(
+    'временная ошибка чтения при актуализации допускает только явный повтор',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      harness.repository.completeRead(harness.repository.details);
+      await pumpEventQueue();
+      harness.model
+        ..selectPath(_newPath())
+        ..confirm();
+      harness.repository.fail(
+        const DailyChoiceConflictFailure(
+          DailyChoiceConflictReason.relationArchived,
+        ),
+      );
+      await pumpEventQueue();
+      harness.model.selectPath(_anotherPath());
+      harness.repository.failRead(const DailyChoiceReadUnavailableFailure());
+      await pumpEventQueue();
+      expect(
+        (harness.model.state as DailyChoicePathReplaceReadFailed).canRetry,
+        isTrue,
+      );
+      expect(harness.repository.reads, hasLength(2));
+      harness.model.retryRead();
+      expect(harness.repository.reads, hasLength(3));
+      harness.repository.completeRead(harness.repository.details);
+      await pumpEventQueue();
+      final ready = harness.model.state as DailyChoicePathReplaceReady;
+      expect(ready.path.steps.single.relationId, _relationId(3));
+      expect(harness.repository.commands, hasLength(1));
+    },
+  );
 
   test('новое предложение обязано быть непрерывным и простым', () async {
     final harness = _Harness();
@@ -341,6 +483,13 @@ final class _Repository implements PersonalGraphRepository {
       GraphSnapshot(value: value, revision: const _Revision()),
     ),
   );
+
+  void completeReadAt(int index, DailyChoiceDetails? value) =>
+      reads[index].complete(
+        DailyChoiceReadSuccess(
+          GraphSnapshot(value: value, revision: const _Revision()),
+        ),
+      );
 
   void failRead(DailyChoiceReadFailure failure) =>
       reads.last.complete(DailyChoiceReadError(failure));

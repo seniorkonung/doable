@@ -29,6 +29,7 @@ final class DailyChoicePathReplaceViewModel extends ChangeNotifier {
   DailyChoicePathReplaceState _state = const DailyChoicePathReplaceLoading();
   DailyChoiceOperationToken? _activeToken;
   DailyChoiceOperationToken? _failureToken;
+  DailyChoicePathReplaceProposal? _pendingProposal;
   int _readGeneration = 0;
   bool _disposed = false;
 
@@ -46,6 +47,19 @@ final class DailyChoicePathReplaceViewModel extends ChangeNotifier {
 
   void selectPath(ConfirmedChoicePath path) {
     final current = _state;
+    final refreshRequired = switch (current) {
+      DailyChoicePathReplaceRejected(failure: DailyChoiceConflictFailure()) =>
+        true,
+      DailyChoicePathReplaceLoading() when _pendingProposal != null => true,
+      _ => false,
+    };
+    if (refreshRequired) {
+      _pendingProposal = DailyChoicePathReplaceProposal(path);
+      _releaseFailure();
+      _setState(const DailyChoicePathReplaceLoading());
+      _load();
+      return;
+    }
     final details = switch (current) {
       DailyChoicePathReplaceChoosing(:final details) ||
       DailyChoicePathReplaceReady(:final details) ||
@@ -122,10 +136,13 @@ final class DailyChoicePathReplaceViewModel extends ChangeNotifier {
 
   void _load() {
     final generation = ++_readGeneration;
-    unawaited(_read(generation));
+    unawaited(_read(generation, _pendingProposal));
   }
 
-  Future<void> _read(int generation) async {
+  Future<void> _read(
+    int generation,
+    DailyChoicePathReplaceProposal? proposal,
+  ) async {
     try {
       final result = await _repository.getDailyChoice(choiceId);
       if (_disposed || generation != _readGeneration) return;
@@ -133,7 +150,7 @@ final class DailyChoicePathReplaceViewModel extends ChangeNotifier {
         GraphResultSuccess(:final value) =>
           value.value == null
               ? const DailyChoicePathReplaceNotFound()
-              : DailyChoicePathReplaceChoosing(value.value!),
+              : _readChoice(value.value!, proposal),
         GraphResultFailure(:final failure) => DailyChoicePathReplaceReadFailed(
           failure,
         ),
@@ -147,6 +164,16 @@ final class DailyChoicePathReplaceViewModel extends ChangeNotifier {
         );
       }
     }
+  }
+
+  DailyChoicePathReplaceState _readChoice(
+    DailyChoiceDetails details,
+    DailyChoicePathReplaceProposal? proposal,
+  ) {
+    _pendingProposal = null;
+    return proposal == null
+        ? DailyChoicePathReplaceChoosing(details)
+        : DailyChoicePathReplaceReady(details, proposal);
   }
 
   Future<void> _finish(Future<DailyChoiceCommandCompletion> future) async {

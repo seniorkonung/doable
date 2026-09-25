@@ -11,8 +11,11 @@ import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../application/choice_path_draft.dart';
 import '../../application/confirmed_choice_path.dart';
 import '../../application/daily_choice_details.dart';
+import '../../application/daily_choice_result.dart';
 import '../../domain/daily_choice_id.dart';
 import '../daily_choice_command_failure_message.dart';
+import '../path/choice_path_page.dart';
+import '../path/choice_path_view_model.dart';
 import 'daily_choice_creation_page.dart';
 import 'daily_choice_path_replace_state.dart';
 import 'daily_choice_path_replace_view_model.dart';
@@ -28,18 +31,8 @@ final class DailyChoicePathReplacePage extends ConsumerStatefulWidget {
   }) {
     final visibleSteps = List<DailyChoiceCreationStep>.unmodifiable(steps);
     DailyChoicePathReplaceProposal(path);
-    if (visibleSteps.length != path.steps.length) {
+    if (!_stepsMatchPath(path, visibleSteps)) {
       throw ArgumentError.value(steps, 'steps');
-    }
-    for (var index = 0; index < visibleSteps.length; index++) {
-      final shown = visibleSteps[index].relation;
-      final confirmed = path.steps[index];
-      if (shown.id != confirmed.relationId ||
-          shown.sourceIntentionId != confirmed.sourceIntentionId ||
-          shown.relatedIntentionId != confirmed.relatedIntentionId ||
-          shown.type != confirmed.type) {
-        throw ArgumentError.value(steps, 'steps');
-      }
     }
     return DailyChoicePathReplacePage._(
       choiceId: choiceId,
@@ -72,6 +65,10 @@ final class _DailyChoicePathReplacePageState
     extends ConsumerState<DailyChoicePathReplacePage> {
   late DailyChoicePathReplaceViewModel _model;
   final _scrollController = ScrollController();
+  late List<DailyChoiceCreationStep> _visibleSteps;
+  late ChoicePathDraftDirection _direction;
+  bool _initialSelectionPending = true;
+  int _pathRefreshGeneration = 0;
 
   @override
   void initState() {
@@ -90,6 +87,10 @@ final class _DailyChoicePathReplacePageState
   }
 
   void _createModel() {
+    _visibleSteps = widget.steps;
+    _direction = widget.direction;
+    _initialSelectionPending = true;
+    ++_pathRefreshGeneration;
     _model = DailyChoicePathReplaceViewModel(
       ref.read(personalGraphRepositoryProvider),
       ref.read(graphCommandCoordinatorProvider.notifier),
@@ -100,11 +101,15 @@ final class _DailyChoicePathReplacePageState
   void _onModelChanged() {
     switch (_model.state) {
       case DailyChoicePathReplaceChoosing():
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _model.state is DailyChoicePathReplaceChoosing) {
-            _model.selectPath(widget.path);
-          }
-        });
+        if (_initialSelectionPending)
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                _initialSelectionPending &&
+                _model.state is DailyChoicePathReplaceChoosing) {
+              _initialSelectionPending = false;
+              _model.selectPath(widget.path);
+            }
+          });
       case DailyChoicePathReplaceSucceeded():
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted &&
@@ -129,8 +134,40 @@ final class _DailyChoicePathReplacePageState
     }
   }
 
+  Future<void> _refreshPath() async {
+    final current = _model.state;
+    if (current is! DailyChoicePathReplaceRejected ||
+        current.failure is! DailyChoiceConflictFailure) {
+      return;
+    }
+    final generation = ++_pathRefreshGeneration;
+    final direction = _direction;
+    final startingId = switch (direction) {
+      ChoicePathDraftDirection.topDown => current.proposal.sourceIntentionId,
+      ChoicePathDraftDirection.bottomUp => current.proposal.selectedIntentionId,
+    };
+    ref.invalidate(
+      choicePathViewModelProvider(startingId, direction: direction),
+    );
+    final selection = await Navigator.of(context).push<ChoicePathSelection>(
+      MaterialPageRoute(
+        builder: (_) => ChoicePathPage.forReplacement(
+          startingIntentionId: startingId,
+          direction: direction,
+        ),
+      ),
+    );
+    if (!mounted || generation != _pathRefreshGeneration || selection == null) {
+      return;
+    }
+    if (!_stepsMatchPath(selection.path, selection.steps)) return;
+    setState(() => _visibleSteps = selection.steps);
+    _model.selectPath(selection.path);
+  }
+
   @override
   void dispose() {
+    ++_pathRefreshGeneration;
     _model.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -156,15 +193,15 @@ final class _DailyChoicePathReplacePageState
             ),
             DailyChoicePathReplaceReady(:final details) => _Confirmation(
               details: details,
-              steps: widget.steps,
-              direction: widget.direction,
+              steps: _visibleSteps,
+              direction: _direction,
               scrollController: _scrollController,
               onConfirm: _model.confirm,
             ),
             DailyChoicePathReplaceSubmitting(:final details) => _Confirmation(
               details: details,
-              steps: widget.steps,
-              direction: widget.direction,
+              steps: _visibleSteps,
+              direction: _direction,
               scrollController: _scrollController,
               isSubmitting: true,
             ),
@@ -176,13 +213,19 @@ final class _DailyChoicePathReplacePageState
             ) =>
               _Confirmation(
                 details: details,
-                steps: widget.steps,
-                direction: widget.direction,
+                steps: _visibleSteps,
+                direction: _direction,
                 scrollController: _scrollController,
                 failure: dailyChoiceCommandFailureMessage(l10n, failure),
                 failurePresentation: failurePresentation,
                 onConfirm: canRetry ? _model.confirm : null,
                 retry: canRetry,
+                onRefresh: failure is DailyChoiceConflictFailure
+                    ? () => unawaited(_refreshPath())
+                    : null,
+                onChooseAgain: failure is DailyChoiceConflictFailure
+                    ? () => unawaited(Navigator.of(context).maybePop())
+                    : null,
               ),
             DailyChoicePathReplaceSucceeded() => _Status(
               l10n.dailyChoicePathReplaced,
@@ -275,6 +318,8 @@ final class _Confirmation extends StatelessWidget {
     this.failurePresentation,
     this.onConfirm,
     this.retry = false,
+    this.onRefresh,
+    this.onChooseAgain,
   });
 
   final DailyChoiceDetails details;
@@ -286,6 +331,8 @@ final class _Confirmation extends StatelessWidget {
   final GraphInitiatorPresentationClaim? failurePresentation;
   final VoidCallback? onConfirm;
   final bool retry;
+  final VoidCallback? onRefresh;
+  final VoidCallback? onChooseAgain;
 
   @override
   Widget build(BuildContext context) {
@@ -363,9 +410,15 @@ final class _Confirmation extends StatelessWidget {
             message: failure!,
             messageKey: const ValueKey('daily-choice-replace-failure'),
           ),
-          if (!retry)
+          if (onRefresh != null)
             TextButton(
-              onPressed: () => unawaited(Navigator.of(context).maybePop()),
+              key: const ValueKey('daily-choice-replace-refresh-path'),
+              onPressed: onRefresh,
+              child: Text(l10n.dailyChoiceCreationRefreshPath),
+            ),
+          if (onChooseAgain != null)
+            TextButton(
+              onPressed: onChooseAgain,
               child: Text(l10n.dailyChoiceReplaceChooseAgain),
             ),
         ],
@@ -398,3 +451,21 @@ String _phrase(AppLocalizations l10n, DailyChoiceCreationStep step) =>
     step.relation.type == LongTermRelationType.need
     ? l10n.relationNeighborhoodNeedPhrase(step.sourceTitle, step.relatedTitle)
     : l10n.relationNeighborhoodCanPhrase(step.sourceTitle, step.relatedTitle);
+
+bool _stepsMatchPath(
+  ConfirmedChoicePath path,
+  List<DailyChoiceCreationStep> steps,
+) {
+  if (steps.length != path.steps.length) return false;
+  for (var index = 0; index < steps.length; index++) {
+    final shown = steps[index].relation;
+    final confirmed = path.steps[index];
+    if (shown.id != confirmed.relationId ||
+        shown.sourceIntentionId != confirmed.sourceIntentionId ||
+        shown.relatedIntentionId != confirmed.relatedIntentionId ||
+        shown.type != confirmed.type) {
+      return false;
+    }
+  }
+  return true;
+}

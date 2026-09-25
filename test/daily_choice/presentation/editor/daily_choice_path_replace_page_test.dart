@@ -222,9 +222,36 @@ void main() {
       isNull,
     );
     expect(repository.commands, hasLength(1));
+    expect(
+      find.byKey(const ValueKey('daily-choice-replace-refresh-path')),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Вернуться к выбору пути'));
     await tester.pumpAndSettle();
     expect(find.text('Домашний экран'), findsOneWidget);
+    expect(repository.commands, hasLength(1));
+  });
+
+  testWidgets('неизвестный отказ не предлагает повтор или актуализацию пути', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    await _pump(tester, repository);
+    repository.completeRead(repository.details);
+    await tester.pumpAndSettle();
+    await _tapVisible(tester, const ValueKey('daily-choice-replace-confirm'));
+    await tester.pump();
+    repository.fail(const DailyChoiceUnexpectedFailure());
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('daily-choice-replace-failure')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('daily-choice-replace-refresh-path')),
+      findsNothing,
+    );
+    expect(find.text('Повторить'), findsNothing);
     expect(repository.commands, hasLength(1));
   });
 
