@@ -9,7 +9,9 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +24,106 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  for (final (locale, context, message) in [
+    (
+      const Locale('ru'),
+      TagEditorCreating(TagCreationFormKey()),
+      'Сохранение этого тега уже выполняется. Дождитесь результата.',
+    ),
+    (
+      const Locale('en'),
+      TagEditorRenaming(Tag(id: _id(1), name: TagName.fromInput('Home'))),
+      'Saving this tag is already in progress. Wait for its result.',
+    ),
+  ]) {
+    testWidgets(
+      'повторное сохранение сообщает о занятости: ${locale.languageCode}',
+      (tester) async {
+        final repository = _Repository();
+        final container = ProviderContainer(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+        final coordinator = container.read(
+          graphCommandCoordinatorProvider.notifier,
+        );
+        final registration = coordinator.registerAppPresentation();
+        addTearDown(registration.release);
+        final firstClaim = registration.nextClaim();
+
+        Widget host(Widget home) => UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: home,
+          ),
+        );
+
+        await tester.pumpWidget(host(TagEditorPage(editorContext: context)));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('tag-editor-name')),
+          'Первое имя',
+        );
+        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+        await tester.pump();
+        expect(repository.commands, hasLength(1));
+
+        await tester.pumpWidget(host(const SizedBox.shrink()));
+        await tester.pumpWidget(host(TagEditorPage(editorContext: context)));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('tag-editor-name')),
+          'Второе имя',
+        );
+        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+        await tester.pump();
+
+        final notice = find.byKey(const ValueKey('tag-editor-already-running'));
+        expect(find.text(message), findsOneWidget);
+        expect(tester.widget<Semantics>(notice).properties.liveRegion, isTrue);
+        expect(tester.getSemantics(notice).label, message);
+        expect(repository.commands, hasLength(1));
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
+              .controller!
+              .text,
+          'Второе имя',
+        );
+
+        repository.fail(const TagUnavailableFailure());
+        await tester.pumpAndSettle();
+        final claim = await firstClaim;
+        expect(claim?.completion, isA<TagCommandCompletion>());
+        expect(claim!.completion.isFailure, isTrue);
+        coordinator.confirmPresentation(claim);
+        var duplicateClaim = false;
+        unawaited(
+          registration.nextClaim().then((claim) {
+            if (claim != null) duplicateClaim = true;
+          }),
+        );
+        await tester.pump();
+        expect(duplicateClaim, isFalse);
+        expect(notice, findsNothing);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('tag-editor-submit')),
+              )
+              .onPressed,
+          isNotNull,
+        );
+        expect(repository.commands, hasLength(1));
+      },
+    );
+  }
 
   testWidgets('ошибка длины читаема и сохраняет ввод при увеличенном тексте', (
     tester,

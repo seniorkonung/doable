@@ -255,6 +255,7 @@
   "tagEditorCreateAction": "Создать тег",
   "tagEditorRenameAction": "Сохранить название",
   "tagEditorSaving": "Сохраняем тег…",
+  "tagEditorAlreadyRunning": "Сохранение этого тега уже выполняется. Дождитесь результата.",
   "tagEditorCancel": "Отмена",
   "tagEditorUseExisting": "Использовать существующий тег",
   "tagEditorReadingCommitted": "Тег сохранён. Обновляем его данные…",

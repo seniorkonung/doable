@@ -117,6 +117,9 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
             if (readStatus != null) ...[
               const SizedBox(height: 16),
               Semantics(
+                key: state.status is TagEditorAlreadyRunning
+                    ? const ValueKey('tag-editor-already-running')
+                    : null,
                 container: true,
                 liveRegion: true,
                 child: Text(readStatus),
@@ -171,6 +174,7 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
 
 String? _readStatus(AppLocalizations l10n, TagEditorStatus status) =>
     switch (status) {
+      TagEditorAlreadyRunning() => l10n.tagEditorAlreadyRunning,
       TagEditorReadingCommitted() => l10n.tagEditorReadingCommitted,
       TagEditorCommittedReadFailed(:final failure) =>
         '${l10n.tagEditorCommittedReadFailed} ${_readFailure(l10n, failure)}',

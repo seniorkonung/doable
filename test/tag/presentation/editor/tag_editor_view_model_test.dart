@@ -127,6 +127,9 @@ void main() {
       final returned = h.reopen(TagEditorRenaming(_tag(1, 'Дом')));
       returned.changeName('Семья');
       await returned.submit();
+      expect(h.state.status, isA<TagEditorAlreadyRunning>());
+      expect(h.state.input, 'Семья');
+      expect(h.state.canSubmit, isFalse);
       expect(h.repository.commands, hasLength(1));
       h.repository.succeedCommand(
         0,
@@ -139,6 +142,9 @@ void main() {
         ),
       );
       await first;
+      expect(h.state.status, isA<TagEditorIdle>());
+      expect(h.state.input, 'Семья');
+      expect(h.state.canSubmit, isTrue);
       expect(h.repository.commands, hasLength(1));
     },
   );
@@ -155,10 +161,15 @@ void main() {
       final returned = h.reopen(TagEditorCreating(formKey));
       returned.changeName('Работа');
       await returned.submit();
+      expect(h.state.status, isA<TagEditorAlreadyRunning>());
+      expect(h.state.input, 'Работа');
+      expect(h.state.canSubmit, isFalse);
       expect(h.repository.commands, hasLength(1));
       h.repository.failCommand(0, const TagUnavailableFailure());
       await first;
+      expect(h.state.status, isA<TagEditorIdle>());
       expect(h.state.input, 'Работа');
+      expect(h.state.canSubmit, isTrue);
     },
   );
 

@@ -871,6 +871,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagEditorSaving => 'Сохраняем тег…';
 
   @override
+  String get tagEditorAlreadyRunning =>
+      'Сохранение этого тега уже выполняется. Дождитесь результата.';
+
+  @override
   String get tagEditorCancel => 'Отмена';
 
   @override

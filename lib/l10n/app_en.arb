@@ -887,6 +887,8 @@
   "@tagEditorRenameAction": { "description": "Подтвердить переименование тега" },
   "tagEditorSaving": "Saving tag…",
   "@tagEditorSaving": { "description": "Выполняется запись тега" },
+  "tagEditorAlreadyRunning": "Saving this tag is already in progress. Wait for its result.",
+  "@tagEditorAlreadyRunning": { "description": "Повторное сохранение при занятом ключе формы тега" },
   "tagEditorCancel": "Cancel",
   "@tagEditorCancel": { "description": "Уйти с формы без новой команды" },
   "tagEditorUseExisting": "Use existing tag",

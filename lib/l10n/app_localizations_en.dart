@@ -868,6 +868,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagEditorSaving => 'Saving tag…';
 
   @override
+  String get tagEditorAlreadyRunning =>
+      'Saving this tag is already in progress. Wait for its result.';
+
+  @override
   String get tagEditorCancel => 'Cancel';
 
   @override

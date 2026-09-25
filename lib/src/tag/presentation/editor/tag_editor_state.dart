@@ -34,6 +34,10 @@ final class TagEditorSubmitting extends TagEditorStatus {
   const TagEditorSubmitting();
 }
 
+final class TagEditorAlreadyRunning extends TagEditorStatus {
+  const TagEditorAlreadyRunning();
+}
+
 final class TagEditorSubmissionFailed extends TagEditorStatus {
   const TagEditorSubmissionFailed(this.failure);
 

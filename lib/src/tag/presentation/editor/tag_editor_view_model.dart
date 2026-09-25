@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_command_coordinator.dart';
@@ -20,6 +22,7 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
   late PersonalGraphRepository _repository;
   late GraphCommandCoordinator _coordinator;
   TagOperationToken? _token;
+  StreamSubscription<GraphCommandCompletion>? _busySubscription;
   bool _closed = false;
 
   @override
@@ -67,7 +70,21 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
         state = state.withStatus(const TagEditorSubmitting());
         await _finish(future);
       case TagCommandAlreadyRunning():
-        return;
+        final key = switch (state.context) {
+          TagEditorCreating(:final formKey) => formKey,
+          TagEditorRenaming(:final tag) => ExistingTagKey(tag.id),
+        };
+        state = state.withStatus(const TagEditorAlreadyRunning());
+        _busySubscription = _coordinator.completions.listen((_) {
+          if (_coordinator.isKeyRunning(key)) return;
+          unawaited(_busySubscription?.cancel());
+          _busySubscription = null;
+          if (!_closed &&
+              ref.mounted &&
+              state.status is TagEditorAlreadyRunning) {
+            state = state.withStatus(const TagEditorIdle());
+          }
+        });
       case GraphCommandCoordinatorDraining():
         state = state.withStatus(
           const TagEditorSubmissionFailed(TagUnexpectedFailure()),
@@ -201,6 +218,8 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
   void closeSession() {
     if (_closed) return;
     _closed = true;
+    unawaited(_busySubscription?.cancel());
+    _busySubscription = null;
     final token = _token;
     if (token != null) _coordinator.releaseInitiatorPresentation(token);
   }

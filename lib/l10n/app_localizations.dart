@@ -1556,6 +1556,12 @@ abstract class AppLocalizations {
   /// **'Saving tag…'**
   String get tagEditorSaving;
 
+  /// Повторное сохранение при занятом ключе формы тега
+  ///
+  /// In en, this message translates to:
+  /// **'Saving this tag is already in progress. Wait for its result.'**
+  String get tagEditorAlreadyRunning;
+
   /// Уйти с формы без новой команды
   ///
   /// In en, this message translates to:

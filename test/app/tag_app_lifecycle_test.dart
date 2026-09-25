@@ -188,11 +188,37 @@ void main() {
           .evaluate()
           .isNotEmpty,
     );
+    await _tap(tester, 'tag-catalog-create');
+    await _until(
+      tester,
+      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isNotEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-editor-name')),
+      'Работа',
+    );
+    await _tap(tester, 'tag-editor-submit');
+    expect(
+      find.text('Сохранение этого тега уже выполняется. Дождитесь результата.'),
+      findsOneWidget,
+    );
+    expect(repository.createAttempts, 1);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     repository.releaseCreate();
     await _until(tester, () => raw.select('SELECT id FROM tags').length == 1);
     await tester.pumpAndSettle();
+    expect(
+      find.text('Сохранение этого тега уже выполняется. Дождитесь результата.'),
+      findsNothing,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
+          .controller!
+          .text,
+      'Работа',
+    );
     expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -209,6 +235,7 @@ void main() {
           .label,
       contains('Тег создан.'),
     );
+    await _tap(tester, 'tag-editor-cancel');
     if (find.byKey(const ValueKey('catalog-open-tags')).evaluate().isNotEmpty) {
       await _tap(tester, 'catalog-open-tags');
     }
