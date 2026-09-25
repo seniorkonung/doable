@@ -936,3 +936,12 @@
   - **Зависимости:** 4.1–4.7 — существующие контракт, чтение и пользовательский повтор; правило отбора из раздела 7 дизайна.
   - **Вероятные файлы:** `lib/src/daily_choice/application/choice_path_suggestions.dart`, `lib/src/graph/data/drift_personal_graph_repository_choice_path_suggestions.dart`, `lib/src/daily_choice/presentation/path/choice_path_suggestions_view.dart`, соответствующие тесты контракта, репозитория, экрана и стоимости; `evidence/4.18.md` для нового измерения.
   - **Размер:** M.
+
+- [ ] 4.21 Восстановить прохождение статического анализа тестов подсказок
+  - **Критерии приёмки:**
+    - В тестах чтения подсказок и стоимости чтения удалены два лишних приведения к `AvailableChoicePathSuggestion`: элементы `ChoicePathSuggestionsSnapshot.items` уже имеют этот тип. Существующие проверки подтверждённого пути и поведения подсказок сохраняются.
+    - Стандартный `flutter analyze` завершается с кодом 0; предметные тесты подсказок и стоимости чтения проходят без изменения поведения приложения.
+  - **Проверка:** `mise exec --no-deps -- flutter analyze`; `mise exec --no-deps -- flutter test test/graph/data/drift_choice_path_suggestions_test.dart test/graph/data/drift_daily_choice_read_cost_test.dart`.
+  - **Зависимости:** 4.20 — уточнённый тип выдачи подсказок.
+  - **Вероятные файлы:** `test/graph/data/drift_choice_path_suggestions_test.dart`, `test/graph/data/drift_daily_choice_read_cost_test.dart`.
+  - **Размер:** XS.

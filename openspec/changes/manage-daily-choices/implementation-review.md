@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задача 94 / 4.20 реализует отбор только допустимых прежних маршрутов в обоих направлениях и при замене; предметные тесты и OpenSpec-валидация прошли. F4: после уточнения типа выдачи `flutter analyze` завершается с двумя предупреждениями в тестах. Сохраняются ранее принятые AR1 и AR2; они не относятся к этому коммиту.
+**Summary:** Задача 94 / 4.20 реализует отбор только допустимых прежних маршрутов в обоих направлениях и при замене; предметные тесты и OpenSpec-валидация прошли. Устранение двух предупреждений `flutter analyze` передано в незавершённую задачу 4.21; проверка пока не проходит. Сохраняются ранее принятые AR1 и AR2; они не относятся к целевому коммиту.
 
 ## Review target
 
@@ -36,18 +36,11 @@
 |---|---|---|
 | Independent decision review | Complete | Свежий изолированный рецензент прочитал все десять назначенных путей из 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 и их diff от efc654279e5867897ca49b401919c54a3012e8d3. Он отметил случай 21-го доступного маршрута; пункт не сохранён как дефект: `design.md:170–172,233` и `tasks.md:931–934` ограничивают подсказки последними 20 выборами, спецификация говорит о рассмотренных выборах, а более старый путь остаётся доступен через каталог и пошаговый обход. |
 | OpenSpec conformance | Complete | На чистом checkout с HEAD 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 прошли `mise exec --no-deps -- openspec validate manage-daily-choices --json`, `mise exec --no-deps -- openspec validate manage-daily-choices --strict --no-interactive`, заданный задачей Flutter-набор подсказок и стоимости (69 тестов), а также сквозные тесты создания и замены (14 тестов). Проверены оба направления, пять недоступных перед допустимым, пустая выдача, предел 20, повтор, повреждение и конфликт подтверждения. |
-| Code quality | Complete | Проверены типы снимка, фильтрация и дедупликация после валидации всех кандидатов, наблюдение скрытых путей, состояние экрана, SQL-стоимость, безопасность отказа и тесты. `mise exec --no-deps -- flutter analyze` на 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 завершился с кодом 1: два `unnecessary_cast`; это F4. |
+| Code quality | Complete | Проверены типы снимка, фильтрация и дедупликация после валидации всех кандидатов, наблюдение скрытых путей, состояние экрана, SQL-стоимость, безопасность отказа и тесты. `mise exec --no-deps -- flutter analyze` на 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 завершился с кодом 1 из-за двух `unnecessary_cast`; исправление и повторная проверка закреплены задачей 4.21. |
 
 ## Findings
 
-### F4 · Low — анализатор отклоняет два лишних приведения в тестах
-
-- **Evidence:** На 0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8 `mise exec --no-deps -- flutter analyze` завершился с кодом 1 и предупредил `unnecessary_cast` в `test/graph/data/drift_choice_path_suggestions_test.dart:310` и `test/graph/data/drift_daily_choice_read_cost_test.dart:587`. Коммит сделал `ChoicePathSuggestionsSnapshot.items` списком `AvailableChoicePathSuggestion` (`lib/src/daily_choice/application/choice_path_suggestions.dart:199`), поэтому прежние приведения в обоих тестах больше не нужны. На базовом коммите элементы имели общий тип `ChoicePathSuggestion`.
-- **Evidence revisions:** ["efc654279e5867897ca49b401919c54a3012e8d3", "0baf481a8eea8e1f1d04ac7dea899d82cb74cbe8"]
-- **Impact:** Стандартная проверка `flutter analyze` не проходит; статическая проверка ветки остаётся красной, несмотря на успешные поведенческие тесты.
-- **Required outcome:** Анализатор должен завершаться с кодом 0 после согласования тестов с точным типом выдачи.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/graph/data/drift_choice_path_suggestions_test.dart", "test/graph/data/drift_daily_choice_read_cost_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Accepted risks
 
