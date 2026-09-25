@@ -58,6 +58,7 @@ import '../../intention/presentation/catalog/catalog_test_support.dart'
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
+import '../../support/tag_read_contract_test_fallback.dart';
 
 /// Контрольная точка согласования: каталог, подробные данные и соседство
 /// обслуживаются одним графом, одним coordinator и одним потоком завершений.
@@ -1627,7 +1628,9 @@ final class _CheckpointHarness {
 }
 
 /// Управляемый граф, обслуживающий все чтения и команды контрольной точки.
-final class _CheckpointGraphRepository implements PersonalGraphRepository {
+final class _CheckpointGraphRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,

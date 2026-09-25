@@ -28,6 +28,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   test('фильтр меняет поколение и отклоняет позднюю первую порцию', () async {
     final harness = _Harness();
@@ -375,7 +377,9 @@ final class _Harness {
   }
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <DailyChoiceCatalogQuery>[];
   final _pages = <Completer<DailyChoiceCatalogPageResult>>[];
   final _commands = <Completer<DailyChoiceCommandResult>>[];

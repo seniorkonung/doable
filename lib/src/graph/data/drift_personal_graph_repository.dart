@@ -38,6 +38,11 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../tag/application/tag_catalog.dart';
+import '../../tag/application/tag_read_result.dart';
+import '../../tag/domain/tag.dart' as tag_domain;
+import '../../tag/domain/tag_id.dart';
+import '../../tag/domain/tag_name.dart';
 import '../application/blocking_relation_reference.dart';
 import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
@@ -61,6 +66,7 @@ part 'drift_personal_graph_repository_relation_groups.dart';
 part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_choice_path_suggestions.dart';
+part 'drift_personal_graph_repository_tag_reads.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -98,6 +104,13 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
+
+  @override
+  Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) =>
+      _readTagCatalogPage(query);
+
+  @override
+  Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);
 
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

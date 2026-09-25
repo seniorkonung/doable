@@ -26,6 +26,8 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   group('поисковый ключ названия намерения', () {
     test('использует полный Unicode Default Case Folding 17.0.0', () {
@@ -840,7 +842,9 @@ IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
   InvalidIntentionIdDecoding() => throw StateError('Ожидался корректный UUID.'),
 };
 
-final class _FailingPersonalGraphRepository implements PersonalGraphRepository {
+final class _FailingPersonalGraphRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,

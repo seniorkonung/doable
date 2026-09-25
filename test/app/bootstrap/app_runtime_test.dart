@@ -41,6 +41,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_read_contract_test_fallback.dart';
 
 const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
@@ -438,6 +439,7 @@ void main() {
 }
 
 final class _ControlledPersonalGraphRepository
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

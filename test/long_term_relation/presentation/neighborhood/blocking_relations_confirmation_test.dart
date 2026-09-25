@@ -32,6 +32,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'neighborhood_test_support.dart';
+import '../../../support/tag_read_contract_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -991,7 +992,9 @@ DailyChoiceCatalogItem _dailyItem({
   );
 }
 
-final class _CommandRepository implements PersonalGraphRepository {
+final class _CommandRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,

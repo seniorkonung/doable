@@ -27,6 +27,8 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 final class ControlledDetailRequest {
   ControlledDetailRequest({bool broadcast = false}) {
     controller = broadcast
@@ -73,7 +75,9 @@ final class ControlledDetailRequest {
   Future<void> close() => controller.close();
 }
 
-final class ControlledDetailsRepository implements PersonalGraphRepository {
+final class ControlledDetailsRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,

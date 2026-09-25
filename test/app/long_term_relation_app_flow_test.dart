@@ -38,6 +38,7 @@ import 'package:drift/drift.dart' show Value;
 
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/tag_read_contract_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -1884,7 +1885,9 @@ Future<void> _pumpUntilCommandAttempt(
 String _textByKey(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
-final class _DelayedRelationRepository implements PersonalGraphRepository {
+final class _DelayedRelationRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,

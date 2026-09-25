@@ -19,6 +19,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   test(
     'нижний обход сохраняет действие и направляет видимый путь к нему',
@@ -518,7 +520,9 @@ final class _Harness {
   }
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <ChoicePathContinuationQuery>[];
   final _requests = <Completer<ChoicePathContinuationResult>>[];
   final _observations =

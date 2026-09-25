@@ -19,6 +19,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   test(
     'замена удерживает ключ выбора после ухода формы до конечного отказа',
@@ -284,7 +286,9 @@ final _choiceA =
 final _choiceB =
     (DailyChoiceId.decode(_uuid(5)) as DailyChoiceIdDecodingSuccess).id;
 
-final class _ControlledRepository implements PersonalGraphRepository {
+final class _ControlledRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,

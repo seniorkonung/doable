@@ -26,6 +26,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   group('GraphCommandCoordinator', () {
     test(
@@ -798,7 +800,9 @@ IntentionCommandStart _acceptExisting(
   ExistingIntentionCommand command,
 ) => coordinator.acceptExisting(command, presentationTitle: 'Намерение');
 
-final class _ControlledGraphRepository implements PersonalGraphRepository {
+final class _ControlledGraphRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,
@@ -912,6 +916,7 @@ final class _ControlledGraphRepository implements PersonalGraphRepository {
 }
 
 final class _ControlledPersonalGraphRepository
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
