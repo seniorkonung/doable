@@ -9,7 +9,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_suggestions_state.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_suggestions_view_model.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -125,6 +124,30 @@ void main() {
       expect(fixture.model.confirmable(_choiceId(1)), isNull);
     },
   );
+
+  test('частые актуализации оставляют одно ожидающее чтение и отбрасывают старый ответ', () async {
+    final fixture = _Fixture();
+    addTearDown(fixture.dispose);
+    fixture.complete(0, [_suggestion(1)]);
+    await pumpEventQueue();
+
+    fixture.model.refresh();
+    for (var revision = 2; revision <= 100; revision++) {
+      fixture.revision(revision);
+    }
+    expect(fixture.repository.queries, hasLength(2));
+    expect(fixture.model.confirmable(_choiceId(1)), isNull);
+
+    fixture.complete(1, [_suggestion(1)], revision: 2);
+    await pumpEventQueue();
+    expect(fixture.repository.queries, hasLength(3));
+    expect(fixture.model.confirmable(_choiceId(1)), isNull);
+
+    fixture.complete(2, [], revision: 100);
+    await pumpEventQueue();
+    expect(fixture.model.state, isA<ChoicePathSuggestionsEmpty>());
+    expect(fixture.model.confirmable(_choiceId(1)), isNull);
+  });
 
   test('освобождение модели отменяет наблюдение и игнорирует ответ', () async {
     final fixture = _Fixture();
