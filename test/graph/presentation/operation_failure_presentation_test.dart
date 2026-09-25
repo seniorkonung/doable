@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_command_failure_message.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
@@ -565,6 +567,58 @@ void main() {
       expect(fallback?.completion, isA<DailyChoiceCommandCompletion>());
     },
   );
+
+  testWidgets(
+    'запоздалый кадр ошибки повтора не подтверждает заменившую её ошибку замены',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final repeatClaim = await harness.createDailyPathClaim(replace: false);
+      final replacementClaim = await harness.createDailyPathClaim(
+        replace: true,
+      );
+      final current = ValueNotifier((
+        claim: repeatClaim,
+        message: 'Не удалось повторить маршрут',
+      ));
+      addTearDown(current.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<
+            ({GraphInitiatorPresentationClaim claim, String message})
+          >(
+            valueListenable: current,
+            builder: (context, value, _) => OperationFailurePresentation(
+              claim: value.claim,
+              message: value.message,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(harness.claimAgain(repeatClaim), same(repeatClaim));
+
+      current.value = (
+        claim: replacementClaim,
+        message: 'Не удалось заменить путь',
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(fallback?.token, same(repeatClaim.token));
+      expect(harness.claimAgain(replacementClaim), same(replacementClaim));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(harness.claimAgain(replacementClaim), isNull);
+      expect(fallback?.token, same(repeatClaim.token));
+    },
+  );
 }
 
 final class _FailureHarness {
@@ -683,6 +737,68 @@ final class _FailureHarness {
     );
     await accepted.future;
     return coordinator.claimInitiatorFailure(accepted.token)!;
+  }
+
+  Future<GraphInitiatorPresentationClaim> createDailyPathClaim({
+    required bool replace,
+  }) async {
+    final relationId = switch (LongTermRelationId.decode(
+      '018f47c2-6b7d-7abc-8def-0123456789ab',
+    )) {
+      LongTermRelationIdDecodingSuccess(:final id) => id,
+      InvalidLongTermRelationIdDecoding() => throw StateError(
+        'Некорректный ID связи.',
+      ),
+    };
+    final choiceId = switch (DailyChoiceId.decode(
+      '018f1400-0000-7000-8000-000000000001',
+    )) {
+      DailyChoiceIdDecodingSuccess(:final id) => id,
+      InvalidDailyChoiceIdDecoding() => throw StateError(
+        'Некорректный ID дневного выбора.',
+      ),
+    };
+    final path = ConfirmedChoicePath([
+      ConfirmedChoicePathStep(
+        relationId: relationId,
+        sourceIntentionId: testDetailsIntentionId(1),
+        type: LongTermRelationType.need,
+        relatedIntentionId: testDetailsIntentionId(2),
+      ),
+    ]);
+    final accepted = replace
+        ? coordinator.acceptDailyChoiceReplace(
+            ReplaceDailyChoicePath(
+              choiceId: choiceId,
+              sourceIntentionId: testDetailsIntentionId(1),
+              selectedIntentionId: testDetailsIntentionId(2),
+              path: path,
+            ),
+          )
+        : coordinator.acceptDailyChoiceCreation(
+            DailyChoiceCreationFormKey(),
+            CreateDailyChoice(
+              sourceIntentionId: testDetailsIntentionId(1),
+              selectedIntentionId: testDetailsIntentionId(2),
+              path: path,
+              date: CalendarDate.fromParts(2026, 9, 25),
+              description: null,
+              isCompleted: false,
+            ),
+          );
+    final token = (accepted as DailyChoiceCommandAccepted).token;
+    repository.completeDailyChoiceCommand(
+      repository.dailyChoiceCommands.length - 1,
+      GraphCommandFailed<DailyChoiceCommandSuccess, DailyChoiceCommandFailure>(
+        replace
+            ? const DailyChoiceConflictFailure(
+                DailyChoiceConflictReason.dependencyChanged,
+              )
+            : const DailyChoiceUnavailableFailure(),
+      ),
+    );
+    await accepted.future;
+    return coordinator.claimInitiatorFailure(token)!;
   }
 
   GraphInitiatorPresentationClaim? claimAgain(

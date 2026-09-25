@@ -56,6 +56,25 @@ Set<String> _storedIds(LocalDatabaseHarness harness, String table) {
   }
 }
 
+List<String> _storedPathRelations(
+  LocalDatabaseHarness harness,
+  String choiceId,
+) {
+  final database = sqlite.sqlite3.open(harness.databaseFile.path);
+  try {
+    return [
+      for (final row in database.select(
+        '''SELECT long_term_relation_id FROM daily_choice_path_steps
+           WHERE daily_choice_id = ?''',
+        [choiceId],
+      ))
+        row['long_term_relation_id'] as String,
+    ];
+  } finally {
+    database.close();
+  }
+}
+
 final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
   Completer<void>? _entered;
   Completer<void>? _released;
@@ -105,6 +124,268 @@ final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
 }
 
 void main() {
+  for (final failWriting in [false, true]) {
+    testWidgets(
+      failWriting
+          ? 'отказ замены после ухода сохраняет прежний путь и сообщает один раз'
+          : 'замена после ухода сохраняет новый путь и сообщает один раз',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        tester.binding.platformDispatcher.localesTestValue = const [
+          Locale('ru'),
+        ];
+        addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+        tester.view.physicalSize = const Size(1200, 4000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        final harness = (await tester.runAsync(
+          LocalDatabaseHarness.fileBacked,
+        ))!;
+        final seeded = await harness.openReadyDatabase();
+        await seedDurabilityGraph(seeded);
+        expect(
+          await durabilityRepository(seeded).execute(durabilityCreate()),
+          isA<GraphCommandSucceeded>(),
+        );
+        await harness.closePersistenceObjectGraph();
+        final gate = _ChoiceSqlGate();
+        final runtime = AppRuntime(
+          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+            openFileBackedLocalDatabase(harness.databaseFile),
+            gate,
+          ),
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+        );
+        addTearDown(() async {
+          gate.release();
+          await tester.pumpWidget(const SizedBox.shrink());
+          await runtime.shutdown();
+          await harness.dispose();
+        });
+        await tester.pumpWidget(MainApp(runtime: runtime));
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('catalog-open-daily-choices')),
+        );
+        await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-open')),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('daily-choice-replace-top-down')),
+        );
+        await _tap(tester, find.text('Намерение 1'));
+        await _tap(
+          tester,
+          find.byKey(ValueKey('choice-path-continue-${durabilityUuid(103)}')),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-select-action')),
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-open-confirmation')),
+        );
+        final confirm = find.byKey(
+          const ValueKey('daily-choice-replace-confirm'),
+        );
+        await _until(tester, () => confirm.evaluate().isNotEmpty);
+        gate.arm(
+          fail: failWriting,
+          operation: LocalDatabaseSqlOperation.delete,
+          table: 'daily_choice_path_steps',
+        );
+        await tester.ensureVisible(confirm);
+        await tester.tap(confirm);
+        await tester.tap(confirm);
+        await tester.pump();
+        await _until(tester, () => gate.hasEntered);
+        expect(_storedPathRelations(harness, durabilityUuid(201)), [
+          durabilityUuid(101),
+          durabilityUuid(102),
+        ]);
+
+        await tester.binding.handlePopRoute();
+        await tester.pump(const Duration(milliseconds: 350));
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        gate.release();
+        final ready = await runtime.bootstrap() as AppRuntimeReady;
+        final repository = ready.container.read(
+          personalGraphRepositoryProvider,
+        );
+        final result = await repository.getDailyChoice(durabilityChoice(201));
+        expect(result, isA<DailyChoiceReadSuccess>());
+        expect(
+          (result as DailyChoiceReadSuccess).value.value!.path.map(
+            (step) => step.relation.id,
+          ),
+          failWriting
+              ? [durabilityRelation(101), durabilityRelation(102)]
+              : [durabilityRelation(103)],
+        );
+        expect(_storedIds(harness, 'daily_choices'), {durabilityUuid(201)});
+        expect(
+          find.byKey(const ValueKey('graph-operation-message')),
+          findsNothing,
+        );
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await _until(
+          tester,
+          () => find
+              .byKey(const ValueKey('graph-operation-message'))
+              .evaluate()
+              .isNotEmpty,
+        );
+        expect(
+          find.textContaining(
+            failWriting
+                ? 'Не удалось выполнить действие с дневным выбором'
+                : 'Путь дневного выбора заменён',
+          ),
+          findsWidgets,
+        );
+        await tester.pumpAndSettle();
+        final message = find.byKey(const ValueKey('graph-operation-message'));
+        ScaffoldMessenger.of(tester.element(message.first))
+            .hideCurrentSnackBar();
+        await tester.pumpAndSettle();
+        expect(message, findsNothing);
+        for (var attempt = 0; attempt < 4; attempt++) {
+          if (find
+              .byKey(const ValueKey('daily-choice-row-1'))
+              .evaluate()
+              .isNotEmpty) {
+            break;
+          }
+          await tester.binding.handlePopRoute();
+          await tester.pump(const Duration(milliseconds: 350));
+        }
+        await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+        expect(
+          find.textContaining(failWriting ? 'Намерение 3' : 'Намерение 4'),
+          findsWidgets,
+        );
+        await tester.pump(const Duration(seconds: 1));
+        expect(message, findsNothing);
+      },
+    );
+  }
+
+  testWidgets(
+    'повтор по подсказке завершается после ухода, смены фокуса и повторного открытия',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      tester.view.physicalSize = const Size(1200, 4000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      final seeded = await harness.openReadyDatabase();
+      await seedDurabilityGraph(seeded);
+      expect(
+        await durabilityRepository(seeded).execute(durabilityCreate()),
+        isA<GraphCommandSucceeded>(),
+      );
+      await harness.closePersistenceObjectGraph();
+      final gate = _ChoiceSqlGate();
+      final runtime = AppRuntime(
+        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+          openFileBackedLocalDatabase(harness.databaseFile),
+          gate,
+        ),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(() async {
+        gate.release();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await harness.dispose();
+      });
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('catalog-open-daily-choices')),
+      );
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('daily-choice-create-from-action')),
+      );
+      await _tap(tester, find.text('Намерение 3'));
+      await _tap(
+        tester,
+        find.byKey(const ValueKey('choice-suggestion-select-0')),
+      );
+      await _until(
+        tester,
+        () => find
+            .byKey(const ValueKey('daily-choice-submit'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-date')),
+        '2027-01-02',
+      );
+      gate.arm(
+        fail: false,
+        operation: LocalDatabaseSqlOperation.insert,
+        table: 'daily_choice_path_steps',
+      );
+      final submit = find.byKey(const ValueKey('daily-choice-submit'));
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.tap(submit);
+      await tester.pump();
+      await _until(tester, () => gate.hasEntered);
+      expect(_storedIds(harness, 'daily_choices'), {durabilityUuid(201)});
+
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 350));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      gate.release();
+      await _until(
+        tester,
+        () => _storedIds(harness, 'daily_choices').length == 2,
+      );
+      expect(_storedIds(harness, 'daily_choice_path_steps'), hasLength(4));
+      expect(
+        find.byKey(const ValueKey('graph-operation-message')),
+        findsNothing,
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _until(
+        tester,
+        () => find
+            .byKey(const ValueKey('graph-operation-message'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      expect(find.textContaining('Дневной выбор создан'), findsWidgets);
+      await tester.pumpAndSettle();
+      final message = find.byKey(const ValueKey('graph-operation-message'));
+      ScaffoldMessenger.of(tester.element(message.first)).hideCurrentSnackBar();
+      await tester.pumpAndSettle();
+      expect(message, findsNothing);
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      expect(find.textContaining('2027-01-02'), findsWidgets);
+      expect(_storedIds(harness, 'daily_choices'), hasLength(2));
+      await tester.pump(const Duration(seconds: 1));
+      expect(message, findsNothing);
+    },
+  );
+
   testWidgets(
     'уход и потеря фокуса сохраняют результат одной команды без частичной записи',
     (tester) async {
