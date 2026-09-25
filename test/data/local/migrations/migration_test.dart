@@ -25,7 +25,7 @@ void main() {
   });
 
   test(
-    'новое хранилище создаётся в версии 3 с пустыми дневными выборами',
+    'новое хранилище создаётся в версии 4 с пустыми дневными выборами',
     () async {
       final version = await database
           .customSelect('PRAGMA user_version')
@@ -37,7 +37,10 @@ void main() {
           .customSelect('SELECT id FROM daily_choice_path_steps')
           .get();
 
-      expect(version.read<int>('user_version'), 3);
+      expect(
+        version.read<int>('user_version'),
+        AppDatabase.currentSchemaVersion,
+      );
       expect(choices, isEmpty);
       expect(steps, isEmpty);
     },
@@ -83,7 +86,7 @@ void main() {
     );
   });
 
-  test('переходит со схемы 1 на схему 3 без переписывания намерений', () async {
+  test('переходит со схемы 1 на схему 4 без переписывания намерений', () async {
     await database.close();
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
@@ -152,7 +155,7 @@ void main() {
         .customSelect('SELECT id FROM long_term_relations')
         .get();
 
-    expect(version.read<int>('user_version'), 3);
+    expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
     expect(
       intentions
           .map(

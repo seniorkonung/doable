@@ -61,6 +61,7 @@ MigrationStrategy localDataMigrationStrategy(
           migrate: () => generated.stepByStep(
             from1To2: _migrateFrom1To2,
             from2To3: _migrateFrom2To3,
+            from3To4: _migrateFrom3To4,
           )(migrator, from, to),
         );
       },
@@ -104,6 +105,19 @@ Future<void> _migrateFrom2To3(
   await migrator.create(schema.dailyChoicePathStepsOneSuccessor);
   await migrator.create(schema.dailyChoicePathStepsRelation);
   await migrator.create(schema.longTermRelationsProtectDailyChoicePath);
+}
+
+Future<void> _migrateFrom3To4(
+  Migrator migrator,
+  generated.Schema4 schema,
+) async {
+  await migrator.create(schema.tags);
+  await migrator.create(schema.tagsImmutableIdentity);
+  await migrator.create(schema.tagAssignments);
+  await migrator.create(schema.tagAssignmentsTagOrder);
+  await migrator.create(schema.tagAssignmentsIntention);
+  await migrator.create(schema.tagAssignmentsLongTermRelation);
+  await migrator.create(schema.tagAssignmentsImmutableIdentity);
 }
 
 Future<void> _recordMigration(

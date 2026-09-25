@@ -3,6 +3,286 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
+class Tags extends Table with TableInfo<Tags, Tag> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  Tags(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
+    'creationSequence',
+  );
+  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
+    'creation_sequence',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL UNIQUE',
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(name) = \'text\' AND instr(CAST(name AS BLOB), X\'00\') = 0 AND substr(name, 1, 1) <> char(65279) AND doable_tag_name_valid_v1(name) = 1)',
+  );
+  static const VerificationMeta _nameKeyMeta = const VerificationMeta(
+    'nameKey',
+  );
+  late final GeneratedColumn<String> nameKey = GeneratedColumn<String>(
+    'name_key',
+    aliasedName,
+    false,
+    generatedAs: GeneratedAs(
+      const CustomExpression('doable_tag_name_key_v1(name)'),
+      true,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL COLLATE BINARY UNIQUE GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [creationSequence, id, name, nameKey];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Tag> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('creation_sequence')) {
+      context.handle(
+        _creationSequenceMeta,
+        creationSequence.isAcceptableOrUnknown(
+          data['creation_sequence']!,
+          _creationSequenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('name_key')) {
+      context.handle(
+        _nameKeyMeta,
+        nameKey.isAcceptableOrUnknown(data['name_key']!, _nameKeyMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {creationSequence};
+  @override
+  Tag map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Tag(
+      creationSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}creation_sequence'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      nameKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_key'],
+      )!,
+    );
+  }
+
+  @override
+  Tags createAlias(String alias) {
+    return Tags(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class Tag extends DataClass implements Insertable<Tag> {
+  final int creationSequence;
+  final String id;
+  final String name;
+  final String nameKey;
+  const Tag({
+    required this.creationSequence,
+    required this.id,
+    required this.name,
+    required this.nameKey,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['creation_sequence'] = Variable<int>(creationSequence);
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  TagsCompanion toCompanion(bool nullToAbsent) {
+    return TagsCompanion(
+      creationSequence: Value(creationSequence),
+      id: Value(id),
+      name: Value(name),
+    );
+  }
+
+  factory Tag.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Tag(
+      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      nameKey: serializer.fromJson<String>(json['name_key']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'creation_sequence': serializer.toJson<int>(creationSequence),
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'name_key': serializer.toJson<String>(nameKey),
+    };
+  }
+
+  Tag copyWith({
+    int? creationSequence,
+    String? id,
+    String? name,
+    String? nameKey,
+  }) => Tag(
+    creationSequence: creationSequence ?? this.creationSequence,
+    id: id ?? this.id,
+    name: name ?? this.name,
+    nameKey: nameKey ?? this.nameKey,
+  );
+  @override
+  String toString() {
+    return (StringBuffer('Tag(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('nameKey: $nameKey')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(creationSequence, id, name, nameKey);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Tag &&
+          other.creationSequence == this.creationSequence &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.nameKey == this.nameKey);
+}
+
+class TagsCompanion extends UpdateCompanion<Tag> {
+  final Value<int> creationSequence;
+  final Value<String> id;
+  final Value<String> name;
+  const TagsCompanion({
+    this.creationSequence = const Value.absent(),
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+  });
+  TagsCompanion.insert({
+    this.creationSequence = const Value.absent(),
+    required String id,
+    required String name,
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<Tag> custom({
+    Expression<int>? creationSequence,
+    Expression<String>? id,
+    Expression<String>? name,
+  }) {
+    return RawValuesInsertable({
+      if (creationSequence != null) 'creation_sequence': creationSequence,
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+    });
+  }
+
+  TagsCompanion copyWith({
+    Value<int>? creationSequence,
+    Value<String>? id,
+    Value<String>? name,
+  }) {
+    return TagsCompanion(
+      creationSequence: creationSequence ?? this.creationSequence,
+      id: id ?? this.id,
+      name: name ?? this.name,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (creationSequence.present) {
+      map['creation_sequence'] = Variable<int>(creationSequence.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagsCompanion(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class Intentions extends Table with TableInfo<Intentions, Intention> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -492,500 +772,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  DailyChoices(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
-    'creationSequence',
-  );
-  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
-    'creation_sequence',
-    aliasedName,
-    false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints:
-        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
-  );
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL UNIQUE',
-  );
-  static const VerificationMeta _sourceIntentionIdMeta = const VerificationMeta(
-    'sourceIntentionId',
-  );
-  late final GeneratedColumn<String> sourceIntentionId =
-      GeneratedColumn<String>(
-        'source_intention_id',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
-      );
-  static const VerificationMeta _selectedIntentionIdMeta =
-      const VerificationMeta('selectedIntentionId');
-  late final GeneratedColumn<String> selectedIntentionId =
-      GeneratedColumn<String>(
-        'selected_intention_id',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
-      );
-  static const VerificationMeta _choiceDateMeta = const VerificationMeta(
-    'choiceDate',
-  );
-  late final GeneratedColumn<String> choiceDate = GeneratedColumn<String>(
-    'choice_date',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (typeof(choice_date) = \'text\' AND length(choice_date) = 10 AND choice_date GLOB \'[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\')',
-  );
-  static const VerificationMeta _descriptionMeta = const VerificationMeta(
-    'description',
-  );
-  late final GeneratedColumn<String> description = GeneratedColumn<String>(
-    'description',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: 'CHECK (description IS NULL OR(typeof(description) = \'text\' AND instr(CAST(description AS BLOB), X\'00\') = 0))',
-  );
-  static const VerificationMeta _isCompletedMeta = const VerificationMeta(
-    'isCompleted',
-  );
-  late final GeneratedColumn<bool> isCompleted = GeneratedColumn<bool>(
-    'is_completed',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (typeof(is_completed) = \'integer\' AND is_completed IN (0, 1))',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    creationSequence,
-    id,
-    sourceIntentionId,
-    selectedIntentionId,
-    choiceDate,
-    description,
-    isCompleted,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'daily_choices';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<DailyChoice> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('creation_sequence')) {
-      context.handle(
-        _creationSequenceMeta,
-        creationSequence.isAcceptableOrUnknown(
-          data['creation_sequence']!,
-          _creationSequenceMeta,
-        ),
-      );
-    }
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('source_intention_id')) {
-      context.handle(
-        _sourceIntentionIdMeta,
-        sourceIntentionId.isAcceptableOrUnknown(
-          data['source_intention_id']!,
-          _sourceIntentionIdMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_sourceIntentionIdMeta);
-    }
-    if (data.containsKey('selected_intention_id')) {
-      context.handle(
-        _selectedIntentionIdMeta,
-        selectedIntentionId.isAcceptableOrUnknown(
-          data['selected_intention_id']!,
-          _selectedIntentionIdMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_selectedIntentionIdMeta);
-    }
-    if (data.containsKey('choice_date')) {
-      context.handle(
-        _choiceDateMeta,
-        choiceDate.isAcceptableOrUnknown(data['choice_date']!, _choiceDateMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_choiceDateMeta);
-    }
-    if (data.containsKey('description')) {
-      context.handle(
-        _descriptionMeta,
-        description.isAcceptableOrUnknown(
-          data['description']!,
-          _descriptionMeta,
-        ),
-      );
-    }
-    if (data.containsKey('is_completed')) {
-      context.handle(
-        _isCompletedMeta,
-        isCompleted.isAcceptableOrUnknown(
-          data['is_completed']!,
-          _isCompletedMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_isCompletedMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {creationSequence};
-  @override
-  DailyChoice map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DailyChoice(
-      creationSequence: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}creation_sequence'],
-      )!,
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      sourceIntentionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}source_intention_id'],
-      )!,
-      selectedIntentionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}selected_intention_id'],
-      )!,
-      choiceDate: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}choice_date'],
-      )!,
-      description: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}description'],
-      ),
-      isCompleted: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_completed'],
-      )!,
-    );
-  }
-
-  @override
-  DailyChoices createAlias(String alias) {
-    return DailyChoices(attachedDatabase, alias);
-  }
-
-  @override
-  List<String> get customConstraints => const [
-    'CHECK(source_intention_id <> selected_intention_id)',
-  ];
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class DailyChoice extends DataClass implements Insertable<DailyChoice> {
-  final int creationSequence;
-  final String id;
-  final String sourceIntentionId;
-  final String selectedIntentionId;
-  final String choiceDate;
-  final String? description;
-  final bool isCompleted;
-  const DailyChoice({
-    required this.creationSequence,
-    required this.id,
-    required this.sourceIntentionId,
-    required this.selectedIntentionId,
-    required this.choiceDate,
-    this.description,
-    required this.isCompleted,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['creation_sequence'] = Variable<int>(creationSequence);
-    map['id'] = Variable<String>(id);
-    map['source_intention_id'] = Variable<String>(sourceIntentionId);
-    map['selected_intention_id'] = Variable<String>(selectedIntentionId);
-    map['choice_date'] = Variable<String>(choiceDate);
-    if (!nullToAbsent || description != null) {
-      map['description'] = Variable<String>(description);
-    }
-    map['is_completed'] = Variable<bool>(isCompleted);
-    return map;
-  }
-
-  DailyChoicesCompanion toCompanion(bool nullToAbsent) {
-    return DailyChoicesCompanion(
-      creationSequence: Value(creationSequence),
-      id: Value(id),
-      sourceIntentionId: Value(sourceIntentionId),
-      selectedIntentionId: Value(selectedIntentionId),
-      choiceDate: Value(choiceDate),
-      description: description == null && nullToAbsent
-          ? const Value.absent()
-          : Value(description),
-      isCompleted: Value(isCompleted),
-    );
-  }
-
-  factory DailyChoice.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DailyChoice(
-      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
-      id: serializer.fromJson<String>(json['id']),
-      sourceIntentionId: serializer.fromJson<String>(
-        json['source_intention_id'],
-      ),
-      selectedIntentionId: serializer.fromJson<String>(
-        json['selected_intention_id'],
-      ),
-      choiceDate: serializer.fromJson<String>(json['choice_date']),
-      description: serializer.fromJson<String?>(json['description']),
-      isCompleted: serializer.fromJson<bool>(json['is_completed']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'creation_sequence': serializer.toJson<int>(creationSequence),
-      'id': serializer.toJson<String>(id),
-      'source_intention_id': serializer.toJson<String>(sourceIntentionId),
-      'selected_intention_id': serializer.toJson<String>(selectedIntentionId),
-      'choice_date': serializer.toJson<String>(choiceDate),
-      'description': serializer.toJson<String?>(description),
-      'is_completed': serializer.toJson<bool>(isCompleted),
-    };
-  }
-
-  DailyChoice copyWith({
-    int? creationSequence,
-    String? id,
-    String? sourceIntentionId,
-    String? selectedIntentionId,
-    String? choiceDate,
-    Value<String?> description = const Value.absent(),
-    bool? isCompleted,
-  }) => DailyChoice(
-    creationSequence: creationSequence ?? this.creationSequence,
-    id: id ?? this.id,
-    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
-    selectedIntentionId: selectedIntentionId ?? this.selectedIntentionId,
-    choiceDate: choiceDate ?? this.choiceDate,
-    description: description.present ? description.value : this.description,
-    isCompleted: isCompleted ?? this.isCompleted,
-  );
-  DailyChoice copyWithCompanion(DailyChoicesCompanion data) {
-    return DailyChoice(
-      creationSequence: data.creationSequence.present
-          ? data.creationSequence.value
-          : this.creationSequence,
-      id: data.id.present ? data.id.value : this.id,
-      sourceIntentionId: data.sourceIntentionId.present
-          ? data.sourceIntentionId.value
-          : this.sourceIntentionId,
-      selectedIntentionId: data.selectedIntentionId.present
-          ? data.selectedIntentionId.value
-          : this.selectedIntentionId,
-      choiceDate: data.choiceDate.present
-          ? data.choiceDate.value
-          : this.choiceDate,
-      description: data.description.present
-          ? data.description.value
-          : this.description,
-      isCompleted: data.isCompleted.present
-          ? data.isCompleted.value
-          : this.isCompleted,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DailyChoice(')
-          ..write('creationSequence: $creationSequence, ')
-          ..write('id: $id, ')
-          ..write('sourceIntentionId: $sourceIntentionId, ')
-          ..write('selectedIntentionId: $selectedIntentionId, ')
-          ..write('choiceDate: $choiceDate, ')
-          ..write('description: $description, ')
-          ..write('isCompleted: $isCompleted')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    creationSequence,
-    id,
-    sourceIntentionId,
-    selectedIntentionId,
-    choiceDate,
-    description,
-    isCompleted,
-  );
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is DailyChoice &&
-          other.creationSequence == this.creationSequence &&
-          other.id == this.id &&
-          other.sourceIntentionId == this.sourceIntentionId &&
-          other.selectedIntentionId == this.selectedIntentionId &&
-          other.choiceDate == this.choiceDate &&
-          other.description == this.description &&
-          other.isCompleted == this.isCompleted);
-}
-
-class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
-  final Value<int> creationSequence;
-  final Value<String> id;
-  final Value<String> sourceIntentionId;
-  final Value<String> selectedIntentionId;
-  final Value<String> choiceDate;
-  final Value<String?> description;
-  final Value<bool> isCompleted;
-  const DailyChoicesCompanion({
-    this.creationSequence = const Value.absent(),
-    this.id = const Value.absent(),
-    this.sourceIntentionId = const Value.absent(),
-    this.selectedIntentionId = const Value.absent(),
-    this.choiceDate = const Value.absent(),
-    this.description = const Value.absent(),
-    this.isCompleted = const Value.absent(),
-  });
-  DailyChoicesCompanion.insert({
-    this.creationSequence = const Value.absent(),
-    required String id,
-    required String sourceIntentionId,
-    required String selectedIntentionId,
-    required String choiceDate,
-    this.description = const Value.absent(),
-    required bool isCompleted,
-  }) : id = Value(id),
-       sourceIntentionId = Value(sourceIntentionId),
-       selectedIntentionId = Value(selectedIntentionId),
-       choiceDate = Value(choiceDate),
-       isCompleted = Value(isCompleted);
-  static Insertable<DailyChoice> custom({
-    Expression<int>? creationSequence,
-    Expression<String>? id,
-    Expression<String>? sourceIntentionId,
-    Expression<String>? selectedIntentionId,
-    Expression<String>? choiceDate,
-    Expression<String>? description,
-    Expression<bool>? isCompleted,
-  }) {
-    return RawValuesInsertable({
-      if (creationSequence != null) 'creation_sequence': creationSequence,
-      if (id != null) 'id': id,
-      if (sourceIntentionId != null) 'source_intention_id': sourceIntentionId,
-      if (selectedIntentionId != null)
-        'selected_intention_id': selectedIntentionId,
-      if (choiceDate != null) 'choice_date': choiceDate,
-      if (description != null) 'description': description,
-      if (isCompleted != null) 'is_completed': isCompleted,
-    });
-  }
-
-  DailyChoicesCompanion copyWith({
-    Value<int>? creationSequence,
-    Value<String>? id,
-    Value<String>? sourceIntentionId,
-    Value<String>? selectedIntentionId,
-    Value<String>? choiceDate,
-    Value<String?>? description,
-    Value<bool>? isCompleted,
-  }) {
-    return DailyChoicesCompanion(
-      creationSequence: creationSequence ?? this.creationSequence,
-      id: id ?? this.id,
-      sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
-      selectedIntentionId: selectedIntentionId ?? this.selectedIntentionId,
-      choiceDate: choiceDate ?? this.choiceDate,
-      description: description ?? this.description,
-      isCompleted: isCompleted ?? this.isCompleted,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (creationSequence.present) {
-      map['creation_sequence'] = Variable<int>(creationSequence.value);
-    }
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (sourceIntentionId.present) {
-      map['source_intention_id'] = Variable<String>(sourceIntentionId.value);
-    }
-    if (selectedIntentionId.present) {
-      map['selected_intention_id'] = Variable<String>(
-        selectedIntentionId.value,
-      );
-    }
-    if (choiceDate.present) {
-      map['choice_date'] = Variable<String>(choiceDate.value);
-    }
-    if (description.present) {
-      map['description'] = Variable<String>(description.value);
-    }
-    if (isCompleted.present) {
-      map['is_completed'] = Variable<bool>(isCompleted.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DailyChoicesCompanion(')
-          ..write('creationSequence: $creationSequence, ')
-          ..write('id: $id, ')
-          ..write('sourceIntentionId: $sourceIntentionId, ')
-          ..write('selectedIntentionId: $selectedIntentionId, ')
-          ..write('choiceDate: $choiceDate, ')
-          ..write('description: $description, ')
-          ..write('isCompleted: $isCompleted')
           ..write(')'))
         .toString();
   }
@@ -1524,6 +1310,845 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
           ..write('priority: $priority, ')
           ..write('description: $description, ')
           ..write('isArchived: $isArchived')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class TagAssignments extends Table
+    with TableInfo<TagAssignments, TagAssignment> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  TagAssignments(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
+    'creationSequence',
+  );
+  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
+    'creation_sequence',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
+  );
+  static const VerificationMeta _tagIdMeta = const VerificationMeta('tagId');
+  late final GeneratedColumn<String> tagId = GeneratedColumn<String>(
+    'tag_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL REFERENCES tags(id)ON UPDATE RESTRICT ON DELETE CASCADE',
+  );
+  static const VerificationMeta _intentionIdMeta = const VerificationMeta(
+    'intentionId',
+  );
+  late final GeneratedColumn<String> intentionId = GeneratedColumn<String>(
+    'intention_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE CASCADE',
+  );
+  static const VerificationMeta _longTermRelationIdMeta =
+      const VerificationMeta('longTermRelationId');
+  late final GeneratedColumn<String> longTermRelationId =
+      GeneratedColumn<String>(
+        'long_term_relation_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        $customConstraints: 'REFERENCES long_term_relations(id)ON UPDATE RESTRICT ON DELETE CASCADE',
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    creationSequence,
+    tagId,
+    intentionId,
+    longTermRelationId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tag_assignments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TagAssignment> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('creation_sequence')) {
+      context.handle(
+        _creationSequenceMeta,
+        creationSequence.isAcceptableOrUnknown(
+          data['creation_sequence']!,
+          _creationSequenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tag_id')) {
+      context.handle(
+        _tagIdMeta,
+        tagId.isAcceptableOrUnknown(data['tag_id']!, _tagIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tagIdMeta);
+    }
+    if (data.containsKey('intention_id')) {
+      context.handle(
+        _intentionIdMeta,
+        intentionId.isAcceptableOrUnknown(
+          data['intention_id']!,
+          _intentionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('long_term_relation_id')) {
+      context.handle(
+        _longTermRelationIdMeta,
+        longTermRelationId.isAcceptableOrUnknown(
+          data['long_term_relation_id']!,
+          _longTermRelationIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {creationSequence};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {tagId, intentionId},
+    {tagId, longTermRelationId},
+  ];
+  @override
+  TagAssignment map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TagAssignment(
+      creationSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}creation_sequence'],
+      )!,
+      tagId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tag_id'],
+      )!,
+      intentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intention_id'],
+      ),
+      longTermRelationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}long_term_relation_id'],
+      ),
+    );
+  }
+
+  @override
+  TagAssignments createAlias(String alias) {
+    return TagAssignments(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'CHECK((intention_id IS NOT NULL)<>(long_term_relation_id IS NOT NULL))',
+    'UNIQUE(tag_id, intention_id)',
+    'UNIQUE(tag_id, long_term_relation_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class TagAssignment extends DataClass implements Insertable<TagAssignment> {
+  final int creationSequence;
+  final String tagId;
+  final String? intentionId;
+  final String? longTermRelationId;
+  const TagAssignment({
+    required this.creationSequence,
+    required this.tagId,
+    this.intentionId,
+    this.longTermRelationId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['creation_sequence'] = Variable<int>(creationSequence);
+    map['tag_id'] = Variable<String>(tagId);
+    if (!nullToAbsent || intentionId != null) {
+      map['intention_id'] = Variable<String>(intentionId);
+    }
+    if (!nullToAbsent || longTermRelationId != null) {
+      map['long_term_relation_id'] = Variable<String>(longTermRelationId);
+    }
+    return map;
+  }
+
+  TagAssignmentsCompanion toCompanion(bool nullToAbsent) {
+    return TagAssignmentsCompanion(
+      creationSequence: Value(creationSequence),
+      tagId: Value(tagId),
+      intentionId: intentionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(intentionId),
+      longTermRelationId: longTermRelationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(longTermRelationId),
+    );
+  }
+
+  factory TagAssignment.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TagAssignment(
+      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
+      tagId: serializer.fromJson<String>(json['tag_id']),
+      intentionId: serializer.fromJson<String?>(json['intention_id']),
+      longTermRelationId: serializer.fromJson<String?>(
+        json['long_term_relation_id'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'creation_sequence': serializer.toJson<int>(creationSequence),
+      'tag_id': serializer.toJson<String>(tagId),
+      'intention_id': serializer.toJson<String?>(intentionId),
+      'long_term_relation_id': serializer.toJson<String?>(longTermRelationId),
+    };
+  }
+
+  TagAssignment copyWith({
+    int? creationSequence,
+    String? tagId,
+    Value<String?> intentionId = const Value.absent(),
+    Value<String?> longTermRelationId = const Value.absent(),
+  }) => TagAssignment(
+    creationSequence: creationSequence ?? this.creationSequence,
+    tagId: tagId ?? this.tagId,
+    intentionId: intentionId.present ? intentionId.value : this.intentionId,
+    longTermRelationId: longTermRelationId.present
+        ? longTermRelationId.value
+        : this.longTermRelationId,
+  );
+  TagAssignment copyWithCompanion(TagAssignmentsCompanion data) {
+    return TagAssignment(
+      creationSequence: data.creationSequence.present
+          ? data.creationSequence.value
+          : this.creationSequence,
+      tagId: data.tagId.present ? data.tagId.value : this.tagId,
+      intentionId: data.intentionId.present
+          ? data.intentionId.value
+          : this.intentionId,
+      longTermRelationId: data.longTermRelationId.present
+          ? data.longTermRelationId.value
+          : this.longTermRelationId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagAssignment(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('tagId: $tagId, ')
+          ..write('intentionId: $intentionId, ')
+          ..write('longTermRelationId: $longTermRelationId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(creationSequence, tagId, intentionId, longTermRelationId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TagAssignment &&
+          other.creationSequence == this.creationSequence &&
+          other.tagId == this.tagId &&
+          other.intentionId == this.intentionId &&
+          other.longTermRelationId == this.longTermRelationId);
+}
+
+class TagAssignmentsCompanion extends UpdateCompanion<TagAssignment> {
+  final Value<int> creationSequence;
+  final Value<String> tagId;
+  final Value<String?> intentionId;
+  final Value<String?> longTermRelationId;
+  const TagAssignmentsCompanion({
+    this.creationSequence = const Value.absent(),
+    this.tagId = const Value.absent(),
+    this.intentionId = const Value.absent(),
+    this.longTermRelationId = const Value.absent(),
+  });
+  TagAssignmentsCompanion.insert({
+    this.creationSequence = const Value.absent(),
+    required String tagId,
+    this.intentionId = const Value.absent(),
+    this.longTermRelationId = const Value.absent(),
+  }) : tagId = Value(tagId);
+  static Insertable<TagAssignment> custom({
+    Expression<int>? creationSequence,
+    Expression<String>? tagId,
+    Expression<String>? intentionId,
+    Expression<String>? longTermRelationId,
+  }) {
+    return RawValuesInsertable({
+      if (creationSequence != null) 'creation_sequence': creationSequence,
+      if (tagId != null) 'tag_id': tagId,
+      if (intentionId != null) 'intention_id': intentionId,
+      if (longTermRelationId != null)
+        'long_term_relation_id': longTermRelationId,
+    });
+  }
+
+  TagAssignmentsCompanion copyWith({
+    Value<int>? creationSequence,
+    Value<String>? tagId,
+    Value<String?>? intentionId,
+    Value<String?>? longTermRelationId,
+  }) {
+    return TagAssignmentsCompanion(
+      creationSequence: creationSequence ?? this.creationSequence,
+      tagId: tagId ?? this.tagId,
+      intentionId: intentionId ?? this.intentionId,
+      longTermRelationId: longTermRelationId ?? this.longTermRelationId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (creationSequence.present) {
+      map['creation_sequence'] = Variable<int>(creationSequence.value);
+    }
+    if (tagId.present) {
+      map['tag_id'] = Variable<String>(tagId.value);
+    }
+    if (intentionId.present) {
+      map['intention_id'] = Variable<String>(intentionId.value);
+    }
+    if (longTermRelationId.present) {
+      map['long_term_relation_id'] = Variable<String>(longTermRelationId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagAssignmentsCompanion(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('tagId: $tagId, ')
+          ..write('intentionId: $intentionId, ')
+          ..write('longTermRelationId: $longTermRelationId')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  DailyChoices(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
+    'creationSequence',
+  );
+  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
+    'creation_sequence',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL UNIQUE',
+  );
+  static const VerificationMeta _sourceIntentionIdMeta = const VerificationMeta(
+    'sourceIntentionId',
+  );
+  late final GeneratedColumn<String> sourceIntentionId =
+      GeneratedColumn<String>(
+        'source_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
+      );
+  static const VerificationMeta _selectedIntentionIdMeta =
+      const VerificationMeta('selectedIntentionId');
+  late final GeneratedColumn<String> selectedIntentionId =
+      GeneratedColumn<String>(
+        'selected_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
+      );
+  static const VerificationMeta _choiceDateMeta = const VerificationMeta(
+    'choiceDate',
+  );
+  late final GeneratedColumn<String> choiceDate = GeneratedColumn<String>(
+    'choice_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(choice_date) = \'text\' AND length(choice_date) = 10 AND choice_date GLOB \'[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\')',
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (description IS NULL OR(typeof(description) = \'text\' AND instr(CAST(description AS BLOB), X\'00\') = 0))',
+  );
+  static const VerificationMeta _isCompletedMeta = const VerificationMeta(
+    'isCompleted',
+  );
+  late final GeneratedColumn<bool> isCompleted = GeneratedColumn<bool>(
+    'is_completed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(is_completed) = \'integer\' AND is_completed IN (0, 1))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    creationSequence,
+    id,
+    sourceIntentionId,
+    selectedIntentionId,
+    choiceDate,
+    description,
+    isCompleted,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'daily_choices';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DailyChoice> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('creation_sequence')) {
+      context.handle(
+        _creationSequenceMeta,
+        creationSequence.isAcceptableOrUnknown(
+          data['creation_sequence']!,
+          _creationSequenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('source_intention_id')) {
+      context.handle(
+        _sourceIntentionIdMeta,
+        sourceIntentionId.isAcceptableOrUnknown(
+          data['source_intention_id']!,
+          _sourceIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIntentionIdMeta);
+    }
+    if (data.containsKey('selected_intention_id')) {
+      context.handle(
+        _selectedIntentionIdMeta,
+        selectedIntentionId.isAcceptableOrUnknown(
+          data['selected_intention_id']!,
+          _selectedIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_selectedIntentionIdMeta);
+    }
+    if (data.containsKey('choice_date')) {
+      context.handle(
+        _choiceDateMeta,
+        choiceDate.isAcceptableOrUnknown(data['choice_date']!, _choiceDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_choiceDateMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_completed')) {
+      context.handle(
+        _isCompletedMeta,
+        isCompleted.isAcceptableOrUnknown(
+          data['is_completed']!,
+          _isCompletedMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_isCompletedMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {creationSequence};
+  @override
+  DailyChoice map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DailyChoice(
+      creationSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}creation_sequence'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sourceIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_intention_id'],
+      )!,
+      selectedIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}selected_intention_id'],
+      )!,
+      choiceDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}choice_date'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      isCompleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_completed'],
+      )!,
+    );
+  }
+
+  @override
+  DailyChoices createAlias(String alias) {
+    return DailyChoices(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'CHECK(source_intention_id <> selected_intention_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class DailyChoice extends DataClass implements Insertable<DailyChoice> {
+  final int creationSequence;
+  final String id;
+  final String sourceIntentionId;
+  final String selectedIntentionId;
+  final String choiceDate;
+  final String? description;
+  final bool isCompleted;
+  const DailyChoice({
+    required this.creationSequence,
+    required this.id,
+    required this.sourceIntentionId,
+    required this.selectedIntentionId,
+    required this.choiceDate,
+    this.description,
+    required this.isCompleted,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['creation_sequence'] = Variable<int>(creationSequence);
+    map['id'] = Variable<String>(id);
+    map['source_intention_id'] = Variable<String>(sourceIntentionId);
+    map['selected_intention_id'] = Variable<String>(selectedIntentionId);
+    map['choice_date'] = Variable<String>(choiceDate);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['is_completed'] = Variable<bool>(isCompleted);
+    return map;
+  }
+
+  DailyChoicesCompanion toCompanion(bool nullToAbsent) {
+    return DailyChoicesCompanion(
+      creationSequence: Value(creationSequence),
+      id: Value(id),
+      sourceIntentionId: Value(sourceIntentionId),
+      selectedIntentionId: Value(selectedIntentionId),
+      choiceDate: Value(choiceDate),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      isCompleted: Value(isCompleted),
+    );
+  }
+
+  factory DailyChoice.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DailyChoice(
+      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
+      id: serializer.fromJson<String>(json['id']),
+      sourceIntentionId: serializer.fromJson<String>(
+        json['source_intention_id'],
+      ),
+      selectedIntentionId: serializer.fromJson<String>(
+        json['selected_intention_id'],
+      ),
+      choiceDate: serializer.fromJson<String>(json['choice_date']),
+      description: serializer.fromJson<String?>(json['description']),
+      isCompleted: serializer.fromJson<bool>(json['is_completed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'creation_sequence': serializer.toJson<int>(creationSequence),
+      'id': serializer.toJson<String>(id),
+      'source_intention_id': serializer.toJson<String>(sourceIntentionId),
+      'selected_intention_id': serializer.toJson<String>(selectedIntentionId),
+      'choice_date': serializer.toJson<String>(choiceDate),
+      'description': serializer.toJson<String?>(description),
+      'is_completed': serializer.toJson<bool>(isCompleted),
+    };
+  }
+
+  DailyChoice copyWith({
+    int? creationSequence,
+    String? id,
+    String? sourceIntentionId,
+    String? selectedIntentionId,
+    String? choiceDate,
+    Value<String?> description = const Value.absent(),
+    bool? isCompleted,
+  }) => DailyChoice(
+    creationSequence: creationSequence ?? this.creationSequence,
+    id: id ?? this.id,
+    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+    selectedIntentionId: selectedIntentionId ?? this.selectedIntentionId,
+    choiceDate: choiceDate ?? this.choiceDate,
+    description: description.present ? description.value : this.description,
+    isCompleted: isCompleted ?? this.isCompleted,
+  );
+  DailyChoice copyWithCompanion(DailyChoicesCompanion data) {
+    return DailyChoice(
+      creationSequence: data.creationSequence.present
+          ? data.creationSequence.value
+          : this.creationSequence,
+      id: data.id.present ? data.id.value : this.id,
+      sourceIntentionId: data.sourceIntentionId.present
+          ? data.sourceIntentionId.value
+          : this.sourceIntentionId,
+      selectedIntentionId: data.selectedIntentionId.present
+          ? data.selectedIntentionId.value
+          : this.selectedIntentionId,
+      choiceDate: data.choiceDate.present
+          ? data.choiceDate.value
+          : this.choiceDate,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      isCompleted: data.isCompleted.present
+          ? data.isCompleted.value
+          : this.isCompleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DailyChoice(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('selectedIntentionId: $selectedIntentionId, ')
+          ..write('choiceDate: $choiceDate, ')
+          ..write('description: $description, ')
+          ..write('isCompleted: $isCompleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    creationSequence,
+    id,
+    sourceIntentionId,
+    selectedIntentionId,
+    choiceDate,
+    description,
+    isCompleted,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DailyChoice &&
+          other.creationSequence == this.creationSequence &&
+          other.id == this.id &&
+          other.sourceIntentionId == this.sourceIntentionId &&
+          other.selectedIntentionId == this.selectedIntentionId &&
+          other.choiceDate == this.choiceDate &&
+          other.description == this.description &&
+          other.isCompleted == this.isCompleted);
+}
+
+class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
+  final Value<int> creationSequence;
+  final Value<String> id;
+  final Value<String> sourceIntentionId;
+  final Value<String> selectedIntentionId;
+  final Value<String> choiceDate;
+  final Value<String?> description;
+  final Value<bool> isCompleted;
+  const DailyChoicesCompanion({
+    this.creationSequence = const Value.absent(),
+    this.id = const Value.absent(),
+    this.sourceIntentionId = const Value.absent(),
+    this.selectedIntentionId = const Value.absent(),
+    this.choiceDate = const Value.absent(),
+    this.description = const Value.absent(),
+    this.isCompleted = const Value.absent(),
+  });
+  DailyChoicesCompanion.insert({
+    this.creationSequence = const Value.absent(),
+    required String id,
+    required String sourceIntentionId,
+    required String selectedIntentionId,
+    required String choiceDate,
+    this.description = const Value.absent(),
+    required bool isCompleted,
+  }) : id = Value(id),
+       sourceIntentionId = Value(sourceIntentionId),
+       selectedIntentionId = Value(selectedIntentionId),
+       choiceDate = Value(choiceDate),
+       isCompleted = Value(isCompleted);
+  static Insertable<DailyChoice> custom({
+    Expression<int>? creationSequence,
+    Expression<String>? id,
+    Expression<String>? sourceIntentionId,
+    Expression<String>? selectedIntentionId,
+    Expression<String>? choiceDate,
+    Expression<String>? description,
+    Expression<bool>? isCompleted,
+  }) {
+    return RawValuesInsertable({
+      if (creationSequence != null) 'creation_sequence': creationSequence,
+      if (id != null) 'id': id,
+      if (sourceIntentionId != null) 'source_intention_id': sourceIntentionId,
+      if (selectedIntentionId != null)
+        'selected_intention_id': selectedIntentionId,
+      if (choiceDate != null) 'choice_date': choiceDate,
+      if (description != null) 'description': description,
+      if (isCompleted != null) 'is_completed': isCompleted,
+    });
+  }
+
+  DailyChoicesCompanion copyWith({
+    Value<int>? creationSequence,
+    Value<String>? id,
+    Value<String>? sourceIntentionId,
+    Value<String>? selectedIntentionId,
+    Value<String>? choiceDate,
+    Value<String?>? description,
+    Value<bool>? isCompleted,
+  }) {
+    return DailyChoicesCompanion(
+      creationSequence: creationSequence ?? this.creationSequence,
+      id: id ?? this.id,
+      sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+      selectedIntentionId: selectedIntentionId ?? this.selectedIntentionId,
+      choiceDate: choiceDate ?? this.choiceDate,
+      description: description ?? this.description,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (creationSequence.present) {
+      map['creation_sequence'] = Variable<int>(creationSequence.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sourceIntentionId.present) {
+      map['source_intention_id'] = Variable<String>(sourceIntentionId.value);
+    }
+    if (selectedIntentionId.present) {
+      map['selected_intention_id'] = Variable<String>(
+        selectedIntentionId.value,
+      );
+    }
+    if (choiceDate.present) {
+      map['choice_date'] = Variable<String>(choiceDate.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (isCompleted.present) {
+      map['is_completed'] = Variable<bool>(isCompleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DailyChoicesCompanion(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('selectedIntentionId: $selectedIntentionId, ')
+          ..write('choiceDate: $choiceDate, ')
+          ..write('description: $description, ')
+          ..write('isCompleted: $isCompleted')
           ..write(')'))
         .toString();
   }
@@ -2068,7 +2693,30 @@ class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final Tags tags = Tags(this);
+  late final Trigger tagsImmutableIdentity = Trigger(
+    'CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'tag identity is immutable\');END',
+    'tags_immutable_identity',
+  );
   late final Intentions intentions = Intentions(this);
+  late final LongTermRelations longTermRelations = LongTermRelations(this);
+  late final TagAssignments tagAssignments = TagAssignments(this);
+  late final Index tagAssignmentsTagOrder = Index(
+    'tag_assignments_tag_order',
+    'CREATE INDEX tag_assignments_tag_order ON tag_assignments (tag_id, creation_sequence)',
+  );
+  late final Index tagAssignmentsIntention = Index(
+    'tag_assignments_intention',
+    'CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)',
+  );
+  late final Index tagAssignmentsLongTermRelation = Index(
+    'tag_assignments_long_term_relation',
+    'CREATE INDEX tag_assignments_long_term_relation ON tag_assignments (long_term_relation_id, tag_id)',
+  );
+  late final Trigger tagAssignmentsImmutableIdentity = Trigger(
+    'CREATE TRIGGER tag_assignments_immutable_identity AFTER UPDATE OF creation_sequence, tag_id, intention_id, long_term_relation_id ON tag_assignments WHEN new.creation_sequence <> old.creation_sequence OR new.tag_id <> old.tag_id OR new.intention_id IS NOT old.intention_id OR new.long_term_relation_id IS NOT old.long_term_relation_id BEGIN SELECT RAISE (ABORT, \'tag assignment identity is immutable\');END',
+    'tag_assignments_immutable_identity',
+  );
   late final DailyChoices dailyChoices = DailyChoices(this);
   late final Index dailyChoicesDateCreationOrder = Index(
     'daily_choices_date_creation_order',
@@ -2094,7 +2742,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE TRIGGER daily_choices_immutable_identity AFTER UPDATE OF creation_sequence, id ON daily_choices WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'daily choice identity is immutable\');END',
     'daily_choices_immutable_identity',
   );
-  late final LongTermRelations longTermRelations = LongTermRelations(this);
   late final DailyChoicePathSteps dailyChoicePathSteps = DailyChoicePathSteps(
     this,
   );
@@ -2204,7 +2851,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    tags,
+    tagsImmutableIdentity,
     intentions,
+    longTermRelations,
+    tagAssignments,
+    tagAssignmentsTagOrder,
+    tagAssignmentsIntention,
+    tagAssignmentsLongTermRelation,
+    tagAssignmentsImmutableIdentity,
     dailyChoices,
     dailyChoicesDateCreationOrder,
     dailyChoicesSourceDateCreationOrder,
@@ -2212,7 +2867,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     dailyChoicesSourceRecent,
     dailyChoicesSelectedRecent,
     dailyChoicesImmutableIdentity,
-    longTermRelations,
     dailyChoicePathSteps,
     dailyChoicePathStepsOneRoot,
     dailyChoicePathStepsOneSuccessor,
@@ -2243,6 +2897,41 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tags',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tags',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('tag_assignments', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('tag_assignments', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('tag_assignments', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tag_assignments',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'daily_choices',
@@ -2316,6 +3005,262 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ]);
 }
 
+typedef $TagsCreateCompanionBuilder = TagsCompanion Function({
+  Value<int> creationSequence,
+  required String id,
+  required String name,
+});
+typedef $TagsUpdateCompanionBuilder = TagsCompanion Function({
+  Value<int> creationSequence,
+  Value<String> id,
+  Value<String> name,
+});
+
+final class $TagsReferences extends BaseReferences<_$AppDatabase, Tags, Tag> {
+  $TagsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<TagAssignments, List<TagAssignment>>
+  _tagAssignmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.tagAssignments,
+    aliasName: 'tags__id__tag_assignments__tag_id',
+  );
+
+  $TagAssignmentsProcessedTableManager get tagAssignmentsRefs {
+    final manager = $TagAssignmentsTableManager(
+      $_db,
+      $_db.tagAssignments,
+    ).filter((f) => f.tagId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_tagAssignmentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $TagsFilterComposer extends Composer<_$AppDatabase, Tags> {
+  $TagsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameKey => $composableBuilder(
+    column: $table.nameKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> tagAssignmentsRefs(
+    Expression<bool> Function($TagAssignmentsFilterComposer f) f,
+  ) {
+    final $TagAssignmentsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tagAssignments,
+      getReferencedColumn: (t) => t.tagId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagAssignmentsFilterComposer(
+            $db: $db,
+            $table: $db.tagAssignments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $TagsOrderingComposer extends Composer<_$AppDatabase, Tags> {
+  $TagsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nameKey => $composableBuilder(
+    column: $table.nameKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $TagsAnnotationComposer extends Composer<_$AppDatabase, Tags> {
+  $TagsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get nameKey =>
+      $composableBuilder(column: $table.nameKey, builder: (column) => column);
+
+  Expression<T> tagAssignmentsRefs<T extends Object>(
+    Expression<T> Function($TagAssignmentsAnnotationComposer a) f,
+  ) {
+    final $TagAssignmentsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tagAssignments,
+      getReferencedColumn: (t) => t.tagId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagAssignmentsAnnotationComposer(
+            $db: $db,
+            $table: $db.tagAssignments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $TagsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          Tags,
+          Tag,
+          $TagsFilterComposer,
+          $TagsOrderingComposer,
+          $TagsAnnotationComposer,
+          $TagsCreateCompanionBuilder,
+          $TagsUpdateCompanionBuilder,
+          (Tag, $TagsReferences),
+          Tag,
+          PrefetchHooks Function({bool tagAssignmentsRefs})
+        > {
+  $TagsTableManager(_$AppDatabase db, Tags table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $TagsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $TagsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $TagsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+              }) => TagsCompanion(
+                creationSequence: creationSequence,
+                id: id,
+                name: name,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                required String id,
+                required String name,
+              }) => TagsCompanion.insert(
+                creationSequence: creationSequence,
+                id: id,
+                name: name,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), $TagsReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: ({tagAssignmentsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (tagAssignmentsRefs) db.tagAssignments,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (tagAssignmentsRefs)
+                    await $_getPrefetchedData<Tag, Tags, TagAssignment>(
+                      currentTable: table,
+                      referencedTable: $TagsReferences._tagAssignmentsRefsTable(
+                        db,
+                      ),
+                      managerFromTypedResult: (p0) =>
+                          $TagsReferences(db, table, p0).tagAssignmentsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.tagId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $TagsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      Tags,
+      Tag,
+      $TagsFilterComposer,
+      $TagsOrderingComposer,
+      $TagsAnnotationComposer,
+      $TagsCreateCompanionBuilder,
+      $TagsUpdateCompanionBuilder,
+      (Tag, $TagsReferences),
+      Tag,
+      PrefetchHooks Function({bool tagAssignmentsRefs})
+    >;
 typedef $IntentionsCreateCompanionBuilder = IntentionsCompanion Function({
   required String id,
   required String title,
@@ -2336,6 +3281,29 @@ typedef $IntentionsUpdateCompanionBuilder = IntentionsCompanion Function({
   Value<int> updatedAt,
   Value<int> rowid,
 });
+
+final class $IntentionsReferences
+    extends BaseReferences<_$AppDatabase, Intentions, Intention> {
+  $IntentionsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<TagAssignments, List<TagAssignment>>
+  _tagAssignmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.tagAssignments,
+    aliasName: 'intentions__id__tag_assignments__intention_id',
+  );
+
+  $TagAssignmentsProcessedTableManager get tagAssignmentsRefs {
+    final manager = $TagAssignmentsTableManager(
+      $_db,
+      $_db.tagAssignments,
+    ).filter((f) => f.intentionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_tagAssignmentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
 
 class $IntentionsFilterComposer extends Composer<_$AppDatabase, Intentions> {
   $IntentionsFilterComposer({
@@ -2384,6 +3352,31 @@ class $IntentionsFilterComposer extends Composer<_$AppDatabase, Intentions> {
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> tagAssignmentsRefs(
+    Expression<bool> Function($TagAssignmentsFilterComposer f) f,
+  ) {
+    final $TagAssignmentsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tagAssignments,
+      getReferencedColumn: (t) => t.intentionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagAssignmentsFilterComposer(
+            $db: $db,
+            $table: $db.tagAssignments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $IntentionsOrderingComposer extends Composer<_$AppDatabase, Intentions> {
@@ -2475,6 +3468,31 @@ class $IntentionsAnnotationComposer
 
   GeneratedColumn<int> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> tagAssignmentsRefs<T extends Object>(
+    Expression<T> Function($TagAssignmentsAnnotationComposer a) f,
+  ) {
+    final $TagAssignmentsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tagAssignments,
+      getReferencedColumn: (t) => t.intentionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagAssignmentsAnnotationComposer(
+            $db: $db,
+            $table: $db.tagAssignments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $IntentionsTableManager
@@ -2488,9 +3506,9 @@ class $IntentionsTableManager
           $IntentionsAnnotationComposer,
           $IntentionsCreateCompanionBuilder,
           $IntentionsUpdateCompanionBuilder,
-          (Intention, BaseReferences<_$AppDatabase, Intentions, Intention>),
+          (Intention, $IntentionsReferences),
           Intention,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool tagAssignmentsRefs})
         > {
   $IntentionsTableManager(_$AppDatabase db, Intentions table)
     : super(
@@ -2544,9 +3562,44 @@ class $IntentionsTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) =>
+                    (e.readTable(table), $IntentionsReferences(db, table, e)),
+              )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({tagAssignmentsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (tagAssignmentsRefs) db.tagAssignments,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (tagAssignmentsRefs)
+                    await $_getPrefetchedData<
+                      Intention,
+                      Intentions,
+                      TagAssignment
+                    >(
+                      currentTable: table,
+                      referencedTable: $IntentionsReferences
+                          ._tagAssignmentsRefsTable(db),
+                      managerFromTypedResult: (p0) => $IntentionsReferences(
+                        db,
+                        table,
+                        p0,
+                      ).tagAssignmentsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.intentionId == item.id,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
         ),
       );
 }
@@ -2561,9 +3614,1145 @@ typedef $IntentionsProcessedTableManager =
       $IntentionsAnnotationComposer,
       $IntentionsCreateCompanionBuilder,
       $IntentionsUpdateCompanionBuilder,
-      (Intention, BaseReferences<_$AppDatabase, Intentions, Intention>),
+      (Intention, $IntentionsReferences),
       Intention,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool tagAssignmentsRefs})
+    >;
+typedef $LongTermRelationsCreateCompanionBuilder =
+    LongTermRelationsCompanion Function({
+      Value<int> creationSequence,
+      required String id,
+      required String sourceIntentionId,
+      required String relatedIntentionId,
+      required String type,
+      required int priority,
+      Value<String?> description,
+      Value<bool> isArchived,
+    });
+typedef $LongTermRelationsUpdateCompanionBuilder =
+    LongTermRelationsCompanion Function({
+      Value<int> creationSequence,
+      Value<String> id,
+      Value<String> sourceIntentionId,
+      Value<String> relatedIntentionId,
+      Value<String> type,
+      Value<int> priority,
+      Value<String?> description,
+      Value<bool> isArchived,
+    });
+
+final class $LongTermRelationsReferences
+    extends BaseReferences<_$AppDatabase, LongTermRelations, LongTermRelation> {
+  $LongTermRelationsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static Intentions _sourceIntentionIdTable(_$AppDatabase db) => db.intentions
+      .createAlias('long_term_relations__source_intention_id__intentions__id');
+
+  $IntentionsProcessedTableManager get sourceIntentionId {
+    final $_column = $_itemColumn<String>('source_intention_id')!;
+
+    final manager = $IntentionsTableManager(
+      $_db,
+      $_db.intentions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sourceIntentionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static Intentions _relatedIntentionIdTable(_$AppDatabase db) => db.intentions
+      .createAlias('long_term_relations__related_intention_id__intentions__id');
+
+  $IntentionsProcessedTableManager get relatedIntentionId {
+    final $_column = $_itemColumn<String>('related_intention_id')!;
+
+    final manager = $IntentionsTableManager(
+      $_db,
+      $_db.intentions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_relatedIntentionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<TagAssignments, List<TagAssignment>>
+  _tagAssignmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.tagAssignments,
+    aliasName:
+        'long_term_relations__id__tag_assignments__long_term_relation_id',
+  );
+
+  $TagAssignmentsProcessedTableManager get tagAssignmentsRefs {
+    final manager = $TagAssignmentsTableManager($_db, $_db.tagAssignments)
+        .filter(
+          (f) => f.longTermRelationId.id.sqlEquals($_itemColumn<String>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(_tagAssignmentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<DailyChoicePathSteps, List<DailyChoicePathStep>>
+  _dailyChoicePathStepsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.dailyChoicePathSteps,
+        aliasName: 'long_term_relations__id__daily_choice_path_steps__long_term_relation_id',
+      );
+
+  $DailyChoicePathStepsProcessedTableManager get dailyChoicePathStepsRefs {
+    final manager =
+        $DailyChoicePathStepsTableManager(
+          $_db,
+          $_db.dailyChoicePathSteps,
+        ).filter(
+          (f) => f.longTermRelationId.id.sqlEquals($_itemColumn<String>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _dailyChoicePathStepsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $LongTermRelationsFilterComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $IntentionsFilterComposer get sourceIntentionId {
+    final $IntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsFilterComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsFilterComposer get relatedIntentionId {
+    final $IntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsFilterComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> tagAssignmentsRefs(
+    Expression<bool> Function($TagAssignmentsFilterComposer f) f,
+  ) {
+    final $TagAssignmentsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tagAssignments,
+      getReferencedColumn: (t) => t.longTermRelationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagAssignmentsFilterComposer(
+            $db: $db,
+            $table: $db.tagAssignments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> dailyChoicePathStepsRefs(
+    Expression<bool> Function($DailyChoicePathStepsFilterComposer f) f,
+  ) {
+    final $DailyChoicePathStepsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dailyChoicePathSteps,
+      getReferencedColumn: (t) => t.longTermRelationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $DailyChoicePathStepsFilterComposer(
+            $db: $db,
+            $table: $db.dailyChoicePathSteps,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $LongTermRelationsOrderingComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $IntentionsOrderingComposer get sourceIntentionId {
+    final $IntentionsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsOrderingComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsOrderingComposer get relatedIntentionId {
+    final $IntentionsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsOrderingComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $LongTermRelationsAnnotationComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<int> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => column,
+  );
+
+  $IntentionsAnnotationComposer get sourceIntentionId {
+    final $IntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsAnnotationComposer get relatedIntentionId {
+    final $IntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> tagAssignmentsRefs<T extends Object>(
+    Expression<T> Function($TagAssignmentsAnnotationComposer a) f,
+  ) {
+    final $TagAssignmentsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tagAssignments,
+      getReferencedColumn: (t) => t.longTermRelationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagAssignmentsAnnotationComposer(
+            $db: $db,
+            $table: $db.tagAssignments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> dailyChoicePathStepsRefs<T extends Object>(
+    Expression<T> Function($DailyChoicePathStepsAnnotationComposer a) f,
+  ) {
+    final $DailyChoicePathStepsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dailyChoicePathSteps,
+      getReferencedColumn: (t) => t.longTermRelationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $DailyChoicePathStepsAnnotationComposer(
+            $db: $db,
+            $table: $db.dailyChoicePathSteps,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $LongTermRelationsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          LongTermRelations,
+          LongTermRelation,
+          $LongTermRelationsFilterComposer,
+          $LongTermRelationsOrderingComposer,
+          $LongTermRelationsAnnotationComposer,
+          $LongTermRelationsCreateCompanionBuilder,
+          $LongTermRelationsUpdateCompanionBuilder,
+          (LongTermRelation, $LongTermRelationsReferences),
+          LongTermRelation,
+          PrefetchHooks Function({
+            bool sourceIntentionId,
+            bool relatedIntentionId,
+            bool tagAssignmentsRefs,
+            bool dailyChoicePathStepsRefs,
+          })
+        > {
+  $LongTermRelationsTableManager(_$AppDatabase db, LongTermRelations table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $LongTermRelationsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $LongTermRelationsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $LongTermRelationsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> sourceIntentionId = const Value.absent(),
+                Value<String> relatedIntentionId = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<int> priority = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+              }) => LongTermRelationsCompanion(
+                creationSequence: creationSequence,
+                id: id,
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                type: type,
+                priority: priority,
+                description: description,
+                isArchived: isArchived,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                required String id,
+                required String sourceIntentionId,
+                required String relatedIntentionId,
+                required String type,
+                required int priority,
+                Value<String?> description = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+              }) => LongTermRelationsCompanion.insert(
+                creationSequence: creationSequence,
+                id: id,
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                type: type,
+                priority: priority,
+                description: description,
+                isArchived: isArchived,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $LongTermRelationsReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                sourceIntentionId = false,
+                relatedIntentionId = false,
+                tagAssignmentsRefs = false,
+                dailyChoicePathStepsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (tagAssignmentsRefs) db.tagAssignments,
+                    if (dailyChoicePathStepsRefs) db.dailyChoicePathSteps,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (sourceIntentionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.sourceIntentionId,
+                            referencedTable: $LongTermRelationsReferences
+                                ._sourceIntentionIdTable(db),
+                            referencedColumn: $LongTermRelationsReferences
+                                ._sourceIntentionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (relatedIntentionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.relatedIntentionId,
+                            referencedTable: $LongTermRelationsReferences
+                                ._relatedIntentionIdTable(db),
+                            referencedColumn: $LongTermRelationsReferences
+                                ._relatedIntentionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (tagAssignmentsRefs)
+                        await $_getPrefetchedData<
+                          LongTermRelation,
+                          LongTermRelations,
+                          TagAssignment
+                        >(
+                          currentTable: table,
+                          referencedTable: $LongTermRelationsReferences
+                              ._tagAssignmentsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $LongTermRelationsReferences(
+                                db,
+                                table,
+                                p0,
+                              ).tagAssignmentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.longTermRelationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (dailyChoicePathStepsRefs)
+                        await $_getPrefetchedData<
+                          LongTermRelation,
+                          LongTermRelations,
+                          DailyChoicePathStep
+                        >(
+                          currentTable: table,
+                          referencedTable: $LongTermRelationsReferences
+                              ._dailyChoicePathStepsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $LongTermRelationsReferences(
+                                db,
+                                table,
+                                p0,
+                              ).dailyChoicePathStepsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.longTermRelationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $LongTermRelationsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      LongTermRelations,
+      LongTermRelation,
+      $LongTermRelationsFilterComposer,
+      $LongTermRelationsOrderingComposer,
+      $LongTermRelationsAnnotationComposer,
+      $LongTermRelationsCreateCompanionBuilder,
+      $LongTermRelationsUpdateCompanionBuilder,
+      (LongTermRelation, $LongTermRelationsReferences),
+      LongTermRelation,
+      PrefetchHooks Function({
+        bool sourceIntentionId,
+        bool relatedIntentionId,
+        bool tagAssignmentsRefs,
+        bool dailyChoicePathStepsRefs,
+      })
+    >;
+typedef $TagAssignmentsCreateCompanionBuilder =
+    TagAssignmentsCompanion Function({
+      Value<int> creationSequence,
+      required String tagId,
+      Value<String?> intentionId,
+      Value<String?> longTermRelationId,
+    });
+typedef $TagAssignmentsUpdateCompanionBuilder =
+    TagAssignmentsCompanion Function({
+      Value<int> creationSequence,
+      Value<String> tagId,
+      Value<String?> intentionId,
+      Value<String?> longTermRelationId,
+    });
+
+final class $TagAssignmentsReferences
+    extends BaseReferences<_$AppDatabase, TagAssignments, TagAssignment> {
+  $TagAssignmentsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static Tags _tagIdTable(_$AppDatabase db) =>
+      db.tags.createAlias('tag_assignments__tag_id__tags__id');
+
+  $TagsProcessedTableManager get tagId {
+    final $_column = $_itemColumn<String>('tag_id')!;
+
+    final manager = $TagsTableManager(
+      $_db,
+      $_db.tags,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_tagIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static Intentions _intentionIdTable(_$AppDatabase db) => db.intentions
+      .createAlias('tag_assignments__intention_id__intentions__id');
+
+  $IntentionsProcessedTableManager? get intentionId {
+    final $_column = $_itemColumn<String>('intention_id');
+    if ($_column == null) return null;
+    final manager = $IntentionsTableManager(
+      $_db,
+      $_db.intentions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_intentionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static LongTermRelations _longTermRelationIdTable(_$AppDatabase db) =>
+      db.longTermRelations.createAlias(
+        'tag_assignments__long_term_relation_id__long_term_relations__id',
+      );
+
+  $LongTermRelationsProcessedTableManager? get longTermRelationId {
+    final $_column = $_itemColumn<String>('long_term_relation_id');
+    if ($_column == null) return null;
+    final manager = $LongTermRelationsTableManager(
+      $_db,
+      $_db.longTermRelations,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_longTermRelationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $TagAssignmentsFilterComposer
+    extends Composer<_$AppDatabase, TagAssignments> {
+  $TagAssignmentsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $TagsFilterComposer get tagId {
+    final $TagsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.tags,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagsFilterComposer(
+            $db: $db,
+            $table: $db.tags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsFilterComposer get intentionId {
+    final $IntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.intentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsFilterComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $LongTermRelationsFilterComposer get longTermRelationId {
+    final $LongTermRelationsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.longTermRelationId,
+      referencedTable: $db.longTermRelations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $LongTermRelationsFilterComposer(
+            $db: $db,
+            $table: $db.longTermRelations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $TagAssignmentsOrderingComposer
+    extends Composer<_$AppDatabase, TagAssignments> {
+  $TagAssignmentsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $TagsOrderingComposer get tagId {
+    final $TagsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.tags,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagsOrderingComposer(
+            $db: $db,
+            $table: $db.tags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsOrderingComposer get intentionId {
+    final $IntentionsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.intentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsOrderingComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $LongTermRelationsOrderingComposer get longTermRelationId {
+    final $LongTermRelationsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.longTermRelationId,
+      referencedTable: $db.longTermRelations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $LongTermRelationsOrderingComposer(
+            $db: $db,
+            $table: $db.longTermRelations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $TagAssignmentsAnnotationComposer
+    extends Composer<_$AppDatabase, TagAssignments> {
+  $TagAssignmentsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => column,
+  );
+
+  $TagsAnnotationComposer get tagId {
+    final $TagsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.tags,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagsAnnotationComposer(
+            $db: $db,
+            $table: $db.tags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsAnnotationComposer get intentionId {
+    final $IntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.intentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $LongTermRelationsAnnotationComposer get longTermRelationId {
+    final $LongTermRelationsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.longTermRelationId,
+      referencedTable: $db.longTermRelations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $LongTermRelationsAnnotationComposer(
+            $db: $db,
+            $table: $db.longTermRelations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $TagAssignmentsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          TagAssignments,
+          TagAssignment,
+          $TagAssignmentsFilterComposer,
+          $TagAssignmentsOrderingComposer,
+          $TagAssignmentsAnnotationComposer,
+          $TagAssignmentsCreateCompanionBuilder,
+          $TagAssignmentsUpdateCompanionBuilder,
+          (TagAssignment, $TagAssignmentsReferences),
+          TagAssignment,
+          PrefetchHooks Function({
+            bool tagId,
+            bool intentionId,
+            bool longTermRelationId,
+          })
+        > {
+  $TagAssignmentsTableManager(_$AppDatabase db, TagAssignments table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $TagAssignmentsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $TagAssignmentsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $TagAssignmentsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                Value<String> tagId = const Value.absent(),
+                Value<String?> intentionId = const Value.absent(),
+                Value<String?> longTermRelationId = const Value.absent(),
+              }) => TagAssignmentsCompanion(
+                creationSequence: creationSequence,
+                tagId: tagId,
+                intentionId: intentionId,
+                longTermRelationId: longTermRelationId,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                required String tagId,
+                Value<String?> intentionId = const Value.absent(),
+                Value<String?> longTermRelationId = const Value.absent(),
+              }) => TagAssignmentsCompanion.insert(
+                creationSequence: creationSequence,
+                tagId: tagId,
+                intentionId: intentionId,
+                longTermRelationId: longTermRelationId,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $TagAssignmentsReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                tagId = false,
+                intentionId = false,
+                longTermRelationId = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (tagId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.tagId,
+                            referencedTable: $TagAssignmentsReferences
+                                ._tagIdTable(db),
+                            referencedColumn: $TagAssignmentsReferences
+                                ._tagIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (intentionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.intentionId,
+                            referencedTable: $TagAssignmentsReferences
+                                ._intentionIdTable(db),
+                            referencedColumn: $TagAssignmentsReferences
+                                ._intentionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (longTermRelationId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.longTermRelationId,
+                            referencedTable: $TagAssignmentsReferences
+                                ._longTermRelationIdTable(db),
+                            referencedColumn: $TagAssignmentsReferences
+                                ._longTermRelationIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $TagAssignmentsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      TagAssignments,
+      TagAssignment,
+      $TagAssignmentsFilterComposer,
+      $TagAssignmentsOrderingComposer,
+      $TagAssignmentsAnnotationComposer,
+      $TagAssignmentsCreateCompanionBuilder,
+      $TagAssignmentsUpdateCompanionBuilder,
+      (TagAssignment, $TagAssignmentsReferences),
+      TagAssignment,
+      PrefetchHooks Function({
+        bool tagId,
+        bool intentionId,
+        bool longTermRelationId,
+      })
     >;
 typedef $DailyChoicesCreateCompanionBuilder = DailyChoicesCompanion Function({
   Value<int> creationSequence,
@@ -3109,573 +5298,6 @@ typedef $DailyChoicesProcessedTableManager =
         bool dailyChoicePathStepsRefs,
       })
     >;
-typedef $LongTermRelationsCreateCompanionBuilder =
-    LongTermRelationsCompanion Function({
-      Value<int> creationSequence,
-      required String id,
-      required String sourceIntentionId,
-      required String relatedIntentionId,
-      required String type,
-      required int priority,
-      Value<String?> description,
-      Value<bool> isArchived,
-    });
-typedef $LongTermRelationsUpdateCompanionBuilder =
-    LongTermRelationsCompanion Function({
-      Value<int> creationSequence,
-      Value<String> id,
-      Value<String> sourceIntentionId,
-      Value<String> relatedIntentionId,
-      Value<String> type,
-      Value<int> priority,
-      Value<String?> description,
-      Value<bool> isArchived,
-    });
-
-final class $LongTermRelationsReferences
-    extends BaseReferences<_$AppDatabase, LongTermRelations, LongTermRelation> {
-  $LongTermRelationsReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static Intentions _sourceIntentionIdTable(_$AppDatabase db) => db.intentions
-      .createAlias('long_term_relations__source_intention_id__intentions__id');
-
-  $IntentionsProcessedTableManager get sourceIntentionId {
-    final $_column = $_itemColumn<String>('source_intention_id')!;
-
-    final manager = $IntentionsTableManager(
-      $_db,
-      $_db.intentions,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_sourceIntentionIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static Intentions _relatedIntentionIdTable(_$AppDatabase db) => db.intentions
-      .createAlias('long_term_relations__related_intention_id__intentions__id');
-
-  $IntentionsProcessedTableManager get relatedIntentionId {
-    final $_column = $_itemColumn<String>('related_intention_id')!;
-
-    final manager = $IntentionsTableManager(
-      $_db,
-      $_db.intentions,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_relatedIntentionIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<DailyChoicePathSteps, List<DailyChoicePathStep>>
-  _dailyChoicePathStepsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.dailyChoicePathSteps,
-        aliasName: 'long_term_relations__id__daily_choice_path_steps__long_term_relation_id',
-      );
-
-  $DailyChoicePathStepsProcessedTableManager get dailyChoicePathStepsRefs {
-    final manager =
-        $DailyChoicePathStepsTableManager(
-          $_db,
-          $_db.dailyChoicePathSteps,
-        ).filter(
-          (f) => f.longTermRelationId.id.sqlEquals($_itemColumn<String>('id')!),
-        );
-
-    final cache = $_typedResult.readTableOrNull(
-      _dailyChoicePathStepsRefsTable($_db),
-    );
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
-class $LongTermRelationsFilterComposer
-    extends Composer<_$AppDatabase, LongTermRelations> {
-  $LongTermRelationsFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<int> get creationSequence => $composableBuilder(
-    column: $table.creationSequence,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get type => $composableBuilder(
-    column: $table.type,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get priority => $composableBuilder(
-    column: $table.priority,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  $IntentionsFilterComposer get sourceIntentionId {
-    final $IntentionsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsFilterComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $IntentionsFilterComposer get relatedIntentionId {
-    final $IntentionsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.relatedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsFilterComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<bool> dailyChoicePathStepsRefs(
-    Expression<bool> Function($DailyChoicePathStepsFilterComposer f) f,
-  ) {
-    final $DailyChoicePathStepsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dailyChoicePathSteps,
-      getReferencedColumn: (t) => t.longTermRelationId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicePathStepsFilterComposer(
-            $db: $db,
-            $table: $db.dailyChoicePathSteps,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $LongTermRelationsOrderingComposer
-    extends Composer<_$AppDatabase, LongTermRelations> {
-  $LongTermRelationsOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<int> get creationSequence => $composableBuilder(
-    column: $table.creationSequence,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get type => $composableBuilder(
-    column: $table.type,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get priority => $composableBuilder(
-    column: $table.priority,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  $IntentionsOrderingComposer get sourceIntentionId {
-    final $IntentionsOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsOrderingComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $IntentionsOrderingComposer get relatedIntentionId {
-    final $IntentionsOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.relatedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsOrderingComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $LongTermRelationsAnnotationComposer
-    extends Composer<_$AppDatabase, LongTermRelations> {
-  $LongTermRelationsAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<int> get creationSequence => $composableBuilder(
-    column: $table.creationSequence,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get type =>
-      $composableBuilder(column: $table.type, builder: (column) => column);
-
-  GeneratedColumn<int> get priority =>
-      $composableBuilder(column: $table.priority, builder: (column) => column);
-
-  GeneratedColumn<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => column,
-  );
-
-  $IntentionsAnnotationComposer get sourceIntentionId {
-    final $IntentionsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsAnnotationComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $IntentionsAnnotationComposer get relatedIntentionId {
-    final $IntentionsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.relatedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsAnnotationComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<T> dailyChoicePathStepsRefs<T extends Object>(
-    Expression<T> Function($DailyChoicePathStepsAnnotationComposer a) f,
-  ) {
-    final $DailyChoicePathStepsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dailyChoicePathSteps,
-      getReferencedColumn: (t) => t.longTermRelationId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicePathStepsAnnotationComposer(
-            $db: $db,
-            $table: $db.dailyChoicePathSteps,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $LongTermRelationsTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          LongTermRelations,
-          LongTermRelation,
-          $LongTermRelationsFilterComposer,
-          $LongTermRelationsOrderingComposer,
-          $LongTermRelationsAnnotationComposer,
-          $LongTermRelationsCreateCompanionBuilder,
-          $LongTermRelationsUpdateCompanionBuilder,
-          (LongTermRelation, $LongTermRelationsReferences),
-          LongTermRelation,
-          PrefetchHooks Function({
-            bool sourceIntentionId,
-            bool relatedIntentionId,
-            bool dailyChoicePathStepsRefs,
-          })
-        > {
-  $LongTermRelationsTableManager(_$AppDatabase db, LongTermRelations table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $LongTermRelationsFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $LongTermRelationsOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $LongTermRelationsAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<int> creationSequence = const Value.absent(),
-                Value<String> id = const Value.absent(),
-                Value<String> sourceIntentionId = const Value.absent(),
-                Value<String> relatedIntentionId = const Value.absent(),
-                Value<String> type = const Value.absent(),
-                Value<int> priority = const Value.absent(),
-                Value<String?> description = const Value.absent(),
-                Value<bool> isArchived = const Value.absent(),
-              }) => LongTermRelationsCompanion(
-                creationSequence: creationSequence,
-                id: id,
-                sourceIntentionId: sourceIntentionId,
-                relatedIntentionId: relatedIntentionId,
-                type: type,
-                priority: priority,
-                description: description,
-                isArchived: isArchived,
-              ),
-          createCompanionCallback:
-              ({
-                Value<int> creationSequence = const Value.absent(),
-                required String id,
-                required String sourceIntentionId,
-                required String relatedIntentionId,
-                required String type,
-                required int priority,
-                Value<String?> description = const Value.absent(),
-                Value<bool> isArchived = const Value.absent(),
-              }) => LongTermRelationsCompanion.insert(
-                creationSequence: creationSequence,
-                id: id,
-                sourceIntentionId: sourceIntentionId,
-                relatedIntentionId: relatedIntentionId,
-                type: type,
-                priority: priority,
-                description: description,
-                isArchived: isArchived,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $LongTermRelationsReferences(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback:
-              ({
-                sourceIntentionId = false,
-                relatedIntentionId = false,
-                dailyChoicePathStepsRefs = false,
-              }) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [
-                    if (dailyChoicePathStepsRefs) db.dailyChoicePathSteps,
-                  ],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (sourceIntentionId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.sourceIntentionId,
-                            referencedTable: $LongTermRelationsReferences
-                                ._sourceIntentionIdTable(db),
-                            referencedColumn: $LongTermRelationsReferences
-                                ._sourceIntentionIdTable(db)
-                                .id,
-                          ) as T;
-                        }
-                        if (relatedIntentionId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.relatedIntentionId,
-                            referencedTable: $LongTermRelationsReferences
-                                ._relatedIntentionIdTable(db),
-                            referencedColumn: $LongTermRelationsReferences
-                                ._relatedIntentionIdTable(db)
-                                .id,
-                          ) as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (dailyChoicePathStepsRefs)
-                        await $_getPrefetchedData<
-                          LongTermRelation,
-                          LongTermRelations,
-                          DailyChoicePathStep
-                        >(
-                          currentTable: table,
-                          referencedTable: $LongTermRelationsReferences
-                              ._dailyChoicePathStepsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $LongTermRelationsReferences(
-                                db,
-                                table,
-                                p0,
-                              ).dailyChoicePathStepsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.longTermRelationId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
-                  },
-                );
-              },
-        ),
-      );
-}
-
-typedef $LongTermRelationsProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      LongTermRelations,
-      LongTermRelation,
-      $LongTermRelationsFilterComposer,
-      $LongTermRelationsOrderingComposer,
-      $LongTermRelationsAnnotationComposer,
-      $LongTermRelationsCreateCompanionBuilder,
-      $LongTermRelationsUpdateCompanionBuilder,
-      (LongTermRelation, $LongTermRelationsReferences),
-      LongTermRelation,
-      PrefetchHooks Function({
-        bool sourceIntentionId,
-        bool relatedIntentionId,
-        bool dailyChoicePathStepsRefs,
-      })
-    >;
 typedef $DailyChoicePathStepsCreateCompanionBuilder =
     DailyChoicePathStepsCompanion Function({
       required String id,
@@ -4209,12 +5831,15 @@ typedef $IntentionTitlesFtsProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $TagsTableManager get tags => $TagsTableManager(_db, _db.tags);
   $IntentionsTableManager get intentions =>
       $IntentionsTableManager(_db, _db.intentions);
-  $DailyChoicesTableManager get dailyChoices =>
-      $DailyChoicesTableManager(_db, _db.dailyChoices);
   $LongTermRelationsTableManager get longTermRelations =>
       $LongTermRelationsTableManager(_db, _db.longTermRelations);
+  $TagAssignmentsTableManager get tagAssignments =>
+      $TagAssignmentsTableManager(_db, _db.tagAssignments);
+  $DailyChoicesTableManager get dailyChoices =>
+      $DailyChoicesTableManager(_db, _db.dailyChoices);
   $DailyChoicePathStepsTableManager get dailyChoicePathSteps =>
       $DailyChoicePathStepsTableManager(_db, _db.dailyChoicePathSteps);
   $IntentionTitlesFtsTableManager get intentionTitlesFts =>
