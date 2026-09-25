@@ -819,6 +819,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCatalogRename => 'Rename tag';
 
   @override
+  String get tagCatalogDelete => 'Delete tag';
+
+  @override
+  String tagDeleteConfirmationTitle(String tagName) {
+    return 'Delete tag “$tagName”?';
+  }
+
+  @override
+  String get tagDeleteConfirmationScope =>
+      'This permanently deletes the tag and all its assignments to active and archived intentions and long-term relations, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.';
+
+  @override
+  String get tagDeleteCancel => 'Cancel';
+
+  @override
+  String get tagDeleteConfirm => 'Delete tag and assignments';
+
+  @override
+  String get tagDeleteAlreadyRunning =>
+      'An operation on this tag is already in progress. Wait for its result.';
+
+  @override
+  String get tagDeleteSaving => 'Deleting tag and assignments…';
+
+  @override
   String get tagCatalogSelected => 'Selected tag';
 
   @override

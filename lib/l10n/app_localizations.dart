@@ -1466,6 +1466,48 @@ abstract class AppLocalizations {
   /// **'Rename tag'**
   String get tagCatalogRename;
 
+  /// Удалить выбранный тег
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tag'**
+  String get tagCatalogDelete;
+
+  /// Заголовок подтверждения удаления конкретного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tag “{tagName}”?'**
+  String tagDeleteConfirmationTitle(String tagName);
+
+  /// Полный охват удаления тега независимо от загруженной порции
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes the tag and all its assignments to active and archived intentions and long-term relations, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.'**
+  String get tagDeleteConfirmationScope;
+
+  /// Отменить удаление тега
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get tagDeleteCancel;
+
+  /// Подтвердить удаление тега и всех назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tag and assignments'**
+  String get tagDeleteConfirm;
+
+  /// Повторный вход во время команды того же тега
+  ///
+  /// In en, this message translates to:
+  /// **'An operation on this tag is already in progress. Wait for its result.'**
+  String get tagDeleteAlreadyRunning;
+
+  /// Ожидание подтверждения удаления тега
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting tag and assignments…'**
+  String get tagDeleteSaving;
+
   /// Тег выбран после завершения формы
   ///
   /// In en, this message translates to:

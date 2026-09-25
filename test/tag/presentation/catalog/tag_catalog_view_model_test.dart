@@ -114,6 +114,22 @@ void main() {
     },
   );
 
+  test('позднее чтение после удаления не возвращает удалённый тег', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, [_tag(1, 'Дом')], cursor: _Cursor());
+    await pumpEventQueue();
+    final pending = h.model.loadMore();
+    await h.deleted(_id(1), revision: 2);
+    expect((h.state as TagCatalogLoaded).items, isEmpty);
+    h.repository.page(1, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
+    await pending;
+    expect(h.repository.queries[2].cursor, isNull);
+    h.repository.page(2, [_tag(2, 'Работа')], revision: 2);
+    await pumpEventQueue();
+    expect((h.state as TagCatalogLoaded).items.map((tag) => tag.id), [_id(2)]);
+  });
+
   test('учтённое завершение не запускает повторное чтение', () async {
     final h = _Harness();
     addTearDown(h.dispose);

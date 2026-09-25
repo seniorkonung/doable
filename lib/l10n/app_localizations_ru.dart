@@ -822,6 +822,31 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagCatalogRename => 'Переименовать тег';
 
   @override
+  String get tagCatalogDelete => 'Удалить тег';
+
+  @override
+  String tagDeleteConfirmationTitle(String tagName) {
+    return 'Удалить тег «$tagName»?';
+  }
+
+  @override
+  String get tagDeleteConfirmationScope =>
+      'Тег и все его назначения активным и архивированным намерениям и долговременным связям будут удалены необратимо, включая незагруженные назначения. Сами намерения, связи, дневные выборы и их пути сохраняются.';
+
+  @override
+  String get tagDeleteCancel => 'Отмена';
+
+  @override
+  String get tagDeleteConfirm => 'Удалить тег и назначения';
+
+  @override
+  String get tagDeleteAlreadyRunning =>
+      'Изменение этого тега уже выполняется. Дождитесь результата.';
+
+  @override
+  String get tagDeleteSaving => 'Удаляем тег и назначения…';
+
+  @override
   String get tagCatalogSelected => 'Выбранный тег';
 
   @override

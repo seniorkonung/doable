@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,11 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_command_result.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/tag_catalog.dart' hide TagCatalogPage;
+import '../../application/tag_command.dart';
+import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
 import '../editor/tag_editor_state.dart';
+import '../tag_failure_message.dart';
 import 'tag_catalog_state.dart';
 import 'tag_catalog_view_model.dart';
+import 'tag_delete_confirmation.dart';
 
 @RoutePage()
 final class TagCatalogPage extends ConsumerStatefulWidget {
@@ -21,7 +29,112 @@ final class TagCatalogPage extends ConsumerStatefulWidget {
 
 final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
   final _creationKey = TagCreationFormKey();
+  late final GraphCommandCoordinator _coordinator;
   Tag? _selectedTag;
+  TagOperationToken? _activeDeleteToken;
+  TagOperationToken? _failureToken;
+  GraphInitiatorPresentationClaim? _failureClaim;
+  TagCommandFailure? _deleteFailure;
+  bool _confirmationOpen = false;
+  bool _deleteBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+  }
+
+  @override
+  void dispose() {
+    _releasePresentation();
+    super.dispose();
+  }
+
+  void _releasePresentation() {
+    if (_activeDeleteToken case final token?) {
+      _coordinator.releaseInitiatorPresentation(token);
+    }
+    if (_failureToken case final token?) {
+      _coordinator.releaseInitiatorPresentation(token);
+    }
+    _failureToken = null;
+    _failureClaim = null;
+  }
+
+  Future<void> _confirmDelete(Tag tag) async {
+    if (_confirmationOpen || _activeDeleteToken != null) return;
+    setState(() => _confirmationOpen = true);
+    final confirmed = await confirmTagDeletion(context, tag);
+    if (!mounted) return;
+    setState(() => _confirmationOpen = false);
+    if (!confirmed) return;
+    _releasePresentation();
+    final start = _coordinator.acceptTagDelete(DeleteTag(tag.id));
+    switch (start) {
+      case TagCommandAccepted(:final token, :final future):
+        setState(() {
+          _activeDeleteToken = token;
+          _deleteFailure = null;
+          _deleteBusy = false;
+        });
+        unawaited(_finishDelete(tag, token, future));
+      case TagCommandAlreadyRunning():
+        setState(() {
+          _deleteBusy = true;
+          _deleteFailure = null;
+        });
+      case GraphCommandCoordinatorDraining():
+        setState(() {
+          _deleteBusy = false;
+          _deleteFailure = const TagUnexpectedFailure();
+        });
+    }
+  }
+
+  Future<void> _finishDelete(
+    Tag tag,
+    TagOperationToken token,
+    Future<TagCommandCompletion> future,
+  ) async {
+    try {
+      final completion = await future;
+      if (!mounted || !identical(_activeDeleteToken, token)) return;
+      switch (completion.result) {
+        case GraphResultSuccess(value: TagDeleted(:final tagId))
+            when tagId == tag.id:
+          setState(() {
+            _activeDeleteToken = null;
+            if (_selectedTag?.id == tagId) _selectedTag = null;
+          });
+        case GraphResultFailure(:final failure):
+          final canPresentHere = ModalRoute.of(context)?.isCurrent ?? false;
+          if (!canPresentHere) {
+            _coordinator.releaseInitiatorPresentation(token);
+          }
+          setState(() {
+            _activeDeleteToken = null;
+            _deleteFailure = canPresentHere ? failure : null;
+            _failureToken = canPresentHere ? token : null;
+            _failureClaim = canPresentHere
+                ? _coordinator.claimInitiatorFailure(token)
+                : null;
+          });
+        case GraphResultSuccess():
+          _coordinator.releaseInitiatorPresentation(token);
+          setState(() {
+            _activeDeleteToken = null;
+            _deleteFailure = const TagUnexpectedFailure();
+          });
+      }
+    } on Object {
+      if (!mounted || !identical(_activeDeleteToken, token)) return;
+      _coordinator.releaseInitiatorPresentation(token);
+      setState(() {
+        _activeDeleteToken = null;
+        _deleteFailure = const TagUnexpectedFailure();
+      });
+    }
+  }
 
   Future<void> _openEditor(TagEditorContext editorContext) async {
     final selected = await context.router.push<Tag>(
@@ -49,23 +162,52 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
           ),
         ],
       ),
-      body: switch (state) {
-        TagCatalogInitialLoading() => _CatalogStatus(
-          message: localizations.tagCatalogLoading,
-          loading: true,
-        ),
-        TagCatalogInitialFailure(:final failure, :final canRetry) =>
-          _CatalogStatus(
-            message: _readFailure(localizations, failure),
-            onRetry: canRetry ? model.retryFirstPage : null,
+      body: Column(
+        children: [
+          if (_activeDeleteToken != null)
+            Semantics(
+              liveRegion: true,
+              child: _CatalogInlineStatus(
+                message: localizations.tagDeleteSaving,
+                loading: true,
+              ),
+            ),
+          if (_deleteBusy)
+            _CatalogInlineStatus(
+              message: localizations.tagDeleteAlreadyRunning,
+            ),
+          if (_deleteFailure case final failure?)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: OperationFailurePresentation(
+                claim: _failureClaim,
+                message: tagFailureMessage(localizations, failure),
+                messageKey: const ValueKey('tag-delete-failure'),
+              ),
+            ),
+          Expanded(
+            child: switch (state) {
+              TagCatalogInitialLoading() => _CatalogStatus(
+                message: localizations.tagCatalogLoading,
+                loading: true,
+              ),
+              TagCatalogInitialFailure(:final failure, :final canRetry) =>
+                _CatalogStatus(
+                  message: _readFailure(localizations, failure),
+                  onRetry: canRetry ? model.retryFirstPage : null,
+                ),
+              TagCatalogLoaded loaded => _LoadedCatalog(
+                state: loaded,
+                model: model,
+                selectedTag: _selectedTag,
+                onRename: (tag) => _openEditor(TagEditorRenaming(tag)),
+                onDelete: (tag) => unawaited(_confirmDelete(tag)),
+                canDelete: !_confirmationOpen && _activeDeleteToken == null,
+              ),
+            },
           ),
-        TagCatalogLoaded loaded => _LoadedCatalog(
-          state: loaded,
-          model: model,
-          selectedTag: _selectedTag,
-          onRename: (tag) => _openEditor(TagEditorRenaming(tag)),
-        ),
-      },
+        ],
+      ),
     );
   }
 }
@@ -76,12 +218,16 @@ final class _LoadedCatalog extends StatelessWidget {
     required this.model,
     required this.selectedTag,
     required this.onRename,
+    required this.onDelete,
+    required this.canDelete,
   });
 
   final TagCatalogLoaded state;
   final TagCatalogViewModel model;
   final Tag? selectedTag;
   final ValueChanged<Tag> onRename;
+  final ValueChanged<Tag> onDelete;
+  final bool canDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -113,10 +259,11 @@ final class _LoadedCatalog extends StatelessWidget {
             child: ListTile(
               title: Text(selected.name.value),
               subtitle: Text(localizations.tagCatalogSelected),
-              trailing: IconButton(
-                tooltip: localizations.tagCatalogRename,
-                onPressed: () => onRename(selected),
-                icon: const Icon(Icons.edit_outlined),
+              trailing: _TagActions(
+                tag: selected,
+                onRename: onRename,
+                onDelete: onDelete,
+                canDelete: canDelete,
               ),
             ),
           ),
@@ -133,10 +280,11 @@ final class _LoadedCatalog extends StatelessWidget {
                 child: ListTile(
                   title: Text(tag.name.value),
                   trailing: state.canUseCurrentItems
-                      ? IconButton(
-                          tooltip: localizations.tagCatalogRename,
-                          onPressed: () => onRename(tag),
-                          icon: const Icon(Icons.edit_outlined),
+                      ? _TagActions(
+                          tag: tag,
+                          onRename: onRename,
+                          onDelete: onDelete,
+                          canDelete: canDelete,
                         )
                       : null,
                 ),
@@ -167,6 +315,41 @@ final class _LoadedCatalog extends StatelessWidget {
                       onAction: model.loadMore,
                     ),
           },
+      ],
+    );
+  }
+}
+
+final class _TagActions extends StatelessWidget {
+  const _TagActions({
+    required this.tag,
+    required this.onRename,
+    required this.onDelete,
+    required this.canDelete,
+  });
+
+  final Tag tag;
+  final ValueChanged<Tag> onRename;
+  final ValueChanged<Tag> onDelete;
+  final bool canDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: l10n.tagCatalogRename,
+          onPressed: () => onRename(tag),
+          icon: const Icon(Icons.edit_outlined),
+        ),
+        IconButton(
+          key: ValueKey('tag-catalog-delete-${tag.id.toCanonicalString()}'),
+          tooltip: l10n.tagCatalogDelete,
+          onPressed: canDelete ? () => onDelete(tag) : null,
+          icon: const Icon(Icons.delete_outline),
+        ),
       ],
     );
   }
