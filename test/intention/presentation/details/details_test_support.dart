@@ -1,7 +1,15 @@
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
+
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -67,6 +75,28 @@ final class ControlledDetailRequest {
 
 final class ControlledDetailsRepository implements PersonalGraphRepository {
   @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
+  @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
   ) => throw UnsupportedError(
@@ -91,11 +121,13 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   final commands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
   final blockingRelationsCommands = <DeleteBlockingRelations>[];
+  final dailyChoiceCommands = <DailyChoiceCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
   final _blockingRelationsCommandRequests =
       <Completer<DeleteBlockingRelationsResult>>[];
+  final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
   var _watchCallCount = 0;
 
   Result<IntentionCatalogPage>? catalogResult;
@@ -103,10 +135,13 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
 
   /// Запросы порций соседства в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
+  final dailyChoiceGroupQueries = <DailyChoiceGroupQuery>[];
 
   /// Ответ соседства на конкретный запрос; по умолчанию группа пуста.
   RelationGroupPageResult Function(RelationGroupQuery query)?
   onRelationGroupPage;
+  RelationGroupPageResult Function(DailyChoiceGroupQuery query)?
+  onDailyChoiceGroupPage;
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -133,11 +168,33 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
   );
 
   @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
+
+  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) {
-    relationGroupQueries.add(query);
-    final result = onRelationGroupPage?.call(query);
+    if (query is DailyChoiceGroupQuery) {
+      dailyChoiceGroupQueries.add(query);
+      return Future.value(
+        onDailyChoiceGroupPage?.call(query) ??
+            GraphResultSuccess(
+              DailyChoiceGroupFirstPage(
+                items: const [],
+                counts: testRelationCounts(),
+                nextCursor: null,
+                revision: const TestDetailsRevision(0),
+              ),
+            ),
+      );
+    }
+    final relationQuery = query as RelationGroupQuery;
+    relationGroupQueries.add(relationQuery);
+    final result = onRelationGroupPage?.call(relationQuery);
     return Future.value(
       result ??
           GraphResultSuccess(
@@ -184,6 +241,7 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
       ),
       final DeleteBlockingRelations deletion =>
         await _executeBlockingRelationsDelete(deletion),
+      final DailyChoiceCommand choice => await _executeDailyChoice(choice),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -197,6 +255,18 @@ final class ControlledDetailsRepository implements PersonalGraphRepository {
     _relationCommandRequests.add(request);
     return request.future;
   }
+
+  Future<DailyChoiceCommandResult> _executeDailyChoice(
+    DailyChoiceCommand command,
+  ) {
+    dailyChoiceCommands.add(command);
+    final request = Completer<DailyChoiceCommandResult>();
+    _dailyChoiceCommandRequests.add(request);
+    return request.future;
+  }
+
+  void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) =>
+      _dailyChoiceCommandRequests[index].complete(result);
 
   Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
     DeleteBlockingRelations command,
@@ -311,6 +381,8 @@ RelationCounts testRelationCounts({
   int archivedNeedOutgoing = 0,
   int archivedCanIncoming = 0,
   int archivedCanOutgoing = 0,
+  int dailySource = 0,
+  int dailySelected = 0,
 }) => RelationCounts(
   activeNeedIncoming: activeNeedIncoming,
   activeNeedOutgoing: activeNeedOutgoing,
@@ -320,6 +392,8 @@ RelationCounts testRelationCounts({
   archivedNeedOutgoing: archivedNeedOutgoing,
   archivedCanIncoming: archivedCanIncoming,
   archivedCanOutgoing: archivedCanOutgoing,
+  dailySource: dailySource,
+  dailySelected: dailySelected,
 );
 
 Future<void> waitForDetailRequests(

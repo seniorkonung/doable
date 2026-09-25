@@ -241,6 +241,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.';
 
   @override
+  String get blockingRelationsInvalidProtected =>
+      'This relation is used in a saved daily path. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again. The entire selected set remains unchanged.';
+
+  @override
   String get blockingRelationsRefreshIntentionNotFound =>
       'This intention no longer exists. Its relations cannot be deleted here.';
 
@@ -266,7 +270,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get blockingRelationsDeleteProhibited =>
-      'A selected relation can no longer be deleted. Refresh the selection and confirm it again.';
+      'A selected relation is now used in a saved daily path. The entire set remains unchanged. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again.';
 
   @override
   String get relationNeighborhoodSummaryLoading =>
@@ -308,6 +312,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String relationNeighborhoodCanTotal(int count) {
     return 'Can: $count';
   }
+
+  @override
+  String relationNeighborhoodDailyTotal(int count) {
+    return 'Daily choices: $count';
+  }
+
+  @override
+  String get relationNeighborhoodDailySourceRole => 'Source intention';
+
+  @override
+  String get relationNeighborhoodDailySelectedRole => 'Selected action';
+
+  @override
+  String get relationNeighborhoodLongTermGroups => 'Long-term relations';
 
   @override
   String get relationNeighborhoodScopeLabel => 'Relation state';
@@ -743,6 +761,78 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationRelation => 'relation';
 
   @override
+  String get graphOperationDailyChoice => 'daily choice';
+
+  @override
+  String get dailyChoiceCreated => 'Daily choice created.';
+
+  @override
+  String get dailyChoiceUpdated => 'Daily choice updated.';
+
+  @override
+  String get dailyChoicePathReplaced => 'Daily choice path replaced.';
+
+  @override
+  String get dailyChoiceDeleted => 'Daily choice deleted.';
+
+  @override
+  String get dailyChoiceDeleteAction => 'Delete daily choice permanently';
+
+  @override
+  String get dailyChoiceDeleteConfirmationTitle =>
+      'Delete daily choice permanently?';
+
+  @override
+  String dailyChoiceDeleteConfirmationMessage(
+    String phrase,
+    String date,
+    String choiceId,
+  ) {
+    return 'Choice: $phrase\nDate: $date\nChoice ID: $choiceId\n\nThis cannot be undone. Intentions, long-term relations, and other daily choices will remain.';
+  }
+
+  @override
+  String get dailyChoiceDeleteConfirmAction => 'Delete permanently';
+
+  @override
+  String get dailyChoiceSourceInvalid =>
+      'Check the source intention of the daily choice.';
+
+  @override
+  String get dailyChoiceSelectedInvalid =>
+      'Check the selected intention of the daily choice.';
+
+  @override
+  String get dailyChoiceDateInvalid => 'Check the daily choice date.';
+
+  @override
+  String get dailyChoiceDescriptionInvalid =>
+      'Check the daily choice description.';
+
+  @override
+  String get dailyChoicePathInvalid => 'Check the daily choice path.';
+
+  @override
+  String get dailyChoiceOperationNotFound =>
+      'This daily choice no longer exists.';
+
+  @override
+  String get dailyChoiceOperationConflict =>
+      'The data changed. Refresh it and confirm again.';
+
+  @override
+  String get dailyChoiceOperationUnavailable =>
+      'Could not complete the daily choice operation. Try again.';
+
+  @override
+  String get dailyChoiceOperationCorruption =>
+      'Stored data is damaged. The daily choice was not changed.';
+
+  @override
+  String get dailyChoiceOperationUnexpected =>
+      'The daily choice operation failed because of an unexpected error.';
+
+  @override
   String get relationEditorCreated => 'Relation created.';
 
   @override
@@ -794,6 +884,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorUpdateParticipantArchived =>
       'An active relation can only link active intentions.';
+
+  @override
+  String get relationEditorUpdateReferencedByDailyPath =>
+      'This relation is used by a saved daily path. Its type and participants can’t be changed.';
+
+  @override
+  String get relationEditorPathProtection =>
+      'This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.';
+
+  @override
+  String get relationEditorPathProtectionWithDraft =>
+      'This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.';
 
   @override
   String get relationEditorUpdateUnavailable =>
@@ -878,6 +980,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be deleted because its current state conflicts with the operation.';
 
   @override
+  String get relationDeleteReferencedByDailyPath =>
+      'This relation is used by a saved daily path. Delete or replace the daily choices that use it first.';
+
+  @override
   String get relationDeleteUnavailable =>
       'The relation couldn’t be deleted. Try again.';
 
@@ -891,6 +997,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationNeighborhoodOpenRelation => 'Opens the relation details';
+
+  @override
+  String get relationNeighborhoodOpenDailyChoice =>
+      'Open the full saved daily path';
 
   @override
   String get relationDetailsTitle => 'Relation';
@@ -960,6 +1070,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationDetailsDeleteAction => 'Delete relation permanently';
 
   @override
+  String get relationDetailsPathProtection =>
+      'This relation is used in a saved daily path. It cannot be deleted, and its type and participants cannot be changed. Its description, priority, and archive state remain editable.';
+
+  @override
+  String get relationDetailsDeletionChecking =>
+      'Deletion is unavailable until this relation’s dependencies are confirmed.';
+
+  @override
   String get relationDetailsDeleteConfirmationTitle =>
       'Delete relation permanently?';
 
@@ -986,6 +1104,83 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get participantPickerTitle => 'Select a participant';
+
+  @override
+  String get actionPickerTitle => 'Select an action';
+
+  @override
+  String get actionPickerCancel => 'Cancel action selection';
+
+  @override
+  String get actionPickerLoading => 'Loading actions…';
+
+  @override
+  String get actionPickerEmpty => 'No active actions are available.';
+
+  @override
+  String get actionPickerNoMatches => 'No actions match this title.';
+
+  @override
+  String get actionPickerUnavailable =>
+      'Actions couldn’t be loaded. Try again.';
+
+  @override
+  String get actionPickerCorruption =>
+      'Saved action data is damaged and can’t be shown.';
+
+  @override
+  String get actionPickerUnexpected =>
+      'Actions couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get actionPickerSelectHint => 'Selects this action to find its reason';
+
+  @override
+  String get actionPickerOpenDetails => 'Open action details';
+
+  @override
+  String actionPickerTotalCount(int count) {
+    return 'Total actions: $count';
+  }
+
+  @override
+  String get sourcePickerTitle => 'Select a reason';
+
+  @override
+  String get sourcePickerCancel => 'Cancel reason selection';
+
+  @override
+  String get sourcePickerLoading => 'Loading intentions…';
+
+  @override
+  String get sourcePickerEmpty => 'No active intentions are available.';
+
+  @override
+  String get sourcePickerNoMatches => 'No intentions match this title.';
+
+  @override
+  String get sourcePickerUnavailable =>
+      'Intentions couldn’t be loaded. Try again.';
+
+  @override
+  String get sourcePickerCorruption =>
+      'Saved intention data is damaged and can’t be shown.';
+
+  @override
+  String get sourcePickerUnexpected =>
+      'Intentions couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get sourcePickerSelectHint =>
+      'Selects this intention as the new reason';
+
+  @override
+  String get sourcePickerOpenDetails => 'Open intention details';
+
+  @override
+  String sourcePickerTotalCount(int count) {
+    return 'Total intentions: $count';
+  }
 
   @override
   String get participantPickerCancel => 'Cancel the selection';
@@ -1104,5 +1299,467 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String relationEditorPriorityOption(String priority) {
     return 'Priority $priority';
+  }
+
+  @override
+  String get detailsChoosePathAction => 'Choose an action along a path';
+
+  @override
+  String get choicePathTitle => 'Choose a path to an action';
+
+  @override
+  String get choicePathBottomTitle => 'Choose a source for the action';
+
+  @override
+  String get choicePathBottomTraversal =>
+      'Exploration: from the action to a source';
+
+  @override
+  String get choicePathBottomPathDirection =>
+      'Relation direction: from the source to the action';
+
+  @override
+  String choicePathFixedAction(String action) {
+    return 'Selected action: $action';
+  }
+
+  @override
+  String get choicePathActionPending => 'Loading the selected action…';
+
+  @override
+  String choicePathCurrentSource(String source) {
+    return 'Source: $source';
+  }
+
+  @override
+  String get choicePathSourceSelected => 'Source confirmed';
+
+  @override
+  String choicePathSelectSource(String source) {
+    return 'Confirm source “$source”';
+  }
+
+  @override
+  String get choicePathBottomNoPath =>
+      'There are no valid incoming relations for this action right now. Choose another action.';
+
+  @override
+  String get choicePathDirection =>
+      'Path from the source intention to an action';
+
+  @override
+  String choicePathSource(String source) {
+    return 'Source intention: $source';
+  }
+
+  @override
+  String get choicePathSourcePending => 'Loading the source intention…';
+
+  @override
+  String choicePathReturnTo(String source) {
+    return 'Return to “$source”';
+  }
+
+  @override
+  String choicePathStepSemantics(int index, String phrase, String priority) {
+    return 'Step $index: $phrase. Priority $priority';
+  }
+
+  @override
+  String get choicePathActionSelected => 'Action selected';
+
+  @override
+  String choicePathSelectAction(String action) {
+    return 'Choose action “$action”';
+  }
+
+  @override
+  String get choicePathSelectionNotSaved =>
+      'The daily choice has not been created yet.';
+
+  @override
+  String get choicePathContinuations => 'Available continuations';
+
+  @override
+  String get choicePathLoading => 'Checking available continuations…';
+
+  @override
+  String get choicePathNoPath =>
+      'There is no valid path from this intention to another action right now.';
+
+  @override
+  String get choicePathNoFurtherPath =>
+      'There are no further valid continuations.';
+
+  @override
+  String get choicePathConflict =>
+      'The graph has changed. Refresh the path before continuing.';
+
+  @override
+  String get choicePathRefresh => 'Refresh path';
+
+  @override
+  String get choicePathNotFound =>
+      'An intention on this path no longer exists.';
+
+  @override
+  String get choicePathInvalid =>
+      'Continuations could not be checked because of an invalid request.';
+
+  @override
+  String get choicePathUnavailable =>
+      'Continuations are temporarily unavailable. Try again.';
+
+  @override
+  String get choicePathCorruption =>
+      'Saved path data is damaged. Continuation is unavailable.';
+
+  @override
+  String get choicePathUnexpected =>
+      'Continuations could not be checked because of an unexpected error.';
+
+  @override
+  String get choicePathLoadMore => 'Show more continuations';
+
+  @override
+  String get choicePathLoadingMore => 'Loading the next page…';
+
+  @override
+  String choicePathContinueSemantics(String phrase, String priority) {
+    return 'Continue along relation: $phrase. Priority $priority';
+  }
+
+  @override
+  String get dailyChoiceCreationTitle => 'Confirm daily choice';
+
+  @override
+  String get dailyChoiceCatalogTitle => 'Daily choices';
+
+  @override
+  String get dailyChoiceCreateFromAction => 'Create a choice from an action';
+
+  @override
+  String get dailyChoiceCatalogLoading => 'Loading daily choices…';
+
+  @override
+  String get dailyChoiceCatalogDateFilter => 'Date';
+
+  @override
+  String get dailyChoiceCatalogApplyDate => 'Apply date';
+
+  @override
+  String get dailyChoiceCatalogDateInvalid =>
+      'Enter a valid date as YYYY-MM-DD.';
+
+  @override
+  String get dailyChoiceCatalogCompletionFilter => 'Completion';
+
+  @override
+  String get dailyChoiceCatalogAllStates => 'All states';
+
+  @override
+  String get dailyChoiceCatalogIncomplete => 'Not completed';
+
+  @override
+  String get dailyChoiceCatalogCompleted => 'Completed';
+
+  @override
+  String get dailyChoiceCatalogClearFilters => 'Clear filters';
+
+  @override
+  String dailyChoiceCatalogTotalCount(int count) {
+    return 'Total daily choices: $count';
+  }
+
+  @override
+  String get dailyChoiceCatalogEmpty => 'No daily choices match the filters.';
+
+  @override
+  String get dailyChoiceCatalogRefreshing => 'Refreshing daily choices…';
+
+  @override
+  String get dailyChoiceCatalogLoadingMore => 'Loading more daily choices…';
+
+  @override
+  String get dailyChoiceCatalogLoadMore => 'Show more daily choices';
+
+  @override
+  String get dailyChoiceCatalogUnavailable =>
+      'Could not load daily choices. Try again.';
+
+  @override
+  String get dailyChoiceCatalogCorruption =>
+      'Stored daily choice data is damaged and cannot be shown.';
+
+  @override
+  String get dailyChoiceCatalogExpired =>
+      'The catalog changed. Refresh it to continue.';
+
+  @override
+  String get dailyChoiceCatalogInvalid =>
+      'The catalog position is no longer valid.';
+
+  @override
+  String get dailyChoiceCatalogUnexpected =>
+      'Could not load daily choices because of an unexpected error.';
+
+  @override
+  String dailyChoiceCatalogRowLabel(
+    int number,
+    String phrase,
+    String date,
+    String completion,
+  ) {
+    return 'Choice #$number. $phrase. $date. $completion';
+  }
+
+  @override
+  String get dailyChoiceDetailsTitle => 'Daily choice';
+
+  @override
+  String get dailyChoiceEditTitle => 'Edit daily choice';
+
+  @override
+  String get dailyChoiceEditSave => 'Save changes';
+
+  @override
+  String get dailyChoiceEditRefresh => 'Return to details and refresh';
+
+  @override
+  String get dailyChoiceDetailsLoading => 'Loading daily choice…';
+
+  @override
+  String get dailyChoiceDetailsNotFound =>
+      'This daily choice no longer exists.';
+
+  @override
+  String get dailyChoiceDetailsUnavailable =>
+      'Could not load this daily choice. Try again.';
+
+  @override
+  String get dailyChoiceDetailsCorruption =>
+      'The stored path is damaged and cannot be shown.';
+
+  @override
+  String get dailyChoiceDetailsUnexpected =>
+      'Could not load this daily choice because of an unexpected error.';
+
+  @override
+  String dailyChoiceDetailsPhrase(String source, String selected) {
+    return 'To $source, today I $selected';
+  }
+
+  @override
+  String dailyChoiceDetailsDate(String date) {
+    return 'Daily choice date: $date';
+  }
+
+  @override
+  String get dailyChoiceDetailsCompleted => 'Completed';
+
+  @override
+  String get dailyChoiceDetailsNotCompleted => 'Not completed';
+
+  @override
+  String get dailyChoiceDetailsDescription => 'Description';
+
+  @override
+  String get dailyChoiceDetailsPath => 'Stored path';
+
+  @override
+  String get dailyChoiceDetailsSource => 'Source intention';
+
+  @override
+  String get dailyChoiceDetailsIntermediate => 'Intermediate intention';
+
+  @override
+  String get dailyChoiceDetailsSelectedAction => 'Selected action';
+
+  @override
+  String get dailyChoiceDetailsArchived => 'Archived';
+
+  @override
+  String get dailyChoiceDetailsActive => 'Active';
+
+  @override
+  String get dailyChoiceDetailsReady => 'Ready for action';
+
+  @override
+  String get dailyChoiceDetailsNotReady => 'Not ready for action';
+
+  @override
+  String dailyChoiceDetailsStep(int number) {
+    return 'Transition $number';
+  }
+
+  @override
+  String get dailyChoiceCreationPath => 'Path to confirm';
+
+  @override
+  String dailyChoiceCreationAction(String action) {
+    return 'Selected action: $action';
+  }
+
+  @override
+  String get dailyChoiceCreationDate => 'Daily choice date';
+
+  @override
+  String get dailyChoiceCreationDateHint => 'Enter YYYY-MM-DD (0001–9999)';
+
+  @override
+  String get dailyChoiceCreationDescription => 'Description (optional)';
+
+  @override
+  String get dailyChoiceCreationCompleted => 'Already completed';
+
+  @override
+  String get dailyChoiceCreationCompletedHint =>
+      'Mark if the action was already done for this date';
+
+  @override
+  String get dailyChoiceCreationSave => 'Save daily choice';
+
+  @override
+  String get dailyChoiceCreationSaving => 'Saving…';
+
+  @override
+  String get dailyChoiceCreationCancel => 'Cancel';
+
+  @override
+  String get dailyChoiceCreationRefreshPath =>
+      'Return to the path and refresh it';
+
+  @override
+  String get dailyChoiceReplaceTitle => 'Confirm path replacement';
+
+  @override
+  String get dailyChoiceReplacePreparing =>
+      'Preparing the new path confirmation…';
+
+  @override
+  String get dailyChoiceReplaceCurrent => 'Daily choice to replace';
+
+  @override
+  String get dailyChoiceReplaceNewPath => 'New path from source to action';
+
+  @override
+  String get dailyChoiceReplaceNoDescription => 'No description';
+
+  @override
+  String get dailyChoiceReplaceFieldsPreserved =>
+      'The date, description, and completion will stay unchanged when the path is replaced.';
+
+  @override
+  String get dailyChoiceReplaceCompletionPreserved =>
+      'Completion stays on even if a different action is selected.';
+
+  @override
+  String get dailyChoiceReplaceConfirm => 'Replace path only';
+
+  @override
+  String get dailyChoiceReplaceSubmitting => 'Replacing path…';
+
+  @override
+  String get dailyChoiceReplaceChooseAgain => 'Return to path selection';
+
+  @override
+  String get dailyChoiceReplaceOpen => 'Replace path';
+
+  @override
+  String get dailyChoiceReplaceChooseDirection =>
+      'Choose the new path direction';
+
+  @override
+  String get dailyChoiceReplaceChooseDirectionDescription =>
+      'Choose a new source or action to replace the saved path.';
+
+  @override
+  String get dailyChoiceReplaceFromSource => 'Start from a new source';
+
+  @override
+  String get dailyChoiceReplaceFromAction => 'Start from a new action';
+
+  @override
+  String get dailyChoiceReplaceSelectPath => 'Choose a replacement path';
+
+  @override
+  String get dailyChoiceReplaceOpenConfirmation => 'Confirm path replacement';
+
+  @override
+  String get choicePathOpenConfirmation => 'Continue to choice confirmation';
+
+  @override
+  String get choiceSuggestionTitle => 'Previous routes';
+
+  @override
+  String get choiceSuggestionLoading => 'Loading previous route suggestions…';
+
+  @override
+  String get choiceSuggestionEmpty =>
+      'No previous routes for this participant.';
+
+  @override
+  String get choiceSuggestionUpdating =>
+      'Refreshing suggestions. Route selection is temporarily unavailable.';
+
+  @override
+  String get choiceSuggestionNotFound =>
+      'The selected intention no longer exists.';
+
+  @override
+  String get choiceSuggestionUnavailable =>
+      'Couldn’t load suggestions. Try again.';
+
+  @override
+  String get choiceSuggestionCorruption =>
+      'Stored suggestion data is damaged and can’t be confirmed.';
+
+  @override
+  String get choiceSuggestionUnexpected =>
+      'Couldn’t load suggestions because of an unexpected error.';
+
+  @override
+  String choiceSuggestionPosition(int index, int total) {
+    return 'Suggestion $index of $total';
+  }
+
+  @override
+  String choiceSuggestionSource(String source) {
+    return 'Source: $source';
+  }
+
+  @override
+  String choiceSuggestionAction(String action) {
+    return 'Selected action: $action';
+  }
+
+  @override
+  String get choiceSuggestionView => 'View full route';
+
+  @override
+  String get choiceSuggestionSelect => 'Select route';
+
+  @override
+  String get choiceSuggestionArchivedIntention =>
+      'Route unavailable: an intention is archived.';
+
+  @override
+  String get choiceSuggestionArchivedRelation =>
+      'Route unavailable: a relation in the route is archived.';
+
+  @override
+  String get choiceSuggestionActionNotReady =>
+      'Route unavailable: the final action is no longer ready for action.';
+
+  @override
+  String get choiceSuggestionPreviewTitle => 'Full route';
+
+  @override
+  String get choiceSuggestionDirection =>
+      'Route direction: from source to action';
+
+  @override
+  String choiceSuggestionStep(int index, int total) {
+    return 'Step $index of $total';
   }
 }

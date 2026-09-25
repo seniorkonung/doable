@@ -7,6 +7,7 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../long_term_relation/application/relation_counts.dart';
 import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention_id.dart';
@@ -18,8 +19,8 @@ part 'intention_catalog_view_model.g.dart';
 
 /// Ограниченный каталог намерений для одного назначения.
 ///
-/// Назначение задаёт отдельное состояние просмотра: выбор участника связи и
-/// открытый каталог намерений не разделяют охват, фильтр и загруженную часть.
+/// Назначение задаёт отдельное состояние просмотра: общий каталог и режимы
+/// выбора участников не разделяют фильтр и загруженную часть.
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   late IntentionCatalogPurpose _purpose;
@@ -41,6 +42,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     scope: switch (_purpose) {
       BrowseIntentionCatalog() => _scope,
       SelectRelationParticipant(:final scope) => scope,
+      SelectDailyChoiceAction() => IntentionScope.active,
+      SelectDailyChoiceSource() => IntentionScope.active,
     },
     titleFilterText: _titleFilterText,
     order: _order,
@@ -73,6 +76,12 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     try {
       query = IntentionCatalogQuery(
         scope: catalogScope,
+        readinessFilter: switch (purpose) {
+          SelectDailyChoiceAction() => IntentionReadinessFilter.readyOnly,
+          BrowseIntentionCatalog() ||
+          SelectRelationParticipant() ||
+          SelectDailyChoiceSource() => IntentionReadinessFilter.all,
+        },
         titleFilter: _titleFilterText,
         order: _order,
         pageSize: _policy.pageSize,
@@ -101,7 +110,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   void changeScope(IntentionScope scope) {
-    if (_purpose is SelectRelationParticipant || _scope == scope) {
+    if (_purpose is! BrowseIntentionCatalog || _scope == scope) {
       return;
     }
     _scope = scope;
@@ -539,6 +548,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionCatalogQuery _continuationQuery(IntentionCatalogLoaded confirmed) =>
       IntentionCatalogQuery(
         scope: confirmed.query.scope,
+        readinessFilter: confirmed.query.readinessFilter,
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
@@ -548,6 +558,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionCatalogQuery _firstPageQuery(IntentionCatalogLoaded confirmed) =>
       IntentionCatalogQuery(
         scope: confirmed.query.scope,
+        readinessFilter: confirmed.query.readinessFilter,
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
@@ -583,7 +594,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
-  /// Принимает подтверждённые изменения намерений и долговременных связей.
+  /// Принимает подтверждённые изменения намерений, долговременных и дневных связей.
   ///
   /// Отказ не согласует данные: подтверждённого пакета у него нет.
   void _handleCompletion(GraphCommandCompletion completion) {
@@ -697,12 +708,28 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       reconciled = next;
     }
 
-    final countedIds = <IntentionId>{};
+    final absoluteCounts = <IntentionId, RelationCounts>{};
     for (final change in package.countChanges) {
-      if (!countedIds.add(change.intentionId)) {
+      if (absoluteCounts.containsKey(change.intentionId)) {
         return null;
       }
-      reconciled = _applyCountsContent(reconciled, change);
+      absoluteCounts[change.intentionId] = change.counts;
+    }
+    for (final change in package.dailyChanges) {
+      for (final entry in change.intentionCounts.entries) {
+        final previous = absoluteCounts[entry.key];
+        if (previous != null && previous != entry.value) {
+          return null;
+        }
+        absoluteCounts[entry.key] = entry.value;
+      }
+    }
+    for (final entry in absoluteCounts.entries) {
+      reconciled = _applyCountsContent(
+        reconciled,
+        entry.key,
+        entry.value.active,
+      );
     }
 
     return _withRevision(reconciled, package.revision);
@@ -714,20 +741,19 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// у намерения вне выдачи нет строки, которую следует заменить.
   IntentionCatalogConfirmedState _applyCountsContent(
     IntentionCatalogConfirmedState confirmed,
-    IntentionRelationCountsChanged change,
+    IntentionId intentionId,
+    int activeRelationCount,
   ) {
     if (confirmed is! IntentionCatalogLoaded) {
       return confirmed;
     }
-    final index = confirmed.items.indexWhere(
-      (item) => item.id == change.intentionId,
-    );
+    final index = confirmed.items.indexWhere((item) => item.id == intentionId);
     if (index < 0) {
       return confirmed;
     }
 
     final items = [...confirmed.items];
-    items[index] = items[index].withActiveRelationCount(change.counts.active);
+    items[index] = items[index].withActiveRelationCount(activeRelationCount);
     return IntentionCatalogLoaded(
       selection: confirmed.selection,
       query: confirmed.query,
@@ -831,8 +857,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// Каталожная часть подтверждённого пакета изменений графа.
 ///
 /// Пакет применяется целиком и ровно один раз: каталожные мутации задают
-/// состав загруженной части, а изменения количеств заменяют абсолютные
-/// числа уже загруженных строк, не затрагивая их состав.
+/// состав загруженной части, а абсолютные количества, включая переданные
+/// дневной командой, заменяют числа уже загруженных строк.
 final class _CatalogChangePackage {
   _CatalogChangePackage(this.revision, Iterable<GraphChange> changes)
     : mutations = List.unmodifiable(
@@ -840,14 +866,18 @@ final class _CatalogChangePackage {
       ),
       countChanges = List.unmodifiable(
         changes.whereType<IntentionRelationCountsChanged>(),
-      );
+      ),
+      dailyChanges = List.unmodifiable(changes.whereType<DailyChoiceChange>());
 
   final GraphRevision revision;
   final List<IntentionCatalogMutation> mutations;
   final List<IntentionRelationCountsChanged> countChanges;
+  final List<DailyChoiceChange> dailyChanges;
 
   bool get hasForeignRevision =>
-      mutations.any(_isForeign) || countChanges.any(_isForeign);
+      mutations.any(_isForeign) ||
+      countChanges.any(_isForeign) ||
+      dailyChanges.any(_isForeign);
 
   bool _isForeign(GraphChange change) =>
       change.revision.compareTo(revision) != GraphRevisionOrder.same;

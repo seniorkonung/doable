@@ -2,6 +2,7 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/long_term_relation_permissions.dart';
 
 /// Состояние подробного просмотра одной долговременной связи.
 ///
@@ -23,18 +24,28 @@ final class RelationDetailsLoading extends RelationDetailsState {
   const RelationDetailsLoading({required super.isOperationRunning});
 }
 
-/// Подтверждённые подробные данные связи на одной ревизии графа.
+/// Подтверждённые данные связи; разрешение может получить более новую ревизию
+/// до завершения повторного чтения остальных полей.
 final class RelationDetailsLoaded extends RelationDetailsState {
-  const RelationDetailsLoaded({
+  RelationDetailsLoaded({
     required this.details,
     required this.revision,
     required super.isOperationRunning,
+    LongTermRelationPermissions? permissions,
+    GraphRevision? permissionRevision,
     this.refreshStatus = const RelationDetailsFresh(),
     this.lifecycleChange,
-  });
+  }) : permissions = permissions ?? details.permissions,
+       permissionRevision = permissionRevision ?? revision;
 
   final LongTermRelationDetails details;
   final GraphRevision revision;
+
+  /// Подтверждённое разрешение с собственного пакета графа или полного чтения.
+  final LongTermRelationPermissions permissions;
+  final GraphRevision permissionRevision;
+  LongTermRelationDetails get editingDetails =>
+      details.withPermissions(permissions);
   final RelationDetailsRefreshStatus refreshStatus;
   final RelationDetailsLifecycleChange? lifecycleChange;
 
@@ -44,6 +55,8 @@ final class RelationDetailsLoaded extends RelationDetailsState {
   RelationDetailsLoaded copyWith({
     LongTermRelationDetails? details,
     GraphRevision? revision,
+    LongTermRelationPermissions? permissions,
+    GraphRevision? permissionRevision,
     bool? isOperationRunning,
     RelationDetailsRefreshStatus? refreshStatus,
     RelationDetailsLifecycleChange? lifecycleChange,
@@ -51,6 +64,8 @@ final class RelationDetailsLoaded extends RelationDetailsState {
   }) => RelationDetailsLoaded(
     details: details ?? this.details,
     revision: revision ?? this.revision,
+    permissions: permissions ?? this.permissions,
+    permissionRevision: permissionRevision ?? this.permissionRevision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     refreshStatus: refreshStatus ?? this.refreshStatus,
     lifecycleChange: clearLifecycleChange

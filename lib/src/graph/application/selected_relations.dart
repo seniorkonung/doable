@@ -1,6 +1,9 @@
+import '../../daily_choice/application/daily_choice_catalog.dart';
+import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
+import 'blocking_relation_reference.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
 
@@ -16,57 +19,132 @@ final class SelectedRelationsQueryValidationException implements Exception {
 }
 
 /// Неизменяемая граница одного явно выбранного набора связей намерения.
+/// Смешанный запрос сохраняет вид каждой ссылки, даже при совпадении UUID.
 final class SelectedRelationsQuery {
   factory SelectedRelationsQuery({
     required IntentionId intentionId,
     required Iterable<LongTermRelationId> relationIds,
+  }) => SelectedRelationsQuery.mixed(
+    intentionId: intentionId,
+    references: relationIds.map(LongTermBlockingRelationReference.new),
+  );
+
+  factory SelectedRelationsQuery.mixed({
+    required IntentionId intentionId,
+    required Iterable<BlockingRelationReference> references,
   }) {
-    final ids = <LongTermRelationId>{};
-    for (final id in relationIds) {
-      if (!ids.add(id)) {
+    final selected = <BlockingRelationReference>{};
+    for (final reference in references) {
+      if (!selected.add(reference)) {
         throw const SelectedRelationsQueryValidationException(
           SelectedRelationsQueryValidationFailure.duplicateRelation,
         );
       }
     }
-    if (ids.isEmpty) {
+    if (selected.isEmpty) {
       throw const SelectedRelationsQueryValidationException(
         SelectedRelationsQueryValidationFailure.emptySelection,
       );
     }
     return SelectedRelationsQuery._(
       intentionId: intentionId,
-      relationIds: Set.unmodifiable(ids),
+      references: Set.unmodifiable(selected),
+      relationIds: Set.unmodifiable(
+        selected.whereType<LongTermBlockingRelationReference>().map(
+          (reference) => reference.id,
+        ),
+      ),
+      dailyChoiceIds: Set.unmodifiable(
+        selected.whereType<DailyChoiceBlockingRelationReference>().map(
+          (reference) => reference.id,
+        ),
+      ),
     );
   }
 
   const SelectedRelationsQuery._({
     required this.intentionId,
+    required this.references,
     required this.relationIds,
+    required this.dailyChoiceIds,
   });
 
   final IntentionId intentionId;
+  final Set<BlockingRelationReference> references;
   final Set<LongTermRelationId> relationIds;
+  final Set<DailyChoiceId> dailyChoiceIds;
 }
 
 sealed class SelectedRelationEntry {
-  const SelectedRelationEntry(this.id);
+  const SelectedRelationEntry();
 
-  final LongTermRelationId id;
+  BlockingRelationReference get reference;
 }
 
 final class SelectedRelationPresent extends SelectedRelationEntry {
-  SelectedRelationPresent(this.details) : super(details.relation.id);
+  SelectedRelationPresent(this.details);
 
   final LongTermRelationDetails details;
+  LongTermRelationId get id => details.relation.id;
+  bool get canDelete => details.permissions.canDelete;
+
+  @override
+  BlockingRelationReference get reference =>
+      LongTermBlockingRelationReference(id);
 }
 
 final class SelectedRelationMissing extends SelectedRelationEntry {
-  const SelectedRelationMissing(super.id);
+  const SelectedRelationMissing(this.id);
+
+  final LongTermRelationId id;
+
+  @override
+  BlockingRelationReference get reference =>
+      LongTermBlockingRelationReference(id);
 }
 
 final class SelectedRelationNoLongerBlocking extends SelectedRelationEntry {
-  const SelectedRelationNoLongerBlocking(super.id);
+  const SelectedRelationNoLongerBlocking(this.id);
+
+  final LongTermRelationId id;
+
+  @override
+  BlockingRelationReference get reference =>
+      LongTermBlockingRelationReference(id);
+}
+
+final class SelectedDailyChoicePresent extends SelectedRelationEntry {
+  SelectedDailyChoicePresent(this.item);
+
+  final DailyChoiceCatalogItem item;
+  DailyChoiceId get id => item.id;
+
+  /// Прямую дневную связь можно удалить отдельной подтверждённой командой.
+  bool get canDelete => true;
+
+  @override
+  BlockingRelationReference get reference =>
+      DailyChoiceBlockingRelationReference(id);
+}
+
+final class SelectedDailyChoiceMissing extends SelectedRelationEntry {
+  const SelectedDailyChoiceMissing(this.id);
+
+  final DailyChoiceId id;
+
+  @override
+  BlockingRelationReference get reference =>
+      DailyChoiceBlockingRelationReference(id);
+}
+
+final class SelectedDailyChoiceNoLongerBlocking extends SelectedRelationEntry {
+  const SelectedDailyChoiceNoLongerBlocking(this.id);
+
+  final DailyChoiceId id;
+
+  @override
+  BlockingRelationReference get reference =>
+      DailyChoiceBlockingRelationReference(id);
 }
 
 enum SelectedRelationsSnapshotValidationFailure { entriesMismatch }
@@ -81,14 +159,30 @@ final class SelectedRelationsSnapshot {
   factory SelectedRelationsSnapshot({
     required SelectedRelationsQuery query,
     required Map<LongTermRelationId, SelectedRelationEntry> entries,
+  }) => SelectedRelationsSnapshot.mixed(
+    query: query,
+    entriesByReference: {
+      for (final entry in entries.entries)
+        LongTermBlockingRelationReference(entry.key): entry.value,
+    },
+  );
+
+  factory SelectedRelationsSnapshot.mixed({
+    required SelectedRelationsQuery query,
+    required Map<BlockingRelationReference, SelectedRelationEntry>
+    entriesByReference,
   }) {
-    if (entries.length != query.relationIds.length ||
-        !entries.keys.toSet().containsAll(query.relationIds) ||
-        entries.entries.any((entry) {
-          if (entry.key != entry.value.id) return true;
+    if (entriesByReference.length != query.references.length ||
+        !entriesByReference.keys.toSet().containsAll(query.references) ||
+        entriesByReference.entries.any((entry) {
+          if (entry.key != entry.value.reference) return true;
           if (entry.value case SelectedRelationPresent(:final details)) {
             return details.relation.sourceIntentionId != query.intentionId &&
                 details.relation.relatedIntentionId != query.intentionId;
+          }
+          if (entry.value case SelectedDailyChoicePresent(:final item)) {
+            return item.source.id != query.intentionId &&
+                item.selected.id != query.intentionId;
           }
           return false;
         })) {
@@ -96,12 +190,22 @@ final class SelectedRelationsSnapshot {
         SelectedRelationsSnapshotValidationFailure.entriesMismatch,
       );
     }
-    return SelectedRelationsSnapshot._(Map.unmodifiable(entries));
+    return SelectedRelationsSnapshot._(Map.unmodifiable(entriesByReference));
   }
 
-  const SelectedRelationsSnapshot._(this.entries);
+  const SelectedRelationsSnapshot._(this.entriesByReference);
 
-  final Map<LongTermRelationId, SelectedRelationEntry> entries;
+  /// Каждая ссылка исходного запроса имеет ровно один результат.
+  final Map<BlockingRelationReference, SelectedRelationEntry>
+  entriesByReference;
+
+  /// Совместимое представление долговременной части для существующего экрана.
+  Map<LongTermRelationId, SelectedRelationEntry> get entries =>
+      Map.unmodifiable({
+        for (final entry in entriesByReference.entries)
+          if (entry.key case LongTermBlockingRelationReference(:final id))
+            id: entry.value,
+      });
 }
 
 sealed class SelectedRelationsReadFailure implements GraphCommandFailure {

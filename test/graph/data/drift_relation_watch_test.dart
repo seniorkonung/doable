@@ -1,17 +1,27 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation;
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
@@ -110,6 +120,88 @@ void main() {
     expect(_failure(corrupted), isA<LongTermRelationReadCorruptionFailure>());
   });
 
+  test('подробности вычисляют запрет по шагу сохранённого пути', () async {
+    final choiceId = _uuid(201);
+    await database.customStatement(
+      '''
+        INSERT INTO daily_choices
+          (id, source_intention_id, selected_intention_id, choice_date, is_completed)
+        VALUES (?, ?, ?, '2026-09-23', 1)
+      ''',
+      [choiceId, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
+    );
+    await database.customStatement(
+      '''
+        INSERT INTO daily_choice_path_steps
+          (id, daily_choice_id, long_term_relation_id)
+        VALUES (?, ?, ?)
+      ''',
+      [_uuid(202), choiceId, relationId.toCanonicalString()],
+    );
+    final snapshot = _snapshot(
+      await repository.watchRelation(relationId).first,
+    );
+    expect(
+      snapshot.value!.permissions.restriction,
+      LongTermRelationPermissionRestriction.referencedByDailyPath,
+    );
+    expect(snapshot.value!.permissions.canDelete, isFalse);
+
+    final sourceCounts = await repository.getRelationCounts(sourceId);
+    final selectedCounts = await repository.getRelationCounts(relatedId);
+    expect(
+      (sourceCounts as ResultSuccess<GraphSnapshot<RelationCounts>>)
+          .value
+          .value
+          .dailySource,
+      1,
+    );
+    expect(
+      (selectedCounts as ResultSuccess<GraphSnapshot<RelationCounts>>)
+          .value
+          .value
+          .dailySelected,
+      1,
+    );
+
+    final updatedResult = await repository.execute(
+      UpdateLongTermRelation(
+        relationId: relationId,
+        patch: LongTermRelationPatch(
+          description: LongTermRelationDescriptionReplaced(
+            LongTermRelationDescription.fromInput('Новое описание')!,
+          ),
+        ),
+      ),
+    );
+    final updated =
+        (updatedResult
+                    as GraphCommandSucceeded<
+                      LongTermRelationCommandSuccess,
+                      LongTermRelationCommandFailure
+                    >)
+                .value
+                .value
+            as LongTermRelationUpdated;
+    expect(updated.permissions.canDelete, isFalse);
+    expect(
+      updated.changes
+          .whereType<LongTermRelationUpdatedChange>()
+          .single
+          .permissions
+          .canChangeMeaning,
+      isFalse,
+    );
+
+    await database.customStatement('DELETE FROM daily_choices WHERE id = ?', [
+      choiceId,
+    ]);
+    final released = _snapshot(
+      await repository.watchRelation(relationId).first,
+    );
+    expect(released.value!.permissions.canDelete, isTrue);
+  });
+
   test('перечитывает участника после его переименования', () async {
     final events = StreamIterator(repository.watchRelation(relationId));
     addTearDown(events.cancel);
@@ -133,6 +225,60 @@ void main() {
     expect(updated.value!.related.title, 'Переименованное намерение');
     expect(updated.value!.relation.id, relationId);
   });
+
+  test(
+    'наблюдает появление и исчезновение ссылки пути без правки связи',
+    () async {
+      await database.customStatement(
+        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+        [relatedId.toCanonicalString()],
+      );
+      final events = StreamIterator(repository.watchRelation(relationId));
+      addTearDown(events.cancel);
+      expect(await events.moveNext(), isTrue);
+      final initial = _snapshot(events.current);
+      expect(initial.value!.permissions.canDelete, isTrue);
+
+      final creation = await repository.execute(
+        CreateDailyChoice(
+          sourceIntentionId: sourceId,
+          selectedIntentionId: relatedId,
+          path: ConfirmedChoicePath([
+            ConfirmedChoicePathStep(
+              relationId: relationId,
+              sourceIntentionId: sourceId,
+              type: LongTermRelationType.need,
+              relatedIntentionId: relatedId,
+            ),
+          ]),
+          date: CalendarDate.fromParts(2026, 9, 23),
+          description: null,
+          isCompleted: false,
+        ),
+      );
+      final choiceId =
+          ((creation as GraphCommandSucceeded).value.value
+                  as DailyChoiceCreated)
+              .choice
+              .id;
+      expect(await events.moveNext(), isTrue);
+      final occupied = _snapshot(events.current);
+      expect(occupied.value!.permissions.canDelete, isFalse);
+      expect(
+        occupied.revision.compareTo(initial.revision),
+        GraphRevisionOrder.newer,
+      );
+
+      await repository.execute(DeleteDailyChoice(choiceId));
+      expect(await events.moveNext(), isTrue);
+      final released = _snapshot(events.current);
+      expect(released.value!.permissions.canDelete, isTrue);
+      expect(
+        released.revision.compareTo(occupied.revision),
+        GraphRevisionOrder.newer,
+      );
+    },
+  );
 
   test('согласованно отражает каскадное архивирование участника', () async {
     final events = StreamIterator(repository.watchRelation(relationId));

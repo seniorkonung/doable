@@ -59,7 +59,18 @@ final class _IntentionCatalogPageState
     );
     final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
-      appBar: AppBar(title: Text(localizations.catalogTitle)),
+      appBar: AppBar(
+        title: Text(localizations.catalogTitle),
+        actions: [
+          IconButton(
+            key: const ValueKey('catalog-open-daily-choices'),
+            tooltip: localizations.dailyChoiceCatalogTitle,
+            onPressed: () =>
+                context.router.push(const DailyChoiceCatalogRoute()),
+            icon: const Icon(Icons.today),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('catalog-create-intention'),
         onPressed: () {

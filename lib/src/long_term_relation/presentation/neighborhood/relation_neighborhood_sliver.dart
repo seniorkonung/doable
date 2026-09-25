@@ -5,6 +5,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../daily_choice/application/daily_choice_catalog.dart';
+import '../../../daily_choice/domain/daily_choice_id.dart';
+import '../../../graph/application/blocking_relation_reference.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -27,6 +30,7 @@ final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
     required this.intentionId,
     required this.intentionTitle,
     required this.onOpenRelation,
+    required this.onOpenDailyChoice,
     required this.onCreateRelation,
     this.selectionMode = false,
     super.key,
@@ -37,6 +41,9 @@ final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
 
   /// Открывает подробные данные выбранной связи; маршрут выбирает страница.
   final ValueChanged<LongTermRelationId> onOpenRelation;
+
+  /// Открывает сохранённый путь дневного выбора по его идентификатору.
+  final ValueChanged<DailyChoiceId> onOpenDailyChoice;
 
   /// Открывает создание связи в направлении выбранной группы соседства.
   final ValueChanged<RelationDirection> onCreateRelation;
@@ -110,13 +117,15 @@ final class _RelationNeighborhoodSliverState
             state: state,
             intentionId: widget.intentionId,
             intentionTitle: widget.intentionTitle,
+            onOpenDailyChoice: widget.onOpenDailyChoice,
             onSelectGroup: viewModel.selectGroup,
+            onSelectDailyGroup: viewModel.selectDailyGroup,
             onSelectScope: viewModel.selectScope,
             onSelectType: viewModel.selectType,
             onSelectDirection: viewModel.selectDirection,
             onCreateRelation: widget.onCreateRelation,
             onRetryRefresh: onRetryRefresh,
-            selectedCount: selection?.selected.length,
+            selectedCount: selection?.selectedByReference.length,
           );
         }
         return _buildBodyChild(context, state, index - 1, viewModel, selection);
@@ -126,6 +135,7 @@ final class _RelationNeighborhoodSliverState
 
   int _bodyChildCount(RelationNeighborhoodState state) => switch (state) {
     RelationGroupLoaded(:final items) => items.length + 1,
+    DailyChoiceGroupLoaded(:final items) => items.length + 1,
     RelationGroupInitialLoad() ||
     RelationGroupInitialFailure() ||
     RelationNeighborhoodIntentionNotFound() ||
@@ -172,7 +182,62 @@ final class _RelationNeighborhoodSliverState
           ? viewModel.retryRefresh
           : null,
     ),
+    final DailyChoiceGroupLoaded loaded when index < loaded.items.length =>
+      _buildDailyChoiceRow(loaded, index, viewModel, selection),
+    final DailyChoiceGroupLoaded loaded => _LoadedGroupFooter(
+      state: loaded,
+      onRetryLoadMore:
+          loaded.progress is RelationGroupLoadMoreFailure &&
+              (loaded.progress as RelationGroupLoadMoreFailure).canRetry &&
+              loaded.summaryFreshness == RelationSummaryFreshness.current
+          ? viewModel.retryLoadMore
+          : null,
+      onRetryRefresh:
+          loaded.summaryStatus is RelationSummaryRefreshFailure &&
+              (loaded.summaryStatus as RelationSummaryRefreshFailure).canRetry
+          ? viewModel.retryRefresh
+          : null,
+    ),
   };
+
+  Widget _buildDailyChoiceRow(
+    DailyChoiceGroupLoaded state,
+    int index,
+    RelationNeighborhoodViewModel viewModel,
+    BlockingRelationsSelectionState? selection,
+  ) {
+    _scheduleLoadMore(index, viewModel);
+    final item = state.items[index];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: _DailyChoiceRow(
+        key: ValueKey(
+          'relation-neighborhood-daily-row-${item.id.toCanonicalString()}',
+        ),
+        item: item,
+        role: (state.group as DailyChoiceRelationGroup).role,
+        onOpen: widget.onOpenDailyChoice,
+        isSelected: selection?.selectedByReference.containsKey(
+          DailyChoiceBlockingRelationReference(item.id),
+        ),
+        onToggleSelection: selection is BlockingRelationsSelectionEditing
+            ? () {
+                final editor = ref.read(
+                  blockingRelationsSelectionViewModelProvider(
+                    widget.intentionId,
+                  ).notifier,
+                );
+                final reference = DailyChoiceBlockingRelationReference(item.id);
+                if (selection.selectedByReference.containsKey(reference)) {
+                  editor.unselectReference(reference);
+                } else {
+                  editor.selectDailyChoice(item);
+                }
+              }
+            : null,
+      ),
+    );
+  }
 
   Widget _buildRelationRow(
     RelationGroupLoaded state,
@@ -237,6 +302,7 @@ final class _RelationNeighborhoodSliverState
       RelationGroupInitialLoad() ||
       RelationGroupInitialFailure() ||
       RelationNeighborhoodIntentionNotFound() ||
+      DailyChoiceGroupLoaded() ||
       RelationGroupEmpty() => <LongTermRelationId>{},
     };
     _rowKeys.removeWhere((id, _) => !retained.contains(id));
@@ -329,7 +395,9 @@ final class _NeighborhoodHeader extends StatelessWidget {
     required this.state,
     required this.intentionId,
     required this.intentionTitle,
+    required this.onOpenDailyChoice,
     required this.onSelectGroup,
+    required this.onSelectDailyGroup,
     required this.onSelectScope,
     required this.onSelectType,
     required this.onSelectDirection,
@@ -341,7 +409,9 @@ final class _NeighborhoodHeader extends StatelessWidget {
   final RelationNeighborhoodState state;
   final IntentionId intentionId;
   final String intentionTitle;
+  final ValueChanged<DailyChoiceId> onOpenDailyChoice;
   final ValueChanged<RelationGroupSelection> onSelectGroup;
+  final ValueChanged<DailyChoiceRelationRole> onSelectDailyGroup;
   final ValueChanged<RelationScope> onSelectScope;
   final ValueChanged<LongTermRelationType> onSelectType;
   final ValueChanged<RelationDirection> onSelectDirection;
@@ -383,6 +453,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
             BlockingRelationsConfirmationAction(
               intentionId: intentionId,
               intentionTitle: intentionTitle,
+              onOpenDailyChoice: onOpenDailyChoice,
             ),
             const SizedBox(height: 12),
           ],
@@ -390,6 +461,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
             _RelationSummary(
               counts: value.counts,
               selection: state.selection,
+              longTermSelected: state.group is LongTermRelationGroup,
               freshness: value.summaryFreshness,
               onSelectGroup: onSelectGroup,
               onRetryRefresh: onRetryRefresh,
@@ -402,29 +474,40 @@ final class _NeighborhoodHeader extends StatelessWidget {
               progressIndicator: state is RelationGroupInitialLoad,
               padding: EdgeInsets.zero,
             ),
+          const SizedBox(height: 12),
+          _DailyChoiceSummary(
+            counts: confirmed?.counts,
+            selectedGroup: state.group,
+            onSelectGroup: onSelectDailyGroup,
+          ),
           const SizedBox(height: 20),
           _SelectionControls(
             selection: state.selection,
-            counts: confirmed?.counts,
+            currentGroup: state.group is LongTermRelationGroup,
+            counts: state.group is LongTermRelationGroup
+                ? confirmed?.counts
+                : null,
             onSelectScope: onSelectScope,
             onSelectType: onSelectType,
             onSelectDirection: onSelectDirection,
           ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FilledButton.icon(
-              key: const ValueKey('relation-neighborhood-create-relation'),
-              onPressed: () => onCreateRelation(state.selection.direction),
-              icon: const Icon(Icons.add_link),
-              label: Text(switch (state.selection.direction) {
-                RelationDirection.outgoing =>
-                  localizations.relationNeighborhoodCreateOutgoingAction,
-                RelationDirection.incoming =>
-                  localizations.relationNeighborhoodCreateIncomingAction,
-              }),
+          if (state.group is LongTermRelationGroup) ...[
+            const SizedBox(height: 16),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FilledButton.icon(
+                key: const ValueKey('relation-neighborhood-create-relation'),
+                onPressed: () => onCreateRelation(state.selection.direction),
+                icon: const Icon(Icons.add_link),
+                label: Text(switch (state.selection.direction) {
+                  RelationDirection.outgoing =>
+                    localizations.relationNeighborhoodCreateOutgoingAction,
+                  RelationDirection.incoming =>
+                    localizations.relationNeighborhoodCreateIncomingAction,
+                }),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -435,6 +518,7 @@ final class _RelationSummary extends StatelessWidget {
   const _RelationSummary({
     required this.counts,
     required this.selection,
+    required this.longTermSelected,
     required this.freshness,
     required this.onSelectGroup,
     required this.onRetryRefresh,
@@ -442,6 +526,7 @@ final class _RelationSummary extends StatelessWidget {
 
   final RelationCounts counts;
   final RelationGroupSelection selection;
+  final bool longTermSelected;
   final RelationSummaryFreshness freshness;
   final ValueChanged<RelationGroupSelection> onSelectGroup;
   final Future<void> Function()? onRetryRefresh;
@@ -516,6 +601,7 @@ final class _RelationSummary extends StatelessWidget {
           scope: RelationScope.active,
           counts: counts,
           selection: selection,
+          longTermSelected: longTermSelected,
           onSelectGroup: onSelectGroup,
         ),
         const SizedBox(height: 12),
@@ -523,12 +609,75 @@ final class _RelationSummary extends StatelessWidget {
           scope: RelationScope.archived,
           counts: counts,
           selection: selection,
+          longTermSelected: longTermSelected,
           onSelectGroup: onSelectGroup,
         ),
       ],
     );
   }
 }
+
+final class _DailyChoiceSummary extends StatelessWidget {
+  const _DailyChoiceSummary({
+    required this.counts,
+    required this.selectedGroup,
+    required this.onSelectGroup,
+  });
+
+  final RelationCounts? counts;
+  final RelationGroup selectedGroup;
+  final ValueChanged<DailyChoiceRelationRole> onSelectGroup;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              counts == null
+                  ? l10n.dailyChoiceCatalogTitle
+                  : l10n.relationNeighborhoodDailyTotal(counts!.dailyTotal),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final role in DailyChoiceRelationRole.values)
+                  ChoiceChip(
+                    key: ValueKey('relation-neighborhood-daily-${role.name}'),
+                    label: Text(
+                      counts == null
+                          ? _dailyRoleLabel(l10n, role)
+                          : '${_dailyRoleLabel(l10n, role)}: '
+                                '${counts!.forSelection(DailyChoiceRelationGroup(role: role))}',
+                    ),
+                    selected:
+                        selectedGroup == DailyChoiceRelationGroup(role: role),
+                    onSelected: (_) => onSelectGroup(role),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _dailyRoleLabel(AppLocalizations l10n, DailyChoiceRelationRole role) =>
+    switch (role) {
+      DailyChoiceRelationRole.source =>
+        l10n.relationNeighborhoodDailySourceRole,
+      DailyChoiceRelationRole.selected =>
+        l10n.relationNeighborhoodDailySelectedRole,
+    };
 
 final class _SummaryFreshnessStatus extends StatelessWidget {
   const _SummaryFreshnessStatus({
@@ -565,12 +714,14 @@ final class _ScopeSummary extends StatelessWidget {
     required this.scope,
     required this.counts,
     required this.selection,
+    required this.longTermSelected,
     required this.onSelectGroup,
   });
 
   final RelationScope scope;
   final RelationCounts counts;
   final RelationGroupSelection selection;
+  final bool longTermSelected;
   final ValueChanged<RelationGroupSelection> onSelectGroup;
 
   @override
@@ -598,6 +749,7 @@ final class _ScopeSummary extends StatelessWidget {
               type: LongTermRelationType.need,
               counts: counts,
               selection: selection,
+              longTermSelected: longTermSelected,
               onSelectGroup: onSelectGroup,
             ),
             const SizedBox(height: 8),
@@ -606,6 +758,7 @@ final class _ScopeSummary extends StatelessWidget {
               type: LongTermRelationType.can,
               counts: counts,
               selection: selection,
+              longTermSelected: longTermSelected,
               onSelectGroup: onSelectGroup,
             ),
           ],
@@ -621,6 +774,7 @@ final class _TypeSummary extends StatelessWidget {
     required this.type,
     required this.counts,
     required this.selection,
+    required this.longTermSelected,
     required this.onSelectGroup,
   });
 
@@ -628,6 +782,7 @@ final class _TypeSummary extends StatelessWidget {
   final LongTermRelationType type;
   final RelationCounts counts;
   final RelationGroupSelection selection;
+  final bool longTermSelected;
   final ValueChanged<RelationGroupSelection> onSelectGroup;
 
   @override
@@ -673,6 +828,7 @@ final class _TypeSummary extends StatelessWidget {
                   direction: direction,
                 ),
                 selected:
+                    longTermSelected &&
                     selection.scope == scope &&
                     selection.type == type &&
                     selection.direction == direction,
@@ -718,6 +874,7 @@ final class _GroupTransition extends StatelessWidget {
 final class _SelectionControls extends StatelessWidget {
   const _SelectionControls({
     required this.selection,
+    required this.currentGroup,
     required this.counts,
     required this.onSelectScope,
     required this.onSelectType,
@@ -725,6 +882,7 @@ final class _SelectionControls extends StatelessWidget {
   });
 
   final RelationGroupSelection selection;
+  final bool currentGroup;
   final RelationCounts? counts;
   final ValueChanged<RelationScope> onSelectScope;
   final ValueChanged<LongTermRelationType> onSelectType;
@@ -736,9 +894,14 @@ final class _SelectionControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          localizations.relationNeighborhoodLongTermGroups,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
         _ChoiceGroup<RelationScope>(
           label: localizations.relationNeighborhoodScopeLabel,
-          selected: selection.scope,
+          selected: currentGroup ? selection.scope : null,
           choices: [
             (
               value: RelationScope.active,
@@ -756,7 +919,7 @@ final class _SelectionControls extends StatelessWidget {
         const SizedBox(height: 12),
         _ChoiceGroup<LongTermRelationType>(
           label: localizations.relationNeighborhoodTypeLabel,
-          selected: selection.type,
+          selected: currentGroup ? selection.type : null,
           choices: [
             (
               value: LongTermRelationType.need,
@@ -774,7 +937,7 @@ final class _SelectionControls extends StatelessWidget {
         const SizedBox(height: 12),
         _ChoiceGroup<RelationDirection>(
           label: localizations.relationNeighborhoodDirectionLabel,
-          selected: selection.direction,
+          selected: currentGroup ? selection.direction : null,
           choices: [
             (
               value: RelationDirection.outgoing,
@@ -817,7 +980,7 @@ final class _ChoiceGroup<T> extends StatelessWidget {
   });
 
   final String label;
-  final T selected;
+  final T? selected;
   final List<_Choice<T>> choices;
   final ValueChanged<T> onSelected;
 
@@ -977,6 +1140,105 @@ final class _RelationRow extends StatelessWidget {
   }
 }
 
+final class _DailyChoiceRow extends StatelessWidget {
+  const _DailyChoiceRow({
+    required this.item,
+    required this.role,
+    required this.onOpen,
+    this.isSelected,
+    this.onToggleSelection,
+    super.key,
+  });
+
+  final DailyChoiceCatalogItem item;
+  final DailyChoiceRelationRole role;
+  final ValueChanged<DailyChoiceId> onOpen;
+  final bool? isSelected;
+  final VoidCallback? onToggleSelection;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final roleLabel = _dailyRoleLabel(l10n, role);
+    final phrase = l10n.dailyChoiceDetailsPhrase(
+      item.source.title,
+      item.selected.title,
+    );
+    final date = l10n.dailyChoiceDetailsDate(item.date.toCanonicalString());
+    final completion = item.isCompleted
+        ? l10n.dailyChoiceDetailsCompleted
+        : l10n.dailyChoiceDetailsNotCompleted;
+    void open() => onOpen(item.id);
+    final selectionAction = isSelected == true
+        ? l10n.relationNeighborhoodRemoveFromSelection
+        : l10n.relationNeighborhoodAddToSelection;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Semantics(
+            button: true,
+            label: [
+              l10n.dailyChoiceDetailsTitle,
+              roleLabel,
+              phrase,
+              date,
+              completion,
+            ].join('. '),
+            hint: l10n.relationNeighborhoodOpenDailyChoice,
+            onTap: open,
+            child: ExcludeSemantics(
+              child: InkWell(
+                onTap: open,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        roleLabel,
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        phrase,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(date),
+                      Text(completion),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (isSelected case final checked?)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Checkbox(
+                    key: ValueKey(
+                      'relation-neighborhood-select-daily-${item.id.toCanonicalString()}',
+                    ),
+                    value: checked,
+                    onChanged: onToggleSelection == null
+                        ? null
+                        : (_) => onToggleSelection!(),
+                    semanticLabel:
+                        '$selectionAction: $phrase. $date. $completion',
+                  ),
+                  Expanded(child: Text(selectionAction)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 final class _Participant extends StatelessWidget {
   const _Participant({required this.label, required this.participant});
 
@@ -1053,7 +1315,7 @@ final class _LoadedGroupFooter extends StatelessWidget {
     required this.onRetryRefresh,
   });
 
-  final RelationGroupLoaded state;
+  final RelationGroupConfirmedState state;
   final Future<void> Function()? onRetryLoadMore;
   final Future<void> Function()? onRetryRefresh;
 
@@ -1084,7 +1346,11 @@ final class _LoadedGroupFooter extends StatelessWidget {
         retry: onRetryRefresh,
       ),
       RelationSummaryCurrent() =>
-        state.hasConfirmedEnd
+        (switch (state) {
+              RelationGroupLoaded(:final hasConfirmedEnd) ||
+              DailyChoiceGroupLoaded(:final hasConfirmedEnd) => hasConfirmedEnd,
+              RelationGroupEmpty() => true,
+            })
             ? _NeighborhoodStatus(
                 message: localizations.relationNeighborhoodConfirmedEnd,
               )

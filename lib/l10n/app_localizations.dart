@@ -494,6 +494,12 @@ abstract class AppLocalizations {
   /// **'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.'**
   String get blockingRelationsInvalidMoved;
 
+  /// Защита выбранной связи сохранённым дневным путём
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used in a saved daily path. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again. The entire selected set remains unchanged.'**
+  String get blockingRelationsInvalidProtected;
+
   /// Безопасное отсутствие намерения при проверке выбора
   ///
   /// In en, this message translates to:
@@ -533,7 +539,7 @@ abstract class AppLocalizations {
   /// Конфликт массового удаления: связь заблокирована
   ///
   /// In en, this message translates to:
-  /// **'A selected relation can no longer be deleted. Refresh the selection and confirm it again.'**
+  /// **'A selected relation is now used in a saved daily path. The entire set remains unchanged. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again.'**
   String get blockingRelationsDeleteProhibited;
 
   /// Первоначальная загрузка соседства и полной сводки
@@ -589,6 +595,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Can: {count}'**
   String relationNeighborhoodCanTotal(int count);
+
+  /// No description provided for @relationNeighborhoodDailyTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices: {count}'**
+  String relationNeighborhoodDailyTotal(int count);
+
+  /// Роль намерения как источника дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get relationNeighborhoodDailySourceRole;
+
+  /// Роль намерения как выбранного действия
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action'**
+  String get relationNeighborhoodDailySelectedRole;
+
+  /// Подпись групп долговременных связей в соседстве
+  ///
+  /// In en, this message translates to:
+  /// **'Long-term relations'**
+  String get relationNeighborhoodLongTermGroups;
 
   /// Подпись выбора активных или архивных связей
   ///
@@ -1328,6 +1358,124 @@ abstract class AppLocalizations {
   /// **'relation'**
   String get graphOperationRelation;
 
+  /// Безопасное обозначение дневного выбора в сообщении операции
+  ///
+  /// In en, this message translates to:
+  /// **'daily choice'**
+  String get graphOperationDailyChoice;
+
+  /// Подтверждение создания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice created.'**
+  String get dailyChoiceCreated;
+
+  /// Подтверждение изменения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice updated.'**
+  String get dailyChoiceUpdated;
+
+  /// Подтверждение замены пути дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice path replaced.'**
+  String get dailyChoicePathReplaced;
+
+  /// Подтверждение удаления дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice deleted.'**
+  String get dailyChoiceDeleted;
+
+  /// Открытие отдельного подтверждения удаления дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Delete daily choice permanently'**
+  String get dailyChoiceDeleteAction;
+
+  /// Заголовок отдельного подтверждения удаления дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Delete daily choice permanently?'**
+  String get dailyChoiceDeleteConfirmationTitle;
+
+  /// Конкретный выбор, дата, идентификатор и необратимость удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Choice: {phrase}\nDate: {date}\nChoice ID: {choiceId}\n\nThis cannot be undone. Intentions, long-term relations, and other daily choices will remain.'**
+  String dailyChoiceDeleteConfirmationMessage(
+    String phrase,
+    String date,
+    String choiceId,
+  );
+
+  /// Отправить подтверждённое удаление дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Delete permanently'**
+  String get dailyChoiceDeleteConfirmAction;
+
+  /// Ошибка исходного намерения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the source intention of the daily choice.'**
+  String get dailyChoiceSourceInvalid;
+
+  /// Ошибка выбранного намерения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the selected intention of the daily choice.'**
+  String get dailyChoiceSelectedInvalid;
+
+  /// Ошибка даты дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the daily choice date.'**
+  String get dailyChoiceDateInvalid;
+
+  /// Ошибка описания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the daily choice description.'**
+  String get dailyChoiceDescriptionInvalid;
+
+  /// Ошибка пути дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Check the daily choice path.'**
+  String get dailyChoicePathInvalid;
+
+  /// Дневной выбор отсутствует при выполнении команды
+  ///
+  /// In en, this message translates to:
+  /// **'This daily choice no longer exists.'**
+  String get dailyChoiceOperationNotFound;
+
+  /// Конфликт актуальности дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'The data changed. Refresh it and confirm again.'**
+  String get dailyChoiceOperationConflict;
+
+  /// Временная недоступность дневной команды
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the daily choice operation. Try again.'**
+  String get dailyChoiceOperationUnavailable;
+
+  /// Повреждение данных дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The daily choice was not changed.'**
+  String get dailyChoiceOperationCorruption;
+
+  /// Неожиданный отказ команды дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'The daily choice operation failed because of an unexpected error.'**
+  String get dailyChoiceOperationUnexpected;
+
   /// Подтверждение успешного создания долговременной связи
   ///
   /// In en, this message translates to:
@@ -1411,6 +1559,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An active relation can only link active intentions.'**
   String get relationEditorUpdateParticipantArchived;
+
+  /// Конфликт изменения смысла используемой дневным путём связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used by a saved daily path. Its type and participants can’t be changed.'**
+  String get relationEditorUpdateReferencedByDailyPath;
+
+  /// Ограничение смысла связи сохранённым дневным путём
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.'**
+  String get relationEditorPathProtection;
+
+  /// Исправление черновика при новом ограничении пути
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.'**
+  String get relationEditorPathProtectionWithDraft;
 
   /// Устранимая недоступность изменения связи
   ///
@@ -1544,6 +1710,12 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be deleted because its current state conflicts with the operation.'**
   String get relationDeleteConflict;
 
+  /// Конфликт удаления используемой дневным путём связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used by a saved daily path. Delete or replace the daily choices that use it first.'**
+  String get relationDeleteReferencedByDailyPath;
+
   /// Устранимая недоступность удаления связи
   ///
   /// In en, this message translates to:
@@ -1567,6 +1739,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opens the relation details'**
   String get relationNeighborhoodOpenRelation;
+
+  /// Назначение перехода к полному пути дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Open the full saved daily path'**
+  String get relationNeighborhoodOpenDailyChoice;
 
   /// Заголовок подробного просмотра связи
   ///
@@ -1688,6 +1866,18 @@ abstract class AppLocalizations {
   /// **'Delete relation permanently'**
   String get relationDetailsDeleteAction;
 
+  /// Причина недоступности удаления связи в подробностях
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is used in a saved daily path. It cannot be deleted, and its type and participants cannot be changed. Its description, priority, and archive state remain editable.'**
+  String get relationDetailsPathProtection;
+
+  /// Неизвестные разрешения на удаление связи
+  ///
+  /// In en, this message translates to:
+  /// **'Deletion is unavailable until this relation’s dependencies are confirmed.'**
+  String get relationDetailsDeletionChecking;
+
   /// Заголовок подтверждения необратимого удаления конкретной связи
   ///
   /// In en, this message translates to:
@@ -1728,6 +1918,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select a participant'**
   String get participantPickerTitle;
+
+  /// Заголовок выбора действия для нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Select an action'**
+  String get actionPickerTitle;
+
+  /// Отмена выбора действия
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel action selection'**
+  String get actionPickerCancel;
+
+  /// Чтение первой порции действий
+  ///
+  /// In en, this message translates to:
+  /// **'Loading actions…'**
+  String get actionPickerLoading;
+
+  /// Пустой выбор активных действий
+  ///
+  /// In en, this message translates to:
+  /// **'No active actions are available.'**
+  String get actionPickerEmpty;
+
+  /// Пустой результат поиска действий по названию
+  ///
+  /// In en, this message translates to:
+  /// **'No actions match this title.'**
+  String get actionPickerNoMatches;
+
+  /// Устранимый отказ чтения действий
+  ///
+  /// In en, this message translates to:
+  /// **'Actions couldn’t be loaded. Try again.'**
+  String get actionPickerUnavailable;
+
+  /// Повреждённые данные действий
+  ///
+  /// In en, this message translates to:
+  /// **'Saved action data is damaged and can’t be shown.'**
+  String get actionPickerCorruption;
+
+  /// Непредвиденный отказ чтения действий
+  ///
+  /// In en, this message translates to:
+  /// **'Actions couldn’t be loaded because of an unexpected error.'**
+  String get actionPickerUnexpected;
+
+  /// Семантическая подсказка выбора действия
+  ///
+  /// In en, this message translates to:
+  /// **'Selects this action to find its reason'**
+  String get actionPickerSelectHint;
+
+  /// Переход к подробностям действия
+  ///
+  /// In en, this message translates to:
+  /// **'Open action details'**
+  String get actionPickerOpenDetails;
+
+  /// Точное количество доступных действий
+  ///
+  /// In en, this message translates to:
+  /// **'Total actions: {count}'**
+  String actionPickerTotalCount(int count);
+
+  /// Заголовок выбора нового основания
+  ///
+  /// In en, this message translates to:
+  /// **'Select a reason'**
+  String get sourcePickerTitle;
+
+  /// Отмена выбора основания
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel reason selection'**
+  String get sourcePickerCancel;
+
+  /// Чтение первой порции намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading intentions…'**
+  String get sourcePickerLoading;
+
+  /// Пустой выбор активных оснований
+  ///
+  /// In en, this message translates to:
+  /// **'No active intentions are available.'**
+  String get sourcePickerEmpty;
+
+  /// Пустой результат буквального фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions match this title.'**
+  String get sourcePickerNoMatches;
+
+  /// Устранимый отказ чтения намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions couldn’t be loaded. Try again.'**
+  String get sourcePickerUnavailable;
+
+  /// Повреждённые данные намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Saved intention data is damaged and can’t be shown.'**
+  String get sourcePickerCorruption;
+
+  /// Непредвиденный отказ чтения намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions couldn’t be loaded because of an unexpected error.'**
+  String get sourcePickerUnexpected;
+
+  /// Семантическая подсказка выбора основания
+  ///
+  /// In en, this message translates to:
+  /// **'Selects this intention as the new reason'**
+  String get sourcePickerSelectHint;
+
+  /// Переход к подробностям намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Open intention details'**
+  String get sourcePickerOpenDetails;
+
+  /// Число доступных активных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Total intentions: {count}'**
+  String sourcePickerTotalCount(int count);
 
   /// Назначение отмены выбора участника
   ///
@@ -1944,6 +2266,773 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Priority {priority}'**
   String relationEditorPriorityOption(String priority);
+
+  /// Открыть верхний обход из активного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an action along a path'**
+  String get detailsChoosePathAction;
+
+  /// Заголовок верхнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a path to an action'**
+  String get choicePathTitle;
+
+  /// Заголовок нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a source for the action'**
+  String get choicePathBottomTitle;
+
+  /// Порядок нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Exploration: from the action to a source'**
+  String get choicePathBottomTraversal;
+
+  /// Направление связей нижнего пути
+  ///
+  /// In en, this message translates to:
+  /// **'Relation direction: from the source to the action'**
+  String get choicePathBottomPathDirection;
+
+  /// Фиксированное действие нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action: {action}'**
+  String choicePathFixedAction(String action);
+
+  /// Загрузка действия нижнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the selected action…'**
+  String get choicePathActionPending;
+
+  /// Достигнутое основание нижнего пути
+  ///
+  /// In en, this message translates to:
+  /// **'Source: {source}'**
+  String choicePathCurrentSource(String source);
+
+  /// Состояние подтверждения основания
+  ///
+  /// In en, this message translates to:
+  /// **'Source confirmed'**
+  String get choicePathSourceSelected;
+
+  /// Явное подтверждение основания
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm source “{source}”'**
+  String choicePathSelectSource(String source);
+
+  /// У выбранного действия нет входящего пути
+  ///
+  /// In en, this message translates to:
+  /// **'There are no valid incoming relations for this action right now. Choose another action.'**
+  String get choicePathBottomNoPath;
+
+  /// Направление верхнего обхода
+  ///
+  /// In en, this message translates to:
+  /// **'Path from the source intention to an action'**
+  String get choicePathDirection;
+
+  /// Исходное намерение пути
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention: {source}'**
+  String choicePathSource(String source);
+
+  /// Загрузка исходного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the source intention…'**
+  String get choicePathSourcePending;
+
+  /// Возврат к выбранному префиксу пути
+  ///
+  /// In en, this message translates to:
+  /// **'Return to “{source}”'**
+  String choicePathReturnTo(String source);
+
+  /// Семантика направленного шага пути
+  ///
+  /// In en, this message translates to:
+  /// **'Step {index}: {phrase}. Priority {priority}'**
+  String choicePathStepSemantics(int index, String phrase, String priority);
+
+  /// Состояние выбора достигнутого действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action selected'**
+  String get choicePathActionSelected;
+
+  /// Выбрать достигнутое действие
+  ///
+  /// In en, this message translates to:
+  /// **'Choose action “{action}”'**
+  String choicePathSelectAction(String action);
+
+  /// Выбор действия ещё не создаёт дневную связь
+  ///
+  /// In en, this message translates to:
+  /// **'The daily choice has not been created yet.'**
+  String get choicePathSelectionNotSaved;
+
+  /// Заголовок допустимых продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Available continuations'**
+  String get choicePathContinuations;
+
+  /// Загрузка допустимых продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Checking available continuations…'**
+  String get choicePathLoading;
+
+  /// Из исходного намерения нет допустимого пути
+  ///
+  /// In en, this message translates to:
+  /// **'There is no valid path from this intention to another action right now.'**
+  String get choicePathNoPath;
+
+  /// У достигнутого шага нет продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'There are no further valid continuations.'**
+  String get choicePathNoFurtherPath;
+
+  /// Устаревший префикс пути
+  ///
+  /// In en, this message translates to:
+  /// **'The graph has changed. Refresh the path before continuing.'**
+  String get choicePathConflict;
+
+  /// Актуализировать путь после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh path'**
+  String get choicePathRefresh;
+
+  /// Намерение пути отсутствует
+  ///
+  /// In en, this message translates to:
+  /// **'An intention on this path no longer exists.'**
+  String get choicePathNotFound;
+
+  /// Недопустимый запрос продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Continuations could not be checked because of an invalid request.'**
+  String get choicePathInvalid;
+
+  /// Временная недоступность продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Continuations are temporarily unavailable. Try again.'**
+  String get choicePathUnavailable;
+
+  /// Повреждение данных пути
+  ///
+  /// In en, this message translates to:
+  /// **'Saved path data is damaged. Continuation is unavailable.'**
+  String get choicePathCorruption;
+
+  /// Неизвестная ошибка чтения продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Continuations could not be checked because of an unexpected error.'**
+  String get choicePathUnexpected;
+
+  /// Загрузить следующую порцию продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Show more continuations'**
+  String get choicePathLoadMore;
+
+  /// Загрузка следующей порции продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the next page…'**
+  String get choicePathLoadingMore;
+
+  /// Доступная связь для следующего шага
+  ///
+  /// In en, this message translates to:
+  /// **'Continue along relation: {phrase}. Priority {priority}'**
+  String choicePathContinueSemantics(String phrase, String priority);
+
+  /// Заголовок подтверждения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm daily choice'**
+  String get dailyChoiceCreationTitle;
+
+  /// Заголовок каталога дневных выборов и вход из основной навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices'**
+  String get dailyChoiceCatalogTitle;
+
+  /// Вход в создание дневного выбора от действия
+  ///
+  /// In en, this message translates to:
+  /// **'Create a choice from an action'**
+  String get dailyChoiceCreateFromAction;
+
+  /// Начальная загрузка дневного каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Loading daily choices…'**
+  String get dailyChoiceCatalogLoading;
+
+  /// Фильтр по календарной дате
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get dailyChoiceCatalogDateFilter;
+
+  /// Применить фильтр даты
+  ///
+  /// In en, this message translates to:
+  /// **'Apply date'**
+  String get dailyChoiceCatalogApplyDate;
+
+  /// Некорректная дата фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid date as YYYY-MM-DD.'**
+  String get dailyChoiceCatalogDateInvalid;
+
+  /// Фильтр по выполнению
+  ///
+  /// In en, this message translates to:
+  /// **'Completion'**
+  String get dailyChoiceCatalogCompletionFilter;
+
+  /// Оба состояния выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'All states'**
+  String get dailyChoiceCatalogAllStates;
+
+  /// Фильтр невыполненных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Not completed'**
+  String get dailyChoiceCatalogIncomplete;
+
+  /// Фильтр выполненных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get dailyChoiceCatalogCompleted;
+
+  /// Вернуть все даты и оба состояния выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get dailyChoiceCatalogClearFilters;
+
+  /// Полное количество подходящих дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Total daily choices: {count}'**
+  String dailyChoiceCatalogTotalCount(int count);
+
+  /// Пустой дневной каталог
+  ///
+  /// In en, this message translates to:
+  /// **'No daily choices match the filters.'**
+  String get dailyChoiceCatalogEmpty;
+
+  /// Обновление подтверждённого снимка каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing daily choices…'**
+  String get dailyChoiceCatalogRefreshing;
+
+  /// Загрузка следующей порции
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more daily choices…'**
+  String get dailyChoiceCatalogLoadingMore;
+
+  /// Открыть следующую порцию
+  ///
+  /// In en, this message translates to:
+  /// **'Show more daily choices'**
+  String get dailyChoiceCatalogLoadMore;
+
+  /// Временная ошибка чтения дневного каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load daily choices. Try again.'**
+  String get dailyChoiceCatalogUnavailable;
+
+  /// Повреждение данных дневного каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Stored daily choice data is damaged and cannot be shown.'**
+  String get dailyChoiceCatalogCorruption;
+
+  /// Устаревший снимок каталога
+  ///
+  /// In en, this message translates to:
+  /// **'The catalog changed. Refresh it to continue.'**
+  String get dailyChoiceCatalogExpired;
+
+  /// Недопустимая позиция каталога
+  ///
+  /// In en, this message translates to:
+  /// **'The catalog position is no longer valid.'**
+  String get dailyChoiceCatalogInvalid;
+
+  /// Непредвиденная ошибка чтения дневного каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load daily choices because of an unexpected error.'**
+  String get dailyChoiceCatalogUnexpected;
+
+  /// Доступная подпись строки с порядковым номером текущей выдачи
+  ///
+  /// In en, this message translates to:
+  /// **'Choice #{number}. {phrase}. {date}. {completion}'**
+  String dailyChoiceCatalogRowLabel(
+    int number,
+    String phrase,
+    String date,
+    String completion,
+  );
+
+  /// Заголовок подробностей дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice'**
+  String get dailyChoiceDetailsTitle;
+
+  /// Заголовок редактора дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Edit daily choice'**
+  String get dailyChoiceEditTitle;
+
+  /// Сохранение правок дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get dailyChoiceEditSave;
+
+  /// Возврат к актуальным подробностям после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Return to details and refresh'**
+  String get dailyChoiceEditRefresh;
+
+  /// Загрузка подробностей дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Loading daily choice…'**
+  String get dailyChoiceDetailsLoading;
+
+  /// Дневной выбор отсутствует
+  ///
+  /// In en, this message translates to:
+  /// **'This daily choice no longer exists.'**
+  String get dailyChoiceDetailsNotFound;
+
+  /// Временный отказ чтения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this daily choice. Try again.'**
+  String get dailyChoiceDetailsUnavailable;
+
+  /// Повреждённый сохранённый путь
+  ///
+  /// In en, this message translates to:
+  /// **'The stored path is damaged and cannot be shown.'**
+  String get dailyChoiceDetailsCorruption;
+
+  /// Неизвестный отказ чтения дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this daily choice because of an unexpected error.'**
+  String get dailyChoiceDetailsUnexpected;
+
+  /// Формулировка дневной связи из текущих названий
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, today I {selected}'**
+  String dailyChoiceDetailsPhrase(String source, String selected);
+
+  /// Дата дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice date: {date}'**
+  String dailyChoiceDetailsDate(String date);
+
+  /// Дневной выбор выполнен
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get dailyChoiceDetailsCompleted;
+
+  /// Дневной выбор не выполнен
+  ///
+  /// In en, this message translates to:
+  /// **'Not completed'**
+  String get dailyChoiceDetailsNotCompleted;
+
+  /// Описание дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get dailyChoiceDetailsDescription;
+
+  /// Заголовок сохранённого пути
+  ///
+  /// In en, this message translates to:
+  /// **'Stored path'**
+  String get dailyChoiceDetailsPath;
+
+  /// Роль исходного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get dailyChoiceDetailsSource;
+
+  /// Роль промежуточного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate intention'**
+  String get dailyChoiceDetailsIntermediate;
+
+  /// Роль конечного выбранного действия
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action'**
+  String get dailyChoiceDetailsSelectedAction;
+
+  /// Архивное состояние участника или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get dailyChoiceDetailsArchived;
+
+  /// Активное состояние участника или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get dailyChoiceDetailsActive;
+
+  /// Готовность конечного действия
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for action'**
+  String get dailyChoiceDetailsReady;
+
+  /// Утрата готовности конечного действия
+  ///
+  /// In en, this message translates to:
+  /// **'Not ready for action'**
+  String get dailyChoiceDetailsNotReady;
+
+  /// Порядковый номер перехода пути
+  ///
+  /// In en, this message translates to:
+  /// **'Transition {number}'**
+  String dailyChoiceDetailsStep(int number);
+
+  /// Заголовок подтверждаемого пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path to confirm'**
+  String get dailyChoiceCreationPath;
+
+  /// Конечное выбранное действие
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action: {action}'**
+  String dailyChoiceCreationAction(String action);
+
+  /// Подпись даты выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice date'**
+  String get dailyChoiceCreationDate;
+
+  /// Подсказка полного диапазона дат
+  ///
+  /// In en, this message translates to:
+  /// **'Enter YYYY-MM-DD (0001–9999)'**
+  String get dailyChoiceCreationDateHint;
+
+  /// Подпись необязательного описания
+  ///
+  /// In en, this message translates to:
+  /// **'Description (optional)'**
+  String get dailyChoiceCreationDescription;
+
+  /// Явная отметка выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'Already completed'**
+  String get dailyChoiceCreationCompleted;
+
+  /// Пояснение отметки выполнения
+  ///
+  /// In en, this message translates to:
+  /// **'Mark if the action was already done for this date'**
+  String get dailyChoiceCreationCompletedHint;
+
+  /// Подтверждение сохранения выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Save daily choice'**
+  String get dailyChoiceCreationSave;
+
+  /// Сохранение выбора выполняется
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get dailyChoiceCreationSaving;
+
+  /// Отмена без изменения графа
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dailyChoiceCreationCancel;
+
+  /// Возврат к актуализации пути после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Return to the path and refresh it'**
+  String get dailyChoiceCreationRefreshPath;
+
+  /// Заголовок отдельного подтверждения замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm path replacement'**
+  String get dailyChoiceReplaceTitle;
+
+  /// Подготовка подтверждения после чтения выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the new path confirmation…'**
+  String get dailyChoiceReplacePreparing;
+
+  /// Заменяемый дневной выбор
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice to replace'**
+  String get dailyChoiceReplaceCurrent;
+
+  /// Заголовок полного предлагаемого пути
+  ///
+  /// In en, this message translates to:
+  /// **'New path from source to action'**
+  String get dailyChoiceReplaceNewPath;
+
+  /// Пустое описание заменяемого выбора
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get dailyChoiceReplaceNoDescription;
+
+  /// Независимые поля не меняются при замене пути
+  ///
+  /// In en, this message translates to:
+  /// **'The date, description, and completion will stay unchanged when the path is replaced.'**
+  String get dailyChoiceReplaceFieldsPreserved;
+
+  /// Сохранение выполнения при смене действия
+  ///
+  /// In en, this message translates to:
+  /// **'Completion stays on even if a different action is selected.'**
+  String get dailyChoiceReplaceCompletionPreserved;
+
+  /// Явное подтверждение только замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'Replace path only'**
+  String get dailyChoiceReplaceConfirm;
+
+  /// Ожидание результата команды замены
+  ///
+  /// In en, this message translates to:
+  /// **'Replacing path…'**
+  String get dailyChoiceReplaceSubmitting;
+
+  /// Возврат к выбору нового пути после конфликта
+  ///
+  /// In en, this message translates to:
+  /// **'Return to path selection'**
+  String get dailyChoiceReplaceChooseAgain;
+
+  /// Открыть замену из подробностей
+  ///
+  /// In en, this message translates to:
+  /// **'Replace path'**
+  String get dailyChoiceReplaceOpen;
+
+  /// Заголовок выбора направления замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the new path direction'**
+  String get dailyChoiceReplaceChooseDirection;
+
+  /// Описание выбора направления замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new source or action to replace the saved path.'**
+  String get dailyChoiceReplaceChooseDirectionDescription;
+
+  /// Верхний обход замены
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a new source'**
+  String get dailyChoiceReplaceFromSource;
+
+  /// Нижний обход замены
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a new action'**
+  String get dailyChoiceReplaceFromAction;
+
+  /// Заголовок обхода для замены
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a replacement path'**
+  String get dailyChoiceReplaceSelectPath;
+
+  /// Подтверждение выбора пути для замены
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm path replacement'**
+  String get dailyChoiceReplaceOpenConfirmation;
+
+  /// Переход от выбранного действия к форме подтверждения
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to choice confirmation'**
+  String get choicePathOpenConfirmation;
+
+  /// Заголовок подсказок прежних маршрутов
+  ///
+  /// In en, this message translates to:
+  /// **'Previous routes'**
+  String get choiceSuggestionTitle;
+
+  /// Начальная загрузка подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Loading previous route suggestions…'**
+  String get choiceSuggestionLoading;
+
+  /// Подтверждённо пустая выдача подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'No previous routes for this participant.'**
+  String get choiceSuggestionEmpty;
+
+  /// Обновление подсказок перед выбором
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing suggestions. Route selection is temporarily unavailable.'**
+  String get choiceSuggestionUpdating;
+
+  /// Отсутствие выбранного участника
+  ///
+  /// In en, this message translates to:
+  /// **'The selected intention no longer exists.'**
+  String get choiceSuggestionNotFound;
+
+  /// Временная недоступность подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load suggestions. Try again.'**
+  String get choiceSuggestionUnavailable;
+
+  /// Повреждение данных подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Stored suggestion data is damaged and can’t be confirmed.'**
+  String get choiceSuggestionCorruption;
+
+  /// Непредвиденная ошибка подсказок
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load suggestions because of an unexpected error.'**
+  String get choiceSuggestionUnexpected;
+
+  /// Номер подсказки в выдаче
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestion {index} of {total}'**
+  String choiceSuggestionPosition(int index, int total);
+
+  /// Исходное намерение подсказки
+  ///
+  /// In en, this message translates to:
+  /// **'Source: {source}'**
+  String choiceSuggestionSource(String source);
+
+  /// Конечное действие подсказки
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action: {action}'**
+  String choiceSuggestionAction(String action);
+
+  /// Открыть полный текущий маршрут
+  ///
+  /// In en, this message translates to:
+  /// **'View full route'**
+  String get choiceSuggestionView;
+
+  /// Выбрать допустимый маршрут
+  ///
+  /// In en, this message translates to:
+  /// **'Select route'**
+  String get choiceSuggestionSelect;
+
+  /// Причина недоступности архивного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: an intention is archived.'**
+  String get choiceSuggestionArchivedIntention;
+
+  /// Причина недоступности архивной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: a relation in the route is archived.'**
+  String get choiceSuggestionArchivedRelation;
+
+  /// Причина недоступности неготового действия
+  ///
+  /// In en, this message translates to:
+  /// **'Route unavailable: the final action is no longer ready for action.'**
+  String get choiceSuggestionActionNotReady;
+
+  /// Заголовок просмотра всего маршрута
+  ///
+  /// In en, this message translates to:
+  /// **'Full route'**
+  String get choiceSuggestionPreviewTitle;
+
+  /// Направление переходов в просмотре
+  ///
+  /// In en, this message translates to:
+  /// **'Route direction: from source to action'**
+  String get choiceSuggestionDirection;
+
+  /// Порядок перехода маршрута
+  ///
+  /// In en, this message translates to:
+  /// **'Step {index} of {total}'**
+  String choiceSuggestionStep(int index, int total);
 }
 
 class _AppLocalizationsDelegate

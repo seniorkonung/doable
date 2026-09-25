@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
 import '../application/delete_blocking_relations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
@@ -193,7 +194,36 @@ String _messageFor(
     localizations,
     completion,
   ),
+  DailyChoiceCommandCompletion() => _dailyChoiceMessage(
+    localizations,
+    completion,
+  ),
 };
+
+String _dailyChoiceMessage(
+  AppLocalizations localizations,
+  DailyChoiceCommandCompletion completion,
+) => localizations.graphOperationMessage(
+  switch (completion.kind) {
+    DailyChoiceCommandKind.create => localizations.graphOperationCreate,
+    DailyChoiceCommandKind.update ||
+    DailyChoiceCommandKind.replace => localizations.graphOperationUpdate,
+    DailyChoiceCommandKind.delete => localizations.graphOperationDelete,
+  },
+  localizations.graphOperationDailyChoice,
+  switch (completion.result) {
+    GraphResultSuccess() => switch (completion.kind) {
+      DailyChoiceCommandKind.create => localizations.dailyChoiceCreated,
+      DailyChoiceCommandKind.update => localizations.dailyChoiceUpdated,
+      DailyChoiceCommandKind.replace => localizations.dailyChoicePathReplaced,
+      DailyChoiceCommandKind.delete => localizations.dailyChoiceDeleted,
+    },
+    GraphResultFailure(:final failure) => dailyChoiceCommandFailureMessage(
+      localizations,
+      failure,
+    ),
+  },
+);
 
 String _blockingRelationsDeleteMessage(
   AppLocalizations localizations,

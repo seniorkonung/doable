@@ -21,12 +21,13 @@ void main() {
   late InMemoryDiagnosticsSink diagnostics;
   late DriftPersonalGraphRepository repository;
   late _SelectTrace trace;
+  late Database raw;
 
   setUp(() async {
     trace = _SelectTrace();
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
+        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
         trace,
       ),
     );
@@ -42,6 +43,266 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  test('отбирает действия в SQL до порции и считает только совпадения', () async {
+    for (var index = 1; index <= 60; index++) {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-${index.toRadixString(16).padLeft(12, '0')}',
+        title: 'Действие %_ без готовности',
+        createdAt: DateTime.utc(2026, 9, 2, 11, index),
+      );
+    }
+    for (final (suffix, createdHour, updatedHour) in [
+      ('101', 8, 12),
+      ('102', 9, 10),
+      ('103', 10, 11),
+    ]) {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000$suffix',
+        title: 'Действие %_ с одинаковым названием',
+        isActionReady: true,
+        createdAt: DateTime.utc(2026, 9, 2, createdHour),
+        updatedAt: DateTime.utc(2026, 9, 2, updatedHour),
+      );
+    }
+    await _insertIntention(
+      database,
+      id: '018f0b5d-6b2e-7c80-8000-000000000104',
+      title: 'Действие %_ в архиве',
+      isActionReady: true,
+      isArchived: true,
+      createdAt: DateTime.utc(2026, 9, 2, 13),
+    );
+
+    final cases = <(IntentionCatalogOrder, List<String>)>[
+      (IntentionCatalogOrder.createdAtAscending, ['101', '102', '103']),
+      (IntentionCatalogOrder.createdAtDescending, ['103', '102', '101']),
+      (IntentionCatalogOrder.updatedAtAscending, ['102', '103', '101']),
+      (IntentionCatalogOrder.updatedAtDescending, ['101', '103', '102']),
+    ];
+    for (final (order, expectedSuffixes) in cases) {
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: '%_',
+        order: order,
+        pageSize: 1,
+      );
+      trace.statements.clear();
+      final first = _firstPage(await repository.getCatalogPage(query));
+      expect(first.totalCount, 3);
+      expect(first.items, hasLength(1));
+      expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
+      expect(
+        trace.statements.where(_isCatalogCountStatement).single,
+        contains('is_action_ready'),
+      );
+      expect(
+        trace.statements.where((sql) => sql.contains('LIMIT')).single,
+        contains('is_action_ready'),
+      );
+      final ids = [first.items.single.id.toCanonicalString()];
+      var cursor = first.nextCursor;
+      while (cursor != null) {
+        final page = _continuationPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: query.scope,
+              readinessFilter: query.readinessFilter,
+              titleFilter: '%_',
+              order: query.order,
+              pageSize: query.pageSize,
+              cursor: cursor,
+            ),
+          ),
+        );
+        ids.addAll(page.items.map((item) => item.id.toCanonicalString()));
+        cursor = page.nextCursor;
+      }
+      expect(
+        ids,
+        expectedSuffixes.map(
+          (suffix) => '018f0b5d-6b2e-7c80-8000-000000000$suffix',
+        ),
+      );
+    }
+  });
+
+  test(
+    'измеряет вход от действия при редкой готовности в большом каталоге',
+    () async {
+      await database.customStatement('''
+      WITH RECURSIVE ids(n) AS (
+        VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 3000
+      )
+      INSERT INTO intentions
+        (id, title, is_action_ready, is_archived, created_at, updated_at)
+      SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
+             'Действие %_ ' || n, n % 1000 = 0, 0, n, n FROM ids
+    ''');
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: '%_',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 2,
+      );
+      trace.measured.clear();
+      final firstWatch = Stopwatch()..start();
+      final first = _firstPage(await repository.getCatalogPage(query));
+      firstWatch.stop();
+      expect(first.totalCount, 3);
+      expect(first.items.map((item) => item.id), [
+        _id(_uuid(3000)),
+        _id(_uuid(2000)),
+      ]);
+      final firstQueries = List<_MeasuredSelect>.of(trace.measured);
+      expect(
+        firstQueries.map((entry) => entry.rows),
+        everyElement(lessThanOrEqualTo(3)),
+      );
+      final count = firstQueries
+          .where((entry) => _isCatalogCountStatement(entry.sql))
+          .single;
+      final page = firstQueries
+          .where((entry) => entry.sql.contains('LIMIT'))
+          .single;
+      expect(count.rows, 1);
+      expect(page.rows, 3);
+      expect(count.sql, contains('is_action_ready'));
+      expect(page.sql, contains('is_action_ready'));
+      expect(page.sql, isNot(contains('OFFSET')));
+      final countPlan = raw.select(
+        'EXPLAIN QUERY PLAN ${count.sql}',
+        count.arguments,
+      );
+      final pagePlan = raw.select(
+        'EXPLAIN QUERY PLAN ${page.sql}',
+        page.arguments,
+      );
+
+      trace.measured.clear();
+      final nextWatch = Stopwatch()..start();
+      final next = _continuationPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: query.scope,
+            readinessFilter: query.readinessFilter,
+            titleFilter: '%_',
+            order: query.order,
+            pageSize: query.pageSize,
+            cursor: first.nextCursor,
+          ),
+        ),
+      );
+      nextWatch.stop();
+      expect(next.items.map((item) => item.id), [_id(_uuid(1000))]);
+      expect(
+        trace.measured.where((entry) => _isCatalogCountStatement(entry.sql)),
+        isEmpty,
+      );
+      expect(
+        trace.measured
+            .where((entry) => entry.sql.contains('LIMIT'))
+            .single
+            .rows,
+        1,
+      );
+      // ignore: avoid_print
+      print(
+        'Вход от действия: 3000 намерений, 3 готовых, фильтр, порция 2; '
+        'первая=${firstWatch.elapsedMicroseconds} мкс, '
+        'продолжение=${nextWatch.elapsedMicroseconds} мкс, '
+        'COUNT=${count.elapsed.inMicroseconds} мкс, '
+        'SELECT=${page.elapsed.inMicroseconds} мкс; '
+        'план COUNT=${countPlan.map((row) => row['detail']).join(' | ')}; '
+        'план SELECT=${pagePlan.map((row) => row['detail']).join(' | ')}',
+      );
+    },
+  );
+
+  test('курсор привязан к готовности до SQL', () async {
+    for (final suffix in ['201', '202']) {
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000$suffix',
+        title: 'Действие $suffix',
+        isActionReady: true,
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+    }
+    final cursor = _firstPage(
+      await repository.getCatalogPage(
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          readinessFilter: IntentionReadinessFilter.readyOnly,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtAscending,
+          pageSize: 1,
+        ),
+      ),
+    ).nextCursor!;
+    trace.statements.clear();
+
+    final result = await repository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtAscending,
+        pageSize: 1,
+        cursor: cursor,
+      ),
+    );
+
+    expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+    expect(
+      (result as ResultFailure<IntentionCatalogPage>).failure,
+      isA<IntentionValidationFailure>(),
+    );
+    expect(trace.statements, isEmpty);
+  });
+
+  test(
+    'снимки изменения готовности сохраняют точную принадлежность каталогу',
+    () async {
+      const id = '018f0b5d-6b2e-7c80-8000-000000000301';
+      await _insertIntention(
+        database,
+        id: id,
+        title: 'Пройти по Straße',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: 'STRASSE',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 1,
+      );
+      expect(_firstPage(await repository.getCatalogPage(query)).totalCount, 0);
+
+      final result = await repository.execute(
+        EnableIntentionReadiness(_id(id)),
+      );
+      expect(
+        result,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      final mutation =
+          (result
+                  as ResultSuccess<
+                    ConfirmedGraphResult<IntentionCommandSuccess>
+                  >)
+              .value
+              .value
+              .catalogMutation;
+      expect(mutation.before!.matches(query), isFalse);
+      expect(mutation.after!.matches(query), isTrue);
+      expect(_firstPage(await repository.getCatalogPage(query)).totalCount, 1);
+    },
+  );
 
   test('не запрашивает SQLite для недопустимого Unicode фильтра', () {
     expect(
@@ -406,10 +667,7 @@ void main() {
         'Купить молоко',
       ]);
       expect(page.items.last.hasDescription, isTrue);
-      expect(
-        trace.statements.where((statement) => statement.contains('COUNT(')),
-        hasLength(1),
-      );
+      expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
       expect(
         trace.statements.where((statement) => statement.contains('MATCH')),
         hasLength(2),
@@ -678,10 +936,7 @@ void main() {
       (result as ResultFailure<IntentionCatalogPage>).failure,
       isA<IntentionCorruptionFailure>(),
     );
-    expect(
-      trace.statements.where((statement) => statement.contains('COUNT(')),
-      hasLength(1),
-    );
+    expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
     expect(
       diagnostics.events.last,
       isA<CatalogPageReadDiagnosticsEvent>().having(
@@ -787,10 +1042,7 @@ void main() {
         (result as ResultFailure<IntentionCatalogPage>).failure,
         isA<IntentionCorruptionFailure>(),
       );
-      expect(
-        trace.statements.where((statement) => statement.contains('COUNT(')),
-        isEmpty,
-      );
+      expect(trace.statements.where(_isCatalogCountStatement), isEmpty);
     },
   );
 
@@ -918,10 +1170,7 @@ void main() {
         }
 
         expect(actualIds, expectedIds);
-        expect(
-          trace.statements.where((statement) => statement.contains('COUNT(')),
-          isEmpty,
-        );
+        expect(trace.statements.where(_isCatalogCountStatement), isEmpty);
         expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
       }
     },
@@ -1395,11 +1644,16 @@ void main() {
   });
 }
 
+bool _isCatalogCountStatement(String statement) =>
+    statement.contains('COUNT(') &&
+    !statement.contains('doable_relation_count_aggregates');
+
 Future<void> _insertIntention(
   AppDatabase database, {
   required String id,
   required String title,
   String? description,
+  bool isActionReady = false,
   bool isArchived = false,
   required DateTime createdAt,
   DateTime? updatedAt,
@@ -1410,6 +1664,7 @@ Future<void> _insertIntention(
         id: id,
         title: title,
         description: Value(description),
+        isActionReady: Value(isActionReady),
         isArchived: Value(isArchived),
         createdAt: createdAt.microsecondsSinceEpoch,
         updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
@@ -1441,6 +1696,9 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   InvalidIntentionIdDecoding() => throw ArgumentError.value(value, 'value'),
 };
 
+String _uuid(int number) =>
+    '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
+
 IntentionCatalogFirstPage _firstPage(Result<IntentionCatalogPage> result) {
   expect(result, isA<ResultSuccess<IntentionCatalogPage>>());
   final page = (result as ResultSuccess<IntentionCatalogPage>).value;
@@ -1463,6 +1721,8 @@ final class _ForeignCatalogCursor implements IntentionCatalogCursor {
 
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final List<String> statements = [];
+  final List<_MeasuredSelect> measured = [];
+  final Map<LocalDatabaseSqlStatement, Stopwatch> _started = {};
   Object? failure;
   Completer<void>? _blockedSelectStarted;
   Completer<void>? _blockedSelectRelease;
@@ -1491,6 +1751,7 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
   Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     statements.add(statement.statements.single);
+    _started[statement] = Stopwatch()..start();
     final failure = this.failure;
     if (failure != null) throw failure;
     final started = _blockedSelectStarted;
@@ -1501,4 +1762,30 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     _blockedSelectStarted = null;
     _blockedSelectRelease = null;
   }
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    final watch = _started.remove(statement)!..stop();
+    measured.add(
+      _MeasuredSelect(
+        statement.statements.single,
+        statement.arguments,
+        rows.length,
+        watch.elapsed,
+      ),
+    );
+    return rows;
+  }
+}
+
+final class _MeasuredSelect {
+  const _MeasuredSelect(this.sql, this.arguments, this.rows, this.elapsed);
+
+  final String sql;
+  final List<Object?> arguments;
+  final int rows;
+  final Duration elapsed;
 }

@@ -72,7 +72,7 @@ final class BlockingRelationsSelectionViewModelProvider
 }
 
 String _$blockingRelationsSelectionViewModelHash() =>
-    r'446800601c4d8a56c391e05e71ba7fd2056952af';
+    r'025c8efccea2dab4a451fb4d3f86800866c87f03';
 
 /// Хранит незавершённый выбор отдельно от сменяющихся порций соседства.
 

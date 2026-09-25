@@ -1,7 +1,13 @@
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
+
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -21,6 +27,30 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 /// завершаются: переход к подробным данным проверяется отдельно от выбора.
 final class ControlledParticipantPickerRepository
     implements PersonalGraphRepository {
+  @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) => throw UnsupportedError(
+    'Подсказки путей не используются в тесте выбора участника.',
+  );
+
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
   @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
@@ -78,8 +108,15 @@ final class ControlledParticipantPickerRepository
   ) => Completer<Result<GraphSnapshot<RelationCounts>>>().future;
 
   @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
+
+  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => Completer<RelationGroupPageResult>().future;
 
   @override

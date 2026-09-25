@@ -5,6 +5,7 @@ import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
 import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
+import 'long_term_relation_permissions.dart';
 
 enum RelationParticipantSummaryValidationFailure { negativeActiveRelationCount }
 
@@ -90,6 +91,8 @@ final class LongTermRelationDetails {
     required RelationParticipantSummary source,
     required RelationParticipantSummary related,
     required LongTermRelationDescription? description,
+    LongTermRelationPermissions permissions =
+        const LongTermRelationPermissions.unknown(),
   }) {
     _ensureMatchingParticipants(relation, source, related);
     return LongTermRelationDetails._(
@@ -97,6 +100,7 @@ final class LongTermRelationDetails {
       source: source,
       related: related,
       description: description,
+      permissions: permissions,
     );
   }
 
@@ -105,14 +109,25 @@ final class LongTermRelationDetails {
     required this.source,
     required this.related,
     required this.description,
+    required this.permissions,
   });
 
   final LongTermRelation relation;
   final RelationParticipantSummary source;
   final RelationParticipantSummary related;
   final LongTermRelationDescription? description;
+  final LongTermRelationPermissions permissions;
 
   bool get hasDescription => description != null;
+
+  LongTermRelationDetails withPermissions(LongTermRelationPermissions value) =>
+      LongTermRelationDetails(
+        relation: relation,
+        source: source,
+        related: related,
+        description: description,
+        permissions: value,
+      );
 }
 
 sealed class LongTermRelationReadFailure implements GraphCommandFailure {

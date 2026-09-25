@@ -1,7 +1,15 @@
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
+
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -19,6 +27,30 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
 final class ControlledCatalogRepository implements PersonalGraphRepository {
+  @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) => throw UnsupportedError(
+    'Подсказки путей не используются в тесте каталога.',
+  );
+
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
   @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
@@ -40,6 +72,8 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final relationCommands = <LongTermRelationCommand>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
+  final dailyChoiceCommands = <DailyChoiceCommand>[];
+  final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -70,6 +104,10 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
     _relationCommandRequests[index].complete(result);
   }
 
+  void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) {
+    _dailyChoiceCommandRequests[index].complete(result);
+  }
+
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
@@ -86,8 +124,15 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
   ) => throw UnsupportedError('Сводка не используется в тесте каталога.');
 
   @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
+
+  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) =>
       throw UnsupportedError('Группы связей не используются в тесте каталога.');
 
@@ -106,6 +151,9 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
+      final DailyChoiceCommand choiceCommand => await _executeDailyChoice(
+        choiceCommand,
+      ),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -117,6 +165,15 @@ final class ControlledCatalogRepository implements PersonalGraphRepository {
     relationCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationCommandRequests.add(request);
+    return request.future;
+  }
+
+  Future<DailyChoiceCommandResult> _executeDailyChoice(
+    DailyChoiceCommand command,
+  ) {
+    dailyChoiceCommands.add(command);
+    final request = Completer<DailyChoiceCommandResult>();
+    _dailyChoiceCommandRequests.add(request);
     return request.future;
   }
 

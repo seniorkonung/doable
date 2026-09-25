@@ -1,5 +1,11 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
+
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart'
@@ -229,7 +235,7 @@ void main() {
       await _openDetails(tester, repository, intentionA, requestIndex: 0);
 
       final accepted = runtime.commandCoordinator.acceptBlockingRelationsDelete(
-        DeleteBlockingRelations(
+        DeleteBlockingRelations.longTerm(
           intentionId: intentionA.id,
           relationIds: {_relationId},
         ),
@@ -705,6 +711,28 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 
 final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
+  @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
   ) async => _selectedSnapshot(query);
@@ -791,17 +819,27 @@ final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
   );
 
   @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
+
+  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => Future.value(
     GraphResultSuccess(
       RelationGroupFirstPage(
         items:
             relation != null &&
                 query.intentionId == relation!.relation.sourceIntentionId &&
-                query.scope == RelationScope.active &&
-                query.type == LongTermRelationType.need &&
-                query.direction == RelationDirection.outgoing
+                query.group ==
+                    const LongTermRelationGroup(
+                      scope: RelationScope.active,
+                      type: LongTermRelationType.need,
+                      direction: RelationDirection.outgoing,
+                    )
             ? [relation!]
             : const [],
         counts: _countsFor(query.intentionId),

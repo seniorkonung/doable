@@ -1,7 +1,13 @@
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
+
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -13,6 +19,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -25,6 +32,28 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 /// собственного источника данных графа.
 final class ControlledRelationEditorRepository
     implements PersonalGraphRepository {
+  @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
   @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
@@ -105,6 +134,7 @@ final class ControlledRelationEditorRepository
     required LongTermRelation after,
     LongTermRelationDescription? description,
     int revision = 1,
+    Iterable<GraphChange> additionalChanges = const [],
   }) {
     final graphRevision = TestRelationEditorRevision(revision);
     completeRelationCommand(
@@ -122,6 +152,7 @@ final class ControlledRelationEditorRepository
                 before: before,
                 after: after,
               ),
+              ...additionalChanges,
             ],
           ),
         ),
@@ -163,8 +194,15 @@ final class ControlledRelationEditorRepository
   ) => throw UnsupportedError('Сводка не читается черновиком формы.');
 
   @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
+
+  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => throw UnsupportedError('Группы связей не читаются черновиком формы.');
 
   @override
@@ -238,6 +276,8 @@ LongTermRelationDetails testEditorRelationDetails({
   RelationPriority priority = RelationPriority.p2,
   RelationScope scope = RelationScope.active,
   String? description = 'Исходное описание',
+  LongTermRelationPermissions permissions =
+      const LongTermRelationPermissions.unrestricted(),
 }) {
   final relation = LongTermRelation(
     id: testRelationId(1),
@@ -255,6 +295,7 @@ LongTermRelationDetails testEditorRelationDetails({
     description: description == null
         ? null
         : LongTermRelationDescription.fromInput(description),
+    permissions: permissions,
   );
 }
 

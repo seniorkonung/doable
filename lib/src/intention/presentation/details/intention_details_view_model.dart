@@ -281,6 +281,9 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         mutations.isNotEmpty ||
         confirmedChange.changes.whereType<IntentionRelationCountsChanged>().any(
           (change) => change.intentionId == _intentionId,
+        ) ||
+        confirmedChange.changes.whereType<DailyChoiceChange>().any(
+          (change) => change.intentionCounts.containsKey(_intentionId),
         );
     if (!affectsIntention ||
         !_acceptSnapshotRevision(confirmedChange.revision)) {

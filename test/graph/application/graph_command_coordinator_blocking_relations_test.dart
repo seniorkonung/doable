@@ -1,5 +1,12 @@
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -18,6 +25,123 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'смешанное удаление резервирует дневной выбор и долговременную связь',
+    () async {
+      final repository = _ControlledRepository();
+      final coordinator = _coordinator(repository);
+      final command = DeleteBlockingRelations(
+        intentionId: _intentionA,
+        references: {
+          LongTermBlockingRelationReference(_relationA),
+          DailyChoiceBlockingRelationReference(_choiceA),
+        },
+      );
+      final accepted = coordinator.acceptBlockingRelationsDelete(
+        command,
+        presentationTitle: 'Первое',
+      ) as BlockingRelationsDeleteAccepted;
+
+      expect(coordinator.isRunning(_intentionA), isTrue);
+      expect(coordinator.isRelationRunning(_relationA), isTrue);
+      expect(coordinator.isDailyChoiceRunning(_choiceA), isTrue);
+      expect(
+        coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_choiceA)),
+        isA<DailyChoiceCommandAlreadyRunning>(),
+      );
+      expect(
+        coordinator.acceptDailyChoiceUpdate(
+          UpdateDailyChoiceFields(
+            choiceId: _choiceA,
+            patch: const DailyChoiceFieldsPatch(),
+          ),
+        ),
+        isA<DailyChoiceCommandAlreadyRunning>(),
+      );
+      expect(
+        coordinator.acceptRelationDelete(DeleteLongTermRelation(_relationA)),
+        isA<LongTermRelationCommandAlreadyRunning>(),
+      );
+      expect(
+        coordinator.acceptBlockingRelationsDelete(
+          DeleteBlockingRelations(
+            intentionId: _intentionB,
+            references: {
+              DailyChoiceBlockingRelationReference(_choiceA),
+              LongTermBlockingRelationReference(_relationB),
+            },
+          ),
+          presentationTitle: 'Второе',
+        ),
+        isA<BlockingRelationsDeleteAlreadyRunning>(),
+      );
+      expect(coordinator.isRunning(_intentionB), isFalse);
+      expect(coordinator.isRelationRunning(_relationB), isFalse);
+      expect(repository.commands, [same(command)]);
+
+      repository.completeFailure(0);
+      await accepted.future;
+      expect(coordinator.isDailyChoiceRunning(_choiceA), isFalse);
+      await coordinator.shutdown();
+    },
+  );
+
+  test('дневная команда не отдаёт ключ смешанному удалению', () async {
+    final repository = _ControlledRepository();
+    final coordinator = _coordinator(repository);
+    final accepted = coordinator.acceptDailyChoiceDelete(
+      DeleteDailyChoice(_choiceA),
+    ) as DailyChoiceCommandAccepted;
+    expect(
+      coordinator.acceptBlockingRelationsDelete(
+        DeleteBlockingRelations(
+          intentionId: _intentionA,
+          references: {
+            DailyChoiceBlockingRelationReference(_choiceA),
+            LongTermBlockingRelationReference(_relationA),
+          },
+        ),
+        presentationTitle: 'Первое',
+      ),
+      isA<BlockingRelationsDeleteAlreadyRunning>(),
+    );
+    expect(coordinator.isRunning(_intentionA), isFalse);
+    expect(coordinator.isRelationRunning(_relationA), isFalse);
+    repository.completeDailyFailure(0);
+    await accepted.future;
+    await coordinator.shutdown();
+  });
+
+  test('ключи остаются занятыми до публикации конечного результата', () async {
+    final repository = _ControlledRepository();
+    final coordinator = _coordinator(repository);
+    final earlier = coordinator.acceptCreation(
+      IntentionCreationFormKey(),
+      const CreateIntention(title: 'Раннее намерение', description: null),
+    ) as IntentionCommandAccepted;
+    final accepted = coordinator.acceptBlockingRelationsDelete(
+      DeleteBlockingRelations(
+        intentionId: _intentionA,
+        references: {DailyChoiceBlockingRelationReference(_choiceA)},
+      ),
+      presentationTitle: 'Первое',
+    ) as BlockingRelationsDeleteAccepted;
+    repository.completeFailure(1);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(coordinator.isDailyChoiceRunning(_choiceA), isTrue);
+    expect(coordinator.isRunning(_intentionA), isTrue);
+    expect(
+      coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_choiceA)),
+      isA<DailyChoiceCommandAlreadyRunning>(),
+    );
+    repository.completeIntentionFailure(0);
+    await earlier.future;
+    await accepted.future;
+    expect(coordinator.isDailyChoiceRunning(_choiceA), isFalse);
+    await coordinator.shutdown();
+  });
+
   test(
     'массовая команда резервирует все ключи и отклоняет пересечение целиком',
     () async {
@@ -303,10 +427,29 @@ GraphCommandCoordinator _coordinator(PersonalGraphRepository repository) {
 DeleteBlockingRelations _delete(
   IntentionId intentionId,
   Set<LongTermRelationId> relationIds,
-) =>
-    DeleteBlockingRelations(intentionId: intentionId, relationIds: relationIds);
+) => DeleteBlockingRelations.longTerm(
+  intentionId: intentionId,
+  relationIds: relationIds,
+);
 
 final class _ControlledRepository implements PersonalGraphRepository {
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
   final commands = <Object>[];
   final _results = <Completer<Object>>[];
 
@@ -339,6 +482,13 @@ final class _ControlledRepository implements PersonalGraphRepository {
       LongTermRelationCommandSuccess,
       LongTermRelationCommandFailure
     >(LongTermRelationUnavailableFailure()),
+  );
+
+  void completeDailyFailure(int index) => _results[index].complete(
+    const GraphCommandFailed<
+      DailyChoiceCommandSuccess,
+      DailyChoiceCommandFailure
+    >(DailyChoiceUnavailableFailure()),
   );
 
   void completeSuccess(int index, DeleteBlockingRelationsResult result) =>
@@ -380,6 +530,9 @@ final _intentionB = _intentionId('018f47c2-6b7d-7abc-8def-0123456789a2');
 final _relationA = _relationId('018f47c2-6b7d-7abc-8def-0123456789b1');
 final _relationB = _relationId('018f47c2-6b7d-7abc-8def-0123456789b2');
 final _relationC = _relationId('018f47c2-6b7d-7abc-8def-0123456789b3');
+final _choiceA = (DailyChoiceId.decode(
+  '018f47c2-6b7d-7abc-8def-0123456789b1',
+) as DailyChoiceIdDecodingSuccess).id;
 
 LongTermRelation _relation(LongTermRelationId id) => LongTermRelation(
   id: id,

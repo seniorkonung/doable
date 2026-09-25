@@ -125,6 +125,97 @@ void main() {
     },
   );
 
+  test('переход 2 → 3 сохраняет граф и не создаёт дневные выборы', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    await createSchemaV2Fixture(
+      harness.databaseFile,
+      seed: _seedPublishedGraph,
+    );
+
+    final migratedDatabase = await harness.openReadyDatabase();
+    await expectLater(verifyDoableDatabaseSchema(migratedDatabase), completes);
+    await harness.closePersistenceObjectGraph();
+    _expectPublishedGraph(
+      harness.databaseFile,
+      expectedSchemaVersion: AppDatabase.currentSchemaVersion,
+      hasChoiceSchema: true,
+    );
+
+    final reopenedDatabase = await harness.openReadyDatabase();
+    await expectLater(verifyDoableDatabaseSchema(reopenedDatabase), completes);
+    await harness.closePersistenceObjectGraph();
+    _expectPublishedGraph(
+      harness.databaseFile,
+      expectedSchemaVersion: AppDatabase.currentSchemaVersion,
+      hasChoiceSchema: true,
+    );
+  });
+
+  test('сбой перехода 2 → 3 оставляет прежний граф и версию', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    await createSchemaV2Fixture(
+      harness.databaseFile,
+      seed: _seedPublishedGraph,
+    );
+    final interceptor = _Schema2To3FailureInterceptor();
+
+    final failedResult = await harness.open(observer: interceptor);
+    expect(failedResult, isA<LocalDataUnexpectedFailure>());
+    expect(interceptor.didInjectFailure, isTrue);
+    await harness.closePersistenceObjectGraph();
+    _expectPublishedGraph(
+      harness.databaseFile,
+      expectedSchemaVersion: publishedRelationSchemaVersion,
+      hasChoiceSchema: false,
+    );
+
+    final reopenedDatabase = await harness.openReadyDatabase();
+    await expectLater(verifyDoableDatabaseSchema(reopenedDatabase), completes);
+    await harness.closePersistenceObjectGraph();
+    _expectPublishedGraph(
+      harness.databaseFile,
+      expectedSchemaVersion: AppDatabase.currentSchemaVersion,
+      hasChoiceSchema: true,
+    );
+  });
+
+  for (final stopPoint in _MigrationProcessStopPoint.values) {
+    test(
+      'прерывание перехода 2 → 3 ${stopPoint.testDescription} сохраняет целый граф',
+      () async {
+        final harness = await LocalDatabaseHarness.fileBacked();
+        addTearDown(harness.dispose);
+        await createSchemaV2Fixture(
+          harness.databaseFile,
+          seed: _seedPublishedGraph,
+        );
+
+        await _runMigrationWorkerUntilStopPoint(harness, stopPoint);
+        _expectPublishedGraph(
+          harness.databaseFile,
+          expectedSchemaVersion: stopPoint.isAfterCommit
+              ? AppDatabase.currentSchemaVersion
+              : publishedRelationSchemaVersion,
+          hasChoiceSchema: stopPoint.isAfterCommit,
+        );
+
+        final reopenedDatabase = await harness.openReadyDatabase();
+        await expectLater(
+          verifyDoableDatabaseSchema(reopenedDatabase),
+          completes,
+        );
+        await harness.closePersistenceObjectGraph();
+        _expectPublishedGraph(
+          harness.databaseFile,
+          expectedSchemaVersion: AppDatabase.currentSchemaVersion,
+          hasChoiceSchema: true,
+        );
+      },
+    );
+  }
+
   for (final stopPoint in _MigrationProcessStopPoint.values) {
     test(
       'принудительное завершение ${stopPoint.testDescription} сохраняет целое хранилище',
@@ -191,6 +282,79 @@ void _seedPublishedIntentions(sqlite.Database database) {
         1704326400000000
       )
   ''');
+}
+
+void _seedPublishedGraph(sqlite.Database database) {
+  _seedPublishedIntentions(database);
+  database.execute('''
+    INSERT INTO long_term_relations (
+      creation_sequence,
+      id,
+      source_intention_id,
+      related_intention_id,
+      type,
+      priority,
+      description,
+      is_archived
+    ) VALUES (
+      47,
+      '018f0b5d-6b2e-7c80-8000-000000000313',
+      '$_activeIntentionId',
+      '$_archivedIntentionId',
+      'need',
+      2,
+      '  Сохранённая связь  ',
+      1
+    )
+  ''');
+}
+
+void _expectPublishedGraph(
+  File databaseFile, {
+  required int expectedSchemaVersion,
+  required bool hasChoiceSchema,
+}) {
+  _expectPublishedIntentions(
+    databaseFile,
+    expectedSchemaVersion: expectedSchemaVersion,
+    hasRelationSchema: true,
+  );
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    expect(
+      database.select('''
+        SELECT creation_sequence, id, source_intention_id,
+          related_intention_id, type, priority, description, is_archived
+        FROM long_term_relations
+      ''').single,
+      {
+        'creation_sequence': 47,
+        'id': '018f0b5d-6b2e-7c80-8000-000000000313',
+        'source_intention_id': _activeIntentionId,
+        'related_intention_id': _archivedIntentionId,
+        'type': 'need',
+        'priority': 2,
+        'description': '  Сохранённая связь  ',
+        'is_archived': 1,
+      },
+    );
+    final choiceTables = database.select('''
+      SELECT name FROM sqlite_schema
+      WHERE type = 'table'
+        AND name IN ('daily_choices', 'daily_choice_path_steps')
+      ORDER BY name
+    ''');
+    expect(choiceTables, hasChoiceSchema ? hasLength(2) : isEmpty);
+    if (hasChoiceSchema) {
+      expect(database.select('SELECT id FROM daily_choices'), isEmpty);
+      expect(
+        database.select('SELECT id FROM daily_choice_path_steps'),
+        isEmpty,
+      );
+    }
+  } finally {
+    database.close();
+  }
 }
 
 void _expectPublishedIntentions(
@@ -271,6 +435,23 @@ void _expectPublishedIntentions(
       WHERE name = 'long_term_relations'
     ''');
     expect(relationSchema, hasRelationSchema ? hasLength(1) : isEmpty);
+
+    final choiceTables = database.select('''
+      SELECT name FROM sqlite_schema
+      WHERE type = 'table'
+        AND name IN ('daily_choices', 'daily_choice_path_steps')
+      ORDER BY name
+    ''');
+    if (expectedSchemaVersion == AppDatabase.currentSchemaVersion) {
+      expect(choiceTables, hasLength(2));
+      expect(database.select('SELECT id FROM daily_choices'), isEmpty);
+      expect(
+        database.select('SELECT id FROM daily_choice_path_steps'),
+        isEmpty,
+      );
+    } else {
+      expect(choiceTables, isEmpty);
+    }
   } finally {
     database.close();
   }
@@ -431,6 +612,30 @@ final class _InjectedInitialCreationFailure implements Exception {
 
 final class _InjectedSchema1To2Failure implements Exception {
   const _InjectedSchema1To2Failure();
+}
+
+final class _InjectedSchema2To3Failure implements Exception {
+  const _InjectedSchema2To3Failure();
+}
+
+final class _Schema2To3FailureInterceptor
+    extends LocalDatabaseConnectionObserver {
+  var didInjectFailure = false;
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (didInjectFailure) return;
+    final createsChoiceTable = statement.statements.any(
+      (sql) => RegExp(
+        r'^CREATE TABLE(?: IF NOT EXISTS)? ["`]?daily_choices["`]?',
+        caseSensitive: false,
+      ).hasMatch(sql.trimLeft()),
+    );
+    if (!createsChoiceTable) return;
+
+    didInjectFailure = true;
+    throw const _InjectedSchema2To3Failure();
+  }
 }
 
 final class _Schema1To2FailureInterceptor

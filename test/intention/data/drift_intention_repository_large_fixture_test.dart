@@ -254,7 +254,7 @@ Future<void> _expectCompleteKeysetTraversal(
   expect(ids, hasLength(_fixtureSize));
   _expectNoOffset(trace);
   expect(
-    trace.selects.where((select) => select.statement.contains('COUNT(')),
+    trace.selects.where((select) => _isCatalogCountStatement(select.statement)),
     hasLength(1),
   );
   expect(
@@ -267,7 +267,7 @@ void _expectSingleCountAndBoundedRead(_SelectTrace trace) {
   _expectNoOffset(trace);
   final counts = [
     for (final select in trace.selects)
-      if (select.statement.contains('COUNT(')) select,
+      if (_isCatalogCountStatement(select.statement)) select,
   ];
   final reads = [
     for (final select in trace.selects)
@@ -286,6 +286,10 @@ void _expectNoOffset(_SelectTrace trace) => expect(
   trace.selects,
   isNot(anyElement((select) => select.statement.contains('OFFSET'))),
 );
+
+bool _isCatalogCountStatement(String statement) =>
+    statement.contains('COUNT(') &&
+    !statement.contains('doable_relation_count_aggregates');
 
 Duration _percentile95(List<Duration> samples) {
   final sorted = [...samples]..sort();

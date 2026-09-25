@@ -3,9 +3,9 @@ import '../../domain/intention_id.dart';
 
 /// Назначение, ради которого открыт ограниченный каталог намерений.
 ///
-/// Общий просмотр и выбор участника долговременной связи читают одни и те же
-/// порции одного источника, но остаются независимыми состояниями: охват,
-/// фильтр и загруженная часть одного не изменяют другой.
+/// Все назначения читают одни и те же порции одного источника, но остаются
+/// независимыми состояниями: охват, фильтр и загруженная часть одного не
+/// изменяют другие.
 sealed class IntentionCatalogPurpose {
   const IntentionCatalogPurpose();
 }
@@ -19,6 +19,34 @@ final class BrowseIntentionCatalog extends IntentionCatalogPurpose {
 
   @override
   int get hashCode => (BrowseIntentionCatalog).hashCode;
+}
+
+/// Выбор существующего активного действия для дневного выбора.
+///
+/// Охват и готовность закреплены назначением: вызывающая сторона не может
+/// превратить этот список в выбор архивного или неготового намерения.
+final class SelectDailyChoiceAction extends IntentionCatalogPurpose {
+  const SelectDailyChoiceAction();
+
+  @override
+  bool operator ==(Object other) => other is SelectDailyChoiceAction;
+
+  @override
+  int get hashCode => (SelectDailyChoiceAction).hashCode;
+}
+
+/// Выбор нового исходного намерения при замене пути дневного выбора.
+///
+/// Любое активное намерение допустимо как основание, независимо от готовности.
+/// Прежние участники не исключаются: новый путь заменяет обоих участников.
+final class SelectDailyChoiceSource extends IntentionCatalogPurpose {
+  const SelectDailyChoiceSource();
+
+  @override
+  bool operator ==(Object other) => other is SelectDailyChoiceSource;
+
+  @override
+  int get hashCode => (SelectDailyChoiceSource).hashCode;
 }
 
 /// Выбор существующего намерения участником долговременной связи.

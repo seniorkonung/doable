@@ -13,6 +13,7 @@ import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
 import 'relation_details_state.dart';
@@ -125,7 +126,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     final current = state;
     if (current is! RelationDetailsLoaded ||
         _isOperationRunning ||
-        !_isLifecycleChangeApplicable(current.details, kind)) {
+        !_isLifecycleChangeApplicable(current, kind)) {
       return;
     }
 
@@ -163,16 +164,18 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   }
 
   bool _isLifecycleChangeApplicable(
-    LongTermRelationDetails details,
+    RelationDetailsLoaded loaded,
     RelationDetailsLifecycleKind kind,
   ) => switch (kind) {
     RelationDetailsLifecycleKind.archive =>
-      details.relation.scope == RelationScope.active,
+      loaded.permissions.canChangeArchiveState &&
+          loaded.details.relation.scope == RelationScope.active,
     RelationDetailsLifecycleKind.restore =>
-      details.relation.scope == RelationScope.archived &&
-          details.source.archiveState == IntentionArchiveState.active &&
-          details.related.archiveState == IntentionArchiveState.active,
-    RelationDetailsLifecycleKind.delete => true,
+      loaded.permissions.canChangeArchiveState &&
+          loaded.details.relation.scope == RelationScope.archived &&
+          loaded.details.source.archiveState == IntentionArchiveState.active &&
+          loaded.details.related.archiveState == IntentionArchiveState.active,
+    RelationDetailsLifecycleKind.delete => loaded.permissions.canDelete,
   };
 
   Future<void> _finishLifecycleChange(
@@ -302,6 +305,19 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     final relationChanged = changes.whereType<LongTermRelationChange>().any(
       (change) => change.id == _relationId,
     );
+    LongTermRelationPermissions? confirmedPermissions;
+    for (final change in changes) {
+      switch (change) {
+        case DailyChoiceChange(:final relationPermissions):
+          confirmedPermissions =
+              relationPermissions[_relationId] ?? confirmedPermissions;
+        case LongTermRelationChange(:final id, :final permissions)
+            when id == _relationId && permissions?.isConfirmed == true:
+          confirmedPermissions = permissions;
+        case GraphChange():
+          break;
+      }
+    }
     final current = state;
     final participantIds = current is RelationDetailsLoaded
         ? <IntentionId>{current.details.source.id, current.details.related.id}
@@ -317,7 +333,9 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
         GraphChange() => false,
       },
     );
-    if ((!relationChanged && !participantChanged) ||
+    if ((!relationChanged &&
+            !participantChanged &&
+            confirmedPermissions == null) ||
         !_advanceRevisionBarrier(confirmedChange.revision)) {
       return;
     }
@@ -328,6 +346,10 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     _generation = _generation.next();
     state = switch (current) {
       RelationDetailsLoaded() => current.copyWith(
+        permissions: confirmedPermissions,
+        permissionRevision: confirmedPermissions == null
+            ? null
+            : confirmedChange.revision,
         isOperationRunning: _isOperationRunning,
         refreshStatus: const RelationDetailsRefreshing(),
       ),

@@ -242,6 +242,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связь больше не принадлежит этому намерению. Уберите её из выбора и подтвердите оставшийся набор заново.';
 
   @override
+  String get blockingRelationsInvalidProtected =>
+      'Связь используется в сохранённом дневном пути. Сначала отдельно удалите дневной выбор, затем заново выберите и подтвердите удаление освободившейся долговременной связи. Весь выбранный набор пока не удаляется.';
+
+  @override
   String get blockingRelationsRefreshIntentionNotFound =>
       'Намерение больше не существует. Удаление связей недоступно.';
 
@@ -267,7 +271,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get blockingRelationsDeleteProhibited =>
-      'Удаление одной выбранной связи теперь заблокировано. Актуализируйте выбор и подтвердите его заново.';
+      'Одна выбранная связь теперь используется в сохранённом дневном пути. Весь набор сохранён. Сначала отдельно удалите дневной выбор, затем заново выберите и подтвердите удаление освободившейся долговременной связи.';
 
   @override
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
@@ -308,6 +312,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String relationNeighborhoodCanTotal(int count) {
     return 'Можно: $count';
   }
+
+  @override
+  String relationNeighborhoodDailyTotal(int count) {
+    return 'Дневных выборов: $count';
+  }
+
+  @override
+  String get relationNeighborhoodDailySourceRole => 'Исходное намерение';
+
+  @override
+  String get relationNeighborhoodDailySelectedRole => 'Выбранное действие';
+
+  @override
+  String get relationNeighborhoodLongTermGroups => 'Долговременные связи';
 
   @override
   String get relationNeighborhoodScopeLabel => 'Состояние связей';
@@ -744,6 +762,78 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationRelation => 'связь';
 
   @override
+  String get graphOperationDailyChoice => 'дневной выбор';
+
+  @override
+  String get dailyChoiceCreated => 'Дневной выбор создан.';
+
+  @override
+  String get dailyChoiceUpdated => 'Дневной выбор изменён.';
+
+  @override
+  String get dailyChoicePathReplaced => 'Путь дневного выбора заменён.';
+
+  @override
+  String get dailyChoiceDeleted => 'Дневной выбор удалён.';
+
+  @override
+  String get dailyChoiceDeleteAction => 'Удалить дневной выбор навсегда';
+
+  @override
+  String get dailyChoiceDeleteConfirmationTitle =>
+      'Удалить дневной выбор навсегда?';
+
+  @override
+  String dailyChoiceDeleteConfirmationMessage(
+    String phrase,
+    String date,
+    String choiceId,
+  ) {
+    return 'Выбор: $phrase\nДата: $date\nИдентификатор выбора: $choiceId\n\nЭто действие нельзя отменить. Намерения, долговременные связи и другие дневные выборы сохранятся.';
+  }
+
+  @override
+  String get dailyChoiceDeleteConfirmAction => 'Удалить навсегда';
+
+  @override
+  String get dailyChoiceSourceInvalid =>
+      'Проверьте исходное намерение дневного выбора.';
+
+  @override
+  String get dailyChoiceSelectedInvalid =>
+      'Проверьте выбранное намерение дневного выбора.';
+
+  @override
+  String get dailyChoiceDateInvalid => 'Проверьте дату дневного выбора.';
+
+  @override
+  String get dailyChoiceDescriptionInvalid =>
+      'Проверьте описание дневного выбора.';
+
+  @override
+  String get dailyChoicePathInvalid => 'Проверьте путь дневного выбора.';
+
+  @override
+  String get dailyChoiceOperationNotFound =>
+      'Дневной выбор больше не существует.';
+
+  @override
+  String get dailyChoiceOperationConflict =>
+      'Данные изменились. Обновите их и подтвердите снова.';
+
+  @override
+  String get dailyChoiceOperationUnavailable =>
+      'Не удалось выполнить действие с дневным выбором. Повторите попытку.';
+
+  @override
+  String get dailyChoiceOperationCorruption =>
+      'Сохранённые данные повреждены. Дневной выбор не изменён.';
+
+  @override
+  String get dailyChoiceOperationUnexpected =>
+      'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.';
+
+  @override
   String get relationEditorCreated => 'Связь создана.';
 
   @override
@@ -795,6 +885,18 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorUpdateParticipantArchived =>
       'Активная связь может соединять только активные намерения.';
+
+  @override
+  String get relationEditorUpdateReferencedByDailyPath =>
+      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить.';
+
+  @override
+  String get relationEditorPathProtection =>
+      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить. Описание и приоритет остаются доступными.';
+
+  @override
+  String get relationEditorPathProtectionWithDraft =>
+      'Связь используется в сохранённом дневном пути. Верните прежние тип и участников, чтобы сохранить изменения описания и приоритета.';
 
   @override
   String get relationEditorUpdateUnavailable =>
@@ -879,6 +981,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связь не удалось удалить из-за конфликта актуального состояния.';
 
   @override
+  String get relationDeleteReferencedByDailyPath =>
+      'Связь используется в сохранённом дневном пути. Сначала удалите или замените использующие её дневные выборы.';
+
+  @override
   String get relationDeleteUnavailable =>
       'Не удалось удалить связь. Повторите попытку.';
 
@@ -893,6 +999,10 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationNeighborhoodOpenRelation =>
       'Открывает подробные данные связи';
+
+  @override
+  String get relationNeighborhoodOpenDailyChoice =>
+      'Открыть полный путь дневного выбора';
 
   @override
   String get relationDetailsTitle => 'Связь';
@@ -962,6 +1072,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationDetailsDeleteAction => 'Удалить связь навсегда';
 
   @override
+  String get relationDetailsPathProtection =>
+      'Связь используется в сохранённом дневном пути. Удалить её или изменить тип и участников нельзя. Описание, приоритет и архивное состояние остаются доступными.';
+
+  @override
+  String get relationDetailsDeletionChecking =>
+      'Удаление недоступно, пока не подтверждены зависимости связи.';
+
+  @override
   String get relationDetailsDeleteConfirmationTitle =>
       'Удалить связь навсегда?';
 
@@ -988,6 +1106,84 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get participantPickerTitle => 'Выбор участника';
+
+  @override
+  String get actionPickerTitle => 'Выбор действия';
+
+  @override
+  String get actionPickerCancel => 'Отменить выбор действия';
+
+  @override
+  String get actionPickerLoading => 'Загружаем действия…';
+
+  @override
+  String get actionPickerEmpty => 'Доступных активных действий нет.';
+
+  @override
+  String get actionPickerNoMatches => 'Действий с таким названием не найдено.';
+
+  @override
+  String get actionPickerUnavailable =>
+      'Не удалось загрузить действия. Повторите попытку.';
+
+  @override
+  String get actionPickerCorruption =>
+      'Сохранённые данные действий повреждены и не могут быть показаны.';
+
+  @override
+  String get actionPickerUnexpected =>
+      'Не удалось загрузить действия из-за непредвиденной ошибки.';
+
+  @override
+  String get actionPickerSelectHint =>
+      'Выбрать это действие для поиска основания';
+
+  @override
+  String get actionPickerOpenDetails => 'Открыть подробности действия';
+
+  @override
+  String actionPickerTotalCount(int count) {
+    return 'Всего действий: $count';
+  }
+
+  @override
+  String get sourcePickerTitle => 'Выбор основания';
+
+  @override
+  String get sourcePickerCancel => 'Отменить выбор основания';
+
+  @override
+  String get sourcePickerLoading => 'Загружаем намерения…';
+
+  @override
+  String get sourcePickerEmpty => 'Доступных активных намерений нет.';
+
+  @override
+  String get sourcePickerNoMatches => 'Намерений с таким названием не найдено.';
+
+  @override
+  String get sourcePickerUnavailable =>
+      'Не удалось загрузить намерения. Повторите попытку.';
+
+  @override
+  String get sourcePickerCorruption =>
+      'Сохранённые данные намерений повреждены и не могут быть показаны.';
+
+  @override
+  String get sourcePickerUnexpected =>
+      'Не удалось загрузить намерения из-за непредвиденной ошибки.';
+
+  @override
+  String get sourcePickerSelectHint =>
+      'Выбрать это намерение как новое основание';
+
+  @override
+  String get sourcePickerOpenDetails => 'Открыть подробности намерения';
+
+  @override
+  String sourcePickerTotalCount(int count) {
+    return 'Всего намерений: $count';
+  }
 
   @override
   String get participantPickerCancel => 'Отменить выбор';
@@ -1105,5 +1301,466 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String relationEditorPriorityOption(String priority) {
     return 'Приоритет $priority';
+  }
+
+  @override
+  String get detailsChoosePathAction => 'Выбрать действие по пути';
+
+  @override
+  String get choicePathTitle => 'Выбор пути к действию';
+
+  @override
+  String get choicePathBottomTitle => 'Выбор основания для действия';
+
+  @override
+  String get choicePathBottomTraversal => 'Обход: от действия к основанию';
+
+  @override
+  String get choicePathBottomPathDirection =>
+      'Направление связей: от основания к действию';
+
+  @override
+  String choicePathFixedAction(String action) {
+    return 'Выбранное действие: $action';
+  }
+
+  @override
+  String get choicePathActionPending => 'Загружаем выбранное действие…';
+
+  @override
+  String choicePathCurrentSource(String source) {
+    return 'Основание: $source';
+  }
+
+  @override
+  String get choicePathSourceSelected => 'Основание подтверждено';
+
+  @override
+  String choicePathSelectSource(String source) {
+    return 'Подтвердить основание «$source»';
+  }
+
+  @override
+  String get choicePathBottomNoPath =>
+      'Для этого действия сейчас нет допустимых входящих связей. Выберите другое действие.';
+
+  @override
+  String get choicePathDirection => 'Путь от исходного намерения к действию';
+
+  @override
+  String choicePathSource(String source) {
+    return 'Исходное намерение: $source';
+  }
+
+  @override
+  String get choicePathSourcePending => 'Загружаем исходное намерение…';
+
+  @override
+  String choicePathReturnTo(String source) {
+    return 'Вернуться к «$source»';
+  }
+
+  @override
+  String choicePathStepSemantics(int index, String phrase, String priority) {
+    return 'Шаг $index: $phrase. Приоритет $priority';
+  }
+
+  @override
+  String get choicePathActionSelected => 'Действие выбрано';
+
+  @override
+  String choicePathSelectAction(String action) {
+    return 'Выбрать действие «$action»';
+  }
+
+  @override
+  String get choicePathSelectionNotSaved => 'Связь «я сегодня» ещё не создана.';
+
+  @override
+  String get choicePathContinuations => 'Доступные продолжения';
+
+  @override
+  String get choicePathLoading => 'Проверяем доступные продолжения…';
+
+  @override
+  String get choicePathNoPath =>
+      'Из этого намерения сейчас нет допустимого пути к другому действию.';
+
+  @override
+  String get choicePathNoFurtherPath =>
+      'Дальнейших допустимых продолжений нет.';
+
+  @override
+  String get choicePathConflict =>
+      'Граф изменился. Актуализируйте путь перед дальнейшим выбором.';
+
+  @override
+  String get choicePathRefresh => 'Актуализировать путь';
+
+  @override
+  String get choicePathNotFound => 'Намерение пути больше не существует.';
+
+  @override
+  String get choicePathInvalid =>
+      'Не удалось проверить продолжения из-за неверного запроса.';
+
+  @override
+  String get choicePathUnavailable =>
+      'Продолжения временно недоступны. Повторите попытку.';
+
+  @override
+  String get choicePathCorruption =>
+      'Сохранённые данные пути повреждены. Продолжение недоступно.';
+
+  @override
+  String get choicePathUnexpected =>
+      'Не удалось проверить продолжения из-за непредвиденной ошибки.';
+
+  @override
+  String get choicePathLoadMore => 'Показать ещё продолжения';
+
+  @override
+  String get choicePathLoadingMore => 'Загружаем следующую порцию…';
+
+  @override
+  String choicePathContinueSemantics(String phrase, String priority) {
+    return 'Продолжить по связи: $phrase. Приоритет $priority';
+  }
+
+  @override
+  String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
+
+  @override
+  String get dailyChoiceCatalogTitle => 'Дневные выборы';
+
+  @override
+  String get dailyChoiceCreateFromAction => 'Создать выбор от действия';
+
+  @override
+  String get dailyChoiceCatalogLoading => 'Загружаем дневные выборы…';
+
+  @override
+  String get dailyChoiceCatalogDateFilter => 'Дата';
+
+  @override
+  String get dailyChoiceCatalogApplyDate => 'Применить дату';
+
+  @override
+  String get dailyChoiceCatalogDateInvalid =>
+      'Введите корректную дату в формате ГГГГ-ММ-ДД.';
+
+  @override
+  String get dailyChoiceCatalogCompletionFilter => 'Выполнение';
+
+  @override
+  String get dailyChoiceCatalogAllStates => 'Все состояния';
+
+  @override
+  String get dailyChoiceCatalogIncomplete => 'Не выполненные';
+
+  @override
+  String get dailyChoiceCatalogCompleted => 'Выполненные';
+
+  @override
+  String get dailyChoiceCatalogClearFilters => 'Сбросить фильтры';
+
+  @override
+  String dailyChoiceCatalogTotalCount(int count) {
+    return 'Всего дневных выборов: $count';
+  }
+
+  @override
+  String get dailyChoiceCatalogEmpty => 'Дневных выборов по фильтрам нет.';
+
+  @override
+  String get dailyChoiceCatalogRefreshing => 'Обновляем дневные выборы…';
+
+  @override
+  String get dailyChoiceCatalogLoadingMore => 'Загружаем ещё дневные выборы…';
+
+  @override
+  String get dailyChoiceCatalogLoadMore => 'Показать ещё дневные выборы';
+
+  @override
+  String get dailyChoiceCatalogUnavailable =>
+      'Не удалось загрузить дневные выборы. Повторите попытку.';
+
+  @override
+  String get dailyChoiceCatalogCorruption =>
+      'Сохранённые данные дневных выборов повреждены и не могут быть показаны.';
+
+  @override
+  String get dailyChoiceCatalogExpired =>
+      'Каталог изменился. Обновите его, чтобы продолжить.';
+
+  @override
+  String get dailyChoiceCatalogInvalid =>
+      'Позиция каталога больше недействительна.';
+
+  @override
+  String get dailyChoiceCatalogUnexpected =>
+      'Не удалось загрузить дневные выборы из-за непредвиденной ошибки.';
+
+  @override
+  String dailyChoiceCatalogRowLabel(
+    int number,
+    String phrase,
+    String date,
+    String completion,
+  ) {
+    return 'Выбор № $number. $phrase. $date. $completion';
+  }
+
+  @override
+  String get dailyChoiceDetailsTitle => 'Дневной выбор';
+
+  @override
+  String get dailyChoiceEditTitle => 'Редактировать дневной выбор';
+
+  @override
+  String get dailyChoiceEditSave => 'Сохранить изменения';
+
+  @override
+  String get dailyChoiceEditRefresh =>
+      'Вернуться к подробностям и обновить данные';
+
+  @override
+  String get dailyChoiceDetailsLoading => 'Загружаем дневной выбор…';
+
+  @override
+  String get dailyChoiceDetailsNotFound =>
+      'Дневной выбор больше не существует.';
+
+  @override
+  String get dailyChoiceDetailsUnavailable =>
+      'Не удалось загрузить дневной выбор. Повторите попытку.';
+
+  @override
+  String get dailyChoiceDetailsCorruption =>
+      'Сохранённый путь повреждён и не может быть показан.';
+
+  @override
+  String get dailyChoiceDetailsUnexpected =>
+      'Не удалось загрузить дневной выбор из-за непредвиденной ошибки.';
+
+  @override
+  String dailyChoiceDetailsPhrase(String source, String selected) {
+    return 'Чтобы $source, я сегодня $selected';
+  }
+
+  @override
+  String dailyChoiceDetailsDate(String date) {
+    return 'Дата дневного выбора: $date';
+  }
+
+  @override
+  String get dailyChoiceDetailsCompleted => 'Выполнено';
+
+  @override
+  String get dailyChoiceDetailsNotCompleted => 'Не выполнено';
+
+  @override
+  String get dailyChoiceDetailsDescription => 'Описание';
+
+  @override
+  String get dailyChoiceDetailsPath => 'Сохранённый путь';
+
+  @override
+  String get dailyChoiceDetailsSource => 'Основание';
+
+  @override
+  String get dailyChoiceDetailsIntermediate => 'Промежуточное намерение';
+
+  @override
+  String get dailyChoiceDetailsSelectedAction => 'Выбранное действие';
+
+  @override
+  String get dailyChoiceDetailsArchived => 'Архивировано';
+
+  @override
+  String get dailyChoiceDetailsActive => 'Активно';
+
+  @override
+  String get dailyChoiceDetailsReady => 'Готово к действию';
+
+  @override
+  String get dailyChoiceDetailsNotReady => 'Не готово к действию';
+
+  @override
+  String dailyChoiceDetailsStep(int number) {
+    return 'Переход $number';
+  }
+
+  @override
+  String get dailyChoiceCreationPath => 'Подтверждаемый путь';
+
+  @override
+  String dailyChoiceCreationAction(String action) {
+    return 'Выбранное действие: $action';
+  }
+
+  @override
+  String get dailyChoiceCreationDate => 'Дата дневного выбора';
+
+  @override
+  String get dailyChoiceCreationDateHint =>
+      'Введите дату в формате ГГГГ-ММ-ДД (0001–9999)';
+
+  @override
+  String get dailyChoiceCreationDescription => 'Описание (необязательно)';
+
+  @override
+  String get dailyChoiceCreationCompleted => 'Уже выполнено';
+
+  @override
+  String get dailyChoiceCreationCompletedHint =>
+      'Отметьте, если действие уже выполнено для этой даты';
+
+  @override
+  String get dailyChoiceCreationSave => 'Сохранить дневной выбор';
+
+  @override
+  String get dailyChoiceCreationSaving => 'Сохраняем…';
+
+  @override
+  String get dailyChoiceCreationCancel => 'Отмена';
+
+  @override
+  String get dailyChoiceCreationRefreshPath =>
+      'Вернуться к пути и актуализировать его';
+
+  @override
+  String get dailyChoiceReplaceTitle => 'Подтвердить замену пути';
+
+  @override
+  String get dailyChoiceReplacePreparing =>
+      'Готовим подтверждение нового пути…';
+
+  @override
+  String get dailyChoiceReplaceCurrent => 'Заменяемый дневной выбор';
+
+  @override
+  String get dailyChoiceReplaceNewPath => 'Новый путь от основания к действию';
+
+  @override
+  String get dailyChoiceReplaceNoDescription => 'Без описания';
+
+  @override
+  String get dailyChoiceReplaceFieldsPreserved =>
+      'Дата, описание и выполнение сохранятся без изменений при замене пути.';
+
+  @override
+  String get dailyChoiceReplaceCompletionPreserved =>
+      'Выполнение останется включённым, даже если выбрано другое действие.';
+
+  @override
+  String get dailyChoiceReplaceConfirm => 'Заменить только путь';
+
+  @override
+  String get dailyChoiceReplaceSubmitting => 'Заменяем путь…';
+
+  @override
+  String get dailyChoiceReplaceChooseAgain => 'Вернуться к выбору пути';
+
+  @override
+  String get dailyChoiceReplaceOpen => 'Заменить путь';
+
+  @override
+  String get dailyChoiceReplaceChooseDirection =>
+      'Выбрать направление нового пути';
+
+  @override
+  String get dailyChoiceReplaceChooseDirectionDescription =>
+      'Выберите новое основание или действие для замены сохранённого пути.';
+
+  @override
+  String get dailyChoiceReplaceFromSource => 'Начать с нового основания';
+
+  @override
+  String get dailyChoiceReplaceFromAction => 'Начать с нового действия';
+
+  @override
+  String get dailyChoiceReplaceSelectPath => 'Выбрать путь для замены';
+
+  @override
+  String get dailyChoiceReplaceOpenConfirmation => 'Подтвердить замену пути';
+
+  @override
+  String get choicePathOpenConfirmation => 'Перейти к подтверждению выбора';
+
+  @override
+  String get choiceSuggestionTitle => 'Прежние маршруты';
+
+  @override
+  String get choiceSuggestionLoading =>
+      'Загружаем подсказки прежних маршрутов…';
+
+  @override
+  String get choiceSuggestionEmpty =>
+      'Прежних маршрутов для этого участника нет.';
+
+  @override
+  String get choiceSuggestionUpdating =>
+      'Обновляем подсказки. Выбор маршрута временно недоступен.';
+
+  @override
+  String get choiceSuggestionNotFound =>
+      'Выбранное намерение больше не существует.';
+
+  @override
+  String get choiceSuggestionUnavailable =>
+      'Не удалось загрузить подсказки. Повторите попытку.';
+
+  @override
+  String get choiceSuggestionCorruption =>
+      'Сохранённые данные подсказок повреждены и не могут быть подтверждены.';
+
+  @override
+  String get choiceSuggestionUnexpected =>
+      'Не удалось загрузить подсказки из-за непредвиденной ошибки.';
+
+  @override
+  String choiceSuggestionPosition(int index, int total) {
+    return 'Подсказка $index из $total';
+  }
+
+  @override
+  String choiceSuggestionSource(String source) {
+    return 'Основание: $source';
+  }
+
+  @override
+  String choiceSuggestionAction(String action) {
+    return 'Выбранное действие: $action';
+  }
+
+  @override
+  String get choiceSuggestionView => 'Просмотреть весь маршрут';
+
+  @override
+  String get choiceSuggestionSelect => 'Выбрать маршрут';
+
+  @override
+  String get choiceSuggestionArchivedIntention =>
+      'Маршрут недоступен: одно из намерений архивировано.';
+
+  @override
+  String get choiceSuggestionArchivedRelation =>
+      'Маршрут недоступен: связь пути архивирована.';
+
+  @override
+  String get choiceSuggestionActionNotReady =>
+      'Маршрут недоступен: конечное действие больше не готово к действию.';
+
+  @override
+  String get choiceSuggestionPreviewTitle => 'Полный маршрут';
+
+  @override
+  String get choiceSuggestionDirection =>
+      'Направление маршрута: от основания к действию';
+
+  @override
+  String choiceSuggestionStep(int index, int total) {
+    return 'Переход $index из $total';
   }
 }

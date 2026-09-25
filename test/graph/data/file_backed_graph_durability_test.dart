@@ -321,7 +321,7 @@ void main() {
       observer.arm();
 
       final result = await _repository(database, const []).execute(
-        DeleteBlockingRelations(
+        DeleteBlockingRelations.longTerm(
           intentionId: _sourceId,
           relationIds: LargeBlockingRelationsFixture.selectedIds,
         ),
@@ -478,9 +478,10 @@ void main() {
         );
         expect(orderedGroup, isA<RelationGroupPageSuccess>());
         expect(
-          (orderedGroup as RelationGroupPageSuccess).value.items.map(
-            (item) => item.relation.id,
-          ),
+          ((orderedGroup as RelationGroupPageSuccess).value
+                  as RelationGroupFirstPage)
+              .items
+              .map((item) => item.relation.id),
           [_firstRelationId, _secondRelationId],
         );
         expect(

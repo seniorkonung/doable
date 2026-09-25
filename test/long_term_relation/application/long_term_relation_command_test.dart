@@ -445,6 +445,7 @@ String _failureDescription(LongTermRelationCommandFailure failure) =>
     switch (failure) {
       LongTermRelationCommandValidationFailure() => 'validation',
       LongTermRelationPairOccupiedFailure() => 'pairOccupied',
+      LongTermRelationReferencedByDailyPathFailure() => 'dailyPath',
       LongTermRelationNotFoundFailure() => 'relationNotFound',
       LongTermRelationParticipantNotFoundFailure() => 'participantNotFound',
       LongTermRelationParticipantArchivedFailure() => 'participantArchived',

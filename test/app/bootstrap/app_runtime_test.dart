@@ -1,7 +1,15 @@
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
+import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
+
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
@@ -15,6 +23,7 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
+import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -299,10 +308,14 @@ void main() {
         final coordinator = runtime.commandCoordinator;
         final intentionId = _intentionId(_relationSourceUuid);
         final relationId = _relationId(_relationRelatedUuid);
+        final choiceId = _choiceId(_relationRelatedUuid);
         final accepted = coordinator.acceptBlockingRelationsDelete(
           DeleteBlockingRelations(
             intentionId: intentionId,
-            relationIds: {relationId},
+            references: {
+              LongTermBlockingRelationReference(relationId),
+              DailyChoiceBlockingRelationReference(choiceId),
+            },
           ),
           presentationTitle: 'Намерение',
         ) as BlockingRelationsDeleteAccepted;
@@ -311,10 +324,11 @@ void main() {
         final shutdown = runtime.shutdown();
         expect(coordinator.isRunning(intentionId), isTrue);
         expect(coordinator.isRelationRunning(relationId), isTrue);
+        expect(coordinator.isDailyChoiceRunning(choiceId), isTrue);
         expect(closeObserver.closeCalls, 0);
         expect(
           coordinator.acceptBlockingRelationsDelete(
-            DeleteBlockingRelations(
+            DeleteBlockingRelations.longTerm(
               intentionId: _intentionId(_relationRelatedUuid),
               relationIds: {_relationId(_relationSourceUuid)},
             ),
@@ -333,10 +347,50 @@ void main() {
         expect(completion.token, same(accepted.token));
         expect(coordinator.isRunning(intentionId), isFalse);
         expect(coordinator.isRelationRunning(relationId), isFalse);
+        expect(coordinator.isDailyChoiceRunning(choiceId), isFalse);
         await shutdown;
         expect(closeObserver.closeCalls, 1);
       },
     );
+
+    test('shutdown дожидается принятой дневной команды', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final closeObserver = _CloseTrackingObserver();
+      final runtime = AppRuntime(
+        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(),
+          closeObserver,
+        ),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+        repositoryFactory: (_) => repository,
+      );
+      addTearDown(runtime.shutdown);
+      await runtime.bootstrap();
+      final coordinator = runtime.commandCoordinator;
+      final choiceId = _choiceId(_relationRelatedUuid);
+      final accepted = coordinator.acceptDailyChoiceDelete(
+        DeleteDailyChoice(choiceId),
+      ) as DailyChoiceCommandAccepted;
+      coordinator.releaseInitiatorPresentation(accepted.token);
+
+      final shutdown = runtime.shutdown();
+      expect(coordinator.isDailyChoiceRunning(choiceId), isTrue);
+      expect(closeObserver.closeCalls, 0);
+      expect(
+        coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(choiceId)),
+        isA<GraphCommandCoordinatorDraining>(),
+      );
+
+      repository.complete(
+        const GraphCommandFailed<
+          DailyChoiceCommandSuccess,
+          DailyChoiceCommandFailure
+        >(DailyChoiceUnavailableFailure()),
+      );
+      await accepted.future;
+      await shutdown;
+      expect(closeObserver.closeCalls, 1);
+    });
 
     test(
       'shutdown ждёт in-flight bootstrap и не создаёт provider graph',
@@ -386,6 +440,28 @@ void main() {
 final class _ControlledPersonalGraphRepository
     implements PersonalGraphRepository {
   @override
+  Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
+    ChoicePathSuggestionsQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<ChoicePathContinuationResult> getChoicePathContinuations(
+    ChoicePathContinuationQuery query,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Чтение дневного выбора не используется этим тестом.',
+      );
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
+      throw UnsupportedError(
+        'Наблюдение дневного выбора не используется этим тестом.',
+      );
+
+  @override
   Future<SelectedRelationsReadResult> getSelectedRelations(
     SelectedRelationsQuery query,
   ) => throw UnsupportedError(
@@ -426,8 +502,15 @@ final class _ControlledPersonalGraphRepository
   ) => throw UnsupportedError('Сводка не используется в этих тестах.');
 
   @override
+  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
+    DailyChoiceCatalogQuery query,
+  ) => throw UnsupportedError(
+    'Каталог дневных выборов не используется в этом тесте.',
+  );
+
+  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupQuery query,
+    RelationGroupPageQuery query,
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
 
   @override
@@ -455,6 +538,13 @@ LongTermRelationId _relationId(String value) =>
         'Некорректный UUID fixture связи.',
       ),
     };
+
+DailyChoiceId _choiceId(String value) => switch (DailyChoiceId.decode(value)) {
+  DailyChoiceIdDecodingSuccess(:final id) => id,
+  InvalidDailyChoiceIdDecoding() => throw StateError(
+    'Некорректный UUID fixture дневного выбора.',
+  ),
+};
 
 const _relationSourceUuid = '018f47c2-6b7d-7abc-8def-0123456789ab';
 const _relationRelatedUuid = '018f47c2-6b7d-7abc-8def-0123456789ac';

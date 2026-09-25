@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../daily_choice/application/daily_choice_catalog.dart';
+import '../../../daily_choice/domain/daily_choice_id.dart';
+import '../../../graph/application/blocking_relation_reference.dart';
 import '../../../graph/application/delete_blocking_relations.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention_id.dart';
@@ -15,11 +18,13 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
   const BlockingRelationsConfirmationAction({
     required this.intentionId,
     required this.intentionTitle,
+    required this.onOpenDailyChoice,
     super.key,
   });
 
   final IntentionId intentionId;
   final String intentionTitle;
+  final ValueChanged<DailyChoiceId> onOpenDailyChoice;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,8 +35,8 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (selection is BlockingRelationsSelectionEditing &&
-            selection.selected.isNotEmpty &&
-            selection.invalidReasons.isEmpty)
+            selection.selectedByReference.isNotEmpty &&
+            selection.invalidReasonsByReference.isEmpty)
           FilledButton.icon(
             key: const ValueKey('blocking-relations-review'),
             onPressed: () => _review(context, ref, provider),
@@ -39,42 +44,51 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
             label: Text(localizations.blockingRelationsReviewAction),
           ),
         if (selection is BlockingRelationsSelectionEditing)
-          for (final entry in selection.invalidReasons.entries)
+          for (final entry in selection.invalidReasonsByReference.entries)
             Card(
               key: ValueKey(
-                'blocking-relations-invalid-${entry.key.toCanonicalString()}',
+                'blocking-relations-invalid-${_referenceKey(entry.key)}',
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      localizations.blockingRelationsInvalidSelectedRelationId(
-                        entry.key.toCanonicalString(),
+              child: Semantics(
+                container: true,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        localizations
+                            .blockingRelationsInvalidSelectedRelationId(
+                              _referenceId(entry.key),
+                            ),
                       ),
-                    ),
-                    Text(
-                      '${selection.selected[entry.key]!.source.title} → '
-                      '${selection.selected[entry.key]!.related.title}',
-                    ),
-                    Text(switch (entry.value) {
-                      BlockingRelationsInvalidReason.missing =>
-                        localizations.blockingRelationsInvalidMissing,
-                      BlockingRelationsInvalidReason.noLongerBlocking =>
-                        localizations.blockingRelationsInvalidMoved,
-                    }),
-                    TextButton(
-                      key: ValueKey(
-                        'blocking-relations-remove-invalid-${entry.key.toCanonicalString()}',
+                      Text(
+                        _selectedPhrase(
+                          localizations,
+                          selection.selectedByReference[entry.key]!,
+                        ),
                       ),
-                      onPressed: () =>
-                          ref.read(provider.notifier).unselect(entry.key),
-                      child: Text(
-                        localizations.relationNeighborhoodRemoveFromSelection,
+                      Text(switch (entry.value) {
+                        BlockingRelationsInvalidReason.missing =>
+                          localizations.blockingRelationsInvalidMissing,
+                        BlockingRelationsInvalidReason.noLongerBlocking =>
+                          localizations.blockingRelationsInvalidMoved,
+                        BlockingRelationsInvalidReason.referencedByDailyPath =>
+                          localizations.blockingRelationsInvalidProtected,
+                      }),
+                      TextButton(
+                        key: ValueKey(
+                          'blocking-relations-remove-invalid-${_referenceKey(entry.key)}',
+                        ),
+                        onPressed: () => ref
+                            .read(provider.notifier)
+                            .unselectReference(entry.key),
+                        child: Text(
+                          localizations.relationNeighborhoodRemoveFromSelection,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -148,6 +162,7 @@ final class BlockingRelationsConfirmationAction extends ConsumerWidget {
       builder: (_) => _BlockingRelationsConfirmation(
         snapshot: prepared.snapshot,
         provider: provider,
+        onOpenDailyChoice: onOpenDailyChoice,
       ),
     );
     if (!context.mounted) {
@@ -207,14 +222,49 @@ String _failureMessage(
   },
 };
 
+String _referenceId(BlockingRelationReference reference) => switch (reference) {
+  LongTermBlockingRelationReference(:final id) => id.toCanonicalString(),
+  DailyChoiceBlockingRelationReference(:final id) => id.toCanonicalString(),
+};
+
+String _referenceKey(BlockingRelationReference reference) =>
+    switch (reference) {
+      LongTermBlockingRelationReference() => _referenceId(reference),
+      DailyChoiceBlockingRelationReference() =>
+        'daily-${_referenceId(reference)}',
+    };
+
+String _selectedPhrase(
+  AppLocalizations localizations,
+  BlockingRelationsSelectedItem item,
+) => switch (item) {
+  BlockingRelationsSelectedLongTerm(:final row) =>
+    row.relation.type == LongTermRelationType.need
+        ? localizations.relationNeighborhoodNeedPhrase(
+            row.source.title,
+            row.related.title,
+          )
+        : localizations.relationNeighborhoodCanPhrase(
+            row.source.title,
+            row.related.title,
+          ),
+  BlockingRelationsSelectedDailyChoice(:final item) =>
+    localizations.dailyChoiceDetailsPhrase(
+      item.source.title,
+      item.selected.title,
+    ),
+};
+
 final class _BlockingRelationsConfirmation extends ConsumerStatefulWidget {
   const _BlockingRelationsConfirmation({
     required this.snapshot,
     required this.provider,
+    required this.onOpenDailyChoice,
   });
 
   final BlockingRelationsPreparedSelection snapshot;
   final BlockingRelationsSelectionViewModelProvider provider;
+  final ValueChanged<DailyChoiceId> onOpenDailyChoice;
 
   @override
   ConsumerState<_BlockingRelationsConfirmation> createState() =>
@@ -233,6 +283,11 @@ final class _BlockingRelationsConfirmationState
     Navigator.of(context).pop(confirmed);
   }
 
+  void _openDailyChoice(DailyChoiceId id) {
+    _finish(false);
+    widget.onOpenDailyChoice(id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
@@ -249,7 +304,7 @@ final class _BlockingRelationsConfirmationState
         body: SafeArea(
           child: ListView.builder(
             key: const ValueKey('blocking-relations-confirm-list'),
-            itemCount: snapshot.rows.length + 2,
+            itemCount: snapshot.items.length + 2,
             itemBuilder: (context, index) {
               if (index == 0) {
                 return Padding(
@@ -265,6 +320,14 @@ final class _BlockingRelationsConfirmationState
                         if (!canConfirm) ...[
                           const SizedBox(height: 8),
                           Text(switch (selection) {
+                            BlockingRelationsSelectionEditing(
+                              :final invalidReasons,
+                            )
+                                when invalidReasons.values.contains(
+                                  BlockingRelationsInvalidReason
+                                      .referencedByDailyPath,
+                                ) =>
+                              localizations.blockingRelationsInvalidProtected,
                             BlockingRelationsSelectionRefreshFailed(
                               :final failure,
                             ) =>
@@ -275,7 +338,7 @@ final class _BlockingRelationsConfirmationState
                         const SizedBox(height: 8),
                         Text(
                           localizations.blockingRelationsConfirmationCount(
-                            snapshot.rows.length,
+                            snapshot.items.length,
                           ),
                         ),
                       ],
@@ -283,13 +346,21 @@ final class _BlockingRelationsConfirmationState
                   ),
                 );
               }
-              if (index <= snapshot.rows.length) {
-                final row = snapshot.rows[index - 1];
-                return _ConfirmationRow(
-                  row: row,
-                  intentionId: snapshot.command.intentionId,
-                  description: snapshot.descriptions[row.relation.id],
-                );
+              if (index <= snapshot.items.length) {
+                return switch (snapshot.items[index - 1]) {
+                  BlockingRelationsSelectedLongTerm(:final row) =>
+                    _ConfirmationRow(
+                      row: row,
+                      intentionId: snapshot.command.intentionId,
+                      description: snapshot.descriptions[row.relation.id],
+                    ),
+                  BlockingRelationsSelectedDailyChoice(:final item) =>
+                    _DailyConfirmationRow(
+                      item: item,
+                      intentionId: snapshot.command.intentionId,
+                      onOpen: () => _openDailyChoice(item.id),
+                    ),
+                };
               }
               return Padding(
                 padding: const EdgeInsets.all(16),
@@ -355,6 +426,9 @@ final class _ConfirmationRow extends StatelessWidget {
     final scope = relation.scope == RelationScope.active
         ? localizations.relationNeighborhoodRelationActive
         : localizations.relationNeighborhoodRelationArchived;
+    final relationId = localizations.blockingRelationsInvalidSelectedRelationId(
+      relation.id.toCanonicalString(),
+    );
     final source =
         '${localizations.relationNeighborhoodSourceParticipant}: ${row.source.title}. '
         '${localizations.blockingRelationsParticipantId(row.source.id.toCanonicalString())}';
@@ -372,7 +446,7 @@ final class _ConfirmationRow extends StatelessWidget {
         ),
         container: true,
         label:
-            '$phrase. $direction. $scope. '
+            '$phrase. $relationId. $direction. $scope. '
             '${localizations.relationDetailsPriorityLabel}: ${relation.priority.name.toUpperCase()}. '
             '$source. $related. ${description ?? ''}',
         child: ExcludeSemantics(
@@ -383,6 +457,7 @@ final class _ConfirmationRow extends StatelessWidget {
               children: [
                 Text(phrase, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
+                Text(relationId),
                 Text(direction),
                 Text(scope),
                 Text(
@@ -410,6 +485,97 @@ final class _ConfirmationRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _DailyConfirmationRow extends StatelessWidget {
+  const _DailyConfirmationRow({
+    required this.item,
+    required this.intentionId,
+    required this.onOpen,
+  });
+
+  final DailyChoiceCatalogItem item;
+  final IntentionId intentionId;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final phrase = localizations.dailyChoiceDetailsPhrase(
+      item.source.title,
+      item.selected.title,
+    );
+    final role = item.source.id == intentionId
+        ? localizations.relationNeighborhoodDailySourceRole
+        : localizations.relationNeighborhoodDailySelectedRole;
+    final date = localizations.dailyChoiceDetailsDate(
+      item.date.toCanonicalString(),
+    );
+    final completion = item.isCompleted
+        ? localizations.dailyChoiceDetailsCompleted
+        : localizations.dailyChoiceDetailsNotCompleted;
+    final id = localizations.blockingRelationsParticipantId(
+      item.id.toCanonicalString(),
+    );
+    return Card(
+      key: ValueKey(
+        'blocking-relations-confirm-daily-${item.id.toCanonicalString()}',
+      ),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(
+              key: ValueKey(
+                'blocking-relations-confirm-daily-semantics-${item.id.toCanonicalString()}',
+              ),
+              container: true,
+              label: [
+                localizations.dailyChoiceDetailsTitle,
+                phrase,
+                role,
+                date,
+                completion,
+                id,
+              ].join('. '),
+              child: ExcludeSemantics(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      localizations.dailyChoiceDetailsTitle,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      phrase,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(role),
+                    Text(date),
+                    Text(completion),
+                    Text(id),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              key: ValueKey(
+                'blocking-relations-open-daily-${item.id.toCanonicalString()}',
+              ),
+              onPressed: onOpen,
+              icon: const Icon(Icons.route_outlined),
+              label: Text(localizations.relationNeighborhoodOpenDailyChoice),
+            ),
+          ],
         ),
       ),
     );

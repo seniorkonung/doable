@@ -12,6 +12,7 @@ import '../../../intention/domain/intention.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
 import '../editor/relation_editor_state.dart';
@@ -70,8 +71,9 @@ final class RelationDetailsPage extends ConsumerWidget {
                           context.router.push(
                             RelationEditorRoute(
                               editorContext: RelationEditingContext(
-                                loaded.details,
+                                loaded.editingDetails,
                                 revision: loaded.revision,
+                                permissionRevision: loaded.permissionRevision,
                               ),
                             ),
                           ),
@@ -149,6 +151,9 @@ final class _LoadedRelation extends StatelessWidget {
     final hasKnownRestoreBlocker = sourceBlocksRestore || relatedBlocksRestore;
     final lifecycleActionEnabled =
         !state.isOperationRunning && lifecycleFailure == null;
+    final pathProtected =
+        state.permissions.restriction ==
+        LongTermRelationPermissionRestriction.referencedByDailyPath;
     final phrase = relation.type == LongTermRelationType.need
         ? localizations.relationNeighborhoodNeedPhrase(
             details.source.title,
@@ -208,13 +213,25 @@ final class _LoadedRelation extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: OutlinedButton.icon(
             key: const ValueKey('relation-details-delete-relation'),
-            onPressed: lifecycleActionEnabled
+            onPressed: lifecycleActionEnabled && state.permissions.canDelete
                 ? () => unawaited(_confirmDeletion(context, details, phrase))
                 : null,
             icon: const Icon(Icons.delete_forever_outlined),
             label: Text(localizations.relationDetailsDeleteAction),
           ),
         ),
+        if (!state.permissions.canDelete) ...[
+          const SizedBox(height: 12),
+          Semantics(
+            container: true,
+            child: Text(
+              pathProtected
+                  ? localizations.relationDetailsPathProtection
+                  : localizations.relationDetailsDeletionChecking,
+              key: const ValueKey('relation-details-path-protection'),
+            ),
+          ),
+        ],
         if (lifecycleFailure != null &&
             lifecycleFailure.failure
                 is! LongTermRelationParticipantArchivedFailure) ...[
@@ -322,35 +339,65 @@ final class _LoadedRelation extends StatelessWidget {
         : localizations.relationNeighborhoodRelationArchived;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        scrollable: true,
-        title: Text(localizations.relationDetailsDeleteConfirmationTitle),
-        content: Semantics(
-          container: true,
-          child: Text(
-            localizations.relationDetailsDeleteConfirmationMessage(
-              phrase,
-              details.source.title,
-              details.related.title,
-              scope,
+      builder: (dialogContext) => Consumer(
+        builder: (dialogContext, ref, _) {
+          final current = ref.watch(
+            relationDetailsViewModelProvider(details.relation.id),
+          );
+          final canDelete =
+              current is RelationDetailsLoaded &&
+              current.permissions.canDelete &&
+              !current.isOperationRunning;
+          return AlertDialog(
+            scrollable: true,
+            title: Text(localizations.relationDetailsDeleteConfirmationTitle),
+            content: Semantics(
+              container: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    localizations.relationDetailsDeleteConfirmationMessage(
+                      phrase,
+                      details.source.title,
+                      details.related.title,
+                      scope,
+                    ),
+                  ),
+                  if (!canDelete) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      current is RelationDetailsLoaded &&
+                              current.permissions.restriction ==
+                                  LongTermRelationPermissionRestriction
+                                      .referencedByDailyPath
+                          ? localizations.relationDetailsPathProtection
+                          : localizations.relationDetailsDeletionChecking,
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(localizations.detailsCancelEditAction),
-          ),
-          FilledButton(
-            key: const ValueKey('relation-details-confirm-delete'),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(dialogContext).colorScheme.error,
-              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
-            ),
-            child: Text(localizations.relationDetailsConfirmDeleteAction),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(localizations.detailsCancelEditAction),
+              ),
+              FilledButton(
+                key: const ValueKey('relation-details-confirm-delete'),
+                onPressed: canDelete
+                    ? () => Navigator.of(dialogContext).pop(true)
+                    : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                  foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+                ),
+                child: Text(localizations.relationDetailsConfirmDeleteAction),
+              ),
+            ],
+          );
+        },
       ),
     );
     if (confirmed ?? false) {

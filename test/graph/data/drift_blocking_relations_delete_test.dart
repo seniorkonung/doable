@@ -1,5 +1,9 @@
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation;
+import 'package:doable/src/graph/application/blocking_relation_reference.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -95,7 +99,10 @@ void main() {
 
     final confirmed = _success(
       await repository.execute(
-        DeleteBlockingRelations(intentionId: owner, relationIds: selected),
+        DeleteBlockingRelations.longTerm(
+          intentionId: owner,
+          relationIds: selected,
+        ),
       ),
     );
 
@@ -154,7 +161,10 @@ void main() {
       expect(
         _failure(
           await repository.execute(
-            DeleteBlockingRelations(intentionId: missing, relationIds: [first]),
+            DeleteBlockingRelations.longTerm(
+              intentionId: missing,
+              relationIds: [first],
+            ),
           ),
         ),
         isA<DeleteBlockingRelationsIntentionNotFoundFailure>(),
@@ -162,7 +172,7 @@ void main() {
       expect(
         _failure(
           await repository.execute(
-            DeleteBlockingRelations(
+            DeleteBlockingRelations.longTerm(
               intentionId: owner,
               relationIds: [first, _relationId(999)],
             ),
@@ -177,7 +187,7 @@ void main() {
       expect(
         _failure(
           await repository.execute(
-            DeleteBlockingRelations(
+            DeleteBlockingRelations.longTerm(
               intentionId: owner,
               relationIds: [first, foreign],
             ),
@@ -203,7 +213,7 @@ void main() {
     () async {
       final owner = intentions[0];
       final selected = await _create(repository, owner, intentions[1]);
-      final command = DeleteBlockingRelations(
+      final command = DeleteBlockingRelations.longTerm(
         intentionId: owner,
         relationIds: [selected],
       );
@@ -236,7 +246,7 @@ void main() {
     () async {
       final owner = intentions[0];
       final id = await _create(repository, owner, intentions[1]);
-      final command = DeleteBlockingRelations(
+      final command = DeleteBlockingRelations.longTerm(
         intentionId: owner,
         relationIds: [id],
       );
@@ -284,7 +294,7 @@ void main() {
       final owner = intentions[0];
       final first = await _create(repository, owner, intentions[1]);
       final moved = await _create(repository, intentions[2], owner);
-      final command = DeleteBlockingRelations(
+      final command = DeleteBlockingRelations.longTerm(
         intentionId: owner,
         relationIds: [first, moved],
       );
@@ -337,7 +347,7 @@ void main() {
 
     final failure = _failure(
       await repository.execute(
-        DeleteBlockingRelations(
+        DeleteBlockingRelations.longTerm(
           intentionId: owner,
           relationIds: [first, second],
         ),
@@ -381,7 +391,7 @@ void main() {
 
       final failure = _failure(
         await repository.execute(
-          DeleteBlockingRelations(
+          DeleteBlockingRelations.longTerm(
             intentionId: owner,
             relationIds: [first, corrupted],
           ),
@@ -428,7 +438,7 @@ void main() {
       expect(
         _failure(
           await repository.execute(
-            DeleteBlockingRelations(
+            DeleteBlockingRelations.longTerm(
               intentionId: owner,
               relationIds: [selected],
             ),
@@ -456,7 +466,7 @@ void main() {
 
       final confirmed = _success(
         await repository.execute(
-          DeleteBlockingRelations(
+          DeleteBlockingRelations.longTerm(
             intentionId: owner,
             relationIds: [first, second],
           ),
@@ -473,7 +483,10 @@ void main() {
 
       final missing = _failure(
         await repository.execute(
-          DeleteBlockingRelations(intentionId: owner, relationIds: [first]),
+          DeleteBlockingRelations.longTerm(
+            intentionId: owner,
+            relationIds: [first],
+          ),
         ),
       );
       expect(missing, isA<DeleteBlockingRelationsSelectionConflictFailure>());
@@ -493,7 +506,7 @@ void main() {
     () async {
       final owner = intentions[0];
       final selected = await _create(repository, owner, intentions[1]);
-      final command = DeleteBlockingRelations(
+      final command = DeleteBlockingRelations.longTerm(
         intentionId: owner,
         relationIds: [selected],
       );
@@ -507,7 +520,10 @@ void main() {
 
       final next = await _create(repository, owner, intentions[2]);
       final bulkFirst = repository.execute(
-        DeleteBlockingRelations(intentionId: owner, relationIds: [next]),
+        DeleteBlockingRelations.longTerm(
+          intentionId: owner,
+          relationIds: [next],
+        ),
       );
       final singleSecond = repository.execute(DeleteLongTermRelation(next));
       _success(await bulkFirst);
@@ -533,7 +549,7 @@ void main() {
           sourceIntentionId: LongTermRelationFieldSet(intentions[2]),
         ),
       );
-      final command = DeleteBlockingRelations(
+      final command = DeleteBlockingRelations.longTerm(
         intentionId: owner,
         relationIds: [selected],
       );
@@ -548,7 +564,10 @@ void main() {
 
       final next = await _create(repository, owner, intentions[3]);
       final bulkFirst = repository.execute(
-        DeleteBlockingRelations(intentionId: owner, relationIds: [next]),
+        DeleteBlockingRelations.longTerm(
+          intentionId: owner,
+          relationIds: [next],
+        ),
       );
       final updateSecond = repository.execute(
         UpdateLongTermRelation(
@@ -577,7 +596,10 @@ void main() {
       final selected = await _create(repository, owner, intentions[1]);
       final archiveFirst = repository.execute(ArchiveIntention(owner));
       final bulkSecond = repository.execute(
-        DeleteBlockingRelations(intentionId: owner, relationIds: [selected]),
+        DeleteBlockingRelations.longTerm(
+          intentionId: owner,
+          relationIds: [selected],
+        ),
       );
       expect(await archiveFirst, isA<GraphCommandSucceeded>());
       expect(
@@ -590,7 +612,10 @@ void main() {
       final next = await _create(repository, otherOwner, intentions[3]);
       final remaining = await _create(repository, otherOwner, intentions[4]);
       final bulkFirst = repository.execute(
-        DeleteBlockingRelations(intentionId: otherOwner, relationIds: [next]),
+        DeleteBlockingRelations.longTerm(
+          intentionId: otherOwner,
+          relationIds: [next],
+        ),
       );
       final archiveSecond = repository.execute(ArchiveIntention(otherOwner));
       _success(await bulkFirst);
@@ -618,7 +643,10 @@ void main() {
 
     final confirmed = _success(
       await repository.execute(
-        DeleteBlockingRelations(intentionId: owner, relationIds: selected),
+        DeleteBlockingRelations.longTerm(
+          intentionId: owner,
+          relationIds: selected,
+        ),
       ),
     );
 
@@ -668,7 +696,10 @@ void main() {
 
     final failure = _failure(
       await repository.execute(
-        DeleteBlockingRelations(intentionId: owner, relationIds: selected),
+        DeleteBlockingRelations.longTerm(
+          intentionId: owner,
+          relationIds: selected,
+        ),
       ),
     );
 
@@ -699,7 +730,7 @@ void main() {
 
     final failure = _failure(
       await repository.execute(
-        DeleteBlockingRelations(
+        DeleteBlockingRelations.longTerm(
           intentionId: owner,
           relationIds: LargeBlockingRelationsFixture.selectedIds,
         ),
@@ -715,7 +746,393 @@ void main() {
       GraphRevisionOrder.same,
     );
   });
+
+  test('смешанный свободный набор удаляется целиком одной ревизией', () async {
+    final owner = intentions[0];
+    final path = await _create(repository, owner, intentions[1]);
+    final free = await _create(repository, owner, intentions[2]);
+    final other = await _create(repository, owner, intentions[3]);
+    final choice = (DailyChoiceId.decode(
+      free.toCanonicalString(),
+    ) as DailyChoiceIdDecodingSuccess).id;
+    await _insertChoice(database, choice, owner, intentions[1], path);
+    final before = await _revision(repository, owner);
+    final command = DeleteBlockingRelations(
+      intentionId: owner,
+      references: [
+        DailyChoiceBlockingRelationReference(choice),
+        LongTermBlockingRelationReference(free),
+      ],
+    );
+
+    final confirmed = _success(await repository.execute(command));
+
+    expect(confirmed.revision.compareTo(before), GraphRevisionOrder.newer);
+    expect(confirmed.value.deletedDailyChoices.single.id, choice);
+    expect(confirmed.value.deletedRelations.single.id, free);
+    final choiceChange = confirmed.changes
+        .whereType<DailyChoiceChange>()
+        .single;
+    expect(choiceChange.releasedRelationIds, {path});
+    expect(choiceChange.relationPermissions[path]?.canDelete, isTrue);
+    expect(choiceChange.intentionCounts[owner]?.dailySource, 0);
+    expect(choiceChange.intentionCounts[intentions[1]]?.dailySelected, 0);
+    expect(confirmed.changes.map((change) => change.revision).toSet(), {
+      confirmed.revision,
+    });
+    expect(await _choice(database, choice), isNull);
+    expect(await _choiceStepCount(database, choice), 0);
+    expect(await _relation(database, free), isNull);
+    expect(await _relation(database, path), isNotNull);
+    expect(await _relation(database, other), isNotNull);
+  });
+
+  test(
+    'совместный выбор связи пути и её владельца отклоняет всё до записи',
+    () async {
+      final owner = intentions[0];
+      final path = await _create(repository, owner, intentions[1]);
+      final free = await _create(repository, owner, intentions[2]);
+      final choice = _dailyChoiceId(901);
+      await _insertChoice(database, choice, owner, intentions[1], path);
+      final revision = await _revision(repository, owner);
+      deleteObserver.clear();
+
+      final failure = _failure(
+        await repository.execute(
+          DeleteBlockingRelations(
+            intentionId: owner,
+            references: [
+              LongTermBlockingRelationReference(free),
+              DailyChoiceBlockingRelationReference(choice),
+              LongTermBlockingRelationReference(path),
+            ],
+          ),
+        ),
+      );
+
+      expect(
+        failure,
+        isA<DeleteBlockingRelationsSelectionConflictFailure>()
+            .having(
+              (value) => value.reference,
+              'ссылка',
+              LongTermBlockingRelationReference(path),
+            )
+            .having(
+              (value) => value.reason,
+              'причина',
+              BlockingRelationConflictReason.deletionProhibited,
+            ),
+      );
+      expect(deleteObserver.batchSizes, isEmpty);
+      expect(await _choice(database, choice), isNotNull);
+      expect(await _relation(database, free), isNotNull);
+      expect(
+        (await _revision(repository, owner)).compareTo(revision),
+        GraphRevisionOrder.same,
+      );
+    },
+  );
+
+  test(
+    'устаревшая прямая принадлежность дневной связи сохраняет набор',
+    () async {
+      final owner = intentions[0];
+      final path = await _create(repository, owner, intentions[1]);
+      final movedPath = await _create(repository, intentions[3], intentions[4]);
+      final free = await _create(repository, owner, intentions[2]);
+      final choice = _dailyChoiceId(902);
+      await _insertChoice(database, choice, owner, intentions[1], path);
+      final command = DeleteBlockingRelations(
+        intentionId: owner,
+        references: [
+          LongTermBlockingRelationReference(free),
+          DailyChoiceBlockingRelationReference(choice),
+        ],
+      );
+      await database.customUpdate(
+        'UPDATE daily_choice_path_steps SET long_term_relation_id = ? WHERE daily_choice_id = ?',
+        variables: [
+          Variable<String>(movedPath.toCanonicalString()),
+          Variable<String>(choice.toCanonicalString()),
+        ],
+        updates: {database.dailyChoicePathSteps},
+      );
+      await database.customUpdate(
+        'UPDATE daily_choices SET source_intention_id = ?, selected_intention_id = ? WHERE id = ?',
+        variables: [
+          Variable<String>(intentions[3].toCanonicalString()),
+          Variable<String>(intentions[4].toCanonicalString()),
+          Variable<String>(choice.toCanonicalString()),
+        ],
+        updates: {database.dailyChoices},
+      );
+      final revision = await _revision(repository, owner);
+
+      final failure = _failure(await repository.execute(command));
+
+      expect(
+        failure,
+        isA<DeleteBlockingRelationsSelectionConflictFailure>()
+            .having(
+              (value) => value.reference,
+              'ссылка',
+              DailyChoiceBlockingRelationReference(choice),
+            )
+            .having(
+              (value) => value.reason,
+              'причина',
+              BlockingRelationConflictReason.noLongerBlocking,
+            ),
+      );
+      expect(await _choice(database, choice), isNotNull);
+      expect(await _relation(database, free), isNotNull);
+      expect(
+        (await _revision(repository, owner)).compareTo(revision),
+        GraphRevisionOrder.same,
+      );
+    },
+  );
+
+  test('ошибка после удаления дневной связи откатывает обе записи', () async {
+    final owner = intentions[0];
+    final path = await _create(repository, owner, intentions[1]);
+    final free = await _create(repository, owner, intentions[2]);
+    final choice = _dailyChoiceId(903);
+    await _insertChoice(database, choice, owner, intentions[1], path);
+    final revision = await _revision(repository, owner);
+    deleteObserver.clear();
+    await database.customStatement('''
+      CREATE TEMP TRIGGER fail_mixed_delete
+      BEFORE DELETE ON long_term_relations
+      WHEN OLD.id = '${free.toCanonicalString()}'
+      BEGIN SELECT RAISE(ABORT, 'mixed deletion failure'); END
+    ''');
+
+    final failure = _failure(
+      await repository.execute(
+        DeleteBlockingRelations(
+          intentionId: owner,
+          references: [
+            DailyChoiceBlockingRelationReference(choice),
+            LongTermBlockingRelationReference(free),
+          ],
+        ),
+      ),
+    );
+
+    expect(failure, isA<DeleteBlockingRelationsUnexpectedFailure>());
+    expect(deleteObserver.dailyDeletes, 1);
+    expect(await _choice(database, choice), isNotNull);
+    expect(await _choiceStepCount(database, choice), 1);
+    expect(await _relation(database, free), isNotNull);
+    expect(
+      (await _revision(repository, owner)).compareTo(revision),
+      GraphRevisionOrder.same,
+    );
+  });
+
+  test('новый шаг после подтверждения блокирует выбранную связь', () async {
+    final owner = intentions[0];
+    final selected = await _create(repository, owner, intentions[1]);
+    final command = DeleteBlockingRelations(
+      intentionId: owner,
+      references: [LongTermBlockingRelationReference(selected)],
+    );
+    final choice = _dailyChoiceId(904);
+    await _insertChoice(database, choice, owner, intentions[1], selected);
+    final revision = await _revision(repository, owner);
+    deleteObserver.clear();
+
+    final failure = _failure(await repository.execute(command));
+
+    expect(
+      failure,
+      isA<DeleteBlockingRelationsSelectionConflictFailure>().having(
+        (value) => value.reason,
+        'причина',
+        BlockingRelationConflictReason.deletionProhibited,
+      ),
+    );
+    expect(deleteObserver.batchSizes, isEmpty);
+    expect(await _choice(database, choice), isNotNull);
+    expect(await _relation(database, selected), isNotNull);
+    expect(
+      (await _revision(repository, owner)).compareTo(revision),
+      GraphRevisionOrder.same,
+    );
+  });
+
+  test(
+    'замена требует нового набора, а совместный выбор не обходит путь',
+    () async {
+      final oldSource = intentions[0];
+      final oldAction = intentions[1];
+      final newSource = intentions[3];
+      final newAction = intentions[4];
+      final oldPath = await _create(repository, oldSource, oldAction);
+      final free = await _create(repository, oldSource, intentions[2]);
+      final newPath = await _create(repository, newSource, newAction);
+      await database.customStatement(
+        'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
+        [newAction.toCanonicalString()],
+      );
+      final choice = _dailyChoiceId(905);
+      await _insertChoice(database, choice, oldSource, oldAction, oldPath);
+      final stale = DeleteBlockingRelations(
+        intentionId: oldSource,
+        references: [
+          LongTermBlockingRelationReference(free),
+          DailyChoiceBlockingRelationReference(choice),
+        ],
+      );
+
+      final replacement = await repository.execute(
+        ReplaceDailyChoicePath(
+          choiceId: choice,
+          sourceIntentionId: newSource,
+          selectedIntentionId: newAction,
+          path: ConfirmedChoicePath([
+            ConfirmedChoicePathStep(
+              relationId: newPath,
+              sourceIntentionId: newSource,
+              type: LongTermRelationType.need,
+              relatedIntentionId: newAction,
+            ),
+          ]),
+        ),
+      );
+      expect(replacement, isA<GraphCommandSucceeded>());
+      final revision = await _revision(repository, newSource);
+      deleteObserver.clear();
+
+      final staleFailure = _failure(await repository.execute(stale));
+      expect(
+        staleFailure,
+        isA<DeleteBlockingRelationsSelectionConflictFailure>()
+            .having(
+              (value) => value.reference,
+              'ссылка',
+              DailyChoiceBlockingRelationReference(choice),
+            )
+            .having(
+              (value) => value.reason,
+              'причина',
+              BlockingRelationConflictReason.noLongerBlocking,
+            ),
+      );
+      expect(deleteObserver.batchSizes, isEmpty);
+      expect(await _relation(database, free), isNotNull);
+      expect(await _choice(database, choice), isNotNull);
+
+      final jointlySelected = _failure(
+        await repository.execute(
+          DeleteBlockingRelations(
+            intentionId: newSource,
+            references: [
+              DailyChoiceBlockingRelationReference(choice),
+              LongTermBlockingRelationReference(newPath),
+            ],
+          ),
+        ),
+      );
+      expect(
+        jointlySelected,
+        isA<DeleteBlockingRelationsSelectionConflictFailure>()
+            .having(
+              (value) => value.reference,
+              'ссылка',
+              LongTermBlockingRelationReference(newPath),
+            )
+            .having(
+              (value) => value.reason,
+              'причина',
+              BlockingRelationConflictReason.deletionProhibited,
+            ),
+      );
+      expect(deleteObserver.batchSizes, isEmpty);
+      expect(await _choice(database, choice), isNotNull);
+      expect(await _relation(database, newPath), isNotNull);
+      expect(
+        (await _revision(repository, newSource)).compareTo(revision),
+        GraphRevisionOrder.same,
+      );
+
+      expect(
+        await repository.execute(DeleteDailyChoice(choice)),
+        isA<GraphCommandSucceeded>(),
+      );
+      expect(
+        await repository.execute(
+          DeleteBlockingRelations.longTerm(
+            intentionId: newSource,
+            relationIds: [newPath],
+          ),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      expect(await _relation(database, newPath), isNull);
+      expect(await _relation(database, oldPath), isNotNull);
+    },
+  );
 }
+
+DailyChoiceId _dailyChoiceId(int value) =>
+    (DailyChoiceId.decode(_uuid(value)) as DailyChoiceIdDecodingSuccess).id;
+
+Future<void> _insertChoice(
+  AppDatabase database,
+  DailyChoiceId id,
+  IntentionId source,
+  IntentionId selected,
+  LongTermRelationId path,
+) async {
+  await database.customInsert(
+    '''INSERT INTO daily_choices
+       (id, source_intention_id, selected_intention_id, choice_date,
+        description, is_completed) VALUES (?, ?, ?, '2026-09-23', NULL, 0)''',
+    variables: [
+      Variable<String>(id.toCanonicalString()),
+      Variable<String>(source.toCanonicalString()),
+      Variable<String>(selected.toCanonicalString()),
+    ],
+    updates: {database.dailyChoices},
+  );
+  await database.customInsert(
+    '''INSERT INTO daily_choice_path_steps
+       (id, daily_choice_id, long_term_relation_id, previous_step_id)
+       VALUES (?, ?, ?, NULL)''',
+    variables: [
+      Variable<String>(id.toCanonicalString()),
+      Variable<String>(id.toCanonicalString()),
+      Variable<String>(path.toCanonicalString()),
+    ],
+    updates: {database.dailyChoicePathSteps},
+  );
+}
+
+Future<Map<String, Object?>?> _choice(
+  AppDatabase database,
+  DailyChoiceId id,
+) async {
+  final rows = await database
+      .customSelect(
+        'SELECT * FROM daily_choices WHERE id = ?',
+        variables: [Variable<String>(id.toCanonicalString())],
+      )
+      .get();
+  return rows.isEmpty ? null : rows.single.data;
+}
+
+Future<int> _choiceStepCount(AppDatabase database, DailyChoiceId id) async =>
+    (await database
+            .customSelect(
+              'SELECT COUNT(*) AS count FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+              variables: [Variable<String>(id.toCanonicalString())],
+            )
+            .getSingle())
+        .read<int>('count');
 
 DriftPersonalGraphRepository _repository(
   AppDatabase database,
@@ -836,12 +1253,22 @@ final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
 
 final class _BulkDeleteObserver extends LocalDatabaseConnectionObserver {
   final batchSizes = <int>[];
+  var dailyDeletes = 0;
   var failAfterFirstBatch = false;
 
-  void clear() => batchSizes.clear();
+  void clear() {
+    batchSizes.clear();
+    dailyDeletes = 0;
+  }
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation == LocalDatabaseSqlOperation.delete &&
+        statement.statements.any(
+          (sql) => sql.contains('DELETE FROM') && sql.contains('daily_choices'),
+        )) {
+      dailyDeletes++;
+    }
     if (statement.operation != LocalDatabaseSqlOperation.update ||
         !statement.statements.any(
           (sql) =>

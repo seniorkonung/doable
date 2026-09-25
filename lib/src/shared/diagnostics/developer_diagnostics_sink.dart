@@ -26,6 +26,51 @@ final class DeveloperDiagnosticsSink implements DiagnosticsSink {
 }
 
 Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
+  DailyChoiceReadDiagnosticsEvent() => {
+    'operation': 'dailyChoiceDetailRead',
+    'stage': 'read',
+    ..._encodeStatus(event.status),
+  },
+  ChoicePathSuggestionReadDiagnosticsEvent(:final stage) => {
+    'operation': 'choicePathSuggestionRead',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
+  DailyChoiceCatalogPageReadDiagnosticsEvent(
+    :final pageSize,
+    :final isContinuation,
+  ) =>
+    {
+      'operation': 'dailyChoiceCatalogPageRead',
+      'stage': 'read',
+      'pageSize': pageSize,
+      'isContinuation': isContinuation,
+      ..._encodeStatus(event.status),
+    },
+  ChoicePathContinuationReadDiagnosticsEvent(
+    :final stage,
+    :final pageSize,
+    :final isContinuation,
+  ) =>
+    {
+      'operation': 'choicePathContinuationRead',
+      'stage': stage.name,
+      ..._encodeStatus(event.status),
+      'pageSize': pageSize,
+      'isContinuation': isContinuation,
+    },
+  DailyChoicePathValidationDiagnosticsEvent(:final commandType) => {
+    'operation': 'dailyChoicePathValidation',
+    'commandType': commandType.name,
+    'stage': 'validation',
+    ..._encodeStatus(event.status),
+  },
+  DailyChoiceCommandDiagnosticsEvent(:final commandType, :final stage) => {
+    'operation': 'dailyChoiceCommand',
+    'commandType': commandType.name,
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
   BootstrapDiagnosticsEvent(:final schemaVersion) => {
     'operation': 'bootstrap',
     ..._encodeStatus(event.status),
@@ -58,6 +103,20 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
   ) =>
     {
       'operation': 'relationGroupPageRead',
+      'stage': 'read',
+      ..._encodeStatus(event.status),
+      'pageSize': pageSize,
+      'isContinuation': isContinuation,
+      'requiresNewSnapshot': requiresNewSnapshot,
+    },
+  DailyChoiceGroupPageReadDiagnosticsEvent(
+    :final pageSize,
+    :final isContinuation,
+    :final requiresNewSnapshot,
+  ) =>
+    {
+      'operation': 'dailyChoiceGroupPageRead',
+      'stage': 'read',
       ..._encodeStatus(event.status),
       'pageSize': pageSize,
       'isContinuation': isContinuation,

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../daily_choice/application/daily_choice_catalog.dart';
+import '../../../graph/application/blocking_relation_reference.dart';
 import '../../../graph/application/delete_blocking_relations.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
@@ -12,6 +14,7 @@ import '../../../graph/application/selected_relations.dart';
 import '../../../intention/application/intention_result.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation_id.dart';
 import 'blocking_relations_selection_state.dart';
 
@@ -27,8 +30,9 @@ final class BlockingRelationsSelectionViewModel
   GraphRevision? _selectionRevision;
   final _descriptions = <LongTermRelationId, String?>{};
   final _invalidReasons =
-      <LongTermRelationId, BlockingRelationsInvalidReason>{};
+      <BlockingRelationReference, BlockingRelationsInvalidReason>{};
   StreamSubscription<SelectedRelationsReadResult>? _preparedSubscription;
+  var _preparedGeneration = 0;
 
   @override
   BlockingRelationsSelectionState build(IntentionId intentionId) {
@@ -43,12 +47,19 @@ final class BlockingRelationsSelectionViewModel
     });
     return BlockingRelationsSelectionEditing(
       intentionId: intentionId,
-      selected: const {},
+      selectedByReference: const {},
     );
   }
 
   /// Добавляет только явно указанную непосредственную связь.
-  bool select(LongTermRelationSummary row) {
+  bool select(LongTermRelationSummary row) =>
+      _select(BlockingRelationsSelectedLongTerm(row));
+
+  /// Дневной выбор добавляется только по его прямому участнику.
+  bool selectDailyChoice(DailyChoiceCatalogItem item) =>
+      _select(BlockingRelationsSelectedDailyChoice(item));
+
+  bool _select(BlockingRelationsSelectedItem item) {
     final current = state;
     if (current is BlockingRelationsSelectionRunning ||
         current is BlockingRelationsSelectionRefreshing ||
@@ -57,12 +68,18 @@ final class BlockingRelationsSelectionViewModel
             current.requiresRefresh)) {
       return false;
     }
-    final relation = row.relation;
-    if (relation.sourceIntentionId != current.intentionId &&
-        relation.relatedIntentionId != current.intentionId) {
+    final belongs = switch (item) {
+      BlockingRelationsSelectedLongTerm(:final row) =>
+        row.relation.sourceIntentionId == current.intentionId ||
+            row.relation.relatedIntentionId == current.intentionId,
+      BlockingRelationsSelectedDailyChoice(:final item) =>
+        item.source.id == current.intentionId ||
+            item.selected.id == current.intentionId,
+    };
+    if (!belongs) {
       return false;
     }
-    if (current.selected.containsKey(relation.id)) {
+    if (current.selectedByReference.containsKey(item.reference)) {
       return false;
     }
     _stopPreparedObservation();
@@ -70,35 +87,44 @@ final class BlockingRelationsSelectionViewModel
     _selectionRevision = null;
     state = BlockingRelationsSelectionEditing(
       intentionId: current.intentionId,
-      selected: {...current.selected, relation.id: row},
-      invalidReasons: _invalidReasons,
+      selectedByReference: {
+        ...current.selectedByReference,
+        item.reference: item,
+      },
+      invalidReasonsByReference: _invalidReasons,
     );
     return true;
   }
 
   /// Удаляет только конкретный идентификатор из незавершённого выбора.
-  bool unselect(LongTermRelationId relationId) {
+  bool unselect(LongTermRelationId relationId) =>
+      unselectReference(LongTermBlockingRelationReference(relationId));
+
+  bool unselectReference(BlockingRelationReference reference) {
     final current = state;
     if (current is BlockingRelationsSelectionRunning ||
         current is BlockingRelationsSelectionRefreshing ||
         current is BlockingRelationsSelectionRefreshFailed ||
         (current is BlockingRelationsSelectionFailed &&
             current.requiresRefresh) ||
-        !current.selected.containsKey(relationId)) {
+        !current.selectedByReference.containsKey(reference)) {
       return false;
     }
     _stopPreparedObservation();
     _releaseFailureClaim();
     _selectionRevision = null;
-    final updated = Map<LongTermRelationId, LongTermRelationSummary>.of(
-      current.selected,
-    )..remove(relationId);
-    _descriptions.remove(relationId);
-    _invalidReasons.remove(relationId);
+    final updated =
+        Map<BlockingRelationReference, BlockingRelationsSelectedItem>.of(
+          current.selectedByReference,
+        )..remove(reference);
+    if (reference case LongTermBlockingRelationReference(:final id)) {
+      _descriptions.remove(id);
+    }
+    _invalidReasons.remove(reference);
     state = BlockingRelationsSelectionEditing(
       intentionId: current.intentionId,
-      selected: updated,
-      invalidReasons: _invalidReasons,
+      selectedByReference: updated,
+      invalidReasonsByReference: _invalidReasons,
     );
     return true;
   }
@@ -107,16 +133,16 @@ final class BlockingRelationsSelectionViewModel
   bool prepare() {
     final current = state;
     if (current is! BlockingRelationsSelectionEditing ||
-        current.selected.isEmpty ||
-        current.invalidReasons.isNotEmpty) {
+        current.selectedByReference.isEmpty ||
+        current.invalidReasonsByReference.isNotEmpty) {
       return false;
     }
     state = BlockingRelationsSelectionPrepared(
       intentionId: current.intentionId,
-      selected: current.selected,
+      selectedByReference: current.selectedByReference,
       snapshot: BlockingRelationsPreparedSelection.fromSelected(
         intentionId: current.intentionId,
-        selected: current.selected,
+        selected: current.selectedByReference,
         descriptions: _descriptions,
       ),
     );
@@ -130,21 +156,29 @@ final class BlockingRelationsSelectionViewModel
       return;
     }
     _stopPreparedObservation();
-    final query = SelectedRelationsQuery(
+    final generation = _preparedGeneration;
+    final query = SelectedRelationsQuery.mixed(
       intentionId: current.intentionId,
-      relationIds: current.selected.keys,
+      references: current.selectedByReference.keys,
     );
     _preparedSubscription = _repository
         .watchSelectedRelations(query)
         .listen(
-          _handlePreparedObservation,
-          onError: (Object _) =>
-              _preparedReadFailed(BlockingRelationsRefreshFailure.unexpected),
+          (result) => _handlePreparedObservation(result, generation),
+          onError: (Object _) => _preparedReadFailed(
+            BlockingRelationsRefreshFailure.unexpected,
+            generation,
+          ),
         );
   }
 
-  void _handlePreparedObservation(SelectedRelationsReadResult result) {
-    if (!ref.mounted || state is! BlockingRelationsSelectionPrepared) {
+  void _handlePreparedObservation(
+    SelectedRelationsReadResult result,
+    int generation,
+  ) {
+    if (!ref.mounted ||
+        generation != _preparedGeneration ||
+        state is! BlockingRelationsSelectionPrepared) {
       return;
     }
     final current = state as BlockingRelationsSelectionPrepared;
@@ -157,7 +191,7 @@ final class BlockingRelationsSelectionViewModel
             BlockingRelationsRefreshFailure.corruption,
           SelectedRelationsReadUnexpectedFailure() =>
             BlockingRelationsRefreshFailure.unexpected,
-        });
+        }, generation);
       case SelectedRelationsReadSuccess(value: final snapshot):
         final previousRevision = _selectionRevision;
         if (previousRevision != null &&
@@ -167,7 +201,10 @@ final class BlockingRelationsSelectionViewModel
                     GraphRevisionOrder.same)) {
           return;
         }
-        final updated = _updatedSelection(current.selected, snapshot.value);
+        final updated = _updatedSelection(
+          current.selectedByReference,
+          snapshot.value,
+        );
         _selectionRevision = snapshot.revision;
         _descriptions
           ..clear()
@@ -179,14 +216,14 @@ final class BlockingRelationsSelectionViewModel
           _stopPreparedObservation();
           state = BlockingRelationsSelectionEditing(
             intentionId: current.intentionId,
-            selected: updated.selected,
-            invalidReasons: _invalidReasons,
+            selectedByReference: updated.selected,
+            invalidReasonsByReference: _invalidReasons,
           );
           return;
         }
         state = BlockingRelationsSelectionPrepared(
           intentionId: current.intentionId,
-          selected: updated.selected,
+          selectedByReference: updated.selected,
           snapshot: BlockingRelationsPreparedSelection.fromSelected(
             intentionId: current.intentionId,
             selected: updated.selected,
@@ -196,20 +233,26 @@ final class BlockingRelationsSelectionViewModel
     }
   }
 
-  void _preparedReadFailed(BlockingRelationsRefreshFailure failure) {
-    if (!ref.mounted || state is! BlockingRelationsSelectionPrepared) {
+  void _preparedReadFailed(
+    BlockingRelationsRefreshFailure failure,
+    int generation,
+  ) {
+    if (!ref.mounted ||
+        generation != _preparedGeneration ||
+        state is! BlockingRelationsSelectionPrepared) {
       return;
     }
     final current = state;
     _stopPreparedObservation();
     state = BlockingRelationsSelectionRefreshFailed(
       intentionId: current.intentionId,
-      selected: current.selected,
+      selectedByReference: current.selectedByReference,
       failure: failure,
     );
   }
 
   void _stopPreparedObservation() {
+    _preparedGeneration += 1;
     final subscription = _preparedSubscription;
     _preparedSubscription = null;
     if (subscription != null) unawaited(subscription.cancel());
@@ -222,13 +265,13 @@ final class BlockingRelationsSelectionViewModel
     if (current is BlockingRelationsSelectionPrepared ||
         current is BlockingRelationsSelectionRunning ||
         current is BlockingRelationsSelectionRefreshing ||
-        current.selected.isEmpty) {
+        current.selectedByReference.isEmpty) {
       return false;
     }
     _releaseFailureClaim();
     state = BlockingRelationsSelectionRefreshing(
       intentionId: current.intentionId,
-      selected: current.selected,
+      selectedByReference: current.selectedByReference,
     );
     try {
       final intention = await _repository.getRelationCounts(
@@ -253,9 +296,9 @@ final class BlockingRelationsSelectionViewModel
       }
 
       final result = await _repository.getSelectedRelations(
-        SelectedRelationsQuery(
+        SelectedRelationsQuery.mixed(
           intentionId: current.intentionId,
-          relationIds: current.selected.keys,
+          references: current.selectedByReference.keys,
         ),
       );
       if (!ref.mounted || state is! BlockingRelationsSelectionRefreshing) {
@@ -278,12 +321,15 @@ final class BlockingRelationsSelectionViewModel
               GraphRevisionOrder.older) {
         state = BlockingRelationsSelectionEditing(
           intentionId: current.intentionId,
-          selected: current.selected,
-          invalidReasons: _invalidReasons,
+          selectedByReference: current.selectedByReference,
+          invalidReasonsByReference: _invalidReasons,
         );
         return true;
       }
-      final updated = _updatedSelection(current.selected, snapshot.value);
+      final updated = _updatedSelection(
+        current.selectedByReference,
+        snapshot.value,
+      );
       _selectionRevision = snapshot.revision;
       _descriptions
         ..clear()
@@ -293,8 +339,8 @@ final class BlockingRelationsSelectionViewModel
         ..addAll(updated.invalidReasons);
       state = BlockingRelationsSelectionEditing(
         intentionId: current.intentionId,
-        selected: updated.selected,
-        invalidReasons: updated.invalidReasons,
+        selectedByReference: updated.selected,
+        invalidReasonsByReference: updated.invalidReasons,
       );
       return true;
     } on Object {
@@ -309,38 +355,53 @@ final class BlockingRelationsSelectionViewModel
   }
 
   ({
-    Map<LongTermRelationId, LongTermRelationSummary> selected,
-    Map<LongTermRelationId, BlockingRelationsInvalidReason> invalidReasons,
+    Map<BlockingRelationReference, BlockingRelationsSelectedItem> selected,
+    Map<BlockingRelationReference, BlockingRelationsInvalidReason>
+    invalidReasons,
     Map<LongTermRelationId, String?> descriptions,
   })
   _updatedSelection(
-    Map<LongTermRelationId, LongTermRelationSummary> selected,
+    Map<BlockingRelationReference, BlockingRelationsSelectedItem> selected,
     SelectedRelationsSnapshot snapshot,
   ) {
-    final refreshed = Map<LongTermRelationId, LongTermRelationSummary>.of(
-      selected,
-    );
+    final refreshed =
+        Map<BlockingRelationReference, BlockingRelationsSelectedItem>.of(
+          selected,
+        );
     final invalidReasons =
-        Map<LongTermRelationId, BlockingRelationsInvalidReason>.of(
+        Map<BlockingRelationReference, BlockingRelationsInvalidReason>.of(
           _invalidReasons,
         );
     final descriptions = Map<LongTermRelationId, String?>.of(_descriptions);
-    for (final entry in snapshot.entries.entries) {
-      final id = entry.key;
+    for (final entry in snapshot.entriesByReference.entries) {
+      final reference = entry.key;
       switch (entry.value) {
-        case SelectedRelationMissing():
-          invalidReasons[id] = BlockingRelationsInvalidReason.missing;
-        case SelectedRelationNoLongerBlocking():
-          invalidReasons[id] = BlockingRelationsInvalidReason.noLongerBlocking;
+        case SelectedRelationMissing() || SelectedDailyChoiceMissing():
+          invalidReasons[reference] = BlockingRelationsInvalidReason.missing;
+        case SelectedRelationNoLongerBlocking() ||
+            SelectedDailyChoiceNoLongerBlocking():
+          invalidReasons[reference] =
+              BlockingRelationsInvalidReason.noLongerBlocking;
         case SelectedRelationPresent(:final details):
-          invalidReasons.remove(id);
-          descriptions[id] = details.description?.value;
-          refreshed[id] = LongTermRelationSummary(
-            relation: details.relation,
-            source: details.source,
-            related: details.related,
-            hasDescription: details.hasDescription,
+          if (details.permissions.restriction ==
+              LongTermRelationPermissionRestriction.referencedByDailyPath) {
+            invalidReasons[reference] =
+                BlockingRelationsInvalidReason.referencedByDailyPath;
+          } else {
+            invalidReasons.remove(reference);
+          }
+          descriptions[details.relation.id] = details.description?.value;
+          refreshed[reference] = BlockingRelationsSelectedLongTerm(
+            LongTermRelationSummary(
+              relation: details.relation,
+              source: details.source,
+              related: details.related,
+              hasDescription: details.hasDescription,
+            ),
           );
+        case SelectedDailyChoicePresent(:final item):
+          invalidReasons.remove(reference);
+          refreshed[reference] = BlockingRelationsSelectedDailyChoice(item);
       }
     }
     return (
@@ -356,7 +417,7 @@ final class BlockingRelationsSelectionViewModel
   ) {
     state = BlockingRelationsSelectionRefreshFailed(
       intentionId: previous.intentionId,
-      selected: previous.selected,
+      selectedByReference: previous.selectedByReference,
       failure: failure,
     );
     return false;
@@ -369,8 +430,8 @@ final class BlockingRelationsSelectionViewModel
       _stopPreparedObservation();
       state = BlockingRelationsSelectionEditing(
         intentionId: current.intentionId,
-        selected: current.selected,
-        invalidReasons: _invalidReasons,
+        selectedByReference: current.selectedByReference,
+        invalidReasonsByReference: _invalidReasons,
       );
     }
   }
@@ -391,7 +452,7 @@ final class BlockingRelationsSelectionViewModel
         _activeToken = token;
         state = BlockingRelationsSelectionRunning(
           intentionId: current.intentionId,
-          selected: current.selected,
+          selectedByReference: current.selectedByReference,
           snapshot: current.snapshot,
           token: token,
         );
@@ -399,13 +460,13 @@ final class BlockingRelationsSelectionViewModel
       case BlockingRelationsDeleteAlreadyRunning():
         state = BlockingRelationsSelectionFailed(
           intentionId: current.intentionId,
-          selected: current.selected,
+          selectedByReference: current.selectedByReference,
           failure: const BlockingRelationsSelectionBusy(),
         );
       case GraphCommandCoordinatorDraining():
         state = BlockingRelationsSelectionFailed(
           intentionId: current.intentionId,
-          selected: current.selected,
+          selectedByReference: current.selectedByReference,
           failure: const BlockingRelationsSelectionDraining(),
         );
     }
@@ -419,8 +480,8 @@ final class BlockingRelationsSelectionViewModel
       _releaseFailureClaim();
       state = BlockingRelationsSelectionEditing(
         intentionId: current.intentionId,
-        selected: current.selected,
-        invalidReasons: _invalidReasons,
+        selectedByReference: current.selectedByReference,
+        invalidReasonsByReference: _invalidReasons,
       );
     }
   }
@@ -443,12 +504,12 @@ final class BlockingRelationsSelectionViewModel
           _activeToken = null;
           state = BlockingRelationsSelectionEditing(
             intentionId: current.intentionId,
-            selected: const {},
+            selectedByReference: const {},
           );
         case GraphResultFailure(:final failure):
           state = BlockingRelationsSelectionFailed(
             intentionId: current.intentionId,
-            selected: current.selected,
+            selectedByReference: current.selectedByReference,
             failure: BlockingRelationsSelectionCommandFailure(failure),
             presentationClaim: _coordinator.claimInitiatorFailure(
               completion.token,
@@ -464,7 +525,7 @@ final class BlockingRelationsSelectionViewModel
       if (current is BlockingRelationsSelectionRunning) {
         state = BlockingRelationsSelectionFailed(
           intentionId: current.intentionId,
-          selected: current.selected,
+          selectedByReference: current.selectedByReference,
           failure: const BlockingRelationsSelectionCommandFailure(
             DeleteBlockingRelationsUnexpectedFailure(),
           ),

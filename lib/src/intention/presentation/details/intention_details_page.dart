@@ -321,6 +321,11 @@ final class _LoadedDetails extends StatelessWidget {
                 onRetryStateChange: onRetryStateChange,
                 onShowBlockingRelations: onShowBlockingRelations,
                 onShowArchivedRelations: onShowArchivedRelations,
+                onChoosePath: () => unawaited(
+                  context.router.push(
+                    ChoicePathRoute(sourceIntentionId: intention.id),
+                  ),
+                ),
               ),
             },
           ),
@@ -332,6 +337,9 @@ final class _LoadedDetails extends StatelessWidget {
           selectionMode: selectionMode,
           onOpenRelation: (relationId) => unawaited(
             context.router.push(RelationDetailsRoute(relationId: relationId)),
+          ),
+          onOpenDailyChoice: (choiceId) => unawaited(
+            context.router.push(DailyChoiceDetailsRoute(choiceId: choiceId)),
           ),
           onCreateRelation: (direction) => unawaited(
             context.router.push(
@@ -367,6 +375,7 @@ final class _DetailsActions extends StatelessWidget {
     required this.onRetryStateChange,
     required this.onShowBlockingRelations,
     required this.onShowArchivedRelations,
+    required this.onChoosePath,
   });
 
   final IntentionDetailsLoaded state;
@@ -379,6 +388,7 @@ final class _DetailsActions extends StatelessWidget {
   final VoidCallback onRetryStateChange;
   final VoidCallback onShowBlockingRelations;
   final VoidCallback onShowArchivedRelations;
+  final VoidCallback onChoosePath;
 
   @override
   Widget build(BuildContext context) {
@@ -455,6 +465,13 @@ final class _DetailsActions extends StatelessWidget {
           spacing: 12,
           runSpacing: 12,
           children: [
+            if (!isArchived)
+              FilledButton.icon(
+                key: const ValueKey('intention-details-choose-path'),
+                onPressed: controlsEnabled ? onChoosePath : null,
+                icon: const Icon(Icons.route_outlined),
+                label: Text(localizations.detailsChoosePathAction),
+              ),
             OutlinedButton.icon(
               key: const ValueKey('intention-details-edit'),
               onPressed: controlsEnabled ? onBeginEditing : null,

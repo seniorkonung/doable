@@ -1,19 +1,29 @@
 import '../domain/long_term_relation.dart';
+import 'relation_group.dart';
 
 enum RelationCountsValidationFailure { negativeCount }
+
+enum RelationCountGroup {
+  activeNeedIncoming,
+  activeNeedOutgoing,
+  activeCanIncoming,
+  activeCanOutgoing,
+  archivedNeedIncoming,
+  archivedNeedOutgoing,
+  archivedCanIncoming,
+  archivedCanOutgoing,
+  dailySource,
+  dailySelected,
+}
 
 final class RelationCountsValidationException implements Exception {
   const RelationCountsValidationException({
     required this.failure,
-    required this.scope,
-    required this.type,
-    required this.direction,
+    required this.group,
   });
 
   final RelationCountsValidationFailure failure;
-  final RelationScope scope;
-  final LongTermRelationType type;
-  final RelationDirection direction;
+  final RelationCountGroup group;
 }
 
 final class RelationCounts {
@@ -26,54 +36,48 @@ final class RelationCounts {
     required int archivedNeedOutgoing,
     required int archivedCanIncoming,
     required int archivedCanOutgoing,
+    int dailySource = 0,
+    int dailySelected = 0,
   }) => RelationCounts._(
     activeNeedIncoming: _requireNonNegative(
       activeNeedIncoming,
-      scope: RelationScope.active,
-      type: LongTermRelationType.need,
-      direction: RelationDirection.incoming,
+      RelationCountGroup.activeNeedIncoming,
     ),
     activeNeedOutgoing: _requireNonNegative(
       activeNeedOutgoing,
-      scope: RelationScope.active,
-      type: LongTermRelationType.need,
-      direction: RelationDirection.outgoing,
+      RelationCountGroup.activeNeedOutgoing,
     ),
     activeCanIncoming: _requireNonNegative(
       activeCanIncoming,
-      scope: RelationScope.active,
-      type: LongTermRelationType.can,
-      direction: RelationDirection.incoming,
+      RelationCountGroup.activeCanIncoming,
     ),
     activeCanOutgoing: _requireNonNegative(
       activeCanOutgoing,
-      scope: RelationScope.active,
-      type: LongTermRelationType.can,
-      direction: RelationDirection.outgoing,
+      RelationCountGroup.activeCanOutgoing,
     ),
     archivedNeedIncoming: _requireNonNegative(
       archivedNeedIncoming,
-      scope: RelationScope.archived,
-      type: LongTermRelationType.need,
-      direction: RelationDirection.incoming,
+      RelationCountGroup.archivedNeedIncoming,
     ),
     archivedNeedOutgoing: _requireNonNegative(
       archivedNeedOutgoing,
-      scope: RelationScope.archived,
-      type: LongTermRelationType.need,
-      direction: RelationDirection.outgoing,
+      RelationCountGroup.archivedNeedOutgoing,
     ),
     archivedCanIncoming: _requireNonNegative(
       archivedCanIncoming,
-      scope: RelationScope.archived,
-      type: LongTermRelationType.can,
-      direction: RelationDirection.incoming,
+      RelationCountGroup.archivedCanIncoming,
     ),
     archivedCanOutgoing: _requireNonNegative(
       archivedCanOutgoing,
-      scope: RelationScope.archived,
-      type: LongTermRelationType.can,
-      direction: RelationDirection.outgoing,
+      RelationCountGroup.archivedCanOutgoing,
+    ),
+    dailySource: _requireNonNegative(
+      dailySource,
+      RelationCountGroup.dailySource,
+    ),
+    dailySelected: _requireNonNegative(
+      dailySelected,
+      RelationCountGroup.dailySelected,
     ),
   );
 
@@ -86,6 +90,8 @@ final class RelationCounts {
     required this.archivedNeedOutgoing,
     required this.archivedCanIncoming,
     required this.archivedCanOutgoing,
+    required this.dailySource,
+    required this.dailySelected,
   });
 
   final int activeNeedIncoming;
@@ -96,6 +102,8 @@ final class RelationCounts {
   final int archivedNeedOutgoing;
   final int archivedCanIncoming;
   final int archivedCanOutgoing;
+  final int dailySource;
+  final int dailySelected;
 
   int get activeNeed =>
       _forType(scope: RelationScope.active, type: LongTermRelationType.need);
@@ -113,7 +121,20 @@ final class RelationCounts {
 
   int get archived => archivedNeed + archivedCan;
 
-  int get total => active + archived;
+  int get dailyTotal => dailySource + dailySelected;
+
+  int get longTermTotal => active + archived;
+
+  int get total => longTermTotal + dailyTotal;
+
+  int forSelection(RelationGroup group) => switch (group) {
+    LongTermRelationGroup(:final scope, :final type, :final direction) =>
+      forGroup(scope: scope, type: type, direction: direction),
+    DailyChoiceRelationGroup(role: DailyChoiceRelationRole.source) =>
+      dailySource,
+    DailyChoiceRelationGroup(role: DailyChoiceRelationRole.selected) =>
+      dailySelected,
+  };
 
   int forGroup({
     required RelationScope scope,
@@ -181,18 +202,11 @@ final class RelationCounts {
       ) +
       forGroup(scope: scope, type: type, direction: RelationDirection.outgoing);
 
-  static int _requireNonNegative(
-    int value, {
-    required RelationScope scope,
-    required LongTermRelationType type,
-    required RelationDirection direction,
-  }) {
+  static int _requireNonNegative(int value, RelationCountGroup group) {
     if (value < 0) {
       throw RelationCountsValidationException(
         failure: RelationCountsValidationFailure.negativeCount,
-        scope: scope,
-        type: type,
-        direction: direction,
+        group: group,
       );
     }
     return value;
@@ -208,7 +222,9 @@ final class RelationCounts {
       other.archivedNeedIncoming == archivedNeedIncoming &&
       other.archivedNeedOutgoing == archivedNeedOutgoing &&
       other.archivedCanIncoming == archivedCanIncoming &&
-      other.archivedCanOutgoing == archivedCanOutgoing;
+      other.archivedCanOutgoing == archivedCanOutgoing &&
+      other.dailySource == dailySource &&
+      other.dailySelected == dailySelected;
 
   @override
   int get hashCode => Object.hash(
@@ -220,6 +236,8 @@ final class RelationCounts {
     archivedNeedOutgoing,
     archivedCanIncoming,
     archivedCanOutgoing,
+    dailySource,
+    dailySelected,
   );
 }
 

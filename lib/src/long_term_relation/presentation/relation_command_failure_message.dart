@@ -15,6 +15,8 @@ String longTermRelationCommandFailureMessage(
       localizations.relationEditorCreatePairOccupied,
     LongTermRelationNotFoundFailure() =>
       localizations.relationEditorCreateUnexpected,
+    LongTermRelationReferencedByDailyPathFailure() =>
+      localizations.relationEditorCreateUnexpected,
     LongTermRelationParticipantNotFoundFailure() =>
       localizations.relationEditorCreateParticipantNotFound,
     LongTermRelationParticipantArchivedFailure() =>
@@ -33,6 +35,8 @@ String longTermRelationCommandFailureMessage(
       localizations.relationEditorUpdatePairOccupied,
     LongTermRelationNotFoundFailure() =>
       localizations.relationEditorUpdateNotFound,
+    LongTermRelationReferencedByDailyPathFailure() =>
+      localizations.relationEditorUpdateReferencedByDailyPath,
     LongTermRelationParticipantNotFoundFailure() =>
       localizations.relationEditorUpdateParticipantNotFound,
     LongTermRelationParticipantArchivedFailure() =>
@@ -52,6 +56,7 @@ String longTermRelationCommandFailureMessage(
       localizations.relationArchiveCorruption,
     LongTermRelationCommandValidationFailure() ||
     LongTermRelationPairOccupiedFailure() ||
+    LongTermRelationReferencedByDailyPathFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() =>
       localizations.relationArchiveConflict,
@@ -79,11 +84,15 @@ String longTermRelationCommandFailureMessage(
     LongTermRelationCommandValidationFailure() ||
     LongTermRelationPairOccupiedFailure() =>
       localizations.relationRestoreConflict,
+    LongTermRelationReferencedByDailyPathFailure() =>
+      localizations.relationRestoreConflict,
     LongTermRelationUnexpectedFailure() =>
       localizations.relationRestoreUnexpected,
   },
   LongTermRelationCommandKind.delete => switch (failure) {
     LongTermRelationNotFoundFailure() => localizations.relationDeleteNotFound,
+    LongTermRelationReferencedByDailyPathFailure() =>
+      localizations.relationDeleteReferencedByDailyPath,
     LongTermRelationUnavailableFailure() =>
       localizations.relationDeleteUnavailable,
     LongTermRelationCorruptionFailure() =>

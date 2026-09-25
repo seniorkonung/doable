@@ -3,6 +3,7 @@ import '../../../graph/application/graph_revision.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -65,11 +66,15 @@ final class RelationCreationContext extends RelationEditorContext {
 /// Основа остаётся неизменной в течение экранной сессии и позволяет отличить
 /// явные правки от полей, которые форма не должна перезаписывать.
 final class RelationEditingContext extends RelationEditorContext {
-  const RelationEditingContext(this.details, {required this.revision})
-    : super();
+  const RelationEditingContext(
+    this.details, {
+    required this.revision,
+    this.permissionRevision,
+  }) : super();
 
   final LongTermRelationDetails details;
   final GraphRevision revision;
+  final GraphRevision? permissionRevision;
 
   /// Строит частичную правку только из значений, отличающихся от основы.
   LongTermRelationPatch patchFor(
@@ -197,6 +202,11 @@ final class RelationEditorRelationNotFound extends RelationEditorFailure {
   const RelationEditorRelationNotFound();
 }
 
+/// Сохранённый дневной путь использует смысл редактируемой связи.
+final class RelationEditorReferencedByDailyPath extends RelationEditorFailure {
+  const RelationEditorReferencedByDailyPath();
+}
+
 /// Доказанно устранимая недоступность хранилища.
 final class RelationEditorUnavailable extends RelationEditorFailure {
   const RelationEditorUnavailable();
@@ -275,6 +285,9 @@ final class RelationEditorState {
     required this.relatedParticipant,
     required this.sourceRevision,
     required this.relatedRevision,
+    required this.permissions,
+    required this.permissionRevision,
+    this.permissionRequiresNewRevision = false,
     required this.type,
     required this.priority,
     required this.description,
@@ -291,6 +304,8 @@ final class RelationEditorState {
           relatedParticipant: creation.initialRelatedParticipant,
           sourceRevision: null,
           relatedRevision: null,
+          permissions: const LongTermRelationPermissions.unknown(),
+          permissionRevision: null,
           type: null,
           priority: null,
           description: '',
@@ -303,6 +318,8 @@ final class RelationEditorState {
           relatedParticipant: editing.details.related,
           sourceRevision: editing.revision,
           relatedRevision: editing.revision,
+          permissions: editing.details.permissions,
+          permissionRevision: editing.permissionRevision ?? editing.revision,
           type: editing.details.relation.type,
           priority: editing.details.relation.priority,
           description: editing.details.description?.value ?? '',
@@ -322,6 +339,9 @@ final class RelationEditorState {
   final RelationParticipantSummary? relatedParticipant;
   final GraphRevision? sourceRevision;
   final GraphRevision? relatedRevision;
+  final LongTermRelationPermissions permissions;
+  final GraphRevision? permissionRevision;
+  final bool permissionRequiresNewRevision;
 
   GraphRevision? revisionFor(RelationParticipantRole role) => switch (role) {
     RelationParticipantRole.source => sourceRevision,
@@ -410,7 +430,19 @@ final class RelationEditorState {
   bool get canSubmit =>
       completeness is RelationDraftComplete &&
       (context is RelationCreationContext || hasChanges) &&
+      (editingBasis == null ||
+          !_meaningChanged ||
+          permissions.canChangeMeaning) &&
       (operation is RelationEditorIdle || canRetry);
+
+  bool get _meaningChanged {
+    final basis = editingBasis;
+    if (basis == null) return false;
+    final relation = basis.relation;
+    return type != relation.type ||
+        sourceIntentionId != relation.sourceIntentionId ||
+        relatedIntentionId != relation.relatedIntentionId;
+  }
 
   RelationEditorState withParticipant(
     RelationParticipantRole role,
@@ -447,8 +479,13 @@ final class RelationEditorState {
     );
   }
 
-  RelationEditorState withType(LongTermRelationType value) =>
-      _copyWith(type: value, operation: operation);
+  RelationEditorState withType(LongTermRelationType value) => _copyWith(
+    type: value,
+    operation: _operationAfter(
+      (failure) =>
+          failure is RelationEditorReferencedByDailyPath && value != type,
+    ),
+  );
 
   RelationEditorState withPriority(RelationPriority value) =>
       _copyWith(priority: value, operation: operation);
@@ -458,7 +495,7 @@ final class RelationEditorState {
     operation: _operationAfter(_isCorrectedByDescription),
   );
 
-  /// Освежает только отображаемые снимки участников с прежними id.
+  /// Освежает разрешение и отображаемые снимки участников с прежними id.
   ///
   /// Исходная основа, введённые поля, выбранные идентификаторы и ошибка
   /// остаются прежними. Поэтому фоновое чтение не превращается в неявную
@@ -471,14 +508,56 @@ final class RelationEditorState {
     if (basis == null || details.relation.id != basis.relation.id) {
       return this;
     }
-    return withConfirmedParticipant(
-      RelationParticipantRole.source,
-      details.source,
-      revision,
-    ).withConfirmedParticipant(
-      RelationParticipantRole.related,
-      details.related,
-      revision,
+    return withPermissions(details.permissions, revision)
+        .withConfirmedParticipant(
+          RelationParticipantRole.source,
+          details.source,
+          revision,
+        )
+        .withConfirmedParticipant(
+          RelationParticipantRole.related,
+          details.related,
+          revision,
+        );
+  }
+
+  RelationEditorState withPermissions(
+    LongTermRelationPermissions value,
+    GraphRevision revision,
+  ) {
+    final previous = permissionRevision;
+    if (previous != null) {
+      final order = revision.compareTo(previous);
+      if (order == GraphRevisionOrder.older ||
+          order == GraphRevisionOrder.differentEpoch ||
+          (permissionRequiresNewRevision && order == GraphRevisionOrder.same)) {
+        return this;
+      }
+    }
+    final nextOperation =
+        value.canChangeMeaning &&
+            operation is RelationEditorFailed &&
+            (operation as RelationEditorFailed).failure
+                is RelationEditorReferencedByDailyPath
+        ? const RelationEditorIdle()
+        : operation;
+    return RelationEditorState(
+      context: context,
+      sourceParticipant: sourceParticipant,
+      relatedParticipant: relatedParticipant,
+      sourceRevision: sourceRevision,
+      relatedRevision: relatedRevision,
+      permissions: value,
+      permissionRevision: revision,
+      permissionRequiresNewRevision: false,
+      type: type,
+      priority: priority,
+      description: description,
+      operation: nextOperation,
+      event: event,
+      failurePresentation: nextOperation is RelationEditorIdle
+          ? null
+          : failurePresentation,
     );
   }
 
@@ -509,6 +588,9 @@ final class RelationEditorState {
       relatedRevision: role == RelationParticipantRole.related
           ? revision
           : relatedRevision,
+      permissions: permissions,
+      permissionRevision: permissionRevision,
+      permissionRequiresNewRevision: permissionRequiresNewRevision,
       type: type,
       priority: priority,
       description: description,
@@ -553,6 +635,9 @@ final class RelationEditorState {
       relatedRevision: role == RelationParticipantRole.related
           ? snapshot.revision
           : relatedRevision,
+      permissions: permissions,
+      permissionRevision: permissionRevision,
+      permissionRequiresNewRevision: permissionRequiresNewRevision,
       type: type,
       priority: priority,
       description: description,
@@ -578,6 +663,16 @@ final class RelationEditorState {
     relatedParticipant: relatedParticipant,
     sourceRevision: sourceRevision,
     relatedRevision: relatedRevision,
+    permissions:
+        value is RelationEditorFailed &&
+            value.failure is RelationEditorReferencedByDailyPath
+        ? const LongTermRelationPermissions.referencedByDailyPath()
+        : permissions,
+    permissionRevision: permissionRevision,
+    permissionRequiresNewRevision:
+        permissionRequiresNewRevision ||
+        (value is RelationEditorFailed &&
+            value.failure is RelationEditorReferencedByDailyPath),
     type: type,
     priority: priority,
     description: description,
@@ -592,6 +687,9 @@ final class RelationEditorState {
     relatedParticipant: relatedParticipant,
     sourceRevision: sourceRevision,
     relatedRevision: relatedRevision,
+    permissions: permissions,
+    permissionRevision: permissionRevision,
+    permissionRequiresNewRevision: permissionRequiresNewRevision,
     type: type,
     priority: priority,
     description: description,
@@ -615,6 +713,9 @@ final class RelationEditorState {
     relatedParticipant: relatedParticipant ?? this.relatedParticipant,
     sourceRevision: sourceRevision ?? this.sourceRevision,
     relatedRevision: relatedRevision ?? this.relatedRevision,
+    permissions: permissions,
+    permissionRevision: permissionRevision,
+    permissionRequiresNewRevision: permissionRequiresNewRevision,
     type: type ?? this.type,
     priority: priority ?? this.priority,
     description: description ?? this.description,
@@ -646,6 +747,7 @@ final class RelationEditorState {
         RelationEditorPairOccupied() ||
         RelationEditorSameParticipants() ||
         RelationEditorRelationNotFound() ||
+        RelationEditorReferencedByDailyPath() ||
         RelationEditorUnavailable() ||
         RelationEditorCorruption() ||
         RelationEditorUnexpected() => false,
@@ -660,6 +762,7 @@ final class RelationEditorState {
     // Занятость пары и самосвязь зависят только от участников.
     RelationEditorPairOccupied() ||
     RelationEditorSameParticipants() => identityChanged,
+    RelationEditorReferencedByDailyPath() => identityChanged,
     RelationEditorDescriptionInvalid() ||
     RelationEditorRelationNotFound() ||
     RelationEditorUnavailable() ||
