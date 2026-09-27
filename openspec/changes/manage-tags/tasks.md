@@ -681,7 +681,7 @@
   - **Вероятные файлы:** `lib/src/graph/data/drift_personal_graph_repository_tagged_entities.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `test/graph/data/drift_tagged_entities_read_test.dart`, `test/graph/data/drift_tag_diagnostics_test.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 3.4 Подтвердить контракт полного обхода и отказов реального чтения навигации
+- [x] 3.4 Подтвердить контракт полного обхода и отказов реального чтения навигации
   - **Критерии приёмки:**
     - Результаты 3.1–3.3 подтверждены на настоящем Drift/SQLite-адаптере: смешанный порядок, полнота обоих охватов, типизированные исходы, целостность и безопасная диагностика соответствуют требованиям навигации и ограниченного получения из спецификации тегов.
     - Существующие чтения каталога, выбора и назначений сохраняют контракты; для разработки представления достаточно TagReadContract, GraphRevision и общего канала завершений без знания SQLite.
