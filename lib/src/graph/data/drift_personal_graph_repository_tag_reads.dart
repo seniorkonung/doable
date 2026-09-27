@@ -20,6 +20,9 @@ extension _TagReading on DriftPersonalGraphRepository {
                   !cursor.matches(query, _epoch))) {
             throw const _InvalidTagCatalogCursor();
           }
+          if (query.mode is TagCatalogSelectionMode) {
+            throw const _UnsupportedTagCatalogSelection();
+          }
           if (cursor is _DriftTagCatalogCursor &&
               cursor.revision.compareTo(_currentRevision) !=
                   GraphRevisionOrder.same) {
@@ -62,6 +65,7 @@ extension _TagReading on DriftPersonalGraphRepository {
             nextCursor: hasNext
                 ? _DriftTagCatalogCursor(
                     epoch: _epoch,
+                    mode: query.mode,
                     revision: revision,
                     pageSize: query.pageSize,
                     boundarySequence: _requiredStoredInteger(
@@ -167,18 +171,26 @@ tag_domain.Tag _decodeStoredTag(Map<String, Object?> data) {
 final class _DriftTagCatalogCursor implements TagCatalogCursor {
   const _DriftTagCatalogCursor({
     required this.epoch,
+    required this.mode,
     required this.revision,
     required this.pageSize,
     required this.boundarySequence,
   });
 
   final _GraphEpoch epoch;
+  final TagCatalogMode mode;
   final GraphRevision revision;
   final int pageSize;
   final int boundarySequence;
 
   bool matches(TagCatalogQuery query, _GraphEpoch owner) =>
-      identical(epoch, owner) && pageSize == query.pageSize;
+      identical(epoch, owner) &&
+      mode == query.mode &&
+      pageSize == query.pageSize;
+}
+
+final class _UnsupportedTagCatalogSelection implements Exception {
+  const _UnsupportedTagCatalogSelection();
 }
 
 final class _InvalidTagCatalogCursor implements Exception {

@@ -6,10 +6,12 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -122,6 +124,24 @@ void main() {
       await repository.getTagCatalogPage(TagCatalogQuery(pageSize: 1)),
     );
     final cursor = first.nextCursor!;
+
+    final target = IntentionTagTarget(
+      (IntentionId.decode(_uuid(12)) as IntentionIdDecodingSuccess).id,
+    );
+    expect(
+      await repository.getTagCatalogPage(
+        TagCatalogQuery(
+          pageSize: 1,
+          cursor: cursor,
+          mode: TagCatalogSelectionMode(target),
+        ),
+      ),
+      isA<TagCatalogPageError>().having(
+        (result) => result.failure,
+        'причина',
+        isA<TagCatalogInvalidCursor>(),
+      ),
+    );
 
     expect(
       await repository.getTagCatalogPage(

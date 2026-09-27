@@ -524,6 +524,7 @@ String _readFailure(
   TagCatalogCorruptionFailure() => localizations.tagCatalogCorruption,
   TagCatalogInvalidCursor() ||
   TagCatalogSnapshotExpired() ||
+  TagCatalogTargetNotFound() ||
   TagCatalogUnexpectedFailure() => localizations.tagCatalogUnexpected,
 };
 
@@ -535,6 +536,7 @@ String _pageFailure(
   TagCatalogCorruptionFailure() => localizations.tagCatalogLoadMoreCorruption,
   TagCatalogInvalidCursor() ||
   TagCatalogSnapshotExpired() ||
+  TagCatalogTargetNotFound() ||
   TagCatalogUnexpectedFailure() => localizations.tagCatalogLoadMoreUnexpected,
 };
 
