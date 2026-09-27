@@ -16,6 +16,7 @@ String tagFailureMessage(
   },
   TagNameOccupiedFailure() => localizations.tagNameOccupied,
   TagNotFoundFailure() => localizations.tagNotFound,
+  TagTargetNotFoundFailure() => localizations.tagUnexpected,
   TagUnavailableFailure() => localizations.tagUnavailable,
   TagCorruptionFailure() => localizations.tagCorruption,
   TagUnexpectedFailure() => localizations.tagUnexpected,

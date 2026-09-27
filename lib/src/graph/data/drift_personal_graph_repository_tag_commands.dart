@@ -1,7 +1,7 @@
 part of 'drift_personal_graph_repository.dart';
 
 extension _TagCommandExecution on DriftPersonalGraphRepository {
-  Future<TagCommandResult> _executeTag(TagCommand command) async {
+  Future<TagCommandResult> _executeTag(TagLifecycleCommand command) async {
     final stopwatch = Stopwatch()..start();
     var stage = TagCommandDiagnosticsStage.validation;
     final type = switch (command) {

@@ -3,6 +3,8 @@ import '../../graph/application/graph_revision.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
 import '../domain/tag_name.dart';
+import '../domain/tag_assignment.dart';
+import '../domain/tag_target.dart';
 import 'tag_change.dart';
 
 sealed class TagCommandFailure implements GraphCommandFailure {
@@ -31,6 +33,15 @@ final class TagNotFoundFailure extends TagCommandFailure {
   const TagNotFoundFailure(this.tagId);
 
   final TagId tagId;
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.notFound;
+}
+
+final class TagTargetNotFoundFailure extends TagCommandFailure {
+  const TagTargetNotFoundFailure(this.target);
+
+  final TagTarget target;
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.notFound;
@@ -99,6 +110,26 @@ final class TagDeleted extends TagCommandSuccess {
   @override
   final TagDeletedChange change;
   TagId get tagId => change.tagId;
+}
+
+/// Возвращается после commit при изменении ровно одной пары.
+final class TagAssignmentChanged extends TagCommandSuccess {
+  const TagAssignmentChanged(this.change);
+
+  @override
+  final TagAssignmentChangedChange change;
+  TagAssignment get assignment => change.assignment;
+  TagAssignmentState get state => change.state;
+}
+
+/// Возвращается после проверки существования обеих сторон без новой записи.
+final class TagAssignmentUnchanged extends TagCommandSuccess {
+  const TagAssignmentUnchanged(this.change);
+
+  @override
+  final TagAssignmentUnchangedChange change;
+  TagAssignment get assignment => change.assignment;
+  TagAssignmentState get state => change.state;
 }
 
 typedef TagCommandResult =

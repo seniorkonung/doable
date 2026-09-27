@@ -112,6 +112,8 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
             TagRenamed(:final after) => after.id,
             TagUnchanged(:final tag) => tag.id,
             TagDeleted() => throw StateError('Unexpected tag command result'),
+            TagAssignmentChanged() || TagAssignmentUnchanged() =>
+              throw StateError('Unexpected tag command result'),
           };
           await _readCommitted(tagId, completion.confirmedChange?.revision);
       }

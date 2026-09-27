@@ -1,6 +1,7 @@
 import '../../graph/application/graph_revision.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
+import '../domain/tag_assignment.dart';
 
 /// Один компактный факт о теге на общей ревизии личного графа.
 sealed class TagChange implements GraphChange {
@@ -72,4 +73,35 @@ final class TagDeletedChange extends TagChange {
   @override
   final GraphRevision revision;
   final TagId tagId;
+}
+
+/// Подтверждённое состояние одной пары после команды назначения или снятия.
+enum TagAssignmentState { assigned, absent }
+
+/// Фактическое изменение одной пары; остальные назначения не перечисляются.
+final class TagAssignmentChangedChange extends TagChange {
+  const TagAssignmentChangedChange({
+    required this.revision,
+    required this.assignment,
+    required this.state,
+  });
+
+  @override
+  final GraphRevision revision;
+  final TagAssignment assignment;
+  final TagAssignmentState state;
+}
+
+/// Повтор подтверждает уже существовавшее состояние без новой ревизии.
+final class TagAssignmentUnchangedChange extends TagChange {
+  const TagAssignmentUnchangedChange({
+    required this.revision,
+    required this.assignment,
+    required this.state,
+  });
+
+  @override
+  final GraphRevision revision;
+  final TagAssignment assignment;
+  final TagAssignmentState state;
 }
