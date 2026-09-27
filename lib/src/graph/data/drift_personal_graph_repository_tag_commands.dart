@@ -1,13 +1,15 @@
 part of 'drift_personal_graph_repository.dart';
 
 extension _TagCommandExecution on DriftPersonalGraphRepository {
-  Future<TagCommandResult> _executeTag(TagLifecycleCommand command) async {
+  Future<TagCommandResult> _executeTag(TagCommand command) async {
     final stopwatch = Stopwatch()..start();
     var stage = TagCommandDiagnosticsStage.validation;
     final type = switch (command) {
       CreateTag() => TagCommandDiagnosticsType.create,
       RenameTag() => TagCommandDiagnosticsType.rename,
       DeleteTag() => TagCommandDiagnosticsType.delete,
+      AssignTag() => TagCommandDiagnosticsType.assign,
+      RemoveTagAssignment() => TagCommandDiagnosticsType.removeAssignment,
     };
     void record(DiagnosticsStatus status) => _recordDiagnostics(
       TagCommandDiagnosticsEvent(
@@ -36,13 +38,21 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
                 command,
                 onStage: (value) => stage = value,
               ),
+              AssignTag() => _assignTag(
+                command,
+                onStage: (value) => stage = value,
+              ),
+              RemoveTagAssignment() => _removeTagAssignment(
+                command,
+                onStage: (value) => stage = value,
+              ),
             },
           );
         } on Object catch (error) {
           // После отката индекс имени остаётся окончательным арбитром гонки.
           final conflictingName = switch (command) {
             CreateTag(:final name) || RenameTag(:final name) => name,
-            DeleteTag() => null,
+            DeleteTag() || AssignTag() || RemoveTagAssignment() => null,
           };
           if (conflictingName != null) {
             if (classifySqliteFailure(error) case SqliteConstraintFailure(
@@ -56,7 +66,9 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
                   switch (command) {
                     CreateTag() => true,
                     RenameTag(:final tagId) => occupied.id != tagId,
-                    DeleteTag() => false,
+                    DeleteTag() ||
+                    AssignTag() ||
+                    RemoveTagAssignment() => false,
                   }) {
                 throw _TagNameOccupied(occupied.id);
               }
@@ -146,6 +158,129 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     return _CommittedTagDeleted(command.tagId);
   }
 
+  Future<_CommittedTagCommand> _assignTag(
+    AssignTag command, {
+    required void Function(TagCommandDiagnosticsStage) onStage,
+  }) async {
+    await _checkAssignmentIdentities(command.tagId, command.target);
+    final assignment = command.assignment;
+    if (await _assignmentExists(assignment)) {
+      return _CommittedTagAssignmentUnchanged(
+        assignment,
+        TagAssignmentState.assigned,
+      );
+    }
+
+    onStage(TagCommandDiagnosticsStage.write);
+    final tagId = command.tagId.toCanonicalString();
+    await _database.into(_database.tagAssignments).insert(
+      switch (command.target) {
+        IntentionTagTarget(:final intentionId) =>
+          local.TagAssignmentsCompanion.insert(
+            tagId: tagId,
+            intentionId: Value(intentionId.toCanonicalString()),
+          ),
+        LongTermRelationTagTarget(:final relationId) =>
+          local.TagAssignmentsCompanion.insert(
+            tagId: tagId,
+            longTermRelationId: Value(relationId.toCanonicalString()),
+          ),
+      },
+    );
+    return _CommittedTagAssignmentChanged(
+      assignment,
+      TagAssignmentState.assigned,
+    );
+  }
+
+  Future<_CommittedTagCommand> _removeTagAssignment(
+    RemoveTagAssignment command, {
+    required void Function(TagCommandDiagnosticsStage) onStage,
+  }) async {
+    await _checkAssignmentIdentities(command.tagId, command.target);
+    final assignment = command.assignment;
+    if (!await _assignmentExists(assignment)) {
+      return _CommittedTagAssignmentUnchanged(
+        assignment,
+        TagAssignmentState.absent,
+      );
+    }
+
+    onStage(TagCommandDiagnosticsStage.write);
+    final tagId = command.tagId.toCanonicalString();
+    final rows =
+        await (_database.delete(_database.tagAssignments)..where(
+              (row) =>
+                  row.tagId.equals(tagId) &
+                  switch (command.target) {
+                    IntentionTagTarget(:final intentionId) =>
+                      row.intentionId.equals(intentionId.toCanonicalString()),
+                    LongTermRelationTagTarget(:final relationId) =>
+                      row.longTermRelationId.equals(
+                        relationId.toCanonicalString(),
+                      ),
+                  },
+            ))
+            .go();
+    if (rows != 1) throw const _StoredIntentionCorruption();
+    return _CommittedTagAssignmentChanged(
+      assignment,
+      TagAssignmentState.absent,
+    );
+  }
+
+  Future<void> _checkAssignmentIdentities(TagId tagId, TagTarget target) async {
+    if (await _findTagById(tagId) == null) throw _TagMissing(tagId);
+    final exists = switch (target) {
+      IntentionTagTarget(:final intentionId) =>
+        await _database
+            .customSelect(
+              'SELECT 1 FROM intentions WHERE id = ?',
+              variables: [Variable<String>(intentionId.toCanonicalString())],
+              readsFrom: {_database.intentions},
+            )
+            .getSingleOrNull(),
+      LongTermRelationTagTarget(:final relationId) =>
+        await _database
+            .customSelect(
+              'SELECT 1 FROM long_term_relations WHERE id = ?',
+              variables: [Variable<String>(relationId.toCanonicalString())],
+              readsFrom: {_database.longTermRelations},
+            )
+            .getSingleOrNull(),
+    };
+    if (exists == null) throw _TagTargetMissing(target);
+  }
+
+  Future<bool> _assignmentExists(TagAssignment assignment) async {
+    final tagId = Variable<String>(assignment.tagId.toCanonicalString());
+    final row = switch (assignment.target) {
+      IntentionTagTarget(:final intentionId) =>
+        await _database
+            .customSelect(
+              'SELECT 1 FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+              variables: [
+                tagId,
+                Variable<String>(intentionId.toCanonicalString()),
+              ],
+              readsFrom: {_database.tagAssignments},
+            )
+            .getSingleOrNull(),
+      LongTermRelationTagTarget(:final relationId) =>
+        await _database
+            .customSelect(
+              'SELECT 1 FROM tag_assignments WHERE tag_id = ? AND long_term_relation_id = ?',
+              variables: [
+                tagId,
+                Variable<String>(relationId.toCanonicalString()),
+              ],
+              readsFrom: {_database.tagAssignments},
+            )
+            .getSingleOrNull(),
+    };
+    return row != null;
+  }
+
   Future<tag_domain.Tag?> _findTagById(TagId id) async {
     final row = await _database
         .customSelect(
@@ -228,9 +363,52 @@ final class _CommittedTagDeleted extends _CommittedTagCommand {
       TagDeleted(TagDeletedChange(revision: revision, tagId: id));
 }
 
+final class _CommittedTagAssignmentChanged extends _CommittedTagCommand {
+  const _CommittedTagAssignmentChanged(this.assignment, this.state);
+
+  final TagAssignment assignment;
+  final TagAssignmentState state;
+
+  @override
+  bool get didMutate => true;
+
+  @override
+  TagCommandSuccess toSuccess(GraphRevision revision) => TagAssignmentChanged(
+    TagAssignmentChangedChange(
+      revision: revision,
+      assignment: assignment,
+      state: state,
+    ),
+  );
+}
+
+final class _CommittedTagAssignmentUnchanged extends _CommittedTagCommand {
+  const _CommittedTagAssignmentUnchanged(this.assignment, this.state);
+
+  final TagAssignment assignment;
+  final TagAssignmentState state;
+
+  @override
+  bool get didMutate => false;
+
+  @override
+  TagCommandSuccess toSuccess(GraphRevision revision) => TagAssignmentUnchanged(
+    TagAssignmentUnchangedChange(
+      revision: revision,
+      assignment: assignment,
+      state: state,
+    ),
+  );
+}
+
 final class _TagMissing implements Exception {
   const _TagMissing(this.id);
   final TagId id;
+}
+
+final class _TagTargetMissing implements Exception {
+  const _TagTargetMissing(this.target);
+  final TagTarget target;
 }
 
 final class _TagNameOccupied implements Exception {
@@ -240,6 +418,9 @@ final class _TagNameOccupied implements Exception {
 
 TagCommandFailure _classifyTagCommandFailure(Object error) {
   if (error is _TagMissing) return TagNotFoundFailure(error.id);
+  if (error is _TagTargetMissing) {
+    return TagTargetNotFoundFailure(error.target);
+  }
   if (error is _TagNameOccupied) return TagNameOccupiedFailure(error.id);
   if (error is _StoredIntentionCorruption) return const TagCorruptionFailure();
   return switch (classifySqliteFailure(error)) {

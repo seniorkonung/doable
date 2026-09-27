@@ -46,8 +46,10 @@ import '../../tag/application/tag_id_generator.dart';
 import '../../tag/application/tag_read_result.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag.dart' as tag_domain;
+import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_id.dart';
 import '../../tag/domain/tag_name.dart';
+import '../../tag/domain/tag_target.dart';
 import '../application/blocking_relation_reference.dart';
 import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
@@ -432,6 +434,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       final CreateTag createTag => await _executeTag(createTag),
       final RenameTag renameTag => await _executeTag(renameTag),
       final DeleteTag deleteTag => await _executeTag(deleteTag),
+      final AssignTag assignTag => await _executeTag(assignTag),
+      final RemoveTagAssignment removeTagAssignment => await _executeTag(
+        removeTagAssignment,
+      ),
       _ => throw UnsupportedError(
         'Команда не поддерживается модулем личного графа.',
       ),

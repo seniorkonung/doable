@@ -2,6 +2,7 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -10,8 +11,11 @@ import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+import '../../support/tag_storage_fixture.dart';
 
 final class _RecordingSink implements DiagnosticsSink {
   final events = <DiagnosticsEvent>[];
@@ -204,5 +208,137 @@ void main() {
     );
     expect(sink.attempts, 4);
     expect(raw.select('SELECT id FROM tags'), hasLength(1));
+  });
+
+  test('назначение и снятие сообщают безопасные этапы и коды отказа', () async {
+    seedTagStorageFixture(raw);
+    final sink = _RecordingSink();
+    final graph = repository(sink);
+    final tag =
+        (TagId.decode(tagFixtureId(lastTagNumber)) as TagIdDecodingSuccess).id;
+    final missingTag =
+        (TagId.decode(tagFixtureId(999)) as TagIdDecodingSuccess).id;
+    final target = IntentionTagTarget(
+      (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id,
+    );
+    const privateError = 'CANARY-SQL-параметр-назначения';
+
+    final missing = await graph.execute(
+      RemoveTagAssignment(tagId: missingTag, target: target),
+    );
+    expect((missing as TagCommandFailed).failure, isA<TagNotFoundFailure>());
+    final missingEvent = sink.events
+        .whereType<TagCommandDiagnosticsEvent>()
+        .last;
+    expect(
+      missingEvent.commandType,
+      TagCommandDiagnosticsType.removeAssignment,
+    );
+    expect(missingEvent.stage, TagCommandDiagnosticsStage.validation);
+    expect(
+      (missingEvent.status as DiagnosticsFailed).code,
+      DiagnosticsFailureCode.notFound,
+    );
+
+    raw.execute('''
+      CREATE TEMP TRIGGER fail_assignment BEFORE INSERT ON tag_assignments
+      BEGIN SELECT RAISE(ABORT, '$privateError'); END
+    ''');
+    final failed = await graph.execute(AssignTag(tagId: tag, target: target));
+    expect((failed as TagCommandFailed).failure, isA<TagUnexpectedFailure>());
+    final writeEvent = sink.events.whereType<TagCommandDiagnosticsEvent>().last;
+    expect(writeEvent.commandType, TagCommandDiagnosticsType.assign);
+    expect(writeEvent.stage, TagCommandDiagnosticsStage.write);
+    expect(
+      (writeEvent.status as DiagnosticsFailed).code,
+      DiagnosticsFailureCode.unexpected,
+    );
+    expect(
+      raw.select(
+        'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+        [tagFixtureId(lastTagNumber), tagFixtureId(2)],
+      ),
+      isEmpty,
+    );
+    raw.execute('DROP TRIGGER fail_assignment');
+
+    final assigned = await graph.execute(AssignTag(tagId: tag, target: target));
+    expect(assigned, isA<TagCommandSucceeded>());
+    final assignedEvent = sink.events
+        .whereType<TagCommandDiagnosticsEvent>()
+        .last;
+    expect(assignedEvent.commandType, TagCommandDiagnosticsType.assign);
+    expect(assignedEvent.stage, TagCommandDiagnosticsStage.write);
+    expect(assignedEvent.status, isA<DiagnosticsSucceeded>());
+    final repeated = await graph.execute(AssignTag(tagId: tag, target: target));
+    expect(
+      (repeated as TagCommandSucceeded).value.value,
+      isA<TagAssignmentUnchanged>(),
+    );
+    final repeatEvent = sink.events
+        .whereType<TagCommandDiagnosticsEvent>()
+        .last;
+    expect(repeatEvent.stage, TagCommandDiagnosticsStage.validation);
+    expect(repeatEvent.status, isA<DiagnosticsSucceeded>());
+
+    final removed = await graph.execute(
+      RemoveTagAssignment(tagId: tag, target: target),
+    );
+    expect(removed, isA<TagCommandSucceeded>());
+    final removedEvent = sink.events
+        .whereType<TagCommandDiagnosticsEvent>()
+        .last;
+    expect(
+      removedEvent.commandType,
+      TagCommandDiagnosticsType.removeAssignment,
+    );
+    expect(removedEvent.stage, TagCommandDiagnosticsStage.write);
+    expect(removedEvent.status, isA<DiagnosticsSucceeded>());
+    final diagnostics = [
+      ...sink.events.map((event) => event.toString()),
+      ...sink.messages,
+    ].join('\n');
+    for (final value in [
+      privateError,
+      tagFixtureId(lastTagNumber),
+      tagFixtureId(2),
+    ]) {
+      expect(diagnostics, isNot(contains(value)));
+    }
+  });
+
+  test('отказ диагностики не меняет назначение и снятие', () async {
+    seedTagStorageFixture(raw);
+    final sink = _ThrowingSink();
+    final graph = repository(sink);
+    final tag =
+        (TagId.decode(tagFixtureId(lastTagNumber)) as TagIdDecodingSuccess).id;
+    final target = IntentionTagTarget(
+      (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id,
+    );
+
+    expect(
+      await graph.execute(AssignTag(tagId: tag, target: target)),
+      isA<TagCommandSucceeded>(),
+    );
+    expect(
+      raw.select(
+        'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+        [tagFixtureId(lastTagNumber), tagFixtureId(2)],
+      ),
+      hasLength(1),
+    );
+    expect(
+      await graph.execute(RemoveTagAssignment(tagId: tag, target: target)),
+      isA<TagCommandSucceeded>(),
+    );
+    expect(
+      raw.select(
+        'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+        [tagFixtureId(lastTagNumber), tagFixtureId(2)],
+      ),
+      isEmpty,
+    );
+    expect(sink.attempts, 4);
   });
 }
