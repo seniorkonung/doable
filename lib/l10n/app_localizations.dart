@@ -1370,6 +1370,24 @@ abstract class AppLocalizations {
   /// **'tag'**
   String get graphOperationTag;
 
+  /// Назначение тега получателю в общем сообщении
+  ///
+  /// In en, this message translates to:
+  /// **'Assign'**
+  String get graphOperationAssignTag;
+
+  /// Снятие назначения тега в общем сообщении
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get graphOperationRemoveTagAssignment;
+
+  /// Безопасное обозначение назначения без личных данных
+  ///
+  /// In en, this message translates to:
+  /// **'tag assignment'**
+  String get graphOperationTagAssignment;
+
   /// Заголовок каталога тегов и переход к нему
   ///
   /// In en, this message translates to:
@@ -1645,6 +1663,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tag deleted with all its assignments.'**
   String get tagDeleted;
+
+  /// Подтверждение нового назначения тега
+  ///
+  /// In en, this message translates to:
+  /// **'Tag assigned.'**
+  String get tagAssigned;
+
+  /// Подтверждение повторного назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Tag already assigned.'**
+  String get tagAlreadyAssigned;
+
+  /// Подтверждение снятия назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Tag assignment removed.'**
+  String get tagAssignmentRemoved;
+
+  /// Подтверждение повторного снятия
+  ///
+  /// In en, this message translates to:
+  /// **'Tag assignment already absent.'**
+  String get tagAssignmentAlreadyAbsent;
+
+  /// Занятость ключей назначения при повторном действии
+  ///
+  /// In en, this message translates to:
+  /// **'A tag assignment change is already in progress. Wait for its result.'**
+  String get tagAssignmentAlreadyRunning;
+
+  /// Отсутствие получателя назначения
+  ///
+  /// In en, this message translates to:
+  /// **'This recipient no longer exists. Refresh its details.'**
+  String get tagAssignmentTargetNotFound;
+
+  /// Временная недоступность назначения или снятия
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the tag assignment operation. Try again.'**
+  String get tagAssignmentUnavailable;
+
+  /// Повреждение при назначении или снятии
+  ///
+  /// In en, this message translates to:
+  /// **'Stored tag assignment data is damaged. The assignment was not changed.'**
+  String get tagAssignmentCorruption;
+
+  /// Неизвестный отказ назначения или снятия
+  ///
+  /// In en, this message translates to:
+  /// **'The tag assignment operation failed because of an unexpected error.'**
+  String get tagAssignmentUnexpected;
 
   /// Недопустимые символы в названии тега
   ///

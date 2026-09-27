@@ -12,6 +12,7 @@ import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/presentation/relation_command_failure_message.dart';
 import '../../shared/presentation/presentation_frame_evidence.dart';
+import '../../tag/application/tag_change.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/presentation/tag_failure_message.dart';
 import '../application/graph_command_coordinator.dart';
@@ -211,29 +212,44 @@ String _tagMessage(
     TagCommandKind.create => localizations.graphOperationCreate,
     TagCommandKind.rename => localizations.graphOperationUpdate,
     TagCommandKind.delete => localizations.graphOperationDelete,
-    TagCommandKind.assign ||
-    TagCommandKind.removeAssignment => localizations.graphOperationUpdate,
+    TagCommandKind.assign => localizations.graphOperationAssignTag,
+    TagCommandKind.removeAssignment =>
+      localizations.graphOperationRemoveTagAssignment,
   },
-  localizations.graphOperationTag,
+  switch (completion.kind) {
+    TagCommandKind.assign || TagCommandKind.removeAssignment =>
+      localizations.graphOperationTagAssignment,
+    _ => localizations.graphOperationTag,
+  },
   switch (completion.result) {
     GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
       (TagCommandKind.create, TagCreated()) => localizations.tagCreated,
       (TagCommandKind.rename, TagRenamed()) => localizations.tagRenamed,
       (TagCommandKind.rename, TagUnchanged()) => localizations.tagUnchanged,
       (TagCommandKind.delete, TagDeleted()) => localizations.tagDeleted,
-      (TagCommandKind.assign, TagAssignmentChanged()) ||
-      (TagCommandKind.assign, TagAssignmentUnchanged()) ||
-      (TagCommandKind.removeAssignment, TagAssignmentChanged()) ||
-      (
-        TagCommandKind.removeAssignment,
-        TagAssignmentUnchanged(),
-      ) => localizations.graphOperationUpdate,
-      _ => localizations.tagUnexpected,
+      (TagCommandKind.assign, TagAssignmentChanged(:final state))
+          when state == TagAssignmentState.assigned =>
+        localizations.tagAssigned,
+      (TagCommandKind.assign, TagAssignmentUnchanged(:final state))
+          when state == TagAssignmentState.assigned =>
+        localizations.tagAlreadyAssigned,
+      (TagCommandKind.removeAssignment, TagAssignmentChanged(:final state))
+          when state == TagAssignmentState.absent =>
+        localizations.tagAssignmentRemoved,
+      (TagCommandKind.removeAssignment, TagAssignmentUnchanged(:final state))
+          when state == TagAssignmentState.absent =>
+        localizations.tagAssignmentAlreadyAbsent,
+      _ => switch (completion.kind) {
+        TagCommandKind.assign || TagCommandKind.removeAssignment =>
+          localizations.tagAssignmentUnexpected,
+        _ => localizations.tagUnexpected,
+      },
     },
-    GraphResultFailure(:final failure) => tagFailureMessage(
-      localizations,
-      failure,
-    ),
+    GraphResultFailure(:final failure) => switch (completion.kind) {
+      TagCommandKind.assign || TagCommandKind.removeAssignment =>
+        tagAssignmentFailureMessage(localizations, failure),
+      _ => tagFailureMessage(localizations, failure),
+    },
   },
 );
 

@@ -768,6 +768,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationTag => 'тег';
 
   @override
+  String get graphOperationAssignTag => 'Назначение';
+
+  @override
+  String get graphOperationRemoveTagAssignment => 'Снятие';
+
+  @override
+  String get graphOperationTagAssignment => 'назначение тега';
+
+  @override
   String get tagCatalogTitle => 'Теги';
 
   @override
@@ -920,6 +929,38 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get tagDeleted => 'Тег удалён вместе со всеми назначениями.';
+
+  @override
+  String get tagAssigned => 'Тег назначен.';
+
+  @override
+  String get tagAlreadyAssigned => 'Тег уже назначен.';
+
+  @override
+  String get tagAssignmentRemoved => 'Назначение тега снято.';
+
+  @override
+  String get tagAssignmentAlreadyAbsent => 'Назначение тега уже отсутствует.';
+
+  @override
+  String get tagAssignmentAlreadyRunning =>
+      'Изменение назначения тега уже выполняется. Дождитесь результата.';
+
+  @override
+  String get tagAssignmentTargetNotFound =>
+      'Этого получателя больше нет. Обновите подробности.';
+
+  @override
+  String get tagAssignmentUnavailable =>
+      'Не удалось изменить назначение тега. Повторите попытку.';
+
+  @override
+  String get tagAssignmentCorruption =>
+      'Сохранённые данные назначения тега повреждены. Назначение не изменено.';
+
+  @override
+  String get tagAssignmentUnexpected =>
+      'Назначение тега не изменено из-за непредвиденной ошибки.';
 
   @override
   String get tagNameInvalidUnicode =>

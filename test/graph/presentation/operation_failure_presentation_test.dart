@@ -19,7 +19,9 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/tag_failure_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -462,6 +464,72 @@ void main() {
     );
   }
 
+  for (final scenario in <({Locale locale, String failure, String busy})>[
+    (
+      locale: const Locale('en'),
+      failure: 'This recipient no longer exists. Refresh its details.',
+      busy: 'A tag assignment change is already in progress. Wait for its result.',
+    ),
+    (
+      locale: const Locale('ru'),
+      failure: 'Этого получателя больше нет. Обновите подробности.',
+      busy: 'Изменение назначения тега уже выполняется. Дождитесь результата.',
+    ),
+  ]) {
+    testWidgets(
+      'инлайн-отказ назначения и занятость доступны для ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = _FailureHarness();
+        addTearDown(harness.dispose);
+        final claim = await harness.createAssignmentClaim();
+
+        await tester.pumpWidget(
+          harness.app(
+            Builder(
+              builder: (context) => Column(
+                children: [
+                  OperationFailurePresentation(
+                    claim: claim,
+                    message: tagAssignmentFailureMessage(
+                      AppLocalizations.of(context),
+                      TagTargetNotFoundFailure(
+                        IntentionTagTarget(testDetailsIntentionId(1)),
+                      ),
+                    ),
+                    messageKey: const ValueKey('assignment-failure-message'),
+                  ),
+                  OperationFailurePresentation(
+                    claim: null,
+                    message: tagAssignmentStartMessage(
+                      AppLocalizations.of(context),
+                      const TagCommandAlreadyRunning(),
+                    )!,
+                    messageKey: const ValueKey('assignment-busy-message'),
+                  ),
+                ],
+              ),
+            ),
+            locale: scenario.locale,
+          ),
+        );
+
+        expect(find.text(scenario.failure), findsOneWidget);
+        expect(find.text(scenario.busy), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('assignment-failure-message')),
+          ),
+          matchesSemantics(
+            label: scenario.failure,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        expect(harness.claimAgain(claim), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'исчезнувшая до кадра ошибка тега передаёт право общей поверхности',
     (tester) async {
@@ -778,6 +846,25 @@ final class _FailureHarness {
     repository.completeTagCommand(
       repository.tagCommands.length - 1,
       const TagCommandFailed(TagNameInputFailure(TagNameFailureReason.empty)),
+    );
+    await accepted.future;
+    return coordinator.claimInitiatorFailure(accepted.token)!;
+  }
+
+  Future<GraphInitiatorPresentationClaim> createAssignmentClaim() async {
+    final tagId = switch (TagId.decode(
+      '018f1400-0000-7000-8000-000000000003',
+    )) {
+      TagIdDecodingSuccess(:final id) => id,
+      InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
+    };
+    final target = IntentionTagTarget(testDetailsIntentionId(1));
+    final accepted = coordinator.acceptTagAssign(
+      AssignTag(tagId: tagId, target: target),
+    ) as TagCommandAccepted;
+    repository.completeTagCommand(
+      repository.tagCommands.length - 1,
+      TagCommandFailed(TagTargetNotFoundFailure(target)),
     );
     await accepted.future;
     return coordinator.claimInitiatorFailure(accepted.token)!;

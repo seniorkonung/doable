@@ -767,6 +767,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationTag => 'tag';
 
   @override
+  String get graphOperationAssignTag => 'Assign';
+
+  @override
+  String get graphOperationRemoveTagAssignment => 'Remove';
+
+  @override
+  String get graphOperationTagAssignment => 'tag assignment';
+
+  @override
   String get tagCatalogTitle => 'Tags';
 
   @override
@@ -916,6 +925,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagDeleted => 'Tag deleted with all its assignments.';
+
+  @override
+  String get tagAssigned => 'Tag assigned.';
+
+  @override
+  String get tagAlreadyAssigned => 'Tag already assigned.';
+
+  @override
+  String get tagAssignmentRemoved => 'Tag assignment removed.';
+
+  @override
+  String get tagAssignmentAlreadyAbsent => 'Tag assignment already absent.';
+
+  @override
+  String get tagAssignmentAlreadyRunning =>
+      'A tag assignment change is already in progress. Wait for its result.';
+
+  @override
+  String get tagAssignmentTargetNotFound =>
+      'This recipient no longer exists. Refresh its details.';
+
+  @override
+  String get tagAssignmentUnavailable =>
+      'Could not complete the tag assignment operation. Try again.';
+
+  @override
+  String get tagAssignmentCorruption =>
+      'Stored tag assignment data is damaged. The assignment was not changed.';
+
+  @override
+  String get tagAssignmentUnexpected =>
+      'The tag assignment operation failed because of an unexpected error.';
 
   @override
   String get tagNameInvalidUnicode => 'Tag name contains invalid characters.';

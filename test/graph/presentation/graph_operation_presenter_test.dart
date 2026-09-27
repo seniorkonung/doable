@@ -22,8 +22,10 @@ import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -324,6 +326,159 @@ void main() {
       },
     );
   }
+
+  for (final scenario
+      in <({TagCommandKind kind, bool unchanged, String en, String ru})>[
+        (
+          kind: TagCommandKind.assign,
+          unchanged: false,
+          en: 'Tag assigned.',
+          ru: 'Тег назначен.',
+        ),
+        (
+          kind: TagCommandKind.assign,
+          unchanged: true,
+          en: 'Tag already assigned.',
+          ru: 'Тег уже назначен.',
+        ),
+        (
+          kind: TagCommandKind.removeAssignment,
+          unchanged: false,
+          en: 'Tag assignment removed.',
+          ru: 'Назначение тега снято.',
+        ),
+        (
+          kind: TagCommandKind.removeAssignment,
+          unchanged: true,
+          en: 'Tag assignment already absent.',
+          ru: 'Назначение тега уже отсутствует.',
+        ),
+      ]) {
+    for (final locale in const [Locale('en'), Locale('ru')]) {
+      testWidgets(
+        'исход назначения ${scenario.kind.name}, ${scenario.unchanged}, ${locale.languageCode}',
+        (tester) async {
+          final harness = await _pumpPresenterApp(tester, locale: locale);
+          final accepted = harness.startTag(scenario.kind);
+          harness.completeTagSuccess(
+            accepted,
+            scenario.kind,
+            unchanged: scenario.unchanged,
+          );
+          await tester.pumpAndSettle();
+
+          final message = locale.languageCode == 'ru'
+              ? '${scenario.kind == TagCommandKind.assign ? 'Назначение' : 'Снятие'} — «назначение тега»: ${scenario.ru}'
+              : '${scenario.kind == TagCommandKind.assign ? 'Assign' : 'Remove'} — “tag assignment”: ${scenario.en}';
+          expect(find.text(message), findsOneWidget);
+          await _closeMessage(tester);
+        },
+      );
+    }
+  }
+
+  for (final scenario in <({TagCommandFailure failure, String en, String ru})>[
+    (
+      failure: TagNotFoundFailure(_tagId),
+      en: 'This tag no longer exists. Refresh the catalog.',
+      ru: 'Этого тега больше нет. Обновите каталог.',
+    ),
+    (
+      failure: TagTargetNotFoundFailure(
+        IntentionTagTarget(testDetailsIntentionId(1)),
+      ),
+      en: 'This recipient no longer exists. Refresh its details.',
+      ru: 'Этого получателя больше нет. Обновите подробности.',
+    ),
+    (
+      failure: const TagUnavailableFailure(),
+      en: 'Could not complete the tag assignment operation. Try again.',
+      ru: 'Не удалось изменить назначение тега. Повторите попытку.',
+    ),
+    (
+      failure: const TagCorruptionFailure(),
+      en: 'Stored tag assignment data is damaged. The assignment was not changed.',
+      ru: 'Сохранённые данные назначения тега повреждены. Назначение не изменено.',
+    ),
+    (
+      failure: const TagUnexpectedFailure(),
+      en: 'The tag assignment operation failed because of an unexpected error.',
+      ru: 'Назначение тега не изменено из-за непредвиденной ошибки.',
+    ),
+  ]) {
+    for (final locale in const [Locale('en'), Locale('ru')]) {
+      testWidgets(
+        'отказ назначения ${scenario.failure.runtimeType}, ${locale.languageCode}',
+        (tester) async {
+          final harness = await _pumpPresenterApp(tester, locale: locale);
+          final accepted = harness.startTag(TagCommandKind.assign);
+          harness.completeTagFailure(accepted, scenario.failure);
+          await tester.pumpAndSettle();
+
+          final message = locale.languageCode == 'ru'
+              ? 'Назначение — «назначение тега»: ${scenario.ru}'
+              : 'Assign — “tag assignment”: ${scenario.en}';
+          expect(find.text(message), findsOneWidget);
+          await _closeMessage(tester);
+        },
+      );
+    }
+  }
+
+  for (final locale in const [Locale('en'), Locale('ru')]) {
+    testWidgets(
+      'отказ назначения после ухода ждёт смешанную очередь, ${locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester, locale: locale);
+        final intention = harness.startDelete(index: 2, title: 'Граф');
+        final assignment = harness.startTag(
+          TagCommandKind.removeAssignment,
+          releaseInitiator: false,
+        );
+        harness.completeDeleted(intention);
+        harness.completeTagFailure(assignment, const TagCorruptionFailure());
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(
+            locale.languageCode == 'ru'
+                ? 'Удаление — «Граф»: Намерение удалено.'
+                : _deleted('Граф'),
+          ),
+          findsOneWidget,
+        );
+        expect(harness.claimInitiatorFailure(assignment.token), isNotNull);
+        await _closeMessage(tester);
+        harness.releaseInitiatorPresentation(assignment.token);
+        await tester.pumpAndSettle();
+        final fallback = locale.languageCode == 'ru'
+            ? 'Снятие — «назначение тега»: Сохранённые данные назначения тега повреждены. Назначение не изменено.'
+            : 'Remove — “tag assignment”: Stored tag assignment data is damaged. The assignment was not changed.';
+        expect(find.text(fallback), findsOneWidget);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets('сырое исключение назначения не раскрывает личные данные', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final accepted = harness.startTag(TagCommandKind.assign);
+    harness.failTagWithException(accepted, StateError('личное имя и SQL'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Assign — “tag assignment”: The tag assignment operation failed because of an unexpected error.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('личное имя'), findsNothing);
+    expect(find.textContaining('SQL'), findsNothing);
+    await _closeMessage(tester);
+  });
 
   for (final scenario
       in <({DailyChoiceValidationField field, String en, String ru})>[
@@ -1565,8 +1720,18 @@ final class _PresenterHarness {
         RenameTag(tagId: _tagId, name: TagName.fromInput('Новое имя')),
       ),
       TagCommandKind.delete => _coordinator.acceptTagDelete(DeleteTag(_tagId)),
-      TagCommandKind.assign || TagCommandKind.removeAssignment =>
-        throw StateError('Сценарий проверяет жизненный цикл тега.'),
+      TagCommandKind.assign => _coordinator.acceptTagAssign(
+        AssignTag(
+          tagId: _tagId,
+          target: IntentionTagTarget(testDetailsIntentionId(1)),
+        ),
+      ),
+      TagCommandKind.removeAssignment => _coordinator.acceptTagRemoveAssignment(
+        RemoveTagAssignment(
+          tagId: _tagId,
+          target: IntentionTagTarget(testDetailsIntentionId(1)),
+        ),
+      ),
     } as TagCommandAccepted;
     if (releaseInitiator) {
       _coordinator.releaseInitiatorPresentation(accepted.token);
@@ -1597,7 +1762,31 @@ final class _PresenterHarness {
         TagDeletedChange(revision: revision, tagId: _tagId),
       ),
       TagCommandKind.assign || TagCommandKind.removeAssignment =>
-        throw StateError('Сценарий проверяет жизненный цикл тега.'),
+        unchanged
+            ? TagAssignmentUnchanged(
+                TagAssignmentUnchangedChange(
+                  revision: revision,
+                  assignment: TagAssignment(
+                    tagId: _tagId,
+                    target: IntentionTagTarget(testDetailsIntentionId(1)),
+                  ),
+                  state: kind == TagCommandKind.assign
+                      ? TagAssignmentState.assigned
+                      : TagAssignmentState.absent,
+                ),
+              )
+            : TagAssignmentChanged(
+                TagAssignmentChangedChange(
+                  revision: revision,
+                  assignment: TagAssignment(
+                    tagId: _tagId,
+                    target: IntentionTagTarget(testDetailsIntentionId(1)),
+                  ),
+                  state: kind == TagCommandKind.assign
+                      ? TagAssignmentState.assigned
+                      : TagAssignmentState.absent,
+                ),
+              ),
     };
     repository.completeTagCommand(
       _tagIndexes[accepted]!,
