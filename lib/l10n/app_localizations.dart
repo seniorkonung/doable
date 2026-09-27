@@ -1718,6 +1718,150 @@ abstract class AppLocalizations {
   /// **'The tag assignment operation failed because of an unexpected error.'**
   String get tagAssignmentUnexpected;
 
+  /// Заголовок блока назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned tags'**
+  String get tagAssignmentsTitle;
+
+  /// Вид получателя: намерение
+  ///
+  /// In en, this message translates to:
+  /// **'intention'**
+  String get tagAssignmentsIntention;
+
+  /// Вид получателя: долговременная связь
+  ///
+  /// In en, this message translates to:
+  /// **'long-term relation'**
+  String get tagAssignmentsRelation;
+
+  /// Активное состояние получателя
+  ///
+  /// In en, this message translates to:
+  /// **'active'**
+  String get tagAssignmentsActive;
+
+  /// Архивное состояние получателя
+  ///
+  /// In en, this message translates to:
+  /// **'archived'**
+  String get tagAssignmentsArchived;
+
+  /// Контекст блока для экранного диктора
+  ///
+  /// In en, this message translates to:
+  /// **'Tag assignments: {targetKind}, {archiveState}'**
+  String tagAssignmentsContext(String targetKind, String archiveState);
+
+  /// Начальная загрузка назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading assignments…'**
+  String get tagAssignmentsLoading;
+
+  /// Существующий получатель без назначений
+  ///
+  /// In en, this message translates to:
+  /// **'No tags assigned yet.'**
+  String get tagAssignmentsEmpty;
+
+  /// Актуализация открытых назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing assignments…'**
+  String get tagAssignmentsRefreshing;
+
+  /// Устранимый отказ чтения назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load assignments. Try again.'**
+  String get tagAssignmentsUnavailable;
+
+  /// Повреждение данных назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Stored assignment data is damaged and cannot be shown.'**
+  String get tagAssignmentsCorruption;
+
+  /// Неизвестный отказ чтения назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load assignments because of an unexpected error.'**
+  String get tagAssignmentsUnexpected;
+
+  /// Есть продолжение списка назначений
+  ///
+  /// In en, this message translates to:
+  /// **'More assignments are available.'**
+  String get tagAssignmentsMoreAvailable;
+
+  /// Явная подгрузка следующей порции
+  ///
+  /// In en, this message translates to:
+  /// **'Show more assignments'**
+  String get tagAssignmentsLoadMore;
+
+  /// Подгрузка следующей порции назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more assignments…'**
+  String get tagAssignmentsLoadingMore;
+
+  /// Конец списка назначений
+  ///
+  /// In en, this message translates to:
+  /// **'All assignments are shown.'**
+  String get tagAssignmentsAllShown;
+
+  /// Устранимый отказ подгрузки
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load more assignments.'**
+  String get tagAssignmentsLoadMoreUnavailable;
+
+  /// Повреждение данных следующей порции
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged; more assignments cannot be shown.'**
+  String get tagAssignmentsLoadMoreCorruption;
+
+  /// Неизвестный отказ подгрузки
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load more assignments because of an unexpected error.'**
+  String get tagAssignmentsLoadMoreUnexpected;
+
+  /// Переход к выбору тега
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a tag'**
+  String get tagAssignmentsChoose;
+
+  /// Доступная подпись перехода к выбору
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a tag for the {archiveState} {targetKind}'**
+  String tagAssignmentsChooseSemantic(String targetKind, String archiveState);
+
+  /// Снятие одной пары назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Remove assignment'**
+  String get tagAssignmentsRemove;
+
+  /// Доступная подпись снятия назначения конкретного тега
+  ///
+  /// In en, this message translates to:
+  /// **'Remove assignment: {tagName}'**
+  String tagAssignmentsRemoveNamed(String tagName);
+
+  /// Ожидание подтверждения снятия
+  ///
+  /// In en, this message translates to:
+  /// **'Removing assignment…'**
+  String get tagAssignmentsRemoving;
+
   /// Недопустимые символы в названии тега
   ///
   /// In en, this message translates to:

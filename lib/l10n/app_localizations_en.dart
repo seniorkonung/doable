@@ -959,6 +959,90 @@ class AppLocalizationsEn extends AppLocalizations {
       'The tag assignment operation failed because of an unexpected error.';
 
   @override
+  String get tagAssignmentsTitle => 'Assigned tags';
+
+  @override
+  String get tagAssignmentsIntention => 'intention';
+
+  @override
+  String get tagAssignmentsRelation => 'long-term relation';
+
+  @override
+  String get tagAssignmentsActive => 'active';
+
+  @override
+  String get tagAssignmentsArchived => 'archived';
+
+  @override
+  String tagAssignmentsContext(String targetKind, String archiveState) {
+    return 'Tag assignments: $targetKind, $archiveState';
+  }
+
+  @override
+  String get tagAssignmentsLoading => 'Loading assignments…';
+
+  @override
+  String get tagAssignmentsEmpty => 'No tags assigned yet.';
+
+  @override
+  String get tagAssignmentsRefreshing => 'Refreshing assignments…';
+
+  @override
+  String get tagAssignmentsUnavailable =>
+      'Could not load assignments. Try again.';
+
+  @override
+  String get tagAssignmentsCorruption =>
+      'Stored assignment data is damaged and cannot be shown.';
+
+  @override
+  String get tagAssignmentsUnexpected =>
+      'Could not load assignments because of an unexpected error.';
+
+  @override
+  String get tagAssignmentsMoreAvailable => 'More assignments are available.';
+
+  @override
+  String get tagAssignmentsLoadMore => 'Show more assignments';
+
+  @override
+  String get tagAssignmentsLoadingMore => 'Loading more assignments…';
+
+  @override
+  String get tagAssignmentsAllShown => 'All assignments are shown.';
+
+  @override
+  String get tagAssignmentsLoadMoreUnavailable =>
+      'Could not load more assignments.';
+
+  @override
+  String get tagAssignmentsLoadMoreCorruption =>
+      'Stored data is damaged; more assignments cannot be shown.';
+
+  @override
+  String get tagAssignmentsLoadMoreUnexpected =>
+      'Could not load more assignments because of an unexpected error.';
+
+  @override
+  String get tagAssignmentsChoose => 'Choose a tag';
+
+  @override
+  String tagAssignmentsChooseSemantic(String targetKind, String archiveState) {
+    return 'Choose a tag for the $archiveState $targetKind';
+  }
+
+  @override
+  String get tagAssignmentsRemove => 'Remove assignment';
+
+  @override
+  String tagAssignmentsRemoveNamed(String tagName) {
+    return 'Remove assignment: $tagName';
+  }
+
+  @override
+  String get tagAssignmentsRemoving => 'Removing assignment…';
+
+  @override
   String get tagNameInvalidUnicode => 'Tag name contains invalid characters.';
 
   @override

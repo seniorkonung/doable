@@ -963,6 +963,90 @@ class AppLocalizationsRu extends AppLocalizations {
       'Назначение тега не изменено из-за непредвиденной ошибки.';
 
   @override
+  String get tagAssignmentsTitle => 'Назначенные теги';
+
+  @override
+  String get tagAssignmentsIntention => 'намерение';
+
+  @override
+  String get tagAssignmentsRelation => 'долговременная связь';
+
+  @override
+  String get tagAssignmentsActive => 'не в архиве';
+
+  @override
+  String get tagAssignmentsArchived => 'в архиве';
+
+  @override
+  String tagAssignmentsContext(String targetKind, String archiveState) {
+    return 'Назначения тегов: $targetKind, $archiveState';
+  }
+
+  @override
+  String get tagAssignmentsLoading => 'Загружаем назначения…';
+
+  @override
+  String get tagAssignmentsEmpty => 'Назначений тегов пока нет.';
+
+  @override
+  String get tagAssignmentsRefreshing => 'Обновляем назначения…';
+
+  @override
+  String get tagAssignmentsUnavailable =>
+      'Не удалось загрузить назначения. Повторите попытку.';
+
+  @override
+  String get tagAssignmentsCorruption =>
+      'Сохранённые данные назначений повреждены и не могут быть показаны.';
+
+  @override
+  String get tagAssignmentsUnexpected =>
+      'Не удалось загрузить назначения из-за непредвиденной ошибки.';
+
+  @override
+  String get tagAssignmentsMoreAvailable => 'Есть ещё назначения.';
+
+  @override
+  String get tagAssignmentsLoadMore => 'Показать ещё назначения';
+
+  @override
+  String get tagAssignmentsLoadingMore => 'Загружаем ещё назначения…';
+
+  @override
+  String get tagAssignmentsAllShown => 'Все назначения показаны.';
+
+  @override
+  String get tagAssignmentsLoadMoreUnavailable =>
+      'Не удалось загрузить следующие назначения.';
+
+  @override
+  String get tagAssignmentsLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующие назначения нельзя показать.';
+
+  @override
+  String get tagAssignmentsLoadMoreUnexpected =>
+      'Не удалось загрузить следующие назначения из-за непредвиденной ошибки.';
+
+  @override
+  String get tagAssignmentsChoose => 'Выбрать тег';
+
+  @override
+  String tagAssignmentsChooseSemantic(String targetKind, String archiveState) {
+    return 'Выбрать тег для получателя: $targetKind, $archiveState';
+  }
+
+  @override
+  String get tagAssignmentsRemove => 'Снять назначение';
+
+  @override
+  String tagAssignmentsRemoveNamed(String tagName) {
+    return 'Снять назначение: $tagName';
+  }
+
+  @override
+  String get tagAssignmentsRemoving => 'Снимаем назначение…';
+
+  @override
   String get tagNameInvalidUnicode =>
       'Название тега содержит недопустимые символы.';
 
