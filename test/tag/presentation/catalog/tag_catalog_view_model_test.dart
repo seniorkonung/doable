@@ -19,6 +19,128 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('отсутствие выбранного тега до пакета убирает строку и отбрасывает старые страницы', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final cursor = _Cursor();
+    h.repository.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа')], cursor: cursor);
+    await pumpEventQueue();
+    h.model.selectTag(_id(1));
+    h.repository.tagRead(_tag(1, 'Дом'));
+    await pumpEventQueue();
+
+    final pending = h.model.loadMore();
+    h.repository.tagRead(null, revision: 2);
+    await pumpEventQueue();
+    final refreshing = h.state as TagCatalogLoaded;
+    expect(refreshing.items.map((tag) => tag.id), [_id(2)]);
+    expect(refreshing.selection, isA<TagCatalogNoSelection>());
+    expect(refreshing.freshness, TagCatalogFreshness.refreshing);
+    expect(h.model.canActOn(_id(1)), isFalse);
+    expect(h.model.canActOn(_id(2)), isFalse);
+
+    h.repository.page(1, [_tag(1, 'Дом'), _tag(3, 'Поздний')]);
+    await pending;
+    expect(h.repository.queries[2].cursor, isNull);
+    h.repository.page(2, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
+    await pumpEventQueue();
+    expect((h.state as TagCatalogLoaded).items.map((tag) => tag.id), [_id(2)]);
+    expect(h.repository.queries[3].cursor, isNull);
+
+    final freshCursor = _Cursor();
+    h.repository.page(3, [_tag(2, 'Работа')], cursor: freshCursor, revision: 2);
+    await pumpEventQueue();
+    final fresh = h.state as TagCatalogLoaded;
+    expect(fresh.freshness, TagCatalogFreshness.current);
+    expect(fresh.items.map((tag) => tag.id), [_id(2)]);
+    expect(h.model.canActOn(_id(2)), isTrue);
+    final more = h.model.loadMore();
+    expect(h.repository.queries[4].cursor, same(freshCursor));
+    h.repository.page(4, [_tag(3, 'Поздний')], revision: 2);
+    await more;
+    expect((h.state as TagCatalogLoaded).items.map((tag) => tag.id), [
+      _id(2),
+      _id(3),
+    ]);
+    expect(
+      h.repository.queries.every((query) => query.pageSize <= 100),
+      isTrue,
+    );
+  });
+
+  test(
+    'отсутствие выбранного тега вне порции очищает выбор до пакета',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, [_tag(1, 'Дом')], cursor: _Cursor());
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Далёкий'));
+      await pumpEventQueue();
+
+      h.repository.tagRead(null, revision: 2);
+      await pumpEventQueue();
+      final refreshing = h.state as TagCatalogLoaded;
+      expect(refreshing.selection, isA<TagCatalogNoSelection>());
+      expect(refreshing.freshness, TagCatalogFreshness.refreshing);
+      expect(h.model.canActOn(_id(52)), isFalse);
+      expect(h.model.canActOn(_id(1)), isFalse);
+      expect(h.repository.queries, hasLength(2));
+
+      h.repository.page(1, [_tag(1, 'Дом')], revision: 2);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).freshness,
+        TagCatalogFreshness.current,
+      );
+      expect(h.model.canActOn(_id(1)), isTrue);
+    },
+  );
+
+  test('старое отсутствие не очищает выбор с новой страницы', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, [_tag(1, 'Дом')], revision: 3);
+    await pumpEventQueue();
+    h.model.selectTag(_id(1));
+    h.repository.tagRead(_tag(1, 'Дом'));
+    await pumpEventQueue();
+
+    h.repository.tagRead(null, revision: 2);
+    await pumpEventQueue();
+    final loaded = h.state as TagCatalogLoaded;
+    expect(loaded.selection, isA<TagCatalogSelectionReady>());
+    expect(loaded.items.single.id, _id(1));
+    expect(loaded.freshness, TagCatalogFreshness.current);
+    expect(h.model.canActOn(_id(1)), isTrue);
+    expect(h.repository.queries, hasLength(1));
+  });
+
+  test(
+    'отсутствие вне новой порции очищает выбор после постороннего пакета',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, [_tag(1, 'Дом')], cursor: _Cursor(), revision: 3);
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Далёкий'));
+      await pumpEventQueue();
+      await h.created(_tag(2, 'Работа'), revision: 3);
+
+      h.repository.tagRead(null, revision: 2);
+      await pumpEventQueue();
+      final loaded = h.state as TagCatalogLoaded;
+      expect(loaded.selection, isA<TagCatalogNoSelection>());
+      expect(loaded.items.map((tag) => tag.id), [_id(1)]);
+      expect(loaded.freshness, TagCatalogFreshness.current);
+      expect(h.model.canActOn(_id(52)), isFalse);
+      expect(h.model.canActOn(_id(1)), isTrue);
+      expect(h.repository.queries, hasLength(1));
+    },
+  );
+
   test(
     'страница новой ревизии перед пакетом обновляет выбранное имя',
     () async {

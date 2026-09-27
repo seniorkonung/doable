@@ -384,6 +384,47 @@ void main() {
     expect(find.text('Show more tags'), findsNothing);
   });
 
+  testWidgets('отсутствие из наблюдения убирает строку и действия до пакета', (
+    tester,
+  ) async {
+    final repository = _CatalogRepository();
+    addTearDown(repository.dispose);
+    await _pumpCatalog(tester, repository);
+    repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(TagCatalogPage)),
+    );
+    container
+        .read(tagCatalogViewModelProvider.notifier)
+        .selectTag(_tag(1, 'Дом').id);
+    repository.tagRead(_tag(1, 'Дом'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsOneWidget);
+
+    repository.tagRead(null, revision: 2);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
+    expect(find.byKey(ValueKey('tag-catalog-delete-${_id(1)}')), findsNothing);
+    expect(find.byTooltip('Rename tag'), findsNothing);
+    expect(find.text('Refreshing tags…'), findsOneWidget);
+
+    repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
+    expect(find.byKey(ValueKey('tag-catalog-delete-${_id(1)}')), findsNothing);
+    expect(find.byTooltip('Rename tag'), findsNothing);
+    expect(repository.queries, hasLength(3));
+
+    repository.complete(_page([_tag(2, 'Работа')], revision: 2));
+    await tester.pumpAndSettle();
+    expect(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')), findsNothing);
+    expect(find.byKey(ValueKey('tag-catalog-row-${_id(2)}')), findsOneWidget);
+    expect(find.byTooltip('Rename tag'), findsOneWidget);
+  });
+
   testWidgets('пакет после страницы обновляет выбранное имя вне порции', (
     tester,
   ) async {
@@ -607,8 +648,8 @@ final class _CatalogRepository extends Fake implements PersonalGraphRepository {
   @override
   Stream<TagReadResult> watchTag(TagId id) => _tagReads.stream;
 
-  void tagRead(Tag tag) => _tagReads.add(
-    TagReadSuccess(GraphSnapshot(value: tag, revision: const _Revision())),
+  void tagRead(Tag? tag, {int revision = 1}) => _tagReads.add(
+    TagReadSuccess(GraphSnapshot(value: tag, revision: _Revision(revision))),
   );
 
   @override

@@ -128,7 +128,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         }
         final tag = value.value;
         if (tag == null) {
-          _clearSelection();
+          _confirmedMissing(id, value.revision);
         } else if (tag.id != id) {
           _selectedReadFailed(id, generation, const TagReadCorruptionFailure());
         } else {
@@ -145,12 +145,54 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     _publishSelection(TagCatalogSelectionFailure(id, failure));
   }
 
-  void _clearSelection() {
+  void _confirmedMissing(TagId id, GraphRevision revision) {
+    final current = state;
+    final pageOrder = current is TagCatalogLoaded
+        ? current.revision.compareTo(revision)
+        : null;
+    if (current is TagCatalogLoaded &&
+        pageOrder == GraphRevisionOrder.newer &&
+        current.items.any((tag) => tag.id == id)) {
+      return;
+    }
+    final required = _requiredRevision;
+    if (required == null ||
+        revision.compareTo(required) == GraphRevisionOrder.newer ||
+        revision.compareTo(required) == GraphRevisionOrder.differentEpoch) {
+      _requiredRevision = revision;
+    }
+    _staleReadAttempts = 0;
     _selectionGeneration++;
     unawaited(_selectedReads?.cancel());
     _selectedReads = null;
     _selectedRevision = null;
-    _publishSelection(const TagCatalogNoSelection());
+    _selection = const TagCatalogNoSelection();
+    if (current is TagCatalogLoaded) {
+      final items = [
+        for (final tag in current.items)
+          if (tag.id != id) tag,
+      ];
+      final pageIsCurrent =
+          (pageOrder == GraphRevisionOrder.same ||
+              pageOrder == GraphRevisionOrder.newer) &&
+          items.length == current.items.length;
+      state = current.withStatus(
+        items: items,
+        selection: _selection,
+        freshness: pageIsCurrent
+            ? current.freshness
+            : TagCatalogFreshness.refreshing,
+        pageStatus: pageIsCurrent
+            ? current.pageStatus
+            : const TagCatalogPageIdle(),
+      );
+      if (pageIsCurrent) return;
+    }
+    _refreshNeeded = true;
+    if (_activeRequest == null) {
+      _refreshNeeded = false;
+      unawaited(_startFirst());
+    }
   }
 
   void _publishSelection(TagCatalogSelection selection) {
