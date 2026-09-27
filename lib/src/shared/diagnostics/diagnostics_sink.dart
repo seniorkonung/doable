@@ -111,6 +111,15 @@ final class TagCatalogPageReadDiagnosticsEvent extends DiagnosticsEvent {
   final TagReadDiagnosticsStage stage;
 }
 
+final class TagAssignmentsPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const TagAssignmentsPageReadDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final TagReadDiagnosticsStage stage;
+}
+
 final class TagDetailReadDiagnosticsEvent extends DiagnosticsEvent {
   const TagDetailReadDiagnosticsEvent({
     required this.stage,

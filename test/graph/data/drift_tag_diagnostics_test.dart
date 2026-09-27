@@ -1,11 +1,14 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/sqlite_tag_functions.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tag_assignments_page.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -338,6 +341,84 @@ void main() {
         [tagFixtureId(lastTagNumber), tagFixtureId(2)],
       ),
       isEmpty,
+    );
+    expect(sink.attempts, 4);
+  });
+
+  test(
+    'чтения назначений сохраняют безопасные этапы и категории причин',
+    () async {
+      seedTagStorageFixture(raw);
+      final sink = _RecordingSink();
+      final graph = repository(sink);
+      final target = IntentionTagTarget(
+        (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id,
+      );
+      final missing = IntentionTagTarget(
+        (IntentionId.decode(
+          tagFixtureId(999),
+        ) as IntentionIdDecodingSuccess).id,
+      );
+
+      expect(
+        await graph.getTagAssignmentsPage(TagAssignmentsQuery(target: target)),
+        isA<TagAssignmentsPageSuccess>(),
+      );
+      expect(
+        await graph.getTagCatalogPage(
+          TagCatalogQuery(mode: TagCatalogSelectionMode(target)),
+        ),
+        isA<TagCatalogPageSuccess>(),
+      );
+      expect(
+        await graph.getTagAssignmentsPage(TagAssignmentsQuery(target: missing)),
+        isA<TagAssignmentsPageError>().having(
+          (error) => error.failure.category,
+          'категория',
+          GraphFailureCategory.notFound,
+        ),
+      );
+      final failed = sink.events
+          .whereType<TagAssignmentsPageReadDiagnosticsEvent>()
+          .last;
+      expect(failed.stage, TagReadDiagnosticsStage.read);
+      expect(
+        (failed.status as DiagnosticsFailed).code,
+        DiagnosticsFailureCode.notFound,
+      );
+      expect(
+        sink.events.whereType<TagCatalogPageReadDiagnosticsEvent>().last.status,
+        isA<DiagnosticsSucceeded>(),
+      );
+      final recorded = sink.messages.join('\n');
+      for (final privateValue in [
+        tagFixtureId(1),
+        tagFixtureId(999),
+        'Намерение 1',
+      ]) {
+        expect(recorded, isNot(contains(privateValue)));
+      }
+    },
+  );
+
+  test('отказ приёмника не меняет результат чтений назначений', () async {
+    seedTagStorageFixture(raw);
+    final sink = _ThrowingSink();
+    final graph = repository(sink);
+    final target = LongTermRelationTagTarget(
+      (LongTermRelationId.decode(
+        tagFixtureId(101),
+      ) as LongTermRelationIdDecodingSuccess).id,
+    );
+    expect(
+      await graph.getTagAssignmentsPage(TagAssignmentsQuery(target: target)),
+      isA<TagAssignmentsPageSuccess>(),
+    );
+    expect(
+      await graph.getTagCatalogPage(
+        TagCatalogQuery(mode: TagCatalogSelectionMode(target)),
+      ),
+      isA<TagCatalogPageSuccess>(),
     );
     expect(sink.attempts, 4);
   });

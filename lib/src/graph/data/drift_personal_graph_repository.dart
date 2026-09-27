@@ -123,7 +123,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<TagAssignmentsPageResult> getTagAssignmentsPage(
     TagAssignmentsQuery query,
-  ) async => const TagAssignmentsPageError(TagAssignmentsUnexpectedFailure());
+  ) => _readTagAssignmentsPage(query);
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);
