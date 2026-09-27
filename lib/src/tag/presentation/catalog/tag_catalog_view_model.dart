@@ -220,7 +220,12 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     if (!ref.mounted || generation != _generation) return;
     switch (result) {
       case GraphResultSuccess(:final value):
-        if (_precedesRequired(value.revision)) {
+        final current = state;
+        final precedesDisplayed =
+            current is TagCatalogLoaded &&
+            value.revision.compareTo(current.revision) ==
+                GraphRevisionOrder.older;
+        if (_precedesRequired(value.revision) || precedesDisplayed) {
           if (++_staleReadAttempts >= _maxStaleReads) {
             _refreshNeeded = false;
             _firstFailure(const TagCatalogUnavailableFailure());
@@ -297,11 +302,8 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     if (!ref.mounted) return;
     final package = completion.confirmedChange;
     if (package == null) return;
-    for (final known in [
-      ?_requiredRevision,
-      if (state case TagCatalogLoaded(:final revision)) revision,
-    ]) {
-      final order = package.revision.compareTo(known);
+    if (_requiredRevision case final required?) {
+      final order = package.revision.compareTo(required);
       if (order == GraphRevisionOrder.older ||
           order == GraphRevisionOrder.same) {
         return;
@@ -310,24 +312,52 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     _requiredRevision = package.revision;
     _staleReadAttempts = 0;
     final current = state;
+    final pageAlreadyIncludes =
+        current is TagCatalogLoaded &&
+        switch (package.revision.compareTo(current.revision)) {
+          GraphRevisionOrder.older || GraphRevisionOrder.same => true,
+          GraphRevisionOrder.newer ||
+          GraphRevisionOrder.differentEpoch => false,
+        };
+    final canUpdateSelection =
+        _selectedRevision == null ||
+        switch (package.revision.compareTo(_selectedRevision!)) {
+          GraphRevisionOrder.newer || GraphRevisionOrder.differentEpoch => true,
+          GraphRevisionOrder.older || GraphRevisionOrder.same => false,
+        };
     var items = current is TagCatalogLoaded ? current.items : <Tag>[];
     for (final change in package.changes) {
       switch (change) {
         case TagRenamedChange(:final after):
-          items = [
-            for (final tag in items)
-              if (tag.id == after.id) after else tag,
-          ];
-          if (_selection.id == after.id) {
-            _selection = TagCatalogSelectionReady(after);
-            _selectedRevision = package.revision;
+          if (!pageAlreadyIncludes) {
+            items = [
+              for (final tag in items)
+                if (tag.id == after.id) after else tag,
+            ];
+          }
+          if (canUpdateSelection && _selection.id == after.id) {
+            var selected = after;
+            GraphRevision revision = package.revision;
+            if (pageAlreadyIncludes) {
+              for (final tag in current.items) {
+                if (tag.id == after.id) {
+                  selected = tag;
+                  revision = current.revision;
+                  break;
+                }
+              }
+            }
+            _selection = TagCatalogSelectionReady(selected);
+            _selectedRevision = revision;
           }
         case TagDeletedChange(:final tagId):
-          items = [
-            for (final tag in items)
-              if (tag.id != tagId) tag,
-          ];
-          if (_selection.id == tagId) {
+          if (!pageAlreadyIncludes) {
+            items = [
+              for (final tag in items)
+                if (tag.id != tagId) tag,
+            ];
+          }
+          if (canUpdateSelection && _selection.id == tagId) {
             _selectionGeneration++;
             unawaited(_selectedReads?.cancel());
             _selectedReads = null;
@@ -341,6 +371,12 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       }
     }
     if (current is TagCatalogLoaded) {
+      if (pageAlreadyIncludes) {
+        if (!identical(current.selection, _selection)) {
+          state = current.withSelection(_selection);
+        }
+        return;
+      }
       state = current.withStatus(
         items: items,
         selection: _selection,

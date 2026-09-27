@@ -20,6 +20,141 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
+    'страница новой ревизии перед пакетом обновляет выбранное имя',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, [_tag(1, 'Дом')], cursor: _Cursor(), revision: 2);
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Старое имя'));
+      await pumpEventQueue();
+
+      await h.renamed(
+        _tag(52, 'Старое имя'),
+        _tag(52, 'Новое имя'),
+        revision: 2,
+      );
+      h.repository.tagRead(_tag(52, 'Старое имя'));
+      await pumpEventQueue();
+
+      final loaded = h.state as TagCatalogLoaded;
+      expect(
+        loaded.selection,
+        isA<TagCatalogSelectionReady>().having(
+          (selection) => selection.tag.name.value,
+          'название',
+          'Новое имя',
+        ),
+      );
+      expect(h.model.canActOn(_id(52)), isTrue);
+      expect(h.repository.queries, hasLength(1));
+    },
+  );
+
+  test(
+    'страница новой ревизии перед пакетом очищает удалённый выбор',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, [_tag(1, 'Дом')], cursor: _Cursor(), revision: 2);
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Старое имя'));
+      await pumpEventQueue();
+
+      await h.deleted(_id(52), revision: 2);
+      h.repository.tagRead(_tag(52, 'Старое имя'));
+      await pumpEventQueue();
+
+      final loaded = h.state as TagCatalogLoaded;
+      expect(loaded.selection, isA<TagCatalogNoSelection>());
+      expect(loaded.items.map((tag) => tag.id), [_id(1)]);
+      expect(h.model.canActOn(_id(52)), isFalse);
+      expect(h.repository.queries, hasLength(1));
+    },
+  );
+
+  test('пакет прежней ревизии не откатывает более поздний выбор', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, [_tag(52, 'Последнее имя')], revision: 3);
+    await pumpEventQueue();
+    h.model.selectTag(_id(52));
+    h.repository.tagRead(_tag(52, 'Старое имя'));
+    await pumpEventQueue();
+
+    await h.renamed(
+      _tag(52, 'Старое имя'),
+      _tag(52, 'Промежуточное имя'),
+      revision: 2,
+    );
+    h.repository.tagRead(_tag(52, 'Старое имя'));
+    await pumpEventQueue();
+
+    final loaded = h.state as TagCatalogLoaded;
+    expect(loaded.items.single.name.value, 'Последнее имя');
+    expect(
+      loaded.selection,
+      isA<TagCatalogSelectionReady>().having(
+        (selection) => selection.tag.name.value,
+        'название',
+        'Последнее имя',
+      ),
+    );
+    expect(h.model.canActOn(_id(52)), isTrue);
+    expect(h.repository.queries, hasLength(1));
+  });
+
+  test('поздняя первая страница не откатывает более новую основу', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(
+      0,
+      [_tag(52, 'Последнее имя')],
+      cursor: _Cursor(),
+      revision: 3,
+    );
+    await pumpEventQueue();
+    h.model.selectTag(_id(52));
+    h.repository.tagRead(_tag(52, 'Старое имя'));
+    await pumpEventQueue();
+
+    final more = h.model.loadMore();
+    h.repository.page(1, [_tag(52, 'Промежуточное имя')], revision: 2);
+    await more;
+    await pumpEventQueue();
+    expect(h.repository.queries, hasLength(3));
+    await h.renamed(
+      _tag(52, 'Старое имя'),
+      _tag(52, 'Промежуточное имя'),
+      revision: 2,
+    );
+
+    h.repository.page(2, [_tag(52, 'Промежуточное имя')], revision: 2);
+    await pumpEventQueue();
+    expect(h.repository.queries, hasLength(4));
+    expect(
+      (h.state as TagCatalogLoaded).revision,
+      isA<_Revision>().having((revision) => revision.number, 'номер', 3),
+    );
+
+    h.repository.page(3, [_tag(52, 'Последнее имя')], revision: 3);
+    await pumpEventQueue();
+    final loaded = h.state as TagCatalogLoaded;
+    expect(loaded.items.single.name.value, 'Последнее имя');
+    expect(loaded.freshness, TagCatalogFreshness.current);
+    expect(
+      loaded.selection,
+      isA<TagCatalogSelectionReady>().having(
+        (selection) => selection.tag.name.value,
+        'название',
+        'Последнее имя',
+      ),
+    );
+  });
+
+  test(
     'выбор вне порции следует подтверждённому переименованию и удалению',
     () async {
       final h = _Harness();
@@ -76,10 +211,13 @@ void main() {
       expect(h.repository.queries, hasLength(3));
 
       await h.deleted(_id(52), revision: 3);
+      h.repository.tagRead(_tag(52, 'Старое имя'));
+      await pumpEventQueue();
       expect(
         (h.state as TagCatalogLoaded).selection,
         isA<TagCatalogNoSelection>(),
       );
+      expect(h.model.canActOn(_id(52)), isFalse);
       h.repository.page(2, [_tag(1, 'Дом')]);
       await pumpEventQueue();
       h.repository.page(3, [_tag(1, 'Дом')], revision: 3);

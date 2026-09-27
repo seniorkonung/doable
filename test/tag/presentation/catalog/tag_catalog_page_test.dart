@@ -4,6 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -15,10 +16,14 @@ import 'package:doable/src/tag/application/tag_catalog.dart'
     as data
     show TagCatalogPage;
 import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -379,6 +384,97 @@ void main() {
     expect(find.text('Show more tags'), findsNothing);
   });
 
+  testWidgets('пакет после страницы обновляет выбранное имя вне порции', (
+    tester,
+  ) async {
+    final repository = _CatalogRepository();
+    addTearDown(repository.dispose);
+    await _pumpCatalog(tester, repository);
+    repository.complete(_page([_tag(1, 'Дом')], revision: 2));
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(TagCatalogPage)),
+    );
+    container
+        .read(tagCatalogViewModelProvider.notifier)
+        .selectTag(_tag(52, 'Старое имя').id);
+    repository.tagRead(_tag(52, 'Старое имя'));
+    await tester.pumpAndSettle();
+    expect(find.text('Старое имя'), findsOneWidget);
+
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final accepted = coordinator.acceptTagRename(
+      RenameTag(
+        tagId: _tag(52, 'Старое имя').id,
+        name: TagName.fromInput('Новое имя'),
+      ),
+    ) as TagCommandAccepted;
+    repository.completeCommand(
+      TagRenamed(
+        TagRenamedChange(
+          revision: const _Revision(2),
+          before: _tag(52, 'Старое имя'),
+          after: _tag(52, 'Новое имя'),
+        ),
+      ),
+    );
+    await accepted.future;
+    repository.tagRead(_tag(52, 'Старое имя'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Новое имя'), findsOneWidget);
+    expect(find.text('Старое имя'), findsNothing);
+    expect(
+      find.byKey(ValueKey('tag-catalog-delete-${_id(52)}')),
+      findsOneWidget,
+    );
+    expect(repository.queries, hasLength(1));
+  });
+
+  testWidgets('пакет после страницы убирает удалённый выбор и действия', (
+    tester,
+  ) async {
+    final repository = _CatalogRepository();
+    addTearDown(repository.dispose);
+    await _pumpCatalog(tester, repository);
+    repository.complete(_page([_tag(1, 'Дом')], revision: 2));
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(TagCatalogPage)),
+    );
+    container
+        .read(tagCatalogViewModelProvider.notifier)
+        .selectTag(_tag(52, 'Старое имя').id);
+    repository.tagRead(_tag(52, 'Старое имя'));
+    await tester.pumpAndSettle();
+    expect(find.text('Старое имя'), findsOneWidget);
+
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final accepted = coordinator.acceptTagDelete(
+      DeleteTag(_tag(52, 'Старое имя').id),
+    ) as TagCommandAccepted;
+    repository.completeCommand(
+      TagDeleted(
+        TagDeletedChange(
+          revision: const _Revision(2),
+          tagId: _tag(52, 'Старое имя').id,
+        ),
+      ),
+    );
+    await accepted.future;
+    repository.tagRead(_tag(52, 'Старое имя'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Старое имя'), findsNothing);
+    expect(find.byKey(ValueKey('tag-catalog-delete-${_id(52)}')), findsNothing);
+    expect(find.byTooltip('Rename tag'), findsOneWidget);
+    expect(repository.queries, hasLength(1));
+  });
+
   testWidgets(
     'подгрузка, повтор и длинное название доступны при крупном тексте',
     (tester) async {
@@ -455,15 +551,18 @@ Future<void> _pumpCatalog(
   );
 }
 
-TagCatalogPageSuccess _page(List<Tag> tags, {TagCatalogCursor? cursor}) =>
-    TagCatalogPageSuccess(
-      data.TagCatalogPage(
-        items: tags,
-        pageSize: TagCatalogQuery.defaultPageSize,
-        nextCursor: cursor,
-        revision: const _Revision(),
-      ),
-    );
+TagCatalogPageSuccess _page(
+  List<Tag> tags, {
+  TagCatalogCursor? cursor,
+  int revision = 1,
+}) => TagCatalogPageSuccess(
+  data.TagCatalogPage(
+    items: tags,
+    pageSize: TagCatalogQuery.defaultPageSize,
+    nextCursor: cursor,
+    revision: _Revision(revision),
+  ),
+);
 
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
@@ -471,16 +570,27 @@ Tag _tag(int number, String name) => Tag(
 );
 
 final class _Revision implements GraphRevision {
-  const _Revision();
+  const _Revision([this.number = 1]);
+
+  final int number;
 
   @override
-  GraphRevisionOrder compareTo(GraphRevision other) => GraphRevisionOrder.same;
+  GraphRevisionOrder compareTo(GraphRevision other) => switch (other) {
+    _Revision(number: final value) when number < value =>
+      GraphRevisionOrder.older,
+    _Revision(number: final value) when number > value =>
+      GraphRevisionOrder.newer,
+    _Revision() => GraphRevisionOrder.same,
+    _ => GraphRevisionOrder.differentEpoch,
+  };
 }
 
 final class _Cursor implements TagCatalogCursor {}
 
 final class _CatalogRepository extends Fake implements PersonalGraphRepository {
   final _pending = <Completer<TagCatalogPageResult>>[];
+  final _commands = <Completer<TagCommandResult>>[];
+  final _tagReads = StreamController<TagReadResult>.broadcast();
   final queries = <TagCatalogQuery>[];
   int get calls => _pending.length;
 
@@ -493,4 +603,29 @@ final class _CatalogRepository extends Fake implements PersonalGraphRepository {
   }
 
   void complete(TagCatalogPageResult result) => _pending.last.complete(result);
+
+  @override
+  Stream<TagReadResult> watchTag(TagId id) => _tagReads.stream;
+
+  void tagRead(Tag tag) => _tagReads.add(
+    TagReadSuccess(GraphSnapshot(value: tag, revision: const _Revision())),
+  );
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    final pending = Completer<TagCommandResult>();
+    _commands.add(pending);
+    return await pending.future as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  void completeCommand(TagCommandSuccess success) => _commands.last.complete(
+    TagCommandSucceeded(
+      ConfirmedGraphResult(revision: const _Revision(2), value: success),
+    ),
+  );
+
+  Future<void> dispose() => _tagReads.close();
 }
