@@ -330,6 +330,54 @@ void main() {
     (_relationTarget(1), 'долговременной связи'),
   ]) {
     for (final assigned in [false, true]) {
+      for (final tagReadFirst in [false, true]) {
+        test(
+          'повтор проверки пары $recipient после ${tagReadFirst ? 'раннего' : 'позднего'} наблюдения тега: ${assigned ? 'назначен' : 'свободен'}',
+          () async {
+            final h = _Harness();
+            addTearDown(h.dispose);
+            h.repository.page(0, []);
+            await pumpEventQueue();
+            h.model.setMode(TagCatalogSelectionMode(target));
+            h.repository.selectionPage(1, target, [
+              TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+            ], cursor: _Cursor());
+            await pumpEventQueue();
+            h.model.selectTag(_id(52));
+            if (tagReadFirst) h.repository.tagRead(_tag(52, 'Вне порции'));
+            h.repository.statusReads.single.complete(
+              const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+            );
+            await pumpEventQueue();
+            if (!tagReadFirst) {
+              h.repository.tagRead(_tag(52, 'Вне порции'));
+              await pumpEventQueue();
+            }
+            expect(
+              (h.state as TagCatalogLoaded).selectedAssignment,
+              TagCatalogSelectedAssignment.unavailable,
+            );
+            expect(h.model.assignSelected(), isNull);
+            h.model.retrySelectedAssignment();
+            expect(h.repository.statusQueries, hasLength(2));
+            expect(h.model.assignSelected(), isNull);
+            h.repository.statusRead(1, assigned);
+            await pumpEventQueue();
+            expect(
+              (h.state as TagCatalogLoaded).selectedAssignment,
+              assigned
+                  ? TagCatalogSelectedAssignment.assigned
+                  : TagCatalogSelectedAssignment.available,
+            );
+            expect(
+              h.model.assignSelected(),
+              assigned ? isNull : isA<TagCommandAccepted>(),
+            );
+          },
+        );
+      }
+    }
+    for (final assigned in [false, true]) {
       test(
         'точечное чтение выбора вне порции для $recipient: ${assigned ? 'назначен' : 'свободен'}',
         () async {
@@ -410,6 +458,95 @@ void main() {
       expect(h.model.assignSelected(), isNull);
     },
   );
+
+  test(
+    'поздний ответ прежнего выбора не скрывает отказ текущей пары',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, []);
+      await pumpEventQueue();
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+      ], cursor: _Cursor());
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.model.selectTag(_id(53));
+      h.repository.statusReads[1].complete(
+        const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+      );
+      h.repository.tagRead(_tag(53, 'Текущий'));
+      await pumpEventQueue();
+      h.repository.statusRead(0, false);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selectedAssignment,
+        TagCatalogSelectedAssignment.unavailable,
+      );
+      expect(h.model.assignSelected(), isNull);
+    },
+  );
+
+  test(
+    'поздний ответ прежнего получателя не скрывает отказ текущей пары',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, []);
+      await pumpEventQueue();
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+      ], cursor: _Cursor());
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.model.setMode(TagCatalogSelectionMode(_relationTarget(1)));
+      h.repository.selectionPage(2, _relationTarget(1), [
+        TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+      ], cursor: _Cursor());
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.repository.statusReads[1].complete(
+        const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+      );
+      h.repository.tagRead(_tag(52, 'Текущий'));
+      await pumpEventQueue();
+      h.repository.statusRead(0, false);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selectedAssignment,
+        TagCatalogSelectedAssignment.unavailable,
+      );
+      expect(h.model.assignSelected(), isNull);
+    },
+  );
+
+  test('ответ прежней ревизии не скрывает отказ текущей проверки', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, []);
+    await pumpEventQueue();
+    h.model.setMode(TagCatalogSelectionMode(_target(1)));
+    h.repository.selectionPage(1, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+    ], cursor: _Cursor());
+    await pumpEventQueue();
+    h.model.selectTag(_id(52));
+    h.repository.tagRead(_tag(52, 'Вне порции'));
+    await h.renamed(_tag(1, 'Первый'), _tag(1, 'Новый'), revision: 2);
+    expect(h.repository.statusReads, hasLength(2));
+    h.repository.statusReads[1].complete(
+      const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+    );
+    h.repository.statusRead(0, false);
+    await pumpEventQueue();
+    expect(
+      (h.state as TagCatalogLoaded).selectedAssignment,
+      TagCatalogSelectedAssignment.unavailable,
+    );
+    expect(h.model.assignSelected(), isNull);
+  });
 
   test('ответ точечного чтения другой эпохи не открывает назначение', () async {
     final h = _Harness();

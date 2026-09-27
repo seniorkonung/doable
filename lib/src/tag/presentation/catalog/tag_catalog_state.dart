@@ -37,7 +37,14 @@ enum TagCatalogFreshness { current, refreshing, stale }
 
 /// Признак относится только к выбранному тегу и получателю текущего режима.
 /// Неизвестный признак не разрешает отправку назначения.
-enum TagCatalogSelectedAssignment { unknown, available, assigned }
+enum TagCatalogSelectedAssignment {
+  unknown,
+  available,
+  assigned,
+  unavailable,
+  corruption,
+  unexpected,
+}
 
 sealed class TagCatalogSelection {
   const TagCatalogSelection();

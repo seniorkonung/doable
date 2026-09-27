@@ -19,6 +19,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart'
     as data
     show TagCatalogPage;
 import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -40,6 +41,98 @@ String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
 void main() {
+  for (final (relation, recipient) in [
+    (false, 'намерения'),
+    (true, 'долговременной связи'),
+  ]) {
+    for (final assigned in [false, true]) {
+      for (final tagReadFirst in [false, true]) {
+        testWidgets(
+          'экран повторяет проверку пары $recipient после ${tagReadFirst ? 'раннего' : 'позднего'} чтения тега: ${assigned ? 'назначен' : 'свободен'}',
+          (tester) async {
+            final repository = _CatalogRepository();
+            addTearDown(repository.dispose);
+            final target = relation
+                ? LongTermRelationTagTarget(
+                    (LongTermRelationId.decode(
+                      _id(200),
+                    ) as LongTermRelationIdDecodingSuccess).id,
+                  )
+                : IntentionTagTarget(
+                    (IntentionId.decode(
+                      _id(100),
+                    ) as IntentionIdDecodingSuccess).id,
+                  );
+            await _pumpCatalog(tester, repository, target: target);
+            repository.complete(
+              TagCatalogPageSuccess(
+                data.TagCatalogPage.selection(
+                  target: target,
+                  rows: [
+                    TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+                  ],
+                  pageSize: TagCatalogQuery.defaultPageSize,
+                  nextCursor: _Cursor(),
+                  revision: const _Revision(),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final container = ProviderScope.containerOf(
+              tester.element(find.byType(TagCatalogPage)),
+            );
+            container
+                .read(
+                  tagCatalogViewModelProvider(
+                    mode: TagCatalogSelectionMode(target),
+                  ).notifier,
+                )
+                .selectTag(_tag(52, 'Вне порции').id);
+            if (tagReadFirst) {
+              repository.tagRead(_tag(52, 'Вне порции'));
+            }
+            repository.statusReads.single.complete(
+              const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+            );
+            await tester.pump();
+            await tester.pump();
+            if (!tagReadFirst) {
+              repository.tagRead(_tag(52, 'Вне порции'));
+              await tester.pumpAndSettle();
+            }
+            final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+            expect(assign, findsOneWidget);
+            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+            expect(
+              find.text('Could not load assignments. Try again.'),
+              findsOneWidget,
+            );
+            await tester.tap(find.text('Try again'));
+            await tester.pump();
+            expect(repository.statusReads, hasLength(2));
+            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+            repository.statusReads.last.complete(
+              TagAssignmentStatusSuccess(
+                GraphSnapshot(value: assigned, revision: const _Revision()),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(
+              find.text('Could not load assignments. Try again.'),
+              findsNothing,
+            );
+            if (assigned) {
+              expect(assign, findsNothing);
+              expect(repository._commands, isEmpty);
+            } else {
+              expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+            }
+          },
+        );
+      }
+    }
+  }
+
   for (final (relation, recipient) in [
     (false, 'намерения'),
     (true, 'долговременной связи'),
@@ -1179,6 +1272,7 @@ Future<void> _pumpCatalog(
   WidgetTester tester,
   _CatalogRepository repository, {
   bool largeText = false,
+  TagTarget? target,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -1194,7 +1288,7 @@ Future<void> _pumpCatalog(
               .copyWith(textScaler: TextScaler.linear(largeText ? 2.5 : 1)),
           child: child!,
         ),
-        home: const TagCatalogPage(),
+        home: TagCatalogPage(target: target),
       ),
     ),
   );
@@ -1240,8 +1334,19 @@ final class _CatalogRepository extends Fake implements PersonalGraphRepository {
   final _pending = <Completer<TagCatalogPageResult>>[];
   final _commands = <Completer<TagCommandResult>>[];
   final _tagReads = StreamController<TagReadResult>.broadcast();
+  final statusReads = <Completer<TagAssignmentStatusResult>>[];
   final queries = <TagCatalogQuery>[];
   int get calls => _pending.length;
+
+  @override
+  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
+    TagId id,
+    TagTarget target,
+  ) {
+    final read = Completer<TagAssignmentStatusResult>();
+    statusReads.add(read);
+    return read.future;
+  }
 
   @override
   Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) {

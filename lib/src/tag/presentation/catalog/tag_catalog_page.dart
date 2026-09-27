@@ -397,6 +397,15 @@ final class _LoadedCatalog extends StatelessWidget {
     final selectedOutsidePage = selected != null && !selectedInPage;
     final selectedAssigned =
         state.selectedAssignment == TagCatalogSelectedAssignment.assigned;
+    final assignmentFailure = switch (state.selectedAssignment) {
+      TagCatalogSelectedAssignment.unavailable =>
+        localizations.tagAssignmentsUnavailable,
+      TagCatalogSelectedAssignment.corruption =>
+        localizations.tagAssignmentsCorruption,
+      TagCatalogSelectedAssignment.unexpected =>
+        localizations.tagAssignmentsUnexpected,
+      _ => null,
+    };
     return Column(
       children: [
         if (state.freshness == TagCatalogFreshness.refreshing)
@@ -424,6 +433,15 @@ final class _LoadedCatalog extends StatelessWidget {
             message: _selectedReadFailure(localizations, failure),
             onRetry: canRetry ? model.retrySelectedTag : null,
           ),
+        if (choosing && selection.id != null && assignmentFailure != null)
+          _CatalogInlineStatus(
+            message: assignmentFailure,
+            onRetry:
+                state.selectedAssignment ==
+                    TagCatalogSelectedAssignment.unavailable
+                ? model.retrySelectedAssignment
+                : null,
+          ),
         Expanded(
           child: ListView.builder(
             key: const ValueKey('tag-catalog-list'),
@@ -444,6 +462,10 @@ final class _LoadedCatalog extends StatelessWidget {
                               TagCatalogSelectedAssignment.available =>
                                 localizations.tagCatalogAvailable,
                               TagCatalogSelectedAssignment.unknown =>
+                                localizations.tagCatalogSelected,
+                              TagCatalogSelectedAssignment.unavailable ||
+                              TagCatalogSelectedAssignment.corruption ||
+                              TagCatalogSelectedAssignment.unexpected =>
                                 localizations.tagCatalogSelected,
                             }
                           : localizations.tagCatalogSelected,

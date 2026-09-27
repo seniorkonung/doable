@@ -178,6 +178,18 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     }
   }
 
+  void retrySelectedAssignment() {
+    final current = state;
+    if (current is! TagCatalogLoaded ||
+        _selection.id == null ||
+        _selectedAssignment != TagCatalogSelectedAssignment.unavailable) {
+      return;
+    }
+    _clearSelectedAssignment();
+    state = current.withStatus(selectedAssignment: _selectedAssignment);
+    _readSelectedAssignment();
+  }
+
   void _readSelectedAssignment() {
     final current = state;
     final id = _selection.id;
@@ -230,11 +242,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
                     value.revision.compareTo(current.revision) ==
                         GraphRevisionOrder.differentEpoch))) {
           if (++_assignmentStaleReads >= _maxStaleReads) {
-            _selectedReadFailed(
-              id,
-              selectionGeneration,
-              const TagReadUnavailableFailure(),
-            );
+            _selectedAssignmentFailed(TagCatalogSelectedAssignment.unavailable);
           } else {
             _readSelectedAssignment();
           }
@@ -257,11 +265,21 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       ):
         _targetMissing(target);
       case TagAssignmentStatusError(:final failure):
-        _selectedReadFailed(id, selectionGeneration, switch (failure) {
-          TagAssignmentStatusUnavailable() => const TagReadUnavailableFailure(),
-          TagAssignmentStatusCorruption() => const TagReadCorruptionFailure(),
-          _ => const TagReadUnexpectedFailure(),
+        _selectedAssignmentFailed(switch (failure) {
+          TagAssignmentStatusUnavailable() =>
+            TagCatalogSelectedAssignment.unavailable,
+          TagAssignmentStatusCorruption() =>
+            TagCatalogSelectedAssignment.corruption,
+          _ => TagCatalogSelectedAssignment.unexpected,
         });
+    }
+  }
+
+  void _selectedAssignmentFailed(TagCatalogSelectedAssignment failure) {
+    _selectedAssignment = failure;
+    _selectedAssignmentRevision = null;
+    if (state case TagCatalogLoaded loaded) {
+      state = loaded.withStatus(selectedAssignment: failure);
     }
   }
 
@@ -493,7 +511,11 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
             _selection.id,
             value.revision,
           );
-          if (!found && _selection.id != null) {
+          if (!found &&
+              _selection.id != null &&
+              _selectedAssignment != TagCatalogSelectedAssignment.unavailable &&
+              _selectedAssignment != TagCatalogSelectedAssignment.corruption &&
+              _selectedAssignment != TagCatalogSelectedAssignment.unexpected) {
             _assignmentReadGeneration++;
             _clearSelectedAssignment();
           }
