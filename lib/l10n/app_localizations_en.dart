@@ -779,6 +779,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCatalogTitle => 'Tags';
 
   @override
+  String get tagCatalogSelectionTitle => 'Choose a tag';
+
+  @override
+  String get tagCatalogAssigned => 'Assigned';
+
+  @override
+  String get tagCatalogAvailable => 'Available to assign';
+
+  @override
+  String get tagCatalogAssign => 'Assign tag';
+
+  @override
+  String tagCatalogAssignNamed(String tagName) {
+    return 'Assign tag $tagName';
+  }
+
+  @override
+  String get tagCatalogAssigning => 'Assigning tag…';
+
+  @override
   String get tagCatalogLoading => 'Loading tags…';
 
   @override

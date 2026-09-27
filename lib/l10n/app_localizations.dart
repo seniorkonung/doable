@@ -1394,6 +1394,42 @@ abstract class AppLocalizations {
   /// **'Tags'**
   String get tagCatalogTitle;
 
+  /// Заголовок каталога выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a tag'**
+  String get tagCatalogSelectionTitle;
+
+  /// Тег уже назначен получателю
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned'**
+  String get tagCatalogAssigned;
+
+  /// Тег доступен для назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Available to assign'**
+  String get tagCatalogAvailable;
+
+  /// Явное действие назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Assign tag'**
+  String get tagCatalogAssign;
+
+  /// Семантика действия назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Assign tag {tagName}'**
+  String tagCatalogAssignNamed(String tagName);
+
+  /// Ожидание подтверждения назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Assigning tag…'**
+  String get tagCatalogAssigning;
+
   /// Начальная загрузка каталога тегов
   ///
   /// In en, this message translates to:

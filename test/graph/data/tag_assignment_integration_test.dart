@@ -494,7 +494,7 @@ void main() {
         (_, _) {},
       );
       final catalogSubscription = container.listen(
-        tagCatalogViewModelProvider,
+        tagCatalogViewModelProvider(),
         (_, _) {},
       );
       addTearDown(assignmentsSubscription.close);
@@ -502,11 +502,11 @@ void main() {
       final assignments = container.read(
         tagAssignmentsViewModelProvider(target).notifier,
       );
-      final catalog = container.read(tagCatalogViewModelProvider.notifier);
+      final catalog = container.read(tagCatalogViewModelProvider().notifier);
       TagAssignmentsState assignmentState() =>
           container.read(tagAssignmentsViewModelProvider(target));
       TagCatalogState catalogState() =>
-          container.read(tagCatalogViewModelProvider);
+          container.read(tagCatalogViewModelProvider());
 
       Future<void> until(bool Function() condition) async {
         for (var attempt = 0; attempt < 40 && !condition(); attempt++) {

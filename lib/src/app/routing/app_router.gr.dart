@@ -45,12 +45,13 @@ import 'package:doable/src/long_term_relation/presentation/editor/relation_edito
     as _i21;
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
     as _i12;
+import 'package:doable/src/tag/domain/tag_target.dart' as _i23;
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart'
     as _i13;
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart'
     as _i14;
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart'
-    as _i23;
+    as _i24;
 import 'package:flutter/material.dart' as _i17;
 
 /// generated route for
@@ -502,25 +503,58 @@ class RelationParticipantPickerRouteArgs {
 
 /// generated route for
 /// [_i13.TagCatalogPage]
-class TagCatalogRoute extends _i15.PageRouteInfo<void> {
-  const TagCatalogRoute({List<_i15.PageRouteInfo>? children})
-    : super(TagCatalogRoute.name, initialChildren: children);
+class TagCatalogRoute extends _i15.PageRouteInfo<TagCatalogRouteArgs> {
+  TagCatalogRoute({
+    _i23.TagTarget? target,
+    _i17.Key? key,
+    List<_i15.PageRouteInfo>? children,
+  }) : super(
+         TagCatalogRoute.name,
+         args: TagCatalogRouteArgs(target: target, key: key),
+         initialChildren: children,
+       );
 
   static const String name = 'TagCatalogRoute';
 
   static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
-      return const _i13.TagCatalogPage();
+      final args = data.argsAs<TagCatalogRouteArgs>(
+        orElse: () => const TagCatalogRouteArgs(),
+      );
+      return _i13.TagCatalogPage(target: args.target, key: args.key);
     },
   );
+}
+
+class TagCatalogRouteArgs {
+  const TagCatalogRouteArgs({this.target, this.key});
+
+  final _i23.TagTarget? target;
+
+  final _i17.Key? key;
+
+  @override
+  String toString() {
+    return 'TagCatalogRouteArgs{target: $target, key: $key}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! TagCatalogRouteArgs) return false;
+    return target == other.target && key == other.key;
+  }
+
+  @override
+  int get hashCode => target.hashCode ^ key.hashCode;
 }
 
 /// generated route for
 /// [_i14.TagEditorPage]
 class TagEditorRoute extends _i15.PageRouteInfo<TagEditorRouteArgs> {
   TagEditorRoute({
-    required _i23.TagEditorContext editorContext,
+    required _i24.TagEditorContext editorContext,
     _i17.Key? key,
     List<_i15.PageRouteInfo>? children,
   }) : super(
@@ -546,7 +580,7 @@ class TagEditorRoute extends _i15.PageRouteInfo<TagEditorRouteArgs> {
 class TagEditorRouteArgs {
   const TagEditorRouteArgs({required this.editorContext, this.key});
 
-  final _i23.TagEditorContext editorContext;
+  final _i24.TagEditorContext editorContext;
 
   final _i17.Key? key;
 

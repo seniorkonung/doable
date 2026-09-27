@@ -40,12 +40,12 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   int _staleReadAttempts = 0;
 
   @override
-  TagCatalogState build() {
+  TagCatalogState build({TagCatalogMode mode = const TagCatalogBrowseMode()}) {
     unawaited(_completions?.cancel());
     unawaited(_selectedReads?.cancel());
     _repository = ref.watch(personalGraphRepositoryProvider);
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
-    _mode = const TagCatalogBrowseMode();
+    _mode = mode;
     _assignmentStatus = const TagCatalogAssignmentIdle();
     _requiredRevision = null;
     _selection = const TagCatalogNoSelection();
@@ -61,7 +61,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       unawaited(_selectedReads?.cancel());
     });
     unawaited(_startFirst());
-    return const TagCatalogInitialLoading();
+    return TagCatalogInitialLoading(mode: mode);
   }
 
   /// Смена режима или получателя отменяет право прежних порций и выбора

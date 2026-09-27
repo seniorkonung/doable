@@ -780,6 +780,26 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagCatalogTitle => 'Теги';
 
   @override
+  String get tagCatalogSelectionTitle => 'Выбор тега';
+
+  @override
+  String get tagCatalogAssigned => 'Назначен';
+
+  @override
+  String get tagCatalogAvailable => 'Доступен для назначения';
+
+  @override
+  String get tagCatalogAssign => 'Назначить тег';
+
+  @override
+  String tagCatalogAssignNamed(String tagName) {
+    return 'Назначить тег «$tagName»';
+  }
+
+  @override
+  String get tagCatalogAssigning => 'Назначаем тег…';
+
+  @override
   String get tagCatalogLoading => 'Загружаем теги…';
 
   @override

@@ -939,15 +939,15 @@ final class _Harness {
         personalGraphRepositoryProvider.overrideWith((ref) => repository),
       ],
     );
-    subscription = container.listen(tagCatalogViewModelProvider, (_, _) {});
+    subscription = container.listen(tagCatalogViewModelProvider(), (_, _) {});
   }
 
   final repository = _Repository();
   late final ProviderContainer container;
   late final ProviderSubscription<TagCatalogState> subscription;
   TagCatalogViewModel get model =>
-      container.read(tagCatalogViewModelProvider.notifier);
-  TagCatalogState get state => container.read(tagCatalogViewModelProvider);
+      container.read(tagCatalogViewModelProvider().notifier);
+  TagCatalogState get state => container.read(tagCatalogViewModelProvider());
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
 

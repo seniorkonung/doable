@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -10,6 +11,8 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart'
     hide TagCatalogPage;
 import 'package:doable/src/tag/application/tag_catalog.dart'
@@ -22,7 +25,9 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +40,153 @@ String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
 void main() {
+  testWidgets(
+    'выбор назначает свободный тег архивному получателю только по нажатию',
+    (tester) async {
+      late sqlite.Database raw;
+      final database = AppDatabase(
+        openInMemoryLocalDatabase(setup: (db) => raw = db),
+      );
+      await database.open();
+      addTearDown(database.close);
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(100), 'Архивное намерение', 0, 1, 100, 100],
+      );
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(101), 'Другое намерение', 0, 0, 101, 101],
+      );
+      raw.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(200), _id(100), _id(101), 'need', 2, 1],
+      );
+      for (var number = 1; number <= 52; number++) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _id(number),
+          'Тег $number',
+        ]);
+      }
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_id(1), _id(100)],
+      );
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        InMemoryDiagnosticsSink(),
+      );
+      final router = AppRouter();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp.router(
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final target = IntentionTagTarget(
+        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
+      );
+      final result = router.push<Object?>(TagCatalogRoute(target: target));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Выбор тега'), findsOneWidget);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(TagCatalogPage)),
+      );
+      final catalog = container.read(
+        tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target)),
+      );
+      expect(catalog, isA<TagCatalogLoaded>());
+      expect(
+        (catalog as TagCatalogLoaded).selectionRows.first.isAssigned,
+        isTrue,
+      );
+      expect(find.text('Назначен'), findsOneWidget);
+      expect(find.text('Доступен для назначения'), findsWidgets);
+      expect(find.byTooltip('Удалить тег'), findsNothing);
+      expect(raw.select('SELECT * FROM tag_assignments'), hasLength(1));
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-load-more')));
+      await tester.pumpAndSettle();
+      final lastRow = find.byKey(ValueKey('tag-catalog-row-${_id(52)}'));
+      await tester.scrollUntilVisible(
+        lastRow,
+        300,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('tag-catalog-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.tap(lastRow);
+      await tester.pumpAndSettle();
+      expect(raw.select('SELECT * FROM tag_assignments'), hasLength(1));
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
+      await tester.pumpAndSettle();
+      expect(
+        raw
+            .select(
+              'SELECT tag_id FROM tag_assignments WHERE intention_id = ? ORDER BY tag_id',
+              [_id(100)],
+            )
+            .map((row) => row['tag_id']),
+        [_id(1), _id(52)],
+      );
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-load-more')));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        lastRow,
+        300,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('tag-catalog-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(
+        find.descendant(of: lastRow, matching: find.text('Назначен')),
+        findsOneWidget,
+      );
+      router.pop();
+      expect(await result, isNull);
+      await tester.pumpAndSettle();
+
+      final relationTarget = LongTermRelationTagTarget(
+        (LongTermRelationId.decode(
+          _id(200),
+        ) as LongTermRelationIdDecodingSuccess).id,
+      );
+      final relationResult = router.push<Object?>(
+        TagCatalogRoute(target: relationTarget),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        router.current.argsAs<TagCatalogRouteArgs>().target,
+        relationTarget,
+      );
+      await tester.tap(find.byKey(ValueKey('tag-catalog-row-${_id(2)}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
+      await tester.pumpAndSettle();
+      expect(
+        raw.select(
+          'SELECT tag_id FROM tag_assignments WHERE long_term_relation_id = ?',
+          [_id(200)],
+        ).single['tag_id'],
+        _id(2),
+      );
+      router.pop();
+      expect(await relationResult, isNull);
+    },
+  );
+
   testWidgets('выбор вне первой порции следует внешним изменениям тега', (
     tester,
   ) async {
@@ -374,6 +526,69 @@ void main() {
     expect(repository.calls, 2);
   });
 
+  testWidgets(
+    'выбор показывает занятость и отказ на английском при крупном тексте',
+    (tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _CatalogRepository();
+      addTearDown(repository.dispose);
+      final target = IntentionTagTarget(
+        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(2.5)),
+              child: child!,
+            ),
+            home: TagCatalogPage(target: target),
+          ),
+        ),
+      );
+      repository.complete(
+        TagCatalogPageSuccess(
+          data.TagCatalogPage.selection(
+            target: target,
+            rows: [TagSelectionRow(tag: _tag(1, 'Home'), isAssigned: false)],
+            pageSize: TagCatalogQuery.defaultPageSize,
+            nextCursor: null,
+            revision: const _Revision(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')));
+      repository.tagRead(_tag(1, 'Home'));
+      await tester.pumpAndSettle();
+      final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+      expect(find.text('Available to assign'), findsOneWidget);
+      expect(assign, findsOneWidget);
+      await tester.tap(assign);
+      await tester.pump();
+      expect(find.text('Assigning tag…'), findsOneWidget);
+      expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+      repository.failCommand(const TagUnavailableFailure());
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Could not complete the tag assignment operation. Try again.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('пустой каталог отличается от загрузки и отказа', (tester) async {
     final repository = _CatalogRepository();
     await _pumpCatalog(tester, repository);
@@ -396,7 +611,7 @@ void main() {
       tester.element(find.byType(TagCatalogPage)),
     );
     container
-        .read(tagCatalogViewModelProvider.notifier)
+        .read(tagCatalogViewModelProvider().notifier)
         .selectTag(_tag(1, 'Дом').id);
     repository.tagRead(_tag(1, 'Дом'));
     await tester.pumpAndSettle();
@@ -437,7 +652,7 @@ void main() {
       tester.element(find.byType(TagCatalogPage)),
     );
     container
-        .read(tagCatalogViewModelProvider.notifier)
+        .read(tagCatalogViewModelProvider().notifier)
         .selectTag(_tag(52, 'Старое имя').id);
     repository.tagRead(_tag(52, 'Старое имя'));
     await tester.pumpAndSettle();
@@ -486,7 +701,7 @@ void main() {
       tester.element(find.byType(TagCatalogPage)),
     );
     container
-        .read(tagCatalogViewModelProvider.notifier)
+        .read(tagCatalogViewModelProvider().notifier)
         .selectTag(_tag(52, 'Старое имя').id);
     repository.tagRead(_tag(52, 'Старое имя'));
     await tester.pumpAndSettle();
@@ -667,6 +882,9 @@ final class _CatalogRepository extends Fake implements PersonalGraphRepository {
       ConfirmedGraphResult(revision: const _Revision(2), value: success),
     ),
   );
+
+  void failCommand(TagCommandFailure failure) =>
+      _commands.last.complete(TagCommandFailed(failure));
 
   Future<void> dispose() => _tagReads.close();
 }

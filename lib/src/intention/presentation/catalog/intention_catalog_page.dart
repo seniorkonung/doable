@@ -65,7 +65,7 @@ final class _IntentionCatalogPageState
           IconButton(
             key: const ValueKey('catalog-open-tags'),
             tooltip: localizations.tagCatalogTitle,
-            onPressed: () => context.router.push(const TagCatalogRoute()),
+            onPressed: () => context.router.push(TagCatalogRoute()),
             icon: const Icon(Icons.label_outline),
           ),
           IconButton(

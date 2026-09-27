@@ -10,23 +10,30 @@ part of 'tag_catalog_view_model.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(TagCatalogViewModel)
-final tagCatalogViewModelProvider = TagCatalogViewModelProvider._();
+final tagCatalogViewModelProvider = TagCatalogViewModelFamily._();
 
 final class TagCatalogViewModelProvider
     extends $NotifierProvider<TagCatalogViewModel, TagCatalogState> {
-  TagCatalogViewModelProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'tagCatalogViewModelProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  TagCatalogViewModelProvider._({
+    required TagCatalogViewModelFamily super.from,
+    required TagCatalogMode super.argument,
+  }) : super(
+         retry: null,
+         name: r'tagCatalogViewModelProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
   String debugGetCreateSourceHash() => _$tagCatalogViewModelHash();
+
+  @override
+  String toString() {
+    return r'tagCatalogViewModelProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -39,13 +46,52 @@ final class TagCatalogViewModelProvider
       providerOverride: $SyncValueProvider<TagCatalogState>(value),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TagCatalogViewModelProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
 }
 
 String _$tagCatalogViewModelHash() =>
-    r'dfbec0b64f35b2e1dab0678c687ea1ea67f95ef5';
+    r'232b7f6ebd3a52fd64c249cb0ee5712a84bbaa50';
+
+final class TagCatalogViewModelFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          TagCatalogViewModel,
+          TagCatalogState,
+          TagCatalogState,
+          TagCatalogState,
+          TagCatalogMode
+        > {
+  TagCatalogViewModelFamily._()
+    : super(
+        retry: null,
+        name: r'tagCatalogViewModelProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  TagCatalogViewModelProvider call({
+    TagCatalogMode mode = const TagCatalogBrowseMode(),
+  }) => TagCatalogViewModelProvider._(argument: mode, from: this);
+
+  @override
+  String toString() => r'tagCatalogViewModelProvider';
+}
 
 abstract class _$TagCatalogViewModel extends $Notifier<TagCatalogState> {
-  TagCatalogState build();
+  late final _$args = ref.$arg as TagCatalogMode;
+  TagCatalogMode get mode => _$args;
+
+  TagCatalogState build({TagCatalogMode mode = const TagCatalogBrowseMode()});
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
@@ -58,6 +104,6 @@ abstract class _$TagCatalogViewModel extends $Notifier<TagCatalogState> {
               Object?,
               Object?
             >;
-    return element.handleCreate(ref, build);
+    return element.handleCreate(ref, () => build(mode: _$args));
   }
 }
