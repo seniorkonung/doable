@@ -148,6 +148,10 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
       case TagReadSuccess(value: GraphSnapshot(value: final tag)):
         if (tag == null) {
           state = state.withStatus(TagEditorExistingMissing(id));
+        } else if (tag.id != id) {
+          state = state.withStatus(
+            TagEditorExistingReadFailed(id, const TagReadCorruptionFailure()),
+          );
         } else {
           state = state.withStatus(
             TagEditorExistingResolved(tag),
@@ -186,6 +190,14 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
             TagEditorCommittedReadFailed(
               id,
               const TagReadUnavailableFailure(),
+              committedRevision,
+            ),
+          );
+        } else if (value.value case final Tag tag when tag.id != id) {
+          state = state.withStatus(
+            TagEditorCommittedReadFailed(
+              id,
+              const TagReadCorruptionFailure(),
               committedRevision,
             ),
           );

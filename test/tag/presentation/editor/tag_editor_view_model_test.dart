@@ -116,6 +116,25 @@ void main() {
   );
 
   test(
+    'конфликт не подменяет полученный id другим одноимённым тегом',
+    () async {
+      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+      addTearDown(h.dispose);
+      h.model.changeName('Дом');
+      final submit = h.model.submit();
+      h.repository.failCommand(0, TagNameOccupiedFailure(_id(1)));
+      await submit;
+      final selection = h.model.useExisting();
+      h.repository.completeRead(0, _tag(2, 'Дом'));
+      await selection;
+      expect(h.repository.readIds, [_id(1)]);
+      expect(h.state.status, isA<TagEditorExistingReadFailed>());
+      expect(h.state.event, isNull);
+      expect(h.repository.commands, hasLength(1));
+    },
+  );
+
+  test(
     'уход сохраняет принятую команду и возврат не обходит блокировку тега',
     () async {
       final h = _Harness(TagEditorRenaming(_tag(1, 'Дом')));
@@ -215,6 +234,26 @@ void main() {
     final retry = h.model.retryCommittedRead();
     h.repository.completeRead(1, _tag(1, 'Старое'), revision: 1);
     await retry;
+    expect(h.state.status, isA<TagEditorCommittedReadFailed>());
+    expect(h.state.event, isNull);
+    expect(h.repository.commands, hasLength(1));
+  });
+
+  test('чтение после создания не выдаёт другой тег как сохранённый', () async {
+    final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+    addTearDown(h.dispose);
+    h.model.changeName('Дом');
+    final submit = h.model.submit();
+    h.repository.succeedCommand(
+      0,
+      TagCreated(
+        TagCreatedChange(revision: const _Revision(2), after: _tag(1, 'Дом')),
+      ),
+    );
+    await pumpEventQueue();
+    h.repository.completeRead(0, _tag(2, 'Дом'));
+    await submit;
+    expect(h.repository.readIds, [_id(1)]);
     expect(h.state.status, isA<TagEditorCommittedReadFailed>());
     expect(h.state.event, isNull);
     expect(h.repository.commands, hasLength(1));

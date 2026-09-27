@@ -347,6 +347,195 @@ void main() {
     expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
   });
 
+  testWidgets('новый тег из выбора сохраняется до явного назначения связи', (
+    tester,
+  ) async {
+    late sqlite.Database raw;
+    final database = AppDatabase(
+      openInMemoryLocalDatabase(setup: (db) => raw = db),
+    );
+    await database.open();
+    addTearDown(database.close);
+    raw.execute(
+      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [_id(100), 'Первое', 0, 0, 100, 100],
+    );
+    raw.execute(
+      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [_id(101), 'Второе', 0, 0, 101, 101],
+    );
+    raw.execute(
+      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+      [_id(200), _id(100), _id(101), 'need', 2, 1],
+    );
+    final repository = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 9, 25),
+      InMemoryDiagnosticsSink(),
+    );
+    final router = AppRouter();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp.router(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router.config(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final target = LongTermRelationTagTarget(
+      (LongTermRelationId.decode(
+        _id(200),
+      ) as LongTermRelationIdDecodingSuccess).id,
+    );
+    final result = router.push<Object?>(TagCatalogRoute(target: target));
+    await tester.pumpAndSettle();
+    expect(find.text('Тегов пока нет.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-editor-name')),
+      'Отмена',
+    );
+    await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+    await tester.pumpAndSettle();
+    expect(router.current.argsAs<TagCatalogRouteArgs>().target, target);
+    expect(raw.select('SELECT * FROM tags'), isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-editor-name')),
+      'Дом',
+    );
+    await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+    await _waitForEditorToClose(tester);
+    final tagId = raw.select('SELECT id FROM tags').single['id'] as String;
+    expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+    expect(find.text('Дом'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tag-catalog-assign')), findsOneWidget);
+    expect(router.current.argsAs<TagCatalogRouteArgs>().target, target);
+
+    router.pop();
+    expect(await result, isNull);
+    await tester.pumpAndSettle();
+    expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+    router.push<Object?>(TagCatalogRoute(target: target));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('tag-catalog-row-$tagId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
+    await tester.pumpAndSettle();
+    expect(
+      raw.select(
+        'SELECT tag_id FROM tag_assignments WHERE long_term_relation_id = ?',
+        [_id(200)],
+      ).single['tag_id'],
+      tagId,
+    );
+  });
+
+  testWidgets(
+    'конфликт выбирает исходный тег, а исчезнувшего получателя не заменяет',
+    (tester) async {
+      late sqlite.Database raw;
+      final database = AppDatabase(
+        openInMemoryLocalDatabase(setup: (db) => raw = db),
+      );
+      await database.open();
+      addTearDown(database.close);
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(100), 'Одинаковое имя', 0, 0, 100, 100],
+      );
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(1), 'Дом']);
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        InMemoryDiagnosticsSink(),
+      );
+      final router = AppRouter();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp.router(
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final target = IntentionTagTarget(
+        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
+      );
+      router.push<Object?>(TagCatalogRoute(target: target));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('tag-editor-name')),
+        'дом',
+      );
+      await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+      for (
+        var attempt = 0;
+        attempt < 30 &&
+            find
+                .byKey(const ValueKey('tag-editor-use-existing'))
+                .evaluate()
+                .isEmpty;
+        attempt++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
+            .controller!
+            .text,
+        'дом',
+      );
+      await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
+      await _waitForEditorToClose(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(TagCatalogPage)),
+      );
+      final catalog = container.read(
+        tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target)),
+      ) as TagCatalogLoaded;
+      expect(catalog.selection.id?.toCanonicalString(), _id(1));
+      expect(find.byKey(const ValueKey('tag-catalog-assign')), findsOneWidget);
+      expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+
+      raw.execute('DELETE FROM intentions WHERE id = ?', [_id(100)]);
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(101), 'Одинаковое имя', 0, 0, 101, 101],
+      );
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
+      await tester.pumpAndSettle();
+      expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+      expect(router.current.argsAs<TagCatalogRouteArgs>().target, target);
+    },
+  );
+
   testWidgets('создание, переименование и отмена сохраняют каталог', (
     tester,
   ) async {

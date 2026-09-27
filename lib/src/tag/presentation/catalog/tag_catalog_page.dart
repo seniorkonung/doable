@@ -258,7 +258,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
               : localizations.tagCatalogSelectionTitle,
         ),
         actions: [
-          if (widget.target == null)
+          if (state is! TagCatalogTargetMissing)
             IconButton(
               key: const ValueKey('tag-catalog-create'),
               tooltip: localizations.tagCatalogCreate,
