@@ -618,3 +618,13 @@
   - **Зависимости:** 2.6, 2.29.
   - **Вероятные файлы:** контракт `PersonalGraphRepository`, Drift-чтение назначений, `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, тесты репозитория, ViewModel и интерфейса.
   - **Оценка объёма:** M.
+
+- [ ] 2.31 Сохранять повтор проверки назначения после отказа точечного чтения
+  - **Критерии приёмки:**
+    - Для выбранного через редактор тега вне загруженных порций отказ точечной проверки пары оставляет назначение недоступным и предоставляет пользователю повтор проверки. Более позднее успешное наблюдение самого тега не скрывает этот отказ и возможность повтора, пока статус пары остаётся неизвестным.
+    - Успешный повтор для текущих тега и получателя открывает явное назначение только свободной пары; уже назначенная пара не отправляется повторно. Ответы прежнего выбора, получателя, ревизии или эпохи не возвращают устаревшее действие и не скрывают актуальный отказ.
+    - Проверки ViewModel и экрана воспроизводят порядок «отказ проверки назначения → успешное чтение тега → повтор», а также обратный порядок ответов, для намерения и долговременной связи; подтверждают доступность повтора и состояние кнопки назначения до и после успешной проверки.
+  - **Проверка:** `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_view_model_test.dart test/tag/presentation/catalog/tag_catalog_page_test.dart`; `mise exec --no-deps -- flutter analyze`; `mise exec --no-deps -- openspec validate manage-tags --strict --no-interactive`.
+  - **Зависимости:** 2.30.
+  - **Вероятные файлы:** `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, при необходимости `lib/src/tag/presentation/catalog/tag_catalog_state.dart` и `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, `test/tag/presentation/catalog/tag_catalog_view_model_test.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`.
+  - **Оценка объёма:** S.
