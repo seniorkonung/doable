@@ -154,11 +154,15 @@ void main() {
                   TagCommandKind.create => 'Создание',
                   TagCommandKind.rename => 'Изменение',
                   TagCommandKind.delete => 'Удаление',
+                  TagCommandKind.assign || TagCommandKind.removeAssignment =>
+                    throw StateError('Сценарий проверяет жизненный цикл тега.'),
                 }
               : switch (scenario.kind) {
                   TagCommandKind.create => 'Create',
                   TagCommandKind.rename => 'Edit',
                   TagCommandKind.delete => 'Delete',
+                  TagCommandKind.assign || TagCommandKind.removeAssignment =>
+                    throw StateError('Сценарий проверяет жизненный цикл тега.'),
                 };
           final message = locale.languageCode == 'ru'
               ? '$operation — «тег»: ${scenario.ru}'
@@ -1561,6 +1565,8 @@ final class _PresenterHarness {
         RenameTag(tagId: _tagId, name: TagName.fromInput('Новое имя')),
       ),
       TagCommandKind.delete => _coordinator.acceptTagDelete(DeleteTag(_tagId)),
+      TagCommandKind.assign || TagCommandKind.removeAssignment =>
+        throw StateError('Сценарий проверяет жизненный цикл тега.'),
     } as TagCommandAccepted;
     if (releaseInitiator) {
       _coordinator.releaseInitiatorPresentation(accepted.token);
@@ -1590,6 +1596,8 @@ final class _PresenterHarness {
       TagCommandKind.delete => TagDeleted(
         TagDeletedChange(revision: revision, tagId: _tagId),
       ),
+      TagCommandKind.assign || TagCommandKind.removeAssignment =>
+        throw StateError('Сценарий проверяет жизненный цикл тега.'),
     };
     repository.completeTagCommand(
       _tagIndexes[accepted]!,

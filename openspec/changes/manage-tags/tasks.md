@@ -367,7 +367,7 @@
   - **Вероятные файлы:** `lib/src/graph/data/drift_personal_graph_repository_tag_commands.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, новый `test/graph/data/drift_tag_assignment_test.dart`, `test/graph/data/drift_tag_diagnostics_test.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 2.4 Резервировать тег и получателя на всё время команды назначения
+- [x] 2.4 Резервировать тег и получателя на всё время команды назначения
   - **Критерии приёмки:**
     - GraphCommandCoordinator атомарно резервирует ExistingTagKey и ExistingIntentionKey либо ExistingLongTermRelationKey. Конфликт любого ключа отклоняет всю повторную отправку без очереди и без частичного резервирования; учитываются обычные изменения и массовое удаление выбранных связей.
     - Уход и повторный вход не освобождают ключи. Успех и отказ завершают блокировку и публикуются один раз через прежние claims; штатное закрытие ждёт принятых команд до закрытия базы. Отдельного координатора или канала результатов маршрута нет.

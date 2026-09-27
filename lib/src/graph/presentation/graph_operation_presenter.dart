@@ -211,6 +211,8 @@ String _tagMessage(
     TagCommandKind.create => localizations.graphOperationCreate,
     TagCommandKind.rename => localizations.graphOperationUpdate,
     TagCommandKind.delete => localizations.graphOperationDelete,
+    TagCommandKind.assign ||
+    TagCommandKind.removeAssignment => localizations.graphOperationUpdate,
   },
   localizations.graphOperationTag,
   switch (completion.result) {
@@ -219,6 +221,13 @@ String _tagMessage(
       (TagCommandKind.rename, TagRenamed()) => localizations.tagRenamed,
       (TagCommandKind.rename, TagUnchanged()) => localizations.tagUnchanged,
       (TagCommandKind.delete, TagDeleted()) => localizations.tagDeleted,
+      (TagCommandKind.assign, TagAssignmentChanged()) ||
+      (TagCommandKind.assign, TagAssignmentUnchanged()) ||
+      (TagCommandKind.removeAssignment, TagAssignmentChanged()) ||
+      (
+        TagCommandKind.removeAssignment,
+        TagAssignmentUnchanged(),
+      ) => localizations.graphOperationUpdate,
       _ => localizations.tagUnexpected,
     },
     GraphResultFailure(:final failure) => tagFailureMessage(

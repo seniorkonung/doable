@@ -40,6 +40,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -430,6 +431,48 @@ void main() {
       await shutdown;
       expect(closeObserver.closeCalls, 1);
     });
+
+    test(
+      'shutdown сохраняет резервирование назначения до закрытия базы',
+      () async {
+        final repository = _ControlledPersonalGraphRepository();
+        final closeObserver = _CloseTrackingObserver();
+        final runtime = AppRuntime(
+          connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+            openInMemoryLocalDatabase(),
+            closeObserver,
+          ),
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+          repositoryFactory: (_) => repository,
+        );
+        addTearDown(runtime.shutdown);
+        await runtime.bootstrap();
+        final coordinator = runtime.commandCoordinator;
+        final tagId =
+            (TagId.decode(_relationSourceUuid) as TagIdDecodingSuccess).id;
+        final intentionId = _intentionId(_relationRelatedUuid);
+        final accepted = coordinator.acceptTagAssign(
+          AssignTag(tagId: tagId, target: IntentionTagTarget(intentionId)),
+        ) as TagCommandAccepted;
+        coordinator.releaseInitiatorPresentation(accepted.token);
+
+        final shutdown = runtime.shutdown();
+        expect(coordinator.isTagRunning(tagId), isTrue);
+        expect(coordinator.isRunning(intentionId), isTrue);
+        expect(closeObserver.closeCalls, 0);
+        expect(
+          coordinator.acceptTagAssign(
+            AssignTag(tagId: tagId, target: IntentionTagTarget(intentionId)),
+          ),
+          isA<GraphCommandCoordinatorDraining>(),
+        );
+
+        repository.complete(const TagCommandFailed(TagUnavailableFailure()));
+        await accepted.future;
+        await shutdown;
+        expect(closeObserver.closeCalls, 1);
+      },
+    );
 
     test(
       'shutdown ждёт in-flight bootstrap и не создаёт provider graph',

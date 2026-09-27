@@ -14,6 +14,7 @@ import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag_id.dart';
+import '../../tag/domain/tag_target.dart';
 import 'blocking_relation_reference.dart';
 import 'delete_blocking_relations.dart';
 import 'graph_command_result.dart';
@@ -292,7 +293,7 @@ final class DailyChoiceCommandCompletion extends GraphCommandCompletion {
   bool get isFailure => confirmedResult is GraphResultFailure;
 }
 
-enum TagCommandKind { create, rename, delete }
+enum TagCommandKind { create, rename, delete, assign, removeAssignment }
 
 final class TagCommandCompletion extends GraphCommandCompletion {
   const TagCommandCompletion._({
@@ -641,22 +642,52 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   TagCommandStart acceptTagCreation(
     TagCreationFormKey formKey,
     CreateTag command,
-  ) => _acceptTag(formKey, command, TagCommandKind.create);
+  ) => _acceptTag({formKey}, command, TagCommandKind.create);
 
-  TagCommandStart acceptTagRename(RenameTag command) =>
-      _acceptTag(ExistingTagKey(command.tagId), command, TagCommandKind.rename);
+  TagCommandStart acceptTagRename(RenameTag command) => _acceptTag(
+    {ExistingTagKey(command.tagId)},
+    command,
+    TagCommandKind.rename,
+  );
 
-  TagCommandStart acceptTagDelete(DeleteTag command) =>
-      _acceptTag(ExistingTagKey(command.tagId), command, TagCommandKind.delete);
+  TagCommandStart acceptTagDelete(DeleteTag command) => _acceptTag(
+    {ExistingTagKey(command.tagId)},
+    command,
+    TagCommandKind.delete,
+  );
+
+  TagCommandStart acceptTagAssign(AssignTag command) => _acceptTag(
+    _assignmentKeys(command.tagId, command.target),
+    command,
+    TagCommandKind.assign,
+  );
+
+  TagCommandStart acceptTagRemoveAssignment(RemoveTagAssignment command) =>
+      _acceptTag(
+        _assignmentKeys(command.tagId, command.target),
+        command,
+        TagCommandKind.removeAssignment,
+      );
+
+  Set<GraphCommandKey> _assignmentKeys(TagId tagId, TagTarget target) => {
+    ExistingTagKey(tagId),
+    switch (target) {
+      IntentionTagTarget(:final intentionId) => ExistingIntentionKey(
+        intentionId,
+      ),
+      LongTermRelationTagTarget(:final relationId) =>
+        ExistingLongTermRelationKey(relationId),
+    },
+  };
 
   TagCommandStart _acceptTag(
-    GraphCommandKey key,
+    Set<GraphCommandKey> keys,
     TagCommand command,
     TagCommandKind kind,
   ) {
     final token = TagOperationToken._();
     final acceptance = _acceptOperation(
-      keys: {key},
+      keys: keys,
       entry: _PresentationEntry(token),
       execute: () async => TagCommandCompletion._(
         token: token,
