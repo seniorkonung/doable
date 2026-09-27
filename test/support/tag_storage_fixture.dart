@@ -7,6 +7,34 @@ const firstTagNumber = 301;
 const lastTagNumber = 302;
 
 void seedTagStorageFixture(sqlite.Database database) {
+  seedTagRecipientGraphFixture(database);
+  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    tagFixtureId(firstTagNumber),
+    'Дом',
+  ]);
+  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    tagFixtureId(lastTagNumber),
+    'Работа',
+  ]);
+  for (final number in [1, 2]) {
+    database.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(firstTagNumber), tagFixtureId(number)],
+    );
+  }
+  for (final number in [101, 102]) {
+    database.execute(
+      'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+      [tagFixtureId(firstTagNumber), tagFixtureId(number)],
+    );
+  }
+  database.execute(
+    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+    [tagFixtureId(lastTagNumber), tagFixtureId(3)],
+  );
+}
+
+void seedTagRecipientGraphFixture(sqlite.Database database) {
   for (final (number, archived) in [(1, 0), (2, 1), (3, 0)]) {
     database.execute(
       'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -41,30 +69,6 @@ void seedTagStorageFixture(sqlite.Database database) {
   database.execute(
     'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
     [tagFixtureId(202), tagFixtureId(201), tagFixtureId(101)],
-  );
-  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-    tagFixtureId(firstTagNumber),
-    'Дом',
-  ]);
-  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-    tagFixtureId(lastTagNumber),
-    'Работа',
-  ]);
-  for (final number in [1, 2]) {
-    database.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(number)],
-    );
-  }
-  for (final number in [101, 102]) {
-    database.execute(
-      'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(number)],
-    );
-  }
-  database.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-    [tagFixtureId(lastTagNumber), tagFixtureId(3)],
   );
 }
 
