@@ -1036,6 +1036,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await _scrollTo(tester, find.text('Relations'));
       expect(find.text('Relations'), findsOneWidget);
       expect(find.text('Total relations: 36'), findsOneWidget);
       expect(find.text('Active relations: 10'), findsNWidgets(2));
@@ -1184,6 +1185,11 @@ void main() {
       );
       await tester.pump();
 
+      await _scrollTo(
+        tester,
+        find.text('Loading relations and summary…'),
+        settle: false,
+      );
       expect(find.text('Loading relations and summary…'), findsOneWidget);
 
       repository.completePage(
@@ -1283,6 +1289,7 @@ void main() {
       );
       await _pumpUntilRequestCount(tester, repository, 3);
 
+      await _scrollTo(tester, find.text('Total relations: 100'), settle: false);
       expect(find.text('Total relations: 100'), findsOneWidget);
       expect(find.text('Updating saved relation numbers…'), findsOneWidget);
       expect(
