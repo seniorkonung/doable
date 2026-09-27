@@ -1,11 +1,14 @@
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments_page.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/application/tagged_entities_page.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -114,6 +117,185 @@ void main() {
       ),
       throwsA(isA<TagAssignmentsPageValidationException>()),
     );
+  });
+
+  test('запрос помеченных сущностей проверяет размер и сохраняет выбор', () {
+    final tagId = _tag(1, 'Дом').id;
+    const cursor = _TaggedEntitiesCursor();
+    final defaultQuery = TaggedEntitiesQuery(
+      tagId: tagId,
+      scope: TaggedEntitiesScope.active,
+    );
+    expect(defaultQuery.pageSize, 50);
+    expect(defaultQuery.cursor, isNull);
+
+    for (final size in [1, 100]) {
+      final query = TaggedEntitiesQuery(
+        tagId: tagId,
+        scope: TaggedEntitiesScope.archived,
+        pageSize: size,
+        cursor: cursor,
+      );
+      expect(query.tagId, tagId);
+      expect(query.scope, TaggedEntitiesScope.archived);
+      expect(query.pageSize, size);
+      expect(query.cursor, same(cursor));
+    }
+    for (final size in [0, 101]) {
+      expect(
+        () => TaggedEntitiesQuery(
+          tagId: tagId,
+          scope: TaggedEntitiesScope.active,
+          pageSize: size,
+        ),
+        throwsA(isA<TaggedEntitiesQueryValidationException>()),
+      );
+    }
+  });
+
+  test('смешанная страница хранит типы сущностей и защищает снимок', () {
+    final tag = _tag(1, 'Дом');
+    final intention = TaggedIntention(
+      id: _intentionId(2),
+      title: ' Намерение ',
+      archiveState: IntentionArchiveState.active,
+    );
+    final relation = TaggedLongTermRelation(
+      id: _relationId(3),
+      type: LongTermRelationType.need,
+      sourceTitle: ' Источник ',
+      relatedTitle: ' Результат ',
+      scope: RelationScope.active,
+    );
+    final rows = <TaggedEntity>[intention, relation];
+    const cursor = _TaggedEntitiesCursor();
+    const revision = _Revision();
+    final page = TaggedEntitiesPage(
+      tag: tag,
+      scope: TaggedEntitiesScope.active,
+      items: rows,
+      pageSize: 2,
+      nextCursor: cursor,
+      revision: revision,
+    );
+    rows.clear();
+
+    expect(page.tag, same(tag));
+    expect(page.scope, TaggedEntitiesScope.active);
+    expect(page.revision, same(revision));
+    expect(page.nextCursor, same(cursor));
+    expect(page.items, hasLength(2));
+    expect(intention.target, IntentionTagTarget(_intentionId(2)));
+    expect(intention.title, 'Намерение');
+    expect(relation.target, LongTermRelationTagTarget(_relationId(3)));
+    expect(relation.type, LongTermRelationType.need);
+    expect(relation.sourceTitle, 'Источник');
+    expect(relation.relatedTitle, 'Результат');
+    expect(() => page.items.clear(), throwsUnsupportedError);
+    expect(
+      () => TaggedEntitiesPage(
+        tag: tag,
+        scope: TaggedEntitiesScope.active,
+        items: [intention, relation],
+        pageSize: 1,
+        nextCursor: null,
+        revision: revision,
+      ),
+      throwsA(isA<TaggedEntitiesPageValidationException>()),
+    );
+  });
+
+  test('пустой охват и ошибочная страница различаются', () {
+    final tag = _tag(1, 'Дом');
+    const revision = _Revision();
+    final empty = TaggedEntitiesPage(
+      tag: tag,
+      scope: TaggedEntitiesScope.archived,
+      items: const [],
+      pageSize: 50,
+      nextCursor: null,
+      revision: revision,
+    );
+    expect(empty.items, isEmpty);
+    expect(empty.tag.id, tag.id);
+    final archivedRelation = TaggedLongTermRelation(
+      id: _relationId(3),
+      type: LongTermRelationType.can,
+      sourceTitle: 'Источник',
+      relatedTitle: 'Результат',
+      scope: RelationScope.archived,
+    );
+    expect(
+      TaggedEntitiesPage(
+        tag: tag,
+        scope: TaggedEntitiesScope.archived,
+        items: [archivedRelation],
+        pageSize: 1,
+        nextCursor: null,
+        revision: revision,
+      ).items.single,
+      same(archivedRelation),
+    );
+    expect(
+      () => TaggedEntitiesPage(
+        tag: tag,
+        scope: TaggedEntitiesScope.active,
+        items: const [],
+        pageSize: 50,
+        nextCursor: const _TaggedEntitiesCursor(),
+        revision: revision,
+      ),
+      throwsA(isA<TaggedEntitiesPageValidationException>()),
+    );
+    expect(
+      () => TaggedEntitiesPage(
+        tag: tag,
+        scope: TaggedEntitiesScope.active,
+        items: [
+          TaggedIntention(
+            id: _intentionId(2),
+            title: 'Намерение',
+            archiveState: IntentionArchiveState.archived,
+          ),
+        ],
+        pageSize: 1,
+        nextCursor: null,
+        revision: revision,
+      ),
+      throwsA(isA<TaggedEntitiesPageValidationException>()),
+    );
+  });
+
+  test('исходы чтения различают отсутствие тега и категории отказов', () async {
+    final TagReadContract source = _TagReadSource(const []);
+    final result = await source.getTaggedEntitiesPage(
+      TaggedEntitiesQuery(
+        tagId: _tag(1, 'Дом').id,
+        scope: TaggedEntitiesScope.active,
+      ),
+    );
+    expect((result as TaggedEntitiesPageSuccess).value.items, isEmpty);
+
+    const failures = <TaggedEntitiesReadFailure>[
+      TaggedEntitiesInvalidCursor(),
+      TaggedEntitiesSnapshotExpired(),
+      TaggedEntitiesTagNotFound(),
+      TaggedEntitiesUnavailableFailure(),
+      TaggedEntitiesCorruptionFailure(),
+      TaggedEntitiesUnexpectedFailure(),
+    ];
+    expect(failures.map((failure) => failure.category), [
+      GraphFailureCategory.validation,
+      GraphFailureCategory.conflict,
+      GraphFailureCategory.notFound,
+      GraphFailureCategory.unavailable,
+      GraphFailureCategory.corruption,
+      GraphFailureCategory.unexpected,
+    ]);
+    for (final failure in failures) {
+      final TaggedEntitiesPageResult outcome = TaggedEntitiesPageError(failure);
+      expect(outcome, isA<TaggedEntitiesPageError>());
+    }
   });
 
   test(
@@ -293,6 +475,10 @@ final class _AssignmentsCursor implements TagAssignmentsCursor {
   const _AssignmentsCursor();
 }
 
+final class _TaggedEntitiesCursor implements TaggedEntitiesCursor {
+  const _TaggedEntitiesCursor();
+}
+
 final class _Revision implements GraphRevision {
   const _Revision();
 
@@ -320,6 +506,20 @@ final class _TagReadSource implements TagReadContract {
   ) async => TagAssignmentsPageSuccess(
     TagAssignmentsPage(
       target: query.target,
+      items: const [],
+      pageSize: query.pageSize,
+      nextCursor: null,
+      revision: const _Revision(),
+    ),
+  );
+
+  @override
+  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
+    TaggedEntitiesQuery query,
+  ) async => TaggedEntitiesPageSuccess(
+    TaggedEntitiesPage(
+      tag: _tag(1, 'Дом'),
+      scope: query.scope,
       items: const [],
       pageSize: query.pageSize,
       nextCursor: null,

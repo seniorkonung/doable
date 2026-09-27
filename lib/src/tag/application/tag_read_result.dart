@@ -6,6 +6,7 @@ import '../domain/tag_target.dart';
 import 'tag_assignment_status.dart';
 import 'tag_assignments_page.dart';
 import 'tag_catalog.dart';
+import 'tagged_entities_page.dart';
 
 sealed class TagReadFailure implements GraphCommandFailure {
   const TagReadFailure();
@@ -61,6 +62,15 @@ abstract interface class TagReadContract {
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId tagId,
     TagTarget target,
+  );
+
+  /// Возвращает одну порцию непосредственно помеченных сущностей выбранного
+  /// тега в порядке создания назначений. Охват определяется собственным
+  /// архивным состоянием получателя до разбиения на порции. Пустой успех
+  /// отличается от отсутствия тега; продолжение принадлежит этому тегу,
+  /// охвату, размеру порции и подтверждённому снимку.
+  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
+    TaggedEntitiesQuery query,
   );
 
   /// Наблюдает один тег без загрузки назначений; каждый успех несёт ревизию.

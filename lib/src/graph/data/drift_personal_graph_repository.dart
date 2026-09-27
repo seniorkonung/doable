@@ -45,6 +45,7 @@ import '../../tag/application/tag_change.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_id_generator.dart';
 import '../../tag/application/tag_read_result.dart';
+import '../../tag/application/tagged_entities_page.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
@@ -125,6 +126,11 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<TagAssignmentsPageResult> getTagAssignmentsPage(
     TagAssignmentsQuery query,
   ) => _readTagAssignmentsPage(query);
+
+  @override
+  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
+    TaggedEntitiesQuery query,
+  ) async => const TaggedEntitiesPageError(TaggedEntitiesUnexpectedFailure());
 
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
