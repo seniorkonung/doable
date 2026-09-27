@@ -330,6 +330,58 @@ void main() {
     (_relationTarget(1), 'долговременной связи'),
   ]) {
     for (final assigned in [false, true]) {
+      test(
+        'поздний отказ проверки не заменяет статус второй порции для $recipient: ${assigned ? 'назначен' : 'свободен'}',
+        () async {
+          final h = _Harness();
+          addTearDown(h.dispose);
+          h.repository.page(0, []);
+          await pumpEventQueue();
+          h.model.setMode(TagCatalogSelectionMode(target));
+          h.repository.selectionPage(1, target, [
+            TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+          ], cursor: _Cursor());
+          await pumpEventQueue();
+          h.model.selectTag(_id(52));
+          h.repository.tagRead(_tag(52, 'Вторая порция'));
+          await pumpEventQueue();
+          expect(h.repository.statusQueries.single, (_id(52), target));
+          expect(h.model.assignSelected(), isNull);
+
+          final loading = h.model.loadMore();
+          h.repository.selectionPage(2, target, [
+            TagSelectionRow(
+              tag: _tag(52, 'Вторая порция'),
+              isAssigned: assigned,
+            ),
+          ]);
+          await loading;
+          expect(
+            (h.state as TagCatalogLoaded).selectedAssignment,
+            assigned
+                ? TagCatalogSelectedAssignment.assigned
+                : TagCatalogSelectedAssignment.available,
+          );
+
+          h.repository.statusReads.single.complete(
+            const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+          );
+          await pumpEventQueue();
+          expect(
+            (h.state as TagCatalogLoaded).selectedAssignment,
+            assigned
+                ? TagCatalogSelectedAssignment.assigned
+                : TagCatalogSelectedAssignment.available,
+          );
+          expect(h.repository.statusQueries, hasLength(1));
+          expect(
+            h.model.assignSelected(),
+            assigned ? isNull : isA<TagCommandAccepted>(),
+          );
+        },
+      );
+    }
+    for (final assigned in [false, true]) {
       for (final tagReadFirst in [false, true]) {
         test(
           'повтор проверки пары $recipient после ${tagReadFirst ? 'раннего' : 'позднего'} наблюдения тега: ${assigned ? 'назначен' : 'свободен'}',

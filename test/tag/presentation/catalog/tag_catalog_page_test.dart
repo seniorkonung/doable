@@ -46,6 +46,99 @@ void main() {
     (true, 'долговременной связи'),
   ]) {
     for (final assigned in [false, true]) {
+      testWidgets(
+        'экран сохраняет статус второй порции после позднего отказа для $recipient: ${assigned ? 'назначен' : 'свободен'}',
+        (tester) async {
+          final repository = _CatalogRepository();
+          addTearDown(repository.dispose);
+          final target = relation
+              ? LongTermRelationTagTarget(
+                  (LongTermRelationId.decode(
+                    _id(200),
+                  ) as LongTermRelationIdDecodingSuccess).id,
+                )
+              : IntentionTagTarget(
+                  (IntentionId.decode(
+                    _id(100),
+                  ) as IntentionIdDecodingSuccess).id,
+                );
+          await _pumpCatalog(tester, repository, target: target);
+          repository.complete(
+            TagCatalogPageSuccess(
+              data.TagCatalogPage.selection(
+                target: target,
+                rows: [
+                  TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+                ],
+                pageSize: TagCatalogQuery.defaultPageSize,
+                nextCursor: _Cursor(),
+                revision: const _Revision(),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(TagCatalogPage)),
+          );
+          container
+              .read(
+                tagCatalogViewModelProvider(
+                  mode: TagCatalogSelectionMode(target),
+                ).notifier,
+              )
+              .selectTag(_tag(52, 'Вторая порция').id);
+          repository.tagRead(_tag(52, 'Вторая порция'));
+          await tester.pumpAndSettle();
+          expect(repository.statusReads, hasLength(1));
+          final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+
+          await tester.tap(find.byKey(const ValueKey('tag-catalog-load-more')));
+          await tester.pump();
+          repository.complete(
+            TagCatalogPageSuccess(
+              data.TagCatalogPage.selection(
+                target: target,
+                rows: [
+                  TagSelectionRow(
+                    tag: _tag(52, 'Вторая порция'),
+                    isAssigned: assigned,
+                  ),
+                ],
+                pageSize: TagCatalogQuery.defaultPageSize,
+                nextCursor: null,
+                revision: const _Revision(),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          repository.statusReads.single.complete(
+            const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+          );
+          await tester.pumpAndSettle();
+
+          expect(
+            find.text('Could not load assignments. Try again.'),
+            findsNothing,
+          );
+          expect(find.text('Try again'), findsNothing);
+          expect(repository.statusReads, hasLength(1));
+          if (assigned) {
+            expect(assign, findsNothing);
+            expect(repository._commands, isEmpty);
+          } else {
+            expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+          }
+        },
+      );
+    }
+  }
+
+  for (final (relation, recipient) in [
+    (false, 'намерения'),
+    (true, 'долговременной связи'),
+  ]) {
+    for (final assigned in [false, true]) {
       for (final tagReadFirst in [false, true]) {
         testWidgets(
           'экран повторяет проверку пары $recipient после ${tagReadFirst ? 'раннего' : 'позднего'} чтения тега: ${assigned ? 'назначен' : 'свободен'}',

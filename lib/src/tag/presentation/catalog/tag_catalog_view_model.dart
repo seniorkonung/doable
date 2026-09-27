@@ -185,18 +185,29 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         _selectedAssignment != TagCatalogSelectedAssignment.unavailable) {
       return;
     }
+    if (current.canUseCurrentItems &&
+        !_precedesRequired(current.revision) &&
+        _selectedAssignmentFromRows(
+          current.selectionRows,
+          _selection.id,
+          current.revision,
+        )) {
+      state = current.withStatus(selectedAssignment: _selectedAssignment);
+      return;
+    }
     _clearSelectedAssignment();
     state = current.withStatus(selectedAssignment: _selectedAssignment);
-    _readSelectedAssignment();
+    _readSelectedAssignment(evenIfLoaded: true);
   }
 
-  void _readSelectedAssignment() {
+  void _readSelectedAssignment({bool evenIfLoaded = false}) {
     final current = state;
     final id = _selection.id;
     if (id == null ||
         current is! TagCatalogLoaded ||
         current.mode is! TagCatalogSelectionMode ||
-        current.selectionRows.any((row) => row.tag.id == id) ||
+        (!evenIfLoaded &&
+            current.selectionRows.any((row) => row.tag.id == id)) ||
         _selectedAssignment != TagCatalogSelectedAssignment.unknown) {
       return;
     }
@@ -999,6 +1010,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   ) {
     for (final row in rows) {
       if (row.tag.id == selectedId) {
+        _assignmentReadGeneration++;
         _setSelectedAssignment(
           row.isAssigned
               ? TagCatalogSelectedAssignment.assigned
