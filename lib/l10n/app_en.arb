@@ -544,7 +544,7 @@
   "@detailsDeleteConfirmationTitle": {
     "description": "Заголовок подтверждения необратимого удаления намерения"
   },
-  "detailsDeleteConfirmationMessage": "This can’t be undone. The intention and its description will be permanently deleted.",
+  "detailsDeleteConfirmationMessage": "This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.",
   "@detailsDeleteConfirmationMessage": {
     "description": "Объяснение необратимости физического удаления намерения"
   },

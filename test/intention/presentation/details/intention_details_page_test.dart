@@ -117,7 +117,11 @@ void main() {
     final dailyGroup = find.byKey(
       const ValueKey('relation-neighborhood-daily-source'),
     );
-    await Scrollable.ensureVisible(tester.element(dailyGroup), alignment: 0.3);
+    await tester.scrollUntilVisible(
+      dailyGroup,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(dailyGroup);
     await tester.pumpAndSettle();

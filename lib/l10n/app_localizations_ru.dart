@@ -527,7 +527,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsDeleteConfirmationMessage =>
-      'Это действие нельзя отменить. Намерение и его описание будут удалены навсегда.';
+      'Это действие нельзя отменить. Намерение, его описание и все назначения тегов, включая не показанные сейчас, будут удалены навсегда. Сами теги сохранятся.';
 
   @override
   String get detailsConfirmDeleteAction => 'Удалить навсегда';

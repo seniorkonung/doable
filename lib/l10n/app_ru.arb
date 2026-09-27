@@ -151,7 +151,7 @@
   "detailsRestoreAction": "Восстановить",
   "detailsDeleteAction": "Удалить навсегда",
   "detailsDeleteConfirmationTitle": "Удалить намерение навсегда?",
-  "detailsDeleteConfirmationMessage": "Это действие нельзя отменить. Намерение и его описание будут удалены навсегда.",
+  "detailsDeleteConfirmationMessage": "Это действие нельзя отменить. Намерение, его описание и все назначения тегов, включая не показанные сейчас, будут удалены навсегда. Сами теги сохранятся.",
   "detailsConfirmDeleteAction": "Удалить навсегда",
   "detailsDeleted": "Намерение удалено.",
   "detailsReadinessEnabled": "Намерение отмечено готовым к действию.",

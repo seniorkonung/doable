@@ -971,7 +971,7 @@ abstract class AppLocalizations {
   /// Объяснение необратимости физического удаления намерения
   ///
   /// In en, this message translates to:
-  /// **'This can’t be undone. The intention and its description will be permanently deleted.'**
+  /// **'This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.'**
   String get detailsDeleteConfirmationMessage;
 
   /// Явное подтверждение физического удаления намерения
