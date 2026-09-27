@@ -1,6 +1,82 @@
 part of 'drift_personal_graph_repository.dart';
 
 extension _TagReading on DriftPersonalGraphRepository {
+  Future<TagAssignmentStatusResult> _readTagAssignmentStatus(
+    TagId tagId,
+    TagTarget target,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    var stage = TagReadDiagnosticsStage.validation;
+    void record(DiagnosticsStatus status) => _recordDiagnostics(
+      TagAssignmentStatusReadDiagnosticsEvent(stage: stage, status: status),
+    );
+
+    record(const DiagnosticsStarted());
+    try {
+      final snapshot = await _sequencer.run(
+        () => _database.transaction(() async {
+          final targetSql = switch (target) {
+            IntentionTagTarget(:final intentionId) => _TagReadTargetSql(
+              table: 'intentions',
+              assignmentColumn: 'intention_id',
+              id: intentionId.toCanonicalString(),
+            ),
+            LongTermRelationTagTarget(:final relationId) => _TagReadTargetSql(
+              table: 'long_term_relations',
+              assignmentColumn: 'long_term_relation_id',
+              id: relationId.toCanonicalString(),
+            ),
+          };
+          stage = TagReadDiagnosticsStage.read;
+          final row = await _database
+              .customSelect(
+                '''SELECT EXISTS(SELECT 1 FROM tags WHERE id = ?) AS tag_exists,
+                 EXISTS(SELECT 1 FROM ${targetSql.table} WHERE id = ?) AS target_exists,
+                 EXISTS(SELECT 1 FROM tag_assignments
+                   WHERE tag_id = ? AND ${targetSql.assignmentColumn} = ?) AS is_assigned''',
+                variables: [
+                  Variable<String>(tagId.toCanonicalString()),
+                  Variable<String>(targetSql.id),
+                  Variable<String>(tagId.toCanonicalString()),
+                  Variable<String>(targetSql.id),
+                ],
+                readsFrom: {_database.tags, _database.tagAssignments},
+              )
+              .getSingle();
+          final tagExists = _requiredStoredInteger(row.data, 'tag_exists');
+          final targetExists = _requiredStoredInteger(
+            row.data,
+            'target_exists',
+          );
+          final assigned = _requiredStoredInteger(row.data, 'is_assigned');
+          if ((tagExists != 0 && tagExists != 1) ||
+              (targetExists != 0 && targetExists != 1) ||
+              (assigned != 0 && assigned != 1) ||
+              (assigned == 1 && (tagExists == 0 || targetExists == 0))) {
+            throw const _StoredIntentionCorruption();
+          }
+          if (tagExists == 0) throw const _TagStatusTagMissing();
+          if (targetExists == 0) throw const _TagReadTargetMissing();
+          return GraphSnapshot(
+            value: assigned == 1,
+            revision: _currentRevision,
+          );
+        }),
+      );
+      record(DiagnosticsSucceeded(stopwatch.elapsed));
+      return TagAssignmentStatusSuccess(snapshot);
+    } on Object catch (error) {
+      final failure = _classifyTagAssignmentStatusFailure(error);
+      record(
+        DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: _graphCommandDiagnosticsFailureCode(failure),
+        ),
+      );
+      return TagAssignmentStatusError(failure);
+    }
+  }
+
   Future<TagCatalogPageResult> _readTagCatalogPage(
     TagCatalogQuery query,
   ) async {
@@ -443,6 +519,28 @@ final class _DriftTagAssignmentsCursor implements TagAssignmentsCursor {
 
 final class _TagReadTargetMissing implements Exception {
   const _TagReadTargetMissing();
+}
+
+final class _TagStatusTagMissing implements Exception {
+  const _TagStatusTagMissing();
+}
+
+TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
+  if (error is _TagStatusTagMissing) {
+    return const TagAssignmentStatusTagNotFound();
+  }
+  if (error is _TagReadTargetMissing) {
+    return const TagAssignmentStatusTargetNotFound();
+  }
+  if (error is _StoredIntentionCorruption) {
+    return const TagAssignmentStatusCorruption();
+  }
+  return switch (classifySqliteFailure(error)) {
+    SqliteCorruptionFailure() => const TagAssignmentStatusCorruption(),
+    SqliteUnavailableFailure() => const TagAssignmentStatusUnavailable(),
+    SqliteConstraintFailure() ||
+    SqliteUnexpectedFailure() => const TagAssignmentStatusUnexpected(),
+  };
 }
 
 final class _InvalidTagAssignmentsCursor implements Exception {

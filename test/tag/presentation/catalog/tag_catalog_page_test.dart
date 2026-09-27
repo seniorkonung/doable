@@ -40,6 +40,133 @@ String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
 void main() {
+  for (final (relation, recipient) in [
+    (false, 'намерения'),
+    (true, 'долговременной связи'),
+  ]) {
+    for (final assigned in [false, true]) {
+      testWidgets(
+        'редактор подтверждает вне порции ${assigned ? 'назначенный' : 'свободный'} тег для $recipient',
+        (tester) async {
+          late sqlite.Database raw;
+          final database = AppDatabase(
+            openInMemoryLocalDatabase(setup: (db) => raw = db),
+          );
+          await database.open();
+          addTearDown(database.close);
+          for (final number in [100, 101]) {
+            raw.execute(
+              'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+              [_id(number), 'Намерение $number', 0, 0, number, number],
+            );
+          }
+          raw.execute(
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+            [_id(200), _id(100), _id(101), 'need', 2, 0],
+          );
+          for (var number = 1; number <= 52; number++) {
+            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+              _id(number),
+              number == 52 ? 'Дом' : 'Тег $number',
+            ]);
+          }
+          if (assigned) {
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, ${relation ? 'long_term_relation_id' : 'intention_id'}) VALUES (?, ?)',
+              [_id(52), _id(relation ? 200 : 100)],
+            );
+          }
+          final repository = DriftPersonalGraphRepository(
+            database,
+            UuidV7IntentionIdGenerator(),
+            () => DateTime.utc(2026, 9, 27),
+            InMemoryDiagnosticsSink(),
+          );
+          final router = AppRouter();
+          addTearDown(router.dispose);
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                personalGraphRepositoryProvider.overrideWithValue(repository),
+              ],
+              child: MaterialApp.router(
+                locale: const Locale('ru'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                routerConfig: router.config(),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final target = relation
+              ? LongTermRelationTagTarget(
+                  (LongTermRelationId.decode(
+                    _id(200),
+                  ) as LongTermRelationIdDecodingSuccess).id,
+                )
+              : IntentionTagTarget(
+                  (IntentionId.decode(
+                    _id(100),
+                  ) as IntentionIdDecodingSuccess).id,
+                );
+          router.push<Object?>(TagCatalogRoute(target: target));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('tag-catalog-load-more')),
+            findsOneWidget,
+          );
+          await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const ValueKey('tag-editor-name')),
+            'дом',
+          );
+          await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+          for (
+            var attempt = 0;
+            attempt < 30 &&
+                find
+                    .byKey(const ValueKey('tag-editor-use-existing'))
+                    .evaluate()
+                    .isEmpty;
+            attempt++
+          ) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 20)),
+            );
+            await tester.pumpAndSettle();
+          }
+          await tester.tap(
+            find.byKey(const ValueKey('tag-editor-use-existing')),
+          );
+          await _waitForEditorToClose(tester);
+          expect(
+            find.byKey(const ValueKey('tag-catalog-load-more')),
+            findsOneWidget,
+          );
+          final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+          if (assigned) {
+            expect(assign, findsNothing);
+          } else {
+            expect(assign, findsOneWidget);
+            expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+            await tester.tap(assign);
+            await tester.pumpAndSettle();
+            expect(
+              raw
+                  .select(
+                    'SELECT tag_id FROM tag_assignments WHERE ${relation ? 'long_term_relation_id' : 'intention_id'} = ?',
+                    [_id(relation ? 200 : 100)],
+                  )
+                  .map((row) => row['tag_id']),
+              [_id(52)],
+            );
+          }
+        },
+      );
+    }
+  }
+
   testWidgets(
     'выбор назначает свободный тег архивному получателю только по нажатию',
     (tester) async {

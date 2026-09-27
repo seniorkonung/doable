@@ -1,5 +1,6 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -7,6 +8,8 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments_page.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tag_assignment_status.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -82,6 +85,139 @@ void main() {
 
   TagSelectionPage selection(TagCatalogPageResult result) =>
       (result as TagCatalogPageSuccess).value as TagSelectionPage;
+
+  test(
+    'точечное чтение различает пару и отсутствие для обоих получателей',
+    () async {
+      final assignedTag = (TagId.decode(
+        tagFixtureId(firstTagNumber),
+      ) as TagIdDecodingSuccess).id;
+      final freeTag = (TagId.decode(
+        tagFixtureId(lastTagNumber),
+      ) as TagIdDecodingSuccess).id;
+      final missingTag =
+          (TagId.decode(tagFixtureId(999)) as TagIdDecodingSuccess).id;
+      for (final (assignedTarget, missingTarget) in [
+        (
+          IntentionTagTarget(_intention(1)),
+          IntentionTagTarget(_intention(999)),
+        ),
+        (
+          LongTermRelationTagTarget(_relation(101)),
+          LongTermRelationTagTarget(_relation(999)),
+        ),
+      ]) {
+        final assigned = await graph.getTagAssignmentStatus(
+          assignedTag,
+          assignedTarget,
+        );
+        final free = await graph.getTagAssignmentStatus(
+          freeTag,
+          assignedTarget,
+        );
+        expect((assigned as TagAssignmentStatusSuccess).value.value, isTrue);
+        expect((free as TagAssignmentStatusSuccess).value.value, isFalse);
+        expect(
+          assigned.value.revision.compareTo(free.value.revision),
+          GraphRevisionOrder.same,
+        );
+        expect(
+          await graph.getTagAssignmentStatus(missingTag, assignedTarget),
+          isA<TagAssignmentStatusError>().having(
+            (error) => error.failure,
+            'failure',
+            isA<TagAssignmentStatusTagNotFound>(),
+          ),
+        );
+        expect(
+          await graph.getTagAssignmentStatus(assignedTag, missingTarget),
+          isA<TagAssignmentStatusError>().having(
+            (error) => error.failure,
+            'failure',
+            isA<TagAssignmentStatusTargetNotFound>(),
+          ),
+        );
+      }
+    },
+  );
+
+  test(
+    'точечное чтение у начала и конца большого каталога использует индексы',
+    () async {
+      for (var number = 303; number <= 1502; number++) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          tagFixtureId(number),
+          'Тег $number',
+        ]);
+        for (final (column, recipient) in [
+          ('intention_id', tagFixtureId(1)),
+          ('long_term_relation_id', tagFixtureId(101)),
+        ]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+            [tagFixtureId(number), recipient],
+          );
+        }
+      }
+      var visits = 0;
+      raw.createFunction(
+        functionName: 'measure_pair_scan',
+        function: (_) {
+          visits++;
+          return 1;
+        },
+      );
+      for (final (target, column, recipient) in [
+        (IntentionTagTarget(_intention(1)), 'intention_id', tagFixtureId(1)),
+        (
+          LongTermRelationTagTarget(_relation(101)),
+          'long_term_relation_id',
+          tagFixtureId(101),
+        ),
+      ]) {
+        for (final number in [303, 1502]) {
+          final tag =
+              (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
+          probe.statements.clear();
+          final result = await graph.getTagAssignmentStatus(tag, target);
+          expect((result as TagAssignmentStatusSuccess).value.value, isTrue);
+          final query = probe.statements.singleWhere(
+            (sql) => sql.contains('AS is_assigned'),
+          );
+          expect(probe.statements, hasLength(1));
+          final args = [
+            tagFixtureId(number),
+            recipient,
+            tagFixtureId(number),
+            recipient,
+          ];
+          final plan = raw
+              .select('EXPLAIN QUERY PLAN $query', args)
+              .map((row) => row['detail'].toString())
+              .toList();
+          expect(
+            plan.join(' '),
+            contains('SEARCH tag_assignments USING COVERING INDEX'),
+          );
+          final measured = query.replaceFirst(
+            'AND $column = ?',
+            'AND $column = ? AND measure_pair_scan(tag_id) = 1',
+          );
+          expect(measured, isNot(query));
+          expect(
+            raw
+                .select('EXPLAIN QUERY PLAN $measured', args)
+                .map((row) => row['detail'].toString())
+                .toList(),
+            plan,
+          );
+          visits = 0;
+          expect(raw.select(measured, args).single['is_assigned'], 1);
+          expect(visits, 1);
+        }
+      }
+    },
+  );
 
   test(
     'порции назначений сохраняют порядок создания для обоих получателей',

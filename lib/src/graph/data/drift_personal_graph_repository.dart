@@ -39,6 +39,7 @@ import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
 import '../../tag/application/tag_catalog.dart';
+import '../../tag/application/tag_assignment_status.dart';
 import '../../tag/application/tag_assignments_page.dart';
 import '../../tag/application/tag_change.dart';
 import '../../tag/application/tag_command.dart';
@@ -124,6 +125,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<TagAssignmentsPageResult> getTagAssignmentsPage(
     TagAssignmentsQuery query,
   ) => _readTagAssignmentsPage(query);
+
+  @override
+  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
+    TagId tagId,
+    TagTarget target,
+  ) => _readTagAssignmentStatus(tagId, target);
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);

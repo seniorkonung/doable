@@ -6,6 +6,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
@@ -91,6 +92,7 @@ void main() {
 
     final pending = h.model.loadMore();
     h.model.setMode(TagCatalogSelectionMode(_target(2)));
+    h.repository.statusRead(0, false);
     h.repository.selectionPage(2, _target(1), [
       TagSelectionRow(tag: _tag(2, 'Старый'), isAssigned: true),
     ]);
@@ -327,6 +329,171 @@ void main() {
     (_target(1), 'намерения'),
     (_relationTarget(1), 'долговременной связи'),
   ]) {
+    for (final assigned in [false, true]) {
+      test(
+        'точечное чтение выбора вне порции для $recipient: ${assigned ? 'назначен' : 'свободен'}',
+        () async {
+          final h = _Harness();
+          addTearDown(h.dispose);
+          h.repository.page(0, []);
+          await pumpEventQueue();
+          h.model.setMode(TagCatalogSelectionMode(target));
+          h.repository.selectionPage(1, target, [
+            TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+          ], cursor: _Cursor());
+          await pumpEventQueue();
+          h.model.selectTag(_id(52));
+          h.repository.tagRead(_tag(52, 'Вне порции'));
+          await pumpEventQueue();
+          expect(h.repository.statusQueries.single, (_id(52), target));
+          expect(h.model.assignSelected(), isNull);
+          h.repository.statusRead(0, assigned);
+          await pumpEventQueue();
+          expect(
+            (h.state as TagCatalogLoaded).selectedAssignment,
+            assigned
+                ? TagCatalogSelectedAssignment.assigned
+                : TagCatalogSelectedAssignment.available,
+          );
+          expect(
+            h.model.assignSelected(),
+            assigned ? isNull : isA<TagCommandAccepted>(),
+          );
+        },
+      );
+    }
+  }
+
+  test(
+    'поздние ответы прежнего выбора и ревизии не открывают назначение',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, []);
+      await pumpEventQueue();
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+      ], cursor: _Cursor());
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Старый'));
+      h.model.selectTag(_id(53));
+      h.repository.tagRead(_tag(53, 'Текущий'));
+      await pumpEventQueue();
+      h.repository.statusRead(0, false);
+      h.repository.statusRead(1, true);
+      await pumpEventQueue();
+      expect((h.state as TagCatalogLoaded).selection.id, _id(53));
+      expect(
+        (h.state as TagCatalogLoaded).selectedAssignment,
+        TagCatalogSelectedAssignment.assigned,
+      );
+      expect(h.model.assignSelected(), isNull);
+
+      await h.renamed(_tag(1, 'Первый'), _tag(1, 'Новый'), revision: 2);
+      expect(h.repository.statusQueries, hasLength(3));
+      h.repository.selectionPage(
+        2,
+        _target(1),
+        [TagSelectionRow(tag: _tag(1, 'Новый'), isAssigned: false)],
+        cursor: _Cursor(),
+        revision: 2,
+      );
+      await pumpEventQueue();
+      h.repository.statusRead(2, false, revision: 1);
+      await pumpEventQueue();
+      expect(h.repository.statusQueries, hasLength(4));
+      expect(h.model.assignSelected(), isNull);
+      h.repository.statusRead(3, true, revision: 2);
+      await pumpEventQueue();
+      expect(h.model.assignSelected(), isNull);
+    },
+  );
+
+  test('ответ точечного чтения другой эпохи не открывает назначение', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, []);
+    await pumpEventQueue();
+    h.model.setMode(TagCatalogSelectionMode(_target(1)));
+    h.repository.selectionPage(1, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+    ], cursor: _Cursor());
+    await pumpEventQueue();
+    h.model.selectTag(_id(52));
+    h.repository.tagRead(_tag(52, 'Вне порции'));
+    h.repository.statusRead(0, false, epoch: 1);
+    await pumpEventQueue();
+    expect(h.model.assignSelected(), isNull);
+    expect(h.repository.statusQueries, hasLength(2));
+    h.repository.statusRead(1, true);
+    await pumpEventQueue();
+    expect(
+      (h.state as TagCatalogLoaded).selectedAssignment,
+      TagCatalogSelectedAssignment.assigned,
+    );
+    expect(h.model.assignSelected(), isNull);
+  });
+
+  test(
+    'отсутствие получателя и отказ точечного чтения не разрешают назначение',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, []);
+      await pumpEventQueue();
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+      ], cursor: _Cursor());
+      await pumpEventQueue();
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Вне порции'));
+      h.repository.statusReads[0].complete(
+        const TagAssignmentStatusError(TagAssignmentStatusUnavailable()),
+      );
+      await pumpEventQueue();
+      expect(h.model.assignSelected(), isNull);
+      h.model.selectTag(_id(53));
+      h.repository.tagRead(_tag(53, 'Другой'));
+      h.repository.statusReads[1].complete(
+        const TagAssignmentStatusError(TagAssignmentStatusTargetNotFound()),
+      );
+      await pumpEventQueue();
+      expect(h.state, isA<TagCatalogTargetMissing>());
+      expect(h.model.assignSelected(), isNull);
+    },
+  );
+
+  test('точечное отсутствие тега снимает выбор вне порции', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, []);
+    await pumpEventQueue();
+    h.model.setMode(TagCatalogSelectionMode(_target(1)));
+    h.repository.selectionPage(1, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+    ], cursor: _Cursor());
+    await pumpEventQueue();
+    h.model.selectTag(_id(52));
+    h.repository.tagRead(_tag(52, 'Удалённый'));
+    h.repository.statusReads.single.complete(
+      const TagAssignmentStatusError(TagAssignmentStatusTagNotFound()),
+    );
+    await pumpEventQueue();
+    expect(
+      (h.state as TagCatalogLoaded).selection,
+      isA<TagCatalogNoSelection>(),
+    );
+    expect(h.model.assignSelected(), isNull);
+    expect(h.repository.commands, isEmpty);
+  });
+
+  for (final (target, recipient) in [
+    (_target(1), 'намерения'),
+    (_relationTarget(1), 'долговременной связи'),
+  ]) {
     test(
       'назначенный тег второй порции остаётся назначенным после обновления для $recipient',
       () async {
@@ -396,6 +563,10 @@ void main() {
           cursor: _Cursor(),
           revision: 2,
         );
+        await pumpEventQueue();
+
+        expect(h.repository.statusQueries.single, (_id(52), target));
+        h.repository.statusRead(0, false, revision: 2);
         await pumpEventQueue();
 
         expect(h.model.assignSelected(), isA<TagCommandAccepted>());
@@ -1160,6 +1331,30 @@ final class _Repository extends Fake implements PersonalGraphRepository {
   final pages = <Completer<TagCatalogPageResult>>[];
   final commands = <Completer<TagCommandResult>>[];
   final tagReads = <StreamController<TagReadResult>>[];
+  final statusQueries = <(TagId, TagTarget)>[];
+  final statusReads = <Completer<TagAssignmentStatusResult>>[];
+
+  @override
+  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
+    TagId id,
+    TagTarget target,
+  ) {
+    statusQueries.add((id, target));
+    final completer = Completer<TagAssignmentStatusResult>();
+    statusReads.add(completer);
+    return completer.future;
+  }
+
+  void statusRead(
+    int index,
+    bool assigned, {
+    int revision = 1,
+    int epoch = 0,
+  }) => statusReads[index].complete(
+    TagAssignmentStatusSuccess(
+      GraphSnapshot(value: assigned, revision: _Revision(revision, epoch)),
+    ),
+  );
 
   @override
   Stream<TagReadResult> watchTag(TagId id) {

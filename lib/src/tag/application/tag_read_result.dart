@@ -2,6 +2,8 @@ import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
+import '../domain/tag_target.dart';
+import 'tag_assignment_status.dart';
 import 'tag_assignments_page.dart';
 import 'tag_catalog.dart';
 
@@ -52,6 +54,13 @@ abstract interface class TagReadContract {
   /// продолжение принадлежит получателю и подтверждённому снимку.
   Future<TagAssignmentsPageResult> getTagAssignmentsPage(
     TagAssignmentsQuery query,
+  );
+
+  /// Проверяет одну пару на согласованном снимке. Отсутствие каждого участника
+  /// и отказ чтения различны; остальные назначения не загружаются.
+  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
+    TagId tagId,
+    TagTarget target,
   );
 
   /// Наблюдает один тег без загрузки назначений; каждый успех несёт ревизию.

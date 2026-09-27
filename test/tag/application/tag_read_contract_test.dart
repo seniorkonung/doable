@@ -3,6 +3,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -306,6 +307,12 @@ final class _TagReadSource implements TagReadContract {
 
   final List<TagReadResult> results;
   TagId? requestedId;
+
+  @override
+  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
+    TagId tagId,
+    TagTarget target,
+  ) async => const TagAssignmentStatusError(TagAssignmentStatusUnexpected());
 
   @override
   Future<TagAssignmentsPageResult> getTagAssignmentsPage(
