@@ -86,3 +86,102 @@ Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
             .map((row) => row.values.toList())
             .toList(),
     };
+
+/// Большие воспроизводимые списки для измерения двух видов чтения.
+void seedLargeTagReadFixture(sqlite.Database database, {int tagCount = 1203}) {
+  database.execute('BEGIN');
+  try {
+    for (final number in [1, 2, 3]) {
+      database.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          tagFixtureId(number),
+          'Намерение $number',
+          0,
+          number == 2 ? 1 : 0,
+          number,
+          number,
+        ],
+      );
+    }
+    database.execute(
+      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+      [tagFixtureId(101), tagFixtureId(1), tagFixtureId(3), 'need', 2, 0],
+    );
+    for (var index = 0; index < tagCount; index++) {
+      final id = tagFixtureId(10000 + index);
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        id,
+        'Тег ${index.toString().padLeft(5, '0')}',
+      ]);
+      if (index.isEven) {
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [id, tagFixtureId(1)],
+        );
+      }
+      if (index % 3 == 0) {
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+          [id, tagFixtureId(101)],
+        );
+      }
+    }
+    database.execute('COMMIT');
+  } on Object {
+    database.execute('ROLLBACK');
+    rethrow;
+  }
+}
+
+/// Один тег назначен каждому получателю двух видов, половина из них архивна.
+void seedWidelyAssignedTagFixture(
+  sqlite.Database database, {
+  int recipientPairs = 1200,
+}) {
+  database.execute('BEGIN');
+  try {
+    database.execute(
+      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [tagFixtureId(1), 'Исходное намерение', 0, 0, 1, 1],
+    );
+    for (final (number, name) in [
+      (9000, 'Общий тег'),
+      (9001, 'Сохранённый тег'),
+    ]) {
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(number),
+        name,
+      ]);
+    }
+    database.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(9001), tagFixtureId(1)],
+    );
+    for (var index = 0; index < recipientPairs; index++) {
+      final intentionId = tagFixtureId(10000 + index);
+      final relationId = tagFixtureId(20000 + index);
+      final archived = index.isOdd ? 1 : 0;
+      database.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [intentionId, 'Получатель $index', 0, archived, index + 2, index + 2],
+      );
+      database.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [relationId, tagFixtureId(1), intentionId, 'need', 2, archived],
+      );
+      database.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(9000), intentionId],
+      );
+      database.execute(
+        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+        [tagFixtureId(9000), relationId],
+      );
+    }
+    database.execute('COMMIT');
+  } on Object {
+    database.execute('ROLLBACK');
+    rethrow;
+  }
+}

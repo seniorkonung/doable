@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import 'tag_delete_cost.dart' as cost;
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -304,4 +305,9 @@ void main() {
     expect(result, isA<TagCommandSucceeded>());
     expect(raw.select('SELECT * FROM tags'), isEmpty);
   });
+
+  test('широко используемый тег удаляется одним компактным каскадом', () async {
+    await database.close();
+    await cost.measureWidelyAssignedTagDeletion();
+  }, tags: ['slow']);
 }
