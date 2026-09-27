@@ -10,12 +10,16 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_per
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
+import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../neighborhood/neighborhood_test_support.dart';
+import '../../../support/tag_read_contract_test_fallback.dart';
 import 'relation_details_test_support.dart';
 
 void main() {
@@ -450,6 +454,44 @@ void main() {
       'Saving changes…',
     );
   });
+
+  testWidgets(
+    'выполняющаяся команда связи блокирует выбор тега до завершения',
+    (tester) async {
+      final repository = ControlledRelationDetailsRepository();
+      addTearDown(repository.dispose);
+      final relationId = testRelationId(110);
+      await _pumpRelationDetails(
+        tester,
+        repository,
+        relationId,
+        startUpdateBeforeOpening: true,
+        tagReads: _ReadyRelationTags(),
+      );
+      repository
+          .watchAt(0)
+          .emitDetails(
+            testRelationDetails(
+              relationId: relationId,
+              sourceId: testIntentionId(1),
+              relatedId: testIntentionId(2),
+            ),
+            revision: revision,
+          );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final choose = find.byKey(const ValueKey('tag-assignments-choose'));
+      expect(choose, findsOneWidget);
+      expect(tester.widget<TextButton>(choose).onPressed, isNull);
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(choose).onPressed, isNotNull);
+    },
+  );
 
   testWidgets(
     'ошибка согласования оставляет данные и предлагает уместный повтор',
@@ -899,6 +941,7 @@ Future<ProviderContainer> _pumpRelationDetails(
   Locale locale = const Locale('en'),
   TextScaler textScaler = TextScaler.noScaling,
   bool startUpdateBeforeOpening = false,
+  TagReadContract? tagReads,
 }) async {
   // Просмотр проверяется целиком: высокая поверхность исключает влияние
   // прокрутки на поиск данных и переходов.
@@ -906,7 +949,11 @@ Future<ProviderContainer> _pumpRelationDetails(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final container = ProviderContainer(
-    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      personalGraphRepositoryProvider.overrideWithValue(repository),
+      if (tagReads != null)
+        tagAssignmentsReaderProvider.overrideWithValue(tagReads),
+    ],
     retry: (retryCount, error) => null,
   );
   addTearDown(container.dispose);
@@ -940,4 +987,21 @@ Future<ProviderContainer> _pumpRelationDetails(
   );
   await tester.pump();
   return container;
+}
+
+final class _ReadyRelationTags
+    with TagReadContractTestFallback
+    implements TagReadContract {
+  @override
+  Future<TagAssignmentsPageResult> getTagAssignmentsPage(
+    TagAssignmentsQuery query,
+  ) async => TagAssignmentsPageSuccess(
+    TagAssignmentsPage(
+      target: query.target,
+      items: const [],
+      pageSize: query.pageSize,
+      nextCursor: null,
+      revision: const TestGraphRevision(1),
+    ),
+  );
 }

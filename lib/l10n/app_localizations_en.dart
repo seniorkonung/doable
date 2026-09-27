@@ -1419,7 +1419,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String relatedTitle,
     String scope,
   ) {
-    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. Both intentions and all other relations will remain.';
+    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. All tag assignments of this relation, including those not shown here, will be removed. The tags, both intentions and all other relations will remain.';
   }
 
   @override

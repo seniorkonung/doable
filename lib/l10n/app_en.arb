@@ -1361,7 +1361,7 @@
   "@relationDetailsDeleteConfirmationTitle": {
     "description": "Заголовок подтверждения необратимого удаления конкретной связи"
   },
-  "relationDetailsDeleteConfirmationMessage": "Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. Both intentions and all other relations will remain.",
+  "relationDetailsDeleteConfirmationMessage": "Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. All tag assignments of this relation, including those not shown here, will be removed. The tags, both intentions and all other relations will remain.",
   "@relationDetailsDeleteConfirmationMessage": {
     "description": "Контекст и объяснение необратимости удаления конкретной связи",
     "placeholders": {

@@ -1425,7 +1425,7 @@ class AppLocalizationsRu extends AppLocalizations {
     String relatedTitle,
     String scope,
   ) {
-    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Оба намерения и все остальные связи сохранятся.';
+    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Все назначения тегов этой связи, включая не показанные сейчас, будут сняты. Сами теги, оба намерения и все остальные связи сохранятся.';
   }
 
   @override
