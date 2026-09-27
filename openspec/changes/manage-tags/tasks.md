@@ -628,3 +628,13 @@
   - **Зависимости:** 2.30.
   - **Вероятные файлы:** `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, при необходимости `lib/src/tag/presentation/catalog/tag_catalog_state.dart` и `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, `test/tag/presentation/catalog/tag_catalog_view_model_test.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`.
   - **Оценка объёма:** S.
+
+- [ ] 2.32 Согласовать поздний ответ точечной проверки с загруженной порцией выбранного тега
+  - **Критерии приёмки:**
+    - Если следующая порция подтверждает статус назначения выбранной пары, поздний отказ ранее начатой точечной проверки не заменяет этот статус на недоступный. Свободная пара сохраняет доступное явное назначение, назначенная пара не получает повторную команду.
+    - Показываемый пользователю повтор проверки никогда не оказывается пустым действием: он приводит к актуальному подтверждённому статусу из загруженной порции либо запускает проверку пары. До достоверного подтверждения свободной пары назначение остаётся недоступным. Поздние ответы прежнего выбора, получателя, ревизии или эпохи не меняют текущий статус.
+    - Проверки ViewModel и экрана воспроизводят выбор тега вне первой порции, начало точечного чтения, появление тега в следующей порции и поздний отказ чтения. Для намерения и долговременной связи проверены свободная и уже назначенная пара, доступность назначения и отсутствие бесполезного повтора.
+  - **Проверка:** `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_view_model_test.dart test/tag/presentation/catalog/tag_catalog_page_test.dart`; `mise exec --no-deps -- flutter analyze`; `mise exec --no-deps -- openspec validate manage-tags --strict --no-interactive`.
+  - **Зависимости:** 2.29, 2.30, 2.31.
+  - **Вероятные файлы:** `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, при необходимости `lib/src/tag/presentation/catalog/tag_catalog_state.dart` и `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, `test/tag/presentation/catalog/tag_catalog_view_model_test.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`.
+  - **Оценка объёма:** S.
