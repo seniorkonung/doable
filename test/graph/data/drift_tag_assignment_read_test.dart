@@ -221,6 +221,224 @@ void main() {
     }
   });
 
+  test('проверка ссылок выполняется один раз за обход каждого вида', () async {
+    for (var number = 303; number <= 305; number++) {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(number),
+        'Тег $number',
+      ]);
+      for (final column in ['intention_id', 'long_term_relation_id']) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+          [
+            tagFixtureId(number),
+            tagFixtureId(column == 'intention_id' ? 1 : 101),
+          ],
+        );
+      }
+    }
+    for (final target in [
+      IntentionTagTarget(_intention(1)),
+      LongTermRelationTagTarget(_relation(101)),
+    ]) {
+      probe.statements.clear();
+      TagAssignmentsCursor? assignmentCursor;
+      var assignmentPages = 0;
+      do {
+        final page = assignments(
+          await graph.getTagAssignmentsPage(
+            TagAssignmentsQuery(
+              target: target,
+              pageSize: 1,
+              cursor: assignmentCursor,
+            ),
+          ),
+        );
+        assignmentCursor = page.nextCursor;
+        assignmentPages++;
+      } while (assignmentCursor != null);
+      expect(assignmentPages, greaterThan(1));
+      expect(
+        probe.statements.where((sql) => sql.contains('LEFT JOIN tags')),
+        hasLength(1),
+      );
+
+      probe.statements.clear();
+      TagCatalogCursor? catalogCursor;
+      var catalogPages = 0;
+      do {
+        final page = selection(
+          await graph.getTagCatalogPage(
+            TagCatalogQuery(
+              mode: TagCatalogSelectionMode(target),
+              pageSize: 1,
+              cursor: catalogCursor,
+            ),
+          ),
+        );
+        catalogCursor = page.nextCursor;
+        catalogPages++;
+      } while (catalogCursor != null);
+      expect(catalogPages, greaterThan(1));
+      expect(
+        probe.statements.where((sql) => sql.contains('LEFT JOIN tags')),
+        hasLength(1),
+      );
+    }
+  });
+
+  test('повреждённая ссылка вне первой порции отклоняет оба чтения', () async {
+    raw.execute('PRAGMA foreign_keys = OFF');
+    for (final target in [
+      IntentionTagTarget(_intention(1)),
+      LongTermRelationTagTarget(_relation(101)),
+    ]) {
+      final (column, id) = switch (target) {
+        IntentionTagTarget() => ('intention_id', tagFixtureId(1)),
+        LongTermRelationTagTarget() => (
+          'long_term_relation_id',
+          tagFixtureId(101),
+        ),
+      };
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+        [tagFixtureId(999), id],
+      );
+      expect(
+        await graph.getTagAssignmentsPage(
+          TagAssignmentsQuery(target: target, pageSize: 1),
+        ),
+        isA<TagAssignmentsPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TagAssignmentsCorruptionFailure>(),
+        ),
+      );
+      expect(
+        await graph.getTagCatalogPage(
+          TagCatalogQuery(mode: TagCatalogSelectionMode(target), pageSize: 1),
+        ),
+        isA<TagCatalogPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TagCatalogCorruptionFailure>(),
+        ),
+      );
+      raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
+        tagFixtureId(999),
+      ]);
+    }
+  });
+
+  test('продолжение замечает повреждение после первой порции', () async {
+    raw.execute('PRAGMA foreign_keys = OFF');
+    for (final target in [
+      IntentionTagTarget(_intention(1)),
+      LongTermRelationTagTarget(_relation(101)),
+    ]) {
+      final (column, id) = switch (target) {
+        IntentionTagTarget() => ('intention_id', tagFixtureId(1)),
+        LongTermRelationTagTarget() => (
+          'long_term_relation_id',
+          tagFixtureId(101),
+        ),
+      };
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(target is IntentionTagTarget ? 303 : 304),
+        target is IntentionTagTarget
+            ? 'Дополнительный тег намерения'
+            : 'Дополнительный тег связи',
+      ]);
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+        [tagFixtureId(target is IntentionTagTarget ? 303 : 304), id],
+      );
+      final firstAssignments = assignments(
+        await graph.getTagAssignmentsPage(
+          TagAssignmentsQuery(target: target, pageSize: 1),
+        ),
+      );
+      expect(firstAssignments.nextCursor, isNotNull);
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+        [tagFixtureId(999), id],
+      );
+      expect(
+        await graph.getTagAssignmentsPage(
+          TagAssignmentsQuery(
+            target: target,
+            pageSize: 1,
+            cursor: firstAssignments.nextCursor,
+          ),
+        ),
+        isA<TagAssignmentsPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TagAssignmentsCorruptionFailure>(),
+        ),
+      );
+      raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
+        tagFixtureId(999),
+      ]);
+      expect(
+        await graph.getTagAssignmentsPage(
+          TagAssignmentsQuery(
+            target: target,
+            pageSize: 1,
+            cursor: firstAssignments.nextCursor,
+          ),
+        ),
+        isA<TagAssignmentsPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TagAssignmentsSnapshotExpired>(),
+        ),
+      );
+
+      final firstSelection = selection(
+        await graph.getTagCatalogPage(
+          TagCatalogQuery(mode: TagCatalogSelectionMode(target), pageSize: 1),
+        ),
+      );
+      expect(firstSelection.nextCursor, isNotNull);
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+        [tagFixtureId(999), id],
+      );
+      expect(
+        await graph.getTagCatalogPage(
+          TagCatalogQuery(
+            mode: TagCatalogSelectionMode(target),
+            pageSize: 1,
+            cursor: firstSelection.nextCursor,
+          ),
+        ),
+        isA<TagCatalogPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TagCatalogCorruptionFailure>(),
+        ),
+      );
+      raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
+        tagFixtureId(999),
+      ]);
+      expect(
+        await graph.getTagCatalogPage(
+          TagCatalogQuery(
+            mode: TagCatalogSelectionMode(target),
+            pageSize: 1,
+            cursor: firstSelection.nextCursor,
+          ),
+        ),
+        isA<TagCatalogPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TagCatalogSnapshotExpired>(),
+        ),
+      );
+    }
+  });
+
   test('чужие и устаревшие продолжения не смешивают снимки', () async {
     final target = IntentionTagTarget(_intention(1));
     raw.execute(

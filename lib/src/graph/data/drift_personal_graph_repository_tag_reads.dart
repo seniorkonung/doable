@@ -30,9 +30,19 @@ extension _TagReading on DriftPersonalGraphRepository {
             TagCatalogBrowseMode() => null,
             TagCatalogSelectionMode(:final target) => target,
           };
+          final storageVersion = selectionTarget == null
+              ? null
+              : await _tagReadStorageVersion();
+          final storageChanged =
+              cursor is _DriftTagCatalogCursor &&
+              cursor.storageVersion != storageVersion;
           final targetSql = selectionTarget == null
               ? null
-              : await _validatedTagReadTarget(selectionTarget);
+              : await _validatedTagReadTarget(
+                  selectionTarget,
+                  checkAssignmentReferences: cursor == null || storageChanged,
+                );
+          if (storageChanged) throw const _TagCatalogSnapshotHasExpired();
           final boundary = cursor is _DriftTagCatalogCursor
               ? cursor.boundarySequence
               : null;
@@ -90,6 +100,7 @@ extension _TagReading on DriftPersonalGraphRepository {
                   mode: query.mode,
                   revision: revision,
                   pageSize: query.pageSize,
+                  storageVersion: storageVersion,
                   boundarySequence: _requiredStoredInteger(
                     rows[query.pageSize - 1].data,
                     'creation_sequence',
@@ -151,7 +162,15 @@ extension _TagReading on DriftPersonalGraphRepository {
             throw const _TagAssignmentsSnapshotHasExpired();
           }
           stage = TagReadDiagnosticsStage.read;
-          final target = await _validatedTagReadTarget(query.target);
+          final storageVersion = await _tagReadStorageVersion();
+          final storageChanged =
+              cursor is _DriftTagAssignmentsCursor &&
+              cursor.storageVersion != storageVersion;
+          final target = await _validatedTagReadTarget(
+            query.target,
+            checkAssignmentReferences: cursor == null || storageChanged,
+          );
+          if (storageChanged) throw const _TagAssignmentsSnapshotHasExpired();
           final boundary = cursor is _DriftTagAssignmentsCursor
               ? cursor.boundarySequence
               : null;
@@ -194,6 +213,7 @@ extension _TagReading on DriftPersonalGraphRepository {
                     target: query.target,
                     revision: revision,
                     pageSize: query.pageSize,
+                    storageVersion: storageVersion,
                     boundarySequence: _requiredStoredInteger(
                       rows[query.pageSize - 1].data,
                       'creation_sequence',
@@ -218,7 +238,10 @@ extension _TagReading on DriftPersonalGraphRepository {
     }
   }
 
-  Future<_TagReadTargetSql> _validatedTagReadTarget(TagTarget target) async {
+  Future<_TagReadTargetSql> _validatedTagReadTarget(
+    TagTarget target, {
+    required bool checkAssignmentReferences,
+  }) async {
     final sql = switch (target) {
       IntentionTagTarget(:final intentionId) => _TagReadTargetSql(
         table: 'intentions',
@@ -248,16 +271,30 @@ extension _TagReading on DriftPersonalGraphRepository {
       if (dangling != null) throw const _StoredIntentionCorruption();
       throw const _TagReadTargetMissing();
     }
-    final orphan = await _database
-        .customSelect(
-          '''SELECT 1 FROM tag_assignments a LEFT JOIN tags t ON t.id = a.tag_id
+    if (checkAssignmentReferences) {
+      final orphan = await _database
+          .customSelect(
+            '''SELECT 1 FROM tag_assignments a LEFT JOIN tags t ON t.id = a.tag_id
          WHERE a.${sql.assignmentColumn} = ? AND t.id IS NULL LIMIT 1''',
-          variables: [Variable<String>(sql.id)],
-          readsFrom: {_database.tags, _database.tagAssignments},
-        )
-        .getSingleOrNull();
-    if (orphan != null) throw const _StoredIntentionCorruption();
+            variables: [Variable<String>(sql.id)],
+            readsFrom: {_database.tags, _database.tagAssignments},
+          )
+          .getSingleOrNull();
+      if (orphan != null) throw const _StoredIntentionCorruption();
+    }
     return sql;
+  }
+
+  Future<_TagReadStorageVersion> _tagReadStorageVersion() async {
+    final row = await _database
+        .customSelect(
+          'SELECT total_changes() AS connection_changes, data_version FROM pragma_data_version',
+        )
+        .getSingle();
+    return (
+      connectionChanges: _requiredStoredInteger(row.data, 'connection_changes'),
+      dataVersion: _requiredStoredInteger(row.data, 'data_version'),
+    );
   }
 
   Stream<TagReadResult> _watchTag(TagId id) async* {
@@ -342,6 +379,7 @@ final class _DriftTagCatalogCursor implements TagCatalogCursor {
     required this.mode,
     required this.revision,
     required this.pageSize,
+    required this.storageVersion,
     required this.boundarySequence,
   });
 
@@ -349,6 +387,7 @@ final class _DriftTagCatalogCursor implements TagCatalogCursor {
   final TagCatalogMode mode;
   final GraphRevision revision;
   final int pageSize;
+  final _TagReadStorageVersion? storageVersion;
   final int boundarySequence;
 
   bool matches(TagCatalogQuery query, _GraphEpoch owner) =>
@@ -369,12 +408,15 @@ final class _TagReadTargetSql {
   final String id;
 }
 
+typedef _TagReadStorageVersion = ({int connectionChanges, int dataVersion});
+
 final class _DriftTagAssignmentsCursor implements TagAssignmentsCursor {
   const _DriftTagAssignmentsCursor({
     required this.epoch,
     required this.target,
     required this.revision,
     required this.pageSize,
+    required this.storageVersion,
     required this.boundarySequence,
   });
 
@@ -382,6 +424,7 @@ final class _DriftTagAssignmentsCursor implements TagAssignmentsCursor {
   final TagTarget target;
   final GraphRevision revision;
   final int pageSize;
+  final _TagReadStorageVersion storageVersion;
   final int boundarySequence;
 
   bool matches(TagAssignmentsQuery query, _GraphEpoch owner) =>

@@ -19,7 +19,32 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
-const _tagCount = 1203;
+int _measureReferenceCheckVisits(sqlite.Database database, _Select select) {
+  var visits = 0;
+  database.createFunction(
+    functionName: 'measure_assignment_visit',
+    function: (_) {
+      visits++;
+      return 1;
+    },
+  );
+  final measuredSql = select.sql.replaceFirst(
+    'AND t.id IS NULL',
+    'AND measure_assignment_visit(a.tag_id) = 1 AND t.id IS NULL',
+  );
+  expect(measuredSql, isNot(select.sql));
+  final originalPlan = database
+      .select('EXPLAIN QUERY PLAN ${select.sql}', select.arguments)
+      .map((row) => row['detail'])
+      .toList();
+  final measuredPlan = database
+      .select('EXPLAIN QUERY PLAN $measuredSql', select.arguments)
+      .map((row) => row['detail'])
+      .toList();
+  expect(measuredPlan, originalPlan);
+  expect(database.select(measuredSql, select.arguments), isEmpty);
+  return visits;
+}
 
 final class _Select {
   const _Select(this.sql, this.arguments, this.rows);
@@ -55,13 +80,15 @@ final class _Page {
 }
 
 void main() {
-  test(
-    'большие назначения и выбор читаются ограниченными порциями',
-    _measureTagAssignmentReadCost,
-  );
+  for (final tagCount in [203, 1203]) {
+    test(
+      'назначения и выбор читаются ограниченными порциями при $tagCount тегах',
+      () => _measureTagAssignmentReadCost(tagCount),
+    );
+  }
 }
 
-Future<void> _measureTagAssignmentReadCost() async {
+Future<void> _measureTagAssignmentReadCost(int tagCount) async {
   final directory = await Directory.systemTemp.createTemp(
     'doable_assignment_cost_',
   );
@@ -79,7 +106,7 @@ Future<void> _measureTagAssignmentReadCost() async {
   );
   try {
     await database.open();
-    seedLargeTagReadFixture(raw, tagCount: _tagCount);
+    seedLargeTagReadFixture(raw, tagCount: tagCount);
     final repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -136,12 +163,21 @@ Future<void> _measureTagAssignmentReadCost() async {
       }
       timer.stop();
       final selects = List<_Select>.of(trace.selects);
-      expect(selects, hasLength(3));
-      expect(selects[0].sql, contains('SELECT 1 FROM'));
-      expect(selects[1].sql, contains('LEFT JOIN tags'));
+      expect(selects, hasLength(cursor == null ? 4 : 3));
+      expect(selects[0].sql, contains('FROM pragma_data_version'));
       expect(selects[0].rows, 1);
-      expect(selects[1].rows, 0);
-      final main = selects[2];
+      expect(selects[1].sql, contains('SELECT 1 FROM'));
+      expect(selects[1].rows, 1);
+      if (cursor == null) {
+        expect(selects[2].sql, contains('LEFT JOIN tags'));
+        expect(selects[2].rows, 0);
+      } else {
+        expect(
+          selects.where((select) => select.sql.contains('LEFT JOIN tags')),
+          isEmpty,
+        );
+      }
+      final main = selects.last;
       final sql = main.sql.toUpperCase();
       expect(sql, contains('ORDER BY'));
       expect(sql, contains('LIMIT ?'));
@@ -196,7 +232,7 @@ Future<void> _measureTagAssignmentReadCost() async {
           'kind': 'tag_assignment_page',
           'target': target is IntentionTagTarget ? 'intention' : 'relation',
           'read': kind,
-          'tags': _tagCount,
+          'tags': tagCount,
           'pageSize': size,
           'position': position,
           'selectsPerPage': first.selects.length,
@@ -212,7 +248,7 @@ Future<void> _measureTagAssignmentReadCost() async {
 
     Future<void> traverse(TagTarget target, int size, String kind) async {
       final expected = [
-        for (var index = 0; index < _tagCount; index++)
+        for (var index = 0; index < tagCount; index++)
           if (kind == 'selection' ||
               (target is IntentionTagTarget ? index.isEven : index % 3 == 0))
             tagFixtureId(10000 + index),
@@ -225,11 +261,19 @@ Future<void> _measureTagAssignmentReadCost() async {
       var pages = 0;
       var rows = 0;
       var elapsed = 0;
+      var referenceCheckRuns = 0;
+      var referenceCheckVisits = 0;
       do {
         final queryCursor = cursor;
         final page = await read(target, size, kind, cursor);
         pages++;
         rows += page.selects.fold<int>(0, (sum, select) => sum + select.rows);
+        for (final select in page.selects) {
+          if (select.sql.contains('LEFT JOIN tags')) {
+            referenceCheckRuns++;
+            referenceCheckVisits += _measureReferenceCheckVisits(raw, select);
+          }
+        }
         elapsed += page.elapsed;
         ids.addAll(page.ids);
         assigned.addAll(page.assigned);
@@ -245,11 +289,18 @@ Future<void> _measureTagAssignmentReadCost() async {
       expect(ids.toSet(), hasLength(expected.length));
       if (kind == 'selection') {
         expect(assigned, [
-          for (var index = 0; index < _tagCount; index++)
+          for (var index = 0; index < tagCount; index++)
             target is IntentionTagTarget ? index.isEven : index % 3 == 0,
         ]);
       }
-      expect(rows, expected.length + pages - 1 + pages);
+      expect(rows, expected.length + pages - 1 + pages * 2);
+      expect(referenceCheckRuns, 1);
+      expect(
+        referenceCheckVisits,
+        target is IntentionTagTarget
+            ? (tagCount + 1) ~/ 2
+            : (tagCount + 2) ~/ 3,
+      );
       for (final position in ['first', 'middle', 'last']) {
         final (sampleCursor, page) = samples[position]!;
         await sample(target, size, kind, position, sampleCursor, page);
@@ -259,11 +310,14 @@ Future<void> _measureTagAssignmentReadCost() async {
           'kind': 'tag_assignment_traversal',
           'target': target is IntentionTagTarget ? 'intention' : 'relation',
           'read': kind,
-          'tags': _tagCount,
+          'tags': tagCount,
           'pageSize': size,
-          'queries': pages * 3,
+          'queries': pages * 3 + 1,
           'materializedRows': rows,
           'resultRows': ids.length,
+          'referenceCheckRuns': referenceCheckRuns,
+          'referenceCheckVisits': referenceCheckVisits,
+          'repeatedCheckVisits': referenceCheckVisits * pages,
           'elapsedMicroseconds': elapsed,
         }),
       );
@@ -283,7 +337,7 @@ Future<void> _measureTagAssignmentReadCost() async {
     debugPrintSynchronously(
       jsonEncode({
         'kind': 'tag_assignment_read_fixture',
-        'tags': _tagCount,
+        'tags': tagCount,
         'assignments': raw
             .select('SELECT COUNT(*) FROM tag_assignments')
             .single
