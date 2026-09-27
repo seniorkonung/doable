@@ -35,6 +35,10 @@ final class TagCatalogTargetMissing extends TagCatalogState {
 
 enum TagCatalogFreshness { current, refreshing, stale }
 
+/// Признак относится только к выбранному тегу и получателю текущего режима.
+/// Неизвестный признак не разрешает отправку назначения.
+enum TagCatalogSelectedAssignment { unknown, available, assigned }
+
 sealed class TagCatalogSelection {
   const TagCatalogSelection();
 
@@ -127,6 +131,7 @@ final class TagCatalogLoaded extends TagCatalogState {
     this.refreshFailure,
     this.pageStatus = const TagCatalogPageIdle(),
     this.assignmentStatus = const TagCatalogAssignmentIdle(),
+    this.selectedAssignment = TagCatalogSelectedAssignment.unknown,
   }) : items = List.unmodifiable(items),
        selectionRows = List.unmodifiable(selectionRows);
 
@@ -140,6 +145,7 @@ final class TagCatalogLoaded extends TagCatalogState {
   final TagCatalogReadFailure? refreshFailure;
   final TagCatalogPageStatus pageStatus;
   final TagCatalogAssignmentStatus assignmentStatus;
+  final TagCatalogSelectedAssignment selectedAssignment;
 
   bool get isEmpty => items.isEmpty;
   bool get canUseCurrentItems => freshness == TagCatalogFreshness.current;
@@ -152,6 +158,7 @@ final class TagCatalogLoaded extends TagCatalogState {
     TagCatalogPageStatus? pageStatus,
     TagCatalogSelection? selection,
     TagCatalogAssignmentStatus? assignmentStatus,
+    TagCatalogSelectedAssignment? selectedAssignment,
   }) => TagCatalogLoaded(
     mode: mode,
     items: items ?? this.items,
@@ -160,22 +167,9 @@ final class TagCatalogLoaded extends TagCatalogState {
     revision: revision,
     selection: selection ?? this.selection,
     freshness: freshness ?? this.freshness,
-    refreshFailure: refreshFailure,
+    refreshFailure: refreshFailure ?? this.refreshFailure,
     pageStatus: pageStatus ?? this.pageStatus,
     assignmentStatus: assignmentStatus ?? this.assignmentStatus,
+    selectedAssignment: selectedAssignment ?? this.selectedAssignment,
   );
-
-  TagCatalogLoaded withSelection(TagCatalogSelection selection) =>
-      TagCatalogLoaded(
-        mode: mode,
-        items: items,
-        selectionRows: selectionRows,
-        nextCursor: nextCursor,
-        revision: revision,
-        selection: selection,
-        freshness: freshness,
-        refreshFailure: refreshFailure,
-        pageStatus: pageStatus,
-        assignmentStatus: assignmentStatus,
-      );
 }

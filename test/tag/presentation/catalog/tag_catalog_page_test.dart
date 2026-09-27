@@ -140,6 +140,34 @@ void main() {
             .map((row) => row['tag_id']),
         [_id(1), _id(52)],
       );
+      expect(find.byKey(const ValueKey('tag-catalog-assign')), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Тег 52'),
+        -300,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('tag-catalog-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Тег 52'),
+            matching: find.byType(ListTile),
+          ),
+          matching: find.text('Назначен'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        container
+            .read(
+              tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target))
+                  .notifier,
+            )
+            .assignSelected(),
+        isNull,
+      );
       await tester.tap(find.byKey(const ValueKey('tag-catalog-load-more')));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
@@ -175,12 +203,61 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-load-more')));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        lastRow,
+        300,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('tag-catalog-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.tap(lastRow);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('tag-catalog-assign')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('tag-catalog-assign')), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Тег 52'),
+        -300,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('tag-catalog-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
       expect(
-        raw.select(
-          'SELECT tag_id FROM tag_assignments WHERE long_term_relation_id = ?',
-          [_id(200)],
-        ).single['tag_id'],
-        _id(2),
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Тег 52'),
+            matching: find.byType(ListTile),
+          ),
+          matching: find.text('Назначен'),
+        ),
+        findsOneWidget,
+      );
+      final relationContainer = ProviderScope.containerOf(
+        tester.element(find.byType(TagCatalogPage)),
+      );
+      expect(
+        relationContainer
+            .read(
+              tagCatalogViewModelProvider(
+                mode: TagCatalogSelectionMode(relationTarget),
+              ).notifier,
+            )
+            .assignSelected(),
+        isNull,
+      );
+      expect(
+        raw
+            .select(
+              'SELECT tag_id FROM tag_assignments WHERE long_term_relation_id = ?',
+              [_id(200)],
+            )
+            .map((row) => row['tag_id']),
+        containsAll([_id(2), _id(52)]),
       );
       router.pop();
       expect(await relationResult, isNull);

@@ -395,9 +395,8 @@ final class _LoadedCatalog extends StatelessWidget {
     final selectedInPage =
         selected != null && state.items.any((tag) => tag.id == selected.id);
     final selectedOutsidePage = selected != null && !selectedInPage;
-    final selectedAssigned = state.selectionRows.any(
-      (row) => row.tag.id == selected?.id && row.isAssigned,
-    );
+    final selectedAssigned =
+        state.selectedAssignment == TagCatalogSelectedAssignment.assigned;
     return Column(
       children: [
         if (state.freshness == TagCatalogFreshness.refreshing)
@@ -437,7 +436,18 @@ final class _LoadedCatalog extends StatelessWidget {
                   selected: true,
                   child: ListTile(
                     title: Text(selectedTag.name.value),
-                    subtitle: Text(localizations.tagCatalogSelected),
+                    subtitle: Text(
+                      choosing
+                          ? switch (state.selectedAssignment) {
+                              TagCatalogSelectedAssignment.assigned =>
+                                localizations.tagCatalogAssigned,
+                              TagCatalogSelectedAssignment.available =>
+                                localizations.tagCatalogAvailable,
+                              TagCatalogSelectedAssignment.unknown =>
+                                localizations.tagCatalogSelected,
+                            }
+                          : localizations.tagCatalogSelected,
+                    ),
                     trailing: !choosing && state.canUseCurrentItems
                         ? _TagActions(
                             tag: selectedTag,
@@ -503,6 +513,8 @@ final class _LoadedCatalog extends StatelessWidget {
                 onPressed:
                     state.canUseCurrentItems &&
                         state.assignmentStatus is TagCatalogAssignmentIdle &&
+                        state.selectedAssignment ==
+                            TagCatalogSelectedAssignment.available &&
                         model.canActOn(selected.id)
                     ? onAssign
                     : null,
