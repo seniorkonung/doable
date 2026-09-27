@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Исправления F1 и F2 переданы в незавершённые задачи 1.31–1.34; это планирование не подтверждает исправление кода. Ранее отмеченная выполненной задача 1.30 не подтверждает готовность каталога до выполнения новых задач и повторной проверки реализации.
+**Summary:** Исправлены гонка опережающего чтения страницы и задержка удаления подтверждённо отсутствующего выбранного тега из открытого каталога. Для задач 1.31–1.34 проверены реализация, тесты и отметки повторной готовности. Неразрешённых замечаний и принятых остаточных рисков нет.
 
 ## Review target
 
-- **Baseline ref:** c7fd121af6757c162bf62864e43271a2140ee4ae
-- **Base commit:** c7fd121af6757c162bf62864e43271a2140ee4ae
-- **Reviewed head:** e6596932ad7cdde9a2ecaea865d236468d931fb5
-- **Target commits:** ["6194fd1f6f9f3921b9e4da406e7481b492357d29", "a55a6b6ddb1c599e8489a361e177e303ddc9254a", "bc85426869173259f000c5391cb55a5fa5ffe5c1", "e6596932ad7cdde9a2ecaea865d236468d931fb5"]
-- **Reviewable paths:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/tag/presentation/catalog/tag_catalog_page.dart", "lib/src/tag/presentation/catalog/tag_catalog_state.dart", "lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "lib/src/tag/presentation/catalog/tag_catalog_view_model.g.dart", "lib/src/tag/presentation/editor/tag_editor_page.dart", "lib/src/tag/presentation/editor/tag_editor_state.dart", "lib/src/tag/presentation/editor/tag_editor_view_model.dart", "lib/src/tag/presentation/editor/tag_editor_view_model.g.dart", "openspec/changes/manage-tags/tasks.md", "test/app/tag_app_lifecycle_test.dart", "test/tag/presentation/catalog/tag_catalog_delete_test.dart", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart", "test/tag/presentation/editor/tag_editor_page_test.dart", "test/tag/presentation/editor/tag_editor_view_model_test.dart"]
+- **Baseline ref:** 8b424dafcad028ab9ec7cda3a523605997f039eb
+- **Base commit:** 8b424dafcad028ab9ec7cda3a523605997f039eb
+- **Reviewed head:** 7f1b86a9c314de8dbf92ed56650cc34e3e3ef71c
+- **Target commits:** ["179d90b72e2ffb78b54a6dfd8cd53ab19b53bcf4", "6cb1cd1aea23c6c82149b763fe5feb6222286eca", "0c128fdf39b9f3b4ebd5fc1481f0f7419e191890", "7f1b86a9c314de8dbf92ed56650cc34e3e3ef71c"]
+- **Reviewable paths:** ["lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "openspec/changes/manage-tags/tasks.md", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart"]
 - **OpenSpec change:** manage-tags
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,37 +22,29 @@
 
 ## Reviewed increment
 
-### U1 · Согласование выбранного тега с подтверждённым каталогом
+### U1 · Согласование выбора после опережающего чтения страницы
 
-- **Work items:** ["1.27", "1.30"]
-- **Requirements and scenarios:** ["Подтверждённые изменения и согласованные представления тегов", "Запоздалое чтение после переименования", "Получение данных и безопасные ошибки тегов"]
-- **Affected boundary:** Пользователь открытого каталога → состояние выбора и порционные чтения → общий канал подтверждённых изменений и наблюдение тега.
-- **Implementation target:** ["lib/src/tag/presentation/catalog/tag_catalog_page.dart", "lib/src/tag/presentation/catalog/tag_catalog_state.dart", "lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "lib/src/tag/presentation/catalog/tag_catalog_view_model.g.dart", "test/app/tag_app_lifecycle_test.dart", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart"]
-- **Applicable constraints and non-goals:** Идентичность определяется `TagId`; каталог читается ограниченными порциями; после подтверждения записи поздний ответ не возвращает старое состояние. Назначения и навигация по помеченным сущностям относятся к следующим фазам.
+- **Work items:** ["1.31", "1.32"]
+- **Requirements and scenarios:** ["Подтверждённые изменения и согласованные представления тегов", "Запоздалое чтение после переименования", "Ограниченное получение и последовательный просмотр тегов"]
+- **Affected boundary:** Пользователь открытого каталога → выбранный TagId, порционная страница и наблюдение тега → пакет подтверждённых изменений графа.
+- **Implementation target:** ["lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart"]
+- **Applicable constraints and non-goals:** Идентичность выбора сохраняется по TagId; чтение остаётся ограниченным порциями, ответы прежней ревизии не возвращают устаревшие данные. Управление назначениями и навигация по помеченным сущностям относятся к следующим фазам.
 
-### U2 · Видимый исход повторного сохранения занятой формы
+### U2 · Удаление подтверждённо отсутствующего выбора до пакета
 
-- **Work items:** ["1.28", "1.30"]
-- **Requirements and scenarios:** ["Подтверждённые изменения и согласованные представления тегов", "Повторная отправка создания", "Локализация и доступность управления тегами"]
-- **Affected boundary:** Повторно открытая форма создания или переименования → общий координатор команд → локализованное сообщение и единый канал результата.
-- **Implementation target:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/tag/presentation/editor/tag_editor_page.dart", "lib/src/tag/presentation/editor/tag_editor_state.dart", "lib/src/tag/presentation/editor/tag_editor_view_model.dart", "lib/src/tag/presentation/editor/tag_editor_view_model.g.dart", "test/app/tag_app_lifecycle_test.dart", "test/tag/presentation/editor/tag_editor_page_test.dart", "test/tag/presentation/editor/tag_editor_view_model_test.dart"]
-- **Applicable constraints and non-goals:** Принятая запись завершается после ухода с формы, повторная команда не ставится в очередь, ввод новой сессии сохраняется, результат предъявляется один раз; сообщение доступно на ru/en.
-
-### U3 · Завершение сообщения о занятом удалении
-
-- **Work items:** ["1.29", "1.30"]
-- **Requirements and scenarios:** ["Удаление общего тега", "Подтверждённые изменения и согласованные представления тегов", "Локализация и доступность управления тегами"]
-- **Affected boundary:** Повторное подтверждение в каталоге → общий координатор команд → сообщение о занятости и конечный результат удаления.
-- **Implementation target:** ["lib/src/tag/presentation/catalog/tag_catalog_page.dart", "test/tag/presentation/catalog/tag_catalog_delete_test.dart"]
-- **Applicable constraints and non-goals:** Удаление требует отдельного подтверждения для конкретного `TagId`; повтор не создаёт вторую запись, занятость исчезает по завершении исходной команды, итог предъявляется по общему протоколу на ru/en.
+- **Work items:** ["1.33", "1.34"]
+- **Requirements and scenarios:** ["Подтверждённые изменения и согласованные представления тегов", "Наблюдение сообщает об отсутствии выбранного тега раньше пакета изменений", "Ограниченное получение и последовательный просмотр тегов"]
+- **Affected boundary:** Наблюдение выбранного тега → строки и действия открытого каталога → повторное чтение порции и её продолжение.
+- **Implementation target:** ["lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart"]
+- **Applicable constraints and non-goals:** Отсутствующий тег и его действия исчезают сразу; оставшаяся порция не выдаётся за актуальную, а поздняя прежняя страница не восстанавливает строку. Порционность сохраняется; назначения и навигация находятся вне этого инкремента.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежий рецензент с нулевой историей проверил все 19 изменённых delivery/test путей U1–U3 на точном диапазоне; неизменённые контракт, координатор и адаптер чтения использованы только как контекст. |
-| OpenSpec conformance | Complete | Сопоставлены задачи 1.27–1.30, спецификация, дизайн и тесты. На HEAD e6596932ad7cdde9a2ecaea865d236468d931fb5 прошли `mise exec --no-deps -- openspec validate manage-tags --json` и `--strict --no-interactive`, 47 тестов `test/tag/presentation test/app/tag_app_lifecycle_test.dart` и `mise run --skip-tools check` (форматирование, анализ, 1669 тестов). F1 передано в задачи 1.31–1.32, F2 — в сценарий «Наблюдение сообщает об отсутствии выбранного тега раньше пакета изменений» и задачи 1.33–1.34; код после передачи не проверялся повторно. |
-| Code quality | Complete | На зафиксированном HEAD проверены корректность гонок, читаемость состояний, границы модулей, безопасность сообщений и стоимость чтения во всех изменённых delivery-путях; `git diff --check` прошёл. |
+| Independent decision review | Complete | Свежий рецензент с нулевой историей проверил объединённую границу U1–U2: все три изменённых пути реализации и тестов на точном диапазоне; неизменённые состояние каталога, интерфейс, контракты ревизий, координатор и Drift-чтения использованы только как контекст. Существенных замечаний нет. |
+| OpenSpec conformance | Complete | Задачи 1.31–1.34 сопоставлены со спецификацией, дизайном и четырьмя коммитами. В чистом рабочем дереве на HEAD 7f1b86a9c314de8dbf92ed56650cc34e3e3ef71c прошли mise exec --no-deps -- openspec validate manage-tags --json, mise exec --no-deps -- openspec validate manage-tags --strict --no-interactive, целевые тесты каталога и жизненного цикла приложения (32 теста) и mise run --skip-tools check (форматирование без изменений, анализ без замечаний, 1680 тестов). |
+| Code quality | Complete | Проверены корректность порядка страницы, пакета и наблюдения, отказов и действий с выбором; читаемость и границы ViewModel, безопасность пользовательских данных и ограниченность чтения. git diff --check для четырёх изменённых путей на точном диапазоне прошёл. |
 
 ## Findings
 
@@ -60,4 +52,4 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Все четыре целевых коммита и задачи 1.27–1.30 охвачены U1–U3. Каждый из 20 изменённых путей включён в review unit либо отмечен как planning evidence; других путей в диапазоне нет. Сверены поток чтения выбранного тега, ревизии порционного каталога, публикация координатора, завершение занятых команд, локализации и семантика сообщений; неизменённые координатор и адаптер чтения использованы как контекст. Отчёт касается только зафиксированного диапазона; задачи 1.31–1.34 планируют последующее исправление F1 и F2 и не означают повторной проверки реализации.
+Коммит 179d90b72e2ffb78b54a6dfd8cd53ab19b53bcf4 и задача 1.31 охвачены U1 через изменения ViewModel, тестов и отметку задачи; коммит 6cb1cd1aea23c6c82149b763fe5feb6222286eca и проверочная задача 1.32 — через ту же единицу и результаты проверок. Коммит 0c128fdf39b9f3b4ebd5fc1481f0f7419e191890 и задача 1.33 охвачены U2 через изменения ViewModel, тестов и отметку задачи; коммит 7f1b86a9c314de8dbf92ed56650cc34e3e3ef71c и проверочная задача 1.34 — через U2 и повторные проверки. Все четыре reviewable path учтены: три пути реализации и тестов входят в обе единицы, tasks.md служит свидетельством планирования. Ранее переданные в эти задачи замечания F1 и F2 повторно оценены на исправленном коде; активных замечаний в предыдущем отчёте не было. Последующие фазы назначений и навигации не входят в проверяемый инкремент. Рабочее дерево до записи отчёта было чистым.
