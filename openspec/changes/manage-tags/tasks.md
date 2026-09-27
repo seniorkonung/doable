@@ -638,3 +638,13 @@
   - **Зависимости:** 2.29, 2.30, 2.31.
   - **Вероятные файлы:** `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, при необходимости `lib/src/tag/presentation/catalog/tag_catalog_state.dart` и `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, `test/tag/presentation/catalog/tag_catalog_view_model_test.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`.
   - **Оценка объёма:** S.
+
+- [ ] 2.33 Восстанавливать бюджет устаревших чтений при повторе проверки назначения
+  - **Критерии приёмки:**
+    - После исчерпания установленного предела устаревших ответов точечной проверки выбранной пары повтор пользователя начинает новую попытку с полным бюджетом. Временное отставание снимка в новой попытке не вызывает отказ уже на первом устаревшем ответе; дальнейшие автоматические повторы остаются ограниченными.
+    - До подтверждения актуального статуса пары действие «Назначить» недоступно. Свободная пара становится доступной для явного назначения только после актуального ответа, уже назначенная пара не получает повторную команду. Ответы прежнего выбора, получателя, ревизии или эпохи не меняют текущий статус.
+    - Проверки ViewModel и экрана для намерения и долговременной связи воспроизводят исчерпание бюджета, ручной повтор, несколько устаревших ответов и последующий актуальный ответ; подтверждают доступность повтора и отсутствие преждевременного отказа или назначения по устаревшему снимку.
+  - **Проверка:** `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_view_model_test.dart test/tag/presentation/catalog/tag_catalog_page_test.dart`; `mise exec --no-deps -- flutter analyze`; `mise exec --no-deps -- openspec validate manage-tags --strict --no-interactive`.
+  - **Зависимости:** 2.30, 2.31, 2.32.
+  - **Вероятные файлы:** `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, `test/tag/presentation/catalog/tag_catalog_view_model_test.dart`, при необходимости `test/tag/presentation/catalog/tag_catalog_page_test.dart`.
+  - **Оценка объёма:** S.
