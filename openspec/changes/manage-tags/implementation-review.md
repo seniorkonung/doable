@@ -3,10 +3,10 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** Incomplete
 **Coverage status:** Incomplete
 **Coverage limitations:** Повторная release-сборка APK на текущем рабочем дереве остановилась на игнорируемом `android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`, оставшемся от интеграционного запуска: он ссылается на недоступный release-сборке `integration_test`. Сборка после удаления этого файла зафиксирована в версии свидетельства 2.26, но повторять её с изменением иных файлов в рамках ревью нельзя.
-**Summary:** Активным замечанием остаётся потеря признака назначения выбранного тега вне первой порции. Ранее принятых остаточных рисков нет.
+**Summary:** Активных замечаний и принятых остаточных рисков нет; повторная проверка release-сборки APK остаётся неполной.
 
 ## Review target
 
@@ -44,19 +44,12 @@
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Complete | Два свежих рецензента проверили точный диапазон: один всю объединённую границу U1–U2 из 74 путей, второй U1 из 32 путей. Сгенерированные файлы сверены с исходниками. |
-| OpenSpec conformance | Incomplete | Задачи 2.1–2.26 сопоставлены со спецификациями тегов, намерений и связей, дизайном и свидетельствами. На чистом HEAD 33e464aca112a4ec227b8e181a2a3ce6eaea35df прошли OpenSpec JSON и strict validate, `flutter analyze`, целевые тесты (125), `mise run --skip-tools check` (1830 тестов) и `mise run --skip-tools codegen-check` (0 изменённых файлов). Повторный `flutter build apk --release --no-pub` остановился на игнорируемом GeneratedPluginRegistrant.java с тестовым плагином; прежняя успешная сборка описана в `evidence/assignment-phase-readiness.md`. Активное расхождение описано в F3. |
+| OpenSpec conformance | Incomplete | Задачи 2.1–2.26 сопоставлены со спецификациями тегов, намерений и связей, дизайном и свидетельствами. На чистом HEAD 33e464aca112a4ec227b8e181a2a3ce6eaea35df прошли OpenSpec JSON и strict validate, `flutter analyze`, целевые тесты (125), `mise run --skip-tools check` (1830 тестов) и `mise run --skip-tools codegen-check` (0 изменённых файлов). Повторный `flutter build apk --release --no-pub` остановился на игнорируемом GeneratedPluginRegistrant.java с тестовым плагином; прежняя успешная сборка описана в `evidence/assignment-phase-readiness.md`. |
 | Code quality | Complete | Проверены все 74 пути реализации и тестов: корректность, читаемость, границы модулей, безопасность диагностики, стоимость чтений и полнота проверок. `git diff --check`, анализатор и полный тестовый набор прошли на записанном head. |
 
 ## Findings
 
-### F3 · Medium — выбранный назначенный тег вновь предлагает назначение после обновления
-
-- **Evidence:** `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart:356-364` сохраняет выбранный `Tag`, но заменяет `selectionRows` первой порцией. Для ранее выбранного назначенного тега из второй порции `lib/src/tag/presentation/catalog/tag_catalog_page.dart:395-400,496-507` считает `selectedAssigned` ложным и показывает активное «Назначить»; `tag_catalog_view_model.dart:152-178` также проверяет только текущие строки. Повторная команда в хранилище идемпотентна, но действие интерфейса ложно.
-- **Evidence revisions:** ["33e464aca112a4ec227b8e181a2a3ce6eaea35df"]
-- **Impact:** Любое подтверждённое изменение графа может обновить первую порцию и затем предложить пользователю уже выполненное назначение выбранного тега вне этой порции.
-- **Required outcome:** Статус назначения выбранного тега и доступность действия остаются достоверными после обновления порции, включая выбор вне загруженных строк.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["2.8", "2.12", "lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "lib/src/tag/presentation/catalog/tag_catalog_page.dart"]
+No findings confirmed; review incomplete.
 
 ## Review coverage
 

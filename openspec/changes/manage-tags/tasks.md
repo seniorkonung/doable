@@ -598,3 +598,13 @@
   - **Зависимости:** 2.27.
   - **Вероятные файлы:** `lib/src/data/local/schema/tag_schema.drift`, `lib/src/data/local/app_database.dart`, миграция и schema snapshot, `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, тесты чтения, миграции и файловой долговечности; при реализации — свидетельство измерений в `openspec/changes/manage-tags/evidence/`.
   - **Оценка объёма:** L.
+
+- [ ] 2.29 Сохранить достоверный статус назначения выбранного тега после обновления каталога
+  - **Критерии приёмки:**
+    - Если выбранный тег находится вне обновлённой первой порции, отсутствие его строки в этой порции не трактуется как отсутствие назначения. После подтверждённого изменения графа состояние выбора для того же `TagId` и `TagTarget` показывает актуальный признак назначения либо удерживает действие недоступным до его подтверждения без загрузки всего каталога.
+    - Уже назначенный выбранный тег не получает активное действие «Назначить» и не отправляется повторно через ViewModel. Для действительно доступного тега явное назначение остаётся возможным; удаление выбранного тега, отсутствие получателя, смена получателя и поздние ответы не восстанавливают устаревший признак или действие.
+    - Регрессионная проверка охватывает оба вида получателя, выбор тега из второй порции, подтверждённое изменение графа, обновление первой порции и попытку назначения через интерфейс и ViewModel.
+  - **Проверка:** `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_view_model_test.dart test/tag/presentation/catalog/tag_catalog_page_test.dart`; проверить порядок «выбор — подтверждённое изменение — первая порция», доступность действия и отсутствие повторной команды.
+  - **Зависимости:** 2.8, 2.12.
+  - **Вероятные файлы:** `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, `lib/src/tag/presentation/catalog/tag_catalog_state.dart`, `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, `test/tag/presentation/catalog/tag_catalog_view_model_test.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`.
+  - **Оценка объёма:** M.
