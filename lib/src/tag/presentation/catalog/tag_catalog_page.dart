@@ -226,6 +226,9 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
                   message: _readFailure(localizations, failure),
                   onRetry: canRetry ? model.retryFirstPage : null,
                 ),
+              TagCatalogTargetMissing() => _CatalogStatus(
+                message: localizations.tagCatalogUnexpected,
+              ),
               TagCatalogLoaded loaded => _LoadedCatalog(
                 state: loaded,
                 model: model,

@@ -1,22 +1,36 @@
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../application/tag_catalog.dart';
 import '../../application/tag_read_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
+import '../../domain/tag_target.dart';
 
 sealed class TagCatalogState {
   const TagCatalogState();
 }
 
 final class TagCatalogInitialLoading extends TagCatalogState {
-  const TagCatalogInitialLoading();
+  const TagCatalogInitialLoading({this.mode = const TagCatalogBrowseMode()});
+
+  final TagCatalogMode mode;
 }
 
 final class TagCatalogInitialFailure extends TagCatalogState {
-  const TagCatalogInitialFailure(this.failure);
+  const TagCatalogInitialFailure(
+    this.failure, {
+    this.mode = const TagCatalogBrowseMode(),
+  });
 
   final TagCatalogReadFailure failure;
+  final TagCatalogMode mode;
   bool get canRetry => failure is TagCatalogUnavailableFailure;
+}
+
+final class TagCatalogTargetMissing extends TagCatalogState {
+  const TagCatalogTargetMissing(this.target);
+
+  final TagTarget target;
 }
 
 enum TagCatalogFreshness { current, refreshing, stale }
@@ -78,54 +92,90 @@ final class TagCatalogPageFailure extends TagCatalogPageStatus {
   bool get canRetry => failure is TagCatalogUnavailableFailure;
 }
 
+sealed class TagCatalogAssignmentStatus {
+  const TagCatalogAssignmentStatus();
+}
+
+final class TagCatalogAssignmentIdle extends TagCatalogAssignmentStatus {
+  const TagCatalogAssignmentIdle();
+}
+
+final class TagCatalogAssignmentSubmitting extends TagCatalogAssignmentStatus {
+  const TagCatalogAssignmentSubmitting(this.tagId, this.token);
+
+  final TagId tagId;
+  final TagOperationToken token;
+}
+
+final class TagCatalogAssignmentKeysBusy extends TagCatalogAssignmentStatus {
+  const TagCatalogAssignmentKeysBusy(this.tagId);
+
+  final TagId tagId;
+}
+
 /// Строки и курсор принадлежат одной отображаемой основе. При актуализации
 /// известные имена и удаления учитываются сразу, но список остаётся неактуальным.
 final class TagCatalogLoaded extends TagCatalogState {
   TagCatalogLoaded({
+    required this.mode,
     required List<Tag> items,
+    List<TagSelectionRow> selectionRows = const [],
     required this.nextCursor,
     required this.revision,
     this.selection = const TagCatalogNoSelection(),
     this.freshness = TagCatalogFreshness.current,
     this.refreshFailure,
     this.pageStatus = const TagCatalogPageIdle(),
-  }) : items = List.unmodifiable(items);
+    this.assignmentStatus = const TagCatalogAssignmentIdle(),
+  }) : items = List.unmodifiable(items),
+       selectionRows = List.unmodifiable(selectionRows);
 
+  final TagCatalogMode mode;
   final List<Tag> items;
+  final List<TagSelectionRow> selectionRows;
   final TagCatalogCursor? nextCursor;
   final GraphRevision revision;
   final TagCatalogSelection selection;
   final TagCatalogFreshness freshness;
   final TagCatalogReadFailure? refreshFailure;
   final TagCatalogPageStatus pageStatus;
+  final TagCatalogAssignmentStatus assignmentStatus;
 
   bool get isEmpty => items.isEmpty;
   bool get canUseCurrentItems => freshness == TagCatalogFreshness.current;
 
   TagCatalogLoaded withStatus({
     List<Tag>? items,
+    List<TagSelectionRow>? selectionRows,
     TagCatalogFreshness? freshness,
     TagCatalogReadFailure? refreshFailure,
     TagCatalogPageStatus? pageStatus,
     TagCatalogSelection? selection,
+    TagCatalogAssignmentStatus? assignmentStatus,
   }) => TagCatalogLoaded(
+    mode: mode,
     items: items ?? this.items,
+    selectionRows: selectionRows ?? this.selectionRows,
     nextCursor: nextCursor,
     revision: revision,
     selection: selection ?? this.selection,
     freshness: freshness ?? this.freshness,
     refreshFailure: refreshFailure,
     pageStatus: pageStatus ?? this.pageStatus,
+    assignmentStatus: assignmentStatus ?? this.assignmentStatus,
   );
 
   TagCatalogLoaded withSelection(TagCatalogSelection selection) =>
       TagCatalogLoaded(
+        mode: mode,
         items: items,
+        selectionRows: selectionRows,
         nextCursor: nextCursor,
         revision: revision,
         selection: selection,
         freshness: freshness,
         refreshFailure: refreshFailure,
         pageStatus: pageStatus,
+        assignmentStatus: assignmentStatus,
       );
 }

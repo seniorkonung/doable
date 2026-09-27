@@ -9,9 +9,12 @@ import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../application/tag_catalog.dart';
 import '../../application/tag_change.dart';
+import '../../application/tag_command.dart';
 import '../../application/tag_read_result.dart';
+import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
+import '../../domain/tag_target.dart';
 import 'tag_catalog_state.dart';
 
 part 'tag_catalog_view_model.g.dart';
@@ -21,6 +24,10 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   static const _maxStaleReads = 8;
 
   late PersonalGraphRepository _repository;
+  late GraphCommandCoordinator _coordinator;
+  TagCatalogMode _mode = const TagCatalogBrowseMode();
+  TagCatalogAssignmentStatus _assignmentStatus =
+      const TagCatalogAssignmentIdle();
   StreamSubscription<GraphCommandCompletion>? _completions;
   StreamSubscription<TagReadResult>? _selectedReads;
   TagCatalogSelection _selection = const TagCatalogNoSelection();
@@ -37,7 +44,9 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     unawaited(_completions?.cancel());
     unawaited(_selectedReads?.cancel());
     _repository = ref.watch(personalGraphRepositoryProvider);
-    final coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    _mode = const TagCatalogBrowseMode();
+    _assignmentStatus = const TagCatalogAssignmentIdle();
     _requiredRevision = null;
     _selection = const TagCatalogNoSelection();
     _selectedRevision = null;
@@ -46,7 +55,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     _refreshNeeded = false;
     _generation++;
     _staleReadAttempts = 0;
-    _completions = coordinator.completions.listen(_onCompletion);
+    _completions = _coordinator.completions.listen(_onCompletion);
     ref.onDispose(() {
       unawaited(_completions?.cancel());
       unawaited(_selectedReads?.cancel());
@@ -55,12 +64,33 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     return const TagCatalogInitialLoading();
   }
 
+  /// Смена режима или получателя отменяет право прежних порций и выбора
+  /// изменять новое состояние, не прерывая уже принятую команду.
+  void setMode(TagCatalogMode mode) {
+    if (_mode == mode) return;
+    _mode = mode;
+    _generation++;
+    _selectionGeneration++;
+    unawaited(_selectedReads?.cancel());
+    _selectedReads = null;
+    _selection = const TagCatalogNoSelection();
+    _selectedRevision = null;
+    _assignmentStatus = const TagCatalogAssignmentIdle();
+    _staleReadAttempts = 0;
+    state = TagCatalogInitialLoading(mode: mode);
+    if (_activeRequest == null) {
+      unawaited(_startFirst());
+    } else {
+      _refreshNeeded = true;
+    }
+  }
+
   Future<void> retryFirstPage() {
     final current = state;
     if (current is! TagCatalogInitialFailure || !current.canRetry) {
       return Future.value();
     }
-    state = const TagCatalogInitialLoading();
+    state = TagCatalogInitialLoading(mode: _mode);
     _staleReadAttempts = 0;
     return _startFirst();
   }
@@ -114,6 +144,38 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       return selection is TagCatalogSelectionReady;
     }
     return current.items.any((tag) => tag.id == id);
+  }
+
+  /// Назначение начинается только после явного вызова для выбранного TagId.
+  /// Уже назначенная строка не отправляется повторно; выбор вне порции
+  /// сохраняет идентичность и проверяется командой в хранилище.
+  TagCommandStart? assignSelected() {
+    final current = state;
+    final selection = _selection;
+    if (current is! TagCatalogLoaded ||
+        current.mode is! TagCatalogSelectionMode ||
+        selection is! TagCatalogSelectionReady ||
+        !canActOn(selection.id) ||
+        _assignmentStatus is! TagCatalogAssignmentIdle) {
+      return null;
+    }
+    final mode = current.mode as TagCatalogSelectionMode;
+    for (final row in current.selectionRows) {
+      if (row.tag.id == selection.id && row.isAssigned) return null;
+    }
+    final start = _coordinator.acceptTagAssign(
+      AssignTag(tagId: selection.id, target: mode.target),
+    );
+    switch (start) {
+      case TagCommandAccepted(:final token):
+        _assignmentStatus = TagCatalogAssignmentSubmitting(selection.id, token);
+      case TagCommandAlreadyRunning():
+        _assignmentStatus = TagCatalogAssignmentKeysBusy(selection.id);
+      case GraphCommandCoordinatorDraining():
+        break;
+    }
+    state = current.withStatus(assignmentStatus: _assignmentStatus);
+    return start;
   }
 
   void _onSelectedRead(TagId id, int generation, TagReadResult result) {
@@ -172,12 +234,17 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         for (final tag in current.items)
           if (tag.id != id) tag,
       ];
+      final rows = [
+        for (final row in current.selectionRows)
+          if (row.tag.id != id) row,
+      ];
       final pageIsCurrent =
           (pageOrder == GraphRevisionOrder.same ||
               pageOrder == GraphRevisionOrder.newer) &&
           items.length == current.items.length;
       state = current.withStatus(
         items: items,
+        selectionRows: rows,
         selection: _selection,
         freshness: pageIsCurrent
             ? current.freshness
@@ -237,7 +304,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     return _startFirst();
   }
 
-  Future<void> _startFirst() => _start(() => _loadFirst(_generation));
+  Future<void> _startFirst() => _start(() => _loadFirst(_mode, _generation));
 
   Future<void> _start(Future<void> Function() read) {
     final active = _activeRequest;
@@ -257,11 +324,15 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     return future;
   }
 
-  Future<void> _loadFirst(int generation) async {
-    final result = await _readPage();
+  Future<void> _loadFirst(TagCatalogMode mode, int generation) async {
+    final result = await _readPage(mode);
     if (!ref.mounted || generation != _generation) return;
     switch (result) {
       case GraphResultSuccess(:final value):
+        if (!_matchesMode(value, mode)) {
+          _firstFailure(const TagCatalogUnexpectedFailure());
+          return;
+        }
         final current = state;
         final precedesDisplayed =
             current is TagCatalogLoaded &&
@@ -283,11 +354,18 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         _refreshNeeded = false;
         _staleReadAttempts = 0;
         state = TagCatalogLoaded(
+          mode: mode,
           items: value.items,
+          selectionRows: value is TagSelectionPage ? value.rows : const [],
           nextCursor: value.nextCursor,
           revision: value.revision,
           selection: _selection,
+          assignmentStatus: _assignmentStatus,
         );
+      case GraphResultFailure(failure: TagCatalogTargetNotFound())
+          when mode is TagCatalogSelectionMode:
+        _refreshNeeded = false;
+        _targetMissing(mode.target);
       case GraphResultFailure(:final failure):
         _refreshNeeded = false;
         _firstFailure(failure);
@@ -296,7 +374,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
 
   Future<void> _loadMore(TagCatalogLoaded base, int generation) async {
     state = base.withStatus(pageStatus: const TagCatalogPageLoading());
-    final result = await _readPage(cursor: base.nextCursor);
+    final result = await _readPage(base.mode, cursor: base.nextCursor);
     if (!ref.mounted || generation != _generation) return;
     final current = state;
     if (current is! TagCatalogLoaded) return;
@@ -307,6 +385,14 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     }
     switch (result) {
       case GraphResultSuccess(:final value):
+        if (!_matchesMode(value, base.mode)) {
+          state = current.withStatus(
+            pageStatus: const TagCatalogPageFailure(
+              TagCatalogUnexpectedFailure(),
+            ),
+          );
+          return;
+        }
         if (value.revision.compareTo(base.revision) !=
             GraphRevisionOrder.same) {
           _beginRefresh(current);
@@ -324,10 +410,16 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
           return;
         }
         state = TagCatalogLoaded(
+          mode: base.mode,
           items: [...base.items, ...value.items],
+          selectionRows: [
+            ...base.selectionRows,
+            if (value is TagSelectionPage) ...value.rows,
+          ],
           nextCursor: value.nextCursor,
           revision: base.revision,
           selection: _selection,
+          assignmentStatus: _assignmentStatus,
         );
       case GraphResultFailure(failure: TagCatalogSnapshotExpired()):
         _beginRefresh(current);
@@ -335,6 +427,9 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       case GraphResultFailure(failure: TagCatalogInvalidCursor()):
         _beginRefresh(current);
         _refreshNeeded = true;
+      case GraphResultFailure(failure: TagCatalogTargetNotFound())
+          when base.mode is TagCatalogSelectionMode:
+        _targetMissing((base.mode as TagCatalogSelectionMode).target);
       case GraphResultFailure(:final failure):
         state = current.withStatus(pageStatus: TagCatalogPageFailure(failure));
     }
@@ -342,6 +437,28 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
 
   void _onCompletion(GraphCommandCompletion completion) {
     if (!ref.mounted) return;
+    _finishAssignmentStatus(completion);
+    if (completion case TagCommandCompletion(
+      kind: TagCommandKind.assign,
+      confirmedResult: GraphResultFailure(
+        failure: TagTargetNotFoundFailure(:final target),
+      ),
+    )) {
+      if (_mode case TagCatalogSelectionMode(target: final selectedTarget)
+          when selectedTarget == target) {
+        _targetMissing(target);
+      }
+      return;
+    }
+    if (completion case TagCommandCompletion(
+      kind: TagCommandKind.assign,
+      confirmedResult: GraphResultFailure(
+        failure: TagNotFoundFailure(:final tagId),
+      ),
+    )) {
+      _commandTagMissing(tagId);
+      return;
+    }
     final package = completion.confirmedChange;
     if (package == null) return;
     if (_requiredRevision case final required?) {
@@ -368,6 +485,9 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
           GraphRevisionOrder.older || GraphRevisionOrder.same => false,
         };
     var items = current is TagCatalogLoaded ? current.items : <Tag>[];
+    var rows = current is TagCatalogLoaded
+        ? current.selectionRows
+        : <TagSelectionRow>[];
     for (final change in package.changes) {
       switch (change) {
         case TagRenamedChange(:final after):
@@ -375,6 +495,13 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
             items = [
               for (final tag in items)
                 if (tag.id == after.id) after else tag,
+            ];
+            rows = [
+              for (final row in rows)
+                if (row.tag.id == after.id)
+                  TagSelectionRow(tag: after, isAssigned: row.isAssigned)
+                else
+                  row,
             ];
           }
           if (canUpdateSelection && _selection.id == after.id) {
@@ -398,6 +525,10 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
               for (final tag in items)
                 if (tag.id != tagId) tag,
             ];
+            rows = [
+              for (final row in rows)
+                if (row.tag.id != tagId) row,
+            ];
           }
           if (canUpdateSelection && _selection.id == tagId) {
             _selectionGeneration++;
@@ -406,6 +537,22 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
             _selectedRevision = null;
             _selection = const TagCatalogNoSelection();
           }
+        case TagAssignmentChangedChange(:final assignment, :final state)
+            when !pageAlreadyIncludes &&
+                current is TagCatalogLoaded &&
+                current.mode is TagCatalogSelectionMode &&
+                (current.mode as TagCatalogSelectionMode).target ==
+                    assignment.target:
+          rows = [
+            for (final row in rows)
+              if (row.tag.id == assignment.tagId)
+                TagSelectionRow(
+                  tag: row.tag,
+                  isAssigned: state == TagAssignmentState.assigned,
+                )
+              else
+                row,
+          ];
         case TagChange():
           break;
         case GraphChange():
@@ -414,18 +561,94 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     }
     if (current is TagCatalogLoaded) {
       if (pageAlreadyIncludes) {
-        if (!identical(current.selection, _selection)) {
-          state = current.withSelection(_selection);
+        if (!identical(current.selection, _selection) ||
+            !identical(current.assignmentStatus, _assignmentStatus)) {
+          state = current.withStatus(
+            selection: _selection,
+            assignmentStatus: _assignmentStatus,
+          );
         }
         return;
       }
       state = current.withStatus(
         items: items,
+        selectionRows: rows,
         selection: _selection,
+        assignmentStatus: _assignmentStatus,
         freshness: TagCatalogFreshness.refreshing,
         pageStatus: const TagCatalogPageIdle(),
       );
     }
+    _refreshNeeded = true;
+    if (_activeRequest == null) {
+      _refreshNeeded = false;
+      unawaited(_startFirst());
+    }
+  }
+
+  void _finishAssignmentStatus(GraphCommandCompletion completion) {
+    final status = _assignmentStatus;
+    final current = state;
+    switch (status) {
+      case TagCatalogAssignmentSubmitting(:final token)
+          when completion is TagCommandCompletion &&
+              identical(completion.token, token):
+        _assignmentStatus = const TagCatalogAssignmentIdle();
+      case TagCatalogAssignmentKeysBusy(:final tagId)
+          when current is TagCatalogLoaded &&
+              current.mode is TagCatalogSelectionMode &&
+              !_coordinator.isTagRunning(tagId) &&
+              !_targetRunning((current.mode as TagCatalogSelectionMode).target):
+        _assignmentStatus = const TagCatalogAssignmentIdle();
+      case TagCatalogAssignmentStatus():
+        return;
+    }
+    if (current is TagCatalogLoaded) {
+      state = current.withStatus(assignmentStatus: _assignmentStatus);
+    }
+  }
+
+  bool _targetRunning(TagTarget target) =>
+      _coordinator.isKeyRunning(switch (target) {
+        IntentionTagTarget(:final intentionId) => ExistingIntentionKey(
+          intentionId,
+        ),
+        LongTermRelationTagTarget(:final relationId) =>
+          ExistingLongTermRelationKey(relationId),
+      });
+
+  void _targetMissing(TagTarget target) {
+    _selectionGeneration++;
+    unawaited(_selectedReads?.cancel());
+    _selectedReads = null;
+    _selection = const TagCatalogNoSelection();
+    _selectedRevision = null;
+    _assignmentStatus = const TagCatalogAssignmentIdle();
+    state = TagCatalogTargetMissing(target);
+  }
+
+  void _commandTagMissing(TagId id) {
+    final current = state;
+    if (current is! TagCatalogLoaded || _selection.id != id) return;
+    _selectionGeneration++;
+    unawaited(_selectedReads?.cancel());
+    _selectedReads = null;
+    _selection = const TagCatalogNoSelection();
+    _selectedRevision = null;
+    _generation++;
+    state = current.withStatus(
+      items: [
+        for (final tag in current.items)
+          if (tag.id != id) tag,
+      ],
+      selectionRows: [
+        for (final row in current.selectionRows)
+          if (row.tag.id != id) row,
+      ],
+      selection: _selection,
+      freshness: TagCatalogFreshness.refreshing,
+      pageStatus: const TagCatalogPageIdle(),
+    );
     _refreshNeeded = true;
     if (_activeRequest == null) {
       _refreshNeeded = false;
@@ -449,7 +672,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         pageStatus: const TagCatalogPageIdle(),
       );
     } else {
-      state = TagCatalogInitialFailure(failure);
+      state = TagCatalogInitialFailure(failure, mode: _mode);
     }
   }
 
@@ -461,15 +684,29 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         order == GraphRevisionOrder.differentEpoch;
   }
 
-  Future<TagCatalogPageResult> _readPage({TagCatalogCursor? cursor}) async {
+  Future<TagCatalogPageResult> _readPage(
+    TagCatalogMode mode, {
+    TagCatalogCursor? cursor,
+  }) async {
     try {
       return await _repository.getTagCatalogPage(
-        TagCatalogQuery(cursor: cursor),
+        TagCatalogQuery(cursor: cursor, mode: mode),
       );
     } on Object {
       return const TagCatalogPageError(TagCatalogUnexpectedFailure());
     }
   }
+
+  bool _matchesMode(TagCatalogPage page, TagCatalogMode mode) =>
+      switch ((page, mode)) {
+        (TagBrowsePage(), TagCatalogBrowseMode()) => true,
+        (
+          TagSelectionPage(:final target),
+          TagCatalogSelectionMode(target: final modeTarget),
+        ) =>
+          target == modeTarget,
+        _ => false,
+      };
 
   bool _unique(List<Tag> tags) {
     final ids = <TagId>{};

@@ -11,14 +11,377 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'выбор показывает назначения и назначает тег только по явной команде',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      expect(h.repository.queries.single.mode, const TagCatalogBrowseMode());
+      h.repository.page(0, [_tag(9, 'Старый')]);
+      await pumpEventQueue();
+      expect(h.repository.queries[1].mode, TagCatalogSelectionMode(_target(1)));
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: true),
+        TagSelectionRow(tag: _tag(2, 'Работа'), isAssigned: false),
+      ]);
+      await pumpEventQueue();
+      final loaded = h.state as TagCatalogLoaded;
+      expect(loaded.mode, TagCatalogSelectionMode(_target(1)));
+      expect(loaded.selectionRows.map((row) => row.isAssigned), [true, false]);
+      expect(h.repository.commands, isEmpty);
+
+      h.model.selectTag(_id(2));
+      h.repository.tagRead(_tag(2, 'Работа'));
+      await pumpEventQueue();
+      expect(h.model.assignSelected(), isA<TagCommandAccepted>());
+      expect(h.repository.commands, hasLength(1));
+      expect(
+        (h.state as TagCatalogLoaded).assignmentStatus,
+        isA<TagCatalogAssignmentSubmitting>(),
+      );
+      h.repository.completeCommand(
+        TagAssignmentChanged(
+          TagAssignmentChangedChange(
+            revision: const _Revision(2),
+            assignment: TagAssignment(tagId: _id(2), target: _target(1)),
+            state: TagAssignmentState.assigned,
+          ),
+        ),
+        const _Revision(2),
+      );
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).assignmentStatus,
+        isA<TagCatalogAssignmentIdle>(),
+      );
+      expect(
+        h.repository.queries.last.mode,
+        TagCatalogSelectionMode(_target(1)),
+      );
+    },
+  );
+
+  test('смена получателя отбрасывает позднюю порцию и прежний выбор', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, [_tag(1, 'Дом')]);
+    await pumpEventQueue();
+    h.model.setMode(TagCatalogSelectionMode(_target(1)));
+    h.repository.selectionPage(1, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: false),
+    ], cursor: _Cursor());
+    await pumpEventQueue();
+    h.model.selectTag(_id(52));
+    h.repository.tagRead(_tag(52, 'Далёкий'));
+    await pumpEventQueue();
+    expect((h.state as TagCatalogLoaded).selection.id, _id(52));
+
+    final pending = h.model.loadMore();
+    h.model.setMode(TagCatalogSelectionMode(_target(2)));
+    h.repository.selectionPage(2, _target(1), [
+      TagSelectionRow(tag: _tag(2, 'Старый'), isAssigned: true),
+    ]);
+    await pending;
+    expect(h.repository.queries[3].mode, TagCatalogSelectionMode(_target(2)));
+    h.repository.selectionPage(3, _target(2), [
+      TagSelectionRow(tag: _tag(3, 'Новый'), isAssigned: true),
+    ]);
+    await pumpEventQueue();
+    final loaded = h.state as TagCatalogLoaded;
+    expect(loaded.mode, TagCatalogSelectionMode(_target(2)));
+    expect(loaded.items.map((tag) => tag.id), [_id(3)]);
+    expect(loaded.selection, isA<TagCatalogNoSelection>());
+    expect(h.model.assignSelected(), isNull);
+  });
+
+  test(
+    'отсутствие выбранного тега раньше пакета убирает строку выбора',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, []);
+      await pumpEventQueue();
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: false),
+      ], cursor: _Cursor());
+      await pumpEventQueue();
+      h.model.selectTag(_id(1));
+      h.repository.tagRead(_tag(1, 'Дом'));
+      await pumpEventQueue();
+      final pending = h.model.loadMore();
+      h.repository.tagRead(null, revision: 2);
+      await pumpEventQueue();
+      final refreshing = h.state as TagCatalogLoaded;
+      expect(refreshing.items, isEmpty);
+      expect(refreshing.selectionRows, isEmpty);
+      expect(refreshing.selection, isA<TagCatalogNoSelection>());
+      expect(h.model.assignSelected(), isNull);
+      h.repository.selectionPage(2, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: false),
+      ]);
+      await pending;
+      h.repository.selectionPage(3, _target(1), [], revision: 2);
+      await pumpEventQueue();
+      expect((h.state as TagCatalogLoaded).selectionRows, isEmpty);
+    },
+  );
+
+  test('отсутствие получателя и занятый ключ прекращают назначение', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, []);
+    await pumpEventQueue();
+    h.model.setMode(TagCatalogSelectionMode(_target(1)));
+    h.repository.fail(1, const TagCatalogTargetNotFound());
+    await pumpEventQueue();
+    expect(h.state, isA<TagCatalogTargetMissing>());
+    expect(h.model.assignSelected(), isNull);
+
+    h.model.setMode(TagCatalogSelectionMode(_target(2)));
+    h.repository.selectionPage(2, _target(2), [
+      TagSelectionRow(tag: _tag(2, 'Работа'), isAssigned: false),
+    ]);
+    await pumpEventQueue();
+    h.model.selectTag(_id(2));
+    h.repository.tagRead(_tag(2, 'Работа'));
+    await pumpEventQueue();
+    final original = h.coordinator.acceptTagAssign(
+      AssignTag(tagId: _id(9), target: _target(2)),
+    ) as TagCommandAccepted;
+    expect(h.model.assignSelected(), isA<TagCommandAlreadyRunning>());
+    expect(
+      (h.state as TagCatalogLoaded).assignmentStatus,
+      isA<TagCatalogAssignmentKeysBusy>(),
+    );
+    h.repository.completeCommandFailure(const TagUnavailableFailure());
+    await original.future;
+    await pumpEventQueue();
+    expect(
+      (h.state as TagCatalogLoaded).assignmentStatus,
+      isA<TagCatalogAssignmentIdle>(),
+    );
+  });
+
+  test('отсутствие получателя в результате команды закрывает выбор', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, []);
+    await pumpEventQueue();
+    h.model.setMode(TagCatalogSelectionMode(_target(1)));
+    h.repository.selectionPage(1, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: false),
+    ]);
+    await pumpEventQueue();
+    h.model.selectTag(_id(1));
+    h.repository.tagRead(_tag(1, 'Дом'));
+    await pumpEventQueue();
+    final started = h.model.assignSelected() as TagCommandAccepted;
+    h.repository.completeCommandFailure(TagTargetNotFoundFailure(_target(1)));
+    await started.future;
+    expect(h.state, isA<TagCatalogTargetMissing>());
+    expect(h.model.assignSelected(), isNull);
+  });
+
+  test(
+    'отсутствие тега в результате команды убирает строку и действие',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, []);
+      await pumpEventQueue();
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: false),
+      ]);
+      await pumpEventQueue();
+      h.model.selectTag(_id(1));
+      h.repository.tagRead(_tag(1, 'Дом'));
+      await pumpEventQueue();
+      final started = h.model.assignSelected() as TagCommandAccepted;
+      h.repository.completeCommandFailure(TagNotFoundFailure(_id(1)));
+      await started.future;
+      final refreshing = h.state as TagCatalogLoaded;
+      expect(refreshing.items, isEmpty);
+      expect(refreshing.selectionRows, isEmpty);
+      expect(refreshing.selection, isA<TagCatalogNoSelection>());
+      expect(h.model.assignSelected(), isNull);
+      h.repository.selectionPage(2, _target(1), [], revision: 2);
+      await pumpEventQueue();
+      expect((h.state as TagCatalogLoaded).items, isEmpty);
+    },
+  );
+
+  test('выбранный тег вне порции сохраняет id после переименования', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, []);
+    await pumpEventQueue();
+    h.model.setMode(TagCatalogSelectionMode(_target(1)));
+    h.repository.selectionPage(1, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: true),
+    ], cursor: _Cursor());
+    await pumpEventQueue();
+    h.model.selectTag(_id(1));
+    h.repository.tagRead(_tag(1, 'Дом'));
+    await pumpEventQueue();
+    expect(h.model.assignSelected(), isNull);
+
+    h.model.selectTag(_id(52));
+    h.repository.tagRead(_tag(52, 'Старое'));
+    await pumpEventQueue();
+    await h.renamed(_tag(52, 'Старое'), _tag(52, 'Новое'), revision: 2);
+    final refreshing = h.state as TagCatalogLoaded;
+    expect(refreshing.selection.id, _id(52));
+    expect(
+      refreshing.selection,
+      isA<TagCatalogSelectionReady>().having(
+        (selection) => selection.tag.name.value,
+        'название',
+        'Новое',
+      ),
+    );
+    h.repository.selectionPage(2, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: true),
+    ], revision: 2);
+    await pumpEventQueue();
+    expect(h.model.assignSelected(), isA<TagCommandAccepted>());
+    h.repository.completeCommand(
+      TagAssignmentChanged(
+        TagAssignmentChangedChange(
+          revision: const _Revision(3),
+          assignment: TagAssignment(tagId: _id(52), target: _target(1)),
+          state: TagAssignmentState.assigned,
+        ),
+      ),
+      const _Revision(3),
+    );
+    await pumpEventQueue();
+  });
+
+  test('пакет назначения обновляет признак строки до новой порции', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.repository.page(0, []);
+    await pumpEventQueue();
+    h.model.setMode(TagCatalogSelectionMode(_target(1)));
+    h.repository.selectionPage(1, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: false),
+    ]);
+    await pumpEventQueue();
+    final original = h.coordinator.acceptTagAssign(
+      AssignTag(tagId: _id(1), target: _target(1)),
+    ) as TagCommandAccepted;
+    h.repository.completeCommand(
+      TagAssignmentChanged(
+        TagAssignmentChangedChange(
+          revision: const _Revision(2),
+          assignment: TagAssignment(tagId: _id(1), target: _target(1)),
+          state: TagAssignmentState.assigned,
+        ),
+      ),
+      const _Revision(2),
+    );
+    await original.future;
+    final refreshing = h.state as TagCatalogLoaded;
+    expect(refreshing.selectionRows.single.isAssigned, isTrue);
+    expect(refreshing.freshness, TagCatalogFreshness.refreshing);
+    h.repository.selectionPage(2, _target(1), [
+      TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: true),
+    ], revision: 2);
+    await pumpEventQueue();
+    expect(
+      (h.state as TagCatalogLoaded).selectionRows.single.isAssigned,
+      isTrue,
+    );
+    expect(
+      (h.state as TagCatalogLoaded).freshness,
+      TagCatalogFreshness.current,
+    );
+  });
+
+  test(
+    'выбор объединяет порции одного получателя без повторной подгрузки',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, []);
+      await pumpEventQueue();
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      final cursor = _Cursor();
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: false),
+      ], cursor: cursor);
+      await pumpEventQueue();
+      final first = h.model.loadMore();
+      final repeated = h.model.loadMore();
+      expect(identical(first, repeated), isTrue);
+      expect(h.repository.queries, hasLength(3));
+      expect(h.repository.queries.last.cursor, same(cursor));
+      expect(
+        h.repository.queries.last.mode,
+        TagCatalogSelectionMode(_target(1)),
+      );
+      h.repository.selectionPage(2, _target(1), [
+        TagSelectionRow(tag: _tag(2, 'Работа'), isAssigned: true),
+      ]);
+      await first;
+      final loaded = h.state as TagCatalogLoaded;
+      expect(loaded.items.map((tag) => tag.id), [_id(1), _id(2)]);
+      expect(loaded.selectionRows.map((row) => row.isAssigned), [false, true]);
+    },
+  );
+
+  test(
+    'страница выбора перед пакетом сохраняет подтверждённый признак',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.repository.page(0, []);
+      await pumpEventQueue();
+      h.model.setMode(TagCatalogSelectionMode(_target(1)));
+      h.repository.selectionPage(1, _target(1), [
+        TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: true),
+      ], revision: 2);
+      await pumpEventQueue();
+      final original = h.coordinator.acceptTagAssign(
+        AssignTag(tagId: _id(1), target: _target(1)),
+      ) as TagCommandAccepted;
+      h.repository.completeCommand(
+        TagAssignmentChanged(
+          TagAssignmentChangedChange(
+            revision: const _Revision(2),
+            assignment: TagAssignment(tagId: _id(1), target: _target(1)),
+            state: TagAssignmentState.assigned,
+          ),
+        ),
+        const _Revision(2),
+      );
+      await original.future;
+      expect(
+        (h.state as TagCatalogLoaded).selectionRows.single.isAssigned,
+        isTrue,
+      );
+      expect(
+        (h.state as TagCatalogLoaded).freshness,
+        TagCatalogFreshness.current,
+      );
+      expect(h.repository.queries, hasLength(2));
+    },
+  );
+
   test('отсутствие выбранного тега до пакета убирает строку и отбрасывает старые страницы', () async {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -680,6 +1043,24 @@ final class _Repository extends Fake implements PersonalGraphRepository {
   void fail(int index, TagCatalogReadFailure failure) =>
       pages[index].complete(TagCatalogPageError(failure));
 
+  void selectionPage(
+    int index,
+    TagTarget target,
+    List<TagSelectionRow> rows, {
+    TagCatalogCursor? cursor,
+    int revision = 1,
+  }) => pages[index].complete(
+    TagCatalogPageSuccess(
+      TagCatalogPage.selection(
+        target: target,
+        rows: rows,
+        pageSize: TagCatalogQuery.defaultPageSize,
+        nextCursor: cursor,
+        revision: _Revision(revision),
+      ),
+    ),
+  );
+
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -697,6 +1078,9 @@ final class _Repository extends Fake implements PersonalGraphRepository {
       ),
     );
   }
+
+  void completeCommandFailure(TagCommandFailure failure) =>
+      commands.last.complete(TagCommandFailed(failure));
 }
 
 final class _Cursor implements TagCatalogCursor {}
@@ -720,5 +1104,10 @@ final class _Revision implements GraphRevision {
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
+TagTarget _target(int number) => IntentionTagTarget(
+  (IntentionId.decode(
+    '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
+  ) as IntentionIdDecodingSuccess).id,
+);
 Tag _tag(int number, String name) =>
     Tag(id: _id(number), name: TagName.fromInput(name));
