@@ -235,8 +235,9 @@ Future<void> _measureTagAssignmentReadCost() async {
         assigned.addAll(page.assigned);
         cursor = page.next;
         if (pages == 1) samples['first'] = (queryCursor, page);
-        if (pages == (pageCount / 2).ceil())
+        if (pages == (pageCount / 2).ceil()) {
           samples['middle'] = (queryCursor, page);
+        }
         if (cursor == null) samples['last'] = (queryCursor, page);
       } while (cursor != null);
       expect(pages, pageCount);

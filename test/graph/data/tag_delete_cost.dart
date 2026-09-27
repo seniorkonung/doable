@@ -55,7 +55,7 @@ final class _DeleteCostProbe extends LocalDatabaseConnectionObserver {
               ).single['total']
               as int;
     } finally {
-      reader.dispose();
+      reader.close();
     }
   }
 }
