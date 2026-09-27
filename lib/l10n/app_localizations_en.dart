@@ -197,6 +197,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.';
 
   @override
+  String get blockingRelationsConfirmationTagAssignments =>
+      'All tag assignments of the selected long-term relations, including those not shown here, will be removed. The reusable tags and their assignments to other entities will remain.';
+
+  @override
   String blockingRelationsConfirmationCount(int count) {
     return 'To delete: $count';
   }

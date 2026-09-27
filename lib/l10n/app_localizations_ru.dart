@@ -198,6 +198,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Проверьте каждую выбранную связь. Удаление нельзя отменить. Само намерение останется; для его удаления понадобится отдельное подтверждение.';
 
   @override
+  String get blockingRelationsConfirmationTagAssignments =>
+      'Все назначения тегов выбранным долговременным связям, включая не показанные здесь, будут сняты. Сами переиспользуемые теги и их назначения другим сущностям сохранятся.';
+
+  @override
   String blockingRelationsConfirmationCount(int count) {
     return 'К удалению: $count';
   }

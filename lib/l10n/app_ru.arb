@@ -58,6 +58,7 @@
   "blockingRelationsReviewAction": "Просмотреть выбранные связи",
   "blockingRelationsConfirmationTitle": "Удалить выбранные связи навсегда?",
   "blockingRelationsConfirmationWarning": "Проверьте каждую выбранную связь. Удаление нельзя отменить. Само намерение останется; для его удаления понадобится отдельное подтверждение.",
+  "blockingRelationsConfirmationTagAssignments": "Все назначения тегов выбранным долговременным связям, включая не показанные здесь, будут сняты. Сами переиспользуемые теги и их назначения другим сущностям сохранятся.",
   "blockingRelationsConfirmationCount": "К удалению: {count}",
   "@blockingRelationsConfirmationCount": {"placeholders": {"count": {"type": "int"}}},
   "blockingRelationsParticipantId": "Идентификатор: {id}",

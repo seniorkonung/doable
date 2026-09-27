@@ -428,6 +428,12 @@ abstract class AppLocalizations {
   /// **'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.'**
   String get blockingRelationsConfirmationWarning;
 
+  /// Снятие назначений выбранных долговременных связей с сохранением тегов и остальных назначений
+  ///
+  /// In en, this message translates to:
+  /// **'All tag assignments of the selected long-term relations, including those not shown here, will be removed. The reusable tags and their assignments to other entities will remain.'**
+  String get blockingRelationsConfirmationTagAssignments;
+
   /// Число связей в подтверждённом наборе
   ///
   /// In en, this message translates to:
