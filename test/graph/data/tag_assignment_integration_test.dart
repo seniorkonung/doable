@@ -16,6 +16,10 @@ import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/domain/tag_target.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -460,4 +464,187 @@ void main() {
       expect(reader.select('PRAGMA foreign_key_check'), isEmpty);
     },
   );
+
+  for (final (label, target) in [
+    ('намерения', _intention(1)),
+    ('долговременной связи', _relation(101)),
+  ]) {
+    test('два потребителя $label согласуют порции и изменения графа', () async {
+      for (var number = 303; number <= 352; number++) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          tagFixtureId(number),
+          'Тег $number',
+        ]);
+        switch (target) {
+          case IntentionTagTarget(:final intentionId):
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+              [tagFixtureId(number), intentionId.toCanonicalString()],
+            );
+          case LongTermRelationTagTarget(:final relationId):
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+              [tagFixtureId(number), relationId.toCanonicalString()],
+            );
+        }
+      }
+
+      final assignmentsSubscription = container.listen(
+        tagAssignmentsViewModelProvider(target),
+        (_, _) {},
+      );
+      final catalogSubscription = container.listen(
+        tagCatalogViewModelProvider,
+        (_, _) {},
+      );
+      addTearDown(assignmentsSubscription.close);
+      addTearDown(catalogSubscription.close);
+      final assignments = container.read(
+        tagAssignmentsViewModelProvider(target).notifier,
+      );
+      final catalog = container.read(tagCatalogViewModelProvider.notifier);
+      TagAssignmentsState assignmentState() =>
+          container.read(tagAssignmentsViewModelProvider(target));
+      TagCatalogState catalogState() =>
+          container.read(tagCatalogViewModelProvider);
+
+      Future<void> until(bool Function() condition) async {
+        for (var attempt = 0; attempt < 40 && !condition(); attempt++) {
+          await pumpEventQueue();
+        }
+        expect(condition(), isTrue);
+      }
+
+      Future<void> settled(GraphRevision revision) => until(
+        () =>
+            catalogState() is TagCatalogLoaded &&
+            assignmentState() is TagAssignmentsLoaded &&
+            (catalogState() as TagCatalogLoaded).freshness ==
+                TagCatalogFreshness.current &&
+            (assignmentState() as TagAssignmentsLoaded).freshness ==
+                TagAssignmentsFreshness.current &&
+            (catalogState() as TagCatalogLoaded).revision.compareTo(revision) ==
+                GraphRevisionOrder.same &&
+            (assignmentState() as TagAssignmentsLoaded).revision.compareTo(
+                  revision,
+                ) ==
+                GraphRevisionOrder.same,
+      );
+
+      await until(() => catalogState() is TagCatalogLoaded);
+      catalog.setMode(TagCatalogSelectionMode(target));
+      await until(
+        () =>
+            catalogState() is TagCatalogLoaded &&
+            (catalogState() as TagCatalogLoaded).mode ==
+                TagCatalogSelectionMode(target) &&
+            assignmentState() is TagAssignmentsLoaded,
+      );
+      expect((catalogState() as TagCatalogLoaded).items, hasLength(50));
+      expect((assignmentState() as TagAssignmentsLoaded).items, hasLength(50));
+      await catalog.loadMore();
+      await assignments.loadMore();
+      final selected = catalogState() as TagCatalogLoaded;
+      final assigned = assignmentState() as TagAssignmentsLoaded;
+      expect(selected.items, hasLength(52));
+      expect(assigned.items, hasLength(51));
+      expect(selected.selectionRows.first.isAssigned, isTrue);
+      expect(selected.selectionRows[1].isAssigned, isFalse);
+      expect(assigned.items.map((tag) => tag.id).toSet(), hasLength(51));
+
+      final completion = await send(
+        AssignTag(tagId: _tag(lastTagNumber), target: target),
+      );
+      expectAssignmentChange(
+        completion,
+        TagAssignmentState.assigned,
+        changed: true,
+      );
+      await settled(completion.revision!);
+      expect(
+        (catalogState() as TagCatalogLoaded).selectionRows[1].isAssigned,
+        isTrue,
+      );
+      expect(
+        (assignmentState() as TagAssignmentsLoaded).items.map((tag) => tag.id),
+        contains(_tag(lastTagNumber)),
+      );
+
+      final removed = await send(
+        RemoveTagAssignment(tagId: _tag(firstTagNumber), target: target),
+      );
+      expectAssignmentChange(removed, TagAssignmentState.absent, changed: true);
+      await settled(removed.revision!);
+      expect(
+        (catalogState() as TagCatalogLoaded).selectionRows.first.isAssigned,
+        isFalse,
+      );
+      expect(
+        (assignmentState() as TagAssignmentsLoaded).items.map((tag) => tag.id),
+        isNot(contains(_tag(firstTagNumber))),
+      );
+
+      final renamed = await send(
+        RenameTag(
+          tagId: _tag(lastTagNumber),
+          name: TagName.fromInput('Переименованный'),
+        ),
+      );
+      expect(success(renamed), isA<TagRenamed>());
+      await settled(renamed.revision!);
+      expect(
+        (catalogState() as TagCatalogLoaded).items[1].name.value,
+        'Переименованный',
+      );
+      expect(
+        (assignmentState() as TagAssignmentsLoaded).items.first.name.value,
+        'Переименованный',
+      );
+
+      final unrelated = coordinator.acceptCreation(
+        IntentionCreationFormKey(),
+        const CreateIntention(
+          title: 'Постороннее намерение',
+          description: null,
+        ),
+      ) as IntentionCommandAccepted;
+      final unrelatedCompletion = await unrelated.future;
+      expect(unrelatedCompletion.isFailure, isFalse);
+      await settled(unrelatedCompletion.revision!);
+      expect(
+        (catalogState() as TagCatalogLoaded).selectionRows[1].isAssigned,
+        isTrue,
+      );
+      expect(
+        (assignmentState() as TagAssignmentsLoaded).items.first.name.value,
+        'Переименованный',
+      );
+
+      final deleted = await send(DeleteTag(_tag(lastTagNumber)));
+      expect(success(deleted), isA<TagDeleted>());
+      await settled(deleted.revision!);
+      expect(
+        (catalogState() as TagCatalogLoaded).items.map((tag) => tag.id),
+        isNot(contains(_tag(lastTagNumber))),
+      );
+      expect(
+        (assignmentState() as TagAssignmentsLoaded).items.map((tag) => tag.id),
+        isNot(contains(_tag(lastTagNumber))),
+      );
+      await catalog.loadMore();
+      final finalSelection = catalogState() as TagCatalogLoaded;
+      final finalAssignments = assignmentState() as TagAssignmentsLoaded;
+      expect(finalSelection.items, hasLength(51));
+      expect(finalSelection.nextCursor, isNull);
+      expect(finalSelection.items.map((tag) => tag.id).toSet(), hasLength(51));
+      expect(finalSelection.selectionRows.first.isAssigned, isFalse);
+      expect(finalAssignments.items, hasLength(50));
+      expect(finalAssignments.nextCursor, isNull);
+      expect(
+        finalAssignments.items.map((tag) => tag.id).toSet(),
+        hasLength(50),
+      );
+      expect(reader.select('PRAGMA foreign_key_check'), isEmpty);
+    });
+  }
 }

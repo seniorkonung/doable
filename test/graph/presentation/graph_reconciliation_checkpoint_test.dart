@@ -16,7 +16,7 @@ import 'package:doable/src/daily_choice/presentation/path/choice_path_suggestion
 
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
-    hide Intention, LongTermRelation;
+    hide Intention, LongTermRelation, TagAssignment;
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -54,8 +54,10 @@ import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart' as tag_domain;
+import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -1618,6 +1620,102 @@ void main() {
     expect(harness.neighborhood.items, hasLength(2));
     expect(harness.catalog.revision, revision);
   });
+
+  test(
+    'пакет назначения сохраняет счётчики и не смешивает продолжения группы',
+    () async {
+      final repository = _CheckpointGraphRepository();
+      final harness = _CheckpointHarness(repository, neighborhoodPageSize: 1);
+      addTearDown(harness.dispose);
+      await harness.loadInitialSurfaces(
+        groupPage: RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+          counts: testRelationCounts(activeNeedOutgoing: 2),
+          nextCursor: const TestRelationGroupCursor(1),
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      final countsBefore = harness.catalogCounts;
+      final detailsBefore = harness.detailsCounts;
+      harness.scrollNeighborhoodTo(0);
+      expect(repository.groupQueries[1].cursor, isNotNull);
+
+      final tagId = switch (TagId.decode(
+        '018f0000-0000-7000-8000-000000000001',
+      )) {
+        TagIdDecodingSuccess(:final id) => id,
+        InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
+      };
+      final target = IntentionTagTarget(harness.ownerId);
+      const revision = TestGraphRevision(5);
+      final accepted = harness.coordinator.acceptTagAssign(
+        AssignTag(tagId: tagId, target: target),
+      ) as TagCommandAccepted;
+      repository.completeTagCommand(
+        0,
+        TagCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: revision,
+            value: TagAssignmentChanged(
+              TagAssignmentChangedChange(
+                revision: revision,
+                assignment: TagAssignment(tagId: tagId, target: target),
+                state: TagAssignmentState.assigned,
+              ),
+            ),
+          ),
+        ),
+      );
+      final completion = await accepted.future;
+      expect(
+        completion.confirmedChange!.changes.single,
+        isA<TagAssignmentChangedChange>(),
+      );
+      await pumpEventQueue();
+      expect(repository.groupQueries, hasLength(3));
+      expect(repository.groupQueries[2].cursor, isNull);
+
+      repository.completeGroupPage(
+        1,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 2, count: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(4),
+        ),
+      );
+      await pumpEventQueue();
+      expect(harness.neighborhood.items, hasLength(1));
+
+      repository.completeGroupPage(
+        2,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+          counts: testRelationCounts(activeNeedOutgoing: 2),
+          nextCursor: const TestRelationGroupCursor(1),
+          revision: revision,
+        ),
+      );
+      await pumpEventQueue();
+      repository.completeGroupPage(
+        3,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 2, count: 1),
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await pumpEventQueue();
+      expect(harness.neighborhood.revision, revision);
+      expect(harness.neighborhood.items, hasLength(2));
+      expect(
+        harness.neighborhood.counts,
+        testRelationCounts(activeNeedOutgoing: 2),
+      );
+      expect(harness.catalog.revision, revision);
+      expect(harness.catalogCounts, countsBefore);
+      expect(harness.detailsCounts, detailsBefore);
+    },
+  );
 }
 
 Future<void> _settleUntil(
