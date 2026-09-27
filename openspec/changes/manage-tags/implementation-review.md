@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Замечание F2 передано в незавершённую задачу 2.33: восстановить полный бюджет устаревших чтений при ручном повторе и проверить результат. Исправление гонки ответов остаётся в незавершённой задаче 2.32. Код по этим задачам ещё не исправлен; принятых остаточных рисков нет.
+**Summary:** Статус назначения выбранного тега согласован с загруженной порцией, а ручной повтор точечной проверки начинает новую ограниченную серию чтений. Открытых замечаний и принятых остаточных рисков нет.
 
 ## Review target
 
-- **Baseline ref:** 0f82de80f912e47fb3f9483421c23a53a5430855
-- **Base commit:** 0f82de80f912e47fb3f9483421c23a53a5430855
-- **Reviewed head:** ff8482bacdfc0b206fe824fcb7cda14525123356
-- **Target commits:** ["ff8482bacdfc0b206fe824fcb7cda14525123356"]
-- **Reviewable paths:** ["lib/src/tag/presentation/catalog/tag_catalog_page.dart", "lib/src/tag/presentation/catalog/tag_catalog_state.dart", "lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "openspec/changes/manage-tags/tasks.md", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart"]
+- **Baseline ref:** 72c485c4c1f7bf79783952bc3160bdd96550f0d7
+- **Base commit:** 72c485c4c1f7bf79783952bc3160bdd96550f0d7
+- **Reviewed head:** 8b93e83b0be769eee51c136f4364b0eaf021bf45
+- **Target commits:** ["a2c85f932fee66da07db9ad8698913b81a66af18", "8b93e83b0be769eee51c136f4364b0eaf021bf45"]
+- **Reviewable paths:** ["lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "openspec/changes/manage-tags/tasks.md", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart"]
 - **OpenSpec change:** manage-tags
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,21 +22,21 @@
 
 ## Reviewed increment
 
-### U1 · Повтор проверки назначения тега вне загруженной порции
+### U1 · Достоверный статус назначения выбранного тега
 
-- **Work items:** ["2.31"]
-- **Requirements and scenarios:** ["Каталог тегов и выбор для назначения", "Отказ проверки назначения выбранного вне порции тега", "Получение данных и безопасные ошибки тегов"]
-- **Affected boundary:** Пользователь каталога, состояние выбранной пары TagId и TagTarget, точечное чтение статуса назначения и доступность явной команды назначения.
-- **Implementation target:** ["lib/src/tag/presentation/catalog/tag_catalog_page.dart", "lib/src/tag/presentation/catalog/tag_catalog_state.dart", "lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart"]
-- **Applicable constraints and non-goals:** Назначение допускается только для подтверждённо свободной пары намерения или долговременной связи; ответы прежнего выбора, получателя, ревизии и эпохи не должны менять текущий статус. Порционный каталог и явная команда назначения сохраняются. Смешанная выдача сущностей по тегу и другие виды получателей не входят в эту работу.
+- **Work items:** ["2.32", "2.33"]
+- **Requirements and scenarios:** ["Каталог тегов и выбор для назначения", "Свободный тег выбран за пределами загруженных порций", "Назначенный тег выбран за пределами загруженных порций", "Отказ проверки назначения выбранного вне порции тега", "Подтверждённые изменения и согласованные представления тегов"]
+- **Affected boundary:** Пользователь выбора тега для намерения или долговременной связи, состояние каталога, точечное чтение статуса пары и доступность явной команды назначения.
+- **Implementation target:** ["lib/src/tag/presentation/catalog/tag_catalog_view_model.dart", "test/tag/presentation/catalog/tag_catalog_page_test.dart", "test/tag/presentation/catalog/tag_catalog_view_model_test.dart"]
+- **Applicable constraints and non-goals:** Каталог загружается порциями. Назначение доступно только после подтверждения свободной пары; назначенная пара не получает повторную команду. Ответы прежнего выбора, получателя, ревизии или эпохи не меняют актуальный статус. Навигация по помеченным сущностям и жизненный цикл тегов не входят в этот инкремент.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Изолированный рецензент проверил все пять путей реализации и тестов U1 в точном диапазоне; материалы планирования, прежний отчёт и история коммитов ему не передавались. Обнаруженные недостатки согласования ответов и бюджета повторов переданы в незавершённые задачи 2.32 и 2.33. |
-| OpenSpec conformance | Complete | Задача 2.31 и сценарий отказа проверки сопоставлены с кодом и тестами обоих видов получателя, обоих порядков ответов и обоих статусов пары. На чистом ff8482bacdfc0b206fe824fcb7cda14525123356 прошли mise exec --no-deps -- openspec validate manage-tags --json (1/1), строгая проверка OpenSpec и два целевых файла flutter test (79 тестов). Исправления недостатков переданы в незавершённые задачи 2.32 и 2.33. |
-| Code quality | Complete | Проверены переходы состояния и ревизии во ViewModel, отображение и доступность повтора, тестовые двойники, обработка отказов, границы входных данных и стоимость дополнительных чтений. На записанном head прошли mise exec --no-deps -- flutter analyze и git diff --check; зависимостей и запросов к хранилищу в диапазоне не добавлено. |
+| Independent decision review | Complete | Изолированный рецензент проверил точный диапазон, охватывающий оба целевых коммита, и все три пути реализации и тестов U1 без материалов OpenSpec, прежнего отчёта и истории коммитов. Существенных замечаний к инженерному решению нет. |
+| OpenSpec conformance | Complete | Задачи 2.32 и 2.33, их критерии приёмки и сценарии выбора вне порции сопоставлены с кодом и тестами для обоих видов получателя и обоих статусов пары. На чистом `8b93e83b0be769eee51c136f4364b0eaf021bf45` прошли `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_view_model_test.dart test/tag/presentation/catalog/tag_catalog_page_test.dart` (96 тестов), `mise exec --no-deps -- openspec validate manage-tags --json` (1/1) и `mise exec --no-deps -- openspec validate manage-tags --strict --no-interactive`. |
+| Code quality | Complete | Проверены переходы состояния, инвалидация позднего точечного чтения, предел автоматических повторов, доступность действия на экране, тестовые двойники, ошибки и стоимость чтений. На том же чистом head `mise exec --no-deps -- flutter analyze` завершился без замечаний; новых зависимостей или запросов к хранилищу диапазон не вводит. |
 
 ## Findings
 
@@ -44,4 +44,4 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Единственный целевой коммит ff8482bacdfc0b206fe824fcb7cda14525123356 и задача 2.31 покрыты U1. openspec/changes/manage-tags/tasks.md использован как свидетельство планирования; все пять изменённых путей кода и тестов входят в U1. Проверены свободная и назначенная пара для намерения и долговременной связи, порядок ответов чтения тега и пары, поздние ответы прежнего выбора и получателя, ревизии и эпохи, появление тега в следующей порции, сообщения об отказах и право на повтор. Рабочее дерево до записи отчёта было чистым; проверки выполнялись на записанном head. Исправление гонки ответов остаётся в незавершённой задаче 2.32. Исправление бюджета ручного повтора передано в новую незавершённую задачу 2.33 с проверками обоих видов получателя; текущая реализация не исправлена и требует отдельного выполнения задач. Принятых остаточных рисков нет.
+Коммит `a2c85f932fee66da07db9ad8698913b81a66af18` и задача 2.32 покрыты проверкой позднего отказа после загрузки выбранного тега во второй порции. Коммит `8b93e83b0be769eee51c136f4364b0eaf021bf45` и задача 2.33 покрыты проверкой исчерпания лимита, ручного повтора, нескольких устаревших ответов и актуального ответа. Оба коммита проверены вместе на итоговом head. `openspec/changes/manage-tags/tasks.md` учтён как свидетельство планирования; все три изменённых пути кода и тестов входят в U1. Проверены свободная и назначенная пара для намерения и долговременной связи, запрет преждевременного назначения, отсутствие бесполезного повтора, защита от поздних ответов и ограничение автоматических попыток. Рабочее дерево перед записью отчёта было чистым; принятых остаточных рисков нет.
