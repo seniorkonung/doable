@@ -6,7 +6,7 @@
 **Result:** Changes needed
 **Coverage status:** Incomplete
 **Coverage limitations:** Повторная release-сборка APK на текущем рабочем дереве остановилась на игнорируемом `android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`, оставшемся от интеграционного запуска: он ссылается на недоступный release-сборке `integration_test`. Сборка после удаления этого файла зафиксирована в версии свидетельства 2.26, но повторять её с изменением иных файлов в рамках ревью нельзя.
-**Summary:** Обнаружены неподдержанный индексом порядок списка назначений и потеря признака назначения выбранного тега вне первой порции. Ранее принятых остаточных рисков нет.
+**Summary:** Активным замечанием остаётся потеря признака назначения выбранного тега вне первой порции. Ранее принятых остаточных рисков нет.
 
 ## Review target
 
@@ -44,19 +44,10 @@
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Complete | Два свежих рецензента проверили точный диапазон: один всю объединённую границу U1–U2 из 74 путей, второй U1 из 32 путей. Сгенерированные файлы сверены с исходниками. |
-| OpenSpec conformance | Incomplete | Задачи 2.1–2.26 сопоставлены со спецификациями тегов, намерений и связей, дизайном и свидетельствами. На чистом HEAD 33e464aca112a4ec227b8e181a2a3ce6eaea35df прошли OpenSpec JSON и strict validate, `flutter analyze`, целевые тесты (125), `mise run --skip-tools check` (1830 тестов) и `mise run --skip-tools codegen-check` (0 изменённых файлов). Повторный `flutter build apk --release --no-pub` остановился на игнорируемом GeneratedPluginRegistrant.java с тестовым плагином; прежняя успешная сборка описана в `evidence/assignment-phase-readiness.md`. Активные расхождения описаны в F2–F3. |
+| OpenSpec conformance | Incomplete | Задачи 2.1–2.26 сопоставлены со спецификациями тегов, намерений и связей, дизайном и свидетельствами. На чистом HEAD 33e464aca112a4ec227b8e181a2a3ce6eaea35df прошли OpenSpec JSON и strict validate, `flutter analyze`, целевые тесты (125), `mise run --skip-tools check` (1830 тестов) и `mise run --skip-tools codegen-check` (0 изменённых файлов). Повторный `flutter build apk --release --no-pub` остановился на игнорируемом GeneratedPluginRegistrant.java с тестовым плагином; прежняя успешная сборка описана в `evidence/assignment-phase-readiness.md`. Активное расхождение описано в F3. |
 | Code quality | Complete | Проверены все 74 пути реализации и тестов: корректность, читаемость, границы модулей, безопасность диагностики, стоимость чтений и полнота проверок. `git diff --check`, анализатор и полный тестовый набор прошли на записанном head. |
 
 ## Findings
-
-### F2 · Medium — порядок назначений не обеспечен индексом получателя
-
-- **Evidence:** `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart:158-170`: выдача отбирает по получателю, но сортирует по `tags.creation_sequence`; индексы назначений упорядочены по получателю и `tag_id`. На эквивалентной схеме план первой страницы содержит `USE TEMP B-TREE FOR ORDER BY`; на поздней странице оптимизатор может выбрать проход тегов по порядку. `LIMIT pageSize + 1` ограничивает результат, но не работу SQL.
-- **Evidence revisions:** ["33e464aca112a4ec227b8e181a2a3ce6eaea35df"]
-- **Impact:** Небольшая первая или последующая порция может требовать сортировки всех назначений получателя либо просмотра большого числа тегов; задержка растёт с размером графа, даже когда интерфейсу нужны единицы строк.
-- **Required outcome:** Определить приемлемую стоимость при заявленном масштабе графа и обеспечить последовательный просмотр назначений без неприемлемого полного сортирования или сканирования ради малой порции.
-- **Earliest source of truth:** design/ADR
-- **Affected artifacts:** ["openspec/changes/manage-tags/design.md", "2.6", "2.24", "lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart"]
 
 ### F3 · Medium — выбранный назначенный тег вновь предлагает назначение после обновления
 
