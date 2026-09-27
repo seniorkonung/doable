@@ -21,6 +21,23 @@ LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
   tagFixtureId(number),
 ) as LongTermRelationIdDecodingSuccess).id;
 
+void _insertMissingTagReference(
+  sqlite.Database database,
+  String recipientColumn,
+  String recipientId,
+) {
+  final tagId = tagFixtureId(999);
+  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    tagId,
+    'Временный тег',
+  ]);
+  database.execute(
+    'INSERT INTO tag_assignments (tag_id, $recipientColumn) VALUES (?, ?)',
+    [tagId, recipientId],
+  );
+  database.execute('DELETE FROM tags WHERE id = ?', [tagId]);
+}
+
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
   final statements = <String>[];
 
@@ -106,6 +123,90 @@ void main() {
           } while (cursor != null);
           expect(names, ['Дом', for (var n = 303; n <= 405; n++) 'Тег $n']);
         }
+      }
+    },
+  );
+
+  test(
+    'ключ порядка назначения повторяет создание тега и остаётся неизменным',
+    () {
+      final tagId = tagFixtureId(firstTagNumber);
+      final expected = raw.select(
+        'SELECT creation_sequence FROM tags WHERE id = ?',
+        [tagId],
+      ).single['creation_sequence'];
+      final assignment = raw.select(
+        'SELECT creation_sequence, tag_creation_sequence FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+        [tagId, tagFixtureId(1)],
+      ).single;
+      expect(assignment['tag_creation_sequence'], expected);
+
+      expect(
+        () => raw.execute(
+          'UPDATE tag_assignments SET tag_creation_sequence = ? WHERE creation_sequence = ?',
+          [(expected as int) + 1, assignment['creation_sequence']],
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+      expect(
+        () => raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id, tag_creation_sequence) VALUES (?, ?, ?)',
+          [tagFixtureId(lastTagNumber), tagFixtureId(1), expected],
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+      );
+      expect(
+        raw.select(
+          'SELECT tag_creation_sequence FROM tag_assignments WHERE creation_sequence = ?',
+          [assignment['creation_sequence']],
+        ).single['tag_creation_sequence'],
+        expected,
+      );
+    },
+  );
+
+  test(
+    'повторное назначение не переносит тег в конец списка получателя',
+    () async {
+      for (final (target, column, recipientId) in [
+        (IntentionTagTarget(_intention(1)), 'intention_id', tagFixtureId(1)),
+        (
+          LongTermRelationTagTarget(_relation(101)),
+          'long_term_relation_id',
+          tagFixtureId(101),
+        ),
+      ]) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+          [tagFixtureId(lastTagNumber), recipientId],
+        );
+        raw.execute(
+          'DELETE FROM tag_assignments WHERE tag_id = ? AND $column = ?',
+          [tagFixtureId(firstTagNumber), recipientId],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+          [tagFixtureId(firstTagNumber), recipientId],
+        );
+        final first = assignments(
+          await graph.getTagAssignmentsPage(
+            TagAssignmentsQuery(target: target, pageSize: 1),
+          ),
+        );
+        final second = assignments(
+          await graph.getTagAssignmentsPage(
+            TagAssignmentsQuery(
+              target: target,
+              pageSize: 1,
+              cursor: first.nextCursor,
+            ),
+          ),
+        );
+        expect(
+          [first.items.single.name.value, second.items.single.name.value],
+          ['Дом', 'Работа'],
+        );
+        expect(second.nextCursor, isNull);
       }
     },
   );
@@ -300,10 +401,7 @@ void main() {
           tagFixtureId(101),
         ),
       };
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-        [tagFixtureId(999), id],
-      );
+      _insertMissingTagReference(raw, column, id);
       expect(
         await graph.getTagAssignmentsPage(
           TagAssignmentsQuery(target: target, pageSize: 1),
@@ -359,10 +457,7 @@ void main() {
         ),
       );
       expect(firstAssignments.nextCursor, isNotNull);
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-        [tagFixtureId(999), id],
-      );
+      _insertMissingTagReference(raw, column, id);
       expect(
         await graph.getTagAssignmentsPage(
           TagAssignmentsQuery(
@@ -401,10 +496,7 @@ void main() {
         ),
       );
       expect(firstSelection.nextCursor, isNotNull);
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-        [tagFixtureId(999), id],
-      );
+      _insertMissingTagReference(raw, column, id);
       expect(
         await graph.getTagCatalogPage(
           TagCatalogQuery(
@@ -534,10 +626,7 @@ void main() {
         'некорректный-id',
       ]);
       raw.execute('DELETE FROM tags WHERE id = ?', ['некорректный-id']);
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(999), tagFixtureId(1)],
-      );
+      _insertMissingTagReference(raw, 'intention_id', tagFixtureId(1));
       expect(
         await graph.getTagAssignmentsPage(TagAssignmentsQuery(target: target)),
         isA<TagAssignmentsPageError>().having(

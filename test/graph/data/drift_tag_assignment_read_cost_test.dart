@@ -46,6 +46,37 @@ int _measureReferenceCheckVisits(sqlite.Database database, _Select select) {
   return visits;
 }
 
+int _measureMainQueryVisits(sqlite.Database database, _Select select) {
+  var visits = 0;
+  database.createFunction(
+    functionName: 'measure_assignment_scan',
+    function: (_) {
+      visits++;
+      return 1;
+    },
+  );
+  final measuredSql = select.sql.replaceFirstMapped(
+    RegExp(r'WHERE a\.(intention_id|long_term_relation_id) = \?'),
+    (match) =>
+        '${match.group(0)} AND measure_assignment_scan(a.creation_sequence) = 1',
+  );
+  expect(measuredSql, isNot(select.sql));
+  final originalPlan = database
+      .select('EXPLAIN QUERY PLAN ${select.sql}', select.arguments)
+      .map((row) => row['detail'])
+      .toList();
+  final measuredPlan = database
+      .select('EXPLAIN QUERY PLAN $measuredSql', select.arguments)
+      .map((row) => row['detail'])
+      .toList();
+  expect(measuredPlan, originalPlan);
+  expect(
+    database.select(measuredSql, select.arguments),
+    hasLength(select.rows),
+  );
+  return visits;
+}
+
 final class _Select {
   const _Select(this.sql, this.arguments, this.rows);
 
@@ -106,7 +137,11 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
   );
   try {
     await database.open();
-    seedLargeTagReadFixture(raw, tagCount: tagCount);
+    seedLargeTagReadFixture(
+      raw,
+      tagCount: tagCount,
+      includeDenseRecipients: true,
+    );
     final repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -119,6 +154,14 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
     final relation = LongTermRelationTagTarget(
       (LongTermRelationId.decode(
         tagFixtureId(101),
+      ) as LongTermRelationIdDecodingSuccess).id,
+    );
+    final denseIntention = IntentionTagTarget(
+      (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id,
+    );
+    final denseRelation = LongTermRelationTagTarget(
+      (LongTermRelationId.decode(
+        tagFixtureId(102),
       ) as LongTermRelationIdDecodingSuccess).id,
     );
 
@@ -199,6 +242,7 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
 
     Future<void> sample(
       TagTarget target,
+      bool dense,
       int size,
       String kind,
       String position,
@@ -227,10 +271,25 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
           ],
       ];
       expect(plans.every((plan) => plan.isNotEmpty), isTrue);
+      final main = first.selects.last;
+      final mainPlan = plans.last;
+      final mainVisits = kind == 'assignments'
+          ? _measureMainQueryVisits(raw, main)
+          : null;
+      if (kind == 'assignments') {
+        final index = target is IntentionTagTarget
+            ? 'tag_assignments_intention_order'
+            : 'tag_assignments_long_term_relation_order';
+        expect(mainPlan.first, contains('SEARCH a USING INDEX $index'));
+        expect(mainPlan.join(' '), isNot(contains('USE TEMP B-TREE')));
+        expect(mainPlan.join(' '), isNot(contains('SCAN tags')));
+        expect(mainVisits, lessThanOrEqualTo(size + 1));
+      }
       debugPrintSynchronously(
         jsonEncode({
           'kind': 'tag_assignment_page',
           'target': target is IntentionTagTarget ? 'intention' : 'relation',
+          'density': dense ? 'dense' : 'sparse',
           'read': kind,
           'tags': tagCount,
           'pageSize': size,
@@ -240,16 +299,23 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
             for (final select in first.selects) select.rows,
           ],
           'elapsedMicroseconds': durations,
+          'mainQueryVisits': mainVisits,
           'sql': [for (final select in first.selects) select.sql],
           'plans': plans,
         }),
       );
     }
 
-    Future<void> traverse(TagTarget target, int size, String kind) async {
+    Future<void> traverse(
+      TagTarget target,
+      bool dense,
+      int size,
+      String kind,
+    ) async {
       final expected = [
         for (var index = 0; index < tagCount; index++)
           if (kind == 'selection' ||
+              dense ||
               (target is IntentionTagTarget ? index.isEven : index % 3 == 0))
             tagFixtureId(10000 + index),
       ];
@@ -290,25 +356,29 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       if (kind == 'selection') {
         expect(assigned, [
           for (var index = 0; index < tagCount; index++)
-            target is IntentionTagTarget ? index.isEven : index % 3 == 0,
+            dense ||
+                (target is IntentionTagTarget ? index.isEven : index % 3 == 0),
         ]);
       }
       expect(rows, expected.length + pages - 1 + pages * 2);
       expect(referenceCheckRuns, 1);
       expect(
         referenceCheckVisits,
-        target is IntentionTagTarget
+        dense
+            ? tagCount
+            : target is IntentionTagTarget
             ? (tagCount + 1) ~/ 2
             : (tagCount + 2) ~/ 3,
       );
       for (final position in ['first', 'middle', 'last']) {
         final (sampleCursor, page) = samples[position]!;
-        await sample(target, size, kind, position, sampleCursor, page);
+        await sample(target, dense, size, kind, position, sampleCursor, page);
       }
       debugPrintSynchronously(
         jsonEncode({
           'kind': 'tag_assignment_traversal',
           'target': target is IntentionTagTarget ? 'intention' : 'relation',
+          'density': dense ? 'dense' : 'sparse',
           'read': kind,
           'tags': tagCount,
           'pageSize': size,
@@ -323,10 +393,15 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       );
     }
 
-    for (final target in [intention, relation]) {
+    for (final (target, dense) in [
+      (intention, false),
+      (relation, false),
+      (denseIntention, true),
+      (denseRelation, true),
+    ]) {
       for (final kind in ['assignments', 'selection']) {
         for (final size in [1, 50, 100]) {
-          await traverse(target, size, kind);
+          await traverse(target, dense, size, kind);
         }
       }
     }

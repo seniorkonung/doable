@@ -7,6 +7,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 const publishedIntentionSchemaVersion = 1;
 const publishedRelationSchemaVersion = 2;
 const publishedDailyChoiceSchemaVersion = 3;
+const tagSchemaVersionBeforeOrder = 4;
 
 typedef SchemaFixtureSeed = void Function(sqlite.Database database);
 
@@ -42,6 +43,16 @@ Future<void> createSchemaV3Fixture(
 }) => _createSchemaFixture(
   databaseFile,
   version: publishedDailyChoiceSchemaVersion,
+  seed: seed,
+);
+
+/// Создаёт файловую фикстуру схемы тегов до индексируемого порядка.
+Future<void> createSchemaV4Fixture(
+  File databaseFile, {
+  SchemaFixtureSeed? seed,
+}) => _createSchemaFixture(
+  databaseFile,
+  version: tagSchemaVersionBeforeOrder,
   seed: seed,
 );
 

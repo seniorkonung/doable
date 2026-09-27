@@ -25,7 +25,7 @@ void main() {
   });
 
   test(
-    'новое хранилище создаётся в версии 4 с пустыми дневными выборами',
+    'новое хранилище создаётся в версии 5 с пустыми дневными выборами',
     () async {
       final version = await database
           .customSelect('PRAGMA user_version')

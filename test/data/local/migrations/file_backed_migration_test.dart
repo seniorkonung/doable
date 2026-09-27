@@ -15,6 +15,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/doable_schema_verifier.dart';
 import '../../../support/local_database_harness.dart';
 import '../../../support/schema_v1_fixture.dart';
+import '../../../support/tag_storage_fixture.dart';
 
 const _activeIntentionId = '018f0b5d-6b2e-7c80-8000-000000000311';
 const _archivedIntentionId = '018f0b5d-6b2e-7c80-8000-000000000312';
@@ -82,6 +83,103 @@ void main() {
       expect(_graphRows(harness.databaseFile, sourceVersion), before);
     }
   });
+
+  test('переход 4 → 5 сохраняет назначения и их последовательности', () async {
+    final fresh = await LocalDatabaseHarness.fileBacked();
+    addTearDown(fresh.dispose);
+    await fresh.openReadyDatabase();
+    await fresh.closePersistenceObjectGraph();
+    final freshSchema = _schemaContract(fresh.databaseFile);
+
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    await createSchemaV4Fixture(
+      harness.databaseFile,
+      seed: (raw) {
+        seedTagStorageFixture(raw);
+        raw.execute('DELETE FROM tag_assignments WHERE creation_sequence = 5');
+      },
+    );
+    final beforeGraph = _graphRows(
+      harness.databaseFile,
+      tagSchemaVersionBeforeOrder,
+    );
+    final beforeAssignments = _assignmentRows(harness.databaseFile);
+
+    final migrated = await harness.openReadyDatabase();
+    await verifyDoableDatabaseSchema(migrated);
+    await harness.closePersistenceObjectGraph();
+    expect(_schemaContract(harness.databaseFile), freshSchema);
+    expect(
+      _graphRows(harness.databaseFile, tagSchemaVersionBeforeOrder),
+      beforeGraph,
+    );
+    final afterAssignments = _assignmentRows(harness.databaseFile);
+    expect(afterAssignments.rows, beforeAssignments.rows);
+    expect(afterAssignments.sequence, beforeAssignments.sequence);
+    final raw = sqlite.sqlite3.open(harness.databaseFile.path);
+    try {
+      expect(raw.select('PRAGMA user_version').single['user_version'], 5);
+      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        raw.select('''
+          SELECT 1 FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
+          WHERE a.tag_creation_sequence <> t.creation_sequence
+        '''),
+        isEmpty,
+      );
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(lastTagNumber), tagFixtureId(3)],
+      );
+      expect(
+        raw
+            .select(
+              '''
+          SELECT creation_sequence FROM tag_assignments
+          WHERE tag_id = ? AND intention_id = ?
+        ''',
+              [tagFixtureId(lastTagNumber), tagFixtureId(3)],
+            )
+            .single['creation_sequence'],
+        6,
+      );
+    } finally {
+      raw.close();
+    }
+  });
+
+  test(
+    'сбой перехода 4 → 5 откатывает схему и назначения до повторного открытия',
+    () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      await createSchemaV4Fixture(
+        harness.databaseFile,
+        seed: seedTagStorageFixture,
+      );
+      final beforeSchema = _schemaContract(harness.databaseFile);
+      final beforeAssignments = _assignmentRows(harness.databaseFile);
+      final interceptor = _Schema4To5FailureInterceptor();
+
+      final failed = await harness.open(observer: interceptor);
+      expect(failed, isA<LocalDataUnexpectedFailure>());
+      expect(interceptor.didInjectFailure, isTrue);
+      await harness.closePersistenceObjectGraph();
+      expect(_schemaContract(harness.databaseFile), beforeSchema);
+      final afterFailure = _assignmentRows(harness.databaseFile);
+      expect(afterFailure.rows, beforeAssignments.rows);
+      expect(afterFailure.sequence, beforeAssignments.sequence);
+
+      final recovered = await harness.openReadyDatabase();
+      await verifyDoableDatabaseSchema(recovered);
+      await harness.closePersistenceObjectGraph();
+      expect(
+        _assignmentRows(harness.databaseFile).rows,
+        beforeAssignments.rows,
+      );
+    },
+  );
 
   test(
     'сбой шага 3 → 4 до commit сохраняет дневной путь и позволяет повтор',
@@ -164,7 +262,7 @@ void main() {
   }
 
   test(
-    'читатель схемы 3 отклоняет настоящий файл версии 4 без изменения',
+    'читатель схемы 3 отклоняет настоящий файл версии 5 без изменения',
     () async {
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
@@ -190,7 +288,7 @@ void main() {
               .having(
                 (error) => error.detectedSchemaVersion,
                 'версия файла',
-                4,
+                AppDatabase.currentSchemaVersion,
               ),
         ),
       );
@@ -618,6 +716,30 @@ Map<String, String?> _schemaContract(File file) {
   }
 }
 
+({List<Map<String, Object?>> rows, int? sequence}) _assignmentRows(File file) {
+  final database = sqlite.sqlite3.open(file.path);
+  try {
+    return (
+      rows: [
+        for (final row in database.select('''
+          SELECT creation_sequence, tag_id, intention_id, long_term_relation_id
+          FROM tag_assignments ORDER BY creation_sequence
+        '''))
+          Map<String, Object?>.from(row),
+      ],
+      sequence:
+          database
+                  .select(
+                    "SELECT seq FROM sqlite_sequence WHERE name = 'tag_assignments'",
+                  )
+                  .firstOrNull?['seq']
+              as int?,
+    );
+  } finally {
+    database.close();
+  }
+}
+
 void _expectNoTagTables(File file, int expectedVersion) {
   expect(file.existsSync(), isTrue);
   final database = sqlite.sqlite3.open(file.path);
@@ -974,6 +1096,28 @@ final class _InjectedSchema2To3Failure implements Exception {
 
 final class _InjectedSchema3To4Failure implements Exception {
   const _InjectedSchema3To4Failure();
+}
+
+final class _InjectedSchema4To5Failure implements Exception {
+  const _InjectedSchema4To5Failure();
+}
+
+final class _Schema4To5FailureInterceptor
+    extends LocalDatabaseConnectionObserver {
+  var didInjectFailure = false;
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (didInjectFailure) return;
+    if (!statement.statements.any(
+      (sql) =>
+          sql.trimLeft().toUpperCase().startsWith('DROP TABLE TAG_ASSIGNMENTS'),
+    )) {
+      return;
+    }
+    didInjectFailure = true;
+    throw const _InjectedSchema4To5Failure();
+  }
 }
 
 final class _Schema3To4FailureInterceptor

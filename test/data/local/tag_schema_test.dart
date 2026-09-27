@@ -33,8 +33,11 @@ void main() {
 
   tearDown(() => harness.dispose());
 
-  test('создаёт версию 4 с индексами, ключом названия и внешними ключами', () {
-    expect(raw.select('PRAGMA user_version').single['user_version'], 4);
+  test('создаёт версию 5 с индексами, ключом названия и внешними ключами', () {
+    expect(
+      raw.select('PRAGMA user_version').single['user_version'],
+      AppDatabase.currentSchemaVersion,
+    );
     final objects = raw
         .select("SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
         .map((row) => row['name'])
@@ -46,9 +49,14 @@ void main() {
         'tag_assignments',
         'tag_assignments_tag_order',
         'tag_assignments_intention',
+        'tag_assignments_intention_order',
         'tag_assignments_long_term_relation',
+        'tag_assignments_long_term_relation_order',
         'tags_immutable_identity',
         'tag_assignments_immutable_identity',
+        'tag_assignments_valid_tag_order_insert',
+        'tag_assignments_fill_tag_order',
+        'tag_assignments_valid_tag_order_update',
       ]),
     );
     final key = raw
@@ -289,7 +297,7 @@ void main() {
   });
 
   test(
-    'переход 3 → 4 добавляет пустые таблицы без перестройки прежних',
+    'переход 3 → 5 добавляет пустые таблицы без перестройки прежних',
     () async {
       final expectedSchema = _schemaObjects(raw);
       await harness.dispose();
@@ -316,7 +324,10 @@ void main() {
         setup: (db) => upgraded = db,
       );
       expect(database.schemaVersion, AppDatabase.currentSchemaVersion);
-      expect(upgraded!.select('PRAGMA user_version').single['user_version'], 4);
+      expect(
+        upgraded!.select('PRAGMA user_version').single['user_version'],
+        AppDatabase.currentSchemaVersion,
+      );
       expect(
         upgraded!.select('SELECT rowid, title FROM intentions').single['title'],
         'Сохранённое намерение',

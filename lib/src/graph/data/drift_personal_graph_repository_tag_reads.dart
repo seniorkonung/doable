@@ -176,11 +176,12 @@ extension _TagReading on DriftPersonalGraphRepository {
               : null;
           final rows = await _database
               .customSelect(
-                '''SELECT t.creation_sequence, t.id, t.name
+                '''SELECT a.tag_creation_sequence AS creation_sequence,
+                 t.creation_sequence AS actual_tag_creation_sequence, t.id, t.name
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.${target.assignmentColumn} = ?
-                 ${boundary == null ? '' : 'AND t.creation_sequence > ?'}
-               ORDER BY t.creation_sequence ASC LIMIT ?''',
+                 ${boundary == null ? '' : 'AND a.tag_creation_sequence > ?'}
+               ORDER BY a.tag_creation_sequence ASC LIMIT ?''',
                 variables: [
                   Variable<String>(target.id),
                   if (boundary != null) Variable<int>(boundary),
@@ -197,6 +198,13 @@ extension _TagReading on DriftPersonalGraphRepository {
               'creation_sequence',
             );
             if (sequence <= previousSequence) {
+              throw const _StoredIntentionCorruption();
+            }
+            if (sequence !=
+                _requiredStoredInteger(
+                  row.data,
+                  'actual_tag_creation_sequence',
+                )) {
               throw const _StoredIntentionCorruption();
             }
             previousSequence = sequence;

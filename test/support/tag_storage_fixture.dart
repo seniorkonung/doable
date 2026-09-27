@@ -88,7 +88,11 @@ Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
     };
 
 /// Большие воспроизводимые списки для измерения двух видов чтения.
-void seedLargeTagReadFixture(sqlite.Database database, {int tagCount = 1203}) {
+void seedLargeTagReadFixture(
+  sqlite.Database database, {
+  int tagCount = 1203,
+  bool includeDenseRecipients = false,
+}) {
   database.execute('BEGIN');
   try {
     for (final number in [1, 2, 3]) {
@@ -108,6 +112,12 @@ void seedLargeTagReadFixture(sqlite.Database database, {int tagCount = 1203}) {
       'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
       [tagFixtureId(101), tagFixtureId(1), tagFixtureId(3), 'need', 2, 0],
     );
+    if (includeDenseRecipients) {
+      database.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [tagFixtureId(102), tagFixtureId(3), tagFixtureId(1), 'need', 2, 0],
+      );
+    }
     for (var index = 0; index < tagCount; index++) {
       final id = tagFixtureId(10000 + index);
       database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
@@ -124,6 +134,16 @@ void seedLargeTagReadFixture(sqlite.Database database, {int tagCount = 1203}) {
         database.execute(
           'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
           [id, tagFixtureId(101)],
+        );
+      }
+      if (includeDenseRecipients) {
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [id, tagFixtureId(2)],
+        );
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+          [id, tagFixtureId(102)],
         );
       }
     }

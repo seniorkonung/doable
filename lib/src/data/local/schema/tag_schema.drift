@@ -28,6 +28,8 @@ CREATE TABLE tag_assignments (
     CHECK (creation_sequence > 0),
   tag_id TEXT NOT NULL
     REFERENCES tags(id) ON UPDATE RESTRICT ON DELETE CASCADE,
+  tag_creation_sequence INTEGER NOT NULL DEFAULT 0
+    CHECK (tag_creation_sequence >= 0),
   intention_id TEXT
     REFERENCES intentions(id) ON UPDATE RESTRICT ON DELETE CASCADE,
   long_term_relation_id TEXT
@@ -45,8 +47,43 @@ CREATE INDEX tag_assignments_tag_order
 CREATE INDEX tag_assignments_intention
   ON tag_assignments (intention_id, tag_id);
 
+CREATE INDEX tag_assignments_intention_order
+  ON tag_assignments (intention_id, tag_creation_sequence);
+
 CREATE INDEX tag_assignments_long_term_relation
   ON tag_assignments (long_term_relation_id, tag_id);
+
+CREATE INDEX tag_assignments_long_term_relation_order
+  ON tag_assignments (long_term_relation_id, tag_creation_sequence);
+
+CREATE TRIGGER tag_assignments_valid_tag_order_insert
+BEFORE INSERT ON tag_assignments
+WHEN
+  (SELECT creation_sequence FROM tags WHERE id = new.tag_id) IS NULL OR
+  (new.tag_creation_sequence <> 0 AND
+   new.tag_creation_sequence <> (SELECT creation_sequence FROM tags WHERE id = new.tag_id))
+BEGIN
+  SELECT RAISE(ABORT, 'tag assignment order does not match tag');
+END;
+
+CREATE TRIGGER tag_assignments_fill_tag_order
+AFTER INSERT ON tag_assignments
+WHEN new.tag_creation_sequence = 0
+BEGIN
+  UPDATE tag_assignments
+  SET tag_creation_sequence = (SELECT creation_sequence FROM tags WHERE id = new.tag_id)
+  WHERE creation_sequence = new.creation_sequence;
+END;
+
+CREATE TRIGGER tag_assignments_valid_tag_order_update
+BEFORE UPDATE ON tag_assignments
+WHEN
+  new.tag_creation_sequence IS NOT (SELECT creation_sequence FROM tags WHERE id = new.tag_id) OR
+  (old.tag_creation_sequence <> 0 AND
+   new.tag_creation_sequence <> old.tag_creation_sequence)
+BEGIN
+  SELECT RAISE(ABORT, 'tag assignment order is immutable');
+END;
 
 CREATE TRIGGER tag_assignments_immutable_identity
 AFTER UPDATE OF creation_sequence, tag_id, intention_id, long_term_relation_id
