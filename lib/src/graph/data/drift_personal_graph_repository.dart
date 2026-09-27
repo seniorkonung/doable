@@ -76,6 +76,7 @@ part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_choice_path_suggestions.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
+part 'drift_personal_graph_repository_tagged_entities.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
@@ -130,7 +131,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
     TaggedEntitiesQuery query,
-  ) async => const TaggedEntitiesPageError(TaggedEntitiesUnexpectedFailure());
+  ) => _readTaggedEntitiesPage(query);
 
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
