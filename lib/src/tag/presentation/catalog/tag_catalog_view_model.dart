@@ -195,6 +195,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       state = current.withStatus(selectedAssignment: _selectedAssignment);
       return;
     }
+    _assignmentStaleReads = 0;
     _clearSelectedAssignment();
     state = current.withStatus(selectedAssignment: _selectedAssignment);
     _readSelectedAssignment(evenIfLoaded: true);

@@ -47,6 +47,95 @@ void main() {
   ]) {
     for (final assigned in [false, true]) {
       testWidgets(
+        'экран сохраняет повтор после исчерпания устаревших проверок $recipient: ${assigned ? 'назначен' : 'свободен'}',
+        (tester) async {
+          final repository = _CatalogRepository();
+          addTearDown(repository.dispose);
+          final target = relation
+              ? LongTermRelationTagTarget(
+                  (LongTermRelationId.decode(
+                    _id(200),
+                  ) as LongTermRelationIdDecodingSuccess).id,
+                )
+              : IntentionTagTarget(
+                  (IntentionId.decode(
+                    _id(100),
+                  ) as IntentionIdDecodingSuccess).id,
+                );
+          await _pumpCatalog(tester, repository, target: target);
+          repository.complete(
+            TagCatalogPageSuccess(
+              data.TagCatalogPage.selection(
+                target: target,
+                rows: [
+                  TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
+                ],
+                pageSize: TagCatalogQuery.defaultPageSize,
+                nextCursor: _Cursor(),
+                revision: const _Revision(2),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(TagCatalogPage)),
+          );
+          container
+              .read(
+                tagCatalogViewModelProvider(
+                  mode: TagCatalogSelectionMode(target),
+                ).notifier,
+              )
+              .selectTag(_tag(52, 'Вне порции').id);
+          repository.tagRead(_tag(52, 'Вне порции'), revision: 2);
+          await tester.pumpAndSettle();
+          final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+
+          for (var index = 0; index < 8; index++) {
+            repository.statusReads[index].complete(
+              const TagAssignmentStatusSuccess(
+                GraphSnapshot(value: false, revision: _Revision(1)),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+          expect(repository.statusReads, hasLength(8));
+          expect(find.text('Try again'), findsOneWidget);
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+
+          await tester.tap(find.text('Try again'));
+          await tester.pump();
+          expect(repository.statusReads, hasLength(9));
+          for (var index = 8; index < 11; index++) {
+            repository.statusReads[index].complete(
+              const TagAssignmentStatusSuccess(
+                GraphSnapshot(value: false, revision: _Revision(1)),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(repository.statusReads, hasLength(index + 2));
+            expect(find.text('Try again'), findsNothing);
+            expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+          }
+          repository.statusReads[11].complete(
+            TagAssignmentStatusSuccess(
+              GraphSnapshot(value: assigned, revision: const _Revision(2)),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('Try again'), findsNothing);
+          if (assigned) {
+            expect(assign, findsNothing);
+          } else {
+            expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
+          }
+          expect(repository._commands, isEmpty);
+        },
+      );
+    }
+    for (final assigned in [false, true]) {
+      testWidgets(
         'экран сохраняет статус второй порции после позднего отказа для $recipient: ${assigned ? 'назначен' : 'свободен'}',
         (tester) async {
           final repository = _CatalogRepository();
