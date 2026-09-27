@@ -30,6 +30,15 @@ void main() {
         }
         for (final stage in TagReadDiagnosticsStage.values) {
           sink.record(
+            TaggedEntitiesPageReadDiagnosticsEvent(
+              stage: stage,
+              status: const DiagnosticsFailed(
+                duration: Duration(microseconds: 31),
+                code: DiagnosticsFailureCode.corruption,
+              ),
+            ),
+          );
+          sink.record(
             TagCatalogPageReadDiagnosticsEvent(
               stage: stage,
               status: const DiagnosticsSucceeded(Duration(microseconds: 23)),
@@ -55,6 +64,13 @@ void main() {
                 'failureCode': 'conflict',
               },
           for (final stage in TagReadDiagnosticsStage.values) ...[
+            {
+              'operation': 'taggedEntitiesPageRead',
+              'stage': stage.name,
+              'outcome': 'failed',
+              'durationMicros': 31,
+              'failureCode': 'corruption',
+            },
             {
               'operation': 'tagCatalogPageRead',
               'stage': stage.name,

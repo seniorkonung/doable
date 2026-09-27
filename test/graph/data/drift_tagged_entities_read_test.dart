@@ -88,6 +88,240 @@ void main() {
     return all;
   }
 
+  Future<void> expectCorruption(TaggedEntitiesScope scope) async {
+    expect(
+      await graph.getTaggedEntitiesPage(
+        TaggedEntitiesQuery(
+          tagId: _tag(firstTagNumber),
+          scope: scope,
+          pageSize: 1,
+        ),
+      ),
+      isA<TaggedEntitiesPageError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TaggedEntitiesCorruptionFailure>(),
+      ),
+    );
+  }
+
+  test(
+    'отсутствующий получатель вне охвата и порции отклоняет чтение',
+    () async {
+      raw.execute('PRAGMA foreign_keys = OFF');
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(firstTagNumber), tagFixtureId(999)],
+      );
+      await expectCorruption(TaggedEntitiesScope.active);
+    },
+  );
+
+  test('отсутствующий участник связи отклоняет порцию', () async {
+    raw.execute('PRAGMA foreign_keys = OFF');
+    raw.execute('DELETE FROM intentions WHERE id = ?', [tagFixtureId(3)]);
+    await expectCorruption(TaggedEntitiesScope.active);
+  });
+
+  test('отсутствующая архивная связь не исчезает за фильтром', () async {
+    raw.execute('PRAGMA foreign_keys = OFF');
+    raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
+      tagFixtureId(102),
+    ]);
+    await expectCorruption(TaggedEntitiesScope.active);
+    await expectCorruption(TaggedEntitiesScope.archived);
+  });
+
+  test(
+    'оставшиеся назначения отсутствующего тега означают повреждение',
+    () async {
+      raw.execute('PRAGMA foreign_keys = OFF');
+      raw.execute('DELETE FROM tags WHERE id = ?', [
+        tagFixtureId(firstTagNumber),
+      ]);
+      await expectCorruption(TaggedEntitiesScope.active);
+    },
+  );
+
+  test('отсутствующий участник вне порции и охвата отклоняет чтение', () async {
+    raw.execute('PRAGMA foreign_keys = OFF');
+    raw.execute('DELETE FROM tag_assignments WHERE intention_id = ?', [
+      tagFixtureId(2),
+    ]);
+    raw.execute('DELETE FROM intentions WHERE id = ?', [tagFixtureId(2)]);
+    await expectCorruption(TaggedEntitiesScope.active);
+  });
+
+  test('назначение без получателя не превращается в пустой успех', () async {
+    raw.execute('PRAGMA ignore_check_constraints = ON');
+    raw.execute('INSERT INTO tag_assignments (tag_id) VALUES (?)', [
+      tagFixtureId(firstTagNumber),
+    ]);
+    await expectCorruption(TaggedEntitiesScope.active);
+  });
+
+  test('повреждение дополнительной строки отклоняет всю порцию', () async {
+    raw.execute('DELETE FROM daily_choice_path_steps');
+    raw.execute('PRAGMA ignore_check_constraints = ON');
+    raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
+      'CANARY-вид',
+      tagFixtureId(101),
+    ]);
+    await expectCorruption(TaggedEntitiesScope.active);
+  });
+
+  test('нестрогое название получателя отклоняет всю порцию', () async {
+    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+      ' CANARY-название ',
+      tagFixtureId(1),
+    ]);
+    await expectCorruption(TaggedEntitiesScope.active);
+  });
+
+  test('начальный BOM сохранённого названия не удаляется при чтении', () async {
+    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+      '\uFEFFНамерение',
+      tagFixtureId(1),
+    ]);
+    await expectCorruption(TaggedEntitiesScope.active);
+  });
+
+  test('начальный BOM названия тега не удаляется при чтении', () async {
+    raw.execute('PRAGMA ignore_check_constraints = ON');
+    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+      '\uFEFFДом',
+      tagFixtureId(firstTagNumber),
+    ]);
+    await expectCorruption(TaggedEntitiesScope.active);
+  });
+
+  test('недопустимый UTF-8 идентичности даёт повреждение', () async {
+    raw.execute('DELETE FROM tag_assignments WHERE tag_id = ?', [
+      tagFixtureId(firstTagNumber),
+    ]);
+    raw.execute('''INSERT INTO intentions (id, title, created_at, updated_at)
+      VALUES (CAST(x'FF' AS TEXT), 'Намерение', 1, 1)''');
+    raw.execute(
+      '''INSERT INTO tag_assignments (tag_id, intention_id)
+      VALUES (?, CAST(x'FF' AS TEXT))''',
+      [tagFixtureId(firstTagNumber)],
+    );
+    await expectCorruption(TaggedEntitiesScope.active);
+  });
+
+  test(
+    'неверная идентичность участника отклоняет дополнительную строку',
+    () async {
+      raw.execute(
+        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
+        ['CANARY-неверный-id', 'Участник'],
+      );
+      raw.execute(
+        '''INSERT INTO long_term_relations
+      (id, source_intention_id, related_intention_id, type, priority)
+      VALUES (?, ?, ?, 'need', 1)''',
+        [tagFixtureId(103), tagFixtureId(3), 'CANARY-неверный-id'],
+      );
+      raw.execute(
+        'DELETE FROM tag_assignments WHERE tag_id = ? AND long_term_relation_id = ?',
+        [tagFixtureId(firstTagNumber), tagFixtureId(101)],
+      );
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+        [tagFixtureId(firstTagNumber), tagFixtureId(103)],
+      );
+      await expectCorruption(TaggedEntitiesScope.active);
+    },
+  );
+
+  for (final (table, number) in [
+    ('intentions', 2),
+    ('long_term_relations', 102),
+  ]) {
+    test(
+      'недопустимое архивное состояние $table не скрывается охватом',
+      () async {
+        raw.execute('PRAGMA ignore_check_constraints = ON');
+        raw.execute('UPDATE $table SET is_archived = 2 WHERE id = ?', [
+          tagFixtureId(number),
+        ]);
+        await expectCorruption(TaggedEntitiesScope.active);
+        await expectCorruption(TaggedEntitiesScope.archived);
+      },
+    );
+  }
+
+  test(
+    'повреждение назначений другого тега не затрагивает выбранный',
+    () async {
+      raw.execute('PRAGMA foreign_keys = OFF');
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(lastTagNumber), tagFixtureId(999)],
+      );
+      final result = await graph.getTaggedEntitiesPage(
+        TaggedEntitiesQuery(
+          tagId: _tag(firstTagNumber),
+          scope: TaggedEntitiesScope.active,
+        ),
+      );
+      expect(result, isA<TaggedEntitiesPageSuccess>());
+    },
+  );
+
+  test(
+    'проверка ссылок выбранного тега выполняется один раз за обход',
+    () async {
+      probe.statements.clear();
+      await collect(_tag(firstTagNumber), TaggedEntitiesScope.active, 1);
+      expect(
+        probe.statements.where(
+          (sql) =>
+              sql.contains('LEFT JOIN') &&
+              sql.contains('tag_assignments a') &&
+              sql.contains('LIMIT 1'),
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'смена хранилища лишает продолжение свидетельства целостности',
+    () async {
+      final first = page(
+        await graph.getTaggedEntitiesPage(
+          TaggedEntitiesQuery(
+            tagId: _tag(firstTagNumber),
+            scope: TaggedEntitiesScope.active,
+            pageSize: 1,
+          ),
+        ),
+      );
+      raw.execute('PRAGMA foreign_keys = OFF');
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(firstTagNumber), tagFixtureId(999)],
+      );
+      expect(
+        await graph.getTaggedEntitiesPage(
+          TaggedEntitiesQuery(
+            tagId: _tag(firstTagNumber),
+            scope: TaggedEntitiesScope.active,
+            pageSize: 1,
+            cursor: first.nextCursor,
+          ),
+        ),
+        isA<TaggedEntitiesPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TaggedEntitiesSnapshotExpired>(),
+        ),
+      );
+      await expectCorruption(TaggedEntitiesScope.active);
+    },
+  );
+
   test('оба охвата смешивают виды в порядке назначения без соседей', () async {
     raw.execute(
       'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
@@ -326,7 +560,11 @@ void main() {
     );
     expect(active, [isA<TaggedLongTermRelation>(), isA<TaggedIntention>()]);
     final pageQueries = probe.statements
-        .where((sql) => sql.contains('FROM tag_assignments a'))
+        .where(
+          (sql) =>
+              sql.contains('FROM tag_assignments a') &&
+              sql.contains('ORDER BY a.creation_sequence'),
+        )
         .toList();
     expect(pageQueries, hasLength(2));
     expect(

@@ -12,6 +12,7 @@ import 'package:doable/src/tag/application/tag_assignments_page.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/application/tagged_entities_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/domain/tag_target.dart';
@@ -41,12 +42,34 @@ final class _ThrowingSink implements DiagnosticsSink {
   }
 }
 
+final class _ReadFault extends LocalDatabaseConnectionObserver {
+  Object? failure;
+
+  @override
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation == LocalDatabaseSqlOperation.select &&
+        statement.statements.single.contains('FROM tags WHERE id = ?')) {
+      final error = failure;
+      if (error != null) throw error;
+    }
+  }
+}
+
+final class _ForeignTaggedCursor implements TaggedEntitiesCursor {}
+
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
+  late _ReadFault readFault;
 
   setUp(() async {
-    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
+    readFault = _ReadFault();
+    database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(setup: (db) => raw = db),
+        readFault,
+      ),
+    );
     await database.open();
   });
   tearDown(() => database.close());
@@ -58,6 +81,154 @@ void main() {
         () => DateTime.utc(2026, 9, 25),
         sink,
       );
+
+  test(
+    'навигация сообщает этап, категорию и длительность без личных данных',
+    () async {
+      seedTagStorageFixture(raw);
+      final sink = _RecordingSink();
+      final graph = repository(sink);
+      final id = (TagId.decode(
+        tagFixtureId(firstTagNumber),
+      ) as TagIdDecodingSuccess).id;
+      TaggedEntitiesQuery query({TaggedEntitiesCursor? cursor}) =>
+          TaggedEntitiesQuery(
+            tagId: id,
+            scope: TaggedEntitiesScope.active,
+            pageSize: 1,
+            cursor: cursor,
+          );
+
+      expect(
+        await graph.getTaggedEntitiesPage(query()),
+        isA<TaggedEntitiesPageSuccess>(),
+      );
+      expect(
+        await graph.getTaggedEntitiesPage(
+          query(cursor: _ForeignTaggedCursor()),
+        ),
+        isA<TaggedEntitiesPageError>(),
+      );
+      final validation = sink.events
+          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+          .last;
+      expect(validation.stage, TagReadDiagnosticsStage.validation);
+      expect(
+        (validation.status as DiagnosticsFailed).code,
+        DiagnosticsFailureCode.validation,
+      );
+
+      readFault.failure = sqlite.SqliteException(
+        extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+        message: 'CANARY-SQL-ошибка',
+        causingStatement: 'CANARY-запрос',
+        parametersToStatement: [tagFixtureId(firstTagNumber)],
+      );
+      expect(
+        await graph.getTaggedEntitiesPage(query()),
+        isA<TaggedEntitiesPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TaggedEntitiesUnavailableFailure>(),
+        ),
+      );
+      final unavailable = sink.events
+          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+          .last;
+      expect(unavailable.stage, TagReadDiagnosticsStage.read);
+      expect(
+        (unavailable.status as DiagnosticsFailed).code,
+        DiagnosticsFailureCode.unavailable,
+      );
+
+      readFault.failure = StateError('CANARY-неизвестная-причина');
+      expect(
+        await graph.getTaggedEntitiesPage(query()),
+        isA<TaggedEntitiesPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TaggedEntitiesUnexpectedFailure>(),
+        ),
+      );
+      final unknown = sink.events
+          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+          .last;
+      expect(
+        (unknown.status as DiagnosticsFailed).code,
+        DiagnosticsFailureCode.unexpected,
+      );
+
+      readFault.failure = null;
+      raw.execute('PRAGMA foreign_keys = OFF');
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(firstTagNumber), tagFixtureId(999)],
+      );
+      expect(
+        await graph.getTaggedEntitiesPage(query()),
+        isA<TaggedEntitiesPageError>().having(
+          (error) => error.failure,
+          'причина',
+          isA<TaggedEntitiesCorruptionFailure>(),
+        ),
+      );
+      final corruption = sink.events
+          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+          .last;
+      expect(
+        (corruption.status as DiagnosticsFailed).code,
+        DiagnosticsFailureCode.corruption,
+      );
+      final events = sink.events
+          .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+          .toList();
+      expect(
+        events.where((event) => event.status is DiagnosticsStarted),
+        hasLength(5),
+      );
+      expect(
+        events.where((event) => event.status is DiagnosticsSucceeded),
+        hasLength(1),
+      );
+      for (final event in events.where(
+        (event) => event.status is DiagnosticsFailed,
+      )) {
+        expect(
+          (event.status as DiagnosticsFailed).duration.isNegative,
+          isFalse,
+        );
+      }
+      final recorded = sink.messages.join('\n');
+      for (final canary in [
+        'CANARY-SQL-ошибка',
+        'CANARY-запрос',
+        'CANARY-неизвестная-причина',
+        tagFixtureId(firstTagNumber),
+        tagFixtureId(999),
+        tagFixtureId(101),
+        tagFixtureId(1),
+        'Дом',
+        'Намерение 1',
+      ]) {
+        expect(recorded, isNot(contains(canary)));
+      }
+    },
+  );
+
+  test('отказ приёмника не меняет результат чтения навигации', () async {
+    seedTagStorageFixture(raw);
+    final sink = _ThrowingSink();
+    final graph = repository(sink);
+    final id =
+        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
+    expect(
+      await graph.getTaggedEntitiesPage(
+        TaggedEntitiesQuery(tagId: id, scope: TaggedEntitiesScope.active),
+      ),
+      isA<TaggedEntitiesPageSuccess>(),
+    );
+    expect(sink.attempts, 2);
+  });
 
   test('реальные исходы и повреждение чтения оставляют только безопасную диагностику', () async {
     final sink = _RecordingSink();
