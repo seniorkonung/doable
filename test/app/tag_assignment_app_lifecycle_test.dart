@@ -1,6 +1,10 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
+import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -11,6 +15,7 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
+import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
@@ -21,6 +26,8 @@ import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.da
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -28,6 +35,236 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 
 void main() {
+  for (final (description, target) in [
+    ('намерение', _intentionTarget(1)),
+    ('связь «нужно»', _relationTarget(101)),
+    ('связь «можно»', _relationTarget(103)),
+  ]) {
+    testWidgets(
+      '$description: поиск согласует редактор, назначения и позднее чтение после переименования и удаления',
+      (tester) async {
+        late sqlite.Database raw;
+        late _ControlledReads repository;
+        final diagnostics = InMemoryDiagnosticsSink();
+        final runtime = AppRuntime(
+          connectionFactory: () =>
+              openInMemoryLocalDatabase(setup: (database) => raw = database),
+          diagnosticsSink: diagnostics,
+          repositoryFactory: (database) => repository = _ControlledReads(
+            DriftPersonalGraphRepository(
+              database,
+              UuidV7IntentionIdGenerator(),
+              () => DateTime.utc(2026, 9, 28),
+              diagnostics,
+            ),
+          ),
+        );
+        final router = AppRouter();
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          router.dispose();
+          await runtime.shutdown();
+        });
+        final ready =
+            await tester.runAsync(runtime.bootstrap) as AppRuntimeReady;
+        seedTagStorageFixture(raw);
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 3, 0],
+        );
+        final provider = tagCatalogViewModelProvider(
+          mode: TagCatalogSelectionMode(target),
+        );
+        TagCatalogLoaded loaded() =>
+            ready.container.read(provider) as TagCatalogLoaded;
+        bool current() =>
+            ready.container.read(provider) is TagCatalogLoaded &&
+            loaded().canUseCurrentItems;
+        final search = find.byKey(const ValueKey('tag-catalog-search'));
+        final editor = find.byKey(const ValueKey('tag-editor-name'));
+        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: ready.container,
+            child: MaterialApp.router(
+              locale: const Locale('ru'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              routerConfig: router.config(
+                deepLinkBuilder: (_) =>
+                    DeepLink([TagCatalogRoute(target: target)]),
+              ),
+            ),
+          ),
+        );
+        await _pumpUntil(tester, current);
+        await tester.enterText(search, 'дом');
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(search).controller!.text, 'дом');
+        expect(find.text('Дом'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+        await tester.pumpAndSettle();
+        await tester.enterText(editor, 'Для дома');
+        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+        await _pumpUntil(
+          tester,
+          () =>
+              editor.evaluate().isEmpty &&
+              current() &&
+              loaded().selection is TagCatalogSelectionReady,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(search).controller!.text, 'дом');
+        expect(find.text('Дом'), findsOneWidget);
+        expect(find.text('Для дома'), findsOneWidget);
+        final selectedId = loaded().selection.id!;
+        final selectedRow = find.byKey(
+          ValueKey('tag-catalog-row-${selectedId.toCanonicalString()}'),
+        );
+        expect(
+          loaded().selectedAssignment,
+          TagCatalogSelectedAssignment.available,
+        );
+        await tester.tap(assign);
+        await _pumpUntil(
+          tester,
+          () =>
+              current() &&
+              loaded().selectedAssignment ==
+                  TagCatalogSelectedAssignment.assigned,
+        );
+        expect(
+          find.descendant(of: selectedRow, matching: find.text('Назначен')),
+          findsOneWidget,
+        );
+        final removed = runtime.commandCoordinator.acceptTagRemoveAssignment(
+          RemoveTagAssignment(tagId: selectedId, target: target),
+        ) as TagCommandAccepted;
+        await tester.runAsync(() => removed.future);
+        await _pumpUntil(
+          tester,
+          () =>
+              current() &&
+              loaded().selectedAssignment ==
+                  TagCatalogSelectedAssignment.available,
+        );
+        expect(
+          find.descendant(
+            of: selectedRow,
+            matching: find.text('Доступен для назначения'),
+          ),
+          findsOneWidget,
+        );
+
+        repository.holdNextCatalogRead();
+        final unrelatedRename = runtime.commandCoordinator.acceptTagRename(
+          RenameTag(
+            tagId: _tagId(lastTagNumber),
+            name: TagName.fromInput('Рабочее'),
+          ),
+        ) as TagCommandAccepted;
+        await tester.runAsync(() => unrelatedRename.future);
+        await _pumpUntil(tester, () => repository.catalogReadStarted);
+        final reassigned = runtime.commandCoordinator.acceptTagAssign(
+          AssignTag(tagId: selectedId, target: target),
+        ) as TagCommandAccepted;
+        await tester.runAsync(() => reassigned.future);
+        await _pumpUntil(
+          tester,
+          () =>
+              loaded().selectedAssignment ==
+              TagCatalogSelectedAssignment.assigned,
+        );
+        final renamed = runtime.commandCoordinator.acceptTagRename(
+          RenameTag(tagId: selectedId, name: TagName.fromInput('Спорт')),
+        ) as TagCommandAccepted;
+        await tester.runAsync(() => renamed.future);
+        await _pumpUntil(
+          tester,
+          () =>
+              selectedRow.evaluate().isEmpty &&
+              find.text('Спорт').evaluate().isNotEmpty,
+        );
+        expect(tester.widget<TextField>(search).controller!.text, 'дом');
+        repository.releaseCatalogRead();
+        await _pumpUntil(
+          tester,
+          () => current() && loaded().selection is TagCatalogSelectionReady,
+        );
+        expect(selectedRow, findsNothing);
+        expect(find.text('Для дома'), findsNothing);
+        expect(find.text('Дом'), findsOneWidget);
+        expect(find.text('Спорт'), findsOneWidget);
+        expect(loaded().selection.id, selectedId);
+        expect(
+          loaded().selectedAssignment,
+          TagCatalogSelectedAssignment.assigned,
+        );
+        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+
+        repository.holdNextCatalogRead();
+        final beforeDelete = runtime.commandCoordinator.acceptTagRename(
+          RenameTag(
+            tagId: _tagId(lastTagNumber),
+            name: TagName.fromInput('Работа'),
+          ),
+        ) as TagCommandAccepted;
+        await tester.runAsync(() => beforeDelete.future);
+        await _pumpUntil(tester, () => repository.catalogReadStarted);
+        final deleted = runtime.commandCoordinator.acceptTagDelete(
+          DeleteTag(selectedId),
+        ) as TagCommandAccepted;
+        await tester.runAsync(() => deleted.future);
+        await _pumpUntil(
+          tester,
+          () => loaded().selection is TagCatalogNoSelection,
+        );
+        repository.releaseCatalogRead();
+        await _pumpUntil(
+          tester,
+          () => current() && loaded().selection is TagCatalogNoSelection,
+        );
+        expect(find.text('Спорт'), findsNothing);
+        expect(find.text('Дом'), findsOneWidget);
+        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+        expect(tester.widget<TextField>(search).controller!.text, 'дом');
+
+        final nextTarget = _intentionTarget(3);
+        final nextProvider = tagCatalogViewModelProvider(
+          mode: TagCatalogSelectionMode(nextTarget),
+        );
+        unawaited(router.push<void>(TagCatalogRoute(target: nextTarget)));
+        await _pumpUntil(
+          tester,
+          () => ready.container.read(nextProvider) is TagCatalogLoaded,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+        expect(find.text('Дом'), findsOneWidget);
+        expect(find.text('Работа'), findsOneWidget);
+        final workRow = find.byKey(
+          ValueKey(
+            'tag-catalog-row-${_tagId(lastTagNumber).toCanonicalString()}',
+          ),
+        );
+        expect(
+          find.descendant(of: workRow, matching: find.text('Назначен')),
+          findsOneWidget,
+        );
+        await router.maybePop();
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(search).controller!.text, 'дом');
+        expect(find.text('Работа'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   test('открытые каталог, выбор и назначения видят общее переименование и удаление', () async {
     late sqlite.Database raw;
     final runtime = AppRuntime(
@@ -512,6 +749,17 @@ Future<void> _until(bool Function() condition) async {
   expect(condition(), isTrue);
 }
 
+Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
+  await tester.pump();
+  for (var attempt = 0; attempt < 100 && !condition(); attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  expect(condition(), isTrue);
+}
+
 final class _ControlledReads extends Fake implements PersonalGraphRepository {
   _ControlledReads(this.delegate);
 
@@ -524,6 +772,9 @@ final class _ControlledReads extends Fake implements PersonalGraphRepository {
   bool _holdAssign = false;
   bool _holdRemove = false;
   bool failNextCatalogRead = false;
+  Completer<void>? _catalogGate;
+  Completer<void>? _catalogRelease;
+  bool catalogReadStarted = false;
   int renameAttempts = 0;
   int assignAttempts = 0;
   int removeAttempts = 0;
@@ -554,16 +805,37 @@ final class _ControlledReads extends Fake implements PersonalGraphRepository {
 
   void releaseCommand() => _commandGate!.complete();
 
+  void holdNextCatalogRead() {
+    _catalogGate = Completer<void>();
+    _catalogRelease = _catalogGate;
+    catalogReadStarted = false;
+  }
+
+  void releaseCatalogRead() => _catalogRelease!.complete();
+
   @override
-  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) {
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async {
     if (failNextCatalogRead) {
       failNextCatalogRead = false;
       return Future.value(
         const TagCatalogError(TagCatalogUnavailableFailure()),
       );
     }
-    return delegate.getTagCatalog(mode);
+    final result = await delegate.getTagCatalog(mode);
+    final gate = _catalogGate;
+    if (gate != null) {
+      _catalogGate = null;
+      catalogReadStarted = true;
+      await gate.future;
+    }
+    return result;
   }
+
+  @override
+  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
+    TagId id,
+    TagTarget target,
+  ) => delegate.getTagAssignmentStatus(id, target);
 
   @override
   Future<TagAssignmentsResult> getTagAssignments(TagTarget target) async {

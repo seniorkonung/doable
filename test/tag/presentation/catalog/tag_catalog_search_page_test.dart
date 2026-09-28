@@ -70,6 +70,150 @@ final _assign = find.byKey(const ValueKey('tag-catalog-assign'));
 
 void main() {
   for (final (description, target) in _modes) {
+    testWidgets(
+      '$description: поиск использует наблюдаемое имя выбранного тега до обновления полного снимка',
+      (tester) async {
+        final repository = await _pumpCatalog(tester, target: target);
+        final home = _tag(1, 'Дом');
+        final renamed = _tag(1, 'Спорт');
+        repository.complete([home, _tag(2, 'Для дома'), _tag(3, 'Работа')]);
+        await tester.pumpAndSettle();
+        final model =
+            ProviderScope.containerOf(
+              tester.element(find.byType(TagCatalogPage)),
+            ).read(
+              tagCatalogViewModelProvider(
+                mode: target == null
+                    ? const TagCatalogBrowseMode()
+                    : TagCatalogSelectionMode(target),
+              ).notifier,
+            );
+        model.selectTag(home.id);
+        await tester.enterText(_search, 'дом');
+        await tester.pump();
+        repository.observe(renamed, revision: 2);
+        await tester.pumpAndSettle();
+        expect(_loaded(tester, target).items.first.name.value, 'Дом');
+        expect(_visibleNames(tester), ['Для дома']);
+        expect(find.text('Дом'), findsNothing);
+        await tester.enterText(_search, 'спорт');
+        await tester.pump();
+        expect(_visibleNames(tester), ['Спорт']);
+        repository.observe(home);
+        await tester.pumpAndSettle();
+        expect(_visibleNames(tester), ['Спорт']);
+        expect(_loaded(tester, target).selection.id, home.id);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      '$description: изменение запроса возвращает начало списка, выбор и обновление сохраняют прокрутку и ввод',
+      (tester) async {
+        final repository = await _pumpCatalog(tester, target: target);
+        final tags = [
+          _tag(1, 'Работа'),
+          for (var index = 2; index <= 60; index++) _tag(index, 'Дом $index'),
+        ];
+        repository.complete(tags);
+        await tester.pumpAndSettle();
+        await tester.enterText(_search, 'дом');
+        await tester.pump();
+        final editable = tester.state<EditableTextState>(
+          find.byType(EditableText),
+        );
+        final input = tester.widget<TextField>(_search).controller!;
+        final editingValue = input.value;
+        final scroll = tester.widget<ListView>(_list).controller!;
+        await tester.drag(_list, const Offset(0, -800));
+        await tester.pumpAndSettle();
+        final offset = scroll.offset;
+        expect(offset, greaterThan(0));
+
+        if (target != null) {
+          await tester.tap(
+            find
+                .descendant(of: _list, matching: find.byType(ListTile))
+                .hitTestable()
+                .first,
+          );
+          await tester.pump();
+          expect(scroll.offset, offset);
+        }
+        await tester.showKeyboard(_search);
+        await _beginRefresh(tester, repository);
+        expect(scroll.offset, offset);
+        repository.complete(tags, revision: 2);
+        await tester.pumpAndSettle();
+        expect(scroll.offset, offset);
+        expect(
+          tester.state<EditableTextState>(find.byType(EditableText)),
+          same(editable),
+        );
+        expect(editable.widget.focusNode.hasFocus, isTrue);
+        expect(input.value, editingValue);
+
+        await tester.enterText(_search, 'Дом');
+        await tester.pumpAndSettle();
+        expect(scroll.offset, 0);
+        expect(_row(tags[1]).hitTestable(), findsOneWidget);
+        await tester.drag(_list, const Offset(0, -800));
+        await tester.pumpAndSettle();
+        await tester.enterText(_search, 'спорт');
+        await tester.pumpAndSettle();
+        expect(find.text('Теги не найдены'), findsOneWidget);
+        await tester.tap(find.byTooltip('Очистить поиск тегов'));
+        await tester.pumpAndSettle();
+        expect(scroll.offset, 0);
+        expect(_row(tags.first).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      '$description: одинаковые страницы имеют независимый ввод, новое открытие начинает поиск заново',
+      (tester) async {
+        final router = AppRouter();
+        final repository = await _pumpCatalog(
+          tester,
+          target: target,
+          router: router,
+        );
+        repository.complete([_tag(1, 'Дом'), _tag(2, 'Работа')]);
+        await tester.pumpAndSettle();
+        await tester.enterText(_search, 'работ');
+        await tester.pump();
+        final firstInput = tester.widget<TextField>(_search).controller!;
+        unawaited(router.push<void>(TagCatalogRoute(target: target)));
+        await tester.pumpAndSettle();
+        final secondInput = tester.widget<TextField>(_search).controller!;
+        expect(secondInput, isNot(same(firstInput)));
+        expect(secondInput.text, isEmpty);
+        expect(_visibleNames(tester), ['Дом', 'Работа']);
+        await tester.enterText(_search, 'дом');
+        await tester.pump();
+        expect(firstInput.text, 'работ');
+        expect(secondInput.text, 'дом');
+        expect(_visibleNames(tester), ['Дом']);
+        await router.maybePop();
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(_search).controller, same(firstInput));
+        expect(_visibleNames(tester), ['Работа']);
+        expect(() => secondInput.addListener(() {}), throwsFlutterError);
+        unawaited(router.push<void>(TagCatalogRoute(target: target)));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
+        expect(_visibleNames(tester), ['Дом', 'Работа']);
+        await tester.enterText(_search, 'дом');
+        await tester.pump();
+        await tester.tap(find.byTooltip('Очистить поиск тегов'));
+        await tester.pump();
+        expect(firstInput.text, 'работ');
+        expect(_visibleNames(tester), ['Дом', 'Работа']);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     if (target != null) {
       for (final assigned in [false, true]) {
         testWidgets(
@@ -695,6 +839,47 @@ void main() {
       },
     );
   }
+
+  final secondIntention = IntentionTagTarget(
+    (IntentionId.decode(_id(2)) as IntentionIdDecodingSuccess).id,
+  );
+  for (final (description, before, after) in [
+    ('из каталога в выбор', null, _modes[1].$2),
+    ('другое намерение', _modes[1].$2, secondIntention),
+    ('из намерения в связь', _modes[1].$2, _modes[2].$2),
+    ('из связи «нужно» в «можно»', _modes[2].$2, _modes[3].$2),
+    ('из выбора в каталог', _modes[3].$2, null),
+  ]) {
+    testWidgets('$description: смена экранной сессии сбрасывает поиск', (
+      tester,
+    ) async {
+      final sessionTarget = ValueNotifier<TagTarget?>(before);
+      addTearDown(sessionTarget.dispose);
+      final repository = await _pumpCatalog(
+        tester,
+        target: before,
+        sessionTarget: sessionTarget,
+      );
+      final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
+      repository.complete(tags);
+      await tester.pumpAndSettle();
+      await tester.enterText(_search, 'дом');
+      await tester.pump();
+      final input = tester.widget<TextField>(_search).controller!;
+      sessionTarget.value = after;
+      await tester.pump();
+      expect(tester.widget<TextField>(_search).controller, same(input));
+      expect(input.text, isEmpty);
+      repository.complete(tags, assignedIds: {tags.first.id});
+      await tester.pumpAndSettle();
+      expect(_visibleNames(tester), ['Дом', 'Работа']);
+      if (after != null) {
+        expect(_assignment(tester, tags.first), 'Назначен');
+        expect(_assignment(tester, tags.last), 'Доступен для назначения');
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
 
 AppLocalizations _localizations(WidgetTester tester) =>
@@ -784,8 +969,9 @@ Future<_CatalogRepository> _pumpCatalog(
   TagTarget? target,
   String language = 'ru',
   AppRouter? router,
+  ValueNotifier<TagTarget?>? sessionTarget,
 }) async {
-  final repository = _CatalogRepository(target);
+  final repository = _CatalogRepository();
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
     router?.dispose();
@@ -801,7 +987,13 @@ Future<_CatalogRepository> _pumpCatalog(
               locale: Locale(language),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
-              home: TagCatalogPage(target: target),
+              home: sessionTarget == null
+                  ? TagCatalogPage(target: target)
+                  : ValueListenableBuilder<TagTarget?>(
+                      valueListenable: sessionTarget,
+                      builder: (context, currentTarget, _) =>
+                          TagCatalogPage(target: currentTarget),
+                    ),
             )
           : MaterialApp.router(
               locale: Locale(language),
@@ -876,10 +1068,8 @@ final class _Revision implements GraphRevision {
 }
 
 final class _CatalogRepository extends Fake implements PersonalGraphRepository {
-  _CatalogRepository(this.target);
-
-  final TagTarget? target;
   final reads = <Completer<TagCatalogResult>>[];
+  final readModes = <TagCatalogMode>[];
   final command = Completer<TagCommandResult>();
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
   final statusReads = <Completer<TagAssignmentStatusResult>>[];
@@ -926,6 +1116,7 @@ final class _CatalogRepository extends Fake implements PersonalGraphRepository {
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) {
     final read = Completer<TagCatalogResult>();
     reads.add(read);
+    readModes.add(mode);
     return read.future;
   }
 
@@ -934,9 +1125,12 @@ final class _CatalogRepository extends Fake implements PersonalGraphRepository {
     int revision = 1,
     Set<TagId>? assignedIds,
   }) => reads.last.complete(
-    TagCatalogSuccess(switch (target) {
-      null => TagCatalogSnapshot(items: tags, revision: _Revision(revision)),
-      final target => TagCatalogSnapshot.selection(
+    TagCatalogSuccess(switch (readModes.last) {
+      TagCatalogBrowseMode() => TagCatalogSnapshot(
+        items: tags,
+        revision: _Revision(revision),
+      ),
+      TagCatalogSelectionMode(:final target) => TagCatalogSnapshot.selection(
         target: target,
         rows: [
           for (var index = 0; index < tags.length; index++)
