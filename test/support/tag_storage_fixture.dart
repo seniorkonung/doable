@@ -205,3 +205,70 @@ void seedWidelyAssignedTagFixture(
     rethrow;
   }
 }
+
+/// Смешанная выдача с редким архивом и таким же числом посторонних назначений.
+/// Архивная связь каждого двадцатого получателя имеет активных участников,
+/// если сам получатель не входит в архив каждого сорокового намерения.
+void seedLargeTaggedEntitiesFixture(
+  sqlite.Database database, {
+  required int recipientPairs,
+}) {
+  database.execute('BEGIN');
+  try {
+    database.execute(
+      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+      [tagFixtureId(1), 'Исходное намерение', 1, 1],
+    );
+    for (final (number, name) in [
+      (9000, 'Выбранный тег'),
+      (9001, 'Другой тег'),
+    ]) {
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(number),
+        name,
+      ]);
+    }
+    for (var index = 0; index < recipientPairs; index++) {
+      final intentionId = tagFixtureId(100000 + index);
+      final relationId = tagFixtureId(200000 + index);
+      database.execute(
+        'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        [
+          intentionId,
+          'Получатель $index',
+          index % 40 == 0 ? 1 : 0,
+          index + 2,
+          index + 2,
+        ],
+      );
+      database.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          relationId,
+          tagFixtureId(1),
+          intentionId,
+          index.isEven ? 'need' : 'can',
+          2,
+          index % 20 == 0 ? 1 : 0,
+        ],
+      );
+      // Назначения постороннего тега чередуются с выбранным, но не входят
+      // ни в основной запрос, ни в аудит ссылок выбранного тега.
+      for (final (column, id) in [
+        ('intention_id', intentionId),
+        ('long_term_relation_id', relationId),
+      ]) {
+        for (final tagNumber in [9000, 9001]) {
+          database.execute(
+            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+            [tagFixtureId(tagNumber), id],
+          );
+        }
+      }
+    }
+    database.execute('COMMIT');
+  } on Object {
+    database.execute('ROLLBACK');
+    rethrow;
+  }
+}
