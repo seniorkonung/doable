@@ -7,9 +7,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Tag, TagAssignment;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -19,7 +17,6 @@ import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
-import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
@@ -35,6 +32,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
 
 final _modes = <(String, TagTarget?)>[
@@ -328,10 +326,10 @@ void main() {
           repository.command.complete(
             TagCommandSucceeded(
               ConfirmedGraphResult(
-                revision: const _Revision(2),
+                revision: const TagCatalogTestRevision(2),
                 value: TagAssignmentChanged(
                   TagAssignmentChangedChange(
-                    revision: const _Revision(2),
+                    revision: const TagCatalogTestRevision(2),
                     assignment: TagAssignment(tagId: home.id, target: target),
                     state: TagAssignmentState.assigned,
                   ),
@@ -420,7 +418,7 @@ void main() {
           expect(repository.statusReads, hasLength(2));
           repository.statusReads.last.complete(
             const TagAssignmentStatusSuccess(
-              GraphSnapshot(value: false, revision: _Revision()),
+              GraphSnapshot(value: false, revision: TagCatalogTestRevision()),
             ),
           );
           await tester.pumpAndSettle();
@@ -477,7 +475,7 @@ void main() {
           repository.observe(selected);
           repository.statusReads.single.complete(
             const TagAssignmentStatusSuccess(
-              GraphSnapshot(value: false, revision: _Revision()),
+              GraphSnapshot(value: false, revision: TagCatalogTestRevision()),
             ),
           );
           await tester.pumpAndSettle();
@@ -887,7 +885,7 @@ AppLocalizations _localizations(WidgetTester tester) =>
 
 Future<void> _beginRefresh(
   WidgetTester tester,
-  _CatalogRepository repository,
+  TagCatalogTestRepository repository,
 ) async {
   final before = _tag(1, 'Работа');
   final after = _tag(1, 'Рабочее');
@@ -902,10 +900,10 @@ Future<void> _beginRefresh(
   repository.command.complete(
     TagCommandSucceeded(
       ConfirmedGraphResult(
-        revision: const _Revision(2),
+        revision: const TagCatalogTestRevision(2),
         value: TagRenamed(
           TagRenamedChange(
-            revision: const _Revision(2),
+            revision: const TagCatalogTestRevision(2),
             before: before,
             after: after,
           ),
@@ -964,14 +962,14 @@ Future<AppRouter> _pumpStoredCatalog(
   return router;
 }
 
-Future<_CatalogRepository> _pumpCatalog(
+Future<TagCatalogTestRepository> _pumpCatalog(
   WidgetTester tester, {
   TagTarget? target,
   String language = 'ru',
   AppRouter? router,
   ValueNotifier<TagTarget?>? sessionTarget,
 }) async {
-  final repository = _CatalogRepository();
+  final repository = TagCatalogTestRepository();
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
     router?.dispose();
@@ -1050,97 +1048,3 @@ Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
 );
-
-final class _Revision implements GraphRevision {
-  const _Revision([this.number = 1]);
-
-  final int number;
-
-  @override
-  GraphRevisionOrder compareTo(GraphRevision other) => switch (other) {
-    _Revision(number: final value) when number < value =>
-      GraphRevisionOrder.older,
-    _Revision(number: final value) when number > value =>
-      GraphRevisionOrder.newer,
-    _Revision() => GraphRevisionOrder.same,
-    _ => GraphRevisionOrder.differentEpoch,
-  };
-}
-
-final class _CatalogRepository extends Fake implements PersonalGraphRepository {
-  final reads = <Completer<TagCatalogResult>>[];
-  final readModes = <TagCatalogMode>[];
-  final command = Completer<TagCommandResult>();
-  final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
-  final statusReads = <Completer<TagAssignmentStatusResult>>[];
-  final observations = <TagId, StreamController<TagReadResult>>{};
-
-  @override
-  Future<GraphCommandResult<TSuccess, TFailure>> execute<
-    TSuccess extends GraphCommandOutcome,
-    TFailure extends GraphCommandFailure
-  >(GraphCommand<TSuccess, TFailure> command) async {
-    commands.add(command);
-    return await this.command.future as GraphCommandResult<TSuccess, TFailure>;
-  }
-
-  @override
-  Stream<TagReadResult> watchTag(TagId id) => observations
-      .putIfAbsent(id, () => StreamController<TagReadResult>.broadcast())
-      .stream;
-
-  void observe(Tag? tag, {TagId? id, int revision = 1}) =>
-      observations[tag?.id ?? id]!.add(
-        TagReadSuccess(
-          GraphSnapshot(value: tag, revision: _Revision(revision)),
-        ),
-      );
-
-  @override
-  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
-    TagId id,
-    TagTarget target,
-  ) {
-    final result = Completer<TagAssignmentStatusResult>();
-    statusReads.add(result);
-    return result.future;
-  }
-
-  Future<void> dispose() async {
-    for (final observation in observations.values) {
-      await observation.close();
-    }
-  }
-
-  @override
-  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) {
-    final read = Completer<TagCatalogResult>();
-    reads.add(read);
-    readModes.add(mode);
-    return read.future;
-  }
-
-  void complete(
-    List<Tag> tags, {
-    int revision = 1,
-    Set<TagId>? assignedIds,
-  }) => reads.last.complete(
-    TagCatalogSuccess(switch (readModes.last) {
-      TagCatalogBrowseMode() => TagCatalogSnapshot(
-        items: tags,
-        revision: _Revision(revision),
-      ),
-      TagCatalogSelectionMode(:final target) => TagCatalogSnapshot.selection(
-        target: target,
-        rows: [
-          for (var index = 0; index < tags.length; index++)
-            TagSelectionRow(
-              tag: tags[index],
-              isAssigned: assignedIds?.contains(tags[index].id) ?? index.isOdd,
-            ),
-        ],
-        revision: _Revision(revision),
-      ),
-    }),
-  );
-}
