@@ -42,7 +42,7 @@ Future<void> _tap(WidgetTester tester, String key) async {
 }
 
 void main() {
-  testWidgets('выбранный тег обновляется после ухода с формы переименования', (
+  testWidgets('поиск и выбор согласованы после ухода с формы переименования', (
     tester,
   ) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -82,7 +82,15 @@ void main() {
       tagIdText,
       'Дом',
     ]);
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      '018f0b5d-6b2e-7c80-8000-000000000002',
+      'Для дома',
+    ]);
     await _tap(tester, 'catalog-open-tags');
+    final search = find.byKey(const ValueKey('tag-catalog-search'));
+    await _until(tester, () => search.evaluate().isNotEmpty);
+    await tester.enterText(search, 'дом');
+    await tester.pump();
     await _tap(tester, 'tag-catalog-create');
     await _until(
       tester,
@@ -103,6 +111,7 @@ void main() {
       tester,
       () => tester.widget<Semantics>(row).properties.selected == true,
     );
+    expect(tester.widget<TextField>(search).controller!.text, 'дом');
     await tester.tap(find.byTooltip('Переименовать тег').first);
     await _until(
       tester,
@@ -110,7 +119,7 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const ValueKey('tag-editor-name')),
-      'Быт',
+      'Спорт',
     );
     repository.holdNextRename();
     await _tap(tester, 'tag-editor-submit');
@@ -120,8 +129,14 @@ void main() {
       tester,
       () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
     );
+    expect(tester.widget<TextField>(search).controller!.text, 'дом');
     repository.releaseRename();
-    await _until(tester, () => find.text('Быт').evaluate().isNotEmpty);
+    await _until(tester, () => row.evaluate().isEmpty);
+    expect(find.text('Для дома'), findsOneWidget);
+    expect(find.text('Спорт'), findsNothing);
+    expect(tester.widget<TextField>(search).controller!.text, 'дом');
+    await tester.enterText(search, 'спорт');
+    await _until(tester, () => find.text('Спорт').evaluate().isNotEmpty);
     expect(tester.widget<Semantics>(row).properties.selected, isTrue);
     expect(find.text('Дом'), findsNothing);
     expect(repository.renameAttempts, 1);
@@ -299,6 +314,10 @@ void main() {
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
       await _tap(tester, 'catalog-open-tags');
+      final search = find.byKey(const ValueKey('tag-catalog-search'));
+      await _until(tester, () => search.evaluate().isNotEmpty);
+      await tester.enterText(search, 'STRASS');
+      await tester.pump();
       await _tap(tester, 'tag-catalog-create');
       await _until(
         tester,
@@ -347,6 +366,7 @@ void main() {
       );
       await tester.tap(find.text('Try again'));
       await _until(tester, () => find.text('Straße').evaluate().isNotEmpty);
+      expect(tester.widget<TextField>(search).controller!.text, 'STRASS');
       expect(repository.createAttempts, 1);
       expect(raw.select('SELECT id FROM tags'), hasLength(1));
       expect(tester.takeException(), isNull);

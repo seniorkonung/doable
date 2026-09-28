@@ -58,6 +58,16 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
   }
 
   @override
+  void didUpdateWidget(covariant TagCatalogPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.target == widget.target) return;
+    _searchController.clear();
+    _filter = TagCatalogFilter.empty;
+    _searchIsInvalid = false;
+    _scrollToStart();
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
@@ -96,6 +106,19 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
           _searchIsInvalid = true;
       }
     });
+    _scrollToStart();
+  }
+
+  void _scrollToStart() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
+      });
+    }
   }
 
   void _clearSearch() {
