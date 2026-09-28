@@ -7,6 +7,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tagged_entities_page.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -19,6 +20,525 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 
 void main() {
+  test(
+    'отсутствие наблюдения действует и после более нового постороннего пакета',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.reads.page(0, [_intention(1)], cursor: _Cursor());
+      await pumpEventQueue();
+      h.change(3);
+      h.reads.observe(null, revision: 2);
+      expect(h.state, isA<TagNavigationTagMissing>());
+      h.reads.page(1, [_intention(2)], revision: 3);
+      await pumpEventQueue();
+      expect(h.state, isA<TagNavigationTagMissing>());
+      expect(h.reads.queries, hasLength(2));
+    },
+  );
+
+  for (final source in ['пакет', 'наблюдение']) {
+    test(
+      '$source обновляет известное имя под более новой требуемой ревизией списка',
+      () async {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        h.reads.page(0, [_intention(1)], cursor: _Cursor());
+        await pumpEventQueue();
+        h.change(3);
+        if (source == 'пакет') {
+          h.change(
+            2,
+            changes: [
+              TagRenamedChange(
+                revision: const _Revision(2),
+                before: _tag('Дом'),
+                after: _tag('Быт'),
+              ),
+            ],
+          );
+        } else {
+          h.reads.observe(_tag('Быт'), revision: 2);
+        }
+        final refreshing = h.state as TagNavigationLoaded;
+        expect(refreshing.tag.name.value, 'Быт');
+        expect(refreshing.canUseCurrentItems, isFalse);
+        h.reads.observe(_tag('Дом'));
+        expect((h.state as TagNavigationLoaded).tag.name.value, 'Быт');
+        h.reads.page(1, [_relation(1)], tag: _tag('Быт'), revision: 3);
+        await pumpEventQueue();
+        expect((h.state as TagNavigationLoaded).canUseCurrentItems, isTrue);
+        expect(h.reads.queries, hasLength(2));
+      },
+    );
+  }
+
+  test(
+    'синхронный отказ подключения наблюдения остаётся типизированным',
+    () async {
+      final h = _Harness(reader: _Reads(throwOnWatch: true));
+      addTearDown(h.dispose);
+      await pumpEventQueue();
+      final failed = h.state as TagNavigationInitialFailure;
+      expect(failed.failure, isA<TaggedEntitiesUnexpectedFailure>());
+      expect(failed.canRetry, isFalse);
+      h.reads.fail(0, const TaggedEntitiesUnexpectedFailure());
+      await pumpEventQueue();
+      expect(h.state, isA<TagNavigationInitialFailure>());
+    },
+  );
+
+  test('оба источника подписаны до первого обращения за страницей', () async {
+    final h = _Harness(checkSubscriptions: true);
+    addTearDown(h.dispose);
+    h.reads.page(0, []);
+    await pumpEventQueue();
+    expect(h.state, isA<TagNavigationLoaded>());
+  });
+
+  for (final kind in ['исключение', 'завершение', 'чужой тег']) {
+    test(
+      '$kind наблюдения отключает действия без раскрытия исходной ошибки',
+      () async {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        h.reads.page(0, [_intention(1)], cursor: _Cursor());
+        await pumpEventQueue();
+        switch (kind) {
+          case 'исключение':
+            h.reads.watches.single.addError(StateError('SQL и личные данные'));
+          case 'завершение':
+            await h.reads.watches.single.close();
+          case 'чужой тег':
+            h.reads.observe(_tag('Дом', id: 2));
+        }
+        await pumpEventQueue();
+        final failed = h.state as TagNavigationLoaded;
+        expect(
+          failed.refreshFailure?.category,
+          kind == 'чужой тег'
+              ? GraphFailureCategory.corruption
+              : GraphFailureCategory.unexpected,
+        );
+        expect(h.model.canActOn(_intention(1).target), isFalse);
+        await h.model.retryRefresh();
+        expect(h.reads.queries, hasLength(1));
+      },
+    );
+  }
+
+  test(
+    'освобождение отменяет оба источника и право поздней страницы',
+    () async {
+      final h = _Harness();
+      final stateCount = h.states.length;
+      h.dispose();
+      expect(h.changes.hasListener, isFalse);
+      expect(h.reads.watches.single.hasListener, isFalse);
+      h.reads.page(0, [_intention(1)]);
+      await pumpEventQueue();
+      await h.model.retryRefresh();
+      expect(h.model.canActOn(_intention(1).target), isFalse);
+      expect(h.states, hasLength(stateCount));
+      expect(h.reads.queries, hasLength(1));
+    },
+  );
+
+  test(
+    'истёкшее продолжение начинает первую порцию вместо повтора курсора',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.reads.page(0, [_intention(1)], cursor: _Cursor());
+      await pumpEventQueue();
+      final pending = h.model.loadMore();
+      h.reads.fail(1, const TaggedEntitiesSnapshotExpired());
+      await pending;
+      expect(
+        (h.state as TagNavigationLoaded).freshness,
+        TagNavigationFreshness.refreshing,
+      );
+      expect(h.reads.queries, hasLength(3));
+      expect(h.reads.queries.last.cursor, isNull);
+      expect(h.model.canActOn(_intention(1).target), isFalse);
+      h.reads.page(2, [_relation(1)], revision: 2, epoch: 1);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagNavigationLoaded).items.single.target,
+        _relation(1).target,
+      );
+      expect(
+        (h.state as TagNavigationLoaded).revision.compareTo(
+          const _Revision(2, 1),
+        ),
+        GraphRevisionOrder.same,
+      );
+    },
+  );
+
+  test(
+    'повтор истёкших первых снимков ограничен и доступен новый явный повтор',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      for (var index = 0; index < 8; index++) {
+        h.reads.fail(index, const TaggedEntitiesSnapshotExpired());
+        await pumpEventQueue();
+      }
+      expect(h.reads.queries, hasLength(8));
+      expect((h.state as TagNavigationInitialFailure).canRetry, isTrue);
+      final retry = h.model.retryFirstPage();
+      h.reads.page(8, []);
+      await retry;
+      expect(h.state, isA<TagNavigationLoaded>());
+    },
+  );
+
+  for (final loaded in [false, true]) {
+    test(
+      'явный повтор ${loaded ? 'актуализации' : 'начала'} восстанавливает бюджет старых ответов',
+      () async {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        if (loaded) {
+          h.reads.page(0, [_intention(1)], cursor: _Cursor());
+          await pumpEventQueue();
+        }
+        h.change(10);
+        final offset = loaded ? 1 : 0;
+        for (var index = offset; index < offset + 8; index++) {
+          h.reads.page(index, [_intention(2)]);
+          await pumpEventQueue();
+        }
+        expect(h.reads.queries, hasLength(offset + 8));
+        if (loaded) {
+          final failed = h.state as TagNavigationLoaded;
+          expect(failed.freshness, TagNavigationFreshness.stale);
+          expect(
+            failed.refreshFailure,
+            isA<TaggedEntitiesUnavailableFailure>(),
+          );
+          expect(failed.items.single.target, _intention(1).target);
+        } else {
+          expect((h.state as TagNavigationInitialFailure).canRetry, isTrue);
+        }
+        final retry = loaded
+            ? h.model.retryRefresh()
+            : h.model.retryFirstPage();
+        h.reads.page(offset + 8, [_intention(2)]);
+        await retry;
+        await pumpEventQueue();
+        expect(h.reads.queries, hasLength(offset + 10));
+        h.reads.page(offset + 9, [_relation(1)], revision: 10);
+        await pumpEventQueue();
+        expect(
+          (h.state as TagNavigationLoaded).items.single.target,
+          _relation(1).target,
+        );
+        expect((h.state as TagNavigationLoaded).canUseCurrentItems, isTrue);
+      },
+    );
+  }
+
+  test('сигналы во время актуализации объединяются без лишнего чтения свежей страницы', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.reads.page(0, [_intention(1)], cursor: _Cursor());
+    await pumpEventQueue();
+    h.change(2);
+    h.change(3);
+    h.change(4);
+    h.reads.observe(_tag('Дом'), revision: 4);
+    expect(h.reads.queries, hasLength(2));
+    h.reads.page(1, [_relation(1)], revision: 4);
+    await pumpEventQueue();
+    h.change(4);
+    h.change(3);
+    h.reads.observe(_tag('Старое название'), revision: 3);
+    expect(h.reads.queries, hasLength(2));
+    expect((h.state as TagNavigationLoaded).tag.name.value, 'Дом');
+    expect((h.state as TagNavigationLoaded).canUseCurrentItems, isTrue);
+  });
+
+  test(
+    'новая эпоха отвергает прежние продолжение, пакет и наблюдение',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.reads.page(0, [_intention(1)], revision: 10, cursor: _Cursor());
+      await pumpEventQueue();
+      final pending = h.model.loadMore();
+      h.reads.observe(_tag('Быт'), revision: 1, epoch: 1);
+      h.change(1, epoch: 1);
+      h.reads.page(1, [_intention(2)], revision: 11);
+      await pending;
+      expect(h.reads.queries.last.cursor, isNull);
+      expect((h.state as TagNavigationLoaded).canUseCurrentItems, isFalse);
+      h.reads.page(2, [_relation(1)], tag: _tag('Быт'), revision: 1, epoch: 1);
+      await pumpEventQueue();
+      h.reads.observe(null, revision: 12);
+      h.change(
+        12,
+        changes: [
+          TagDeletedChange(revision: const _Revision(12), tagId: _tagId(1)),
+        ],
+      );
+      expect((h.state as TagNavigationLoaded).tag.name.value, 'Быт');
+      expect(
+        (h.state as TagNavigationLoaded).items.single.target,
+        _relation(1).target,
+      );
+      expect(h.reads.queries, hasLength(3));
+    },
+  );
+
+  for (final failure in const [
+    TagReadUnavailableFailure(),
+    TagReadCorruptionFailure(),
+    TagReadUnexpectedFailure(),
+  ]) {
+    test(
+      'отказ наблюдения категории ${failure.category} сохраняет строки без актуальных действий',
+      () async {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        h.reads.page(0, [_intention(1)], cursor: _Cursor());
+        await pumpEventQueue();
+        h.reads.watches.single.add(TagReadError(failure));
+        final failed = h.state as TagNavigationLoaded;
+        expect(failed.refreshFailure?.category, failure.category);
+        expect(failed.items.single.target, _intention(1).target);
+        expect(failed.nextCursor, isNull);
+        expect(h.model.canActOn(_intention(1).target), isFalse);
+        final retry = h.model.retryRefresh();
+        if (failure is TagReadUnavailableFailure) {
+          expect(h.reads.watchedIds, hasLength(2));
+          expect(h.reads.watches.first.hasListener, isFalse);
+          h.reads.page(1, [_intention(2)]);
+          await retry;
+          expect(h.model.canActOn(_intention(2).target), isTrue);
+        } else {
+          await retry;
+          expect(h.reads.queries, hasLength(1));
+          expect(h.state, same(failed));
+        }
+      },
+    );
+  }
+
+  for (final loaded in [false, true]) {
+    test(
+      'наблюдение отсутствия ${loaded ? 'после загрузки' : 'до страницы'} действует без пакета',
+      () async {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        if (loaded) {
+          h.reads.page(0, [_intention(1)], cursor: _Cursor());
+          await pumpEventQueue();
+          unawaited(h.model.loadMore());
+        }
+        h.reads.observe(null, revision: 2);
+        expect(h.state, isA<TagNavigationTagMissing>());
+        h.reads.page(loaded ? 1 : 0, [_intention(2)]);
+        await pumpEventQueue();
+        h.change(
+          3,
+          changes: [
+            TagCreatedChange(
+              revision: const _Revision(3),
+              after: _tag('Дом', id: 2),
+            ),
+          ],
+        );
+        h.model.setScope(TaggedEntitiesScope.archived);
+        expect(h.state, isA<TagNavigationTagMissing>());
+        expect(h.state.tagId, _tagId(1));
+        expect(h.state.scope, TaggedEntitiesScope.archived);
+        expect(h.model.canActOn(_intention(1).target), isFalse);
+        expect(h.reads.queries, hasLength(loaded ? 2 : 1));
+      },
+    );
+  }
+
+  for (final order in [
+    ['страница', 'пакет', 'наблюдение'],
+    ['страница', 'наблюдение', 'пакет'],
+    ['пакет', 'страница', 'наблюдение'],
+    ['пакет', 'наблюдение', 'страница'],
+    ['наблюдение', 'страница', 'пакет'],
+    ['наблюдение', 'пакет', 'страница'],
+  ]) {
+    test('опережающий снимок не откатывается: ${order.join(' → ')}', () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      for (final source in order) {
+        switch (source) {
+          case 'страница':
+            h.reads.page(
+              0,
+              [_relation(1)],
+              tag: _tag('Новое название'),
+              revision: 3,
+            );
+            await pumpEventQueue();
+          case 'пакет':
+            h.change(
+              2,
+              changes: [
+                TagRenamedChange(
+                  revision: const _Revision(2),
+                  before: _tag('Дом'),
+                  after: _tag('Промежуточное название'),
+                ),
+              ],
+            );
+          case 'наблюдение':
+            h.reads.observe(_tag('Новое название'), revision: 3);
+        }
+      }
+      await pumpEventQueue();
+      final current = h.state as TagNavigationLoaded;
+      expect(current.tag.name.value, 'Новое название');
+      expect(
+        current.revision.compareTo(const _Revision(3)),
+        GraphRevisionOrder.same,
+      );
+      expect(current.canUseCurrentItems, isTrue);
+      expect(h.reads.queries, hasLength(1));
+    });
+  }
+
+  test(
+    'переименование сразу видно, отказ актуализации повторяет только чтение',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.reads.page(0, [_intention(1)], cursor: _Cursor());
+      await pumpEventQueue();
+      expect(h.model.canActOn(_intention(1).target), isTrue);
+      h.change(
+        2,
+        changes: [
+          TagRenamedChange(
+            revision: const _Revision(2),
+            before: _tag('Дом'),
+            after: _tag('Быт'),
+          ),
+        ],
+      );
+      final refreshing = h.state as TagNavigationLoaded;
+      expect(refreshing.tag.name.value, 'Быт');
+      expect(refreshing.items.single.target, _intention(1).target);
+      expect(refreshing.freshness, TagNavigationFreshness.refreshing);
+      expect(refreshing.hasReachedEnd, isFalse);
+      expect(h.model.canActOn(_intention(1).target), isFalse);
+      h.reads.fail(1, const TaggedEntitiesUnavailableFailure());
+      await pumpEventQueue();
+      final failed = h.state as TagNavigationLoaded;
+      expect(failed.freshness, TagNavigationFreshness.stale);
+      expect(failed.refreshFailure, isA<TaggedEntitiesUnavailableFailure>());
+      h.reads.observe(_tag('Быт'), revision: 2);
+      expect(
+        (h.state as TagNavigationLoaded).freshness,
+        TagNavigationFreshness.stale,
+      );
+      await h.model.loadMore();
+      await h.model.retryLoadMore();
+      expect(h.reads.queries, hasLength(2));
+      final retry = h.model.retryRefresh();
+      expect(h.model.retryRefresh(), same(retry));
+      expect(h.reads.queries.last.cursor, isNull);
+      h.reads.page(2, [_relation(1)], tag: _tag('Быт'), revision: 2);
+      await retry;
+      expect((h.state as TagNavigationLoaded).canUseCurrentItems, isTrue);
+      expect(h.model.canActOn(_relation(1).target), isTrue);
+      expect(h.model.canActOn(_intention(1).target), isFalse);
+    },
+  );
+
+  test(
+    'смена тега отменяет прежнее наблюдение, смена охвата сохраняет текущее',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      expect(h.reads.watchedIds, [_tagId(1)]);
+      h.model.setScope(TaggedEntitiesScope.archived);
+      expect(h.reads.watchedIds, [_tagId(1)]);
+      h.model.setTagId(_tagId(2));
+      expect(h.reads.watchedIds, [_tagId(1), _tagId(2)]);
+      h.reads.observe(null, revision: 2, index: 0);
+      h.reads.page(0, []);
+      await pumpEventQueue();
+      expect(h.state, isA<TagNavigationInitialLoading>());
+      h.reads.page(1, [], tag: _tag('Другой тег', id: 2));
+      await pumpEventQueue();
+      expect((h.state as TagNavigationLoaded).tag.name.value, 'Другой тег');
+      h.reads.observe(null, revision: 2, index: 1);
+      expect(h.state, isA<TagNavigationTagMissing>());
+    },
+  );
+
+  test('пакет во время начального чтения запрещает прежнюю ревизию', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.change(2);
+    h.reads.page(0, [_intention(1)]);
+    await pumpEventQueue();
+    expect(h.state, isA<TagNavigationInitialLoading>());
+    expect(h.reads.queries, hasLength(2));
+    expect(h.reads.queries.last.cursor, isNull);
+    h.reads.page(1, [_relation(1)], revision: 2);
+    await pumpEventQueue();
+    expect(
+      (h.state as TagNavigationLoaded).items.single.target,
+      _relation(1).target,
+    );
+  });
+
+  test(
+    'общая ревизия обновляет первую порцию и сохраняет тег и охват',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.model.setScope(TaggedEntitiesScope.archived);
+      h.reads.page(0, []);
+      await pumpEventQueue();
+      h.reads.page(1, [_intention(1, archived: true)], cursor: _Cursor());
+      await pumpEventQueue();
+      final more = h.model.loadMore();
+      h.reads.page(2, [_relation(1, archived: true)]);
+      await more;
+      h.change(2);
+      expect(h.reads.queries, hasLength(4));
+      expect(h.reads.queries.last.tagId, _tagId(1));
+      expect(h.reads.queries.last.scope, TaggedEntitiesScope.archived);
+      expect(h.reads.queries.last.cursor, isNull);
+      expect((h.state as TagNavigationLoaded).nextCursor, isNull);
+      h.reads.page(3, [_intention(2, archived: true)], revision: 2);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagNavigationLoaded).items.single.target,
+        _intention(2).target,
+      );
+    },
+  );
+
+  test('подтверждённое удаление не возвращается поздней страницей', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.change(
+      2,
+      changes: [
+        TagDeletedChange(revision: const _Revision(2), tagId: _tagId(1)),
+      ],
+    );
+    expect(h.state, isA<TagNavigationTagMissing>());
+    h.reads.page(0, [_intention(1)]);
+    await pumpEventQueue();
+    expect(h.state, isA<TagNavigationTagMissing>());
+    expect(h.reads.queries, hasLength(1));
+  });
+
   test(
     'вход выбирает активный охват и отличает пустоту от отсутствия тега',
     () async {
@@ -251,10 +771,6 @@ void main() {
       category: GraphFailureCategory.validation,
     ),
     (
-      failure: TaggedEntitiesSnapshotExpired(),
-      category: GraphFailureCategory.conflict,
-    ),
-    (
       failure: TaggedEntitiesUnavailableFailure(),
       category: GraphFailureCategory.unavailable,
     ),
@@ -442,12 +958,22 @@ void main() {
           epoch: revision.epoch,
         );
         await pending;
-        final failed = h.state as TagNavigationLoaded;
-        expect(failed.items.single.target, _intention(1).target);
-        expect(failed.nextCursor, isNull);
+        final refreshing = h.state as TagNavigationLoaded;
+        expect(refreshing.items.single.target, _intention(1).target);
+        expect(refreshing.nextCursor, isNull);
+        expect(refreshing.freshness, TagNavigationFreshness.refreshing);
+        expect(h.reads.queries, hasLength(3));
+        expect(h.reads.queries.last.cursor, isNull);
+        h.reads.page(
+          2,
+          [_relation(2)],
+          revision: revision.value < 1 ? 1 : revision.value,
+          epoch: revision.epoch,
+        );
+        await pumpEventQueue();
         expect(
-          (failed.pageStatus as TagNavigationPageFailure).failure,
-          isA<TaggedEntitiesSnapshotExpired>(),
+          (h.state as TagNavigationLoaded).items.single.target,
+          _relation(2).target,
         );
       },
     );
@@ -470,9 +996,19 @@ void main() {
 }
 
 final class _Harness {
-  _Harness() {
+  _Harness({_Reads? reader, bool checkSubscriptions = false})
+    : reads = reader ?? _Reads() {
+    if (checkSubscriptions) {
+      reads.beforeRead = () {
+        expect(changes.hasListener, isTrue);
+        expect(reads.watches.single.hasListener, isTrue);
+      };
+    }
     container = ProviderContainer(
-      overrides: [tagNavigationReaderProvider.overrideWithValue(reads)],
+      overrides: [
+        tagNavigationReaderProvider.overrideWithValue(reads),
+        tagNavigationChangesProvider.overrideWithValue(changes.stream),
+      ],
     );
     subscription = container.listen(
       tagNavigationViewModelProvider(_tagId(1)),
@@ -482,23 +1018,71 @@ final class _Harness {
     model = container.read(tagNavigationViewModelProvider(_tagId(1)).notifier);
   }
 
-  final reads = _Reads();
+  final _Reads reads;
+  final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
+    sync: true,
+  );
   final states = <TagNavigationState>[];
   late final ProviderContainer container;
   late final ProviderSubscription<TagNavigationState> subscription;
   late final TagNavigationViewModel model;
   TagNavigationState get state => subscription.read();
-  void dispose() => container.dispose();
+  void change(
+    int revision, {
+    int epoch = 0,
+    List<GraphChange> changes = const [],
+  }) => this.changes.add(_Package(_Revision(revision, epoch), changes));
+  void dispose() {
+    container.dispose();
+    unawaited(changes.close());
+    reads.dispose();
+  }
+}
+
+final class _Package implements ConfirmedGraphChangePackage {
+  const _Package(this.revision, this.changes);
+  @override
+  final GraphRevision revision;
+  @override
+  final List<GraphChange> changes;
 }
 
 final class _Reads with TagReadContractTestFallback implements TagReadContract {
+  _Reads({this.throwOnWatch = false});
+  final bool throwOnWatch;
+  void Function()? beforeRead;
   final queries = <TaggedEntitiesQuery>[];
   final pending = <Completer<TaggedEntitiesPageResult>>[];
+  final watchedIds = <TagId>[];
+  final watches = <StreamController<TagReadResult>>[];
+
+  @override
+  Stream<TagReadResult> watchTag(TagId id) {
+    if (throwOnWatch) throw StateError('SQL и личные данные');
+    watchedIds.add(id);
+    final watch = StreamController<TagReadResult>.broadcast(sync: true);
+    watches.add(watch);
+    return watch.stream;
+  }
+
+  void observe(Tag? tag, {int revision = 1, int epoch = 0, int index = 0}) =>
+      watches[index].add(
+        TagReadSuccess(
+          GraphSnapshot(value: tag, revision: _Revision(revision, epoch)),
+        ),
+      );
+
+  void dispose() {
+    for (final watch in watches) {
+      unawaited(watch.close());
+    }
+  }
 
   @override
   Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
     TaggedEntitiesQuery query,
   ) {
+    beforeRead?.call();
     queries.add(query);
     final result = Completer<TaggedEntitiesPageResult>();
     pending.add(result);
@@ -553,6 +1137,9 @@ final class _Revision implements GraphRevision {
         : GraphRevisionOrder.same;
   }
 }
+
+Tag _tag(String name, {int id = 1}) =>
+    Tag(id: _tagId(id), name: TagName.fromInput(name));
 
 TagId _tagId(int n) => (TagId.decode(
   '10000000-0000-4000-8000-${n.toString().padLeft(12, '0')}',

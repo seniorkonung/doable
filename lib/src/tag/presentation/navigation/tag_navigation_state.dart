@@ -2,6 +2,7 @@ import '../../../graph/application/graph_revision.dart';
 import '../../application/tagged_entities_page.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
+import '../../domain/tag_target.dart';
 
 sealed class TagNavigationState {
   const TagNavigationState({required this.tagId, required this.scope});
@@ -36,6 +37,8 @@ sealed class TagNavigationPageStatus {
   const TagNavigationPageStatus();
 }
 
+enum TagNavigationFreshness { current, refreshing, stale }
+
 final class TagNavigationPageIdle extends TagNavigationPageStatus {
   const TagNavigationPageIdle();
 }
@@ -59,6 +62,8 @@ final class TagNavigationLoaded extends TagNavigationState {
     required List<TaggedEntity> items,
     required this.nextCursor,
     required this.revision,
+    this.freshness = TagNavigationFreshness.current,
+    this.refreshFailure,
     this.pageStatus = const TagNavigationPageIdle(),
   }) : items = List.unmodifiable(items),
        super(tagId: tag.id);
@@ -67,11 +72,35 @@ final class TagNavigationLoaded extends TagNavigationState {
   final List<TaggedEntity> items;
   final TaggedEntitiesCursor? nextCursor;
   final GraphRevision revision;
+  final TagNavigationFreshness freshness;
+  final TaggedEntitiesReadFailure? refreshFailure;
   final TagNavigationPageStatus pageStatus;
 
   bool get isEmpty => items.isEmpty;
+  bool get canUseCurrentItems => freshness == TagNavigationFreshness.current;
   bool get hasReachedEnd =>
-      nextCursor == null && pageStatus is TagNavigationPageIdle;
+      canUseCurrentItems &&
+      nextCursor == null &&
+      pageStatus is TagNavigationPageIdle;
+
+  bool contains(TagTarget target) => items.any((item) => item.target == target);
+
+  TagNavigationLoaded withStatus({
+    Tag? tag,
+    bool clearCursor = false,
+    TagNavigationFreshness? freshness,
+    TaggedEntitiesReadFailure? refreshFailure,
+    TagNavigationPageStatus? pageStatus,
+  }) => TagNavigationLoaded(
+    tag: tag ?? this.tag,
+    scope: scope,
+    items: items,
+    nextCursor: clearCursor ? null : nextCursor,
+    revision: revision,
+    freshness: freshness ?? this.freshness,
+    refreshFailure: refreshFailure,
+    pageStatus: pageStatus ?? this.pageStatus,
+  );
 
   TagNavigationLoaded withPageStatus(
     TagNavigationPageStatus status, {
@@ -82,6 +111,8 @@ final class TagNavigationLoaded extends TagNavigationState {
     items: items,
     nextCursor: clearCursor ? null : nextCursor,
     revision: revision,
+    freshness: freshness,
+    refreshFailure: refreshFailure,
     pageStatus: status,
   );
 }
