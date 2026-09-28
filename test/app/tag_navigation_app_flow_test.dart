@@ -199,6 +199,79 @@ void main() {
     );
 
     testWidgets(
+      'смена системного языка на открытой навигации сохраняет тег, охваты и все порции из $locale',
+      (tester) async {
+        final app = await _pumpApp(tester, locale);
+        final before = _snapshot(app.raw);
+        await _openCatalogTag(tester, firstTagNumber);
+        await _loaded(tester, firstTagNumber);
+        for (final scope in TaggedEntitiesScope.values) {
+          await _selectScope(tester, scope);
+          await _loadAll(tester, scope);
+          final loaded = await _loaded(tester, firstTagNumber);
+          for (final language in [locale == 'ru' ? 'en' : 'ru', locale]) {
+            tester.binding.platformDispatcher.localesTestValue = [
+              Locale(language),
+            ];
+            await tester.pumpAndSettle();
+            final current = await _loaded(tester, firstTagNumber);
+            expect(app.router.current.name, TagNavigationRoute.name);
+            expect(
+              app.router.current.argsAs<TagNavigationRouteArgs>().tagId,
+              loaded.tagId,
+            );
+            expect(current.tag, loaded.tag);
+            expect(current.scope, loaded.scope);
+            expect(current.items, orderedEquals(loaded.items));
+            expect(current.revision, loaded.revision);
+            expect(current.nextCursor, loaded.nextCursor);
+            expect(current.hasReachedEnd, isTrue);
+            expect(_l10n(tester).localeName, language);
+            await _scrollToTop(tester);
+            final l10n = _l10n(tester);
+            expect(find.text(l10n.tagNavigationTag('Дом 🏷️')), findsOneWidget);
+            expect(
+              tester.widget<ChoiceChip>(find.byKey(ValueKey(scope))).selected,
+              isTrue,
+            );
+            final archived = scope == TaggedEntitiesScope.archived;
+            for (final (target, title) in [
+              (
+                _intention(archived ? 2 : 1),
+                archived ? 'Намерение 2' : 'Одинаковое намерение',
+              ),
+              (
+                _relation(archived ? 103 : 101),
+                archived
+                    ? l10n.relationNeighborhoodCanPhrase(
+                        'Одинаковое намерение',
+                        'Одинаковое намерение',
+                      )
+                    : l10n.relationNeighborhoodNeedPhrase(
+                        'Одинаковое намерение',
+                        'Непомеченный сосед',
+                      ),
+              ),
+            ]) {
+              final row = find.byKey(ValueKey(target));
+              await tester.scrollUntilVisible(
+                row,
+                800,
+                scrollable: find.byType(Scrollable).last,
+              );
+              expect(
+                find.descendant(of: row, matching: find.text(title)),
+                findsOneWidget,
+              );
+            }
+            expect(_snapshot(app.raw), before);
+            expect(tester.takeException(), isNull);
+          }
+        }
+      },
+    );
+
+    testWidgets(
       'теги без назначений и только в архиве доступны из основного каталога на $locale',
       (tester) async {
         final app = await _pumpApp(tester, locale);

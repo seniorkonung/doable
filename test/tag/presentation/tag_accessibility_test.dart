@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
@@ -17,6 +18,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/semantics.dart';
@@ -25,6 +28,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+
+part 'tag_navigation_accessibility_scenarios.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
   for (var attempt = 0; attempt < 100; attempt++) {
@@ -79,6 +84,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 
 void main() {
   _registerAssignmentScenarios();
+  _registerNavigationEntryScenarios();
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     testWidgets(
       'диктор и увеличенный текст сохраняют ввод, действия и подтверждение — ${locale.languageCode}',

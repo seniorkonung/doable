@@ -25,6 +25,7 @@ import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart'
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -33,7 +34,10 @@ import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
 
+part 'tag_navigation_semantics_scenarios.dart';
+
 void main() {
+  _registerNavigationSemanticsScenarios();
   for (final (relation, archived, number) in [
     (false, false, 4),
     (false, true, 2),
@@ -212,15 +216,20 @@ void main() {
       }
     });
 
-    testWidgets(
-      'длинный текст, охваты, подгрузка и повтор доступны на $locale',
-      (tester) async {
-        tester.view.physicalSize = const Size(360, 640);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
+    testWidgets('длинный текст, охваты, подгрузка и повтор доступны на $locale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final semantics = tester.ensureSemantics();
+      try {
         final reads = _Reads();
         addTearDown(reads.dispose);
         await _pumpPage(tester, reads, locale: locale, textScale: 3);
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(TagNavigationPage)),
+        );
         final tag = Tag(
           id: _tag.id,
           name: TagName.fromInput('Длинный тег ' * 20),
@@ -252,6 +261,10 @@ void main() {
         await tester.pumpAndSettle();
         await _scrollTo(tester, _row(intention));
         expect(
+          tester.getSemantics(_row(intention)).label,
+          '${l10n.tagNavigationIntentionArchived}: ${intention.title}',
+        );
+        expect(
           tester
               .getSize(
                 find
@@ -264,16 +277,35 @@ void main() {
               .height,
           greaterThan(100),
         );
+        await _scrollTo(tester, _row(relation));
+        expect(
+          tester.getSemantics(_row(relation)).label,
+          '${l10n.tagNavigationRelationArchived}: ${l10n.relationNeighborhoodCanPhrase(relation.sourceTitle, relation.relatedTitle)}',
+        );
         final more = find.text(
           russian ? 'Показать ещё сущности' : 'Show more entities',
         );
         await _scrollTo(tester, more);
         await tester.tap(more);
         await tester.pump();
+        await _expectNavigationStatusSemantics(
+          tester,
+          l10n.tagNavigationLoadingMore,
+        );
         reads.fail(2, const TaggedEntitiesUnavailableFailure());
         await tester.pumpAndSettle();
+        await _expectNavigationStatusSemantics(
+          tester,
+          l10n.tagNavigationLoadMoreUnavailable,
+        );
         final retry = find.text(russian ? 'Повторить' : 'Try again');
         await _scrollTo(tester, retry);
+        final retrySemantics = tester.getSemantics(retry);
+        expect(retrySemantics.flagsCollection.isButton, isTrue);
+        expect(
+          retrySemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+          isTrue,
+        );
         await tester.tap(retry);
         await tester.pump();
         reads.page(3, [_intention(3, archived: true)], tag: tag);
@@ -282,8 +314,10 @@ void main() {
         expect(_row(_intention(3, archived: true)), findsOneWidget);
         expect(reads.queries.last.scope, TaggedEntitiesScope.archived);
         expect(tester.takeException(), isNull);
-      },
-    );
+      } finally {
+        semantics.dispose();
+      }
+    });
 
     testWidgets('смешанные строки, охват и семантика на $locale', (
       tester,
