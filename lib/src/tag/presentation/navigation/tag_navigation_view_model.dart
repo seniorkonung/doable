@@ -114,13 +114,17 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
       return;
     }
     state = _loading();
+    if (_watchFailure case final failure?) {
+      _firstFailure(_navigationWatchFailure(failure));
+      return;
+    }
     _requestFirstPage();
   }
 
   /// Прежний запрос теряет право публикации, но завершается до нового чтения.
   /// Несколько смен выбора объединяются в одну первую порцию последнего выбора.
   void _requestFirstPage() {
-    if (_tagIsMissing) return;
+    if (_tagIsMissing || _watchFailure != null) return;
     _firstPagePending = _activeRequest != null;
     if (!_firstPagePending) unawaited(_startFirst());
   }
@@ -394,7 +398,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
         }
       }
     }
-    if (!advanced) {
+    if (!advanced || _watchFailure != null) {
       if (!identical(current, state)) state = current;
       return;
     }
@@ -444,7 +448,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
                       tag: tag,
                       refreshFailure: current.refreshFailure,
                     );
-                    if (advanced) {
+                    if (advanced && _watchFailure == null) {
                       _beginRefresh(updated);
                     } else {
                       state = updated;
@@ -483,14 +487,20 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
   }
 
   void _watchTagFailed(TagReadFailure failure) {
+    // Отказ наблюдения отзывает право уже начатой страницы на публикацию.
+    _generation++;
+    _firstPagePending = false;
     _watchFailure = failure;
     _watchRecovery?.firstPage = null;
-    _firstFailure(switch (failure) {
-      TagReadUnavailableFailure() => const TaggedEntitiesUnavailableFailure(),
-      TagReadCorruptionFailure() => const TaggedEntitiesCorruptionFailure(),
-      TagReadUnexpectedFailure() => const TaggedEntitiesUnexpectedFailure(),
-    });
+    _firstFailure(_navigationWatchFailure(failure));
   }
+
+  TaggedEntitiesReadFailure _navigationWatchFailure(TagReadFailure failure) =>
+      switch (failure) {
+        TagReadUnavailableFailure() => const TaggedEntitiesUnavailableFailure(),
+        TagReadCorruptionFailure() => const TaggedEntitiesCorruptionFailure(),
+        TagReadUnexpectedFailure() => const TaggedEntitiesUnexpectedFailure(),
+      };
 
   /// Повтор подтверждают новая подписка и согласованная новая первая порция.
   void _completeWatchRecovery() {

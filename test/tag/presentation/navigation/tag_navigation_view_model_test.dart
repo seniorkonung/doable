@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 
 part 'tag_navigation_terminal_watch_scenarios.dart';
+part 'tag_navigation_late_page_scenarios.dart';
 
 void main() {
   test(
@@ -330,6 +331,7 @@ void main() {
   }
 
   _testTerminalWatchRecovery();
+  _testLatePageAfterWatchFailure();
 
   for (final loaded in [false, true]) {
     test(
@@ -1062,6 +1064,8 @@ final class _Reads with TagReadContractTestFallback implements TagReadContract {
   final watchedIds = <TagId>[];
   final watches = <StreamController<TagReadResult>>[];
   final doneCallbacks = <void Function()>[];
+  final dataCallbacks = <void Function(TagReadResult)>[];
+  final errorCallbacks = <void Function(Object)>[];
 
   @override
   Stream<TagReadResult> watchTag(TagId id) {
@@ -1071,7 +1075,12 @@ final class _Reads with TagReadContractTestFallback implements TagReadContract {
         ? StreamController<TagReadResult>(sync: true)
         : StreamController<TagReadResult>.broadcast(sync: true);
     watches.add(watch);
-    return _CapturedDoneStream(watch.stream, doneCallbacks.add);
+    return _CapturedWatchStream(
+      watch.stream,
+      captureDone: doneCallbacks.add,
+      captureData: dataCallbacks.add,
+      captureError: errorCallbacks.add,
+    );
   }
 
   void observe(Tag? tag, {int revision = 1, int epoch = 0, int index = 0}) =>

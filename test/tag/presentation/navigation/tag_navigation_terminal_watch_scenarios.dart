@@ -249,12 +249,19 @@ void _testTerminalWatchRecovery() {
   }
 }
 
-// Сохраняет callback для проверки уже запланированного окончания старой подписки.
-final class _CapturedDoneStream extends Stream<TagReadResult> {
-  _CapturedDoneStream(this.source, this.captureDone);
+// Сохраняет уже запланированные обработчики, которые отмена подписки не отзывает.
+final class _CapturedWatchStream extends Stream<TagReadResult> {
+  _CapturedWatchStream(
+    this.source, {
+    required this.captureDone,
+    required this.captureData,
+    required this.captureError,
+  });
 
   final Stream<TagReadResult> source;
   final void Function(void Function()) captureDone;
+  final void Function(void Function(TagReadResult)) captureData;
+  final void Function(void Function(Object)) captureError;
 
   @override
   StreamSubscription<TagReadResult> listen(
@@ -264,6 +271,8 @@ final class _CapturedDoneStream extends Stream<TagReadResult> {
     bool? cancelOnError,
   }) {
     if (onDone != null) captureDone(onDone);
+    if (onData != null) captureData(onData);
+    if (onError is void Function(Object)) captureError(onError);
     return source.listen(
       onData,
       onError: onError,
