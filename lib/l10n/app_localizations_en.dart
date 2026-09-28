@@ -883,6 +883,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCatalogSelectionTitle => 'Choose a tag';
 
   @override
+  String get tagCatalogSearch => 'Search tags';
+
+  @override
+  String get tagCatalogClearSearch => 'Clear tag search';
+
+  @override
+  String get tagCatalogInvalidSearch =>
+      'Invalid characters are shown as �. Your input is retained but wasn’t applied; results use the last valid query.';
+
+  @override
+  String get tagCatalogNoMatches => 'No tags found';
+
+  @override
   String get tagCatalogAssigned => 'Assigned';
 
   @override

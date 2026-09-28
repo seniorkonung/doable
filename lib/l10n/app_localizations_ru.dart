@@ -884,6 +884,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagCatalogSelectionTitle => 'Выбор тега';
 
   @override
+  String get tagCatalogSearch => 'Поиск тегов';
+
+  @override
+  String get tagCatalogClearSearch => 'Очистить поиск тегов';
+
+  @override
+  String get tagCatalogInvalidSearch =>
+      'Недопустимые символы показаны как �. Ввод сохранён, но не применён; показаны результаты последнего корректного запроса.';
+
+  @override
+  String get tagCatalogNoMatches => 'Теги не найдены';
+
+  @override
   String get tagCatalogAssigned => 'Назначен';
 
   @override

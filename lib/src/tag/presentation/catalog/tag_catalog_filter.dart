@@ -11,6 +11,8 @@ sealed class TagCatalogFilterResult {
 final class TagCatalogFilter extends TagCatalogFilterResult {
   const TagCatalogFilter._(this._matchingKey);
 
+  static const empty = TagCatalogFilter._('');
+
   /// Проверяет исходный ввод до преобразования регистра, не исправляя его.
   /// Пустая строка допустима; пробелы и длина запроса сохраняют свой смысл.
   static TagCatalogFilterResult fromInput(String input) {
