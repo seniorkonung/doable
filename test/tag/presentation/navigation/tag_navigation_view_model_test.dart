@@ -19,6 +19,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 
+part 'tag_navigation_terminal_watch_scenarios.dart';
+
 void main() {
   test(
     'отсутствие наблюдения действует и после более нового постороннего пакета',
@@ -314,6 +316,7 @@ void main() {
         if (failure is TagReadUnavailableFailure) {
           expect(h.reads.watchedIds, hasLength(2));
           expect(h.reads.watches.first.hasListener, isFalse);
+          h.reads.observe(_tag('Дом'), index: 1);
           h.reads.page(1, [_intention(2)]);
           await retry;
           expect(h.model.canActOn(_intention(2).target), isTrue);
@@ -325,6 +328,8 @@ void main() {
       },
     );
   }
+
+  _testTerminalWatchRecovery();
 
   for (final loaded in [false, true]) {
     test(
@@ -1048,21 +1053,25 @@ final class _Package implements ConfirmedGraphChangePackage {
 }
 
 final class _Reads with TagReadContractTestFallback implements TagReadContract {
-  _Reads({this.throwOnWatch = false});
+  _Reads({this.throwOnWatch = false, this.terminalWatches = false});
   final bool throwOnWatch;
+  final bool terminalWatches;
   void Function()? beforeRead;
   final queries = <TaggedEntitiesQuery>[];
   final pending = <Completer<TaggedEntitiesPageResult>>[];
   final watchedIds = <TagId>[];
   final watches = <StreamController<TagReadResult>>[];
+  final doneCallbacks = <void Function()>[];
 
   @override
   Stream<TagReadResult> watchTag(TagId id) {
     if (throwOnWatch) throw StateError('SQL и личные данные');
     watchedIds.add(id);
-    final watch = StreamController<TagReadResult>.broadcast(sync: true);
+    final watch = terminalWatches
+        ? StreamController<TagReadResult>(sync: true)
+        : StreamController<TagReadResult>.broadcast(sync: true);
     watches.add(watch);
-    return watch.stream;
+    return _CapturedDoneStream(watch.stream, doneCallbacks.add);
   }
 
   void observe(Tag? tag, {int revision = 1, int epoch = 0, int index = 0}) =>

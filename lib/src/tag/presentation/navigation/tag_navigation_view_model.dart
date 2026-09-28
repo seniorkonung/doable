@@ -53,7 +53,8 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
   StreamSubscription<ConfirmedGraphChangePackage>? _changes;
   StreamSubscription<TagReadResult>? _tagReads;
   int _tagGeneration = 0;
-  bool _watchFailed = false;
+  TagReadFailure? _watchFailure;
+  _WatchRecovery? _watchRecovery;
   Tag? _knownTag;
   GraphRevision? _tagRevision;
 
@@ -106,6 +107,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
 
   void _changeSelection() {
     _generation++;
+    _watchRecovery?.firstPage = null;
     _staleReadAttempts = 0;
     if (_tagIsMissing) {
       _tagMissing();
@@ -132,7 +134,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     }
     state = _loading();
     _staleReadAttempts = 0;
-    if (_watchFailed) _watchSelectedTag();
+    if (_watchFailure != null) _watchSelectedTag(recovering: true);
     return _startFirst();
   }
 
@@ -157,7 +159,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     }
     _staleReadAttempts = 0;
     _beginRefresh(current);
-    if (_watchFailed) _watchSelectedTag();
+    if (_watchFailure != null) _watchSelectedTag(recovering: true);
     return _startFirst();
   }
 
@@ -250,15 +252,22 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
           _firstFailure(const TaggedEntitiesUnexpectedFailure());
           return;
         }
-        _knownTag = value.tag;
-        _tagRevision = value.revision;
-        state = TagNavigationLoaded(
+        final loaded = TagNavigationLoaded(
           tag: value.tag,
           scope: scope,
           items: value.items,
           nextCursor: value.nextCursor,
           revision: value.revision,
         );
+        final recovery = _watchRecovery;
+        if (recovery != null) {
+          recovery.firstPage = (generation: generation, value: loaded);
+          _completeWatchRecovery();
+        } else {
+          _knownTag = value.tag;
+          _tagRevision = value.revision;
+          state = loaded;
+        }
       case GraphResultFailure(failure: TaggedEntitiesTagNotFound()):
         _tagMissing();
       case GraphResultFailure(failure: TaggedEntitiesSnapshotExpired()):
@@ -338,6 +347,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     _generation++;
     _firstPagePending = false;
     _knownTag = null;
+    _watchRecovery = null;
     _tagGeneration++;
     unawaited(_tagReads?.cancel());
     state = TagNavigationTagMissing(tagId: _tagId, scope: _scope);
@@ -397,11 +407,12 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     _requestFirstPage();
   }
 
-  void _watchSelectedTag() {
+  void _watchSelectedTag({bool recovering = false}) {
     unawaited(_tagReads?.cancel());
     final generation = ++_tagGeneration;
     final tagId = _tagId;
-    _watchFailed = false;
+    _watchFailure = null;
+    _watchRecovery = recovering ? _WatchRecovery() : null;
     try {
       _tagReads = _reads
           .watchTag(tagId)
@@ -423,6 +434,10 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
                   }
                   _knownTag = tag;
                   _tagRevision = value.revision;
+                  _watchRecovery?.observation = GraphSnapshot(
+                    value: tag,
+                    revision: value.revision,
+                  );
                   final current = state;
                   if (current is TagNavigationLoaded) {
                     final updated = current.withStatus(
@@ -439,6 +454,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
                     _staleReadAttempts = 0;
                     _requestFirstPage();
                   }
+                  _completeWatchRecovery();
                 case TagReadError(:final failure):
                   _watchTagFailed(failure);
               }
@@ -450,7 +466,9 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
             },
             onDone: () {
               if (ref.mounted && generation == _tagGeneration) {
-                _watchTagFailed(const TagReadUnexpectedFailure());
+                _watchTagFailed(
+                  _watchFailure ?? const TagReadUnexpectedFailure(),
+                );
               }
             },
           );
@@ -465,12 +483,42 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
   }
 
   void _watchTagFailed(TagReadFailure failure) {
-    _watchFailed = true;
+    _watchFailure = failure;
+    _watchRecovery?.firstPage = null;
     _firstFailure(switch (failure) {
       TagReadUnavailableFailure() => const TaggedEntitiesUnavailableFailure(),
       TagReadCorruptionFailure() => const TaggedEntitiesCorruptionFailure(),
       TagReadUnexpectedFailure() => const TaggedEntitiesUnexpectedFailure(),
     });
+  }
+
+  /// Повтор подтверждают новая подписка и согласованная новая первая порция.
+  void _completeWatchRecovery() {
+    if (_watchFailure != null) return;
+    final observation = _watchRecovery?.observation;
+    final firstPage = _watchRecovery?.firstPage;
+    if (observation == null ||
+        firstPage == null ||
+        !_canPublish(firstPage.generation) ||
+        _precedesRequired(firstPage.value.revision)) {
+      return;
+    }
+    switch (firstPage.value.revision.compareTo(observation.revision)) {
+      case GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch:
+        return;
+      case GraphRevisionOrder.same:
+        if (firstPage.value.tag.name != observation.value.name) {
+          _watchRecovery?.firstPage = null;
+          _firstFailure(const TaggedEntitiesUnexpectedFailure());
+          return;
+        }
+      case GraphRevisionOrder.newer:
+        break;
+    }
+    _watchRecovery = null;
+    _knownTag = firstPage.value.tag;
+    _tagRevision = firstPage.value.revision;
+    state = firstPage.value;
   }
 
   bool _acceptsTagRevision(GraphRevision revision) =>
@@ -479,6 +527,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
           revision.compareTo(_tagRevision!) != GraphRevisionOrder.older);
 
   void _beginRefresh(TagNavigationLoaded current) {
+    _watchRecovery?.firstPage = null;
     state = current.withStatus(
       clearCursor: true,
       freshness: TagNavigationFreshness.refreshing,
@@ -541,4 +590,9 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
       return const TaggedEntitiesPageError(TaggedEntitiesUnexpectedFailure());
     }
   }
+}
+
+final class _WatchRecovery {
+  GraphSnapshot<Tag>? observation;
+  ({int generation, TagNavigationLoaded value})? firstPage;
 }
