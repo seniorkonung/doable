@@ -621,6 +621,12 @@ void main() {
               language: language,
             );
             final l10n = _localizations(tester);
+            for (final explanation
+                in language == 'ru'
+                    ? ['не применён', 'последнего корректного запроса']
+                    : ['wasn’t applied', 'last valid query']) {
+              expect(l10n.tagCatalogInvalidSearch, contains(explanation));
+            }
             final tags = [
               _tag(1, 'Работа'),
               _tag(2, 'Дом'),
@@ -631,6 +637,10 @@ void main() {
 
             await tester.enterText(_search, '\u0000');
             await tester.pump();
+            expect(
+              tester.widget<TextField>(_search).controller!.text,
+              '\u0000',
+            );
             expect(_visibleNames(tester), ['Работа', 'Дом', 'Для дома']);
             expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
             expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
@@ -643,6 +653,13 @@ void main() {
 
               expect(tester.widget<TextField>(_search).controller!.text, input);
               expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+              await tester.pumpAndSettle();
+              expect(
+                tester
+                    .getSemantics(find.text(l10n.tagCatalogInvalidSearch))
+                    .label,
+                contains(l10n.tagCatalogInvalidSearch),
+              );
               expect(_visibleNames(tester), ['Дом', 'Для дома']);
               expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
               if (target != null) {
@@ -678,6 +695,197 @@ void main() {
         },
       );
     }
+
+    testWidgets(
+      '$description: некорректный ввод и фильтр сохраняются после редактора, переименования и назначения',
+      (tester) async {
+        final router = await _pumpStoredCatalog(tester, target: target);
+        final l10n = _localizations(tester);
+        final home = _tag(firstTagNumber, 'Дом 🏷️');
+        final unused = _tag(303, 'Дом без назначений');
+        const invalid = 'спорт\u0000\ud800\udc00\udc00';
+        await tester.enterText(_search, 'дом');
+        await tester.pump();
+        await tester.enterText(_search, invalid);
+        await tester.pump();
+        final editingValue = tester
+            .widget<TextField>(_search)
+            .controller!
+            .value;
+        expect(_visibleNames(tester), [
+          'Дом 🏷️',
+          'Дом без назначений',
+          'Дом в архиве',
+        ]);
+
+        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+        await tester.pumpAndSettle();
+        expect(router.current.name, TagEditorRoute.name);
+        await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(_search).controller!.value,
+          editingValue,
+        );
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+        expect(_visibleNames(tester), [
+          'Дом 🏷️',
+          'Дом без назначений',
+          'Дом в архиве',
+        ]);
+
+        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('tag-editor-name')),
+          'Новый дом',
+        );
+        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+        await _pumpUntil(
+          tester,
+          () =>
+              router.current.name == TagCatalogRoute.name &&
+              _loaded(tester, target).canUseCurrentItems &&
+              _visibleNames(tester).contains('Новый дом'),
+        );
+        expect(
+          tester.widget<TextField>(_search).controller!.value,
+          editingValue,
+        );
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+        expect(_visibleNames(tester), [
+          'Дом 🏷️',
+          'Дом без назначений',
+          'Дом в архиве',
+          'Новый дом',
+        ]);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(TagCatalogPage)),
+        );
+        final rename = container
+            .read(graphCommandCoordinatorProvider.notifier)
+            .acceptTagRename(
+              RenameTag(tagId: home.id, name: TagName.fromInput('Спорт')),
+            );
+        expect(rename, isA<TagCommandAccepted>());
+        await tester.runAsync(() => (rename as TagCommandAccepted).future);
+        await _pumpUntil(
+          tester,
+          () =>
+              _loaded(tester, target).canUseCurrentItems &&
+              _loaded(tester, target).items.first.name.value == 'Спорт',
+        );
+        await tester.pumpAndSettle();
+        expect(router.current.name, TagCatalogRoute.name);
+        expect(
+          tester.widget<TextField>(_search).controller!.value,
+          editingValue,
+        );
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+        expect(_visibleNames(tester), [
+          'Дом без назначений',
+          'Дом в архиве',
+          'Новый дом',
+        ]);
+        expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
+
+        if (target != null) {
+          expect(_assignment(tester, unused), l10n.tagCatalogAvailable);
+          await tester.tap(_row(unused));
+          await tester.pump();
+          await tester.tap(_assign);
+          await _pumpUntil(
+            tester,
+            () =>
+                _loaded(tester, target).canUseCurrentItems &&
+                _loaded(tester, target).selectedAssignment ==
+                    TagCatalogSelectedAssignment.assigned,
+          );
+          await tester.pumpAndSettle();
+          expect(_assignment(tester, unused), l10n.tagCatalogAssigned);
+          expect(_visibleNames(tester), [
+            'Дом без назначений',
+            'Дом в архиве',
+            'Новый дом',
+          ]);
+          expect(
+            tester.widget<TextField>(_search).controller!.value,
+            editingValue,
+          );
+          expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+        }
+
+        await tester.enterText(_search, 'спорт');
+        await tester.pump();
+        expect(_visibleNames(tester), ['Спорт']);
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsNothing);
+        if (target != null) {
+          expect(_assignment(tester, home), l10n.tagCatalogAssigned);
+        }
+        await tester.enterText(_search, invalid);
+        await tester.pump();
+        await tester.tap(find.byTooltip(l10n.tagCatalogClearSearch));
+        await tester.pump();
+        expect(_visibleNames(tester), [
+          'Спорт',
+          'Дом без назначений',
+          'Дом в архиве',
+          'Новый дом',
+        ]);
+        expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsNothing);
+        if (target != null) {
+          expect(_assignment(tester, unused), l10n.tagCatalogAssigned);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      '$description: отказ и повтор обновления сохраняют некорректный ввод и применённый фильтр',
+      (tester) async {
+        final repository = await _pumpCatalog(tester, target: target);
+        final l10n = _localizations(tester);
+        final home = _tag(2, 'Дом');
+        final forHome = _tag(3, 'Для дома');
+        repository.complete([_tag(1, 'Работа'), home, forHome]);
+        await tester.pumpAndSettle();
+        await tester.enterText(_search, 'дом');
+        await tester.pump();
+        const invalid = 'работ\udc00';
+        await tester.enterText(_search, invalid);
+        await tester.pump();
+        await _beginRefresh(tester, repository);
+        repository.reads.last.complete(
+          const TagCatalogError(TagCatalogUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(l10n.tagCatalogUnavailable), findsOneWidget);
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+        expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
+        expect(tester.widget<TextField>(_search).controller!.text, invalid);
+        expect(_visibleNames(tester), ['Дом', 'Для дома']);
+
+        await tester.tap(find.text(l10n.commonRetry));
+        await tester.pump();
+        repository.complete([_tag(1, 'Рабочее'), home, forHome], revision: 2);
+        await tester.pumpAndSettle();
+        expect(find.text(l10n.tagCatalogUnavailable), findsNothing);
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+        expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
+        expect(tester.widget<TextField>(_search).controller!.text, invalid);
+        expect(_visibleNames(tester), ['Дом', 'Для дома']);
+        if (target != null) {
+          expect(_assignment(tester, home), l10n.tagCatalogAssigned);
+          expect(_assignment(tester, forHome), l10n.tagCatalogAvailable);
+        }
+        await tester.enterText(_search, 'раб');
+        await tester.pump();
+        expect(_visibleNames(tester), ['Рабочее']);
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets(
       '$description: загрузка и отказ первоначального чтения имеют приоритет перед отсутствием совпадений',
@@ -882,6 +1090,16 @@ void main() {
 
 AppLocalizations _localizations(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(TagCatalogPage)));
+
+Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
+  for (var attempt = 0; attempt < 100 && !condition(); attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  expect(condition(), isTrue);
+}
 
 Future<void> _beginRefresh(
   WidgetTester tester,

@@ -69,9 +69,13 @@ void main() {
           ),
         );
         final home = _tag(firstTagNumber, 'Дом');
+        final forHome = _tag(firstTagNumber + 2, 'Для дома');
         final work = _tag(lastTagNumber, 'Работа');
-        repository.complete([home, work], assignedIds: {home.id});
+        repository.complete([home, forHome, work], assignedIds: {home.id});
         await tester.pumpAndSettle();
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(TagCatalogPage)),
+        );
         final container = ProviderScope.containerOf(
           tester.element(find.byType(TagCatalogPage)),
         );
@@ -82,38 +86,58 @@ void main() {
         final beforeSearch = _calls(repository);
         expect(beforeSearch, (1, 0, 0));
 
-        for (final (query, names) in [
-          ('д', ['Дом']),
-          ('до', ['Дом']),
-          ('дом', ['Дом']),
-          ('дом\u0000', ['Дом']),
-          ('дом', ['Дом']),
-          ('спорт', <String>[]),
-          ('работ', ['Работа']),
+        for (final (query, names, invalid) in [
+          ('\u0000', ['Дом', 'Для дома', 'Работа'], true),
+          ('д', ['Дом', 'Для дома'], false),
+          ('до', ['Дом', 'Для дома'], false),
+          ('дом', ['Дом', 'Для дома'], false),
+          ('работ\u0000', ['Дом', 'Для дома'], true),
+          ('работ', ['Работа'], false),
+          ('дом\ud800', ['Работа'], true),
+          ('дом', ['Дом', 'Для дома'], false),
+          ('работ\udc00', ['Дом', 'Для дома'], true),
+          ('', ['Дом', 'Для дома', 'Работа'], false),
+          ('спорт', <String>[], false),
+          ('дом\u0000', <String>[], true),
+          ('работ', ['Работа'], false),
         ]) {
           await tester.enterText(_search, query);
           await tester.pumpAndSettle();
           expect(_visibleNames(tester), names);
           expect(_calls(repository), beforeSearch);
           expect(container.read(provider), same(snapshot));
-          if (query == 'спорт') {
-            expect(find.text('Теги не найдены'), findsOneWidget);
-          }
+          expect(tester.widget<TextField>(_search).controller!.text, query);
+          expect(
+            find.text(l10n.tagCatalogInvalidSearch),
+            invalid ? findsOneWidget : findsNothing,
+          );
+          expect(
+            find.text(l10n.tagCatalogNoMatches),
+            names.isEmpty ? findsOneWidget : findsNothing,
+          );
         }
         await tester.tap(find.byTooltip('Очистить поиск тегов'));
         await tester.pumpAndSettle();
-        expect(_visibleNames(tester), ['Дом', 'Работа']);
+        expect(_visibleNames(tester), ['Дом', 'Для дома', 'Работа']);
         expect(_calls(repository), beforeSearch);
         expect(container.read(provider), same(snapshot));
         if (mode is TagCatalogSelectionMode) {
           expect(_assignment(tester, home), 'Назначен');
+          expect(_assignment(tester, forHome), 'Доступен для назначения');
           expect(_assignment(tester, work), 'Доступен для назначения');
         }
 
-        final renamed = _tag(lastTagNumber, 'Рабочее');
+        await tester.enterText(_search, 'дом');
+        await tester.pumpAndSettle();
+        const invalidInput = 'работ\ud800';
+        await tester.enterText(_search, invalidInput);
+        await tester.pumpAndSettle();
+        expect(_visibleNames(tester), ['Дом', 'Для дома']);
+        expect(_calls(repository), beforeSearch);
+        final renamed = _tag(firstTagNumber, 'Спорт');
         final accepted = container
             .read(graphCommandCoordinatorProvider.notifier)
-            .acceptTagRename(RenameTag(tagId: work.id, name: renamed.name));
+            .acceptTagRename(RenameTag(tagId: home.id, name: renamed.name));
         expect(accepted, isA<TagCommandAccepted>());
         repository.command.complete(
           TagCommandSucceeded(
@@ -122,7 +146,7 @@ void main() {
               value: TagRenamed(
                 TagRenamedChange(
                   revision: const TagCatalogTestRevision(2),
-                  before: work,
+                  before: home,
                   after: renamed,
                 ),
               ),
@@ -133,20 +157,47 @@ void main() {
         await tester.pump();
         expect(_calls(repository), (beforeSearch.$1 + 1, 0, 1));
         repository.complete(
-          [home, renamed],
+          [renamed, forHome, work],
           revision: 2,
           assignedIds: {home.id},
         );
         await tester.pumpAndSettle();
         final afterRename = _calls(repository);
+        expect(afterRename, (beforeSearch.$1 + 1, 0, 1));
+        final updatedSnapshot = container.read(provider);
+        expect(_visibleNames(tester), ['Для дома']);
+        expect(
+          tester.widget<TextField>(_search).controller!.text,
+          invalidInput,
+        );
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+        expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
+        if (mode is TagCatalogSelectionMode) {
+          expect(_assignment(tester, forHome), 'Доступен для назначения');
+        }
         await tester.enterText(_search, 'раб');
         await tester.pumpAndSettle();
-        expect(_visibleNames(tester), ['Рабочее']);
+        expect(_visibleNames(tester), ['Работа']);
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsNothing);
+        expect(_calls(repository), afterRename);
+        expect(container.read(provider), same(updatedSnapshot));
+        await tester.enterText(_search, 'дом\udc00');
+        await tester.pumpAndSettle();
+        expect(_visibleNames(tester), ['Работа']);
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
         expect(_calls(repository), afterRename);
         await tester.tap(find.byTooltip('Очистить поиск тегов'));
         await tester.pumpAndSettle();
-        expect(_visibleNames(tester), ['Дом', 'Рабочее']);
+        expect(_visibleNames(tester), ['Спорт', 'Для дома', 'Работа']);
+        expect(find.text(l10n.tagCatalogInvalidSearch), findsNothing);
+        expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
         expect(_calls(repository), afterRename);
+        expect(container.read(provider), same(updatedSnapshot));
+        if (mode is TagCatalogSelectionMode) {
+          expect(_assignment(tester, renamed), 'Назначен');
+          expect(_assignment(tester, forHome), 'Доступен для назначения');
+          expect(_assignment(tester, work), 'Доступен для назначения');
+        }
         expect(tester.takeException(), isNull);
       },
     );
