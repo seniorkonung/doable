@@ -1,6 +1,6 @@
 # ADR-0013: Читать списки тегов полными согласованными снимками
 
-- Status: proposed
+- Status: accepted
 - Originating change: stabilize-tag-selection
 - Date: 2026-09-28
 
