@@ -82,10 +82,9 @@ void main() {
             isTrue,
           );
           final list = find.byKey(const ValueKey('tag-catalog-list'));
-          final scrollable = find.descendant(
-            of: list,
-            matching: find.byType(Scrollable),
-          );
+          final scrollable = find
+              .descendant(of: list, matching: find.byType(Scrollable))
+              .first;
           final position = tester.state<ScrollableState>(scrollable).position;
           final listBounds = tester.getRect(list);
           final assign = find.byKey(const ValueKey('tag-catalog-assign'));
@@ -125,10 +124,9 @@ void main() {
           scale: scale,
         );
         final list = find.byKey(const ValueKey('tag-catalog-list'));
-        final scrollable = find.descendant(
-          of: list,
-          matching: find.byType(Scrollable),
-        );
+        final scrollable = find
+            .descendant(of: list, matching: find.byType(Scrollable))
+            .first;
         final position = tester.state<ScrollableState>(scrollable).position;
         position.jumpTo(280);
         await tester.pump();

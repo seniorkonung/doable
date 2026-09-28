@@ -329,125 +329,142 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
       ),
       bottomNavigationBar: switch (state) {
         TagCatalogLoaded loaded when loaded.mode is TagCatalogSelectionMode =>
-          _AssignAction(
-            state: loaded,
-            filter: _filter,
-            model: model,
-            onAssign: _assignSelected,
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: _AssignAction(
+              state: loaded,
+              filter: _filter,
+              model: model,
+              onAssign: _assignSelected,
+            ),
           ),
         _ => null,
       },
-      body: Column(
-        children: [
-          if (state is! TagCatalogTargetMissing)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                key: const ValueKey('tag-catalog-search'),
-                controller: _searchController,
-                onChanged: _updateSearch,
-                decoration: InputDecoration(
-                  labelText: localizations.tagCatalogSearch,
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchController.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: localizations.tagCatalogClearSearch,
-                          onPressed: _clearSearch,
-                          icon: const Icon(Icons.clear),
+      body: SizedBox.expand(
+        key: const ValueKey('tag-catalog-viewport'),
+        child: CustomScrollView(
+          key: const ValueKey('tag-catalog-list'),
+          controller: _scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  if (state is! TagCatalogTargetMissing)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        key: const ValueKey('tag-catalog-search'),
+                        controller: _searchController,
+                        onChanged: _updateSearch,
+                        decoration: InputDecoration(
+                          labelText: localizations.tagCatalogSearch,
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchController.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: localizations.tagCatalogClearSearch,
+                                  onPressed: _clearSearch,
+                                  icon: const Icon(Icons.clear),
+                                ),
+                          error: _searchIsInvalid
+                              ? Semantics(
+                                  liveRegion: true,
+                                  child: Text(
+                                    localizations.tagCatalogInvalidSearch,
+                                  ),
+                                )
+                              : null,
                         ),
-                  error: _searchIsInvalid
-                      ? ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxHeight:
-                                (MediaQuery.sizeOf(context).height -
-                                    MediaQuery.viewInsetsOf(context).bottom) /
-                                4,
+                      ),
+                    ),
+                  if (_activeDeleteToken != null)
+                    Semantics(
+                      liveRegion: true,
+                      child: _CatalogInlineStatus(
+                        message: localizations.tagDeleteSaving,
+                        loading: true,
+                      ),
+                    ),
+                  if (_deleteBusy)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Semantics(
+                        key: const ValueKey('tag-delete-already-running'),
+                        container: true,
+                        liveRegion: true,
+                        label: localizations.tagDeleteAlreadyRunning,
+                        child: ExcludeSemantics(
+                          child: Text(
+                            localizations.tagDeleteAlreadyRunning,
+                            textAlign: TextAlign.center,
                           ),
-                          child: SingleChildScrollView(
-                            child: Semantics(
-                              liveRegion: true,
-                              child: Text(
-                                localizations.tagCatalogInvalidSearch,
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
+                        ),
+                      ),
+                    ),
+                  if (_deleteFailure case final failure?)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: OperationFailurePresentation(
+                        claim: _failureClaim,
+                        message: tagFailureMessage(localizations, failure),
+                        messageKey: const ValueKey('tag-delete-failure'),
+                      ),
+                    ),
+                  if (state is TagCatalogLoaded &&
+                      state.assignmentStatus is TagCatalogAssignmentSubmitting)
+                    _CatalogInlineStatus(
+                      message: localizations.tagCatalogAssigning,
+                      loading: true,
+                    ),
+                  if (state is TagCatalogLoaded &&
+                      state.assignmentStatus is TagCatalogAssignmentKeysBusy)
+                    _CatalogInlineStatus(
+                      message: localizations.tagAssignmentAlreadyRunning,
+                    ),
+                  if (_assignFailure case final failure?)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: OperationFailurePresentation(
+                        claim: _failureClaim,
+                        message: tagAssignmentFailureMessage(
+                          localizations,
+                          failure,
+                        ),
+                        messageKey: const ValueKey(
+                          'tag-catalog-assign-failure',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            switch (state) {
+              TagCatalogInitialLoading() => SliverFillRemaining(
+                hasScrollBody: false,
+                child: _CatalogStatus(
+                  message: localizations.tagCatalogLoading,
+                  loading: true,
                 ),
-              ),
-            ),
-          if (_activeDeleteToken != null)
-            Semantics(
-              liveRegion: true,
-              child: _CatalogInlineStatus(
-                message: localizations.tagDeleteSaving,
-                loading: true,
-              ),
-            ),
-          if (_deleteBusy)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Semantics(
-                key: const ValueKey('tag-delete-already-running'),
-                container: true,
-                liveRegion: true,
-                label: localizations.tagDeleteAlreadyRunning,
-                child: ExcludeSemantics(
-                  child: Text(
-                    localizations.tagDeleteAlreadyRunning,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ),
-          if (_deleteFailure case final failure?)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: OperationFailurePresentation(
-                claim: _failureClaim,
-                message: tagFailureMessage(localizations, failure),
-                messageKey: const ValueKey('tag-delete-failure'),
-              ),
-            ),
-          if (state is TagCatalogLoaded &&
-              state.assignmentStatus is TagCatalogAssignmentSubmitting)
-            _CatalogInlineStatus(
-              message: localizations.tagCatalogAssigning,
-              loading: true,
-            ),
-          if (state is TagCatalogLoaded &&
-              state.assignmentStatus is TagCatalogAssignmentKeysBusy)
-            _CatalogInlineStatus(
-              message: localizations.tagAssignmentAlreadyRunning,
-            ),
-          if (_assignFailure case final failure?)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: OperationFailurePresentation(
-                claim: _failureClaim,
-                message: tagAssignmentFailureMessage(localizations, failure),
-                messageKey: const ValueKey('tag-catalog-assign-failure'),
-              ),
-            ),
-          Expanded(
-            child: switch (state) {
-              TagCatalogInitialLoading() => _CatalogStatus(
-                message: localizations.tagCatalogLoading,
-                loading: true,
               ),
               TagCatalogInitialFailure(:final failure, :final canRetry) =>
-                _CatalogStatus(
-                  message: _readFailure(localizations, failure),
-                  onRetry: canRetry ? model.retryInitialLoad : null,
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _CatalogStatus(
+                    message: _readFailure(localizations, failure),
+                    onRetry: canRetry ? model.retryInitialLoad : null,
+                  ),
                 ),
-              TagCatalogTargetMissing() => _CatalogStatus(
-                message: localizations.tagAssignmentTargetNotFound,
+              TagCatalogTargetMissing() => SliverFillRemaining(
+                hasScrollBody: false,
+                child: _CatalogStatus(
+                  message: localizations.tagAssignmentTargetNotFound,
+                ),
               ),
               TagCatalogLoaded loaded => _LoadedCatalog(
                 state: loaded,
                 filter: _filter,
-                scrollController: _scrollController,
                 model: model,
                 selection: loaded.selection,
                 onRename: (tag) {
@@ -461,8 +478,8 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
                 onOpen: _openNavigation,
               ),
             },
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -472,7 +489,6 @@ final class _LoadedCatalog extends StatelessWidget {
   const _LoadedCatalog({
     required this.state,
     required this.filter,
-    required this.scrollController,
     required this.model,
     required this.selection,
     required this.onRename,
@@ -484,7 +500,6 @@ final class _LoadedCatalog extends StatelessWidget {
 
   final TagCatalogLoaded state;
   final TagCatalogFilter filter;
-  final ScrollController scrollController;
   final TagCatalogViewModel model;
   final TagCatalogSelection selection;
   final ValueChanged<Tag> onRename;
@@ -501,7 +516,10 @@ final class _LoadedCatalog extends StatelessWidget {
         filter.isEmpty &&
         state.canUseCurrentItems &&
         selection is TagCatalogNoSelection) {
-      return _CatalogStatus(message: localizations.tagCatalogEmpty);
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: _CatalogStatus(message: localizations.tagCatalogEmpty),
+      );
     }
     final selected = switch (selection) {
       TagCatalogSelectionReady(:final tag) => tag,
@@ -540,119 +558,120 @@ final class _LoadedCatalog extends StatelessWidget {
         localizations.tagAssignmentsUnexpected,
       _ => null,
     };
-    return Column(
-      children: [
-        if (state.freshness == TagCatalogFreshness.refreshing)
-          _CatalogInlineStatus(
-            message: localizations.tagCatalogRefreshing,
-            loading: true,
-          ),
-        if (state.freshness == TagCatalogFreshness.stale)
-          _CatalogInlineStatus(
-            message: _readFailure(localizations, state.refreshFailure!),
-            onRetry: state.refreshFailure is TagCatalogUnavailableFailure
-                ? model.retryRefresh
-                : null,
-          ),
-        if (selection is TagCatalogSelectionLoading)
-          _CatalogInlineStatus(
-            message: localizations.tagCatalogLoading,
-            loading: true,
-          ),
-        if (selection case TagCatalogSelectionFailure(
-          :final failure,
-          :final canRetry,
-        ))
-          _CatalogInlineStatus(
-            message: _selectedReadFailure(localizations, failure),
-            onRetry: canRetry ? model.retrySelectedTag : null,
-          ),
-        if (choosing && selection.id != null && assignmentFailure != null)
-          _CatalogInlineStatus(
-            message: assignmentFailure,
-            onRetry:
-                state.selectedAssignment ==
-                    TagCatalogSelectedAssignment.unavailable
-                ? model.retrySelectedAssignment
-                : null,
-          ),
-        Expanded(
-          key: const ValueKey('tag-catalog-viewport'),
-          child:
-              state.canUseCurrentItems &&
-                  !filter.isEmpty &&
-                  rows.isEmpty &&
-                  !selectedOutsideSnapshot
-              ? _CatalogStatus(message: localizations.tagCatalogNoMatches)
-              : ListView.builder(
-                  key: const ValueKey('tag-catalog-list'),
-                  controller: scrollController,
-                  itemCount: rows.length + (selectedOutsideSnapshot ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (selectedOutsideSnapshot && index == 0) {
-                      final selectedTag = selected;
-                      return Semantics(
-                        container: true,
-                        selected: true,
-                        child: ListTile(
-                          title: Text(selectedTag.name.value),
-                          subtitle: Text(localizations.tagCatalogSelected),
-                          trailing: state.canUseCurrentItems
-                              ? _TagActions(
-                                  tag: selectedTag,
-                                  onRename: onRename,
-                                  onDelete: onDelete,
-                                  canDelete: canDelete,
-                                  onOpen: onOpen,
-                                )
-                              : null,
-                        ),
-                      );
-                    }
-                    final row = rows[index - (selectedOutsideSnapshot ? 1 : 0)];
-                    final tag = row.tag;
-                    final selectedId = selection.id;
-                    final assigned = choosing && row.isAssigned;
-                    return Semantics(
-                      key: ValueKey(
-                        'tag-catalog-row-${tag.id.toCanonicalString()}',
-                      ),
-                      container: true,
-                      selected: tag.id == selectedId,
-                      child: ListTile(
-                        title: Text(tag.name.value),
-                        subtitle: choosing
-                            ? Text(
-                                assigned
-                                    ? localizations.tagCatalogAssigned
-                                    : localizations.tagCatalogAvailable,
-                              )
-                            : null,
-                        onTap:
-                            choosing &&
-                                state.canUseCurrentItems &&
-                                state.assignmentStatus
-                                    is TagCatalogAssignmentIdle
-                            ? () => onSelect(tag.id)
-                            : null,
-                        trailing:
-                            !choosing &&
-                                state.canUseCurrentItems &&
-                                (tag.id != selectedId ||
-                                    selection is TagCatalogSelectionReady)
-                            ? _TagActions(
-                                tag: tag,
-                                onRename: onRename,
-                                onDelete: onDelete,
-                                canDelete: canDelete,
-                                onOpen: onOpen,
-                              )
-                            : null,
-                      ),
-                    );
-                  },
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            children: [
+              if (state.freshness == TagCatalogFreshness.refreshing)
+                _CatalogInlineStatus(
+                  message: localizations.tagCatalogRefreshing,
+                  loading: true,
                 ),
+              if (state.freshness == TagCatalogFreshness.stale)
+                _CatalogInlineStatus(
+                  message: _readFailure(localizations, state.refreshFailure!),
+                  onRetry: state.refreshFailure is TagCatalogUnavailableFailure
+                      ? model.retryRefresh
+                      : null,
+                ),
+              if (selection is TagCatalogSelectionLoading)
+                _CatalogInlineStatus(
+                  message: localizations.tagCatalogLoading,
+                  loading: true,
+                ),
+              if (selection case TagCatalogSelectionFailure(
+                :final failure,
+                :final canRetry,
+              ))
+                _CatalogInlineStatus(
+                  message: _selectedReadFailure(localizations, failure),
+                  onRetry: canRetry ? model.retrySelectedTag : null,
+                ),
+              if (choosing && selection.id != null && assignmentFailure != null)
+                _CatalogInlineStatus(
+                  message: assignmentFailure,
+                  onRetry:
+                      state.selectedAssignment ==
+                          TagCatalogSelectedAssignment.unavailable
+                      ? model.retrySelectedAssignment
+                      : null,
+                ),
+            ],
+          ),
         ),
+        if (state.canUseCurrentItems &&
+            !filter.isEmpty &&
+            rows.isEmpty &&
+            !selectedOutsideSnapshot)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _CatalogStatus(message: localizations.tagCatalogNoMatches),
+          )
+        else
+          SliverList.builder(
+            itemCount: rows.length + (selectedOutsideSnapshot ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (selectedOutsideSnapshot && index == 0) {
+                final selectedTag = selected;
+                return Semantics(
+                  container: true,
+                  selected: true,
+                  child: ListTile(
+                    title: Text(selectedTag.name.value),
+                    subtitle: Text(localizations.tagCatalogSelected),
+                    trailing: state.canUseCurrentItems
+                        ? _TagActions(
+                            tag: selectedTag,
+                            onRename: onRename,
+                            onDelete: onDelete,
+                            canDelete: canDelete,
+                            onOpen: onOpen,
+                          )
+                        : null,
+                  ),
+                );
+              }
+              final row = rows[index - (selectedOutsideSnapshot ? 1 : 0)];
+              final tag = row.tag;
+              final selectedId = selection.id;
+              final assigned = choosing && row.isAssigned;
+              return Semantics(
+                key: ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'),
+                container: true,
+                selected: tag.id == selectedId,
+                child: ListTile(
+                  title: Text(tag.name.value),
+                  subtitle: choosing
+                      ? Text(
+                          assigned
+                              ? localizations.tagCatalogAssigned
+                              : localizations.tagCatalogAvailable,
+                        )
+                      : null,
+                  onTap:
+                      choosing &&
+                          state.canUseCurrentItems &&
+                          state.assignmentStatus is TagCatalogAssignmentIdle
+                      ? () => onSelect(tag.id)
+                      : null,
+                  trailing:
+                      !choosing &&
+                          state.canUseCurrentItems &&
+                          (tag.id != selectedId ||
+                              selection is TagCatalogSelectionReady)
+                      ? _TagActions(
+                          tag: tag,
+                          onRename: onRename,
+                          onDelete: onDelete,
+                          canDelete: canDelete,
+                          onOpen: onOpen,
+                        )
+                      : null,
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -814,7 +833,7 @@ final class _CatalogStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: SingleChildScrollView(
+    child: Padding(
       padding: const EdgeInsets.all(24),
       child: _StatusContent(
         message: message,
