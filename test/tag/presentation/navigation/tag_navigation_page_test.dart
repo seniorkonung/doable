@@ -35,9 +35,11 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
 
 part 'tag_navigation_semantics_scenarios.dart';
+part 'tag_navigation_terminal_page_scenarios.dart';
 
 void main() {
   _registerNavigationSemanticsScenarios();
+  _registerTerminalNavigationScenarios();
   for (final (relation, archived, number) in [
     (false, false, 4),
     (false, true, 2),

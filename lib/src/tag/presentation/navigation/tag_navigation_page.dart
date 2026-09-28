@@ -274,7 +274,9 @@ final class _NavigationStatus extends StatelessWidget {
             if (onAction case final action?) ...[
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: action,
+                onPressed: () {
+                  if (context.mounted) action();
+                },
                 child: Text(
                   actionLabel ?? AppLocalizations.of(context).commonRetry,
                 ),

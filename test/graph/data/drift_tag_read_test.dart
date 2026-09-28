@@ -312,4 +312,79 @@ void main() {
       ),
     );
   });
+
+  for (final loaded in [false, true]) {
+    for (final (name, error, failure) in [
+      (
+        'временной недоступности',
+        sqlite.SqliteException(
+          extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+          message: 'занято',
+        ),
+        isA<TagReadUnavailableFailure>(),
+      ),
+      (
+        'повреждения',
+        sqlite.SqliteException(
+          extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
+          message: 'повреждение',
+        ),
+        isA<TagReadCorruptionFailure>(),
+      ),
+      (
+        'неизвестной причины',
+        StateError('неизвестная причина'),
+        isA<TagReadUnexpectedFailure>(),
+      ),
+    ]) {
+      test(
+        'отказ наблюдения $name ${loaded ? 'после загрузки' : 'до первого снимка'} заканчивает поток и допускает новое подключение',
+        () async {
+          addTag(1, 'Дом');
+          if (!loaded) probe.failure = error;
+          final events = StreamIterator(repository.watchTag(_tagId(1)));
+          addTearDown(events.cancel);
+          if (loaded) {
+            expect(await events.moveNext(), isTrue);
+            expect(events.current, isA<TagReadSuccess>());
+            probe.failure = error;
+            database.markTablesUpdated({database.tags});
+          }
+
+          expect(await events.moveNext(), isTrue);
+          expect(
+            events.current,
+            isA<TagReadError>().having(
+              (result) => result.failure,
+              'причина',
+              failure,
+            ),
+          );
+          expect(await events.moveNext(), isFalse);
+
+          probe.failure = null;
+          final restored = StreamIterator(repository.watchTag(_tagId(1)));
+          addTearDown(restored.cancel);
+          expect(await restored.moveNext(), isTrue);
+          expect(
+            (restored.current as TagReadSuccess).value.value!.name.value,
+            'Дом',
+          );
+          await database.customUpdate(
+            'UPDATE tags SET name = ? WHERE id = ?',
+            variables: [
+              const Variable<String>('Быт'),
+              Variable<String>(_uuid(1)),
+            ],
+            updates: {database.tags},
+          );
+          expect(await restored.moveNext(), isTrue);
+          expect(
+            (restored.current as TagReadSuccess).value.value!.name.value,
+            'Быт',
+          );
+        },
+      );
+    }
+  }
 }

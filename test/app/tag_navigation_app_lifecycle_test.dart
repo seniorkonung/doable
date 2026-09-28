@@ -36,7 +36,11 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 
+part 'tag_navigation_terminal_app_scenarios.dart';
+
 void main() {
+  _registerTerminalAppScenarios();
+
   for (final continuation in [false, true]) {
     testWidgets(
       'смена охвата отвергает позднюю ${continuation ? 'подгрузку' : 'первую порцию'} через AppRuntime',
@@ -601,35 +605,51 @@ Future<void> _dismissMessage(WidgetTester tester) async {
 }
 
 final class _App {
-  _App(this.runtime, this.router, this.repository, this.raw);
+  _App(
+    this.runtime,
+    this.router,
+    this.repository,
+    this.raw,
+    this.database,
+    this.readProbe,
+  );
 
   final AppRuntime runtime;
   final AppRouter router;
   final _ControlledRepository repository;
   final sqlite.Database raw;
+  final AppDatabase database;
+  final _ReadProbe readProbe;
 
-  static Future<_App> pump(WidgetTester tester) async {
+  static Future<_App> pump(WidgetTester tester, {String locale = 'ru'}) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+    tester.binding.platformDispatcher.localesTestValue = [Locale(locale)];
     addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
     tester.view.physicalSize = const Size(1200, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     late sqlite.Database raw;
     late _ControlledRepository repository;
+    late AppDatabase appDatabase;
+    final readProbe = _ReadProbe();
     final diagnostics = InMemoryDiagnosticsSink();
     final runtime = AppRuntime(
-      connectionFactory: () =>
-          openInMemoryLocalDatabase(setup: (database) => raw = database),
-      diagnosticsSink: diagnostics,
-      repositoryFactory: (database) => repository = _ControlledRepository(
-        DriftPersonalGraphRepository(
-          database,
-          UuidV7IntentionIdGenerator(),
-          () => DateTime.utc(2026, 9, 28),
-          diagnostics,
-        ),
+      connectionFactory: () => observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(setup: (database) => raw = database),
+        readProbe,
       ),
+      diagnosticsSink: diagnostics,
+      repositoryFactory: (database) {
+        appDatabase = database;
+        return repository = _ControlledRepository(
+          DriftPersonalGraphRepository(
+            database,
+            UuidV7IntentionIdGenerator(),
+            () => DateTime.utc(2026, 9, 28),
+            diagnostics,
+          ),
+        );
+      },
     );
     addTearDown(() async {
       repository.releaseAll();
@@ -645,7 +665,7 @@ final class _App {
       () =>
           find.byKey(const ValueKey('catalog-open-tags')).evaluate().isNotEmpty,
     );
-    return _App(runtime, router, repository, raw);
+    return _App(runtime, router, repository, raw, appDatabase, readProbe);
   }
 
   Future<void> openNavigation(WidgetTester tester) async {
@@ -709,6 +729,10 @@ final class _ControlledRepository extends Fake
   final heldPages = <_HeldPage>[];
   final heldCommands = <_HeldCommand>[];
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
+  final watchedIds = <TagId>[];
+  final watchResults = <TagReadResult>[];
+  final watchCallbacks = <_WatchCallbacks>[];
+  int completedWatches = 0;
   final observations =
       <({TagReadResult result, StreamController<TagReadResult> delivery})>[];
   bool holdObservations = false;
@@ -786,6 +810,7 @@ final class _ControlledRepository extends Fake
   ) => delegate.getCatalogPage(query);
   @override
   Stream<TagReadResult> watchTag(TagId id) {
+    watchedIds.add(id);
     late StreamSubscription<TagReadResult> subscription;
     late StreamController<TagReadResult> delivery;
     delivery = StreamController<TagReadResult>(
@@ -795,6 +820,7 @@ final class _ControlledRepository extends Fake
             .watchTag(id)
             .listen(
               (result) {
+                watchResults.add(result);
                 if (holdObservations) {
                   observations.add((result: result, delivery: delivery));
                 } else {
@@ -802,12 +828,15 @@ final class _ControlledRepository extends Fake
                 }
               },
               onError: delivery.addError,
-              onDone: delivery.close,
+              onDone: () {
+                completedWatches++;
+                unawaited(delivery.close());
+              },
             );
       },
       onCancel: () => subscription.cancel(),
     );
-    return delivery.stream;
+    return _CapturedWatchStream(delivery.stream, watchCallbacks.add);
   }
 
   @override
