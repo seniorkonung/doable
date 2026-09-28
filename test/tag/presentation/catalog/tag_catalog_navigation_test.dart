@@ -137,7 +137,7 @@ void main() {
   }
 
   testWidgets(
-    'выбор вне первой порции сохраняет идентичность при переименовании и удалении',
+    'выбор из полного каталога сохраняет идентичность при переименовании и удалении',
     (tester) async {
       final h = await _pumpCatalog(
         tester,
@@ -157,7 +157,15 @@ void main() {
         (h.container.read(
           tagCatalogViewModelProvider(),
         ) as TagCatalogLoaded).items,
-        hasLength(50),
+        hasLength(52),
+      );
+      await tester.scrollUntilVisible(
+        _open(352),
+        300,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('tag-catalog-list')),
+          matching: find.byType(Scrollable),
+        ),
       );
       final oldCallback = tester.widget<IconButton>(_open(352)).onPressed!;
       await tester.tap(_open(352));
@@ -182,7 +190,7 @@ void main() {
         (h.container.read(
           tagCatalogViewModelProvider(),
         ) as TagCatalogLoaded).items,
-        hasLength(50),
+        hasLength(52),
       );
       oldCallback();
       await tester.pumpAndSettle();
@@ -254,7 +262,7 @@ void main() {
           ]),
           hasLength(1),
         );
-        expect(assign, findsNothing);
+        expect(tester.widget<FilledButton>(assign).onPressed, isNull);
         expect(h.router.current.name, TagCatalogRoute.name);
         expect(tester.takeException(), isNull);
       },

@@ -1634,48 +1634,6 @@ abstract class AppLocalizations {
   /// **'Refreshing tags…'**
   String get tagCatalogRefreshing;
 
-  /// У каталога есть следующая порция
-  ///
-  /// In en, this message translates to:
-  /// **'More tags are available.'**
-  String get tagCatalogMoreAvailable;
-
-  /// Загрузить следующую порцию каталога тегов
-  ///
-  /// In en, this message translates to:
-  /// **'Show more tags'**
-  String get tagCatalogLoadMore;
-
-  /// Загрузка следующей порции каталога тегов
-  ///
-  /// In en, this message translates to:
-  /// **'Loading more tags…'**
-  String get tagCatalogLoadingMore;
-
-  /// Достигнут конец каталога тегов
-  ///
-  /// In en, this message translates to:
-  /// **'All tags are shown.'**
-  String get tagCatalogAllShown;
-
-  /// Временная ошибка чтения следующей порции тегов
-  ///
-  /// In en, this message translates to:
-  /// **'More tags couldn’t be loaded.'**
-  String get tagCatalogLoadMoreUnavailable;
-
-  /// Повреждение при чтении следующей порции тегов
-  ///
-  /// In en, this message translates to:
-  /// **'Stored data is damaged; no more tags can be shown.'**
-  String get tagCatalogLoadMoreCorruption;
-
-  /// Непредвиденная ошибка чтения следующей порции тегов
-  ///
-  /// In en, this message translates to:
-  /// **'More tags couldn’t be loaded because of an unexpected error.'**
-  String get tagCatalogLoadMoreUnexpected;
-
   /// Создать тег из каталога
   ///
   /// In en, this message translates to:
@@ -1993,48 +1951,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not load assignments because of an unexpected error.'**
   String get tagAssignmentsUnexpected;
-
-  /// Есть продолжение списка назначений
-  ///
-  /// In en, this message translates to:
-  /// **'More assignments are available.'**
-  String get tagAssignmentsMoreAvailable;
-
-  /// Явная подгрузка следующей порции
-  ///
-  /// In en, this message translates to:
-  /// **'Show more assignments'**
-  String get tagAssignmentsLoadMore;
-
-  /// Подгрузка следующей порции назначений
-  ///
-  /// In en, this message translates to:
-  /// **'Loading more assignments…'**
-  String get tagAssignmentsLoadingMore;
-
-  /// Конец списка назначений
-  ///
-  /// In en, this message translates to:
-  /// **'All assignments are shown.'**
-  String get tagAssignmentsAllShown;
-
-  /// Устранимый отказ подгрузки
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load more assignments.'**
-  String get tagAssignmentsLoadMoreUnavailable;
-
-  /// Повреждение данных следующей порции
-  ///
-  /// In en, this message translates to:
-  /// **'Stored data is damaged; more assignments cannot be shown.'**
-  String get tagAssignmentsLoadMoreCorruption;
-
-  /// Неизвестный отказ подгрузки
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load more assignments because of an unexpected error.'**
-  String get tagAssignmentsLoadMoreUnexpected;
 
   /// Переход к выбору тега
   ///

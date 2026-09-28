@@ -7,7 +7,7 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
-import '../../application/tag_assignments_page.dart';
+import '../../application/tag_assignments.dart';
 import '../../application/tag_change.dart';
 import '../../application/tag_read_result.dart';
 import '../../domain/tag.dart';
@@ -61,7 +61,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     });
     ref.onDispose(() => unawaited(_changes?.cancel()));
     if (active == null) {
-      unawaited(_startFirst());
+      unawaited(_startRead());
     } else {
       _refreshNeeded = true;
     }
@@ -77,7 +77,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     _staleReadAttempts = 0;
     state = const TagAssignmentsInitialLoading();
     if (_activeRequest == null) {
-      unawaited(_startFirst());
+      unawaited(_startRead());
     } else {
       _refreshNeeded = true;
     }
@@ -91,14 +91,14 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
         current.contains(id);
   }
 
-  Future<void> retryFirstPage() {
+  Future<void> retryInitialLoad() {
     final current = state;
     if (current is! TagAssignmentsInitialFailure || !current.canRetry) {
       return Future.value();
     }
     state = const TagAssignmentsInitialLoading();
     _staleReadAttempts = 0;
-    return _startFirst();
+    return _startRead();
   }
 
   Future<void> retryRefresh() {
@@ -110,33 +110,11 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     }
     state = current.withStatus(freshness: TagAssignmentsFreshness.refreshing);
     _staleReadAttempts = 0;
-    return _startFirst();
+    return _startRead();
   }
 
-  Future<void> loadMore() {
-    final current = state;
-    if (current is! TagAssignmentsLoaded ||
-        !current.canUseCurrentItems ||
-        current.nextCursor == null ||
-        current.pageStatus is! TagAssignmentsPageIdle) {
-      return _activeRequest ?? Future.value();
-    }
-    return _start(() => _loadMore(current, _generation));
-  }
-
-  Future<void> retryLoadMore() {
-    final current = state;
-    if (current is! TagAssignmentsLoaded ||
-        current.pageStatus is! TagAssignmentsPageFailure ||
-        !(current.pageStatus as TagAssignmentsPageFailure).canRetry ||
-        !current.canUseCurrentItems) {
-      return Future.value();
-    }
-    state = current.withStatus(pageStatus: const TagAssignmentsPageIdle());
-    return loadMore();
-  }
-
-  Future<void> _startFirst() => _start(() => _loadFirst(_target, _generation));
+  Future<void> _startRead() =>
+      _start(() => _loadAssignments(_target, _generation));
 
   Future<void> _start(Future<void> Function() read) {
     final active = _activeRequest;
@@ -149,15 +127,15 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
         _activeRequest = null;
         if (_refreshNeeded && ref.mounted) {
           _refreshNeeded = false;
-          unawaited(_startFirst());
+          unawaited(_startRead());
         }
       }),
     );
     return future;
   }
 
-  Future<void> _loadFirst(TagTarget target, int generation) async {
-    final result = await _readPage(target);
+  Future<void> _loadAssignments(TagTarget target, int generation) async {
+    final result = await _readAssignments(target);
     if (!ref.mounted || generation != _generation || target != _target) return;
     if (result is GraphResultFailure && _refreshNeeded) return;
     switch (result) {
@@ -168,13 +146,13 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
             value.revision.compareTo(current.revision) ==
                 GraphRevisionOrder.older;
         if (value.target != target || !_unique(value.items)) {
-          _firstFailure(const TagAssignmentsUnexpectedFailure());
+          _readFailure(const TagAssignmentsUnexpectedFailure());
           return;
         }
         if (_precedesRequired(value.revision) || precedesDisplayed) {
           if (++_staleReadAttempts >= _maxStaleReads) {
             _refreshNeeded = false;
-            _firstFailure(const TagAssignmentsUnavailableFailure());
+            _readFailure(const TagAssignmentsUnavailableFailure());
           } else {
             _refreshNeeded = true;
           }
@@ -185,7 +163,6 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
         state = TagAssignmentsLoaded(
           target: target,
           items: value.items,
-          nextCursor: value.nextCursor,
           revision: value.revision,
         );
       case GraphResultFailure(failure: TagAssignmentsTargetNotFound()):
@@ -193,67 +170,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
         state = const TagAssignmentsTargetMissing();
       case GraphResultFailure(:final failure):
         _refreshNeeded = false;
-        _firstFailure(failure);
-    }
-  }
-
-  Future<void> _loadMore(TagAssignmentsLoaded base, int generation) async {
-    state = base.withStatus(pageStatus: const TagAssignmentsPageLoading());
-    final result = await _readPage(base.target, cursor: base.nextCursor);
-    if (!ref.mounted || generation != _generation || base.target != _target) {
-      return;
-    }
-    final current = state;
-    if (current is! TagAssignmentsLoaded) return;
-    if (current.freshness != TagAssignmentsFreshness.current ||
-        _precedesRequired(base.revision)) {
-      _refreshNeeded = true;
-      return;
-    }
-    switch (result) {
-      case GraphResultSuccess(:final value):
-        if (value.target != base.target) {
-          state = current.withStatus(
-            pageStatus: const TagAssignmentsPageFailure(
-              TagAssignmentsUnexpectedFailure(),
-            ),
-          );
-          return;
-        }
-        if (value.revision.compareTo(base.revision) !=
-            GraphRevisionOrder.same) {
-          _beginRefresh(current);
-          _refreshNeeded = true;
-          return;
-        }
-        final ids = <TagId>{for (final tag in base.items) tag.id};
-        if (value.items.any((tag) => !ids.add(tag.id)) ||
-            (value.items.isEmpty && value.nextCursor != null)) {
-          state = current.withStatus(
-            pageStatus: const TagAssignmentsPageFailure(
-              TagAssignmentsUnexpectedFailure(),
-            ),
-          );
-          return;
-        }
-        state = TagAssignmentsLoaded(
-          target: base.target,
-          items: [...base.items, ...value.items],
-          nextCursor: value.nextCursor,
-          revision: base.revision,
-        );
-      case GraphResultFailure(
-        failure: TagAssignmentsSnapshotExpired() ||
-            TagAssignmentsInvalidCursor(),
-      ):
-        _beginRefresh(current);
-        _refreshNeeded = true;
-      case GraphResultFailure(failure: TagAssignmentsTargetNotFound()):
-        state = const TagAssignmentsTargetMissing();
-      case GraphResultFailure(:final failure):
-        state = current.withStatus(
-          pageStatus: TagAssignmentsPageFailure(failure),
-        );
+        _readFailure(failure);
     }
   }
 
@@ -270,14 +187,14 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     _requiredRevision = package.revision;
     _staleReadAttempts = 0;
     final current = state;
-    final pageAlreadyIncludes =
+    final snapshotAlreadyIncludes =
         current is TagAssignmentsLoaded &&
         switch (package.revision.compareTo(current.revision)) {
           GraphRevisionOrder.older || GraphRevisionOrder.same => true,
           GraphRevisionOrder.newer ||
           GraphRevisionOrder.differentEpoch => false,
         };
-    if (pageAlreadyIncludes) return;
+    if (snapshotAlreadyIncludes) return;
     if (current is TagAssignmentsLoaded) {
       var items = current.items;
       for (final change in package.changes) {
@@ -307,9 +224,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
       }
       state = current.withStatus(
         items: items,
-        clearCursor: true,
         freshness: TagAssignmentsFreshness.refreshing,
-        pageStatus: const TagAssignmentsPageIdle(),
       );
     } else {
       state = const TagAssignmentsInitialLoading();
@@ -317,25 +232,16 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     _refreshNeeded = true;
     if (_activeRequest == null) {
       _refreshNeeded = false;
-      unawaited(_startFirst());
+      unawaited(_startRead());
     }
   }
 
-  void _beginRefresh(TagAssignmentsLoaded current) {
-    state = current.withStatus(
-      clearCursor: true,
-      freshness: TagAssignmentsFreshness.refreshing,
-      pageStatus: const TagAssignmentsPageIdle(),
-    );
-  }
-
-  void _firstFailure(TagAssignmentsReadFailure failure) {
+  void _readFailure(TagAssignmentsReadFailure failure) {
     final current = state;
     if (current is TagAssignmentsLoaded) {
       state = current.withStatus(
         freshness: TagAssignmentsFreshness.stale,
         refreshFailure: failure,
-        pageStatus: const TagAssignmentsPageIdle(),
       );
     } else {
       state = TagAssignmentsInitialFailure(failure);
@@ -350,16 +256,11 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
         order == GraphRevisionOrder.differentEpoch;
   }
 
-  Future<TagAssignmentsPageResult> _readPage(
-    TagTarget target, {
-    TagAssignmentsCursor? cursor,
-  }) async {
+  Future<TagAssignmentsResult> _readAssignments(TagTarget target) async {
     try {
-      return await _reads.getTagAssignmentsPage(
-        TagAssignmentsQuery(target: target, cursor: cursor),
-      );
+      return await _reads.getTagAssignments(target);
     } on Object {
-      return const TagAssignmentsPageError(TagAssignmentsUnexpectedFailure());
+      return const TagAssignmentsError(TagAssignmentsUnexpectedFailure());
     }
   }
 

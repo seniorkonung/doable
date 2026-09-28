@@ -116,12 +116,17 @@ void main() {
                 ]).single['id']
                 as String;
         expect(_assignments(raw, newTagId), isEmpty);
+        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+        expect(assign, findsOneWidget);
+        await tester.pumpAndSettle();
         expect(
-          find.byKey(const ValueKey('tag-catalog-assign')),
+          assign.hitTestable(),
           findsOneWidget,
+          reason:
+              'Сообщение об успешном создании не перекрывает назначение тега.',
         );
 
-        await _tap(tester, find.byKey(const ValueKey('tag-catalog-assign')));
+        await _tap(tester, assign);
         await _waitFor(tester, () => _assigned(raw, newTagId, number));
         router.pop();
         final remove = find.byKey(ValueKey('tag-assignment-remove-$newTagId'));

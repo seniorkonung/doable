@@ -10,8 +10,9 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_per
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
-import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -993,15 +994,12 @@ final class _ReadyRelationTags
     with TagReadContractTestFallback
     implements TagReadContract {
   @override
-  Future<TagAssignmentsPageResult> getTagAssignmentsPage(
-    TagAssignmentsQuery query,
-  ) async => TagAssignmentsPageSuccess(
-    TagAssignmentsPage(
-      target: query.target,
-      items: const [],
-      pageSize: query.pageSize,
-      nextCursor: null,
-      revision: const TestGraphRevision(1),
-    ),
-  );
+  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) async =>
+      TagAssignmentsSuccess(
+        TagAssignmentsSnapshot(
+          target: target,
+          items: const [],
+          revision: const TestGraphRevision(1),
+        ),
+      );
 }

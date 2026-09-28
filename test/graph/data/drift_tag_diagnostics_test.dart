@@ -8,7 +8,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -328,15 +328,15 @@ void main() {
       DiagnosticsFailureCode.corruption,
     );
     expect(
-      await graph.getTagCatalogPage(TagCatalogQuery()),
-      isA<TagCatalogPageError>().having(
+      await graph.getTagCatalog(const TagCatalogBrowseMode()),
+      isA<TagCatalogError>().having(
         (result) => result.failure,
         'причина',
         isA<TagCatalogCorruptionFailure>(),
       ),
     );
     final catalogEvent = sink.events
-        .whereType<TagCatalogPageReadDiagnosticsEvent>()
+        .whereType<TagCatalogReadDiagnosticsEvent>()
         .last;
     expect(
       (catalogEvent.status as DiagnosticsFailed).code,
@@ -532,25 +532,23 @@ void main() {
       );
 
       expect(
-        await graph.getTagAssignmentsPage(TagAssignmentsQuery(target: target)),
-        isA<TagAssignmentsPageSuccess>(),
+        await graph.getTagAssignments(target),
+        isA<TagAssignmentsSuccess>(),
       );
       expect(
-        await graph.getTagCatalogPage(
-          TagCatalogQuery(mode: TagCatalogSelectionMode(target)),
-        ),
-        isA<TagCatalogPageSuccess>(),
+        await graph.getTagCatalog(TagCatalogSelectionMode(target)),
+        isA<TagCatalogSuccess>(),
       );
       expect(
-        await graph.getTagAssignmentsPage(TagAssignmentsQuery(target: missing)),
-        isA<TagAssignmentsPageError>().having(
+        await graph.getTagAssignments(missing),
+        isA<TagAssignmentsError>().having(
           (error) => error.failure.category,
           'категория',
           GraphFailureCategory.notFound,
         ),
       );
       final failed = sink.events
-          .whereType<TagAssignmentsPageReadDiagnosticsEvent>()
+          .whereType<TagAssignmentsReadDiagnosticsEvent>()
           .last;
       expect(failed.stage, TagReadDiagnosticsStage.read);
       expect(
@@ -558,7 +556,7 @@ void main() {
         DiagnosticsFailureCode.notFound,
       );
       expect(
-        sink.events.whereType<TagCatalogPageReadDiagnosticsEvent>().last.status,
+        sink.events.whereType<TagCatalogReadDiagnosticsEvent>().last.status,
         isA<DiagnosticsSucceeded>(),
       );
       final recorded = sink.messages.join('\n');
@@ -581,15 +579,10 @@ void main() {
         tagFixtureId(101),
       ) as LongTermRelationIdDecodingSuccess).id,
     );
+    expect(await graph.getTagAssignments(target), isA<TagAssignmentsSuccess>());
     expect(
-      await graph.getTagAssignmentsPage(TagAssignmentsQuery(target: target)),
-      isA<TagAssignmentsPageSuccess>(),
-    );
-    expect(
-      await graph.getTagCatalogPage(
-        TagCatalogQuery(mode: TagCatalogSelectionMode(target)),
-      ),
-      isA<TagCatalogPageSuccess>(),
+      await graph.getTagCatalog(TagCatalogSelectionMode(target)),
+      isA<TagCatalogSuccess>(),
     );
     expect(sink.attempts, 4);
   });

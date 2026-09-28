@@ -9,7 +9,7 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
-import '../../application/tag_catalog.dart' hide TagCatalogPage;
+import '../../application/tag_catalog.dart';
 import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
 import '../../application/tag_read_result.dart';
@@ -280,6 +280,11 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
             ),
         ],
       ),
+      bottomNavigationBar: switch (state) {
+        TagCatalogLoaded loaded when loaded.mode is TagCatalogSelectionMode =>
+          _AssignAction(state: loaded, model: model, onAssign: _assignSelected),
+        _ => null,
+      },
       body: Column(
         children: [
           if (_activeDeleteToken != null)
@@ -344,7 +349,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
               TagCatalogInitialFailure(:final failure, :final canRetry) =>
                 _CatalogStatus(
                   message: _readFailure(localizations, failure),
-                  onRetry: canRetry ? model.retryFirstPage : null,
+                  onRetry: canRetry ? model.retryInitialLoad : null,
                 ),
               TagCatalogTargetMissing() => _CatalogStatus(
                 message: localizations.tagAssignmentTargetNotFound,
@@ -361,7 +366,6 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
                 },
                 onDelete: (tag) => unawaited(_confirmDelete(tag)),
                 canDelete: !_confirmationOpen && _activeDeleteToken == null,
-                onAssign: _assignSelected,
                 onSelect: _selectTag,
                 onOpen: _openNavigation,
               ),
@@ -382,7 +386,6 @@ final class _LoadedCatalog extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.canDelete,
-    required this.onAssign,
     required this.onSelect,
     required this.onOpen,
   });
@@ -394,7 +397,6 @@ final class _LoadedCatalog extends StatelessWidget {
   final ValueChanged<Tag> onRename;
   final ValueChanged<Tag> onDelete;
   final bool canDelete;
-  final VoidCallback onAssign;
   final ValueChanged<TagId> onSelect;
   final ValueChanged<TagId> onOpen;
 
@@ -411,11 +413,9 @@ final class _LoadedCatalog extends StatelessWidget {
       TagCatalogSelectionReady(:final tag) => tag,
       _ => null,
     };
-    final selectedInPage =
+    final selectedInSnapshot =
         selected != null && state.items.any((tag) => tag.id == selected.id);
-    final selectedOutsidePage = selected != null && !selectedInPage;
-    final selectedAssigned =
-        state.selectedAssignment == TagCatalogSelectedAssignment.assigned;
+    final selectedOutsideSnapshot = selected != null && !selectedInSnapshot;
     final assignmentFailure = switch (state.selectedAssignment) {
       TagCatalogSelectedAssignment.unavailable =>
         localizations.tagAssignmentsUnavailable,
@@ -466,9 +466,9 @@ final class _LoadedCatalog extends StatelessWidget {
           child: ListView.builder(
             key: const ValueKey('tag-catalog-list'),
             controller: scrollController,
-            itemCount: state.items.length + (selectedOutsidePage ? 1 : 0),
+            itemCount: state.items.length + (selectedOutsideSnapshot ? 1 : 0),
             itemBuilder: (context, index) {
-              if (selectedOutsidePage && index == 0) {
+              if (selectedOutsideSnapshot && index == 0) {
                 final selectedTag = selected;
                 return Semantics(
                   container: true,
@@ -503,13 +503,14 @@ final class _LoadedCatalog extends StatelessWidget {
                   ),
                 );
               }
-              final item = state.items[index - (selectedOutsidePage ? 1 : 0)];
+              final item =
+                  state.items[index - (selectedOutsideSnapshot ? 1 : 0)];
               final tag = item.id == selected?.id ? selected! : item;
               final selectedId = selection.id;
               final assigned =
                   choosing &&
                   state
-                      .selectionRows[index - (selectedOutsidePage ? 1 : 0)]
+                      .selectionRows[index - (selectedOutsideSnapshot ? 1 : 0)]
                       .isAssigned;
               return Semantics(
                 key: ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'),
@@ -548,53 +549,55 @@ final class _LoadedCatalog extends StatelessWidget {
             },
           ),
         ),
-        if (choosing)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Semantics(
-              label: selected == null
-                  ? localizations.tagCatalogAssign
-                  : localizations.tagCatalogAssignNamed(selected.name.value),
-              child: FilledButton(
-                key: const ValueKey('tag-catalog-assign'),
-                onPressed:
-                    selected != null &&
-                        !selectedAssigned &&
-                        state.canUseCurrentItems &&
-                        state.assignmentStatus is TagCatalogAssignmentIdle &&
-                        state.selectedAssignment ==
-                            TagCatalogSelectedAssignment.available &&
-                        model.canActOn(selected.id)
-                    ? onAssign
-                    : null,
-                child: Text(localizations.tagCatalogAssign),
-              ),
+      ],
+    );
+  }
+}
+
+final class _AssignAction extends StatelessWidget {
+  const _AssignAction({
+    required this.state,
+    required this.model,
+    required this.onAssign,
+  });
+
+  final TagCatalogLoaded state;
+  final TagCatalogViewModel model;
+  final VoidCallback onAssign;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final selected = switch (state.selection) {
+      TagCatalogSelectionReady(:final tag) => tag,
+      _ => null,
+    };
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Align(
+          heightFactor: 1,
+          child: Semantics(
+            label: selected == null
+                ? localizations.tagCatalogAssign
+                : localizations.tagCatalogAssignNamed(selected.name.value),
+            child: FilledButton(
+              key: const ValueKey('tag-catalog-assign'),
+              onPressed:
+                  selected != null &&
+                      state.canUseCurrentItems &&
+                      state.assignmentStatus is TagCatalogAssignmentIdle &&
+                      state.selectedAssignment ==
+                          TagCatalogSelectedAssignment.available &&
+                      model.canActOn(selected.id)
+                  ? onAssign
+                  : null,
+              child: Text(localizations.tagCatalogAssign),
             ),
           ),
-        if (state.canUseCurrentItems)
-          switch (state.pageStatus) {
-            TagCatalogPageLoading() => _CatalogInlineStatus(
-              message: localizations.tagCatalogLoadingMore,
-              loading: true,
-            ),
-            TagCatalogPageFailure(:final failure, :final canRetry) =>
-              _CatalogInlineStatus(
-                message: _pageFailure(localizations, failure),
-                onRetry: canRetry ? model.retryLoadMore : null,
-              ),
-            TagCatalogPageIdle() =>
-              state.nextCursor == null
-                  ? _CatalogInlineStatus(
-                      message: localizations.tagCatalogAllShown,
-                    )
-                  : _CatalogInlineStatus(
-                      message: localizations.tagCatalogMoreAvailable,
-                      actionLabel: localizations.tagCatalogLoadMore,
-                      actionKey: const ValueKey('tag-catalog-load-more'),
-                      onAction: model.loadMore,
-                    ),
-          },
-      ],
+        ),
+      ),
     );
   }
 }
@@ -673,17 +676,11 @@ final class _CatalogInlineStatus extends StatelessWidget {
   const _CatalogInlineStatus({
     required this.message,
     this.loading = false,
-    this.actionLabel,
-    this.actionKey,
-    this.onAction,
     this.onRetry,
   });
 
   final String message;
   final bool loading;
-  final String? actionLabel;
-  final Key? actionKey;
-  final VoidCallback? onAction;
   final VoidCallback? onRetry;
 
   @override
@@ -693,10 +690,9 @@ final class _CatalogInlineStatus extends StatelessWidget {
       message: message,
       loading: loading,
       actionLabel: onRetry == null
-          ? actionLabel
+          ? null
           : AppLocalizations.of(context).commonRetry,
-      actionKey: actionKey,
-      onAction: onRetry ?? onAction,
+      onAction: onRetry,
     ),
   );
 }
@@ -706,14 +702,12 @@ final class _StatusContent extends StatelessWidget {
     required this.message,
     required this.loading,
     this.actionLabel,
-    this.actionKey,
     this.onAction,
   });
 
   final String message;
   final bool loading;
   final String? actionLabel;
-  final Key? actionKey;
   final VoidCallback? onAction;
 
   @override
@@ -730,11 +724,7 @@ final class _StatusContent extends StatelessWidget {
         Text(message, textAlign: TextAlign.center),
         if (onAction case final action?) ...[
           const SizedBox(height: 12),
-          OutlinedButton(
-            key: actionKey,
-            onPressed: action,
-            child: Text(actionLabel!),
-          ),
+          OutlinedButton(onPressed: action, child: Text(actionLabel!)),
         ],
       ],
     ),
@@ -747,22 +737,8 @@ String _readFailure(
 ) => switch (failure) {
   TagCatalogUnavailableFailure() => localizations.tagCatalogUnavailable,
   TagCatalogCorruptionFailure() => localizations.tagCatalogCorruption,
-  TagCatalogInvalidCursor() ||
-  TagCatalogSnapshotExpired() ||
   TagCatalogTargetNotFound() ||
   TagCatalogUnexpectedFailure() => localizations.tagCatalogUnexpected,
-};
-
-String _pageFailure(
-  AppLocalizations localizations,
-  TagCatalogReadFailure failure,
-) => switch (failure) {
-  TagCatalogUnavailableFailure() => localizations.tagCatalogLoadMoreUnavailable,
-  TagCatalogCorruptionFailure() => localizations.tagCatalogLoadMoreCorruption,
-  TagCatalogInvalidCursor() ||
-  TagCatalogSnapshotExpired() ||
-  TagCatalogTargetNotFound() ||
-  TagCatalogUnexpectedFailure() => localizations.tagCatalogLoadMoreUnexpected,
 };
 
 String _selectedReadFailure(

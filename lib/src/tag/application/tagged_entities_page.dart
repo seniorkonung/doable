@@ -8,7 +8,6 @@ import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
 import '../domain/tag_target.dart';
-import 'tag_catalog.dart';
 
 enum TaggedEntitiesScope { active, archived }
 
@@ -26,14 +25,18 @@ final class TaggedEntitiesQueryValidationException implements Exception {
 abstract interface class TaggedEntitiesCursor {}
 
 final class TaggedEntitiesQuery {
+  static const minPageSize = 1;
+  static const maxPageSize = 100;
+  static const defaultPageSize = 50;
+
   factory TaggedEntitiesQuery({
     required TagId tagId,
     required TaggedEntitiesScope scope,
-    int pageSize = TagCatalogQuery.defaultPageSize,
+    int pageSize = TaggedEntitiesQuery.defaultPageSize,
     TaggedEntitiesCursor? cursor,
   }) {
-    if (pageSize < TagCatalogQuery.minPageSize ||
-        pageSize > TagCatalogQuery.maxPageSize) {
+    if (pageSize < TaggedEntitiesQuery.minPageSize ||
+        pageSize > TaggedEntitiesQuery.maxPageSize) {
       throw const TaggedEntitiesQueryValidationException(
         TaggedEntitiesQueryValidationFailure.pageSizeOutOfRange,
       );
@@ -129,8 +132,8 @@ final class TaggedEntitiesPage {
     required TaggedEntitiesCursor? nextCursor,
     required GraphRevision revision,
   }) {
-    if (pageSize < TagCatalogQuery.minPageSize ||
-        pageSize > TagCatalogQuery.maxPageSize ||
+    if (pageSize < TaggedEntitiesQuery.minPageSize ||
+        pageSize > TaggedEntitiesQuery.maxPageSize ||
         items.length > pageSize ||
         (items.isEmpty && nextCursor != null) ||
         items.any((item) => !_belongsToScope(item, scope))) {

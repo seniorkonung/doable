@@ -42,15 +42,15 @@ final class _CatalogTrace extends LocalDatabaseConnectionObserver {
   }
 }
 
-final class _MeasuredPage {
-  const _MeasuredPage(
-    this.page,
+final class _MeasuredSnapshot {
+  const _MeasuredSnapshot(
+    this.snapshot,
     this.elapsedMicroseconds,
     this.select,
     this.plan,
   );
 
-  final TagCatalogPage page;
+  final TagCatalogSnapshot snapshot;
   final int elapsedMicroseconds;
   final _SelectMeasurement select;
   final List<String> plan;
@@ -58,7 +58,7 @@ final class _MeasuredPage {
 
 void main() {
   test(
-    'большой каталог читается ограниченными страницами без пропусков',
+    'большой каталог читается одним полным снимком без пропусков',
     measureTagCatalogReadCost,
   );
 }
@@ -112,29 +112,27 @@ Future<void> measureTagCatalogReadCost({
       }
     }
 
-    Future<_MeasuredPage> read(TagCatalogQuery query) async {
+    Future<_MeasuredSnapshot> read(int count) async {
       trace.selects.clear();
       final watch = Stopwatch()..start();
-      final result = await repository.getTagCatalogPage(query);
+      final result = await repository.getTagCatalog(
+        const TagCatalogBrowseMode(),
+      );
       watch.stop();
-      expect(result, isA<TagCatalogPageSuccess>());
-      final page = (result as TagCatalogPageSuccess).value;
+      expect(result, isA<TagCatalogSuccess>());
+      final snapshot = (result as TagCatalogSuccess).value;
+      expect(snapshot.items, hasLength(count));
       expect(trace.selects, hasLength(1));
       final select = trace.selects.single;
       final sql = select.sql.toUpperCase();
       expect(sql, contains('FROM TAGS'));
-      expect(sql, contains('ORDER BY CREATION_SEQUENCE ASC LIMIT ?'));
+      expect(sql, contains('ORDER BY CREATION_SEQUENCE ASC'));
       expect(sql, isNot(contains('OFFSET')));
       expect(sql, isNot(contains('COUNT(')));
       expect(sql, isNot(contains('TAG_ASSIGNMENTS')));
       expect(sql, isNot(contains('INTENTIONS')));
       expect(sql, isNot(contains('RELATIONS')));
-      expect(select.arguments.last, query.pageSize + 1);
-      expect(select.rows, lessThanOrEqualTo(query.pageSize + 1));
-      expect(
-        select.rows,
-        page.items.length + (page.nextCursor == null ? 0 : 1),
-      );
+      expect(select.rows, count);
       final plan = [
         for (final row in raw.select(
           'EXPLAIN QUERY PLAN ${select.sql}',
@@ -144,22 +142,35 @@ Future<void> measureTagCatalogReadCost({
       ];
       expect(plan, isNotEmpty);
       expect(plan.join(' ').toUpperCase(), isNot(contains('USE TEMP B-TREE')));
-      return _MeasuredPage(page, watch.elapsedMicroseconds, select, plan);
+      return _MeasuredSnapshot(
+        snapshot,
+        watch.elapsedMicroseconds,
+        select,
+        plan,
+      );
     }
 
-    Future<void> report(
-      int count,
-      int size,
-      String position,
-      TagCatalogQuery query,
-      _MeasuredPage measured,
-    ) async {
+    Future<void> report(int count) async {
+      final measured = await read(count);
+      final expectedIds = [
+        tagFixtureId(firstTagNumber),
+        tagFixtureId(lastTagNumber),
+        for (var index = 2; index < count; index++) tagFixtureId(10000 + index),
+      ];
+      expect(
+        measured.snapshot.items.map((tag) => tag.id.toCanonicalString()),
+        expectedIds,
+      );
+      expect(
+        measured.snapshot.items.map((tag) => tag.id).toSet(),
+        hasLength(count),
+      );
       final durations = [measured.elapsedMicroseconds];
       for (var repetition = 1; repetition < 5; repetition++) {
-        final again = await read(query);
+        final again = await read(count);
         expect(
-          again.page.items.map((tag) => tag.id),
-          measured.page.items.map((tag) => tag.id),
+          again.snapshot.items.map((tag) => tag.id.toCanonicalString()),
+          expectedIds,
         );
         expect(again.select.rows, measured.select.rows);
         expect(again.select.sql, measured.select.sql);
@@ -169,12 +180,11 @@ Future<void> measureTagCatalogReadCost({
       // Данные измерения не содержат пользовательских названий или id.
       debugPrintSynchronously(
         jsonEncode({
-          'kind': 'tag_catalog_page',
+          'kind': 'tag_catalog_snapshot',
           'tags': count,
-          'pageSize': size,
-          'position': position,
-          'queries': durations.length,
-          'materializedRowsPerQuery': measured.select.rows,
+          'reads': durations.length,
+          'selectsPerRead': 1,
+          'materializedRowsPerRead': measured.select.rows,
           'elapsedMicroseconds': durations,
           'sql': measured.select.sql,
           'plan': measured.plan,
@@ -182,74 +192,10 @@ Future<void> measureTagCatalogReadCost({
       );
     }
 
-    Future<void> traverse(int count) async {
-      const size = 50;
-      final ids = <String>[];
-      TagCatalogCursor? cursor;
-      var pages = 0;
-      var rows = 0;
-      var totalMicroseconds = 0;
-      do {
-        final query = TagCatalogQuery(pageSize: size, cursor: cursor);
-        final measured = await read(query);
-        pages++;
-        rows += measured.select.rows;
-        totalMicroseconds += measured.elapsedMicroseconds;
-        ids.addAll(
-          measured.page.items.map((tag) => tag.id.toCanonicalString()),
-        );
-        cursor = measured.page.nextCursor;
-        if (pages == 1 || pages == (count ~/ size) ~/ 2 || cursor == null) {
-          await report(
-            count,
-            size,
-            cursor == null
-                ? 'last'
-                : pages == 1
-                ? 'first'
-                : 'middle',
-            query,
-            measured,
-          );
-        }
-      } while (cursor != null);
-
-      expect(pages, (count / size).ceil());
-      expect(rows, count + pages - 1);
-      expect(ids, hasLength(count));
-      expect(ids.toSet(), hasLength(count));
-      expect(ids.take(2), [
-        tagFixtureId(firstTagNumber),
-        tagFixtureId(lastTagNumber),
-      ]);
-      expect(ids.skip(2), [
-        for (var index = 2; index < count; index++) tagFixtureId(10000 + index),
-      ]);
-      debugPrintSynchronously(
-        jsonEncode({
-          'kind': 'tag_catalog_traversal',
-          'tags': count,
-          'pageSize': size,
-          'queries': pages,
-          'materializedRows': rows,
-          'elapsedMicroseconds': totalMicroseconds,
-        }),
-      );
-    }
-
     seedTo(1000, 2);
-    for (final size in [1, 50, 100]) {
-      final query = TagCatalogQuery(pageSize: size);
-      await report(1000, size, 'first', query, await read(query));
-    }
-    await traverse(1000);
-
+    await report(1000);
     seedTo(10000, 1000);
-    for (final size in [1, 50, 100]) {
-      final query = TagCatalogQuery(pageSize: size);
-      await report(10000, size, 'first', query, await read(query));
-    }
-    await traverse(10000);
+    await report(10000);
     final sqlitePages =
         raw.select('PRAGMA page_count').single.values.single as int;
     final sqlitePageSize =

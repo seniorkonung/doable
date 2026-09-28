@@ -374,6 +374,7 @@ void main() {
     );
   }
 
+  // Пять последовательных процессов ограничены по времени внутри _runWorker.
   test(
     'остановка до commit откатывает назначение, после commit сохраняет его',
     () async {
@@ -422,6 +423,7 @@ void main() {
       expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
       expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
     },
+    timeout: Timeout.none,
   );
 
   test('новый процесс сохраняет идентичность, назначения и оба порядка', () async {
@@ -454,18 +456,13 @@ void main() {
       () => DateTime.utc(1900),
       InMemoryDiagnosticsSink(),
     );
-    final firstPage = (await repository.getTagCatalogPage(
-      TagCatalogQuery(pageSize: 1),
-    ) as TagCatalogPageSuccess).value;
-    final secondPage = (await repository.getTagCatalogPage(
-      TagCatalogQuery(pageSize: 1, cursor: firstPage.nextCursor),
-    ) as TagCatalogPageSuccess).value;
-    expect(
-      firstPage.items.single.id.toCanonicalString(),
+    final snapshot = (await repository.getTagCatalog(
+      const TagCatalogBrowseMode(),
+    ) as TagCatalogSuccess).value;
+    expect(snapshot.items.map((tag) => tag.id.toCanonicalString()), [
       tagFixtureId(firstTagNumber),
-    );
-    expect(secondPage.items.single.id.toCanonicalString(), newId);
-    expect(secondPage.nextCursor, isNull);
+      newId,
+    ]);
 
     final assignments = raw.select('''
       SELECT creation_sequence, tag_id, intention_id, long_term_relation_id
@@ -607,8 +604,8 @@ void main() {
         InMemoryDiagnosticsSink(),
       );
       expect(
-        await repository.getTagCatalogPage(TagCatalogQuery()),
-        isA<TagCatalogPageError>().having(
+        await repository.getTagCatalog(const TagCatalogBrowseMode()),
+        isA<TagCatalogError>().having(
           (result) => result.failure,
           'причина отказа',
           isA<TagCatalogCorruptionFailure>(),

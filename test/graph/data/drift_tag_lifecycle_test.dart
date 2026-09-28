@@ -97,9 +97,9 @@ void main() {
   tearDown(() => database.close());
 
   Future<GraphRevision> currentRevision() async =>
-      (await repository.getTagCatalogPage(
-        TagCatalogQuery(),
-      ) as TagCatalogPageSuccess).value.revision;
+      (await repository.getTagCatalog(
+        const TagCatalogBrowseMode(),
+      ) as TagCatalogSuccess).value.revision;
 
   Map<String, List<List<Object?>>> graphState() => {
     for (final table in [

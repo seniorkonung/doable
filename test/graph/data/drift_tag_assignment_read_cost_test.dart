@@ -9,7 +9,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter/foundation.dart' show debugPrintSynchronously;
@@ -100,12 +100,11 @@ final class _Trace extends LocalDatabaseConnectionObserver {
   }
 }
 
-final class _Page {
-  const _Page(this.ids, this.assigned, this.next, this.elapsed, this.selects);
+final class _Snapshot {
+  const _Snapshot(this.ids, this.assigned, this.elapsed, this.selects);
 
   final List<String> ids;
   final List<bool> assigned;
-  final Object? next;
   final int elapsed;
   final List<_Select> selects;
 }
@@ -113,7 +112,7 @@ final class _Page {
 void main() {
   for (final tagCount in [203, 1203]) {
     test(
-      'назначения и выбор читаются ограниченными порциями при $tagCount тегах',
+      'назначения и выбор читаются полными снимками при $tagCount тегах',
       () => _measureTagAssignmentReadCost(tagCount),
     );
   }
@@ -165,103 +164,90 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       ) as LongTermRelationIdDecodingSuccess).id,
     );
 
-    Future<_Page> read(
-      TagTarget target,
-      int size,
-      String kind,
-      Object? cursor,
-    ) async {
+    Future<_Snapshot> read(TagTarget target, String kind) async {
       trace.selects.clear();
       final timer = Stopwatch()..start();
       final List<String> ids;
       final List<bool> assigned;
-      final Object? next;
       if (kind == 'assignments') {
-        final result = await repository.getTagAssignmentsPage(
-          TagAssignmentsQuery(
-            target: target,
-            pageSize: size,
-            cursor: cursor as TagAssignmentsCursor?,
-          ),
-        );
-        expect(result, isA<TagAssignmentsPageSuccess>());
-        final page = (result as TagAssignmentsPageSuccess).value;
-        ids = [for (final tag in page.items) tag.id.toCanonicalString()];
+        final result = await repository.getTagAssignments(target);
+        expect(result, isA<TagAssignmentsSuccess>());
+        final snapshot = (result as TagAssignmentsSuccess).value;
+        expect(snapshot.target, target);
+        ids = [for (final tag in snapshot.items) tag.id.toCanonicalString()];
         assigned = const [];
-        next = page.nextCursor;
       } else {
-        final result = await repository.getTagCatalogPage(
-          TagCatalogQuery(
-            pageSize: size,
-            mode: TagCatalogSelectionMode(target),
-            cursor: cursor as TagCatalogCursor?,
-          ),
+        final result = await repository.getTagCatalog(
+          TagCatalogSelectionMode(target),
         );
-        expect(result, isA<TagCatalogPageSuccess>());
-        final page =
-            (result as TagCatalogPageSuccess).value as TagSelectionPage;
-        ids = [for (final row in page.rows) row.tag.id.toCanonicalString()];
-        assigned = [for (final row in page.rows) row.isAssigned];
-        next = page.nextCursor;
+        expect(result, isA<TagCatalogSuccess>());
+        final snapshot =
+            (result as TagCatalogSuccess).value as TagSelectionSnapshot;
+        expect(snapshot.target, target);
+        ids = [for (final row in snapshot.rows) row.tag.id.toCanonicalString()];
+        assigned = [for (final row in snapshot.rows) row.isAssigned];
       }
       timer.stop();
       final selects = List<_Select>.of(trace.selects);
-      expect(selects, hasLength(cursor == null ? 4 : 3));
-      expect(selects[0].sql, contains('FROM pragma_data_version'));
-      expect(selects[0].rows, 1);
-      expect(selects[1].sql, contains('SELECT 1 FROM'));
-      expect(selects[1].rows, 1);
-      if (cursor == null) {
-        expect(selects[2].sql, contains('LEFT JOIN tags'));
-        expect(selects[2].rows, 0);
-      } else {
-        expect(
-          selects.where((select) => select.sql.contains('LEFT JOIN tags')),
-          isEmpty,
-        );
+      // Проверка получателя и ссылок имеет постоянную стоимость по числу SQL.
+      expect(selects.length, lessThanOrEqualTo(4));
+      expect(
+        selects.where((select) => select.sql.contains('LEFT JOIN tags')),
+        hasLength(1),
+      );
+      final main = selects.singleWhere(
+        (select) => kind == 'assignments'
+            ? select.sql.contains('FROM tag_assignments a JOIN tags t')
+            : select.sql.contains('FROM tags t'),
+      );
+      for (final select in selects.where(
+        (select) => !identical(select, main),
+      )) {
+        expect(select.rows, lessThanOrEqualTo(1));
       }
-      final main = selects.last;
       final sql = main.sql.toUpperCase();
       expect(sql, contains('ORDER BY'));
-      expect(sql, contains('LIMIT ?'));
       expect(sql, isNot(contains('OFFSET')));
       expect(sql, isNot(contains('COUNT(')));
       expect(sql, isNot(contains('SELECT *')));
-      expect(main.arguments.last, size + 1);
-      expect(main.rows, lessThanOrEqualTo(size + 1));
-      expect(main.rows, ids.length + (next == null ? 0 : 1));
-      expect(ids.length, lessThanOrEqualTo(size));
+      expect(main.rows, ids.length);
       if (kind == 'selection') {
         expect(sql, contains('EXISTS(SELECT 1 FROM TAG_ASSIGNMENTS'));
-        expect(sql, contains('FROM TAGS T'));
-      } else {
-        expect(sql, contains('FROM TAG_ASSIGNMENTS A JOIN TAGS T'));
       }
-      return _Page(ids, assigned, next, timer.elapsedMicroseconds, selects);
+      return _Snapshot(ids, assigned, timer.elapsedMicroseconds, selects);
     }
 
-    Future<void> sample(
-      TagTarget target,
-      bool dense,
-      int size,
-      String kind,
-      String position,
-      Object? cursor,
-      _Page first,
-    ) async {
-      final durations = <int>[first.elapsed];
+    Future<void> sample(TagTarget target, bool dense, String kind) async {
+      final expectedIds = [
+        for (var index = 0; index < tagCount; index++)
+          if (kind == 'selection' ||
+              dense ||
+              (target is IntentionTagTarget ? index.isEven : index % 3 == 0))
+            tagFixtureId(10000 + index),
+      ];
+      final expectedAssigned = [
+        for (var index = 0; index < tagCount; index++)
+          dense ||
+              (target is IntentionTagTarget ? index.isEven : index % 3 == 0),
+      ];
+      final snapshot = await read(target, kind);
+      expect(snapshot.ids, expectedIds);
+      expect(snapshot.ids.toSet(), hasLength(expectedIds.length));
+      if (kind == 'selection') expect(snapshot.assigned, expectedAssigned);
+      final durations = [snapshot.elapsed];
       for (var repetition = 1; repetition < 5; repetition++) {
-        final again = await read(target, size, kind, cursor);
-        expect(again.ids, first.ids);
-        expect(again.assigned, first.assigned);
+        final again = await read(target, kind);
+        expect(again.ids, expectedIds);
+        expect(again.assigned, snapshot.assigned);
+        expect(again.selects.length, snapshot.selects.length);
         expect(
           again.selects.map((select) => select.rows),
-          first.selects.map((select) => select.rows),
+          snapshot.selects.map((select) => select.rows),
         );
         durations.add(again.elapsed);
       }
       final plans = <List<String>>[
-        for (final select in first.selects)
+        for (final select in snapshot.selects)
           [
             for (final row in raw.select(
               'EXPLAIN QUERY PLAN ${select.sql}',
@@ -271,8 +257,21 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
           ],
       ];
       expect(plans.every((plan) => plan.isNotEmpty), isTrue);
-      final main = first.selects.last;
+      final main = snapshot.selects.last;
       final mainPlan = plans.last;
+      final referenceCheck = snapshot.selects.singleWhere(
+        (select) => select.sql.contains('LEFT JOIN tags'),
+      );
+      final referenceCheckVisits = _measureReferenceCheckVisits(
+        raw,
+        referenceCheck,
+      );
+      final assignmentCount = dense
+          ? tagCount
+          : target is IntentionTagTarget
+          ? (tagCount + 1) ~/ 2
+          : (tagCount + 2) ~/ 3;
+      expect(referenceCheckVisits, assignmentCount);
       final mainVisits = kind == 'assignments'
           ? _measureMainQueryVisits(raw, main)
           : null;
@@ -283,112 +282,27 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
         expect(mainPlan.first, contains('SEARCH a USING INDEX $index'));
         expect(mainPlan.join(' '), isNot(contains('USE TEMP B-TREE')));
         expect(mainPlan.join(' '), isNot(contains('SCAN tags')));
-        expect(mainVisits, lessThanOrEqualTo(size + 1));
+        expect(mainVisits, expectedIds.length);
       }
       debugPrintSynchronously(
         jsonEncode({
-          'kind': 'tag_assignment_page',
+          'kind': 'tag_assignment_snapshot',
           'target': target is IntentionTagTarget ? 'intention' : 'relation',
           'density': dense ? 'dense' : 'sparse',
           'read': kind,
           'tags': tagCount,
-          'pageSize': size,
-          'position': position,
-          'selectsPerPage': first.selects.length,
+          'reads': durations.length,
+          'selectsPerRead': snapshot.selects.length,
           'materializedRowsPerSelect': [
-            for (final select in first.selects) select.rows,
+            for (final select in snapshot.selects) select.rows,
           ],
+          'resultRows': snapshot.ids.length,
           'elapsedMicroseconds': durations,
           'mainQueryVisits': mainVisits,
-          'sql': [for (final select in first.selects) select.sql],
-          'plans': plans,
-        }),
-      );
-    }
-
-    Future<void> traverse(
-      TagTarget target,
-      bool dense,
-      int size,
-      String kind,
-    ) async {
-      final expected = [
-        for (var index = 0; index < tagCount; index++)
-          if (kind == 'selection' ||
-              dense ||
-              (target is IntentionTagTarget ? index.isEven : index % 3 == 0))
-            tagFixtureId(10000 + index),
-      ];
-      final pageCount = (expected.length / size).ceil();
-      final ids = <String>[];
-      final assigned = <bool>[];
-      final samples = <String, (Object?, _Page)>{};
-      Object? cursor;
-      var pages = 0;
-      var rows = 0;
-      var elapsed = 0;
-      var referenceCheckRuns = 0;
-      var referenceCheckVisits = 0;
-      do {
-        final queryCursor = cursor;
-        final page = await read(target, size, kind, cursor);
-        pages++;
-        rows += page.selects.fold<int>(0, (sum, select) => sum + select.rows);
-        for (final select in page.selects) {
-          if (select.sql.contains('LEFT JOIN tags')) {
-            referenceCheckRuns++;
-            referenceCheckVisits += _measureReferenceCheckVisits(raw, select);
-          }
-        }
-        elapsed += page.elapsed;
-        ids.addAll(page.ids);
-        assigned.addAll(page.assigned);
-        cursor = page.next;
-        if (pages == 1) samples['first'] = (queryCursor, page);
-        if (pages == (pageCount / 2).ceil()) {
-          samples['middle'] = (queryCursor, page);
-        }
-        if (cursor == null) samples['last'] = (queryCursor, page);
-      } while (cursor != null);
-      expect(pages, pageCount);
-      expect(ids, expected);
-      expect(ids.toSet(), hasLength(expected.length));
-      if (kind == 'selection') {
-        expect(assigned, [
-          for (var index = 0; index < tagCount; index++)
-            dense ||
-                (target is IntentionTagTarget ? index.isEven : index % 3 == 0),
-        ]);
-      }
-      expect(rows, expected.length + pages - 1 + pages * 2);
-      expect(referenceCheckRuns, 1);
-      expect(
-        referenceCheckVisits,
-        dense
-            ? tagCount
-            : target is IntentionTagTarget
-            ? (tagCount + 1) ~/ 2
-            : (tagCount + 2) ~/ 3,
-      );
-      for (final position in ['first', 'middle', 'last']) {
-        final (sampleCursor, page) = samples[position]!;
-        await sample(target, dense, size, kind, position, sampleCursor, page);
-      }
-      debugPrintSynchronously(
-        jsonEncode({
-          'kind': 'tag_assignment_traversal',
-          'target': target is IntentionTagTarget ? 'intention' : 'relation',
-          'density': dense ? 'dense' : 'sparse',
-          'read': kind,
-          'tags': tagCount,
-          'pageSize': size,
-          'queries': pages * 3 + 1,
-          'materializedRows': rows,
-          'resultRows': ids.length,
-          'referenceCheckRuns': referenceCheckRuns,
+          'referenceCheckRuns': 1,
           'referenceCheckVisits': referenceCheckVisits,
-          'repeatedCheckVisits': referenceCheckVisits * pages,
-          'elapsedMicroseconds': elapsed,
+          'sql': [for (final select in snapshot.selects) select.sql],
+          'plans': plans,
         }),
       );
     }
@@ -400,9 +314,7 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       (denseRelation, true),
     ]) {
       for (final kind in ['assignments', 'selection']) {
-        for (final size in [1, 50, 100]) {
-          await traverse(target, dense, size, kind);
-        }
+        await sample(target, dense, kind);
       }
     }
     final sqlitePages =

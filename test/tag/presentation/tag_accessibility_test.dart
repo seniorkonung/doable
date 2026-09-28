@@ -358,7 +358,10 @@ void _registerAssignmentScenarios() {
         final newName = 'Straße 🏠é ${'Длинное название ' * 7}'.trimRight();
         await tester.enterText(name, newName);
         await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        await _until(tester, find.byKey(const ValueKey('tag-catalog-assign')));
+        await _until(
+          tester,
+          find.bySemanticsLabel(l10n.tagCatalogAssignNamed(newName)),
+        );
         final newId =
             raw.select('SELECT id FROM tags WHERE name = ?', [
                   newName,
@@ -394,11 +397,17 @@ void _registerAssignmentScenarios() {
               : find.byType(RelationDetailsPage),
         );
         await tester.pumpAndSettle();
-        final more = find.byKey(const ValueKey('tag-assignments-load-more'));
-        await tester.scrollUntilVisible(more, 500, scrollable: detailsScroll);
-        await _tap(tester, more);
+        expect(
+          find.byKey(const ValueKey('tag-assignments-load-more')),
+          findsNothing,
+        );
         final removeNew = find.byKey(ValueKey('tag-assignment-remove-$newId'));
         await _until(tester, removeNew);
+        await tester.scrollUntilVisible(
+          removeNew,
+          500,
+          scrollable: detailsScroll,
+        );
         await tester.ensureVisible(removeNew);
         expect(
           find.byTooltip(l10n.tagAssignmentsRemoveNamed(newName)),
@@ -476,7 +485,10 @@ void _registerAssignmentScenarios() {
         await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
         await _until(tester, find.byKey(const ValueKey('tag-catalog-create')));
         await _dismissPresentedMessages(tester);
-        await _tap(tester, find.byKey(const ValueKey('tag-catalog-load-more')));
+        expect(
+          find.byKey(const ValueKey('tag-catalog-load-more')),
+          findsNothing,
+        );
         final delete = find.byKey(ValueKey('tag-catalog-delete-$newId'));
         await tester.scrollUntilVisible(
           delete,

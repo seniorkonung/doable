@@ -77,66 +77,39 @@ extension _TagReading on DriftPersonalGraphRepository {
     }
   }
 
-  Future<TagCatalogPageResult> _readTagCatalogPage(
-    TagCatalogQuery query,
-  ) async {
+  Future<TagCatalogResult> _readTagCatalog(TagCatalogMode mode) async {
     final stopwatch = Stopwatch()..start();
     var stage = TagReadDiagnosticsStage.validation;
     void record(DiagnosticsStatus status) => _recordDiagnostics(
-      TagCatalogPageReadDiagnosticsEvent(stage: stage, status: status),
+      TagCatalogReadDiagnosticsEvent(stage: stage, status: status),
     );
 
     record(const DiagnosticsStarted());
     try {
-      final page = await _sequencer.run(
+      final snapshot = await _sequencer.run(
         () => _database.transaction(() async {
-          final cursor = query.cursor;
-          if (cursor != null &&
-              (cursor is! _DriftTagCatalogCursor ||
-                  !cursor.matches(query, _epoch))) {
-            throw const _InvalidTagCatalogCursor();
-          }
-          if (cursor is _DriftTagCatalogCursor &&
-              cursor.revision.compareTo(_currentRevision) !=
-                  GraphRevisionOrder.same) {
-            throw const _TagCatalogSnapshotHasExpired();
-          }
           stage = TagReadDiagnosticsStage.read;
-          final selectionTarget = switch (query.mode) {
+          final selectionTarget = switch (mode) {
             TagCatalogBrowseMode() => null,
             TagCatalogSelectionMode(:final target) => target,
           };
-          final storageVersion = selectionTarget == null
-              ? null
-              : await _tagReadStorageVersion();
-          final storageChanged =
-              cursor is _DriftTagCatalogCursor &&
-              cursor.storageVersion != storageVersion;
           final targetSql = selectionTarget == null
               ? null
               : await _validatedTagReadTarget(
                   selectionTarget,
-                  checkAssignmentReferences: cursor == null || storageChanged,
+                  checkAssignmentReferences: true,
                 );
-          if (storageChanged) throw const _TagCatalogSnapshotHasExpired();
-          final boundary = cursor is _DriftTagCatalogCursor
-              ? cursor.boundarySequence
-              : null;
           final rows = await _database
               .customSelect(
                 targetSql == null
                     ? '''SELECT creation_sequence, id, name FROM tags
-                   ${boundary == null ? '' : 'WHERE creation_sequence > ?'}
-                   ORDER BY creation_sequence ASC LIMIT ?'''
+                   ORDER BY creation_sequence ASC'''
                     : '''SELECT t.creation_sequence, t.id, t.name,
                    EXISTS(SELECT 1 FROM tag_assignments a WHERE a.tag_id = t.id AND a.${targetSql.assignmentColumn} = ?) AS is_assigned
                    FROM tags t
-                   ${boundary == null ? '' : 'WHERE t.creation_sequence > ?'}
-                   ORDER BY t.creation_sequence ASC LIMIT ?''',
+                   ORDER BY t.creation_sequence ASC''',
                 variables: [
                   if (targetSql != null) Variable<String>(targetSql.id),
-                  if (boundary != null) Variable<int>(boundary),
-                  Variable<int>(query.pageSize + 1),
                 ],
                 readsFrom: {
                   _database.tags,
@@ -144,7 +117,7 @@ extension _TagReading on DriftPersonalGraphRepository {
                 },
               )
               .get();
-          var previousSequence = boundary ?? 0;
+          var previousSequence = 0;
           final decoded = <tag_domain.Tag>[];
           final selectionRows = <TagSelectionRow>[];
           for (final row in rows) {
@@ -168,39 +141,18 @@ extension _TagReading on DriftPersonalGraphRepository {
               );
             }
           }
-          final hasNext = decoded.length > query.pageSize;
           final revision = _currentRevision;
-          final nextCursor = hasNext
-              ? _DriftTagCatalogCursor(
-                  epoch: _epoch,
-                  mode: query.mode,
-                  revision: revision,
-                  pageSize: query.pageSize,
-                  storageVersion: storageVersion,
-                  boundarySequence: _requiredStoredInteger(
-                    rows[query.pageSize - 1].data,
-                    'creation_sequence',
-                  ),
-                )
-              : null;
           return selectionTarget == null
-              ? TagCatalogPage(
-                  items: decoded.take(query.pageSize).toList(),
-                  pageSize: query.pageSize,
-                  nextCursor: nextCursor,
-                  revision: revision,
-                )
-              : TagCatalogPage.selection(
+              ? TagCatalogSnapshot(items: decoded, revision: revision)
+              : TagCatalogSnapshot.selection(
                   target: selectionTarget,
-                  rows: selectionRows.take(query.pageSize).toList(),
-                  pageSize: query.pageSize,
-                  nextCursor: nextCursor,
+                  rows: selectionRows,
                   revision: revision,
                 );
         }),
       );
       record(DiagnosticsSucceeded(stopwatch.elapsed));
-      return TagCatalogPageSuccess(page);
+      return TagCatalogSuccess(snapshot);
     } on Object catch (error) {
       final failure = _classifyTagCatalogReadFailure(error);
       record(
@@ -209,64 +161,38 @@ extension _TagReading on DriftPersonalGraphRepository {
           code: _graphCommandDiagnosticsFailureCode(failure),
         ),
       );
-      return TagCatalogPageError(failure);
+      return TagCatalogError(failure);
     }
   }
 
-  Future<TagAssignmentsPageResult> _readTagAssignmentsPage(
-    TagAssignmentsQuery query,
-  ) async {
+  Future<TagAssignmentsResult> _readTagAssignments(TagTarget recipient) async {
     final stopwatch = Stopwatch()..start();
     var stage = TagReadDiagnosticsStage.validation;
     void record(DiagnosticsStatus status) => _recordDiagnostics(
-      TagAssignmentsPageReadDiagnosticsEvent(stage: stage, status: status),
+      TagAssignmentsReadDiagnosticsEvent(stage: stage, status: status),
     );
 
     record(const DiagnosticsStarted());
     try {
-      final page = await _sequencer.run(
+      final snapshot = await _sequencer.run(
         () => _database.transaction(() async {
-          final cursor = query.cursor;
-          if (cursor != null &&
-              (cursor is! _DriftTagAssignmentsCursor ||
-                  !cursor.matches(query, _epoch))) {
-            throw const _InvalidTagAssignmentsCursor();
-          }
-          if (cursor is _DriftTagAssignmentsCursor &&
-              cursor.revision.compareTo(_currentRevision) !=
-                  GraphRevisionOrder.same) {
-            throw const _TagAssignmentsSnapshotHasExpired();
-          }
           stage = TagReadDiagnosticsStage.read;
-          final storageVersion = await _tagReadStorageVersion();
-          final storageChanged =
-              cursor is _DriftTagAssignmentsCursor &&
-              cursor.storageVersion != storageVersion;
           final target = await _validatedTagReadTarget(
-            query.target,
-            checkAssignmentReferences: cursor == null || storageChanged,
+            recipient,
+            checkAssignmentReferences: true,
           );
-          if (storageChanged) throw const _TagAssignmentsSnapshotHasExpired();
-          final boundary = cursor is _DriftTagAssignmentsCursor
-              ? cursor.boundarySequence
-              : null;
           final rows = await _database
               .customSelect(
                 '''SELECT a.tag_creation_sequence AS creation_sequence,
                  t.creation_sequence AS actual_tag_creation_sequence, t.id, t.name
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.${target.assignmentColumn} = ?
-                 ${boundary == null ? '' : 'AND a.tag_creation_sequence > ?'}
-               ORDER BY a.tag_creation_sequence ASC LIMIT ?''',
-                variables: [
-                  Variable<String>(target.id),
-                  if (boundary != null) Variable<int>(boundary),
-                  Variable<int>(query.pageSize + 1),
-                ],
+               ORDER BY a.tag_creation_sequence ASC''',
+                variables: [Variable<String>(target.id)],
                 readsFrom: {_database.tags, _database.tagAssignments},
               )
               .get();
-          var previousSequence = boundary ?? 0;
+          var previousSequence = 0;
           final tags = <tag_domain.Tag>[];
           for (final row in rows) {
             final sequence = _requiredStoredInteger(
@@ -287,29 +213,15 @@ extension _TagReading on DriftPersonalGraphRepository {
             tags.add(_decodeStoredTag(row.data));
           }
           final revision = _currentRevision;
-          return TagAssignmentsPage(
-            target: query.target,
-            items: tags.take(query.pageSize).toList(),
-            pageSize: query.pageSize,
-            nextCursor: tags.length > query.pageSize
-                ? _DriftTagAssignmentsCursor(
-                    epoch: _epoch,
-                    target: query.target,
-                    revision: revision,
-                    pageSize: query.pageSize,
-                    storageVersion: storageVersion,
-                    boundarySequence: _requiredStoredInteger(
-                      rows[query.pageSize - 1].data,
-                      'creation_sequence',
-                    ),
-                  )
-                : null,
+          return TagAssignmentsSnapshot(
+            target: recipient,
+            items: tags,
             revision: revision,
           );
         }),
       );
       record(DiagnosticsSucceeded(stopwatch.elapsed));
-      return TagAssignmentsPageSuccess(page);
+      return TagAssignmentsSuccess(snapshot);
     } on Object catch (error) {
       final failure = _classifyTagAssignmentsReadFailure(error);
       record(
@@ -318,7 +230,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           code: _graphCommandDiagnosticsFailureCode(failure),
         ),
       );
-      return TagAssignmentsPageError(failure);
+      return TagAssignmentsError(failure);
     }
   }
 
@@ -457,29 +369,6 @@ tag_domain.Tag _decodeStoredTag(Map<String, Object?> data) {
   }
 }
 
-final class _DriftTagCatalogCursor implements TagCatalogCursor {
-  const _DriftTagCatalogCursor({
-    required this.epoch,
-    required this.mode,
-    required this.revision,
-    required this.pageSize,
-    required this.storageVersion,
-    required this.boundarySequence,
-  });
-
-  final _GraphEpoch epoch;
-  final TagCatalogMode mode;
-  final GraphRevision revision;
-  final int pageSize;
-  final _TagReadStorageVersion? storageVersion;
-  final int boundarySequence;
-
-  bool matches(TagCatalogQuery query, _GraphEpoch owner) =>
-      identical(epoch, owner) &&
-      mode == query.mode &&
-      pageSize == query.pageSize;
-}
-
 final class _TagReadTargetSql {
   const _TagReadTargetSql({
     required this.table,
@@ -493,29 +382,6 @@ final class _TagReadTargetSql {
 }
 
 typedef _TagReadStorageVersion = ({int connectionChanges, int dataVersion});
-
-final class _DriftTagAssignmentsCursor implements TagAssignmentsCursor {
-  const _DriftTagAssignmentsCursor({
-    required this.epoch,
-    required this.target,
-    required this.revision,
-    required this.pageSize,
-    required this.storageVersion,
-    required this.boundarySequence,
-  });
-
-  final _GraphEpoch epoch;
-  final TagTarget target;
-  final GraphRevision revision;
-  final int pageSize;
-  final _TagReadStorageVersion storageVersion;
-  final int boundarySequence;
-
-  bool matches(TagAssignmentsQuery query, _GraphEpoch owner) =>
-      identical(epoch, owner) &&
-      target == query.target &&
-      pageSize == query.pageSize;
-}
 
 final class _TagReadTargetMissing implements Exception {
   const _TagReadTargetMissing();
@@ -543,34 +409,11 @@ TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
   };
 }
 
-final class _InvalidTagAssignmentsCursor implements Exception {
-  const _InvalidTagAssignmentsCursor();
-}
-
-final class _TagAssignmentsSnapshotHasExpired implements Exception {
-  const _TagAssignmentsSnapshotHasExpired();
-}
-
-final class _InvalidTagCatalogCursor implements Exception {
-  const _InvalidTagCatalogCursor();
-}
-
-final class _TagCatalogSnapshotHasExpired implements Exception {
-  const _TagCatalogSnapshotHasExpired();
-}
-
 TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {
   if (error is _TagReadTargetMissing) {
     return const TagCatalogTargetNotFound();
   }
-  if (error is _InvalidTagCatalogCursor) {
-    return const TagCatalogInvalidCursor();
-  }
-  if (error is _TagCatalogSnapshotHasExpired) {
-    return const TagCatalogSnapshotExpired();
-  }
-  if (error is _StoredIntentionCorruption ||
-      error is TagCatalogPageValidationException) {
+  if (error is _StoredIntentionCorruption) {
     return const TagCatalogCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {
@@ -582,17 +425,10 @@ TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {
 }
 
 TagAssignmentsReadFailure _classifyTagAssignmentsReadFailure(Object error) {
-  if (error is _InvalidTagAssignmentsCursor) {
-    return const TagAssignmentsInvalidCursor();
-  }
-  if (error is _TagAssignmentsSnapshotHasExpired) {
-    return const TagAssignmentsSnapshotExpired();
-  }
   if (error is _TagReadTargetMissing) {
     return const TagAssignmentsTargetNotFound();
   }
-  if (error is _StoredIntentionCorruption ||
-      error is TagAssignmentsPageValidationException) {
+  if (error is _StoredIntentionCorruption) {
     return const TagAssignmentsCorruptionFailure();
   }
   return switch (classifySqliteFailure(error)) {

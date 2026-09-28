@@ -922,30 +922,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagCatalogRefreshing => 'Обновляем каталог тегов…';
 
   @override
-  String get tagCatalogMoreAvailable => 'Есть ещё теги.';
-
-  @override
-  String get tagCatalogLoadMore => 'Показать ещё теги';
-
-  @override
-  String get tagCatalogLoadingMore => 'Загружаем ещё теги…';
-
-  @override
-  String get tagCatalogAllShown => 'Все теги показаны.';
-
-  @override
-  String get tagCatalogLoadMoreUnavailable =>
-      'Не удалось загрузить следующие теги.';
-
-  @override
-  String get tagCatalogLoadMoreCorruption =>
-      'Сохранённые данные повреждены; следующие теги нельзя показать.';
-
-  @override
-  String get tagCatalogLoadMoreUnexpected =>
-      'Не удалось загрузить следующие теги из-за непредвиденной ошибки.';
-
-  @override
   String get tagCatalogCreate => 'Создать тег';
 
   @override
@@ -1123,30 +1099,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get tagAssignmentsUnexpected =>
       'Не удалось загрузить назначения из-за непредвиденной ошибки.';
-
-  @override
-  String get tagAssignmentsMoreAvailable => 'Есть ещё назначения.';
-
-  @override
-  String get tagAssignmentsLoadMore => 'Показать ещё назначения';
-
-  @override
-  String get tagAssignmentsLoadingMore => 'Загружаем ещё назначения…';
-
-  @override
-  String get tagAssignmentsAllShown => 'Все назначения показаны.';
-
-  @override
-  String get tagAssignmentsLoadMoreUnavailable =>
-      'Не удалось загрузить следующие назначения.';
-
-  @override
-  String get tagAssignmentsLoadMoreCorruption =>
-      'Сохранённые данные повреждены; следующие назначения нельзя показать.';
-
-  @override
-  String get tagAssignmentsLoadMoreUnexpected =>
-      'Не удалось загрузить следующие назначения из-за непредвиденной ошибки.';
 
   @override
   String get tagAssignmentsChoose => 'Выбрать тег';

@@ -39,7 +39,7 @@ void main() {
             ),
           );
           sink.record(
-            TagCatalogPageReadDiagnosticsEvent(
+            TagCatalogReadDiagnosticsEvent(
               stage: stage,
               status: const DiagnosticsSucceeded(Duration(microseconds: 23)),
             ),
@@ -72,7 +72,7 @@ void main() {
               'failureCode': 'corruption',
             },
             {
-              'operation': 'tagCatalogPageRead',
+              'operation': 'tagCatalogRead',
               'stage': stage.name,
               'outcome': 'succeeded',
               'durationMicros': 23,

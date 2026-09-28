@@ -10,7 +10,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -255,11 +255,15 @@ void main() {
     );
   });
 
-  testWidgets('подгрузка сохраняет строки при отказе и даёт явный повтор', (
+  testWidgets('актуализация сохраняет строки при отказе и даёт явный повтор', (
     tester,
   ) async {
     final reads = _PendingReads();
     final opened = <TagId>[];
+    final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
+      sync: true,
+    );
+    addTearDown(changes.close);
     await tester.pumpWidget(
       _host(
         repository: repository,
@@ -268,26 +272,34 @@ void main() {
         onChoose: (_) {},
         onOpen: opened.add,
         reads: reads,
+        changes: changes.stream,
       ),
     );
     expect(find.text('Загружаем назначения…'), findsOneWidget);
-    final cursor = _Cursor();
-    reads.page(0, [_tag(301, 'Дом')], cursor: cursor);
+    reads.page(0, [_tag(301, 'Дом')]);
     await tester.pumpAndSettle();
     expect(find.text('Дом'), findsOneWidget);
     await tester.tap(
       find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(301)}')),
     );
-    await tester.tap(find.byKey(const ValueKey('tag-assignments-load-more')));
+    changes.add(
+      _Package(const _Revision(1), [
+        TagDeletedChange(revision: const _Revision(1), tagId: _tagId(302)),
+      ]),
+    );
     await tester.pump();
-    expect(find.text('Загружаем ещё назначения…'), findsOneWidget);
+    expect(find.text('Дом'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('tag-assignments-load-more')),
+      findsNothing,
+    );
     reads.fail(1, const TagAssignmentsUnavailableFailure());
     await tester.pumpAndSettle();
     expect(find.text('Дом'), findsOneWidget);
     await tester.tap(find.text('Повторить'));
     await tester.pump();
-    expect(reads.queries[2].cursor, same(cursor));
-    reads.page(2, [_tag(302, 'Работа')]);
+    expect(reads.queries, [_target(1), _target(1), _target(1)]);
+    reads.page(2, [_tag(301, 'Дом'), _tag(302, 'Работа')], revision: 1);
     await tester.pumpAndSettle();
     expect(find.text('Работа'), findsOneWidget);
     final openNext = find.byKey(
@@ -324,10 +336,7 @@ void main() {
             changes: changes.stream,
           ),
         );
-        reads.page(0, [
-          _tag(301, 'Дом'),
-          _tag(302, 'Работа'),
-        ], cursor: _Cursor());
+        reads.page(0, [_tag(301, 'Дом'), _tag(302, 'Работа')]);
         await tester.pumpAndSettle();
         final openHome = find.byKey(
           ValueKey('tag-assignment-open-${tagFixtureId(301)}'),
@@ -341,13 +350,6 @@ void main() {
         final previousWorkAction = tester
             .widget<TextButton>(openWork)
             .onPressed!;
-        await tester.ensureVisible(
-          find.byKey(const ValueKey('tag-assignments-load-more')),
-        );
-        await tester.tap(
-          find.byKey(const ValueKey('tag-assignments-load-more')),
-        );
-        await tester.pump();
         changes.add(
           _Package(const _Revision(1), [
             TagRenamedChange(
@@ -515,32 +517,24 @@ void main() {
 }
 
 final class _PendingReads extends Fake implements TagReadContract {
-  final queries = <TagAssignmentsQuery>[];
-  final pages = <Completer<TagAssignmentsPageResult>>[];
+  final queries = <TagTarget>[];
+  final pages = <Completer<TagAssignmentsResult>>[];
 
   @override
-  Future<TagAssignmentsPageResult> getTagAssignmentsPage(
-    TagAssignmentsQuery query,
-  ) {
-    queries.add(query);
-    final page = Completer<TagAssignmentsPageResult>();
+  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) {
+    queries.add(target);
+    final page = Completer<TagAssignmentsResult>();
     pages.add(page);
     return page.future;
   }
 
-  void page(
-    int index,
-    List<Tag> tags, {
-    TagAssignmentsCursor? cursor,
-    int revision = 0,
-  }) {
+  void page(int index, List<Tag> tags, {int revision = 0}) {
     pages[index].complete(
-      TagAssignmentsPageSuccess(
-        TagAssignmentsPage(
-          target: queries[index].target,
+      TagAssignmentsSuccess(
+        TagAssignmentsSnapshot(
+          target: queries[index],
           items: tags,
-          pageSize: queries[index].pageSize,
-          nextCursor: cursor,
+
           revision: _Revision(revision),
         ),
       ),
@@ -548,10 +542,8 @@ final class _PendingReads extends Fake implements TagReadContract {
   }
 
   void fail(int index, TagAssignmentsReadFailure failure) =>
-      pages[index].complete(TagAssignmentsPageError(failure));
+      pages[index].complete(TagAssignmentsError(failure));
 }
-
-final class _Cursor implements TagAssignmentsCursor {}
 
 final class _Package implements ConfirmedGraphChangePackage {
   const _Package(this.revision, this.changes);

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -19,87 +19,122 @@ void main() {
     final h = _Harness();
     addTearDown(h.dispose);
     expect(h.state, isA<TagAssignmentsInitialLoading>());
-    expect(h.reads.queries.single.target, h.target);
+    expect(h.reads.queries.single, h.target);
     h.reads.page(0, []);
     await pumpEventQueue();
     expect((h.state as TagAssignmentsLoaded).isEmpty, isTrue);
 
     h.model.setTarget(_target(2));
     expect(h.state, isA<TagAssignmentsInitialLoading>());
-    expect(h.reads.queries.last.target, _target(2));
+    expect(h.reads.queries.last, _target(2));
     h.reads.fail(1, const TagAssignmentsTargetNotFound());
     await pumpEventQueue();
     expect(h.state, isA<TagAssignmentsTargetMissing>());
   });
 
-  test('ошибка продолжения сохраняет строки и курсор для повтора', () async {
+  test('одно чтение показывает все 150 назначений без усечения', () async {
     final h = _Harness();
     addTearDown(h.dispose);
-    final cursor = _Cursor();
-    h.reads.page(0, [_tag(1, 'Дом')], cursor: cursor);
+    final tags = [
+      for (var index = 1; index <= 150; index++) _tag(index, 'Тег $index'),
+    ];
+    h.reads.page(0, tags);
     await pumpEventQueue();
-
-    final pending = h.model.loadMore();
-    expect(h.reads.queries[1].cursor, same(cursor));
-    expect(h.model.loadMore(), same(pending));
-    expect(h.reads.queries, hasLength(2));
-    h.reads.fail(1, const TagAssignmentsUnavailableFailure());
-    await pending;
     final loaded = h.state as TagAssignmentsLoaded;
-    expect(loaded.items.map((tag) => tag.id), [_id(1)]);
-    expect(loaded.nextCursor, same(cursor));
-    expect(loaded.pageStatus, isA<TagAssignmentsPageFailure>());
-    expect(h.model.canActOn(_id(1)), isTrue);
-
-    final retry = h.model.retryLoadMore();
-    expect(h.reads.queries[2].cursor, same(cursor));
-    h.reads.page(2, [_tag(2, 'Работа')]);
-    await retry;
-    expect((h.state as TagAssignmentsLoaded).items.map((tag) => tag.id), [
-      _id(1),
-      _id(2),
-    ]);
+    expect(loaded.items, tags);
+    expect(h.reads.queries, [h.target]);
+    expect(h.model.canActOn(_id(150)), isTrue);
+    expect(() => loaded.items.clear(), throwsUnsupportedError);
   });
 
   test(
-    'пакет сразу меняет известные строки и отвергает позднее продолжение',
+    'отказ актуализации сохраняет строки и блокирует действия до повтора',
     () async {
       final h = _Harness();
       addTearDown(h.dispose);
-      h.reads.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа')], cursor: _Cursor());
+      h.reads.page(0, [_tag(1, 'Дом')]);
       await pumpEventQueue();
-      final pending = h.model.loadMore();
       h.changes.add(
-        _Package(_Revision(2), [
+        _Package(const _Revision(2), [
           TagRenamedChange(
             revision: const _Revision(2),
             before: _tag(1, 'Дом'),
             after: _tag(1, 'Семья'),
           ),
-          TagDeletedChange(revision: const _Revision(2), tagId: _id(2)),
         ]),
       );
-      await pumpEventQueue();
-      final refreshing = h.state as TagAssignmentsLoaded;
-      expect(refreshing.items.map((tag) => tag.name.value), ['Семья']);
-      expect(refreshing.freshness, TagAssignmentsFreshness.refreshing);
-      expect(refreshing.nextCursor, isNull);
-      expect(h.model.canActOn(_id(1)), isFalse);
-      h.reads.page(1, [_tag(3, 'Поздний')]);
-      await pending;
-      expect(h.reads.queries[2].cursor, isNull);
-      h.reads.page(2, [_tag(1, 'Семья')], revision: 2);
-      await pumpEventQueue();
       expect(
         (h.state as TagAssignmentsLoaded).items.single.name.value,
         'Семья',
       );
+      expect(h.model.canActOn(_id(1)), isFalse);
+      h.reads.fail(1, const TagAssignmentsUnavailableFailure());
+      await pumpEventQueue();
+      final stale = h.state as TagAssignmentsLoaded;
+      expect(stale.items.single.name.value, 'Семья');
+      expect(stale.freshness, TagAssignmentsFreshness.stale);
+      expect(stale.refreshFailure, isA<TagAssignmentsUnavailableFailure>());
+      expect(h.model.canActOn(_id(1)), isFalse);
+
+      final retry = h.model.retryRefresh();
+      expect(h.reads.queries, [h.target, h.target, h.target]);
+      h.reads.page(2, [_tag(1, 'Семья'), _tag(2, 'Работа')], revision: 2);
+      await retry;
+      expect((h.state as TagAssignmentsLoaded).items.map((tag) => tag.id), [
+        _id(1),
+        _id(2),
+      ]);
       expect(h.model.canActOn(_id(1)), isTrue);
     },
   );
 
   test(
-    'более свежая страница уже включает пакет без повторного чтения',
+    'новый пакет сразу меняет строки и отвергает позднее обновление',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.reads.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
+      await pumpEventQueue();
+      h.changes.add(
+        _Package(const _Revision(2), [
+          TagRenamedChange(
+            revision: const _Revision(2),
+            before: _tag(1, 'Дом'),
+            after: _tag(1, 'Быт'),
+          ),
+        ]),
+      );
+      h.changes.add(
+        _Package(const _Revision(3), [
+          TagRenamedChange(
+            revision: const _Revision(3),
+            before: _tag(1, 'Быт'),
+            after: _tag(1, 'Семья'),
+          ),
+          TagDeletedChange(revision: const _Revision(3), tagId: _id(2)),
+        ]),
+      );
+      final refreshing = h.state as TagAssignmentsLoaded;
+      expect(refreshing.items.map((tag) => tag.name.value), ['Семья']);
+      expect(refreshing.freshness, TagAssignmentsFreshness.refreshing);
+      expect(h.model.canActOn(_id(1)), isFalse);
+      expect(h.reads.queries, hasLength(2));
+
+      h.reads.page(1, [_tag(1, 'Быт'), _tag(2, 'Работа')], revision: 2);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagAssignmentsLoaded).items.map((tag) => tag.name.value),
+        ['Семья'],
+      );
+      expect(h.reads.queries, hasLength(3));
+      h.reads.page(2, [_tag(1, 'Семья')], revision: 3);
+      await pumpEventQueue();
+      expect(h.model.canActOn(_id(1)), isTrue);
+    },
+  );
+
+  test(
+    'более свежий снимок уже включает пакет без повторного чтения',
     () async {
       final h = _Harness();
       addTearDown(h.dispose);
@@ -152,64 +187,34 @@ void main() {
       expect(h.reads.queries, hasLength(1));
       h.reads.page(0, [_tag(1, 'Старый')]);
       await pumpEventQueue();
-      expect(h.reads.queries, hasLength(2));
-      expect(h.reads.queries.last.target, _target(2));
+      expect(h.reads.queries, [h.target, _target(2)]);
       h.reads.page(1, [_tag(2, 'Новый')], target: _target(2));
       await pumpEventQueue();
       expect((h.state as TagAssignmentsLoaded).items.single.id, _id(2));
     },
   );
 
-  test(
-    'отказ актуализации оставляет прежние строки явно устаревшими',
-    () async {
-      final h = _Harness();
-      addTearDown(h.dispose);
-      h.reads.page(0, [_tag(1, 'Дом')]);
-      await pumpEventQueue();
-      h.changes.add(
-        _Package(const _Revision(2), [
-          TagDeletedChange(revision: const _Revision(2), tagId: _id(2)),
-        ]),
-      );
-      await pumpEventQueue();
-      h.reads.fail(1, const TagAssignmentsUnavailableFailure());
-      await pumpEventQueue();
-      final stale = h.state as TagAssignmentsLoaded;
-      expect(stale.items.single.id, _id(1));
-      expect(stale.freshness, TagAssignmentsFreshness.stale);
-      expect(stale.refreshFailure, isA<TagAssignmentsUnavailableFailure>());
-      expect(h.model.canActOn(_id(1)), isFalse);
-      final retry = h.model.retryRefresh();
-      h.reads.page(2, [_tag(1, 'Дом')], revision: 2);
-      await retry;
-      expect(
-        (h.state as TagAssignmentsLoaded).freshness,
-        TagAssignmentsFreshness.current,
-      );
-    },
-  );
-
-  test(
-    'устаревшее продолжение начинает новый снимок без старого курсора',
-    () async {
-      final h = _Harness();
-      addTearDown(h.dispose);
-      h.reads.page(0, [_tag(1, 'Дом')], cursor: _Cursor());
-      await pumpEventQueue();
-      final pending = h.model.loadMore();
-      h.reads.fail(1, const TagAssignmentsSnapshotExpired());
-      await pending;
-      expect((h.state as TagAssignmentsLoaded).nextCursor, isNull);
-      expect(h.reads.queries[2].cursor, isNull);
-      h.reads.page(2, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
-      await pumpEventQueue();
-      expect((h.state as TagAssignmentsLoaded).items.map((tag) => tag.id), [
-        _id(1),
-        _id(2),
-      ]);
-    },
-  );
+  test('устаревший полный ответ повторяется без очистки строк', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.reads.page(0, [_tag(1, 'Дом')]);
+    await pumpEventQueue();
+    h.changes.add(
+      _Package(const _Revision(2), [
+        TagDeletedChange(revision: const _Revision(2), tagId: _id(2)),
+      ]),
+    );
+    h.reads.page(1, [_tag(1, 'Старое имя'), _tag(2, 'Работа')]);
+    await pumpEventQueue();
+    expect((h.state as TagAssignmentsLoaded).items.single.name.value, 'Дом');
+    expect(h.reads.queries, hasLength(3));
+    h.reads.page(2, [_tag(1, 'Дом')], revision: 2);
+    await pumpEventQueue();
+    expect(
+      (h.state as TagAssignmentsLoaded).freshness,
+      TagAssignmentsFreshness.current,
+    );
+  });
 
   test('смена эпохи отбрасывает ответ прежней эпохи', () async {
     final h = _Harness();
@@ -226,6 +231,22 @@ void main() {
     await pumpEventQueue();
     expect((h.state as TagAssignmentsLoaded).items.single.id, _id(1));
   });
+
+  test(
+    'явный повтор начального отказа восстанавливает полный список',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.reads.fail(0, const TagAssignmentsUnavailableFailure());
+      await pumpEventQueue();
+      expect(h.state, isA<TagAssignmentsInitialFailure>());
+      final retry = h.model.retryInitialLoad();
+      expect(h.state, isA<TagAssignmentsInitialLoading>());
+      h.reads.page(1, [_tag(1, 'Дом')]);
+      await retry;
+      expect(h.model.canActOn(_id(1)), isTrue);
+    },
+  );
 
   test('новая ревизия переводит отказ первого чтения в загрузку', () async {
     final h = _Harness();
@@ -244,23 +265,24 @@ void main() {
     expect(h.state, isA<TagAssignmentsLoaded>());
   });
 
-  test('чужая порция сообщает отказ без бесконечной актуализации', () async {
+  test('чужой снимок сообщает отказ без бесконечной актуализации', () async {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.reads.page(0, [_tag(1, 'Дом')], cursor: _Cursor());
+    h.reads.page(0, [_tag(1, 'Дом')]);
     await pumpEventQueue();
-    final pending = h.model.loadMore();
-    h.reads.page(1, [_tag(2, 'Работа')], target: _target(2));
-    await pending;
-    expect(h.reads.queries, hasLength(2));
-    expect(
-      (h.state as TagAssignmentsLoaded).pageStatus,
-      isA<TagAssignmentsPageFailure>().having(
-        (value) => value.failure,
-        'причина',
-        isA<TagAssignmentsUnexpectedFailure>(),
-      ),
+    h.changes.add(
+      _Package(const _Revision(2), [
+        TagDeletedChange(revision: const _Revision(2), tagId: _id(3)),
+      ]),
     );
+    h.reads.page(1, [_tag(2, 'Работа')], target: _target(2), revision: 2);
+    await pumpEventQueue();
+    final stale = h.state as TagAssignmentsLoaded;
+    expect(h.reads.queries, hasLength(2));
+    expect(stale.items.single.id, _id(1));
+    expect(stale.freshness, TagAssignmentsFreshness.stale);
+    expect(stale.refreshFailure, isA<TagAssignmentsUnexpectedFailure>());
+    expect(h.model.canActOn(_id(1)), isFalse);
   });
 }
 
@@ -299,15 +321,13 @@ final class _Harness {
 }
 
 final class _Reads extends Fake implements TagReadContract {
-  final queries = <TagAssignmentsQuery>[];
-  final pages = <Completer<TagAssignmentsPageResult>>[];
+  final queries = <TagTarget>[];
+  final pages = <Completer<TagAssignmentsResult>>[];
 
   @override
-  Future<TagAssignmentsPageResult> getTagAssignmentsPage(
-    TagAssignmentsQuery query,
-  ) {
-    queries.add(query);
-    final page = Completer<TagAssignmentsPageResult>();
+  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) {
+    queries.add(target);
+    final page = Completer<TagAssignmentsResult>();
     pages.add(page);
     return page.future;
   }
@@ -315,18 +335,17 @@ final class _Reads extends Fake implements TagReadContract {
   void page(
     int index,
     List<Tag> tags, {
-    TagAssignmentsCursor? cursor,
+
     int revision = 1,
     int epoch = 0,
     TagTarget? target,
   }) {
     pages[index].complete(
-      TagAssignmentsPageSuccess(
-        TagAssignmentsPage(
-          target: target ?? queries[index].target,
+      TagAssignmentsSuccess(
+        TagAssignmentsSnapshot(
+          target: target ?? queries[index],
           items: tags,
-          pageSize: queries[index].pageSize,
-          nextCursor: cursor,
+
           revision: _Revision(revision, epoch),
         ),
       ),
@@ -334,10 +353,8 @@ final class _Reads extends Fake implements TagReadContract {
   }
 
   void fail(int index, TagAssignmentsReadFailure failure) =>
-      pages[index].complete(TagAssignmentsPageError(failure));
+      pages[index].complete(TagAssignmentsError(failure));
 }
-
-final class _Cursor implements TagAssignmentsCursor {}
 
 final class _Package implements ConfirmedGraphChangePackage {
   const _Package(this.revision, this.changes);

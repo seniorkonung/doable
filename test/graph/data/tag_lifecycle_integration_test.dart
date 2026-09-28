@@ -88,10 +88,10 @@ void main() {
           TagCreationFormKey(),
           CreateTag(TagName.fromInput(name)),
         ) as TagCommandAccepted).future;
-    Future<TagCatalogPage> catalog() async =>
-        (await repository.getTagCatalogPage(
-          TagCatalogQuery(),
-        ) as TagCatalogPageSuccess).value;
+    Future<TagCatalogSnapshot> catalog() async =>
+        (await repository.getTagCatalog(
+          const TagCatalogBrowseMode(),
+        ) as TagCatalogSuccess).value;
 
     final initialRevision = (await catalog()).revision;
     final created = await create('Дом');

@@ -11,11 +11,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/tag/application/tag_catalog.dart'
-    hide TagCatalogPage;
-import 'package:doable/src/tag/application/tag_catalog.dart'
-    as data
-    show TagCatalogPage;
+import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -119,10 +115,7 @@ void main() {
         InMemoryDiagnosticsSink(),
       );
       await _openRealCatalog(tester, repository);
-      expect(
-        find.byKey(const ValueKey('tag-catalog-load-more')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsNothing);
 
       await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
       await tester.pumpAndSettle();
@@ -410,14 +403,13 @@ final class _PendingRepository extends Fake implements PersonalGraphRepository {
   bool deleted = false;
 
   @override
-  Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) async =>
-      TagCatalogPageSuccess(
-        data.TagCatalogPage(
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async =>
+      TagCatalogSuccess(
+        TagCatalogSnapshot(
           items: deleted
               ? []
               : [Tag(id: _tagId(301), name: TagName.fromInput('Дом'))],
-          pageSize: TagCatalogQuery.defaultPageSize,
-          nextCursor: null,
+
           revision: const _Revision(),
         ),
       );
