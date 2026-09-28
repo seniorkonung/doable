@@ -72,6 +72,88 @@ void seedTagRecipientGraphFixture(sqlite.Database database) {
   );
 }
 
+/// Навигация различает одноимённые намерения, собственный архив связи
+/// и связь дневного пути; непомеченный сосед не входит в выдачу.
+void seedTagNavigationFixture(
+  sqlite.Database database, {
+  required int extraPairsPerScope,
+}) {
+  seedTagRecipientGraphFixture(database);
+  database.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+    'Одинаковое намерение',
+    tagFixtureId(1),
+  ]);
+  database.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+    'Непомеченный сосед',
+    tagFixtureId(3),
+  ]);
+  database.execute(
+    'INSERT INTO intentions (id, title, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+    [tagFixtureId(4), 'Одинаковое намерение', 'Описание 4', 104, 204],
+  );
+  database.execute(
+    'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+    [tagFixtureId(103), tagFixtureId(1), tagFixtureId(4), 'can', 3, 1],
+  );
+  for (final (number, name) in [
+    (firstTagNumber, 'Дом 🏷️'),
+    (303, 'Без назначений'),
+    (304, 'Только в архиве'),
+  ]) {
+    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      tagFixtureId(number),
+      name,
+    ]);
+  }
+  for (final (column, number) in [
+    ('intention_id', 1),
+    ('long_term_relation_id', 101),
+    ('intention_id', 4),
+    ('intention_id', 2),
+    ('long_term_relation_id', 102),
+    ('long_term_relation_id', 103),
+  ]) {
+    database.execute(
+      'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+      [tagFixtureId(firstTagNumber), tagFixtureId(number)],
+    );
+  }
+  database.execute(
+    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+    [tagFixtureId(304), tagFixtureId(2)],
+  );
+  for (var index = 0; index < extraPairsPerScope; index++) {
+    for (final archived in [0, 1]) {
+      final intentionId = tagFixtureId(1000 + archived * 100 + index);
+      final relationId = tagFixtureId(2000 + archived * 100 + index);
+      database.execute(
+        'INSERT INTO intentions (id, title, description, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          intentionId,
+          'Получатель $archived/$index',
+          'Описание $archived/$index',
+          archived,
+          1000 + index,
+          1000 + index,
+        ],
+      );
+      database.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [relationId, tagFixtureId(1), intentionId, 'need', 2, archived],
+      );
+      for (final (column, id) in [
+        ('intention_id', intentionId),
+        ('long_term_relation_id', relationId),
+      ]) {
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+          [tagFixtureId(firstTagNumber), id],
+        );
+      }
+    }
+  }
+}
+
 Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
     {
       for (final table in [
