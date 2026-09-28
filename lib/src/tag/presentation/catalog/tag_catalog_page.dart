@@ -18,6 +18,8 @@ import '../../domain/tag_id.dart';
 import '../../domain/tag_target.dart';
 import '../editor/tag_editor_state.dart';
 import '../tag_failure_message.dart';
+import 'tag_catalog_filter.dart';
+import 'tag_catalog_search_controller.dart';
 import 'tag_catalog_state.dart';
 import 'tag_catalog_view_model.dart';
 import 'tag_delete_confirmation.dart';
@@ -35,6 +37,9 @@ final class TagCatalogPage extends ConsumerStatefulWidget {
 final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
   final _creationKey = TagCreationFormKey();
   final _scrollController = ScrollController();
+  final _searchController = TagCatalogSearchController();
+  TagCatalogFilter _filter = TagCatalogFilter.empty;
+  bool _searchIsInvalid = false;
   late final GraphCommandCoordinator _coordinator;
   TagOperationToken? _activeDeleteToken;
   TagOperationToken? _failureToken;
@@ -55,6 +60,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     unawaited(_busyDeleteSubscription?.cancel());
     _releasePresentation();
     super.dispose();
@@ -78,6 +84,24 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
     null => const TagCatalogBrowseMode(),
     final target => TagCatalogSelectionMode(target),
   };
+
+  void _updateSearch(String input) {
+    final result = TagCatalogFilter.fromInput(input);
+    setState(() {
+      switch (result) {
+        case TagCatalogFilter():
+          _filter = result;
+          _searchIsInvalid = false;
+        case TagCatalogFilterInvalidUnicode():
+          _searchIsInvalid = true;
+      }
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    _updateSearch('');
+  }
 
   void _assignSelected() {
     if (_activeAssignToken != null) return;
@@ -287,6 +311,30 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
       },
       body: Column(
         children: [
+          if (state is! TagCatalogTargetMissing)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                key: const ValueKey('tag-catalog-search'),
+                controller: _searchController,
+                onChanged: _updateSearch,
+                decoration: InputDecoration(
+                  labelText: localizations.tagCatalogSearch,
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: localizations.tagCatalogClearSearch,
+                          onPressed: _clearSearch,
+                          icon: const Icon(Icons.clear),
+                        ),
+                  errorText: _searchIsInvalid
+                      ? localizations.tagCatalogInvalidSearch
+                      : null,
+                  errorMaxLines: 5,
+                ),
+              ),
+            ),
           if (_activeDeleteToken != null)
             Semantics(
               liveRegion: true,
@@ -356,6 +404,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
               ),
               TagCatalogLoaded loaded => _LoadedCatalog(
                 state: loaded,
+                filter: _filter,
                 scrollController: _scrollController,
                 model: model,
                 selection: loaded.selection,
@@ -380,6 +429,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
 final class _LoadedCatalog extends StatelessWidget {
   const _LoadedCatalog({
     required this.state,
+    required this.filter,
     required this.scrollController,
     required this.model,
     required this.selection,
@@ -391,6 +441,7 @@ final class _LoadedCatalog extends StatelessWidget {
   });
 
   final TagCatalogLoaded state;
+  final TagCatalogFilter filter;
   final ScrollController scrollController;
   final TagCatalogViewModel model;
   final TagCatalogSelection selection;
@@ -405,6 +456,7 @@ final class _LoadedCatalog extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
     final choosing = state.mode is TagCatalogSelectionMode;
     if (state.isEmpty &&
+        filter.isEmpty &&
         state.canUseCurrentItems &&
         selection is TagCatalogNoSelection) {
       return _CatalogStatus(message: localizations.tagCatalogEmpty);
@@ -415,7 +467,27 @@ final class _LoadedCatalog extends StatelessWidget {
     };
     final selectedInSnapshot =
         selected != null && state.items.any((tag) => tag.id == selected.id);
-    final selectedOutsideSnapshot = selected != null && !selectedInSnapshot;
+    final selectedOutsideSnapshot =
+        selected != null &&
+        !selectedInSnapshot &&
+        filter.matches(selected.name);
+    final rows =
+        switch (state.mode) {
+              TagCatalogBrowseMode() => state.items.map(
+                (tag) => (tag: tag, isAssigned: false),
+              ),
+              TagCatalogSelectionMode() => state.selectionRows.map(
+                (row) => (tag: row.tag, isAssigned: row.isAssigned),
+              ),
+            }
+            .map(
+              (row) => (
+                tag: row.tag.id == selected?.id ? selected! : row.tag,
+                isAssigned: row.isAssigned,
+              ),
+            )
+            .where((row) => filter.matches(row.tag.name))
+            .toList();
     final assignmentFailure = switch (state.selectedAssignment) {
       TagCatalogSelectedAssignment.unavailable =>
         localizations.tagAssignmentsUnavailable,
@@ -463,91 +535,95 @@ final class _LoadedCatalog extends StatelessWidget {
           ),
         Expanded(
           key: const ValueKey('tag-catalog-viewport'),
-          child: ListView.builder(
-            key: const ValueKey('tag-catalog-list'),
-            controller: scrollController,
-            itemCount: state.items.length + (selectedOutsideSnapshot ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (selectedOutsideSnapshot && index == 0) {
-                final selectedTag = selected;
-                return Semantics(
-                  container: true,
-                  selected: true,
-                  child: ListTile(
-                    title: Text(selectedTag.name.value),
-                    subtitle: Text(
-                      choosing
-                          ? switch (state.selectedAssignment) {
-                              TagCatalogSelectedAssignment.assigned =>
-                                localizations.tagCatalogAssigned,
-                              TagCatalogSelectedAssignment.available =>
-                                localizations.tagCatalogAvailable,
-                              TagCatalogSelectedAssignment.unknown =>
-                                localizations.tagCatalogSelected,
-                              TagCatalogSelectedAssignment.unavailable ||
-                              TagCatalogSelectedAssignment.corruption ||
-                              TagCatalogSelectedAssignment.unexpected =>
-                                localizations.tagCatalogSelected,
-                            }
-                          : localizations.tagCatalogSelected,
-                    ),
-                    trailing: !choosing && state.canUseCurrentItems
-                        ? _TagActions(
-                            tag: selectedTag,
-                            onRename: onRename,
-                            onDelete: onDelete,
-                            canDelete: canDelete,
-                            onOpen: onOpen,
-                          )
-                        : null,
-                  ),
-                );
-              }
-              final item =
-                  state.items[index - (selectedOutsideSnapshot ? 1 : 0)];
-              final tag = item.id == selected?.id ? selected! : item;
-              final selectedId = selection.id;
-              final assigned =
-                  choosing &&
-                  state
-                      .selectionRows[index - (selectedOutsideSnapshot ? 1 : 0)]
-                      .isAssigned;
-              return Semantics(
-                key: ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'),
-                container: true,
-                selected: tag.id == selectedId,
-                child: ListTile(
-                  title: Text(tag.name.value),
-                  subtitle: choosing
-                      ? Text(
-                          assigned
-                              ? localizations.tagCatalogAssigned
-                              : localizations.tagCatalogAvailable,
-                        )
-                      : null,
-                  onTap:
-                      choosing &&
-                          state.canUseCurrentItems &&
-                          state.assignmentStatus is TagCatalogAssignmentIdle
-                      ? () => onSelect(tag.id)
-                      : null,
-                  trailing:
-                      !choosing &&
-                          state.canUseCurrentItems &&
-                          (tag.id != selectedId ||
-                              selection is TagCatalogSelectionReady)
-                      ? _TagActions(
-                          tag: tag,
-                          onRename: onRename,
-                          onDelete: onDelete,
-                          canDelete: canDelete,
-                          onOpen: onOpen,
-                        )
-                      : null,
+          child:
+              state.canUseCurrentItems &&
+                  !filter.isEmpty &&
+                  rows.isEmpty &&
+                  !selectedOutsideSnapshot
+              ? _CatalogStatus(message: localizations.tagCatalogNoMatches)
+              : ListView.builder(
+                  key: const ValueKey('tag-catalog-list'),
+                  controller: scrollController,
+                  itemCount: rows.length + (selectedOutsideSnapshot ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (selectedOutsideSnapshot && index == 0) {
+                      final selectedTag = selected;
+                      return Semantics(
+                        container: true,
+                        selected: true,
+                        child: ListTile(
+                          title: Text(selectedTag.name.value),
+                          subtitle: Text(
+                            choosing
+                                ? switch (state.selectedAssignment) {
+                                    TagCatalogSelectedAssignment.assigned =>
+                                      localizations.tagCatalogAssigned,
+                                    TagCatalogSelectedAssignment.available =>
+                                      localizations.tagCatalogAvailable,
+                                    TagCatalogSelectedAssignment.unknown =>
+                                      localizations.tagCatalogSelected,
+                                    TagCatalogSelectedAssignment.unavailable ||
+                                    TagCatalogSelectedAssignment.corruption ||
+                                    TagCatalogSelectedAssignment.unexpected =>
+                                      localizations.tagCatalogSelected,
+                                  }
+                                : localizations.tagCatalogSelected,
+                          ),
+                          trailing: !choosing && state.canUseCurrentItems
+                              ? _TagActions(
+                                  tag: selectedTag,
+                                  onRename: onRename,
+                                  onDelete: onDelete,
+                                  canDelete: canDelete,
+                                  onOpen: onOpen,
+                                )
+                              : null,
+                        ),
+                      );
+                    }
+                    final row = rows[index - (selectedOutsideSnapshot ? 1 : 0)];
+                    final tag = row.tag;
+                    final selectedId = selection.id;
+                    final assigned = choosing && row.isAssigned;
+                    return Semantics(
+                      key: ValueKey(
+                        'tag-catalog-row-${tag.id.toCanonicalString()}',
+                      ),
+                      container: true,
+                      selected: tag.id == selectedId,
+                      child: ListTile(
+                        title: Text(tag.name.value),
+                        subtitle: choosing
+                            ? Text(
+                                assigned
+                                    ? localizations.tagCatalogAssigned
+                                    : localizations.tagCatalogAvailable,
+                              )
+                            : null,
+                        onTap:
+                            choosing &&
+                                state.canUseCurrentItems &&
+                                state.assignmentStatus
+                                    is TagCatalogAssignmentIdle
+                            ? () => onSelect(tag.id)
+                            : null,
+                        trailing:
+                            !choosing &&
+                                state.canUseCurrentItems &&
+                                (tag.id != selectedId ||
+                                    selection is TagCatalogSelectionReady)
+                            ? _TagActions(
+                                tag: tag,
+                                onRename: onRename,
+                                onDelete: onDelete,
+                                canDelete: canDelete,
+                                onOpen: onOpen,
+                              )
+                            : null,
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );

@@ -1568,6 +1568,30 @@ abstract class AppLocalizations {
   /// **'Choose a tag'**
   String get tagCatalogSelectionTitle;
 
+  /// Подпись поискового поля каталога и выбора тега
+  ///
+  /// In en, this message translates to:
+  /// **'Search tags'**
+  String get tagCatalogSearch;
+
+  /// Доступная подпись очистки поискового поля
+  ///
+  /// In en, this message translates to:
+  /// **'Clear tag search'**
+  String get tagCatalogClearSearch;
+
+  /// Ошибка некорректного Unicode с объяснением сохранения последнего корректного фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid characters are shown as �. Your input is retained but wasn’t applied; results use the last valid query.'**
+  String get tagCatalogInvalidSearch;
+
+  /// Нет совпадений для применённого корректного непустого запроса
+  ///
+  /// In en, this message translates to:
+  /// **'No tags found'**
+  String get tagCatalogNoMatches;
+
   /// Тег уже назначен получателю
   ///
   /// In en, this message translates to:
