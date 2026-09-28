@@ -8,6 +8,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -73,6 +74,9 @@ void main() {
           await tester.pumpAndSettle();
         }
         final choose = find.byKey(const ValueKey('tag-assignments-choose'));
+        await _until(tester, choose);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
         if (!isIntention) {
           await tester.scrollUntilVisible(
             choose,
@@ -95,6 +99,8 @@ void main() {
           tester,
           find.byKey(ValueKey('tag-assignment-remove-$existingTagId')),
         );
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
 
         await _tap(tester, choose);
         await _tap(tester, find.byKey(const ValueKey('tag-catalog-create')));
@@ -130,6 +136,24 @@ void main() {
         await _waitFor(tester, () => _assigned(raw, newTagId, number));
         router.pop();
         final remove = find.byKey(ValueKey('tag-assignment-remove-$newTagId'));
+        await _until(tester, remove);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
+        await _tap(
+          tester,
+          find.byKey(ValueKey('tag-assignment-open-$newTagId')),
+        );
+        await _until(tester, find.byType(TagNavigationPage));
+        await tester.pumpAndSettle();
+        expect(
+          router.current
+              .argsAs<TagNavigationRouteArgs>()
+              .tagId
+              .toCanonicalString(),
+          newTagId,
+        );
+        expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
+        router.pop();
         await _tap(tester, remove);
         await _waitFor(tester, () => _assignments(raw, newTagId).isEmpty);
         expect(

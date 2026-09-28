@@ -136,6 +136,10 @@ void main() {
             ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
           );
           await _pumpUntil(tester, () => open.evaluate().isNotEmpty);
+          expect(
+            find.byKey(const ValueKey('tag-catalog-search')),
+            findsNothing,
+          );
           final l10n = AppLocalizations.of(tester.element(open));
           expect(
             tester.getSemantics(open).label,
