@@ -73,11 +73,11 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       unawaited(_completions?.cancel());
       unawaited(_selectedReads?.cancel());
     });
-    unawaited(_startFirst());
+    unawaited(_startRead());
     return TagCatalogInitialLoading(mode: mode);
   }
 
-  /// Смена режима или получателя отменяет право прежних порций и выбора
+  /// Смена режима или получателя отменяет право прежних снимков и выбора
   /// изменять новое состояние, не прерывая уже принятую команду.
   void setMode(TagCatalogMode mode) {
     if (_mode == mode) return;
@@ -97,20 +97,20 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     _staleReadAttempts = 0;
     state = TagCatalogInitialLoading(mode: mode);
     if (_activeRequest == null) {
-      unawaited(_startFirst());
+      unawaited(_startRead());
     } else {
       _refreshNeeded = true;
     }
   }
 
-  Future<void> retryFirstPage() {
+  Future<void> retryInitialLoad() {
     final current = state;
     if (current is! TagCatalogInitialFailure || !current.canRetry) {
       return Future.value();
     }
     state = TagCatalogInitialLoading(mode: _mode);
     _staleReadAttempts = 0;
-    return _startFirst();
+    return _startRead();
   }
 
   void selectTag(TagId id) {
@@ -127,7 +127,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       _selectedAssignmentFromRows(selectionRows, id, revision);
     }
     final createdRevision = _newlyCreatedRevision;
-    final pageRevision = switch (state) {
+    final snapshotRevision = switch (state) {
       TagCatalogLoaded(:final revision) => revision,
       _ => null,
     };
@@ -135,10 +135,10 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         _mode is TagCatalogSelectionMode &&
         _newlyCreatedTagId == id &&
         createdRevision != null &&
-        (pageRevision == null ||
-            pageRevision.compareTo(createdRevision) ==
+        (snapshotRevision == null ||
+            snapshotRevision.compareTo(createdRevision) ==
                 GraphRevisionOrder.same ||
-            pageRevision.compareTo(createdRevision) ==
+            snapshotRevision.compareTo(createdRevision) ==
                 GraphRevisionOrder.older)) {
       _setSelectedAssignment(
         TagCatalogSelectedAssignment.available,
@@ -323,7 +323,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   }
 
   /// Назначение начинается только после явного вызова для выбранного TagId.
-  /// Уже назначенная строка не отправляется повторно; выбор вне порции
+  /// Уже назначенная строка не отправляется повторно; выбор вне снимка
   /// сохраняет идентичность и проверяется командой в хранилище.
   TagCommandStart? assignSelected() {
     final current = state;
@@ -383,11 +383,11 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
 
   void _confirmedMissing(TagId id, GraphRevision revision) {
     final current = state;
-    final pageOrder = current is TagCatalogLoaded
+    final snapshotOrder = current is TagCatalogLoaded
         ? current.revision.compareTo(revision)
         : null;
     if (current is TagCatalogLoaded &&
-        pageOrder == GraphRevisionOrder.newer &&
+        snapshotOrder == GraphRevisionOrder.newer &&
         current.items.any((tag) => tag.id == id)) {
       return;
     }
@@ -413,28 +413,25 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         for (final row in current.selectionRows)
           if (row.tag.id != id) row,
       ];
-      final pageIsCurrent =
-          (pageOrder == GraphRevisionOrder.same ||
-              pageOrder == GraphRevisionOrder.newer) &&
+      final snapshotIsCurrent =
+          (snapshotOrder == GraphRevisionOrder.same ||
+              snapshotOrder == GraphRevisionOrder.newer) &&
           items.length == current.items.length;
       state = current.withStatus(
         items: items,
         selectionRows: rows,
         selection: _selection,
         selectedAssignment: _selectedAssignment,
-        freshness: pageIsCurrent
+        freshness: snapshotIsCurrent
             ? current.freshness
             : TagCatalogFreshness.refreshing,
-        pageStatus: pageIsCurrent
-            ? current.pageStatus
-            : const TagCatalogPageIdle(),
       );
-      if (pageIsCurrent) return;
+      if (snapshotIsCurrent) return;
     }
     _refreshNeeded = true;
     if (_activeRequest == null) {
       _refreshNeeded = false;
-      unawaited(_startFirst());
+      unawaited(_startRead());
     }
   }
 
@@ -448,29 +445,6 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     }
   }
 
-  Future<void> loadMore() {
-    final current = state;
-    if (current is! TagCatalogLoaded ||
-        !current.canUseCurrentItems ||
-        current.nextCursor == null ||
-        current.pageStatus is! TagCatalogPageIdle) {
-      return _activeRequest ?? Future.value();
-    }
-    return _start(() => _loadMore(current, _generation));
-  }
-
-  Future<void> retryLoadMore() {
-    final current = state;
-    if (current is! TagCatalogLoaded ||
-        current.pageStatus is! TagCatalogPageFailure ||
-        !(current.pageStatus as TagCatalogPageFailure).canRetry ||
-        !current.canUseCurrentItems) {
-      return Future.value();
-    }
-    state = current.withStatus(pageStatus: const TagCatalogPageIdle());
-    return loadMore();
-  }
-
   Future<void> retryRefresh() {
     final current = state;
     if (current is! TagCatalogLoaded ||
@@ -480,10 +454,10 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     }
     state = current.withStatus(freshness: TagCatalogFreshness.refreshing);
     _staleReadAttempts = 0;
-    return _startFirst();
+    return _startRead();
   }
 
-  Future<void> _startFirst() => _start(() => _loadFirst(_mode, _generation));
+  Future<void> _startRead() => _start(() => _loadCatalog(_mode, _generation));
 
   Future<void> _start(Future<void> Function() read) {
     final active = _activeRequest;
@@ -496,20 +470,20 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         _activeRequest = null;
         if (_refreshNeeded && ref.mounted) {
           _refreshNeeded = false;
-          unawaited(_startFirst());
+          unawaited(_startRead());
         }
       }),
     );
     return future;
   }
 
-  Future<void> _loadFirst(TagCatalogMode mode, int generation) async {
-    final result = await _readPage(mode);
+  Future<void> _loadCatalog(TagCatalogMode mode, int generation) async {
+    final result = await _readCatalog(mode);
     if (!ref.mounted || generation != _generation) return;
     switch (result) {
       case GraphResultSuccess(:final value):
         if (!_matchesMode(value, mode)) {
-          _firstFailure(const TagCatalogUnexpectedFailure());
+          _readFailure(const TagCatalogUnexpectedFailure());
           return;
         }
         final current = state;
@@ -520,19 +494,20 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         if (_precedesRequired(value.revision) || precedesDisplayed) {
           if (++_staleReadAttempts >= _maxStaleReads) {
             _refreshNeeded = false;
-            _firstFailure(const TagCatalogUnavailableFailure());
+            _readFailure(const TagCatalogUnavailableFailure());
           } else {
             _refreshNeeded = true;
           }
           return;
         }
         if (!_unique(value.items)) {
-          _firstFailure(const TagCatalogUnexpectedFailure());
+          _readFailure(const TagCatalogUnexpectedFailure());
           return;
         }
         _refreshNeeded = false;
         _staleReadAttempts = 0;
-        if (mode is TagCatalogSelectionMode && value is TagSelectionPage) {
+        _reconcileSelection(value);
+        if (mode is TagCatalogSelectionMode && value is TagSelectionSnapshot) {
           final found = _selectedAssignmentFromRows(
             value.rows,
             _selection.id,
@@ -550,8 +525,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         state = TagCatalogLoaded(
           mode: mode,
           items: value.items,
-          selectionRows: value is TagSelectionPage ? value.rows : const [],
-          nextCursor: value.nextCursor,
+          selectionRows: value is TagSelectionSnapshot ? value.rows : const [],
           revision: value.revision,
           selection: _selection,
           assignmentStatus: _assignmentStatus,
@@ -568,78 +542,43 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         _targetMissing(mode.target);
       case GraphResultFailure(:final failure):
         _refreshNeeded = false;
-        _firstFailure(failure);
+        _readFailure(failure);
     }
   }
 
-  Future<void> _loadMore(TagCatalogLoaded base, int generation) async {
-    state = base.withStatus(pageStatus: const TagCatalogPageLoading());
-    final result = await _readPage(base.mode, cursor: base.nextCursor);
-    if (!ref.mounted || generation != _generation) return;
-    final current = state;
-    if (current is! TagCatalogLoaded) return;
-    if (current.freshness != TagCatalogFreshness.current ||
-        _precedesRequired(base.revision)) {
-      _refreshNeeded = true;
+  void _reconcileSelection(TagCatalogSnapshot snapshot) {
+    final id = _selection.id;
+    if (id == null) return;
+    final known = _selectedRevision;
+    if (known != null &&
+        snapshot.revision.compareTo(known) == GraphRevisionOrder.older) {
       return;
     }
-    switch (result) {
-      case GraphResultSuccess(:final value):
-        if (!_matchesMode(value, base.mode)) {
-          state = current.withStatus(
-            pageStatus: const TagCatalogPageFailure(
-              TagCatalogUnexpectedFailure(),
-            ),
-          );
-          return;
-        }
-        if (value.revision.compareTo(base.revision) !=
-            GraphRevisionOrder.same) {
-          _beginRefresh(current);
-          _refreshNeeded = true;
-          return;
-        }
-        final ids = <TagId>{for (final item in base.items) item.id};
-        if (!ids.addAllChecked(value.items) ||
-            (value.items.isEmpty && value.nextCursor != null)) {
-          state = current.withStatus(
-            pageStatus: const TagCatalogPageFailure(
-              TagCatalogUnexpectedFailure(),
-            ),
-          );
-          return;
-        }
-        if (value is TagSelectionPage) {
-          _selectedAssignmentFromRows(
-            value.rows,
-            _selection.id,
-            value.revision,
-          );
-        }
-        state = TagCatalogLoaded(
-          mode: base.mode,
-          items: [...base.items, ...value.items],
-          selectionRows: [
-            ...base.selectionRows,
-            if (value is TagSelectionPage) ...value.rows,
-          ],
-          nextCursor: value.nextCursor,
-          revision: base.revision,
-          selection: _selection,
-          assignmentStatus: _assignmentStatus,
-          selectedAssignment: _selectedAssignment,
-        );
-      case GraphResultFailure(failure: TagCatalogSnapshotExpired()):
-        _beginRefresh(current);
-        _refreshNeeded = true;
-      case GraphResultFailure(failure: TagCatalogInvalidCursor()):
-        _beginRefresh(current);
-        _refreshNeeded = true;
-      case GraphResultFailure(failure: TagCatalogTargetNotFound())
-          when base.mode is TagCatalogSelectionMode:
-        _targetMissing((base.mode as TagCatalogSelectionMode).target);
-      case GraphResultFailure(:final failure):
-        state = current.withStatus(pageStatus: TagCatalogPageFailure(failure));
+    Tag? selected;
+    for (final tag in snapshot.items) {
+      if (tag.id == id) {
+        selected = tag;
+        break;
+      }
+    }
+    if (selected != null) {
+      _selectedRevision = snapshot.revision;
+      if (_selection is! TagCatalogSelectionFailure) {
+        _selection = TagCatalogSelectionReady(selected);
+      }
+      return;
+    }
+    _selectionGeneration++;
+    _assignmentReadGeneration++;
+    _assignmentStaleReads = 0;
+    unawaited(_selectedReads?.cancel());
+    _selectedReads = null;
+    _selectedRevision = null;
+    _clearSelectedAssignment();
+    _selection = const TagCatalogNoSelection();
+    if (_newlyCreatedTagId == id) {
+      _newlyCreatedTagId = null;
+      _newlyCreatedRevision = null;
     }
   }
 
@@ -743,19 +682,19 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       );
       _assignmentReadGeneration++;
       _assignmentStaleReads = 0;
-      final selectionOutsidePage = switch (state) {
+      final selectionOutsideSnapshot = switch (state) {
         TagCatalogLoaded(:final selectionRows) => !selectionRows.any(
           (row) => row.tag.id == selectedId,
         ),
         _ => false,
       };
-      if (!pairChanged && selectionOutsidePage) {
+      if (!pairChanged && selectionOutsideSnapshot) {
         _clearSelectedAssignment();
       }
     }
     _staleReadAttempts = 0;
     final current = state;
-    final pageAlreadyIncludes =
+    final snapshotAlreadyIncludes =
         current is TagCatalogLoaded &&
         switch (package.revision.compareTo(current.revision)) {
           GraphRevisionOrder.older || GraphRevisionOrder.same => true,
@@ -775,7 +714,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     for (final change in package.changes) {
       switch (change) {
         case TagRenamedChange(:final after):
-          if (!pageAlreadyIncludes) {
+          if (!snapshotAlreadyIncludes) {
             items = [
               for (final tag in items)
                 if (tag.id == after.id) after else tag,
@@ -791,7 +730,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
           if (canUpdateSelection && _selection.id == after.id) {
             var selected = after;
             GraphRevision revision = package.revision;
-            if (pageAlreadyIncludes) {
+            if (snapshotAlreadyIncludes) {
               for (final tag in current.items) {
                 if (tag.id == after.id) {
                   selected = tag;
@@ -804,7 +743,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
             _selectedRevision = revision;
           }
         case TagDeletedChange(:final tagId):
-          if (!pageAlreadyIncludes) {
+          if (!snapshotAlreadyIncludes) {
             items = [
               for (final tag in items)
                 if (tag.id != tagId) tag,
@@ -823,7 +762,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
             _selection = const TagCatalogNoSelection();
           }
         case TagAssignmentChangedChange(:final assignment, :final state)
-            when !pageAlreadyIncludes &&
+            when !snapshotAlreadyIncludes &&
                 current is TagCatalogLoaded &&
                 current.mode is TagCatalogSelectionMode &&
                 (current.mode as TagCatalogSelectionMode).target ==
@@ -845,7 +784,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       }
     }
     if (current is TagCatalogLoaded) {
-      if (pageAlreadyIncludes) {
+      if (snapshotAlreadyIncludes) {
         if (_selection.id != null &&
             !current.selectionRows.any((row) => row.tag.id == _selection.id)) {
           _assignmentReadGeneration++;
@@ -870,14 +809,13 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         assignmentStatus: _assignmentStatus,
         selectedAssignment: _selectedAssignment,
         freshness: TagCatalogFreshness.refreshing,
-        pageStatus: const TagCatalogPageIdle(),
       );
       _readSelectedAssignment();
     }
     _refreshNeeded = true;
     if (_activeRequest == null) {
       _refreshNeeded = false;
-      unawaited(_startFirst());
+      unawaited(_startRead());
     }
   }
 
@@ -945,29 +883,20 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       selection: _selection,
       selectedAssignment: _selectedAssignment,
       freshness: TagCatalogFreshness.refreshing,
-      pageStatus: const TagCatalogPageIdle(),
     );
     _refreshNeeded = true;
     if (_activeRequest == null) {
       _refreshNeeded = false;
-      unawaited(_startFirst());
+      unawaited(_startRead());
     }
   }
 
-  void _beginRefresh(TagCatalogLoaded current) {
-    state = current.withStatus(
-      freshness: TagCatalogFreshness.refreshing,
-      pageStatus: const TagCatalogPageIdle(),
-    );
-  }
-
-  void _firstFailure(TagCatalogReadFailure failure) {
+  void _readFailure(TagCatalogReadFailure failure) {
     final current = state;
     if (current is TagCatalogLoaded) {
       state = current.withStatus(
         freshness: TagCatalogFreshness.stale,
         refreshFailure: failure,
-        pageStatus: const TagCatalogPageIdle(),
       );
     } else {
       state = TagCatalogInitialFailure(failure, mode: _mode);
@@ -982,24 +911,19 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         order == GraphRevisionOrder.differentEpoch;
   }
 
-  Future<TagCatalogPageResult> _readPage(
-    TagCatalogMode mode, {
-    TagCatalogCursor? cursor,
-  }) async {
+  Future<TagCatalogResult> _readCatalog(TagCatalogMode mode) async {
     try {
-      return await _repository.getTagCatalogPage(
-        TagCatalogQuery(cursor: cursor, mode: mode),
-      );
+      return await _repository.getTagCatalog(mode);
     } on Object {
-      return const TagCatalogPageError(TagCatalogUnexpectedFailure());
+      return const TagCatalogError(TagCatalogUnexpectedFailure());
     }
   }
 
-  bool _matchesMode(TagCatalogPage page, TagCatalogMode mode) =>
-      switch ((page, mode)) {
-        (TagBrowsePage(), TagCatalogBrowseMode()) => true,
+  bool _matchesMode(TagCatalogSnapshot snapshot, TagCatalogMode mode) =>
+      switch ((snapshot, mode)) {
+        (TagBrowseSnapshot(), TagCatalogBrowseMode()) => true,
         (
-          TagSelectionPage(:final target),
+          TagSelectionSnapshot(:final target),
           TagCatalogSelectionMode(target: final modeTarget),
         ) =>
           target == modeTarget,
@@ -1048,14 +972,5 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     }
     _selectedAssignment = value;
     _selectedAssignmentRevision = revision;
-  }
-}
-
-extension on Set<TagId> {
-  bool addAllChecked(List<Tag> tags) {
-    for (final tag in tags) {
-      if (!add(tag.id)) return false;
-    }
-    return true;
   }
 }

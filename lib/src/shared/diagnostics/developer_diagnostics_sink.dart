@@ -32,13 +32,13 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
-  TagCatalogPageReadDiagnosticsEvent(:final stage) => {
-    'operation': 'tagCatalogPageRead',
+  TagCatalogReadDiagnosticsEvent(:final stage) => {
+    'operation': 'tagCatalogRead',
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
-  TagAssignmentsPageReadDiagnosticsEvent(:final stage) => {
-    'operation': 'tagAssignmentsPageRead',
+  TagAssignmentsReadDiagnosticsEvent(:final stage) => {
+    'operation': 'tagAssignmentsRead',
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },

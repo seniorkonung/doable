@@ -51,19 +51,11 @@ Future<void> _measureCatalogScroll(
     expect(list, findsOneWidget);
 
     final container = ProviderScope.containerOf(tester.element(list));
-    final model = container.read(tagCatalogViewModelProvider().notifier);
-    for (var page = 0; page < 10; page++) {
-      expect(
-        find.byKey(const ValueKey('tag-catalog-load-more')),
-        findsOneWidget,
-      );
-      await tester.runAsync(model.loadMore);
-      await tester.pumpAndSettle();
-    }
     final loaded = container.read(tagCatalogViewModelProvider());
     expect(loaded, isA<TagCatalogLoaded>());
     final loadedCatalog = loaded as TagCatalogLoaded;
-    expect(loadedCatalog.items, hasLength(550));
+    expect(loadedCatalog.items, hasLength(10000));
+    expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsNothing);
 
     final timings = <FrameTiming>[];
     void collect(List<FrameTiming> frames) => timings.addAll(frames);

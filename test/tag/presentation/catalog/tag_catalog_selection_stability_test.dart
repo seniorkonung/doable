@@ -8,11 +8,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
-import 'package:doable/src/tag/application/tag_catalog.dart'
-    hide TagCatalogPage;
-import 'package:doable/src/tag/application/tag_catalog.dart'
-    as data
-    show TagCatalogPage;
+import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -119,6 +115,22 @@ void main() {
             expect(tester.takeException(), isNull);
           }
         }
+
+        await tester.scrollUntilVisible(
+          _row(repository.rows.last.tag),
+          500,
+          scrollable: scrollable,
+          maxScrolls: 100,
+        );
+        expect(_row(repository.rows.last.tag), findsOneWidget);
+        expect(find.text('Тег 132'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('tag-catalog-load-more')),
+          findsNothing,
+        );
+        expect(repository.catalogModes, hasLength(1));
+        expect(repository.commandCount, 0);
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -244,12 +256,10 @@ Future<_ControlledRepository> _showCatalog(
   );
   expect(repository.catalogModes, [TagCatalogSelectionMode(target)]);
   repository.catalogRead.complete(
-    TagCatalogPageSuccess(
-      data.TagCatalogPage.selection(
+    TagCatalogSuccess(
+      TagCatalogSnapshot.selection(
         target: target,
         rows: repository.rows,
-        pageSize: TagCatalogQuery.defaultPageSize,
-        nextCursor: null,
         revision: const _Revision(),
       ),
     ),
@@ -289,7 +299,7 @@ final class _ControlledRepository extends Fake
 
   final TagTarget target;
   final rows = [
-    for (var index = 1; index <= 32; index++)
+    for (var index = 1; index <= 132; index++)
       TagSelectionRow(
         tag: Tag(
           id: (TagId.decode(_id(index)) as TagIdDecodingSuccess).id,
@@ -298,15 +308,15 @@ final class _ControlledRepository extends Fake
         isAssigned: index.isEven,
       ),
   ];
-  final catalogRead = Completer<TagCatalogPageResult>();
+  final catalogRead = Completer<TagCatalogResult>();
   final catalogModes = <TagCatalogMode>[];
   final observations = <TagId, List<_ControlledTagSubscription>>{};
   int assignmentReads = 0;
   int commandCount = 0;
 
   @override
-  Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) {
-    catalogModes.add(query.mode);
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) {
+    catalogModes.add(mode);
     return catalogRead.future;
   }
 

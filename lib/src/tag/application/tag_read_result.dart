@@ -4,7 +4,7 @@ import '../domain/tag.dart';
 import '../domain/tag_id.dart';
 import '../domain/tag_target.dart';
 import 'tag_assignment_status.dart';
-import 'tag_assignments_page.dart';
+import 'tag_assignments.dart';
 import 'tag_catalog.dart';
 import 'tagged_entities_page.dart';
 
@@ -41,21 +41,16 @@ typedef TagReadSuccess =
 typedef TagReadError = GraphResultFailure<GraphSnapshot<Tag?>, TagReadFailure>;
 
 /// Контракт чтений единого репозитория личного графа для потребителей тегов.
-/// Реализация и проверка продолжения принадлежат адаптеру графа.
+/// Согласованное чтение и проверка данных принадлежат адаптеру графа.
 abstract interface class TagReadContract {
-  /// Возвращает обычный каталог либо выбор для типизированного получателя.
-  /// Строки выбора несут подтверждённый признак назначения; оба режима идут
-  /// в порядке создания тегов, включая теги без назначений. Продолжение
-  /// принадлежит режиму и получателю. Отсутствующий получатель — отдельный
-  /// отказ даже при пустом каталоге.
-  Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query);
+  /// Полный каталог на одной ревизии, в порядке создания тегов.
+  /// Режим выбора содержит подтверждённые признаки назначения получателю.
+  /// Отсутствующий получатель — отдельный отказ даже при пустом каталоге.
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode);
 
-  /// Возвращает порцию тегов одного существующего получателя в порядке
-  /// создания тегов. Пустой успех отличается от отсутствия получателя;
-  /// продолжение принадлежит получателю и подтверждённому снимку.
-  Future<TagAssignmentsPageResult> getTagAssignmentsPage(
-    TagAssignmentsQuery query,
-  );
+  /// Все теги существующего получателя на одной ревизии, в порядке создания.
+  /// Пустой успех отличается от отсутствия получателя.
+  Future<TagAssignmentsResult> getTagAssignments(TagTarget target);
 
   /// Проверяет одну пару на согласованном снимке. Отсутствие каждого участника
   /// и отказ чтения различны; остальные назначения не загружаются.

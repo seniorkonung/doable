@@ -40,12 +40,13 @@ void main() {
   });
   tearDown(() => database.close());
 
-  for (final (kind, target) in [
+  for (final (kind, target, expectedCount) in [
     (
       'намерения',
       IntentionTagTarget(
         (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id,
       ),
+      602,
     ),
     (
       'долговременной связи',
@@ -54,10 +55,11 @@ void main() {
           tagFixtureId(101),
         ) as LongTermRelationIdDecodingSuccess).id,
       ),
+      401,
     ),
   ]) {
     testWidgets(
-      'подгрузка и прокрутка 350 назначений $kind остаются доступными',
+      'полная загрузка и прокрутка $expectedCount назначений $kind остаются доступными',
       (tester) async {
         tester.view.physicalSize = const Size(600, 900);
         tester.view.devicePixelRatio = 1;
@@ -95,27 +97,18 @@ void main() {
               container.read(tagAssignmentsViewModelProvider(target))
                   is TagAssignmentsLoaded,
         );
-        final model = container.read(
-          tagAssignmentsViewModelProvider(target).notifier,
-        );
-        for (var page = 0; page < 6; page++) {
-          await tester.runAsync(model.loadMore);
-          await _pumpUntil(tester, () {
-            final value = container.read(
-              tagAssignmentsViewModelProvider(target),
-            );
-            return value is TagAssignmentsLoaded &&
-                value.items.length == (page + 2) * 50;
-          });
-        }
         final state = container.read(tagAssignmentsViewModelProvider(target));
         expect(state, isA<TagAssignmentsLoaded>());
         final loaded = state as TagAssignmentsLoaded;
-        expect(loaded.items, hasLength(350));
+        expect(loaded.items, hasLength(expectedCount));
+        expect(
+          find.byKey(const ValueKey('tag-assignments-load-more')),
+          findsNothing,
+        );
         expect(loaded.items.first.id.toCanonicalString(), tagFixtureId(10000));
         expect(
           loaded.items.last.id.toCanonicalString(),
-          tagFixtureId(target is IntentionTagTarget ? 10698 : 11047),
+          tagFixtureId(target is IntentionTagTarget ? 11202 : 11200),
         );
 
         final scrollable = tester.state<ScrollableState>(

@@ -920,29 +920,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCatalogRefreshing => 'Refreshing tags…';
 
   @override
-  String get tagCatalogMoreAvailable => 'More tags are available.';
-
-  @override
-  String get tagCatalogLoadMore => 'Show more tags';
-
-  @override
-  String get tagCatalogLoadingMore => 'Loading more tags…';
-
-  @override
-  String get tagCatalogAllShown => 'All tags are shown.';
-
-  @override
-  String get tagCatalogLoadMoreUnavailable => 'More tags couldn’t be loaded.';
-
-  @override
-  String get tagCatalogLoadMoreCorruption =>
-      'Stored data is damaged; no more tags can be shown.';
-
-  @override
-  String get tagCatalogLoadMoreUnexpected =>
-      'More tags couldn’t be loaded because of an unexpected error.';
-
-  @override
   String get tagCatalogCreate => 'Create tag';
 
   @override
@@ -1119,30 +1096,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tagAssignmentsUnexpected =>
       'Could not load assignments because of an unexpected error.';
-
-  @override
-  String get tagAssignmentsMoreAvailable => 'More assignments are available.';
-
-  @override
-  String get tagAssignmentsLoadMore => 'Show more assignments';
-
-  @override
-  String get tagAssignmentsLoadingMore => 'Loading more assignments…';
-
-  @override
-  String get tagAssignmentsAllShown => 'All assignments are shown.';
-
-  @override
-  String get tagAssignmentsLoadMoreUnavailable =>
-      'Could not load more assignments.';
-
-  @override
-  String get tagAssignmentsLoadMoreCorruption =>
-      'Stored data is damaged; more assignments cannot be shown.';
-
-  @override
-  String get tagAssignmentsLoadMoreUnexpected =>
-      'Could not load more assignments because of an unexpected error.';
 
   @override
   String get tagAssignmentsChoose => 'Choose a tag';

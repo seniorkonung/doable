@@ -9,7 +9,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -101,13 +101,14 @@ void main() {
       .map((row) => row['tag_id'])
       .toList();
 
-  Future<void> expectUnloadedAssignment(TagTarget target) async {
-    final result = await repository.getTagAssignmentsPage(
-      TagAssignmentsQuery(target: target, pageSize: 1),
-    );
-    final page = (result as TagAssignmentsPageSuccess).value;
-    expect(page.items, hasLength(1));
-    expect(page.nextCursor, isNotNull);
+  Future<void> expectCompleteAssignments(TagTarget target) async {
+    final result = await repository.getTagAssignments(target);
+    final snapshot = (result as TagAssignmentsSuccess).value;
+    expect(snapshot.target, target);
+    expect(snapshot.items.map((tag) => tag.id), [
+      _tag(firstTagNumber),
+      _tag(lastTagNumber),
+    ]);
   }
 
   Future<GraphRevision> revision(int intention) async =>
@@ -134,7 +135,7 @@ void main() {
       rows('daily_choice_path_steps'),
     ];
 
-    await expectUnloadedAssignment(IntentionTagTarget(_intention(4)));
+    await expectCompleteAssignments(IntentionTagTarget(_intention(4)));
     expect(
       await repository.execute(DeleteIntention(_intention(4))),
       isA<ResultSuccess>(),
@@ -181,7 +182,9 @@ void main() {
       final dailyChoicesBefore = rows('daily_choices');
       final pathBefore = rows('daily_choice_path_steps');
 
-      await expectUnloadedAssignment(LongTermRelationTagTarget(_relation(103)));
+      await expectCompleteAssignments(
+        LongTermRelationTagTarget(_relation(103)),
+      );
       expect(
         await repository.execute(DeleteLongTermRelation(_relation(103))),
         isA<GraphCommandSucceeded>(),
@@ -200,7 +203,9 @@ void main() {
       expect(rows('daily_choices'), dailyChoicesBefore);
       expect(rows('daily_choice_path_steps'), pathBefore);
 
-      await expectUnloadedAssignment(LongTermRelationTagTarget(_relation(102)));
+      await expectCompleteAssignments(
+        LongTermRelationTagTarget(_relation(102)),
+      );
       expect(
         await repository.execute(DeleteLongTermRelation(_relation(102))),
         isA<GraphCommandSucceeded>(),

@@ -3,15 +3,14 @@ import 'dart:async';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -70,135 +69,118 @@ void main() {
     ]);
   }
 
-  TagCatalogPage page(TagCatalogPageResult result) =>
-      (result as TagCatalogPageSuccess).value;
+  TagCatalogSnapshot snapshot(TagCatalogResult result) =>
+      (result as TagCatalogSuccess).value;
 
-  test('пустой каталог и последовательный обход ограниченных порций', () async {
-    final empty = page(await repository.getTagCatalogPage(TagCatalogQuery()));
-    expect(empty.items, isEmpty);
-    expect(empty.nextCursor, isNull);
-
-    for (var number = 1; number <= 7; number++) {
+  test('каталог возвращает все 137 тегов за одно чтение', () async {
+    for (var number = 1; number <= 137; number++) {
       addTag(number, 'Тег $number');
     }
-    final names = <String>[];
-    TagCatalogCursor? cursor;
-    do {
-      final next = page(
-        await repository.getTagCatalogPage(
-          TagCatalogQuery(pageSize: 2, cursor: cursor),
-        ),
-      );
-      expect(next.items.length, lessThanOrEqualTo(2));
-      names.addAll(next.items.map((tag) => tag.name.value));
-      cursor = next.nextCursor;
-    } while (cursor != null);
-    expect(names, [for (var n = 1; n <= 7; n++) 'Тег $n']);
+
+    final loaded = snapshot(
+      await repository.getTagCatalog(const TagCatalogBrowseMode()),
+    );
+
+    expect(loaded.items, hasLength(137));
+    expect(loaded.items.map((tag) => tag.id), [
+      for (var number = 1; number <= 137; number++) _tagId(number),
+    ]);
     expect(
       probe.statements.where((sql) => sql.contains('FROM tags')),
-      isNotEmpty,
-    );
-    expect(
-      probe.statements
-          .where((sql) => sql.contains('FROM tags'))
-          .every((sql) => sql.contains('LIMIT ?') && !sql.contains('OFFSET')),
-      isTrue,
+      hasLength(1),
     );
     expect(
       probe.statements.any((sql) => sql.contains('tag_assignments')),
       isFalse,
     );
-    expect(
-      diagnostics.events.whereType<TagCatalogPageReadDiagnosticsEvent>().where(
-        (event) => event.status is DiagnosticsSucceeded,
-      ),
-      isNotEmpty,
-    );
+    expect(() => loaded.items.clear(), throwsUnsupportedError);
   });
 
-  test('чужой курсор и новая ревизия различаются', () async {
-    for (var number = 1; number <= 3; number++) {
+  test('пустой каталог и полный снимок сохраняют порядок создания', () async {
+    final empty = snapshot(
+      await repository.getTagCatalog(const TagCatalogBrowseMode()),
+    );
+    expect(empty.items, isEmpty);
+
+    for (var number = 1; number <= 7; number++) {
       addTag(number, 'Тег $number');
     }
-    final first = page(
-      await repository.getTagCatalogPage(TagCatalogQuery(pageSize: 1)),
+    probe.statements.clear();
+    final loaded = snapshot(
+      await repository.getTagCatalog(const TagCatalogBrowseMode()),
     );
-    final cursor = first.nextCursor!;
-
-    final target = IntentionTagTarget(
-      (IntentionId.decode(_uuid(12)) as IntentionIdDecodingSuccess).id,
+    expect(loaded.items.map((tag) => tag.name.value), [
+      for (var number = 1; number <= 7; number++) 'Тег $number',
+    ]);
+    expect(
+      probe.statements.where((sql) => sql.contains('FROM tags')),
+      hasLength(1),
     );
     expect(
-      await repository.getTagCatalogPage(
-        TagCatalogQuery(
-          pageSize: 1,
-          cursor: cursor,
-          mode: TagCatalogSelectionMode(target),
-        ),
+      diagnostics.events.whereType<TagCatalogReadDiagnosticsEvent>().where(
+        (event) => event.status is DiagnosticsSucceeded,
       ),
-      isA<TagCatalogPageError>().having(
-        (result) => result.failure,
-        'причина',
-        isA<TagCatalogInvalidCursor>(),
-      ),
-    );
-
-    expect(
-      await repository.getTagCatalogPage(
-        TagCatalogQuery(pageSize: 2, cursor: cursor),
-      ),
-      isA<TagCatalogPageError>().having(
-        (result) => result.failure,
-        'причина',
-        isA<TagCatalogInvalidCursor>(),
-      ),
-    );
-    final other = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 25),
-      diagnostics,
-    );
-    expect(
-      await other.getTagCatalogPage(
-        TagCatalogQuery(pageSize: 1, cursor: cursor),
-      ),
-      isA<TagCatalogPageError>().having(
-        (result) => result.failure,
-        'причина',
-        isA<TagCatalogInvalidCursor>(),
-      ),
-    );
-    expect(
-      await repository.execute(
-        const CreateIntention(title: 'Новое намерение', description: null),
-      ),
-      isA<GraphCommandSucceeded>(),
-    );
-    expect(
-      await repository.getTagCatalogPage(
-        TagCatalogQuery(pageSize: 1, cursor: cursor),
-      ),
-      isA<TagCatalogPageError>().having(
-        (result) => result.failure,
-        'причина',
-        isA<TagCatalogSnapshotExpired>(),
-      ),
+      hasLength(2),
     );
   });
 
-  test('повреждение дополнительной строки отклоняет всю порцию', () async {
-    addTag(1, 'Допустимый');
+  test(
+    'повторное чтение получает новую ревизию и не меняет прежний снимок',
+    () async {
+      for (var number = 1; number <= 3; number++) {
+        addTag(number, 'Тег $number');
+      }
+      final first = snapshot(
+        await repository.getTagCatalog(const TagCatalogBrowseMode()),
+      );
+      final other = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        diagnostics,
+      );
+      final sameCatalog = snapshot(
+        await other.getTagCatalog(const TagCatalogBrowseMode()),
+      );
+      expect(
+        sameCatalog.items.map((tag) => tag.id),
+        first.items.map((tag) => tag.id),
+      );
+      expect(
+        await repository.execute(
+          const CreateIntention(title: 'Новое намерение', description: null),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      addTag(4, 'Тег 4');
+      final updated = snapshot(
+        await repository.getTagCatalog(const TagCatalogBrowseMode()),
+      );
+      expect(updated.items.map((tag) => tag.id), [
+        for (var number = 1; number <= 4; number++) _tagId(number),
+      ]);
+      expect(
+        updated.revision.compareTo(first.revision),
+        GraphRevisionOrder.newer,
+      );
+      expect(first.items.map((tag) => tag.id), [
+        for (var number = 1; number <= 3; number++) _tagId(number),
+      ]);
+    },
+  );
+
+  test('повреждение 138-й строки отклоняет весь снимок', () async {
+    for (var number = 1; number <= 137; number++) {
+      addTag(number, 'Тег $number');
+    }
     raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
       'некорректный UUID',
       'Повреждённый',
     ]);
-    final result = await repository.getTagCatalogPage(
-      TagCatalogQuery(pageSize: 1),
-    );
+    final result = await repository.getTagCatalog(const TagCatalogBrowseMode());
     expect(
       result,
-      isA<TagCatalogPageError>().having(
+      isA<TagCatalogError>().having(
         (result) => result.failure,
         'причина',
         isA<TagCatalogCorruptionFailure>(),
@@ -206,7 +188,7 @@ void main() {
     );
     expect(
       (diagnostics.events
-                  .whereType<TagCatalogPageReadDiagnosticsEvent>()
+                  .whereType<TagCatalogReadDiagnosticsEvent>()
                   .last
                   .status
               as DiagnosticsFailed)
@@ -222,8 +204,8 @@ void main() {
       [_uuid(1), 'Первый'],
     );
     expect(
-      await repository.getTagCatalogPage(TagCatalogQuery()),
-      isA<TagCatalogPageError>().having(
+      await repository.getTagCatalog(const TagCatalogBrowseMode()),
+      isA<TagCatalogError>().having(
         (result) => result.failure,
         'причина',
         isA<TagCatalogCorruptionFailure>(),
@@ -243,8 +225,8 @@ void main() {
       _uuid(2),
     ]);
     expect(
-      await repository.getTagCatalogPage(TagCatalogQuery()),
-      isA<TagCatalogPageError>().having(
+      await repository.getTagCatalog(const TagCatalogBrowseMode()),
+      isA<TagCatalogError>().having(
         (result) => result.failure,
         'причина',
         isA<TagCatalogCorruptionFailure>(),
@@ -290,8 +272,8 @@ void main() {
       message: 'занято',
     );
     expect(
-      await repository.getTagCatalogPage(TagCatalogQuery()),
-      isA<TagCatalogPageError>().having(
+      await repository.getTagCatalog(const TagCatalogBrowseMode()),
+      isA<TagCatalogError>().having(
         (result) => result.failure.category,
         'категория',
         GraphFailureCategory.unavailable,
@@ -304,8 +286,8 @@ void main() {
     );
     probe.failure = StateError('неизвестная причина');
     expect(
-      await repository.getTagCatalogPage(TagCatalogQuery()),
-      isA<TagCatalogPageError>().having(
+      await repository.getTagCatalog(const TagCatalogBrowseMode()),
+      isA<TagCatalogError>().having(
         (result) => result.failure.category,
         'категория',
         GraphFailureCategory.unexpected,

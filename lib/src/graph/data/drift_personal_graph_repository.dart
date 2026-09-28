@@ -40,7 +40,7 @@ import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
 import '../../tag/application/tag_catalog.dart';
 import '../../tag/application/tag_assignment_status.dart';
-import '../../tag/application/tag_assignments_page.dart';
+import '../../tag/application/tag_assignments.dart';
 import '../../tag/application/tag_change.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_id_generator.dart';
@@ -120,13 +120,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _DriftGraphRevision(_epoch, _mutationSequence);
 
   @override
-  Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) =>
-      _readTagCatalogPage(query);
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>
+      _readTagCatalog(mode);
 
   @override
-  Future<TagAssignmentsPageResult> getTagAssignmentsPage(
-    TagAssignmentsQuery query,
-  ) => _readTagAssignmentsPage(query);
+  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) =>
+      _readTagAssignments(target);
 
   @override
   Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(

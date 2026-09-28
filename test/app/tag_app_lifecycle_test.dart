@@ -377,14 +377,12 @@ final class _ControlledRepository extends Fake
   ) => delegate.getCatalogPage(query);
 
   @override
-  Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) =>
-      failNextCatalogRead
-      ? _failCatalogRead()
-      : delegate.getTagCatalogPage(query);
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>
+      failNextCatalogRead ? _failCatalogRead() : delegate.getTagCatalog(mode);
 
-  Future<TagCatalogPageResult> _failCatalogRead() async {
+  Future<TagCatalogResult> _failCatalogRead() async {
     failNextCatalogRead = false;
-    return const TagCatalogPageError(TagCatalogUnavailableFailure());
+    return const TagCatalogError(TagCatalogUnavailableFailure());
   }
 
   @override

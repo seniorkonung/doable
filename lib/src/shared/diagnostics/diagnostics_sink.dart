@@ -102,8 +102,8 @@ final class TagCommandDiagnosticsEvent extends DiagnosticsEvent {
   final TagCommandDiagnosticsStage stage;
 }
 
-final class TagCatalogPageReadDiagnosticsEvent extends DiagnosticsEvent {
-  const TagCatalogPageReadDiagnosticsEvent({
+final class TagCatalogReadDiagnosticsEvent extends DiagnosticsEvent {
+  const TagCatalogReadDiagnosticsEvent({
     required this.stage,
     required DiagnosticsStatus status,
   }) : super(status);
@@ -111,8 +111,8 @@ final class TagCatalogPageReadDiagnosticsEvent extends DiagnosticsEvent {
   final TagReadDiagnosticsStage stage;
 }
 
-final class TagAssignmentsPageReadDiagnosticsEvent extends DiagnosticsEvent {
-  const TagAssignmentsPageReadDiagnosticsEvent({
+final class TagAssignmentsReadDiagnosticsEvent extends DiagnosticsEvent {
+  const TagAssignmentsReadDiagnosticsEvent({
     required this.stage,
     required DiagnosticsStatus status,
   }) : super(status);

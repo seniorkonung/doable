@@ -7,7 +7,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
-import '../../application/tag_assignments_page.dart';
+import '../../application/tag_assignments.dart';
 import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
@@ -248,7 +248,7 @@ final class _TagAssignmentsSectionState
             TagAssignmentsInitialFailure(:final failure, :final canRetry) =>
               _AssignmentStatus(
                 message: _readFailure(l10n, failure),
-                onAction: canRetry ? model.retryFirstPage : null,
+                onAction: canRetry ? model.retryInitialLoad : null,
                 actionLabel: l10n.commonRetry,
               ),
             TagAssignmentsLoaded loaded => _LoadedAssignments(
@@ -351,28 +351,6 @@ final class _LoadedAssignments extends StatelessWidget {
               ),
             ),
           ),
-        if (state.canUseCurrentItems && !state.isEmpty)
-          switch (state.pageStatus) {
-            TagAssignmentsPageLoading() => _AssignmentStatus(
-              message: l10n.tagAssignmentsLoadingMore,
-              loading: true,
-            ),
-            TagAssignmentsPageFailure(:final failure, :final canRetry) =>
-              _AssignmentStatus(
-                message: _pageFailure(l10n, failure),
-                onAction: canRetry ? model.retryLoadMore : null,
-                actionLabel: l10n.commonRetry,
-              ),
-            TagAssignmentsPageIdle() =>
-              state.nextCursor == null
-                  ? _AssignmentStatus(message: l10n.tagAssignmentsAllShown)
-                  : _AssignmentStatus(
-                      message: l10n.tagAssignmentsMoreAvailable,
-                      onAction: model.loadMore,
-                      actionLabel: l10n.tagAssignmentsLoadMore,
-                      actionKey: const ValueKey('tag-assignments-load-more'),
-                    ),
-          },
       ],
     );
   }
@@ -384,14 +362,12 @@ final class _AssignmentStatus extends StatelessWidget {
     this.loading = false,
     this.onAction,
     this.actionLabel,
-    this.actionKey,
   });
 
   final String message;
   final bool loading;
   final VoidCallback? onAction;
   final String? actionLabel;
-  final Key? actionKey;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -409,11 +385,7 @@ final class _AssignmentStatus extends StatelessWidget {
           Text(message),
           if (onAction case final action?) ...[
             const SizedBox(height: 12),
-            OutlinedButton(
-              key: actionKey,
-              onPressed: action,
-              child: Text(actionLabel!),
-            ),
+            OutlinedButton(onPressed: action, child: Text(actionLabel!)),
           ],
         ],
       ),
@@ -425,20 +397,6 @@ String _readFailure(AppLocalizations l10n, TagAssignmentsReadFailure failure) =>
     switch (failure) {
       TagAssignmentsUnavailableFailure() => l10n.tagAssignmentsUnavailable,
       TagAssignmentsCorruptionFailure() => l10n.tagAssignmentsCorruption,
-      TagAssignmentsInvalidCursor() ||
-      TagAssignmentsSnapshotExpired() ||
       TagAssignmentsTargetNotFound() ||
       TagAssignmentsUnexpectedFailure() => l10n.tagAssignmentsUnexpected,
     };
-
-String _pageFailure(
-  AppLocalizations l10n,
-  TagAssignmentsReadFailure failure,
-) => switch (failure) {
-  TagAssignmentsUnavailableFailure() => l10n.tagAssignmentsLoadMoreUnavailable,
-  TagAssignmentsCorruptionFailure() => l10n.tagAssignmentsLoadMoreCorruption,
-  TagAssignmentsInvalidCursor() ||
-  TagAssignmentsSnapshotExpired() ||
-  TagAssignmentsTargetNotFound() ||
-  TagAssignmentsUnexpectedFailure() => l10n.tagAssignmentsLoadMoreUnexpected,
-};

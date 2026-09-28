@@ -84,25 +84,6 @@ final class TagCatalogSelectionFailure extends TagCatalogSelection {
   bool get canRetry => failure is TagReadUnavailableFailure;
 }
 
-sealed class TagCatalogPageStatus {
-  const TagCatalogPageStatus();
-}
-
-final class TagCatalogPageIdle extends TagCatalogPageStatus {
-  const TagCatalogPageIdle();
-}
-
-final class TagCatalogPageLoading extends TagCatalogPageStatus {
-  const TagCatalogPageLoading();
-}
-
-final class TagCatalogPageFailure extends TagCatalogPageStatus {
-  const TagCatalogPageFailure(this.failure);
-
-  final TagCatalogReadFailure failure;
-  bool get canRetry => failure is TagCatalogUnavailableFailure;
-}
-
 sealed class TagCatalogAssignmentStatus {
   const TagCatalogAssignmentStatus();
 }
@@ -124,19 +105,17 @@ final class TagCatalogAssignmentKeysBusy extends TagCatalogAssignmentStatus {
   final TagId tagId;
 }
 
-/// Строки и курсор принадлежат одной отображаемой основе. При актуализации
+/// Строки принадлежат одному полному отображаемому снимку. При актуализации
 /// известные имена и удаления учитываются сразу, но список остаётся неактуальным.
 final class TagCatalogLoaded extends TagCatalogState {
   TagCatalogLoaded({
     required this.mode,
     required List<Tag> items,
     List<TagSelectionRow> selectionRows = const [],
-    required this.nextCursor,
     required this.revision,
     this.selection = const TagCatalogNoSelection(),
     this.freshness = TagCatalogFreshness.current,
     this.refreshFailure,
-    this.pageStatus = const TagCatalogPageIdle(),
     this.assignmentStatus = const TagCatalogAssignmentIdle(),
     this.selectedAssignment = TagCatalogSelectedAssignment.unknown,
   }) : items = List.unmodifiable(items),
@@ -145,12 +124,10 @@ final class TagCatalogLoaded extends TagCatalogState {
   final TagCatalogMode mode;
   final List<Tag> items;
   final List<TagSelectionRow> selectionRows;
-  final TagCatalogCursor? nextCursor;
   final GraphRevision revision;
   final TagCatalogSelection selection;
   final TagCatalogFreshness freshness;
   final TagCatalogReadFailure? refreshFailure;
-  final TagCatalogPageStatus pageStatus;
   final TagCatalogAssignmentStatus assignmentStatus;
   final TagCatalogSelectedAssignment selectedAssignment;
 
@@ -162,7 +139,6 @@ final class TagCatalogLoaded extends TagCatalogState {
     List<TagSelectionRow>? selectionRows,
     TagCatalogFreshness? freshness,
     TagCatalogReadFailure? refreshFailure,
-    TagCatalogPageStatus? pageStatus,
     TagCatalogSelection? selection,
     TagCatalogAssignmentStatus? assignmentStatus,
     TagCatalogSelectedAssignment? selectedAssignment,
@@ -170,12 +146,10 @@ final class TagCatalogLoaded extends TagCatalogState {
     mode: mode,
     items: items ?? this.items,
     selectionRows: selectionRows ?? this.selectionRows,
-    nextCursor: nextCursor,
     revision: revision,
     selection: selection ?? this.selection,
     freshness: freshness ?? this.freshness,
     refreshFailure: refreshFailure ?? this.refreshFailure,
-    pageStatus: pageStatus ?? this.pageStatus,
     assignmentStatus: assignmentStatus ?? this.assignmentStatus,
     selectedAssignment: selectedAssignment ?? this.selectedAssignment,
   );

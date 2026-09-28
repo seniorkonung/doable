@@ -10,7 +10,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
@@ -237,7 +237,7 @@ void main() {
   );
 
   test(
-    'выбор вне порции исчезает при удалении даже после отказа чтения',
+    'выбор из полного каталога исчезает при удалении даже после отказа чтения',
     () async {
       late sqlite.Database raw;
       late _ControlledReads repository;
@@ -276,7 +276,7 @@ void main() {
         (ready.container.read(provider) as TagCatalogLoaded).items.any(
           (tag) => tag.id == id,
         ),
-        isFalse,
+        isTrue,
       );
       model.selectTag(id);
       await _until(
@@ -555,21 +555,19 @@ final class _ControlledReads extends Fake implements PersonalGraphRepository {
   void releaseCommand() => _commandGate!.complete();
 
   @override
-  Future<TagCatalogPageResult> getTagCatalogPage(TagCatalogQuery query) {
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) {
     if (failNextCatalogRead) {
       failNextCatalogRead = false;
       return Future.value(
-        const TagCatalogPageError(TagCatalogUnavailableFailure()),
+        const TagCatalogError(TagCatalogUnavailableFailure()),
       );
     }
-    return delegate.getTagCatalogPage(query);
+    return delegate.getTagCatalog(mode);
   }
 
   @override
-  Future<TagAssignmentsPageResult> getTagAssignmentsPage(
-    TagAssignmentsQuery query,
-  ) async {
-    final result = await delegate.getTagAssignmentsPage(query);
+  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) async {
+    final result = await delegate.getTagAssignments(target);
     final gate = _assignmentsGate;
     if (gate != null) {
       _assignmentsGate = null;

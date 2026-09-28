@@ -13,7 +13,7 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_id_generator.dart';
@@ -270,29 +270,26 @@ Future<void> _verifyAssignments(
   DriftPersonalGraphRepository repository, {
   required bool secondIntentionAssigned,
 }) async {
-  final catalog = (await repository.getTagCatalogPage(
-    TagCatalogQuery(),
-  ) as TagCatalogPageSuccess).value;
+  final catalog = (await repository.getTagCatalog(
+    const TagCatalogBrowseMode(),
+  ) as TagCatalogSuccess).value;
   expect(catalog.items.map((tag) => (tag.id, tag.name.value)).toList(), [
     (_tag(301), 'Быт'),
     (_tag(303), 'Работа'),
   ]);
   for (final target in <TagTarget>[_intention(1), _relation(101)]) {
-    final page = (await repository.getTagAssignmentsPage(
-      TagAssignmentsQuery(target: target, pageSize: 1),
-    ) as TagAssignmentsPageSuccess).value;
-    expect(page.items.single.id, _tag(301));
-    expect(page.items.single.name.value, 'Быт');
-    final next = (await repository.getTagAssignmentsPage(
-      TagAssignmentsQuery(target: target, pageSize: 1, cursor: page.nextCursor),
-    ) as TagAssignmentsPageSuccess).value;
-    expect(next.items.single.id, _tag(303));
-    expect(next.items.single.name.value, 'Работа');
-    expect(next.nextCursor, isNull);
+    final snapshot = (await repository.getTagAssignments(
+      target,
+    ) as TagAssignmentsSuccess).value;
+    expect(snapshot.target, target);
+    expect(snapshot.items.map((tag) => (tag.id, tag.name.value)), [
+      (_tag(301), 'Быт'),
+      (_tag(303), 'Работа'),
+    ]);
   }
-  final secondPage = (await repository.getTagAssignmentsPage(
-    TagAssignmentsQuery(target: _intention(2)),
-  ) as TagAssignmentsPageSuccess).value;
+  final secondPage = (await repository.getTagAssignments(
+    _intention(2),
+  ) as TagAssignmentsSuccess).value;
   expect(
     secondPage.items.map((tag) => tag.id).toList(),
     secondIntentionAssigned ? [_tag(303)] : isEmpty,
