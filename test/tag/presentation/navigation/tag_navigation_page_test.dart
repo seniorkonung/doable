@@ -22,6 +22,7 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
+import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -36,10 +37,12 @@ import '../../../support/tag_storage_fixture.dart';
 
 part 'tag_navigation_semantics_scenarios.dart';
 part 'tag_navigation_terminal_page_scenarios.dart';
+part 'tag_navigation_late_page_widget_scenarios.dart';
 
 void main() {
   _registerNavigationSemanticsScenarios();
   _registerTerminalNavigationScenarios();
+  _registerLatePageWidgetScenarios();
   for (final (relation, archived, number) in [
     (false, false, 4),
     (false, true, 2),

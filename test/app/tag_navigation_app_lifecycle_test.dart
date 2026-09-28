@@ -29,6 +29,7 @@ import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart'
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -37,9 +38,11 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 
 part 'tag_navigation_terminal_app_scenarios.dart';
+part 'tag_navigation_late_page_app_scenarios.dart';
 
 void main() {
   _registerTerminalAppScenarios();
+  _registerLatePageAppScenarios();
 
   for (final continuation in [false, true]) {
     testWidgets(
