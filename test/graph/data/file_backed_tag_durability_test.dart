@@ -5,8 +5,11 @@ import 'dart:io';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -16,6 +19,245 @@ import '../../support/schema_v1_fixture.dart';
 import '../../support/tag_storage_fixture.dart';
 
 void main() {
+  for (final sourceVersion in [0, 1, 2, 3, 4]) {
+    test(
+      'полный обход навигации сохраняет порядок после нового процесса, переименования, локали и часов: схема $sourceVersion',
+      () async {
+        final harness = await LocalDatabaseHarness.fileBacked();
+        addTearDown(harness.dispose);
+        await _createNavigationDatabaseFixture(
+          harness.databaseFile,
+          sourceVersion,
+        );
+        Map<String, List<List<Object?>>>? publishedGraph;
+        if (sourceVersion != 0) {
+          final connection = sqlite.sqlite3.open(harness.databaseFile.path);
+          try {
+            publishedGraph = _publishedNavigationGraphRows(
+              connection,
+              sourceVersion,
+            );
+          } finally {
+            connection.close();
+          }
+        }
+        late sqlite.Database raw;
+        final database = await harness.openReadyDatabase(
+          setup: (db) => raw = db,
+        );
+        if (publishedGraph != null) {
+          expect(
+            _publishedNavigationGraphRows(raw, sourceVersion),
+            publishedGraph,
+          );
+        }
+        if (sourceVersion != 4) {
+          expect(raw.select('SELECT id FROM tags'), isEmpty);
+          seedTagNavigationLifecycleFixture(raw);
+        }
+        final graphBefore = retainedTagFixtureGraph(raw);
+        final assignmentsBefore = _assignmentRows(raw);
+        final repository = DriftPersonalGraphRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026),
+          InMemoryDiagnosticsSink(),
+        );
+        final previousPages = <TaggedEntitiesPage>[];
+        for (final scope in TaggedEntitiesScope.values) {
+          final first = await repository.getTaggedEntitiesPage(
+            TaggedEntitiesQuery(
+              tagId: _navigationTagId(),
+              scope: scope,
+              pageSize: 1,
+            ),
+          );
+          expect(first, isA<TaggedEntitiesPageSuccess>());
+          final page = (first as TaggedEntitiesPageSuccess).value;
+          expect(page.nextCursor, isNotNull);
+          previousPages.add(page);
+        }
+        await harness.closePersistenceObjectGraph();
+
+        await _runWorker(
+          harness,
+          'navigation_rename',
+          locale: 'en',
+          clockYear: 1900,
+        );
+        await _runWorker(
+          harness,
+          'navigation_verify',
+          locale: 'ru',
+          clockYear: 2100,
+        );
+
+        final reopened = await harness.openReadyDatabase(
+          setup: (db) => raw = db,
+        );
+        final nextRepository = DriftPersonalGraphRepository(
+          reopened,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(1800),
+          InMemoryDiagnosticsSink(),
+        );
+        for (final previous in previousPages) {
+          expect(
+            await nextRepository.getTaggedEntitiesPage(
+              TaggedEntitiesQuery(
+                tagId: previous.tag.id,
+                scope: previous.scope,
+                pageSize: 1,
+                cursor: previous.nextCursor,
+              ),
+            ),
+            isA<TaggedEntitiesPageError>().having(
+              (result) => result.failure,
+              'прежний курсор',
+              isA<TaggedEntitiesInvalidCursor>(),
+            ),
+          );
+          final first = (await nextRepository.getTaggedEntitiesPage(
+            TaggedEntitiesQuery(
+              tagId: previous.tag.id,
+              scope: previous.scope,
+              pageSize: 1,
+            ),
+          ) as TaggedEntitiesPageSuccess).value;
+          expect(
+            first.revision.compareTo(previous.revision),
+            GraphRevisionOrder.differentEpoch,
+          );
+          expect(first.tag.name.value, 'Быт 🏷️');
+          expect(first.items.single.target, previous.items.single.target);
+        }
+        expect(_assignmentRows(raw), assignmentsBefore);
+        expect(retainedTagFixtureGraph(raw), graphBefore);
+        expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
+        expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+      },
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
+  }
+
+  test('навигация после остановки сохраняет удаления, конец повторного назначения и атомарность последнего номера', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    late sqlite.Database raw;
+    await harness.openReadyDatabase(setup: (db) => raw = db);
+    seedTagNavigationLifecycleFixture(raw);
+    await harness.closePersistenceObjectGraph();
+
+    await _runWorker(harness, 'navigation_mutate', killAtReady: true);
+    await _runWorker(
+      harness,
+      'navigation_verify_removed',
+      locale: 'en',
+      clockYear: 1900,
+    );
+    await harness.openReadyDatabase(setup: (db) => raw = db);
+    final tagsBefore = _tagRows(raw);
+    final assignmentsBefore = _assignmentRows(raw);
+    final graphBefore = retainedTagFixtureGraph(raw);
+    expect(
+      raw
+          .select('SELECT id, name FROM tags ORDER BY creation_sequence')
+          .map((row) => (row['id'], row['name']))
+          .toList(),
+      [
+        (tagFixtureId(firstTagNumber), 'Быт 🏷️'),
+        (tagFixtureId(303), 'Без назначений'),
+        (tagFixtureId(304), 'Только в архиве'),
+        (tagFixtureId(305), 'Работа'),
+      ],
+    );
+    for (final (table, number) in [
+      ('tags', lastTagNumber),
+      ('intentions', 5),
+      ('long_term_relations', 106),
+    ]) {
+      expect(
+        raw.select('SELECT id FROM $table WHERE id = ?', [
+          tagFixtureId(number),
+        ]),
+        isEmpty,
+      );
+    }
+    expect(
+      raw.select('''
+        SELECT MAX(creation_sequence) AS last FROM tag_assignments
+      ''').single['last'],
+      13,
+    );
+    expect(
+      raw
+          .select(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'tag_assignments'",
+          )
+          .single['seq'],
+      14,
+    );
+    expect(raw.select('SELECT id FROM daily_choices'), hasLength(1));
+    expect(raw.select('SELECT id FROM daily_choice_path_steps'), hasLength(1));
+    await harness.closePersistenceObjectGraph();
+
+    await _runWorker(
+      harness,
+      'navigation_assignment_before_commit',
+      killAtReady: true,
+    );
+    await _runWorker(harness, 'navigation_verify_removed');
+    await harness.openReadyDatabase(setup: (db) => raw = db);
+    expect(_tagRows(raw), tagsBefore);
+    expect(_assignmentRows(raw), assignmentsBefore);
+    expect(retainedTagFixtureGraph(raw), graphBefore);
+    expect(
+      raw
+          .select(
+            "SELECT seq FROM sqlite_sequence WHERE name = 'tag_assignments'",
+          )
+          .single['seq'],
+      14,
+    );
+    await harness.closePersistenceObjectGraph();
+
+    await _runWorker(
+      harness,
+      'navigation_assignment_after_commit',
+      killAtReady: true,
+      clockYear: 1800,
+    );
+    await _runWorker(
+      harness,
+      'navigation_verify_reassigned',
+      locale: 'en',
+      clockYear: 2100,
+    );
+    await harness.openReadyDatabase(setup: (db) => raw = db);
+    expect(_tagRows(raw), tagsBefore);
+    expect(retainedTagFixtureGraph(raw), graphBefore);
+    final assignmentsAfter = _assignmentRows(raw);
+    expect(assignmentsAfter, hasLength(assignmentsBefore.length + 1));
+    expect(
+      assignmentsAfter.take(assignmentsBefore.length).toList(),
+      assignmentsBefore,
+    );
+    expect(
+      raw
+          .select(
+            '''
+          SELECT creation_sequence FROM tag_assignments
+          WHERE tag_id = ? AND intention_id = ?
+        ''',
+            [tagFixtureId(firstTagNumber), tagFixtureId(2)],
+          )
+          .single['creation_sequence'],
+      15,
+    );
+    expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
+    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
   for (final sourceVersion in [0, 1, 2, 3]) {
     test(
       'команды сохраняют назначения после остановки и нового процесса: схема $sourceVersion',
@@ -389,6 +631,70 @@ void _seedAssignmentRecipients(sqlite.Database raw) {
   );
 }
 
+TagId _navigationTagId() =>
+    (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
+
+Future<void> _createNavigationDatabaseFixture(File file, int version) async {
+  void seed(sqlite.Database raw) {
+    for (final number in [900, 901]) {
+      raw.execute(
+        'INSERT INTO intentions (id, title, description, is_action_ready, created_at, updated_at) VALUES (?, ?, ?, 1, 10, 20)',
+        [
+          tagFixtureId(number),
+          'Сохранённое намерение $number',
+          '  Точный текст  ',
+        ],
+      );
+    }
+    if (version >= 2) {
+      raw.execute(
+        'INSERT INTO long_term_relations (creation_sequence, id, source_intention_id, related_intention_id, type, priority) VALUES (47, ?, ?, ?, ?, 2)',
+        [tagFixtureId(903), tagFixtureId(900), tagFixtureId(901), 'need'],
+      );
+    }
+    if (version >= 3) {
+      raw.execute(
+        'INSERT INTO daily_choices (creation_sequence, id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (63, ?, ?, ?, ?, 1)',
+        [tagFixtureId(904), tagFixtureId(900), tagFixtureId(901), '2026-09-25'],
+      );
+      raw.execute(
+        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+        [tagFixtureId(905), tagFixtureId(904), tagFixtureId(903)],
+      );
+    }
+    if (version == 4) seedTagNavigationLifecycleFixture(raw);
+  }
+
+  switch (version) {
+    case 0:
+      return;
+    case 1:
+      await createSchemaV1Fixture(file, seed: seed);
+    case 2:
+      await createSchemaV2Fixture(file, seed: seed);
+    case 3:
+      await createSchemaV3Fixture(file, seed: seed);
+    case 4:
+      await createSchemaV4Fixture(file, seed: seed);
+  }
+}
+
+Map<String, List<List<Object?>>> _publishedNavigationGraphRows(
+  sqlite.Database raw,
+  int version,
+) => {
+  for (final table in [
+    'intentions',
+    'intention_titles_fts',
+    if (version >= 2) 'long_term_relations',
+    if (version >= 3) ...['daily_choices', 'daily_choice_path_steps'],
+  ])
+    table: raw
+        .select('SELECT rowid, * FROM $table ORDER BY rowid')
+        .map((row) => row.values.toList())
+        .toList(),
+};
+
 List<List<Object?>> _tagRows(sqlite.Database db) => db
     .select('SELECT * FROM tags ORDER BY creation_sequence')
     .map((row) => row.values.toList())
@@ -403,6 +709,8 @@ Future<void> _runWorker(
   LocalDatabaseHarness harness,
   String operation, {
   bool killAtReady = false,
+  String locale = 'ru',
+  int clockYear = 1999,
 }) async {
   var directory = File(Platform.resolvedExecutable).parent;
   late final String flutterExecutable;
@@ -431,6 +739,8 @@ Future<void> _runWorker(
     environment: {
       'DOABLE_TAG_DATABASE_PATH': harness.databaseFile.path,
       'DOABLE_TAG_OPERATION': operation,
+      'DOABLE_TAG_LOCALE': locale,
+      'DOABLE_TAG_CLOCK_YEAR': '$clockYear',
     },
   );
   final output = StringBuffer();
@@ -471,6 +781,8 @@ Future<void> _runWorker(
     }
     final code = await process.exitCode.timeout(const Duration(seconds: 60));
     await Future.wait([stdoutDone.future, stderrDone.future]);
+    expect(startedPid, isNotNull);
+    expect(startedPid, isNot(pid));
     if (killAtReady) {
       expect(code, isNot(0));
     } else {
