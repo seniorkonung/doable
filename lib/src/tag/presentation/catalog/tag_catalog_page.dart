@@ -34,6 +34,7 @@ final class TagCatalogPage extends ConsumerStatefulWidget {
 
 final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
   final _creationKey = TagCreationFormKey();
+  final _scrollController = ScrollController();
   late final GraphCommandCoordinator _coordinator;
   TagOperationToken? _activeDeleteToken;
   TagOperationToken? _failureToken;
@@ -53,6 +54,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     unawaited(_busyDeleteSubscription?.cancel());
     _releasePresentation();
     super.dispose();
@@ -349,6 +351,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
               ),
               TagCatalogLoaded loaded => _LoadedCatalog(
                 state: loaded,
+                scrollController: _scrollController,
                 model: model,
                 selection: loaded.selection,
                 onRename: (tag) {
@@ -373,6 +376,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
 final class _LoadedCatalog extends StatelessWidget {
   const _LoadedCatalog({
     required this.state,
+    required this.scrollController,
     required this.model,
     required this.selection,
     required this.onRename,
@@ -384,6 +388,7 @@ final class _LoadedCatalog extends StatelessWidget {
   });
 
   final TagCatalogLoaded state;
+  final ScrollController scrollController;
   final TagCatalogViewModel model;
   final TagCatalogSelection selection;
   final ValueChanged<Tag> onRename;
@@ -457,8 +462,10 @@ final class _LoadedCatalog extends StatelessWidget {
                 : null,
           ),
         Expanded(
+          key: const ValueKey('tag-catalog-viewport'),
           child: ListView.builder(
             key: const ValueKey('tag-catalog-list'),
+            controller: scrollController,
             itemCount: state.items.length + (selectedOutsidePage ? 1 : 0),
             itemBuilder: (context, index) {
               if (selectedOutsidePage && index == 0) {
@@ -541,15 +548,19 @@ final class _LoadedCatalog extends StatelessWidget {
             },
           ),
         ),
-        if (choosing && selected != null && !selectedAssigned)
+        if (choosing)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Semantics(
-              label: localizations.tagCatalogAssignNamed(selected.name.value),
+              label: selected == null
+                  ? localizations.tagCatalogAssign
+                  : localizations.tagCatalogAssignNamed(selected.name.value),
               child: FilledButton(
                 key: const ValueKey('tag-catalog-assign'),
                 onPressed:
-                    state.canUseCurrentItems &&
+                    selected != null &&
+                        !selectedAssigned &&
+                        state.canUseCurrentItems &&
                         state.assignmentStatus is TagCatalogAssignmentIdle &&
                         state.selectedAssignment ==
                             TagCatalogSelectedAssignment.available &&

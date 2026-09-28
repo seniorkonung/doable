@@ -114,6 +114,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   }
 
   void selectTag(TagId id) {
+    if (_selection is TagCatalogSelectionReady && _selection.id == id) return;
     _selectionGeneration++;
     _assignmentReadGeneration++;
     _assignmentStaleReads = 0;
@@ -144,7 +145,21 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         createdRevision,
       );
     }
-    _publishSelection(TagCatalogSelectionLoading(id));
+    Tag? loadedTag;
+    if (state case TagCatalogLoaded(:final items, :final revision)) {
+      for (final tag in items) {
+        if (tag.id == id) {
+          loadedTag = tag;
+          _selectedRevision = revision;
+          break;
+        }
+      }
+    }
+    _publishSelection(
+      loadedTag == null
+          ? TagCatalogSelectionLoading(id)
+          : TagCatalogSelectionReady(loadedTag),
+    );
     _readSelectedAssignment();
     try {
       _selectedReads = _repository
