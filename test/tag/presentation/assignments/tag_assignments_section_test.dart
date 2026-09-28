@@ -11,6 +11,7 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments_page.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -45,13 +46,17 @@ Widget _host({
   required TagTarget target,
   required Locale locale,
   required ValueChanged<TagTarget> onChoose,
+  ValueChanged<TagId>? onOpen,
   TagReadContract? reads,
+  Stream<ConfirmedGraphChangePackage>? changes,
   bool largeText = false,
   bool isArchived = false,
 }) => ProviderScope(
   overrides: [
     personalGraphRepositoryProvider.overrideWithValue(repository),
     if (reads != null) tagAssignmentsReaderProvider.overrideWithValue(reads),
+    if (changes != null)
+      tagAssignmentsChangesProvider.overrideWithValue(changes),
   ],
   child: MaterialApp(
     locale: locale,
@@ -70,6 +75,7 @@ Widget _host({
           target: target,
           isArchived: isArchived,
           onChooseTag: onChoose,
+          onOpenTag: onOpen ?? (_) {},
         ),
       ),
     ),
@@ -98,6 +104,72 @@ void main() {
     (const Locale('ru'), 'Выбрать тег', 'Снять назначение'),
     (const Locale('en'), 'Choose a tag', 'Remove assignment'),
   ]) {
+    for (final (kind, target, isArchived) in [
+      ('намерения', _target(1), false),
+      ('намерения', _target(2), true),
+      ('долговременной связи', _relationTarget(101), false),
+      ('долговременной связи', _relationTarget(102), true),
+    ]) {
+      testWidgets(
+        'назначение $kind ${isArchived ? 'в архиве' : 'в активном охвате'} открывает точный тег без изменений: ${locale.languageCode}',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final opened = <TagId>[];
+          final graphBefore = retainedTagFixtureGraph(raw);
+          final assignmentsBefore = raw
+              .select(
+                'SELECT * FROM tag_assignments ORDER BY creation_sequence',
+              )
+              .map((row) => row.values.toList())
+              .toList();
+          await tester.pumpWidget(
+            _host(
+              repository: repository,
+              target: target,
+              isArchived: isArchived,
+              locale: locale,
+              onChoose: (_) {},
+              onOpen: opened.add,
+            ),
+          );
+          final open = find.byKey(
+            ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
+          );
+          await _pumpUntil(tester, () => open.evaluate().isNotEmpty);
+          final l10n = AppLocalizations.of(tester.element(open));
+          expect(
+            tester.getSemantics(open).label,
+            contains(l10n.tagNavigationTitle),
+          );
+          expect(
+            tester
+                .getSemantics(find.byTooltip(l10n.tagNavigationTag('Дом')))
+                .tooltip,
+            l10n.tagNavigationTag('Дом'),
+          );
+          expect(tester.getSemantics(open).flagsCollection.isButton, isTrue);
+          expect(find.byTooltip('$removeText: Дом'), findsOneWidget);
+          expect(
+            tester.getSemantics(find.byTooltip('$removeText: Дом')).tooltip,
+            '$removeText: Дом',
+          );
+          await tester.tap(open);
+          expect(opened, [_tagId(firstTagNumber)]);
+          expect(retainedTagFixtureGraph(raw), graphBefore);
+          expect(
+            raw
+                .select(
+                  'SELECT * FROM tag_assignments ORDER BY creation_sequence',
+                )
+                .map((row) => row.values.toList())
+                .toList(),
+            assignmentsBefore,
+          );
+          semantics.dispose();
+        },
+      );
+    }
+
     testWidgets(
       'снятие последнего назначения сохраняет тег и показывает пустой список: ${locale.languageCode}',
       (tester) async {
@@ -187,12 +259,14 @@ void main() {
     tester,
   ) async {
     final reads = _PendingReads();
+    final opened = <TagId>[];
     await tester.pumpWidget(
       _host(
         repository: repository,
         target: _target(1),
         locale: const Locale('ru'),
         onChoose: (_) {},
+        onOpen: opened.add,
         reads: reads,
       ),
     );
@@ -201,6 +275,9 @@ void main() {
     reads.page(0, [_tag(301, 'Дом')], cursor: cursor);
     await tester.pumpAndSettle();
     expect(find.text('Дом'), findsOneWidget);
+    await tester.tap(
+      find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(301)}')),
+    );
     await tester.tap(find.byKey(const ValueKey('tag-assignments-load-more')));
     await tester.pump();
     expect(find.text('Загружаем ещё назначения…'), findsOneWidget);
@@ -213,7 +290,106 @@ void main() {
     reads.page(2, [_tag(302, 'Работа')]);
     await tester.pumpAndSettle();
     expect(find.text('Работа'), findsOneWidget);
+    final openNext = find.byKey(
+      ValueKey('tag-assignment-open-${tagFixtureId(302)}'),
+    );
+    await tester.ensureVisible(openNext);
+    await tester.pumpAndSettle();
+    await tester.tap(openNext);
+    expect(opened, [_tagId(301), _tagId(302)]);
   });
+
+  for (final (kind, target) in [
+    ('намерения', _target(2)),
+    ('долговременной связи', _relationTarget(102)),
+  ]) {
+    testWidgets(
+      'устаревшее или удалённое назначение $kind не открывается даже прежним действием',
+      (tester) async {
+        final reads = _PendingReads();
+        final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
+          sync: true,
+        );
+        addTearDown(changes.close);
+        final opened = <TagId>[];
+        await tester.pumpWidget(
+          _host(
+            repository: repository,
+            target: target,
+            isArchived: true,
+            locale: const Locale('ru'),
+            onChoose: (_) {},
+            onOpen: opened.add,
+            reads: reads,
+            changes: changes.stream,
+          ),
+        );
+        reads.page(0, [
+          _tag(301, 'Дом'),
+          _tag(302, 'Работа'),
+        ], cursor: _Cursor());
+        await tester.pumpAndSettle();
+        final openHome = find.byKey(
+          ValueKey('tag-assignment-open-${tagFixtureId(301)}'),
+        );
+        final openWork = find.byKey(
+          ValueKey('tag-assignment-open-${tagFixtureId(302)}'),
+        );
+        final previousHomeAction = tester
+            .widget<TextButton>(openHome)
+            .onPressed!;
+        final previousWorkAction = tester
+            .widget<TextButton>(openWork)
+            .onPressed!;
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('tag-assignments-load-more')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('tag-assignments-load-more')),
+        );
+        await tester.pump();
+        changes.add(
+          _Package(const _Revision(1), [
+            TagRenamedChange(
+              revision: const _Revision(1),
+              before: _tag(301, 'Дом'),
+              after: _tag(301, 'Быт'),
+            ),
+            TagDeletedChange(revision: const _Revision(1), tagId: _tagId(302)),
+          ]),
+        );
+        previousHomeAction();
+        previousWorkAction();
+        expect(opened, isEmpty);
+        await tester.pump();
+        expect(tester.widget<TextButton>(openHome).onPressed, isNull);
+        expect(openWork, findsNothing);
+        reads.page(1, [_tag(302, 'Работа')]);
+        await tester.pump();
+        reads.fail(2, const TagAssignmentsUnavailableFailure());
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextButton>(openHome).onPressed, isNull);
+        expect(openWork, findsNothing);
+        previousHomeAction();
+        previousWorkAction();
+        expect(opened, isEmpty);
+
+        await tester.ensureVisible(find.text('Повторить'));
+        await tester.tap(find.text('Повторить'));
+        await tester.pump();
+        reads.page(3, [_tag(301, 'Быт'), _tag(303, 'Работа')], revision: 1);
+        await tester.pumpAndSettle();
+        previousWorkAction();
+        expect(opened, isEmpty);
+        final openReplacement = find.byKey(
+          ValueKey('tag-assignment-open-${tagFixtureId(303)}'),
+        );
+        await tester.ensureVisible(openReplacement);
+        await tester.tap(openReplacement);
+        expect(opened, [_tagId(303)]);
+      },
+    );
+  }
 
   testWidgets('отсутствие получателя не предлагает повтор', (tester) async {
     final reads = _PendingReads();
@@ -296,12 +472,14 @@ void main() {
       });
       final reads = _PendingReads();
       final target = _target(1);
+      final opened = <TagId>[];
       await tester.pumpWidget(
         _host(
           repository: repository,
           target: target,
           locale: const Locale('ru'),
           onChoose: (_) {},
+          onOpen: opened.add,
           reads: reads,
           largeText: true,
           isArchived: true,
@@ -315,6 +493,14 @@ void main() {
         find.bySemanticsLabel('Назначения тегов: намерение, в архиве'),
         findsOneWidget,
       );
+      final open = find.byKey(
+        ValueKey('tag-assignment-open-${tagFixtureId(301)}'),
+      );
+      await tester.ensureVisible(open);
+      await tester.pumpAndSettle();
+      expect(tester.getSemantics(open).label, contains('Сущности с тегом'));
+      await tester.tap(open);
+      expect(opened, [_tagId(301)]);
       await tester.ensureVisible(
         find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
       );
@@ -342,7 +528,12 @@ final class _PendingReads extends Fake implements TagReadContract {
     return page.future;
   }
 
-  void page(int index, List<Tag> tags, {TagAssignmentsCursor? cursor}) {
+  void page(
+    int index,
+    List<Tag> tags, {
+    TagAssignmentsCursor? cursor,
+    int revision = 0,
+  }) {
     pages[index].complete(
       TagAssignmentsPageSuccess(
         TagAssignmentsPage(
@@ -350,7 +541,7 @@ final class _PendingReads extends Fake implements TagReadContract {
           items: tags,
           pageSize: queries[index].pageSize,
           nextCursor: cursor,
-          revision: const _Revision(),
+          revision: _Revision(revision),
         ),
       ),
     );
@@ -362,11 +553,27 @@ final class _PendingReads extends Fake implements TagReadContract {
 
 final class _Cursor implements TagAssignmentsCursor {}
 
-final class _Revision implements GraphRevision {
-  const _Revision();
+final class _Package implements ConfirmedGraphChangePackage {
+  const _Package(this.revision, this.changes);
 
   @override
-  GraphRevisionOrder compareTo(GraphRevision other) => GraphRevisionOrder.same;
+  final GraphRevision revision;
+  @override
+  final List<GraphChange> changes;
+}
+
+final class _Revision implements GraphRevision {
+  const _Revision(this.number);
+
+  final int number;
+
+  @override
+  GraphRevisionOrder compareTo(GraphRevision other) => switch (other) {
+    _Revision(number: final n) when number < n => GraphRevisionOrder.older,
+    _Revision(number: final n) when number > n => GraphRevisionOrder.newer,
+    _Revision() => GraphRevisionOrder.same,
+    _ => GraphRevisionOrder.differentEpoch,
+  };
 }
 
 final class _FailingRepository extends Fake implements PersonalGraphRepository {

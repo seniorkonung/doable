@@ -342,6 +342,9 @@ final class _LoadedDetails extends StatelessWidget {
               onChooseTag: (target) => unawaited(
                 context.router.push(TagCatalogRoute(target: target)),
               ),
+              onOpenTag: (tagId) => unawaited(
+                context.router.push<void>(TagNavigationRoute(tagId: tagId)),
+              ),
             ),
           ),
         ),

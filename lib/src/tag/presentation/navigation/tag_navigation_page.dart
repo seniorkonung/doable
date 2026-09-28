@@ -15,10 +15,21 @@ import 'tag_navigation_state.dart';
 import 'tag_navigation_view_model.dart';
 
 @RoutePage()
-final class TagNavigationPage extends ConsumerWidget {
+final class TagNavigationPage extends ConsumerWidget
+    implements AutoRouteWrapper {
   const TagNavigationPage({required this.tagId, super.key});
 
   final TagId tagId;
+
+  /// Новый вход начинает активный охват, сохраняя выбор предыдущего экрана.
+  @override
+  Widget wrappedRoute(BuildContext context) => ProviderScope(
+    overrides: [
+      tagNavigationViewModelProvider(tagId)
+          .overrideWith(TagNavigationViewModel.new),
+    ],
+    child: this,
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

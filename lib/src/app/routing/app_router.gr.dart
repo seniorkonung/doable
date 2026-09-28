@@ -622,7 +622,9 @@ class TagNavigationRoute extends _i16.PageRouteInfo<TagNavigationRouteArgs> {
     name,
     builder: (data) {
       final args = data.argsAs<TagNavigationRouteArgs>();
-      return _i15.TagNavigationPage(tagId: args.tagId, key: args.key);
+      return _i16.WrappedRoute(
+        child: _i15.TagNavigationPage(tagId: args.tagId, key: args.key),
+      );
     },
   );
 }

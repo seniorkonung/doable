@@ -23,12 +23,14 @@ final class TagAssignmentsSection extends ConsumerStatefulWidget {
     required this.target,
     required this.isArchived,
     required this.onChooseTag,
+    required this.onOpenTag,
     super.key,
   });
 
   final TagTarget target;
   final bool isArchived;
   final ValueChanged<TagTarget> onChooseTag;
+  final ValueChanged<TagId> onOpenTag;
 
   @override
   ConsumerState<TagAssignmentsSection> createState() =>
@@ -93,6 +95,14 @@ final class _TagAssignmentsSectionState
 
   bool get _targetBusy =>
       _activeRemoveToken != null || _coordinator.isKeyRunning(_targetKey);
+
+  void _open(TagId tagId) {
+    final model = ref.read(
+      tagAssignmentsViewModelProvider(widget.target).notifier,
+    );
+    if (!model.canActOn(tagId)) return;
+    widget.onOpenTag(tagId);
+  }
 
   void _remove(Tag tag) {
     final model = ref.read(
@@ -247,6 +257,7 @@ final class _TagAssignmentsSectionState
               canRemove: !_targetBusy,
               isTagBusy: _coordinator.isTagRunning,
               onRemove: _remove,
+              onOpen: _open,
             ),
           },
         ],
@@ -262,6 +273,7 @@ final class _LoadedAssignments extends StatelessWidget {
     required this.canRemove,
     required this.isTagBusy,
     required this.onRemove,
+    required this.onOpen,
   });
 
   final TagAssignmentsLoaded state;
@@ -269,6 +281,7 @@ final class _LoadedAssignments extends StatelessWidget {
   final bool canRemove;
   final bool Function(TagId) isTagBusy;
   final ValueChanged<Tag> onRemove;
+  final ValueChanged<TagId> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -301,6 +314,22 @@ final class _LoadedAssignments extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(tag.name.value),
+                  Semantics(
+                    container: true,
+                    child: Tooltip(
+                      message: l10n.tagNavigationTag(tag.name.value),
+                      child: TextButton.icon(
+                        key: ValueKey(
+                          'tag-assignment-open-${tag.id.toCanonicalString()}',
+                        ),
+                        onPressed: model.canActOn(tag.id)
+                            ? () => onOpen(tag.id)
+                            : null,
+                        icon: const Icon(Icons.arrow_forward),
+                        label: Text(l10n.tagNavigationTitle),
+                      ),
+                    ),
+                  ),
                   Tooltip(
                     message: l10n.tagAssignmentsRemoveNamed(tag.name.value),
                     child: TextButton.icon(

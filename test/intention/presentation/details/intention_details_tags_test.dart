@@ -8,6 +8,8 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -38,6 +40,10 @@ void main() {
           tagFixtureId(2),
         ]);
         final graphBefore = retainedTagFixtureGraph(raw);
+        final assignmentsBefore = raw
+            .select('SELECT * FROM tag_assignments ORDER BY creation_sequence')
+            .map((row) => row.values.toList())
+            .toList();
         final repository = DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
@@ -60,6 +66,15 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        final tagId = (TagId.decode(
+          tagFixtureId(firstTagNumber),
+        ) as TagIdDecodingSuccess).id;
+        unawaited(router.push(TagNavigationRoute(tagId: tagId)));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+        );
+        await tester.pumpAndSettle();
         unawaited(
           router.push(IntentionDetailsRoute(intentionId: _intentionId(number))),
         );
@@ -68,6 +83,43 @@ void main() {
         final choose = find.byKey(const ValueKey('tag-assignments-choose'));
         expect(choose, findsOneWidget);
         expect(find.text('Дом'), findsOneWidget);
+        final open = find.byKey(
+          ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
+        );
+        expect(open, findsOneWidget);
+        await Scrollable.ensureVisible(tester.element(open), alignment: 0.3);
+        await tester.pumpAndSettle();
+        await tester.tap(open);
+        await tester.pumpAndSettle();
+        expect(router.current.name, TagNavigationRoute.name);
+        expect(
+          router.current
+              .argsAs<TagNavigationRouteArgs>()
+              .tagId
+              .toCanonicalString(),
+          tagFixtureId(firstTagNumber),
+        );
+        expect(
+          tester
+              .widget<ChoiceChip>(
+                find.byKey(const ValueKey(TaggedEntitiesScope.active)),
+              )
+              .selected,
+          isTrue,
+        );
+        expect(retainedTagFixtureGraph(raw), graphBefore);
+        expect(
+          raw
+              .select(
+                'SELECT * FROM tag_assignments ORDER BY creation_sequence',
+              )
+              .map((row) => row.values.toList())
+              .toList(),
+          assignmentsBefore,
+        );
+        router.pop();
+        await tester.pumpAndSettle();
+        expect(router.current.name, IntentionDetailsRoute.name);
         await Scrollable.ensureVisible(tester.element(choose), alignment: 0.3);
         await tester.pumpAndSettle();
         await tester.tap(choose);
@@ -166,6 +218,17 @@ void main() {
         await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
         await tester.pumpAndSettle();
         expect(retainedTagFixtureGraph(raw), graphBefore);
+        router.pop();
+        await tester.pumpAndSettle();
+        expect(router.current.name, TagNavigationRoute.name);
+        expect(
+          tester
+              .widget<ChoiceChip>(
+                find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+              )
+              .selected,
+          isTrue,
+        );
       },
     );
   }

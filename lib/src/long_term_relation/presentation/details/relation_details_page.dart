@@ -313,6 +313,9 @@ final class _LoadedRelation extends StatelessWidget {
           isArchived: relation.scope == RelationScope.archived,
           onChooseTag: (target) =>
               unawaited(context.router.push(TagCatalogRoute(target: target))),
+          onOpenTag: (tagId) => unawaited(
+            context.router.push<void>(TagNavigationRoute(tagId: tagId)),
+          ),
         ),
         const SizedBox(height: 24),
         _ParticipantTransition(

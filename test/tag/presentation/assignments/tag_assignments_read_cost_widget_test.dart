@@ -78,6 +78,7 @@ void main() {
                     target: target,
                     isArchived: false,
                     onChooseTag: (_) {},
+                    onOpenTag: (_) {},
                   ),
                 ),
               ),
