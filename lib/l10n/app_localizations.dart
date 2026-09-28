@@ -1394,6 +1394,168 @@ abstract class AppLocalizations {
   /// **'tag assignment'**
   String get graphOperationTagAssignment;
 
+  /// Заголовок навигации по тегу
+  ///
+  /// In en, this message translates to:
+  /// **'Tagged entities'**
+  String get tagNavigationTitle;
+
+  /// Текущий тег навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Tag: {tagName}'**
+  String tagNavigationTag(String tagName);
+
+  /// Подпись переключателя активного и архивного охватов
+  ///
+  /// In en, this message translates to:
+  /// **'Result scope'**
+  String get tagNavigationScope;
+
+  /// Первое чтение выбранного охвата
+  ///
+  /// In en, this message translates to:
+  /// **'Loading tagged entities…'**
+  String get tagNavigationLoading;
+
+  /// Пустой активный охват существующего тега
+  ///
+  /// In en, this message translates to:
+  /// **'No active intentions or long-term relations have this tag.'**
+  String get tagNavigationEmptyActive;
+
+  /// Пустой архивный охват существующего тега
+  ///
+  /// In en, this message translates to:
+  /// **'No archived intentions or long-term relations have this tag.'**
+  String get tagNavigationEmptyArchived;
+
+  /// Вид и собственное активное состояние намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention, active'**
+  String get tagNavigationIntentionActive;
+
+  /// Вид и собственное архивное состояние намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention, archived'**
+  String get tagNavigationIntentionArchived;
+
+  /// Вид и собственное активное состояние связи
+  ///
+  /// In en, this message translates to:
+  /// **'Long-term relation, active'**
+  String get tagNavigationRelationActive;
+
+  /// Вид и собственное архивное состояние связи
+  ///
+  /// In en, this message translates to:
+  /// **'Long-term relation, archived'**
+  String get tagNavigationRelationArchived;
+
+  /// Доступная подсказка перехода к точной сущности
+  ///
+  /// In en, this message translates to:
+  /// **'Open details'**
+  String get tagNavigationOpenDetails;
+
+  /// Актуализация списка без действий по прежним строкам
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing results. The displayed data may be out of date.'**
+  String get tagNavigationRefreshing;
+
+  /// Устранимый отказ актуализации после изменения графа
+  ///
+  /// In en, this message translates to:
+  /// **'Could not refresh results. The displayed data may be out of date. Try loading again.'**
+  String get tagNavigationRefreshUnavailable;
+
+  /// Повреждение при актуализации
+  ///
+  /// In en, this message translates to:
+  /// **'Could not refresh results: stored data is damaged. The displayed data may be out of date.'**
+  String get tagNavigationRefreshCorruption;
+
+  /// Неизвестный отказ актуализации
+  ///
+  /// In en, this message translates to:
+  /// **'Could not refresh results because of an unexpected error. The displayed data may be out of date.'**
+  String get tagNavigationRefreshUnexpected;
+
+  /// Наличие следующей порции
+  ///
+  /// In en, this message translates to:
+  /// **'More entities have this tag.'**
+  String get tagNavigationMoreAvailable;
+
+  /// Явная подгрузка навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Show more entities'**
+  String get tagNavigationLoadMore;
+
+  /// Выполняющаяся подгрузка навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more entities…'**
+  String get tagNavigationLoadingMore;
+
+  /// Конец непустой выдачи навигации
+  ///
+  /// In en, this message translates to:
+  /// **'All entities are shown.'**
+  String get tagNavigationAllShown;
+
+  /// Устранимый отказ первого чтения навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load tagged entities. Try again.'**
+  String get tagNavigationUnavailable;
+
+  /// Повреждение при первом чтении навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Stored tagged entity data is damaged and cannot be shown.'**
+  String get tagNavigationCorruption;
+
+  /// Неизвестный отказ первого чтения навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load tagged entities because of an unexpected error.'**
+  String get tagNavigationUnexpected;
+
+  /// Недопустимое продолжение навигации
+  ///
+  /// In en, this message translates to:
+  /// **'This result continuation is invalid. Reopen tag navigation.'**
+  String get tagNavigationInvalidCursor;
+
+  /// Истёкший снимок навигации
+  ///
+  /// In en, this message translates to:
+  /// **'The list has changed. Reopen tag navigation.'**
+  String get tagNavigationSnapshotExpired;
+
+  /// Устранимый отказ подгрузки навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load more entities.'**
+  String get tagNavigationLoadMoreUnavailable;
+
+  /// Повреждение при подгрузке навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged; more entities cannot be shown.'**
+  String get tagNavigationLoadMoreCorruption;
+
+  /// Неизвестный отказ подгрузки навигации
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load more entities because of an unexpected error.'**
+  String get tagNavigationLoadMoreUnexpected;
+
   /// Заголовок каталога тегов и переход к нему
   ///
   /// In en, this message translates to:

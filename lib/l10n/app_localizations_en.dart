@@ -780,6 +780,103 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationTagAssignment => 'tag assignment';
 
   @override
+  String get tagNavigationTitle => 'Tagged entities';
+
+  @override
+  String tagNavigationTag(String tagName) {
+    return 'Tag: $tagName';
+  }
+
+  @override
+  String get tagNavigationScope => 'Result scope';
+
+  @override
+  String get tagNavigationLoading => 'Loading tagged entities…';
+
+  @override
+  String get tagNavigationEmptyActive =>
+      'No active intentions or long-term relations have this tag.';
+
+  @override
+  String get tagNavigationEmptyArchived =>
+      'No archived intentions or long-term relations have this tag.';
+
+  @override
+  String get tagNavigationIntentionActive => 'Intention, active';
+
+  @override
+  String get tagNavigationIntentionArchived => 'Intention, archived';
+
+  @override
+  String get tagNavigationRelationActive => 'Long-term relation, active';
+
+  @override
+  String get tagNavigationRelationArchived => 'Long-term relation, archived';
+
+  @override
+  String get tagNavigationOpenDetails => 'Open details';
+
+  @override
+  String get tagNavigationRefreshing =>
+      'Refreshing results. The displayed data may be out of date.';
+
+  @override
+  String get tagNavigationRefreshUnavailable =>
+      'Could not refresh results. The displayed data may be out of date. Try loading again.';
+
+  @override
+  String get tagNavigationRefreshCorruption =>
+      'Could not refresh results: stored data is damaged. The displayed data may be out of date.';
+
+  @override
+  String get tagNavigationRefreshUnexpected =>
+      'Could not refresh results because of an unexpected error. The displayed data may be out of date.';
+
+  @override
+  String get tagNavigationMoreAvailable => 'More entities have this tag.';
+
+  @override
+  String get tagNavigationLoadMore => 'Show more entities';
+
+  @override
+  String get tagNavigationLoadingMore => 'Loading more entities…';
+
+  @override
+  String get tagNavigationAllShown => 'All entities are shown.';
+
+  @override
+  String get tagNavigationUnavailable =>
+      'Could not load tagged entities. Try again.';
+
+  @override
+  String get tagNavigationCorruption =>
+      'Stored tagged entity data is damaged and cannot be shown.';
+
+  @override
+  String get tagNavigationUnexpected =>
+      'Could not load tagged entities because of an unexpected error.';
+
+  @override
+  String get tagNavigationInvalidCursor =>
+      'This result continuation is invalid. Reopen tag navigation.';
+
+  @override
+  String get tagNavigationSnapshotExpired =>
+      'The list has changed. Reopen tag navigation.';
+
+  @override
+  String get tagNavigationLoadMoreUnavailable =>
+      'Could not load more entities.';
+
+  @override
+  String get tagNavigationLoadMoreCorruption =>
+      'Stored data is damaged; more entities cannot be shown.';
+
+  @override
+  String get tagNavigationLoadMoreUnexpected =>
+      'Could not load more entities because of an unexpected error.';
+
+  @override
   String get tagCatalogTitle => 'Tags';
 
   @override

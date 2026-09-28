@@ -781,6 +781,103 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationTagAssignment => 'назначение тега';
 
   @override
+  String get tagNavigationTitle => 'Сущности с тегом';
+
+  @override
+  String tagNavigationTag(String tagName) {
+    return 'Тег: $tagName';
+  }
+
+  @override
+  String get tagNavigationScope => 'Охват результатов';
+
+  @override
+  String get tagNavigationLoading => 'Загружаем сущности с тегом…';
+
+  @override
+  String get tagNavigationEmptyActive =>
+      'С этим тегом нет активных намерений и долговременных связей.';
+
+  @override
+  String get tagNavigationEmptyArchived =>
+      'С этим тегом нет архивных намерений и долговременных связей.';
+
+  @override
+  String get tagNavigationIntentionActive => 'Намерение, активно';
+
+  @override
+  String get tagNavigationIntentionArchived => 'Намерение, в архиве';
+
+  @override
+  String get tagNavigationRelationActive => 'Долговременная связь, активна';
+
+  @override
+  String get tagNavigationRelationArchived => 'Долговременная связь, в архиве';
+
+  @override
+  String get tagNavigationOpenDetails => 'Открыть подробности';
+
+  @override
+  String get tagNavigationRefreshing =>
+      'Обновляем выдачу. Показанные данные могут быть устаревшими.';
+
+  @override
+  String get tagNavigationRefreshUnavailable =>
+      'Не удалось обновить выдачу. Показанные данные могут быть устаревшими. Повторите чтение.';
+
+  @override
+  String get tagNavigationRefreshCorruption =>
+      'Не удалось обновить выдачу: сохранённые данные повреждены. Показанные данные могут быть устаревшими.';
+
+  @override
+  String get tagNavigationRefreshUnexpected =>
+      'Не удалось обновить выдачу из-за непредвиденной ошибки. Показанные данные могут быть устаревшими.';
+
+  @override
+  String get tagNavigationMoreAvailable => 'Есть ещё сущности с этим тегом.';
+
+  @override
+  String get tagNavigationLoadMore => 'Показать ещё сущности';
+
+  @override
+  String get tagNavigationLoadingMore => 'Загружаем ещё сущности…';
+
+  @override
+  String get tagNavigationAllShown => 'Все сущности показаны.';
+
+  @override
+  String get tagNavigationUnavailable =>
+      'Не удалось загрузить сущности с тегом. Повторите попытку.';
+
+  @override
+  String get tagNavigationCorruption =>
+      'Сохранённые данные помеченных сущностей повреждены и не могут быть показаны.';
+
+  @override
+  String get tagNavigationUnexpected =>
+      'Не удалось загрузить сущности с тегом из-за непредвиденной ошибки.';
+
+  @override
+  String get tagNavigationInvalidCursor =>
+      'Продолжение выдачи недействительно. Откройте навигацию по тегу заново.';
+
+  @override
+  String get tagNavigationSnapshotExpired =>
+      'Список изменился. Откройте навигацию по тегу заново.';
+
+  @override
+  String get tagNavigationLoadMoreUnavailable =>
+      'Не удалось загрузить следующую порцию сущностей.';
+
+  @override
+  String get tagNavigationLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующая порция сущностей недоступна.';
+
+  @override
+  String get tagNavigationLoadMoreUnexpected =>
+      'Не удалось загрузить следующую порцию сущностей из-за непредвиденной ошибки.';
+
+  @override
   String get tagCatalogTitle => 'Теги';
 
   @override

@@ -22,6 +22,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,6 +34,31 @@ import '../../long_term_relation/presentation/neighborhood/neighborhood_test_sup
     hide testRelationCounts;
 
 void main() {
+  testWidgets('навигация по тегу открывается по типизированному TagId', (
+    tester,
+  ) async {
+    final repository = ControlledRelationDetailsRepository();
+    addTearDown(repository.dispose);
+    final router = AppRouter();
+    addTearDown(router.dispose);
+    final tagId = (TagId.decode(
+      '018f0b5d-6b2e-7c80-8000-000000000301',
+    ) as TagIdDecodingSuccess).id;
+    await _pumpRouter(tester, repository, router);
+    final route = TagNavigationRoute(tagId: tagId);
+    expect(route, isA<PageRouteInfo<TagNavigationRouteArgs>>());
+    unawaited(router.push(route));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(router.current.name, TagNavigationRoute.name);
+    expect(router.current.argsAs<TagNavigationRouteArgs>().tagId, tagId);
+    expect(
+      tester.widget<TagNavigationPage>(find.byType(TagNavigationPage)).tagId,
+      tagId,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('верхний обход открывается из активного намерения', (
     tester,
   ) async {
