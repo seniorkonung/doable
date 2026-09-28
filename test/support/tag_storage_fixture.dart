@@ -169,6 +169,55 @@ Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
             .toList(),
     };
 
+/// Входящая помеченная связь, свободные получатели и непомеченная связь
+/// позволяют проверить границы каскада и физического удаления в навигации.
+void seedTagNavigationLifecycleFixture(sqlite.Database database) {
+  seedTagNavigationFixture(database, extraPairsPerScope: 0);
+  database.execute(
+    'INSERT INTO intentions (id, title, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+    [tagFixtureId(5), 'Отдельное намерение', 'Описание 5', 105, 205],
+  );
+  for (final (number, source, related) in [
+    (104, 3, 1),
+    (105, 3, 4),
+    (106, 4, 3),
+  ]) {
+    database.execute(
+      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+      [
+        tagFixtureId(number),
+        tagFixtureId(source),
+        tagFixtureId(related),
+        'can',
+        3,
+      ],
+    );
+  }
+  for (final (column, number) in [
+    ('long_term_relation_id', 104),
+    ('long_term_relation_id', 106),
+    ('intention_id', 5),
+  ]) {
+    database.execute(
+      'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+      [tagFixtureId(firstTagNumber), tagFixtureId(number)],
+    );
+  }
+  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    tagFixtureId(lastTagNumber),
+    'Работа',
+  ]);
+  for (final (column, number) in [
+    ('intention_id', 3),
+    ('long_term_relation_id', 103),
+  ]) {
+    database.execute(
+      'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+      [tagFixtureId(lastTagNumber), tagFixtureId(number)],
+    );
+  }
+}
+
 /// Большие воспроизводимые списки для измерения двух видов чтения.
 void seedLargeTagReadFixture(
   sqlite.Database database, {

@@ -6,11 +6,24 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/blocking_relation_reference.dart';
+import 'package:doable/src/graph/application/delete_blocking_relations.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_entities_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
@@ -22,6 +35,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
+
+part 'tag_navigation_graph_lifecycle_scenarios.dart';
 
 const _extraPairs = 51;
 
@@ -236,6 +251,7 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+    _testTaggedGraphLifecycle(locale);
   }
 }
 
@@ -412,10 +428,11 @@ Map<String, List<List<Object?>>> _snapshot(sqlite.Database raw) => {
         .toList(),
 };
 
-Future<({sqlite.Database raw, AppRouter router})> _pumpApp(
+Future<({sqlite.Database raw, AppRouter router, AppRuntime runtime})> _pumpApp(
   WidgetTester tester,
-  String locale,
-) async {
+  String locale, {
+  void Function(sqlite.Database)? seed,
+}) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = [Locale(locale)];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
@@ -433,12 +450,19 @@ Future<({sqlite.Database raw, AppRouter router})> _pumpApp(
     await runtime.shutdown();
   });
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
-  seedTagNavigationFixture(raw, extraPairsPerScope: _extraPairs);
+  if (seed != null) {
+    seed(raw);
+  } else {
+    seedTagNavigationFixture(raw, extraPairsPerScope: _extraPairs);
+  }
   final router = ready.container.read(appRouterProvider);
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
-  await _until(tester, find.text('Получатель 0/50'));
-  return (raw: raw, router: router);
+  await _until(
+    tester,
+    find.text(seed == null ? 'Получатель 0/50' : 'Одинаковое намерение'),
+  );
+  return (raw: raw, router: router, runtime: runtime);
 }
 
 Future<void> _openCatalogTag(WidgetTester tester, int number) async {
