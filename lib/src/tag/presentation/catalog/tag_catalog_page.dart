@@ -356,10 +356,24 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
                           onPressed: _clearSearch,
                           icon: const Icon(Icons.clear),
                         ),
-                  errorText: _searchIsInvalid
-                      ? localizations.tagCatalogInvalidSearch
+                  error: _searchIsInvalid
+                      ? ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                (MediaQuery.sizeOf(context).height -
+                                    MediaQuery.viewInsetsOf(context).bottom) /
+                                4,
+                          ),
+                          child: SingleChildScrollView(
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                localizations.tagCatalogInvalidSearch,
+                              ),
+                            ),
+                          ),
+                        )
                       : null,
-                  errorMaxLines: 5,
                 ),
               ),
             ),
@@ -716,22 +730,24 @@ final class _AssignAction extends StatelessWidget {
                       )
                     : null,
               ),
-              Semantics(
-                label: selected == null
-                    ? localizations.tagCatalogAssign
-                    : localizations.tagCatalogAssignNamed(selected.name.value),
-                child: FilledButton(
-                  key: const ValueKey('tag-catalog-assign'),
-                  onPressed:
-                      selected != null &&
-                          state.canUseCurrentItems &&
-                          state.assignmentStatus is TagCatalogAssignmentIdle &&
-                          state.selectedAssignment ==
-                              TagCatalogSelectedAssignment.available &&
-                          model.canActOn(selected.id)
-                      ? onAssign
-                      : null,
-                  child: Text(localizations.tagCatalogAssign),
+              FilledButton(
+                key: const ValueKey('tag-catalog-assign'),
+                onPressed:
+                    selected != null &&
+                        state.canUseCurrentItems &&
+                        state.assignmentStatus is TagCatalogAssignmentIdle &&
+                        state.selectedAssignment ==
+                            TagCatalogSelectedAssignment.available &&
+                        model.canActOn(selected.id)
+                    ? onAssign
+                    : null,
+                child: Text(
+                  localizations.tagCatalogAssign,
+                  semanticsLabel: selected == null
+                      ? localizations.tagCatalogAssign
+                      : localizations.tagCatalogAssignNamed(
+                          selected.name.value,
+                        ),
                 ),
               ),
             ],
