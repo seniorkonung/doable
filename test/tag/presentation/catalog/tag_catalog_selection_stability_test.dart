@@ -30,6 +30,92 @@ void main() {
         '${relation ? 'долговременная связь' : 'намерение'}, $language, текст $scale';
 
     testWidgets(
+      'переключение скрытого выбора на найденную строку сохраняет область назначения и прокрутку: $description',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final repository = await _showCatalog(
+            tester,
+            relation: relation,
+            language: language,
+            scale: scale,
+          );
+          await tester.tap(_row(repository.rows.first.tag));
+          await tester.pump();
+          await tester.enterText(
+            find.byKey(const ValueKey('tag-catalog-search')),
+            'Тег 2',
+          );
+          await tester.pump();
+          expect(
+            find.byKey(const ValueKey('tag-catalog-hidden-selection')),
+            findsOneWidget,
+          );
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(TagCatalogPage)),
+          );
+          final selectionLabel = tester
+              .getSemantics(
+                find.byKey(const ValueKey('tag-catalog-hidden-selection')),
+              )
+              .label;
+          expect(selectionLabel, contains(l10n.tagCatalogSelected));
+          expect(
+            selectionLabel,
+            contains(repository.rows.first.tag.name.value),
+          );
+          expect(selectionLabel, contains(l10n.tagCatalogAvailable));
+          final assignmentLabel = find.descendant(
+            of: find.byKey(const ValueKey('tag-catalog-hidden-selection')),
+            matching: find.text(l10n.tagCatalogAvailable),
+          );
+          await tester.ensureVisible(assignmentLabel);
+          await tester.pump();
+          final selectionViewport = find.ancestor(
+            of: assignmentLabel,
+            matching: find.byType(SingleChildScrollView),
+          );
+          expect(
+            tester
+                .getRect(selectionViewport)
+                .contains(tester.getCenter(assignmentLabel)),
+            isTrue,
+          );
+          final list = find.byKey(const ValueKey('tag-catalog-list'));
+          final scrollable = find.descendant(
+            of: list,
+            matching: find.byType(Scrollable),
+          );
+          final position = tester.state<ScrollableState>(scrollable).position;
+          final listBounds = tester.getRect(list);
+          final assign = find.byKey(const ValueKey('tag-catalog-assign'));
+          final actionBounds = tester.getRect(assign);
+          final pixels = position.pixels;
+
+          await tester.tap(_row(repository.rows[1].tag));
+          await tester.pump();
+
+          expect(
+            find.byKey(const ValueKey('tag-catalog-hidden-selection')),
+            findsNothing,
+          );
+          expect(tester.getRect(list), listBounds);
+          expect(tester.getRect(assign), actionBounds);
+          expect(
+            tester.state<ScrollableState>(scrollable).position,
+            same(position),
+          );
+          expect(position.pixels, pixels);
+          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
+          expect(repository.commandCount, 0);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
       'быстрый выбор сохраняет строки и прокрутку до ответа наблюдения: $description',
       (tester) async {
         final repository = await _showCatalog(

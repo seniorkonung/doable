@@ -310,6 +310,7 @@
   "tagDeleteSaving": "Удаляем тег и назначения…",
   "@tagDeleteSaving": { "description": "Ожидание подтверждения удаления тега" },
   "tagCatalogSelected": "Выбранный тег",
+  "tagCatalogAssignmentUnknown": "Назначение ещё не проверено",
   "tagEditorCreateTitle": "Новый тег",
   "tagEditorRenameTitle": "Переименование тега",
   "tagEditorNameLabel": "Название тега",

@@ -306,7 +306,12 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
       ),
       bottomNavigationBar: switch (state) {
         TagCatalogLoaded loaded when loaded.mode is TagCatalogSelectionMode =>
-          _AssignAction(state: loaded, model: model, onAssign: _assignSelected),
+          _AssignAction(
+            state: loaded,
+            filter: _filter,
+            model: model,
+            onAssign: _assignSelected,
+          ),
         _ => null,
       },
       body: Column(
@@ -468,6 +473,7 @@ final class _LoadedCatalog extends StatelessWidget {
     final selectedInSnapshot =
         selected != null && state.items.any((tag) => tag.id == selected.id);
     final selectedOutsideSnapshot =
+        !choosing &&
         selected != null &&
         !selectedInSnapshot &&
         filter.matches(selected.name);
@@ -553,23 +559,8 @@ final class _LoadedCatalog extends StatelessWidget {
                         selected: true,
                         child: ListTile(
                           title: Text(selectedTag.name.value),
-                          subtitle: Text(
-                            choosing
-                                ? switch (state.selectedAssignment) {
-                                    TagCatalogSelectedAssignment.assigned =>
-                                      localizations.tagCatalogAssigned,
-                                    TagCatalogSelectedAssignment.available =>
-                                      localizations.tagCatalogAvailable,
-                                    TagCatalogSelectedAssignment.unknown =>
-                                      localizations.tagCatalogSelected,
-                                    TagCatalogSelectedAssignment.unavailable ||
-                                    TagCatalogSelectedAssignment.corruption ||
-                                    TagCatalogSelectedAssignment.unexpected =>
-                                      localizations.tagCatalogSelected,
-                                  }
-                                : localizations.tagCatalogSelected,
-                          ),
-                          trailing: !choosing && state.canUseCurrentItems
+                          subtitle: Text(localizations.tagCatalogSelected),
+                          trailing: state.canUseCurrentItems
                               ? _TagActions(
                                   tag: selectedTag,
                                   onRename: onRename,
@@ -633,11 +624,13 @@ final class _LoadedCatalog extends StatelessWidget {
 final class _AssignAction extends StatelessWidget {
   const _AssignAction({
     required this.state,
+    required this.filter,
     required this.model,
     required this.onAssign,
   });
 
   final TagCatalogLoaded state;
+  final TagCatalogFilter filter;
   final TagCatalogViewModel model;
   final VoidCallback onAssign;
 
@@ -648,29 +641,77 @@ final class _AssignAction extends StatelessWidget {
       TagCatalogSelectionReady(:final tag) => tag,
       _ => null,
     };
+    final hiddenSelected =
+        selected != null &&
+        (!filter.matches(selected.name) ||
+            !state.items.any((tag) => tag.id == selected.id));
+    final assignmentLabel = switch (state.selectedAssignment) {
+      TagCatalogSelectedAssignment.available =>
+        localizations.tagCatalogAvailable,
+      TagCatalogSelectedAssignment.assigned => localizations.tagCatalogAssigned,
+      TagCatalogSelectedAssignment.unknown ||
+      TagCatalogSelectedAssignment.unavailable ||
+      TagCatalogSelectedAssignment.corruption ||
+      TagCatalogSelectedAssignment.unexpected =>
+        localizations.tagCatalogAssignmentUnknown,
+    };
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Align(
           heightFactor: 1,
-          child: Semantics(
-            label: selected == null
-                ? localizations.tagCatalogAssign
-                : localizations.tagCatalogAssignNamed(selected.name.value),
-            child: FilledButton(
-              key: const ValueKey('tag-catalog-assign'),
-              onPressed:
-                  selected != null &&
-                      state.canUseCurrentItems &&
-                      state.assignmentStatus is TagCatalogAssignmentIdle &&
-                      state.selectedAssignment ==
-                          TagCatalogSelectedAssignment.available &&
-                      model.canActOn(selected.id)
-                  ? onAssign
-                  : null,
-              child: Text(localizations.tagCatalogAssign),
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                // Постоянная высота сохраняет границы списка при смене выбора.
+                // Длинное название и увеличенный текст доступны через прокрутку.
+                height: 96.0.clamp(0, MediaQuery.sizeOf(context).height / 3),
+                child: hiddenSelected
+                    ? SingleChildScrollView(
+                        child: Semantics(
+                          key: const ValueKey('tag-catalog-hidden-selection'),
+                          container: true,
+                          selected: true,
+                          liveRegion: true,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(localizations.tagCatalogSelected),
+                              Text(
+                                selected.name.value,
+                                textAlign: TextAlign.center,
+                              ),
+                              Text(
+                                assignmentLabel,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : null,
+              ),
+              Semantics(
+                label: selected == null
+                    ? localizations.tagCatalogAssign
+                    : localizations.tagCatalogAssignNamed(selected.name.value),
+                child: FilledButton(
+                  key: const ValueKey('tag-catalog-assign'),
+                  onPressed:
+                      selected != null &&
+                          state.canUseCurrentItems &&
+                          state.assignmentStatus is TagCatalogAssignmentIdle &&
+                          state.selectedAssignment ==
+                              TagCatalogSelectedAssignment.available &&
+                          model.canActOn(selected.id)
+                      ? onAssign
+                      : null,
+                  child: Text(localizations.tagCatalogAssign),
+                ),
+              ),
+            ],
           ),
         ),
       ),

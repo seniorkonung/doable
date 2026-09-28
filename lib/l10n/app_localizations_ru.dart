@@ -969,6 +969,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagCatalogSelected => 'Выбранный тег';
 
   @override
+  String get tagCatalogAssignmentUnknown => 'Назначение ещё не проверено';
+
+  @override
   String get tagEditorCreateTitle => 'Новый тег';
 
   @override

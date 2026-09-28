@@ -940,6 +940,8 @@
   "tagDeleteSaving": "Deleting tag and assignments…",
   "@tagDeleteSaving": { "description": "Ожидание подтверждения удаления тега" },
   "tagCatalogSelected": "Selected tag",
+  "tagCatalogAssignmentUnknown": "Assignment not yet checked",
+  "@tagCatalogAssignmentUnknown": {"description": "Состояние назначения выбранного тега ещё не подтверждено"},
   "@tagCatalogSelected": { "description": "Тег выбран после завершения формы" },
   "tagEditorCreateTitle": "New tag",
   "@tagEditorCreateTitle": { "description": "Заголовок формы создания тега" },
