@@ -530,10 +530,12 @@ void main() {
       await tester.scrollUntilVisible(
         lastRow,
         300,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('tag-catalog-list')),
-          matching: find.byType(Scrollable),
-        ),
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tag-catalog-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.tap(lastRow);
       await tester.pumpAndSettle();
@@ -560,10 +562,12 @@ void main() {
       await tester.scrollUntilVisible(
         find.text('Тег 52'),
         -300,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('tag-catalog-list')),
-          matching: find.byType(Scrollable),
-        ),
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tag-catalog-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       expect(
         find.descendant(
@@ -588,10 +592,12 @@ void main() {
       await tester.scrollUntilVisible(
         lastRow,
         300,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('tag-catalog-list')),
-          matching: find.byType(Scrollable),
-        ),
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tag-catalog-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       expect(
         find.descendant(of: lastRow, matching: find.text('Назначен')),
@@ -622,10 +628,12 @@ void main() {
       await tester.scrollUntilVisible(
         lastRow,
         300,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('tag-catalog-list')),
-          matching: find.byType(Scrollable),
-        ),
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tag-catalog-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.tap(lastRow);
       await tester.pumpAndSettle();
@@ -643,10 +651,12 @@ void main() {
       await tester.scrollUntilVisible(
         find.text('Тег 52'),
         -300,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('tag-catalog-list')),
-          matching: find.byType(Scrollable),
-        ),
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tag-catalog-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       expect(
         find.descendant(
@@ -752,10 +762,12 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(ValueKey('tag-catalog-row-${_id(52)}')),
       300,
-      scrollable: find.descendant(
-        of: find.byKey(const ValueKey('tag-catalog-list')),
-        matching: find.byType(Scrollable),
-      ),
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('tag-catalog-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     expect(find.text('Дом'), findsOneWidget);
     expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsNothing);
@@ -1183,10 +1195,12 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Тег 150'),
       500,
-      scrollable: find.descendant(
-        of: find.byKey(const ValueKey('tag-catalog-list')),
-        matching: find.byType(Scrollable),
-      ),
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('tag-catalog-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     expect(find.text('Тег 150'), findsOneWidget);
     final container = ProviderScope.containerOf(
@@ -1481,10 +1495,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       final list = find.byKey(const ValueKey('tag-catalog-list'));
-      final scrollable = find.descendant(
-        of: list,
-        matching: find.byType(Scrollable),
-      );
+      final scrollable = find
+          .descendant(of: list, matching: find.byType(Scrollable))
+          .first;
       await tester.drag(list, const Offset(0, -900));
       await tester.pumpAndSettle();
       final scrollState = tester.state<ScrollableState>(scrollable);

@@ -60,9 +60,9 @@ void _registerCatalogSearchScenarios() {
             );
             final explanation = find.ancestor(
               of: error,
-              matching: find.byType(SingleChildScrollView),
+              matching: find.byType(CustomScrollView),
             );
-            await tester.drag(explanation, const Offset(0, -600));
+            await Scrollable.ensureVisible(tester.element(error), alignment: 1);
             await tester.pumpAndSettle();
             expect(
               tester.getRect(error).bottom,
@@ -87,6 +87,8 @@ void _registerCatalogSearchScenarios() {
               contains(l10n.tagCatalogInvalidSearch),
             );
             final clear = find.byTooltip(l10n.tagCatalogClearSearch);
+            await tester.ensureVisible(clear);
+            await tester.pumpAndSettle();
             expect(clear.hitTestable(), findsOneWidget);
             _expectAction(tester.getSemantics(clear));
             await tester.tap(clear);
@@ -142,6 +144,13 @@ void _registerCatalogSearchScenarios() {
             );
             if (target != null) {
               await _tap(tester, find.text(l10n.tagCatalogAvailable));
+              await tester.ensureVisible(
+                find.byKey(
+                  const ValueKey('tag-catalog-search'),
+                  skipOffstage: false,
+                ),
+              );
+              await tester.pumpAndSettle();
             }
             await tester.enterText(search, 'спорт');
             await tester.pumpAndSettle();
@@ -260,6 +269,13 @@ void _registerCatalogSearchScenarios() {
                 Tristate.isTrue,
               );
             }
+            await tester.ensureVisible(
+              find.byKey(
+                const ValueKey('tag-catalog-search'),
+                skipOffstage: false,
+              ),
+            );
+            await tester.pumpAndSettle();
             await tester.enterText(search, 'спорт');
             await tester.pumpAndSettle();
             await _tap(tester, create);

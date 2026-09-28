@@ -27,6 +27,7 @@ import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -34,6 +35,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
+
+part 'tag_catalog_search_recovery_scenarios.dart';
 
 final _modes = <(String, TagTarget?)>[
   ('каталог', null),
@@ -65,8 +68,14 @@ final _search = find.byKey(const ValueKey('tag-catalog-search'));
 final _list = find.byKey(const ValueKey('tag-catalog-list'));
 final _selected = find.byKey(const ValueKey('tag-catalog-hidden-selection'));
 final _assign = find.byKey(const ValueKey('tag-catalog-assign'));
+final _editable = find.descendant(
+  of: find.byType(TagCatalogPage),
+  matching: find.byType(EditableText, skipOffstage: false),
+  skipOffstage: false,
+);
 
 void main() {
+  _registerSearchRecoveryScenarios();
   for (final (description, target) in _modes) {
     testWidgets(
       '$description: поиск использует наблюдаемое имя выбранного тега до обновления полного снимка',
@@ -122,7 +131,7 @@ void main() {
         );
         final input = tester.widget<TextField>(_search).controller!;
         final editingValue = input.value;
-        final scroll = tester.widget<ListView>(_list).controller!;
+        final scroll = tester.widget<CustomScrollView>(_list).controller!;
         await tester.drag(_list, const Offset(0, -800));
         await tester.pumpAndSettle();
         final offset = scroll.offset;
@@ -138,25 +147,29 @@ void main() {
           await tester.pump();
           expect(scroll.offset, offset);
         }
+        await _reachSearchElement(tester, _editable);
         await tester.showKeyboard(_search);
+        await tester.drag(_list, const Offset(0, -800));
+        await tester.pumpAndSettle();
+        final refreshOffset = scroll.offset;
+        expect(refreshOffset, greaterThan(0));
         await _beginRefresh(tester, repository);
-        expect(scroll.offset, offset);
+        expect(scroll.offset, refreshOffset);
         repository.complete(tags, revision: 2);
         await tester.pumpAndSettle();
-        expect(scroll.offset, offset);
-        expect(
-          tester.state<EditableTextState>(find.byType(EditableText)),
-          same(editable),
-        );
+        expect(scroll.offset, refreshOffset);
+        expect(tester.state<EditableTextState>(_editable), same(editable));
         expect(editable.widget.focusNode.hasFocus, isTrue);
         expect(input.value, editingValue);
 
+        await _reachSearchElement(tester, _editable);
         await tester.enterText(_search, 'Дом');
         await tester.pumpAndSettle();
         expect(scroll.offset, 0);
         expect(_row(tags[1]).hitTestable(), findsOneWidget);
         await tester.drag(_list, const Offset(0, -800));
         await tester.pumpAndSettle();
+        await _reachSearchElement(tester, _editable);
         await tester.enterText(_search, 'спорт');
         await tester.pumpAndSettle();
         expect(find.text('Теги не найдены'), findsOneWidget);
@@ -1184,6 +1197,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
   WidgetTester tester, {
   TagTarget? target,
   String language = 'ru',
+  double scale = 1,
   AppRouter? router,
   ValueNotifier<TagTarget?>? sessionTarget,
 }) async {
@@ -1201,6 +1215,11 @@ Future<TagCatalogTestRepository> _pumpCatalog(
       child: router == null
           ? MaterialApp(
               locale: Locale(language),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: sessionTarget == null
@@ -1224,6 +1243,16 @@ Future<TagCatalogTestRepository> _pumpCatalog(
   );
   if (router != null) await tester.pump();
   return repository;
+}
+
+Future<void> _reachSearchElement(WidgetTester tester, Finder finder) async {
+  final scrollable = find
+      .descendant(of: _list, matching: find.byType(Scrollable))
+      .first;
+  await tester.scrollUntilVisible(finder, 120, scrollable: scrollable);
+  await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
+  await tester.pumpAndSettle();
+  expect(finder.hitTestable(), findsOneWidget);
 }
 
 List<String> _visibleNames(WidgetTester tester) => [

@@ -162,10 +162,12 @@ void main() {
       await tester.scrollUntilVisible(
         _open(352),
         300,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('tag-catalog-list')),
-          matching: find.byType(Scrollable),
-        ),
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tag-catalog-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       final oldCallback = tester.widget<IconButton>(_open(352)).onPressed!;
       await tester.tap(_open(352));
