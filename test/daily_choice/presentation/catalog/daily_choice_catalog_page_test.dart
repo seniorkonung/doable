@@ -18,6 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   for (final (locale, label) in [
     (const Locale('ru'), 'Создать выбор от действия'),
@@ -206,7 +208,9 @@ Future<AppRouter> _open(
   return router;
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <DailyChoiceCatalogQuery>[];
   final _requests = <Completer<DailyChoiceCatalogPageResult>>[];
 

@@ -31,6 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/tag_read_contract_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -709,7 +710,9 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
   fail('Условие app-level теста не выполнено.');
 }
 
-final class _DelayedPersonalGraphRepository implements PersonalGraphRepository {
+final class _DelayedPersonalGraphRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
     ChoicePathSuggestionsQuery query,

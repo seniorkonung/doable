@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:doable/src/data/local/sqlite_relation_integrity_functions.dart';
+import 'package:doable/src/data/local/sqlite_tag_functions.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/services.dart';
@@ -105,19 +106,21 @@ void main() {
 
         expect(row.read<String>('search_key'), titleSearchKey('Straße'));
         await _expectRelationIntegrityFunctions(database);
+        await _expectTagNameFunctions(database);
       } finally {
         await database.close();
       }
     }
   });
 
-  test('регистрирует функции проверки связей на isolate-соединении', () async {
+  test('регистрирует функции связей и тегов на isolate-соединении', () async {
     final isolate = await spawnConfiguredInMemoryLocalDatabaseIsolate();
     addTearDown(isolate.shutdownAll);
     final database = AppDatabase(await isolate.connect());
     addTearDown(database.close);
 
     await _expectRelationIntegrityFunctions(database);
+    await _expectTagNameFunctions(database);
   });
 
   test('открытие соединения не запускает аудит всего графа', () async {
@@ -159,6 +162,7 @@ void main() {
 
     expect(fixture.read<String>('value'), 'готово');
     expect(searchKey.read<String>('search_key'), 'strasse');
+    await _expectTagNameFunctions(database);
   });
 
   test(
@@ -177,6 +181,7 @@ void main() {
 
       expect(searchKey.read<String>('search_key'), 'strasse');
       await _expectRelationIntegrityFunctions(database);
+      await _expectTagNameFunctions(database);
     },
   );
 }
@@ -213,6 +218,21 @@ Future<void> _expectRelationIntegrityFunctions(AppDatabase database) async {
   expect(row.read<int>('malformed_description'), 0);
 }
 
+Future<void> _expectTagNameFunctions(AppDatabase database) async {
+  final row = await database.customSelect('''
+    SELECT
+      $tagNameValidFunctionName('Straße') AS valid,
+      $tagNameKeyFunctionName('Straße') AS name_key,
+      $tagNameValidFunctionName(' Straße') AS invalid,
+      $tagNameKeyFunctionName(' Straße') AS invalid_key
+  ''').getSingle();
+
+  expect(row.read<int>('valid'), 1);
+  expect(row.read<String>('name_key'), 'strasse');
+  expect(row.read<int>('invalid'), 0);
+  expect(row.readNullable<String>('invalid_key'), isNull);
+}
+
 void _registerFixtureFunction(sqlite.Database database) {
   database.createFunction(
     functionName: 'fixture_marker',
@@ -244,6 +264,16 @@ void _replaceCanonicalFunctions(sqlite.Database database) {
       functionName: relationDescriptionIntegrityFunctionName,
       argumentCount: const sqlite.AllowedArgumentCount(1),
       function: (_) => 1,
+    )
+    ..createFunction(
+      functionName: tagNameValidFunctionName,
+      argumentCount: const sqlite.AllowedArgumentCount(1),
+      function: (_) => 1,
+    )
+    ..createFunction(
+      functionName: tagNameKeyFunctionName,
+      argumentCount: const sqlite.AllowedArgumentCount(1),
+      function: (_) => 'fixture-implementation',
     );
 }
 

@@ -32,8 +32,79 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'neighborhood_test_support.dart';
+import '../../../support/tag_read_contract_test_fallback.dart';
 
 void main() {
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    testWidgets(
+      'подтверждение объясняет снятие назначений связей и сохранение тегов на ${locale.languageCode}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        tester.view.physicalSize = const Size(480, 720);
+        tester.view.devicePixelRatio = 1;
+        tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+          tester.binding.platformDispatcher.clearTextScaleFactorTestValue();
+        });
+        final harness = await _pumpAction(tester, locale);
+        harness.select(testGroupRow(ownerId: harness.intentionId, index: 40));
+        harness.selectDaily(
+          _dailyItem(ownerId: harness.intentionId, index: 41),
+        );
+        await tester.pump();
+
+        await tester.tap(
+          find.byKey(const ValueKey('blocking-relations-review')),
+        );
+        await tester.pumpAndSettle();
+
+        final explanation = find.textContaining(
+          locale.languageCode == 'ru'
+              ? 'Все назначения тегов выбранным долговременным связям'
+              : 'All tag assignments of the selected long-term relations',
+        );
+        expect(explanation, findsOneWidget);
+        expect(
+          tester.getSemantics(explanation).label,
+          contains(
+            locale.languageCode == 'ru'
+                ? 'переиспользуемые теги'
+                : 'reusable tags',
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'подтверждение только дневного выбора не говорит о назначениях связей на ${locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpAction(tester, locale);
+        harness.selectDaily(
+          _dailyItem(ownerId: harness.intentionId, index: 42),
+        );
+        await tester.pump();
+
+        await tester.tap(
+          find.byKey(const ValueKey('blocking-relations-review')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining(
+            locale.languageCode == 'ru'
+                ? 'Все назначения тегов выбранным долговременным связям'
+                : 'All tag assignments of the selected long-term relations',
+          ),
+          findsNothing,
+        );
+      },
+    );
+  }
+
   testWidgets(
     'смешанное подтверждение показывает оба вида и фиксирует только их',
     (tester) async {
@@ -419,6 +490,15 @@ void main() {
       harness.repository.selectedIds,
       rows.map((row) => row.relation.id).toSet(),
     );
+    await tester.scrollUntilVisible(
+      find.byKey(
+        ValueKey(
+          'blocking-relations-confirm-row-${rows.first.relation.id.toCanonicalString()}',
+        ),
+      ),
+      100,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(
       find.text('Чтобы Намерение-владелец, нужно Связанное 1'),
       findsOneWidget,
@@ -612,7 +692,7 @@ void main() {
         const ValueKey('blocking-relations-confirm-delete'),
       );
       await tester.ensureVisible(confirm);
-      await tester.tap(confirm);
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
       await tester.pumpAndSettle();
       expect(harness.repository.commands, isEmpty);
       expect(
@@ -991,7 +1071,9 @@ DailyChoiceCatalogItem _dailyItem({
   );
 }
 
-final class _CommandRepository implements PersonalGraphRepository {
+final class _CommandRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(
     ChoicePathContinuationQuery query,

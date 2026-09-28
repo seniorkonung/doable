@@ -11,6 +11,7 @@ import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/application/relation_group_page.dart';
 import '../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
+import '../../tag/application/tag_read_result.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
 import 'selected_relations.dart';
@@ -23,7 +24,7 @@ abstract interface class GraphCommandRepository {
 }
 
 abstract interface class PersonalGraphRepository
-    implements GraphCommandRepository {
+    implements GraphCommandRepository, TagReadContract {
   /// Читает подсказки для исходного намерения либо выбранного действия на
   /// одной ревизии. Выборка ограничена последними 20 выборами участника по
   /// порядку создания до устранения повторов; возвращается до пяти разных

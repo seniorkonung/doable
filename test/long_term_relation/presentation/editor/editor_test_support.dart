@@ -26,11 +26,14 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 /// Граф, в котором тест сам решает исход каждой команды сохранения связи.
 ///
 /// Чтения здесь недоступны намеренно: черновик формы не должен заводить
 /// собственного источника данных графа.
 final class ControlledRelationEditorRepository
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

@@ -33,6 +33,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
@@ -722,7 +724,9 @@ final class _Change implements GraphChange {
   GraphRevision get revision => const _Revision(2);
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final updateCommands = <UpdateDailyChoiceFields>[];
   final updateRequests = <Completer<DailyChoiceCommandResult>>[];
   final deleteCommands = <DeleteDailyChoice>[];

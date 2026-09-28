@@ -92,6 +92,21 @@ void main() {
       intentions[1],
       intentions[2],
     );
+    await _insertTag(database, 3001, 'Общий');
+    await _insertTag(database, 3002, 'Только связи');
+    for (final id in selected) {
+      await _assignRelationTag(database, 3001, id);
+    }
+    await _assignRelationTag(database, 3002, selected.last);
+    await _assignRelationTag(database, 3001, unselected);
+    await _assignRelationTag(database, 3001, neighborRelation);
+    await _assignIntentionTag(database, 3001, owner);
+    final tagsBefore = await _rows(database, 'tags');
+    final retainedAssignments = {
+      for (final id in [unselected, neighborRelation])
+        id: await _relationTags(database, id),
+    };
+    final ownerAssignments = await _intentionTags(database, owner);
     final intentionsBefore = await _rows(database, 'intentions');
     final unselectedBefore = await _relation(database, unselected);
     final neighborBefore = await _relation(database, neighborRelation);
@@ -147,6 +162,18 @@ void main() {
     expect(await _relation(database, unselected), unselectedBefore);
     expect(await _relation(database, neighborRelation), neighborBefore);
     expect(await _rows(database, 'intentions'), intentionsBefore);
+    expect(await _rows(database, 'tags'), tagsBefore);
+    expect(await _intentionTags(database, owner), ownerAssignments);
+    for (final id in selected) {
+      expect(await _relationTags(database, id), isEmpty);
+    }
+    for (final entry in retainedAssignments.entries) {
+      expect(await _relationTags(database, entry.key), entry.value);
+    }
+    expect(
+      await database.customSelect('PRAGMA foreign_key_check').get(),
+      isEmpty,
+    );
   });
 
   test(
@@ -155,6 +182,11 @@ void main() {
       final owner = intentions[0];
       final first = await _create(repository, owner, intentions[1]);
       final foreign = await _create(repository, intentions[2], intentions[3]);
+      await _insertTag(database, 3001, 'Общий');
+      await _assignRelationTag(database, 3001, first);
+      await _assignRelationTag(database, 3001, foreign);
+      await _assignIntentionTag(database, 3001, owner);
+      final graphBefore = await _graphSnapshot(database);
       final revision = await _revision(repository, owner);
       final missing = _intentionId(99);
 
@@ -201,6 +233,7 @@ void main() {
       );
       expect(await _relation(database, first), isNotNull);
       expect(await _relation(database, foreign), isNotNull);
+      expect(await _graphSnapshot(database), graphBefore);
       expect(
         (await _revision(repository, owner)).compareTo(revision),
         GraphRevisionOrder.same,
@@ -309,6 +342,10 @@ void main() {
         ),
         isA<GraphCommandSucceeded>(),
       );
+      await _insertTag(database, 3001, 'Общий');
+      await _assignRelationTag(database, 3001, first);
+      await _assignRelationTag(database, 3001, moved);
+      final graphBefore = await _graphSnapshot(database);
       final revision = await _revision(repository, owner);
 
       expect(
@@ -323,6 +360,7 @@ void main() {
       );
       expect(await _relation(database, first), isNotNull);
       expect(await _relation(database, moved), isNotNull);
+      expect(await _graphSnapshot(database), graphBefore);
       expect(
         (await _revision(repository, owner)).compareTo(revision),
         GraphRevisionOrder.same,
@@ -722,6 +760,13 @@ void main() {
   test('отказ после первой SQL-порции откатывает все удаления', () async {
     final owner = intentions.first;
     await LargeBlockingRelationsFixture.seed(database, owner);
+    final selected = LargeBlockingRelationsFixture.selectedIds;
+    await _insertTag(database, 3001, 'Общий');
+    for (final id in [selected.first, selected[399], selected.last]) {
+      await _assignRelationTag(database, 3001, id);
+    }
+    await _assignIntentionTag(database, 3001, owner);
+    final graphBefore = await _graphSnapshot(database);
     final beforeRelations = await _rows(database, 'long_term_relations');
     final beforeIntentions = await _rows(database, 'intentions');
     final revision = await _revision(repository, owner);
@@ -739,6 +784,7 @@ void main() {
 
     expect(failure, isA<DeleteBlockingRelationsUnexpectedFailure>());
     expect(deleteObserver.batchSizes, [400]);
+    expect(await _graphSnapshot(database), graphBefore);
     expect(await _rows(database, 'long_term_relations'), beforeRelations);
     expect(await _rows(database, 'intentions'), beforeIntentions);
     expect(
@@ -752,10 +798,24 @@ void main() {
     final path = await _create(repository, owner, intentions[1]);
     final free = await _create(repository, owner, intentions[2]);
     final other = await _create(repository, owner, intentions[3]);
+    await _insertTag(database, 3001, 'Общий');
+    await _insertTag(database, 3002, 'Только удаляемая связь');
+    await _assignRelationTag(database, 3001, path);
+    await _assignRelationTag(database, 3001, free);
+    await _assignRelationTag(database, 3002, free);
+    await _assignRelationTag(database, 3001, other);
+    await _assignIntentionTag(database, 3001, owner);
     final choice = (DailyChoiceId.decode(
       free.toCanonicalString(),
     ) as DailyChoiceIdDecodingSuccess).id;
     await _insertChoice(database, choice, owner, intentions[1], path);
+    final intentionsBefore = await _rows(database, 'intentions');
+    final tagsBefore = await _rows(database, 'tags');
+    final pathBefore = await _relation(database, path);
+    final otherBefore = await _relation(database, other);
+    final pathTagsBefore = await _relationTags(database, path);
+    final otherTagsBefore = await _relationTags(database, other);
+    final ownerTagsBefore = await _intentionTags(database, owner);
     final before = await _revision(repository, owner);
     final command = DeleteBlockingRelations(
       intentionId: owner,
@@ -783,8 +843,18 @@ void main() {
     expect(await _choice(database, choice), isNull);
     expect(await _choiceStepCount(database, choice), 0);
     expect(await _relation(database, free), isNull);
-    expect(await _relation(database, path), isNotNull);
-    expect(await _relation(database, other), isNotNull);
+    expect(await _relationTags(database, free), isEmpty);
+    expect(await _relation(database, path), pathBefore);
+    expect(await _relation(database, other), otherBefore);
+    expect(await _relationTags(database, path), pathTagsBefore);
+    expect(await _relationTags(database, other), otherTagsBefore);
+    expect(await _intentionTags(database, owner), ownerTagsBefore);
+    expect(await _rows(database, 'intentions'), intentionsBefore);
+    expect(await _rows(database, 'tags'), tagsBefore);
+    expect(
+      await database.customSelect('PRAGMA foreign_key_check').get(),
+      isEmpty,
+    );
   });
 
   test(
@@ -795,6 +865,10 @@ void main() {
       final free = await _create(repository, owner, intentions[2]);
       final choice = _dailyChoiceId(901);
       await _insertChoice(database, choice, owner, intentions[1], path);
+      await _insertTag(database, 3001, 'Общий');
+      await _assignRelationTag(database, 3001, path);
+      await _assignRelationTag(database, 3001, free);
+      final graphBefore = await _graphSnapshot(database);
       final revision = await _revision(repository, owner);
       deleteObserver.clear();
 
@@ -828,6 +902,7 @@ void main() {
       expect(deleteObserver.batchSizes, isEmpty);
       expect(await _choice(database, choice), isNotNull);
       expect(await _relation(database, free), isNotNull);
+      expect(await _graphSnapshot(database), graphBefore);
       expect(
         (await _revision(repository, owner)).compareTo(revision),
         GraphRevisionOrder.same,
@@ -901,6 +976,10 @@ void main() {
     final free = await _create(repository, owner, intentions[2]);
     final choice = _dailyChoiceId(903);
     await _insertChoice(database, choice, owner, intentions[1], path);
+    await _insertTag(database, 3001, 'Общий');
+    await _assignRelationTag(database, 3001, free);
+    await _assignRelationTag(database, 3001, path);
+    final graphBefore = await _graphSnapshot(database);
     final revision = await _revision(repository, owner);
     deleteObserver.clear();
     await database.customStatement('''
@@ -927,6 +1006,7 @@ void main() {
     expect(await _choice(database, choice), isNotNull);
     expect(await _choiceStepCount(database, choice), 1);
     expect(await _relation(database, free), isNotNull);
+    expect(await _graphSnapshot(database), graphBefore);
     expect(
       (await _revision(repository, owner)).compareTo(revision),
       GraphRevisionOrder.same,
@@ -940,8 +1020,11 @@ void main() {
       intentionId: owner,
       references: [LongTermBlockingRelationReference(selected)],
     );
+    await _insertTag(database, 3001, 'Общий');
+    await _assignRelationTag(database, 3001, selected);
     final choice = _dailyChoiceId(904);
     await _insertChoice(database, choice, owner, intentions[1], selected);
+    final graphBefore = await _graphSnapshot(database);
     final revision = await _revision(repository, owner);
     deleteObserver.clear();
 
@@ -958,6 +1041,7 @@ void main() {
     expect(deleteObserver.batchSizes, isEmpty);
     expect(await _choice(database, choice), isNotNull);
     expect(await _relation(database, selected), isNotNull);
+    expect(await _graphSnapshot(database), graphBefore);
     expect(
       (await _revision(repository, owner)).compareTo(revision),
       GraphRevisionOrder.same,
@@ -974,6 +1058,10 @@ void main() {
       final oldPath = await _create(repository, oldSource, oldAction);
       final free = await _create(repository, oldSource, intentions[2]);
       final newPath = await _create(repository, newSource, newAction);
+      await _insertTag(database, 3001, 'Общий');
+      await _assignRelationTag(database, 3001, oldPath);
+      await _assignRelationTag(database, 3001, free);
+      await _assignRelationTag(database, 3001, newPath);
       await database.customStatement(
         'UPDATE intentions SET is_action_ready = 1 WHERE id = ?',
         [newAction.toCanonicalString()],
@@ -1004,6 +1092,10 @@ void main() {
         ),
       );
       expect(replacement, isA<GraphCommandSucceeded>());
+      final graphBefore = await _graphSnapshot(database);
+      final tagsBefore = await _rows(database, 'tags');
+      final oldPathTags = await _relationTags(database, oldPath);
+      final freeTags = await _relationTags(database, free);
       final revision = await _revision(repository, newSource);
       deleteObserver.clear();
 
@@ -1025,6 +1117,7 @@ void main() {
       expect(deleteObserver.batchSizes, isEmpty);
       expect(await _relation(database, free), isNotNull);
       expect(await _choice(database, choice), isNotNull);
+      expect(await _graphSnapshot(database), graphBefore);
 
       final jointlySelected = _failure(
         await repository.execute(
@@ -1054,6 +1147,7 @@ void main() {
       expect(deleteObserver.batchSizes, isEmpty);
       expect(await _choice(database, choice), isNotNull);
       expect(await _relation(database, newPath), isNotNull);
+      expect(await _graphSnapshot(database), graphBefore);
       expect(
         (await _revision(repository, newSource)).compareTo(revision),
         GraphRevisionOrder.same,
@@ -1073,7 +1167,11 @@ void main() {
         isA<GraphCommandSucceeded>(),
       );
       expect(await _relation(database, newPath), isNull);
+      expect(await _relationTags(database, newPath), isEmpty);
       expect(await _relation(database, oldPath), isNotNull);
+      expect(await _relationTags(database, oldPath), oldPathTags);
+      expect(await _relationTags(database, free), freeTags);
+      expect(await _rows(database, 'tags'), tagsBefore);
     },
   );
 }
@@ -1217,6 +1315,79 @@ Future<List<Map<String, Object?>>> _rows(
       in await database.customSelect('SELECT * FROM $table ORDER BY id').get())
     row.data,
 ];
+
+Future<void> _insertTag(AppDatabase database, int number, String name) =>
+    database.customStatement('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      _uuid(number),
+      name,
+    ]);
+
+Future<void> _assignRelationTag(
+  AppDatabase database,
+  int tagNumber,
+  LongTermRelationId relationId,
+) => database.customStatement(
+  'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+  [_uuid(tagNumber), relationId.toCanonicalString()],
+);
+
+Future<void> _assignIntentionTag(
+  AppDatabase database,
+  int tagNumber,
+  IntentionId intentionId,
+) => database.customStatement(
+  'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+  [_uuid(tagNumber), intentionId.toCanonicalString()],
+);
+
+Future<List<String>> _relationTags(
+  AppDatabase database,
+  LongTermRelationId relationId,
+) async => [
+  for (final row
+      in await database
+          .customSelect(
+            'SELECT tag_id FROM tag_assignments WHERE long_term_relation_id = ? ORDER BY creation_sequence',
+            variables: [Variable<String>(relationId.toCanonicalString())],
+          )
+          .get())
+    row.read<String>('tag_id'),
+];
+
+Future<List<String>> _intentionTags(
+  AppDatabase database,
+  IntentionId intentionId,
+) async => [
+  for (final row
+      in await database
+          .customSelect(
+            'SELECT tag_id FROM tag_assignments WHERE intention_id = ? ORDER BY creation_sequence',
+            variables: [Variable<String>(intentionId.toCanonicalString())],
+          )
+          .get())
+    row.read<String>('tag_id'),
+];
+
+Future<Map<String, List<Map<String, Object?>>>> _graphSnapshot(
+  AppDatabase database,
+) async => {
+  for (final table in [
+    'intentions',
+    'intention_titles_fts',
+    'long_term_relations',
+    'daily_choices',
+    'daily_choice_path_steps',
+    'tags',
+    'tag_assignments',
+  ])
+    table: [
+      for (final row
+          in await database
+              .customSelect('SELECT * FROM $table ORDER BY rowid')
+              .get())
+        row.data,
+    ],
+};
 
 IntentionId _intentionId(int value) =>
     switch (IntentionId.decode(_uuid(value))) {

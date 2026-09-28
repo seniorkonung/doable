@@ -22,6 +22,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   test('пустая выдача, ошибка и временный повтор различимы', () async {
     final fixture = _Fixture();
@@ -334,7 +336,9 @@ final class _Fixture {
   }
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <ChoicePathSuggestionsQuery>[];
   final requests = <Completer<ChoicePathSuggestionsResult>>[];
   final observations =

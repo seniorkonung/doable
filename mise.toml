@@ -12,7 +12,7 @@ check = [
     "dart format --output=none --set-exit-if-changed .",
     "bash test/tool/check_ci_scope_test.sh",
     "flutter analyze",
-    "flutter test"
+    "flutter test --concurrency=2"
 ]
 check-fast = [
     "dart format --output=none --set-exit-if-changed .",

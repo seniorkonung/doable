@@ -19,6 +19,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   test(
     'отправляет независимые поля и удерживает повтор до результата',
@@ -177,7 +179,9 @@ final class _Harness {
   void dispose() => container.dispose();
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final choice = DailyChoice(
     id: _choiceId(),
     sourceIntentionId: _intentionId(1),

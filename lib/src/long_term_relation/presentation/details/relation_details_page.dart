@@ -10,6 +10,8 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
+import '../../../tag/domain/tag_target.dart';
+import '../../../tag/presentation/assignments/tag_assignments_section.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/long_term_relation_permissions.dart';
@@ -304,6 +306,16 @@ final class _LoadedRelation extends StatelessWidget {
               details.description?.value ??
               localizations.relationDetailsNoDescription,
           valueKey: const ValueKey('relation-details-description'),
+        ),
+        const SizedBox(height: 24),
+        TagAssignmentsSection(
+          target: LongTermRelationTagTarget(relation.id),
+          isArchived: relation.scope == RelationScope.archived,
+          onChooseTag: (target) =>
+              unawaited(context.router.push(TagCatalogRoute(target: target))),
+          onOpenTag: (tagId) => unawaited(
+            context.router.push<void>(TagNavigationRoute(tagId: tagId)),
+          ),
         ),
         const SizedBox(height: 24),
         _ParticipantTransition(

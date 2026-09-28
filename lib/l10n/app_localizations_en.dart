@@ -197,6 +197,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.';
 
   @override
+  String get blockingRelationsConfirmationTagAssignments =>
+      'All tag assignments of the selected long-term relations, including those not shown here, will be removed. The reusable tags and their assignments to other entities will remain.';
+
+  @override
   String blockingRelationsConfirmationCount(int count) {
     return 'To delete: $count';
   }
@@ -528,7 +532,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsDeleteConfirmationMessage =>
-      'This can’t be undone. The intention and its description will be permanently deleted.';
+      'This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.';
 
   @override
   String get detailsConfirmDeleteAction => 'Delete permanently';
@@ -762,6 +766,434 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get graphOperationDailyChoice => 'daily choice';
+
+  @override
+  String get graphOperationTag => 'tag';
+
+  @override
+  String get graphOperationAssignTag => 'Assign';
+
+  @override
+  String get graphOperationRemoveTagAssignment => 'Remove';
+
+  @override
+  String get graphOperationTagAssignment => 'tag assignment';
+
+  @override
+  String get tagNavigationTitle => 'Tagged entities';
+
+  @override
+  String tagNavigationTag(String tagName) {
+    return 'Tag: $tagName';
+  }
+
+  @override
+  String get tagNavigationScope => 'Result scope';
+
+  @override
+  String get tagNavigationLoading => 'Loading tagged entities…';
+
+  @override
+  String get tagNavigationEmptyActive =>
+      'No active intentions or long-term relations have this tag.';
+
+  @override
+  String get tagNavigationEmptyArchived =>
+      'No archived intentions or long-term relations have this tag.';
+
+  @override
+  String get tagNavigationIntentionActive => 'Intention, active';
+
+  @override
+  String get tagNavigationIntentionArchived => 'Intention, archived';
+
+  @override
+  String get tagNavigationRelationActive => 'Long-term relation, active';
+
+  @override
+  String get tagNavigationRelationArchived => 'Long-term relation, archived';
+
+  @override
+  String get tagNavigationOpenDetails => 'Open details';
+
+  @override
+  String get tagNavigationRefreshing =>
+      'Refreshing results. The displayed data may be out of date.';
+
+  @override
+  String get tagNavigationRefreshUnavailable =>
+      'Could not refresh results. The displayed data may be out of date. Try loading again.';
+
+  @override
+  String get tagNavigationRefreshCorruption =>
+      'Could not refresh results: stored data is damaged. The displayed data may be out of date.';
+
+  @override
+  String get tagNavigationRefreshUnexpected =>
+      'Could not refresh results because of an unexpected error. The displayed data may be out of date.';
+
+  @override
+  String get tagNavigationMoreAvailable => 'More entities have this tag.';
+
+  @override
+  String get tagNavigationLoadMore => 'Show more entities';
+
+  @override
+  String get tagNavigationLoadingMore => 'Loading more entities…';
+
+  @override
+  String get tagNavigationAllShown => 'All entities are shown.';
+
+  @override
+  String get tagNavigationUnavailable =>
+      'Could not load tagged entities. Try again.';
+
+  @override
+  String get tagNavigationCorruption =>
+      'Stored tagged entity data is damaged and cannot be shown.';
+
+  @override
+  String get tagNavigationUnexpected =>
+      'Could not load tagged entities because of an unexpected error.';
+
+  @override
+  String get tagNavigationInvalidCursor =>
+      'This result continuation is invalid. Reopen tag navigation.';
+
+  @override
+  String get tagNavigationSnapshotExpired =>
+      'The list has changed. Reopen tag navigation.';
+
+  @override
+  String get tagNavigationLoadMoreUnavailable =>
+      'Could not load more entities.';
+
+  @override
+  String get tagNavigationLoadMoreCorruption =>
+      'Stored data is damaged; more entities cannot be shown.';
+
+  @override
+  String get tagNavigationLoadMoreUnexpected =>
+      'Could not load more entities because of an unexpected error.';
+
+  @override
+  String get tagCatalogTitle => 'Tags';
+
+  @override
+  String get tagCatalogSelectionTitle => 'Choose a tag';
+
+  @override
+  String get tagCatalogAssigned => 'Assigned';
+
+  @override
+  String get tagCatalogAvailable => 'Available to assign';
+
+  @override
+  String get tagCatalogAssign => 'Assign tag';
+
+  @override
+  String tagCatalogAssignNamed(String tagName) {
+    return 'Assign tag $tagName';
+  }
+
+  @override
+  String get tagCatalogAssigning => 'Assigning tag…';
+
+  @override
+  String get tagCatalogLoading => 'Loading tags…';
+
+  @override
+  String get tagCatalogEmpty => 'No tags yet.';
+
+  @override
+  String get tagCatalogUnavailable => 'Tags couldn’t be loaded. Try again.';
+
+  @override
+  String get tagCatalogCorruption =>
+      'Stored tag data is damaged and can’t be shown.';
+
+  @override
+  String get tagCatalogUnexpected =>
+      'Tags couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get tagCatalogRefreshing => 'Refreshing tags…';
+
+  @override
+  String get tagCatalogMoreAvailable => 'More tags are available.';
+
+  @override
+  String get tagCatalogLoadMore => 'Show more tags';
+
+  @override
+  String get tagCatalogLoadingMore => 'Loading more tags…';
+
+  @override
+  String get tagCatalogAllShown => 'All tags are shown.';
+
+  @override
+  String get tagCatalogLoadMoreUnavailable => 'More tags couldn’t be loaded.';
+
+  @override
+  String get tagCatalogLoadMoreCorruption =>
+      'Stored data is damaged; no more tags can be shown.';
+
+  @override
+  String get tagCatalogLoadMoreUnexpected =>
+      'More tags couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get tagCatalogCreate => 'Create tag';
+
+  @override
+  String get tagCatalogRename => 'Rename tag';
+
+  @override
+  String get tagCatalogDelete => 'Delete tag';
+
+  @override
+  String tagDeleteConfirmationTitle(String tagName) {
+    return 'Delete tag “$tagName”?';
+  }
+
+  @override
+  String get tagDeleteConfirmationScope =>
+      'This permanently deletes the tag and all its assignments to active and archived intentions and long-term relations, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.';
+
+  @override
+  String get tagDeleteCancel => 'Cancel';
+
+  @override
+  String get tagDeleteConfirm => 'Delete tag and assignments';
+
+  @override
+  String get tagDeleteAlreadyRunning =>
+      'An operation on this tag is already in progress. Wait for its result.';
+
+  @override
+  String get tagDeleteSaving => 'Deleting tag and assignments…';
+
+  @override
+  String get tagCatalogSelected => 'Selected tag';
+
+  @override
+  String get tagEditorCreateTitle => 'New tag';
+
+  @override
+  String get tagEditorRenameTitle => 'Rename tag';
+
+  @override
+  String get tagEditorNameLabel => 'Tag name';
+
+  @override
+  String get tagEditorNameLimit => 'No more than 255 visible characters.';
+
+  @override
+  String get tagEditorCreateAction => 'Create tag';
+
+  @override
+  String get tagEditorRenameAction => 'Save name';
+
+  @override
+  String get tagEditorSaving => 'Saving tag…';
+
+  @override
+  String get tagEditorAlreadyRunning =>
+      'Saving this tag is already in progress. Wait for its result.';
+
+  @override
+  String get tagEditorCancel => 'Cancel';
+
+  @override
+  String get tagEditorUseExisting => 'Use existing tag';
+
+  @override
+  String get tagEditorReadingCommitted => 'Tag saved. Refreshing its details…';
+
+  @override
+  String get tagEditorCommittedReadFailed =>
+      'Tag saved, but its details couldn’t be refreshed.';
+
+  @override
+  String get tagEditorCommittedMissing =>
+      'Tag saved, but is no longer found. Refresh the catalog.';
+
+  @override
+  String get tagEditorReadingExisting => 'Checking existing tag…';
+
+  @override
+  String get tagEditorExistingMissing =>
+      'The existing tag is gone. Correct the name or refresh the catalog.';
+
+  @override
+  String get tagEditorReadUnavailable => 'Tag couldn’t be read. Try again.';
+
+  @override
+  String get tagEditorReadCorruption => 'Stored tag data is damaged.';
+
+  @override
+  String get tagEditorReadUnexpected =>
+      'Tag couldn’t be read because of an unexpected error.';
+
+  @override
+  String get tagCreated => 'Tag created.';
+
+  @override
+  String get tagRenamed => 'Tag renamed.';
+
+  @override
+  String get tagUnchanged => 'Tag name unchanged.';
+
+  @override
+  String get tagDeleted => 'Tag deleted with all its assignments.';
+
+  @override
+  String get tagAssigned => 'Tag assigned.';
+
+  @override
+  String get tagAlreadyAssigned => 'Tag already assigned.';
+
+  @override
+  String get tagAssignmentRemoved => 'Tag assignment removed.';
+
+  @override
+  String get tagAssignmentAlreadyAbsent => 'Tag assignment already absent.';
+
+  @override
+  String get tagAssignmentAlreadyRunning =>
+      'A tag assignment change is already in progress. Wait for its result.';
+
+  @override
+  String get tagAssignmentTargetNotFound =>
+      'This recipient no longer exists. Refresh its details.';
+
+  @override
+  String get tagAssignmentUnavailable =>
+      'Could not complete the tag assignment operation. Try again.';
+
+  @override
+  String get tagAssignmentCorruption =>
+      'Stored tag assignment data is damaged. The assignment was not changed.';
+
+  @override
+  String get tagAssignmentUnexpected =>
+      'The tag assignment operation failed because of an unexpected error.';
+
+  @override
+  String get tagAssignmentsTitle => 'Assigned tags';
+
+  @override
+  String get tagAssignmentsIntention => 'intention';
+
+  @override
+  String get tagAssignmentsRelation => 'long-term relation';
+
+  @override
+  String get tagAssignmentsActive => 'active';
+
+  @override
+  String get tagAssignmentsArchived => 'archived';
+
+  @override
+  String tagAssignmentsContext(String targetKind, String archiveState) {
+    return 'Tag assignments: $targetKind, $archiveState';
+  }
+
+  @override
+  String get tagAssignmentsLoading => 'Loading assignments…';
+
+  @override
+  String get tagAssignmentsEmpty => 'No tags assigned yet.';
+
+  @override
+  String get tagAssignmentsRefreshing => 'Refreshing assignments…';
+
+  @override
+  String get tagAssignmentsUnavailable =>
+      'Could not load assignments. Try again.';
+
+  @override
+  String get tagAssignmentsCorruption =>
+      'Stored assignment data is damaged and cannot be shown.';
+
+  @override
+  String get tagAssignmentsUnexpected =>
+      'Could not load assignments because of an unexpected error.';
+
+  @override
+  String get tagAssignmentsMoreAvailable => 'More assignments are available.';
+
+  @override
+  String get tagAssignmentsLoadMore => 'Show more assignments';
+
+  @override
+  String get tagAssignmentsLoadingMore => 'Loading more assignments…';
+
+  @override
+  String get tagAssignmentsAllShown => 'All assignments are shown.';
+
+  @override
+  String get tagAssignmentsLoadMoreUnavailable =>
+      'Could not load more assignments.';
+
+  @override
+  String get tagAssignmentsLoadMoreCorruption =>
+      'Stored data is damaged; more assignments cannot be shown.';
+
+  @override
+  String get tagAssignmentsLoadMoreUnexpected =>
+      'Could not load more assignments because of an unexpected error.';
+
+  @override
+  String get tagAssignmentsChoose => 'Choose a tag';
+
+  @override
+  String tagAssignmentsChooseSemantic(String targetKind, String archiveState) {
+    return 'Choose a tag for the $archiveState $targetKind';
+  }
+
+  @override
+  String get tagAssignmentsRemove => 'Remove assignment';
+
+  @override
+  String tagAssignmentsRemoveNamed(String tagName) {
+    return 'Remove assignment: $tagName';
+  }
+
+  @override
+  String get tagAssignmentsRemoving => 'Removing assignment…';
+
+  @override
+  String get tagNameInvalidUnicode => 'Tag name contains invalid characters.';
+
+  @override
+  String get tagNameEmpty => 'Enter a tag name.';
+
+  @override
+  String get tagNameTooLong =>
+      'Tag name must contain no more than 255 visible characters.';
+
+  @override
+  String get tagNameNonCanonical => 'Remove whitespace around the tag name.';
+
+  @override
+  String get tagNameOccupied =>
+      'A tag with this name already exists. Choose another name or use the existing tag.';
+
+  @override
+  String get tagNotFound => 'This tag no longer exists. Refresh the catalog.';
+
+  @override
+  String get tagUnavailable =>
+      'Could not complete the tag operation. Try again.';
+
+  @override
+  String get tagCorruption =>
+      'Stored tag data is damaged. The tag was not changed.';
+
+  @override
+  String get tagUnexpected =>
+      'The tag operation failed because of an unexpected error.';
 
   @override
   String get dailyChoiceCreated => 'Daily choice created.';
@@ -1088,7 +1520,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String relatedTitle,
     String scope,
   ) {
-    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. Both intentions and all other relations will remain.';
+    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. All tag assignments of this relation, including those not shown here, will be removed. The tags, both intentions and all other relations will remain.';
   }
 
   @override

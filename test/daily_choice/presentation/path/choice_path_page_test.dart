@@ -21,6 +21,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   testWidgets(
     'после выбора действия открывает подтверждение, отмена не пишет граф',
@@ -477,7 +479,9 @@ Future<void> _pumpPage(
   ),
 );
 
-final class _PathRepository implements PersonalGraphRepository {
+final class _PathRepository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <ChoicePathContinuationQuery>[];
   final _requests = <Completer<ChoicePathContinuationResult>>[];
   final _observations =

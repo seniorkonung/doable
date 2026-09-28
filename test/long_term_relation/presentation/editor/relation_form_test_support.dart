@@ -27,6 +27,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 
 import '../../../intention/presentation/catalog/catalog_test_support.dart';
 import '../details/relation_details_test_support.dart';
+import '../../../support/tag_read_contract_test_fallback.dart';
 
 /// Граф для страницы создания связи: команды, каталог выбора участника и
 /// подробный просмотр связи конфликтующей пары.
@@ -34,6 +35,7 @@ import '../details/relation_details_test_support.dart';
 /// Соседство и отдельная сводка здесь недоступны: форма получает выбор из
 /// каталога и наблюдает выбранные на замену намерения до сохранения связи.
 final class ControlledRelationFormRepository
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

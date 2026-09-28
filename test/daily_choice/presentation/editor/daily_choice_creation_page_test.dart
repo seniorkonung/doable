@@ -25,6 +25,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
@@ -667,7 +669,9 @@ Future<void> _pump(
   }
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
   final commands = <CreateDailyChoice>[];
   final requests = <Completer<DailyChoiceCommandResult>>[];
 

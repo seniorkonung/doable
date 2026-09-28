@@ -198,6 +198,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Проверьте каждую выбранную связь. Удаление нельзя отменить. Само намерение останется; для его удаления понадобится отдельное подтверждение.';
 
   @override
+  String get blockingRelationsConfirmationTagAssignments =>
+      'Все назначения тегов выбранным долговременным связям, включая не показанные здесь, будут сняты. Сами переиспользуемые теги и их назначения другим сущностям сохранятся.';
+
+  @override
   String blockingRelationsConfirmationCount(int count) {
     return 'К удалению: $count';
   }
@@ -527,7 +531,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsDeleteConfirmationMessage =>
-      'Это действие нельзя отменить. Намерение и его описание будут удалены навсегда.';
+      'Это действие нельзя отменить. Намерение, его описание и все назначения тегов, включая не показанные сейчас, будут удалены навсегда. Сами теги сохранятся.';
 
   @override
   String get detailsConfirmDeleteAction => 'Удалить навсегда';
@@ -763,6 +767,438 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get graphOperationDailyChoice => 'дневной выбор';
+
+  @override
+  String get graphOperationTag => 'тег';
+
+  @override
+  String get graphOperationAssignTag => 'Назначение';
+
+  @override
+  String get graphOperationRemoveTagAssignment => 'Снятие';
+
+  @override
+  String get graphOperationTagAssignment => 'назначение тега';
+
+  @override
+  String get tagNavigationTitle => 'Сущности с тегом';
+
+  @override
+  String tagNavigationTag(String tagName) {
+    return 'Тег: $tagName';
+  }
+
+  @override
+  String get tagNavigationScope => 'Охват результатов';
+
+  @override
+  String get tagNavigationLoading => 'Загружаем сущности с тегом…';
+
+  @override
+  String get tagNavigationEmptyActive =>
+      'С этим тегом нет активных намерений и долговременных связей.';
+
+  @override
+  String get tagNavigationEmptyArchived =>
+      'С этим тегом нет архивных намерений и долговременных связей.';
+
+  @override
+  String get tagNavigationIntentionActive => 'Намерение, активно';
+
+  @override
+  String get tagNavigationIntentionArchived => 'Намерение, в архиве';
+
+  @override
+  String get tagNavigationRelationActive => 'Долговременная связь, активна';
+
+  @override
+  String get tagNavigationRelationArchived => 'Долговременная связь, в архиве';
+
+  @override
+  String get tagNavigationOpenDetails => 'Открыть подробности';
+
+  @override
+  String get tagNavigationRefreshing =>
+      'Обновляем выдачу. Показанные данные могут быть устаревшими.';
+
+  @override
+  String get tagNavigationRefreshUnavailable =>
+      'Не удалось обновить выдачу. Показанные данные могут быть устаревшими. Повторите чтение.';
+
+  @override
+  String get tagNavigationRefreshCorruption =>
+      'Не удалось обновить выдачу: сохранённые данные повреждены. Показанные данные могут быть устаревшими.';
+
+  @override
+  String get tagNavigationRefreshUnexpected =>
+      'Не удалось обновить выдачу из-за непредвиденной ошибки. Показанные данные могут быть устаревшими.';
+
+  @override
+  String get tagNavigationMoreAvailable => 'Есть ещё сущности с этим тегом.';
+
+  @override
+  String get tagNavigationLoadMore => 'Показать ещё сущности';
+
+  @override
+  String get tagNavigationLoadingMore => 'Загружаем ещё сущности…';
+
+  @override
+  String get tagNavigationAllShown => 'Все сущности показаны.';
+
+  @override
+  String get tagNavigationUnavailable =>
+      'Не удалось загрузить сущности с тегом. Повторите попытку.';
+
+  @override
+  String get tagNavigationCorruption =>
+      'Сохранённые данные помеченных сущностей повреждены и не могут быть показаны.';
+
+  @override
+  String get tagNavigationUnexpected =>
+      'Не удалось загрузить сущности с тегом из-за непредвиденной ошибки.';
+
+  @override
+  String get tagNavigationInvalidCursor =>
+      'Продолжение выдачи недействительно. Откройте навигацию по тегу заново.';
+
+  @override
+  String get tagNavigationSnapshotExpired =>
+      'Список изменился. Откройте навигацию по тегу заново.';
+
+  @override
+  String get tagNavigationLoadMoreUnavailable =>
+      'Не удалось загрузить следующую порцию сущностей.';
+
+  @override
+  String get tagNavigationLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующая порция сущностей недоступна.';
+
+  @override
+  String get tagNavigationLoadMoreUnexpected =>
+      'Не удалось загрузить следующую порцию сущностей из-за непредвиденной ошибки.';
+
+  @override
+  String get tagCatalogTitle => 'Теги';
+
+  @override
+  String get tagCatalogSelectionTitle => 'Выбор тега';
+
+  @override
+  String get tagCatalogAssigned => 'Назначен';
+
+  @override
+  String get tagCatalogAvailable => 'Доступен для назначения';
+
+  @override
+  String get tagCatalogAssign => 'Назначить тег';
+
+  @override
+  String tagCatalogAssignNamed(String tagName) {
+    return 'Назначить тег «$tagName»';
+  }
+
+  @override
+  String get tagCatalogAssigning => 'Назначаем тег…';
+
+  @override
+  String get tagCatalogLoading => 'Загружаем теги…';
+
+  @override
+  String get tagCatalogEmpty => 'Тегов пока нет.';
+
+  @override
+  String get tagCatalogUnavailable =>
+      'Не удалось загрузить теги. Повторите попытку.';
+
+  @override
+  String get tagCatalogCorruption =>
+      'Сохранённые данные тегов повреждены и не могут быть показаны.';
+
+  @override
+  String get tagCatalogUnexpected =>
+      'Не удалось загрузить теги из-за непредвиденной ошибки.';
+
+  @override
+  String get tagCatalogRefreshing => 'Обновляем каталог тегов…';
+
+  @override
+  String get tagCatalogMoreAvailable => 'Есть ещё теги.';
+
+  @override
+  String get tagCatalogLoadMore => 'Показать ещё теги';
+
+  @override
+  String get tagCatalogLoadingMore => 'Загружаем ещё теги…';
+
+  @override
+  String get tagCatalogAllShown => 'Все теги показаны.';
+
+  @override
+  String get tagCatalogLoadMoreUnavailable =>
+      'Не удалось загрузить следующие теги.';
+
+  @override
+  String get tagCatalogLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующие теги нельзя показать.';
+
+  @override
+  String get tagCatalogLoadMoreUnexpected =>
+      'Не удалось загрузить следующие теги из-за непредвиденной ошибки.';
+
+  @override
+  String get tagCatalogCreate => 'Создать тег';
+
+  @override
+  String get tagCatalogRename => 'Переименовать тег';
+
+  @override
+  String get tagCatalogDelete => 'Удалить тег';
+
+  @override
+  String tagDeleteConfirmationTitle(String tagName) {
+    return 'Удалить тег «$tagName»?';
+  }
+
+  @override
+  String get tagDeleteConfirmationScope =>
+      'Тег и все его назначения активным и архивированным намерениям и долговременным связям будут удалены необратимо, включая незагруженные назначения. Сами намерения, связи, дневные выборы и их пути сохраняются.';
+
+  @override
+  String get tagDeleteCancel => 'Отмена';
+
+  @override
+  String get tagDeleteConfirm => 'Удалить тег и назначения';
+
+  @override
+  String get tagDeleteAlreadyRunning =>
+      'Изменение этого тега уже выполняется. Дождитесь результата.';
+
+  @override
+  String get tagDeleteSaving => 'Удаляем тег и назначения…';
+
+  @override
+  String get tagCatalogSelected => 'Выбранный тег';
+
+  @override
+  String get tagEditorCreateTitle => 'Новый тег';
+
+  @override
+  String get tagEditorRenameTitle => 'Переименование тега';
+
+  @override
+  String get tagEditorNameLabel => 'Название тега';
+
+  @override
+  String get tagEditorNameLimit => 'Не более 255 отображаемых символов.';
+
+  @override
+  String get tagEditorCreateAction => 'Создать тег';
+
+  @override
+  String get tagEditorRenameAction => 'Сохранить название';
+
+  @override
+  String get tagEditorSaving => 'Сохраняем тег…';
+
+  @override
+  String get tagEditorAlreadyRunning =>
+      'Сохранение этого тега уже выполняется. Дождитесь результата.';
+
+  @override
+  String get tagEditorCancel => 'Отмена';
+
+  @override
+  String get tagEditorUseExisting => 'Использовать существующий тег';
+
+  @override
+  String get tagEditorReadingCommitted => 'Тег сохранён. Обновляем его данные…';
+
+  @override
+  String get tagEditorCommittedReadFailed =>
+      'Тег сохранён, но данные не удалось обновить.';
+
+  @override
+  String get tagEditorCommittedMissing =>
+      'Тег сохранён, но больше не найден. Обновите каталог.';
+
+  @override
+  String get tagEditorReadingExisting => 'Проверяем существующий тег…';
+
+  @override
+  String get tagEditorExistingMissing =>
+      'Существующего тега больше нет. Исправьте название или обновите каталог.';
+
+  @override
+  String get tagEditorReadUnavailable =>
+      'Не удалось прочитать тег. Повторите попытку.';
+
+  @override
+  String get tagEditorReadCorruption => 'Сохранённые данные тега повреждены.';
+
+  @override
+  String get tagEditorReadUnexpected =>
+      'Не удалось прочитать тег из-за непредвиденной ошибки.';
+
+  @override
+  String get tagCreated => 'Тег создан.';
+
+  @override
+  String get tagRenamed => 'Тег переименован.';
+
+  @override
+  String get tagUnchanged => 'Название тега не изменилось.';
+
+  @override
+  String get tagDeleted => 'Тег удалён вместе со всеми назначениями.';
+
+  @override
+  String get tagAssigned => 'Тег назначен.';
+
+  @override
+  String get tagAlreadyAssigned => 'Тег уже назначен.';
+
+  @override
+  String get tagAssignmentRemoved => 'Назначение тега снято.';
+
+  @override
+  String get tagAssignmentAlreadyAbsent => 'Назначение тега уже отсутствует.';
+
+  @override
+  String get tagAssignmentAlreadyRunning =>
+      'Изменение назначения тега уже выполняется. Дождитесь результата.';
+
+  @override
+  String get tagAssignmentTargetNotFound =>
+      'Этого получателя больше нет. Обновите подробности.';
+
+  @override
+  String get tagAssignmentUnavailable =>
+      'Не удалось изменить назначение тега. Повторите попытку.';
+
+  @override
+  String get tagAssignmentCorruption =>
+      'Сохранённые данные назначения тега повреждены. Назначение не изменено.';
+
+  @override
+  String get tagAssignmentUnexpected =>
+      'Назначение тега не изменено из-за непредвиденной ошибки.';
+
+  @override
+  String get tagAssignmentsTitle => 'Назначенные теги';
+
+  @override
+  String get tagAssignmentsIntention => 'намерение';
+
+  @override
+  String get tagAssignmentsRelation => 'долговременная связь';
+
+  @override
+  String get tagAssignmentsActive => 'не в архиве';
+
+  @override
+  String get tagAssignmentsArchived => 'в архиве';
+
+  @override
+  String tagAssignmentsContext(String targetKind, String archiveState) {
+    return 'Назначения тегов: $targetKind, $archiveState';
+  }
+
+  @override
+  String get tagAssignmentsLoading => 'Загружаем назначения…';
+
+  @override
+  String get tagAssignmentsEmpty => 'Назначений тегов пока нет.';
+
+  @override
+  String get tagAssignmentsRefreshing => 'Обновляем назначения…';
+
+  @override
+  String get tagAssignmentsUnavailable =>
+      'Не удалось загрузить назначения. Повторите попытку.';
+
+  @override
+  String get tagAssignmentsCorruption =>
+      'Сохранённые данные назначений повреждены и не могут быть показаны.';
+
+  @override
+  String get tagAssignmentsUnexpected =>
+      'Не удалось загрузить назначения из-за непредвиденной ошибки.';
+
+  @override
+  String get tagAssignmentsMoreAvailable => 'Есть ещё назначения.';
+
+  @override
+  String get tagAssignmentsLoadMore => 'Показать ещё назначения';
+
+  @override
+  String get tagAssignmentsLoadingMore => 'Загружаем ещё назначения…';
+
+  @override
+  String get tagAssignmentsAllShown => 'Все назначения показаны.';
+
+  @override
+  String get tagAssignmentsLoadMoreUnavailable =>
+      'Не удалось загрузить следующие назначения.';
+
+  @override
+  String get tagAssignmentsLoadMoreCorruption =>
+      'Сохранённые данные повреждены; следующие назначения нельзя показать.';
+
+  @override
+  String get tagAssignmentsLoadMoreUnexpected =>
+      'Не удалось загрузить следующие назначения из-за непредвиденной ошибки.';
+
+  @override
+  String get tagAssignmentsChoose => 'Выбрать тег';
+
+  @override
+  String tagAssignmentsChooseSemantic(String targetKind, String archiveState) {
+    return 'Выбрать тег для получателя: $targetKind, $archiveState';
+  }
+
+  @override
+  String get tagAssignmentsRemove => 'Снять назначение';
+
+  @override
+  String tagAssignmentsRemoveNamed(String tagName) {
+    return 'Снять назначение: $tagName';
+  }
+
+  @override
+  String get tagAssignmentsRemoving => 'Снимаем назначение…';
+
+  @override
+  String get tagNameInvalidUnicode =>
+      'Название тега содержит недопустимые символы.';
+
+  @override
+  String get tagNameEmpty => 'Введите название тега.';
+
+  @override
+  String get tagNameTooLong =>
+      'Название тега должно содержать не более 255 отображаемых символов.';
+
+  @override
+  String get tagNameNonCanonical => 'Удалите пробелы по краям названия тега.';
+
+  @override
+  String get tagNameOccupied =>
+      'Тег с таким названием уже есть. Выберите другое название или используйте существующий тег.';
+
+  @override
+  String get tagNotFound => 'Этого тега больше нет. Обновите каталог.';
+
+  @override
+  String get tagUnavailable =>
+      'Не удалось выполнить действие с тегом. Повторите попытку.';
+
+  @override
+  String get tagCorruption =>
+      'Сохранённые данные тега повреждены. Тег не изменён.';
+
+  @override
+  String get tagUnexpected =>
+      'Действие с тегом не выполнено из-за непредвиденной ошибки.';
 
   @override
   String get dailyChoiceCreated => 'Дневной выбор создан.';
@@ -1090,7 +1526,7 @@ class AppLocalizationsRu extends AppLocalizations {
     String relatedTitle,
     String scope,
   ) {
-    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Оба намерения и все остальные связи сохранятся.';
+    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Все назначения тегов этой связи, включая не показанные сейчас, будут сняты. Сами теги, оба намерения и все остальные связи сохранятся.';
   }
 
   @override
