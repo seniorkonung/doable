@@ -245,6 +245,17 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
     }
   }
 
+  void _openNavigation(TagId tagId) {
+    if (!mounted ||
+        widget.target != null ||
+        !ref
+            .read(tagCatalogViewModelProvider(mode: _mode).notifier)
+            .canActOn(tagId)) {
+      return;
+    }
+    unawaited(context.router.push<void>(TagNavigationRoute(tagId: tagId)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
@@ -349,6 +360,7 @@ final class _TagCatalogPageState extends ConsumerState<TagCatalogPage> {
                 canDelete: !_confirmationOpen && _activeDeleteToken == null,
                 onAssign: _assignSelected,
                 onSelect: _selectTag,
+                onOpen: _openNavigation,
               ),
             },
           ),
@@ -368,6 +380,7 @@ final class _LoadedCatalog extends StatelessWidget {
     required this.canDelete,
     required this.onAssign,
     required this.onSelect,
+    required this.onOpen,
   });
 
   final TagCatalogLoaded state;
@@ -378,6 +391,7 @@ final class _LoadedCatalog extends StatelessWidget {
   final bool canDelete;
   final VoidCallback onAssign;
   final ValueChanged<TagId> onSelect;
+  final ValueChanged<TagId> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -476,6 +490,7 @@ final class _LoadedCatalog extends StatelessWidget {
                             onRename: onRename,
                             onDelete: onDelete,
                             canDelete: canDelete,
+                            onOpen: onOpen,
                           )
                         : null,
                   ),
@@ -518,6 +533,7 @@ final class _LoadedCatalog extends StatelessWidget {
                           onRename: onRename,
                           onDelete: onDelete,
                           canDelete: canDelete,
+                          onOpen: onOpen,
                         )
                       : null,
                 ),
@@ -578,12 +594,14 @@ final class _TagActions extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.canDelete,
+    required this.onOpen,
   });
 
   final Tag tag;
   final ValueChanged<Tag> onRename;
   final ValueChanged<Tag> onDelete;
   final bool canDelete;
+  final ValueChanged<TagId> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -591,6 +609,12 @@ final class _TagActions extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        IconButton(
+          key: ValueKey('tag-catalog-open-${tag.id.toCanonicalString()}'),
+          tooltip: l10n.tagNavigationTitle,
+          onPressed: () => onOpen(tag.id),
+          icon: const Icon(Icons.arrow_forward),
+        ),
         IconButton(
           tooltip: l10n.tagCatalogRename,
           onPressed: () => onRename(tag),
