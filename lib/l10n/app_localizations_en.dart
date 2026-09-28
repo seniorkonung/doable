@@ -967,6 +967,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCatalogSelected => 'Selected tag';
 
   @override
+  String get tagCatalogAssignmentUnknown => 'Assignment not yet checked';
+
+  @override
   String get tagEditorCreateTitle => 'New tag';
 
   @override

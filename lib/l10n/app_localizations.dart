@@ -1718,6 +1718,12 @@ abstract class AppLocalizations {
   /// **'Selected tag'**
   String get tagCatalogSelected;
 
+  /// Состояние назначения выбранного тега ещё не подтверждено
+  ///
+  /// In en, this message translates to:
+  /// **'Assignment not yet checked'**
+  String get tagCatalogAssignmentUnknown;
+
   /// Заголовок формы создания тега
   ///
   /// In en, this message translates to:
