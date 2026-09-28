@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -36,10 +37,11 @@ void main() {
         addTearDown(tester.view.reset);
 
         late sqlite.Database raw;
+        final diagnostics = InMemoryDiagnosticsSink();
         final runtime = AppRuntime(
           connectionFactory: () =>
               openInMemoryLocalDatabase(setup: (database) => raw = database),
-          diagnosticsSink: InMemoryDiagnosticsSink(),
+          diagnosticsSink: diagnostics,
         );
         addTearDown(() async {
           await tester.pumpWidget(const SizedBox.shrink());
@@ -86,14 +88,83 @@ void main() {
         }
         await _tap(tester, choose);
 
+        final homeTagId = tagFixtureId(firstTagNumber);
         final existingTagId = tagFixtureId(lastTagNumber);
-        await _tap(
-          tester,
-          find.byKey(ValueKey('tag-catalog-row-$existingTagId')),
+        final homeRow = find.byKey(ValueKey('tag-catalog-row-$homeTagId'));
+        final workRow = find.byKey(ValueKey('tag-catalog-row-$existingTagId'));
+        await _until(tester, homeRow);
+        await tester.pumpAndSettle();
+        final search = find.byKey(const ValueKey('tag-catalog-search'));
+        final localizations = AppLocalizations.of(tester.element(search));
+        final storedBeforeSearch = _storedGraph(raw);
+        final diagnosticsBeforeSearch = diagnostics.events;
+        for (final (query, hasHome, hasWork) in [
+          ('д', true, false),
+          ('до', true, false),
+          ('дмо', false, false),
+          ('дом', true, false),
+          ('спорт', false, false),
+          ('раб', false, true),
+          ('работ', false, true),
+        ]) {
+          await tester.enterText(search, query);
+          await tester.pumpAndSettle();
+          expect(homeRow, hasHome ? findsOneWidget : findsNothing);
+          expect(workRow, hasWork ? findsOneWidget : findsNothing);
+          if (hasHome) {
+            expect(
+              _assignmentLabel(tester, homeRow),
+              localizations.tagCatalogAssigned,
+            );
+          }
+          if (hasWork) {
+            expect(
+              _assignmentLabel(tester, workRow),
+              localizations.tagCatalogAvailable,
+            );
+          }
+          if (!hasHome && !hasWork) {
+            expect(
+              find.text(localizations.tagCatalogNoMatches),
+              findsOneWidget,
+            );
+          }
+          expect(_storedGraph(raw), storedBeforeSearch);
+          expect(diagnostics.events, diagnosticsBeforeSearch);
+        }
+        await tester.tap(find.byTooltip(localizations.tagCatalogClearSearch));
+        await tester.pumpAndSettle();
+        expect(homeRow, findsOneWidget);
+        expect(workRow, findsOneWidget);
+        expect(
+          _assignmentLabel(tester, homeRow),
+          localizations.tagCatalogAssigned,
         );
+        expect(_storedGraph(raw), storedBeforeSearch);
+        expect(diagnostics.events, diagnosticsBeforeSearch);
+
+        await tester.enterText(search, 'работ');
+        await tester.pumpAndSettle();
+        expect(homeRow, findsNothing);
+        expect(_storedGraph(raw), storedBeforeSearch);
+        expect(diagnostics.events, diagnosticsBeforeSearch);
+        await _tap(tester, workRow);
+        expect(_storedGraph(raw), storedBeforeSearch);
         await _tap(tester, find.byKey(const ValueKey('tag-catalog-assign')));
         await _until(tester, find.text('Работа'));
         await _waitFor(tester, () => _assigned(raw, existingTagId, number));
+        final storedAfterAssign = _storedGraph(raw);
+        final assignmentsBefore = storedBeforeSearch['tag_assignments']!;
+        expect(storedAfterAssign['tags'], storedBeforeSearch['tags']);
+        expect(
+          storedAfterAssign['tag_assignments']!.take(assignmentsBefore.length),
+          assignmentsBefore,
+        );
+        expect(
+          storedAfterAssign['tag_assignments'],
+          hasLength(assignmentsBefore.length + 1),
+        );
+        expect(retainedTagFixtureGraph(raw), graphBefore);
         router.pop();
         await _until(
           tester,
@@ -173,6 +244,21 @@ void main() {
         await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
         await _until(tester, find.text(newName));
         expect(find.text(newName), findsOneWidget);
+        await tester.pumpAndSettle();
+        final storedBeforeBrowseSearch = _storedGraph(raw);
+        for (final query in ['общ', 'спорт', 'общий']) {
+          await tester.enterText(search, query);
+          await tester.pumpAndSettle();
+          expect(
+            find.text(newName),
+            query == 'спорт' ? findsNothing : findsOneWidget,
+          );
+          expect(_storedGraph(raw), storedBeforeBrowseSearch);
+        }
+        await tester.tap(find.byTooltip(localizations.tagCatalogClearSearch));
+        await tester.pumpAndSettle();
+        expect(find.text(newName), findsOneWidget);
+        expect(_storedGraph(raw), storedBeforeBrowseSearch);
         if (isIntention && number == 1) {
           router.pop();
           final choiceId = (DailyChoiceId.decode(
@@ -190,6 +276,24 @@ void main() {
     );
   }
 }
+
+Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
+  ...retainedTagFixtureGraph(raw),
+  for (final table in ['tags', 'tag_assignments'])
+    table: raw
+        .select('SELECT * FROM $table ORDER BY rowid')
+        .map((row) => row.values.toList())
+        .toList(),
+};
+
+String _assignmentLabel(WidgetTester tester, Finder row) =>
+    (tester
+                .widget<ListTile>(
+                  find.descendant(of: row, matching: find.byType(ListTile)),
+                )
+                .subtitle!
+            as Text)
+        .data!;
 
 List<sqlite.Row> _assignments(sqlite.Database raw, String tagId) =>
     raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [tagId]);
