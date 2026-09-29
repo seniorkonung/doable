@@ -92,7 +92,7 @@ void main() {
   };
 
   test('удаление по id охватывает назначения за пределами страницы и сохраняет граф', () async {
-    for (var i = 1; i <= 105; i++) {
+    for (var i = 1; i <= 106; i++) {
       raw.execute(
         'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [_uuid(i), 'Намерение $i', 'Описание $i', 1, i.isEven ? 1 : 0, i, i],
@@ -124,9 +124,10 @@ void main() {
         [_uuid(301), _uuid(i)],
       );
     }
+    // Назначение архивному намерению за пределами первой сотни тоже удаляется.
     raw.execute(
-      'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-      [_uuid(301), _uuid(201)],
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [_uuid(301), _uuid(106)],
     );
     raw.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

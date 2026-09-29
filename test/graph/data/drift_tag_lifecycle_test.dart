@@ -138,14 +138,12 @@ void main() {
       [_uuid(5), _uuid(4), _uuid(3)],
     );
     raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_uuid(6), 'Дом']);
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [_uuid(6), _uuid(1)],
-    );
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-      [_uuid(6), _uuid(3)],
-    );
+    for (final intention in [1, 2]) {
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_uuid(6), _uuid(intention)],
+      );
+    }
     final before = graphState();
     final initialRevision = await currentRevision();
 

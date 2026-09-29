@@ -47,7 +47,7 @@ void main() {
       );
       await database.open();
       addTearDown(database.close);
-      for (var i = 1; i <= 105; i++) {
+      for (var i = 1; i <= 107; i++) {
         raw.execute(
           'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
           [_id(i), 'Намерение $i', 0, i.isEven ? 1 : 0, i, i],
@@ -86,9 +86,10 @@ void main() {
           [_id(301), _id(i)],
         );
       }
-      for (final id in [201, 202]) {
+      // Назначения за пределами первой сотни относятся к обоим охватам.
+      for (final id in [106, 107]) {
         raw.execute(
-          'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
           [_id(301), _id(id)],
         );
       }

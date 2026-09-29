@@ -213,10 +213,6 @@ void main() {
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, NULL)',
         [tagFixtureId(firstTagNumber)],
       ),
-      (
-        'INSERT INTO tag_assignments (tag_id, intention_id, long_term_relation_id) VALUES (?, ?, ?)',
-        [tagFixtureId(firstTagNumber), tagFixtureId(3), tagFixtureId(101)],
-      ),
     ]) {
       expect(
         () => raw.execute(sql, values),
@@ -224,6 +220,15 @@ void main() {
         reason: sql,
       );
     }
+    // Второму получателю негде храниться: у назначения один столбец цели.
+    expect(
+      raw
+          .select('SELECT name FROM pragma_table_info(?) ORDER BY cid', [
+            'tag_assignments',
+          ])
+          .map((row) => row['name']),
+      ['creation_sequence', 'tag_id', 'tag_creation_sequence', 'intention_id'],
+    );
     expect(
       () => raw.execute(
         'UPDATE tag_assignments SET intention_id = NULL WHERE intention_id = ?',

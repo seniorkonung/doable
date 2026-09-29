@@ -532,13 +532,22 @@ void _testTaggedGraphLifecycle(String locale) {
       final initial = await _loaded(tester, firstTagNumber);
       final before = _snapshot(app.raw);
       final coordinator = app.runtime.commandCoordinator;
+      // Удаление связей не затрагивает назначения, поэтому их запись
+      // отказывает отдельно от каскада назначений намерения и тега.
       app.raw.execute('''
         CREATE TEMP TRIGGER fail_navigation_assignment_cascade
         AFTER DELETE ON tag_assignments
         WHEN OLD.intention_id = '${tagFixtureId(5)}'
-          OR OLD.long_term_relation_id IN ('${tagFixtureId(103)}', '${tagFixtureId(106)}')
         BEGIN
           SELECT RAISE(ABORT, 'navigation assignment cascade');
+        END
+      ''');
+      app.raw.execute('''
+        CREATE TEMP TRIGGER fail_navigation_relation_delete
+        AFTER DELETE ON long_term_relations
+        WHEN OLD.id IN ('${tagFixtureId(103)}', '${tagFixtureId(106)}')
+        BEGIN
+          SELECT RAISE(ABORT, 'navigation relation delete');
         END
       ''');
       final attempts = <Future<GraphCommandCompletion> Function()>[
@@ -589,6 +598,7 @@ void _testTaggedGraphLifecycle(String locale) {
       );
 
       app.raw.execute('DROP TRIGGER fail_navigation_assignment_cascade');
+      app.raw.execute('DROP TRIGGER fail_navigation_relation_delete');
       for (final attempt in attempts.take(3)) {
         await _changed(tester, attempt());
       }
@@ -774,9 +784,7 @@ void _expectOnlyDeleted(
                   (row) => switch (entry.key) {
                     'intentions' => !row.any(intentionIds.contains),
                     'long_term_relations' => !row.any(relationIds.contains),
-                    'tag_assignments' => !row.any(
-                      {...intentionIds, ...relationIds}.contains,
-                    ),
+                    'tag_assignments' => !row.any(intentionIds.contains),
                     _ => true,
                   },
                 )

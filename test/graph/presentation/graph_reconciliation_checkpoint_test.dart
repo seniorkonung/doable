@@ -133,7 +133,7 @@ void main() {
         openInMemoryLocalDatabase(setup: (db) => raw = db),
       );
       await database.open();
-      seedWidelyAssignedTagFixture(raw, recipientPairs: 107);
+      seedWidelyAssignedTagFixture(raw, recipients: 107);
       repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
@@ -315,6 +315,15 @@ void main() {
               .map((item) => item.id)
               .toList();
           final graphBefore = retainedTagFixtureGraph(raw);
+          List<List<Object?>> retainedTagAssignments() => raw
+              .select(
+                'SELECT * FROM tag_assignments WHERE tag_id = ? ORDER BY creation_sequence',
+                [tagFixtureId(9001)],
+              )
+              .map((row) => row.values.toList())
+              .toList();
+          final retainedBefore = retainedTagAssignments();
+          expect(retainedBefore, hasLength(108));
 
           final deleted = await (coordinator.acceptTagDelete(
             DeleteTag(tagId),
@@ -356,6 +365,7 @@ void main() {
             ]),
             isEmpty,
           );
+          expect(retainedTagAssignments(), retainedBefore);
 
           model().setTagId(newTag.id);
           await _settleUntil(

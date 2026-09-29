@@ -113,14 +113,12 @@ void main() {
     expect((watched.current as TagReadSuccess).value.value!.id, firstTag.id);
     expect((watched.current as TagReadSuccess).value.value!.name.value, 'Дом');
 
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [firstTag.id.toCanonicalString(), _uuid(1)],
-    );
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-      [firstTag.id.toCanonicalString(), _uuid(3)],
-    );
+    for (final intention in [1, 2]) {
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [firstTag.id.toCanonicalString(), _uuid(intention)],
+      );
+    }
 
     final renamed = await (coordinator.acceptTagRename(
       RenameTag(tagId: firstTag.id, name: TagName.fromInput('Быт')),
