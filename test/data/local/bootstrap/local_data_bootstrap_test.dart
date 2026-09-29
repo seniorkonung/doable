@@ -107,6 +107,55 @@ void main() {
       },
     );
 
+    test('не предоставляет хранилище до подтверждения создания схемы, а после '
+        'отказа создаёт схему заново в том же файле', () async {
+      final databaseFile = await _temporaryDatabaseFile();
+      final creationPaused = Completer<void>();
+      final resumeCreation = Completer<void>();
+      var connectionFactoryCalls = 0;
+      final bootstrap = LocalDataBootstrap(
+        connectionFactory: () {
+          connectionFactoryCalls += 1;
+          final connection = openFileBackedLocalDatabase(databaseFile);
+          if (connectionFactoryCalls > 1) return connection;
+          return observeConfiguredLocalDatabaseConnection(
+            connection,
+            _PausingCreationFailureObserver(
+              creationPaused: creationPaused,
+              resumeCreation: resumeCreation,
+            ),
+          );
+        },
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(bootstrap.close);
+
+      LocalDataBootstrapResult? failedResult;
+      final failedOpening = bootstrap.open()
+        ..then((result) => failedResult = result);
+      await creationPaused.future;
+      await pumpEventQueue();
+
+      expect(failedResult, isNull);
+      expect(bootstrap.open(), same(failedOpening));
+
+      resumeCreation.complete();
+      expect(await failedOpening, isA<LocalDataUnexpectedFailure>());
+      expect(databaseFile.existsSync(), isTrue);
+
+      final retriedResult = await bootstrap.open();
+
+      expect(connectionFactoryCalls, 2);
+      expect(retriedResult, isA<LocalDataReady>());
+      final version = await (retriedResult as LocalDataReady).database
+          .customSelect('PRAGMA user_version')
+          .getSingle();
+      expect(
+        version.read<int>('user_version'),
+        AppDatabase.currentSchemaVersion,
+      );
+    });
+
     test('повторно открывает текущую совместимую схему', () async {
       final databaseFile = await _temporaryDatabaseFile();
 
@@ -730,6 +779,34 @@ void _expectBootstrapFailureCode(
       expectedCode,
     ),
   );
+}
+
+/// Останавливает создание схемы на маркере версии — последней записи внутри
+/// транзакции — и затем прерывает её внедрённым отказом.
+final class _PausingCreationFailureObserver
+    extends LocalDatabaseConnectionObserver {
+  _PausingCreationFailureObserver({
+    required this.creationPaused,
+    required this.resumeCreation,
+  });
+
+  final Completer<void> creationPaused;
+  final Completer<void> resumeCreation;
+
+  @override
+  Future<void> afterStatement(LocalDatabaseSqlStatement statement) async {
+    if (creationPaused.isCompleted ||
+        statement.operation != LocalDatabaseSqlOperation.custom ||
+        !RegExp(
+          '^PRAGMA user_version\\s*=\\s*${AppDatabase.currentSchemaVersion};?\$',
+          caseSensitive: false,
+        ).hasMatch(statement.statements.single.trim())) {
+      return;
+    }
+    creationPaused.complete();
+    await resumeCreation.future;
+    throw StateError('Внедрённый отказ создания схемы');
+  }
 }
 
 final class _CloseTrackingObserver extends LocalDatabaseConnectionObserver {
