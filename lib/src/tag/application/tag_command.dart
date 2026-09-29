@@ -1,8 +1,8 @@
 import '../../graph/application/graph_command_result.dart';
+import '../../intention/domain/intention_id.dart';
 import '../domain/tag_id.dart';
 import '../domain/tag_assignment.dart';
 import '../domain/tag_name.dart';
-import '../domain/tag_target.dart';
 import 'tag_result.dart';
 
 /// Команды исполняет общий последовательный исполнитель личного графа.
@@ -32,29 +32,31 @@ final class RenameTag extends TagLifecycleCommand {
 }
 
 /// Подтверждение привязано к id. Исполнение удаляет тег и все его назначения
-/// одной транзакцией, включая незагруженные и назначения архивным сущностям.
+/// одной транзакцией, включая незагруженные и назначения архивным намерениям.
 final class DeleteTag extends TagLifecycleCommand {
   const DeleteTag(this.tagId);
 
   final TagId tagId;
 }
 
-/// Назначение относится только к указанной паре существующих идентичностей.
+/// Назначение относится только к указанным существующим тегу и намерению.
 final class AssignTag extends TagCommand {
-  const AssignTag({required this.tagId, required this.target});
+  const AssignTag({required this.tagId, required this.intentionId});
 
   final TagId tagId;
-  final TagTarget target;
+  final IntentionId intentionId;
 
-  TagAssignment get assignment => TagAssignment(tagId: tagId, target: target);
+  TagAssignment get assignment =>
+      TagAssignment(tagId: tagId, intentionId: intentionId);
 }
 
 /// Снятие сохраняет сам тег и все другие его назначения.
 final class RemoveTagAssignment extends TagCommand {
-  const RemoveTagAssignment({required this.tagId, required this.target});
+  const RemoveTagAssignment({required this.tagId, required this.intentionId});
 
   final TagId tagId;
-  final TagTarget target;
+  final IntentionId intentionId;
 
-  TagAssignment get assignment => TagAssignment(tagId: tagId, target: target);
+  TagAssignment get assignment =>
+      TagAssignment(tagId: tagId, intentionId: intentionId);
 }

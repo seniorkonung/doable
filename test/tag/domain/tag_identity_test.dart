@@ -5,7 +5,6 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -62,41 +61,46 @@ void main() {
     });
   });
 
-  group('получатель и назначение тега', () {
+  group('намерение и назначение тега', () {
     test('различает намерение и долговременную связь с одинаковым UUID', () {
       const value = '018f0b5d-6b2e-7c80-8000-000000000001';
-      final intention = IntentionTagTarget(_intentionId(value));
-      final relation = LongTermRelationTagTarget(_relationId(value));
+      final intention = _intentionId(value);
+      final relation = _relationId(value);
 
-      expect(intention, IntentionTagTarget(_intentionId(value)));
-      expect(relation, LongTermRelationTagTarget(_relationId(value)));
+      expect(intention, _intentionId(value));
+      expect(relation, _relationId(value));
       expect(intention, isNot(relation));
-      expect(<TagTarget>{intention, relation}, hasLength(2));
     });
 
-    test(
-      'назначение определяется только тегом и типизированным получателем',
-      () {
-        const first = '018f0b5d-6b2e-7c80-8000-000000000001';
-        const second = '018f0b5d-6b2e-7c80-8000-000000000002';
-        final intention = IntentionTagTarget(_intentionId(first));
-        final relation = LongTermRelationTagTarget(_relationId(first));
-        final assignment = TagAssignment(
-          tagId: _tagId(first),
-          target: intention,
-        );
+    test('назначение определяется только идентичностями тега и намерения', () {
+      const first = '018f0b5d-6b2e-7c80-8000-000000000001';
+      const second = '018f0b5d-6b2e-7c80-8000-000000000002';
+      final intentionId = _intentionId(first);
+      final assignment = TagAssignment(
+        tagId: _tagId(first),
+        intentionId: intentionId,
+      );
 
-        expect(
-          assignment,
-          TagAssignment(tagId: _tagId(first), target: intention),
-        );
-        expect(<TagAssignment>{
-          assignment,
-          TagAssignment(tagId: _tagId(second), target: intention),
-          TagAssignment(tagId: _tagId(first), target: relation),
-        }, hasLength(3));
-      },
-    );
+      expect(assignment.tagId, _tagId(first));
+      expect(assignment.intentionId, intentionId);
+      expect(
+        assignment,
+        TagAssignment(tagId: _tagId(first), intentionId: _intentionId(first)),
+      );
+      expect(
+        assignment.hashCode,
+        TagAssignment(
+          tagId: _tagId(first),
+          intentionId: _intentionId(first),
+        ).hashCode,
+      );
+      expect(<TagAssignment>{
+        assignment,
+        TagAssignment(tagId: _tagId(first), intentionId: _intentionId(first)),
+        TagAssignment(tagId: _tagId(second), intentionId: intentionId),
+        TagAssignment(tagId: _tagId(first), intentionId: _intentionId(second)),
+      }, hasLength(3));
+    });
   });
 }
 
