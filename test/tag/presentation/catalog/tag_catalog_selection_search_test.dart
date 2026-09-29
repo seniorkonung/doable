@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';

@@ -769,7 +769,7 @@ void main() {
       await repository.execute(
         DeleteBlockingRelations.longTerm(
           intentionId: owner,
-          relationIds: LargeBlockingRelationsFixture.selectedIds,
+          relationIds: selected,
         ),
       ),
     );

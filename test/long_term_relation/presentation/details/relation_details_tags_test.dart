@@ -8,7 +8,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
@@ -103,7 +103,7 @@ void main() {
         unawaited(router.push(TagNavigationRoute(tagId: tagId)));
         await tester.pumpAndSettle();
         await tester.tap(
-          find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+          find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
         );
         await tester.pumpAndSettle();
         unawaited(
@@ -225,7 +225,7 @@ void main() {
         expect(
           tester
               .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+                find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
               )
               .selected,
           isTrue,

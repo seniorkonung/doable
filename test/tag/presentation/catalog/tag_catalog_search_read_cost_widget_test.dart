@@ -3,7 +3,6 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -11,7 +10,6 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
@@ -26,24 +24,17 @@ final _search = find.byKey(const ValueKey('tag-catalog-search'));
 final _list = find.byKey(const ValueKey('tag-catalog-list'));
 
 void main() {
-  final intention = IntentionTagTarget(
-    (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id,
-  );
-  final need = LongTermRelationTagTarget(
-    (LongTermRelationId.decode(
-      tagFixtureId(101),
-    ) as LongTermRelationIdDecodingSuccess).id,
-  );
-  final can = LongTermRelationTagTarget(
-    (LongTermRelationId.decode(
-      tagFixtureId(102),
-    ) as LongTermRelationIdDecodingSuccess).id,
-  );
+  final intention =
+      (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
+  final archivedAction =
+      (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
   for (final (description, mode) in <(String, TagCatalogMode)>[
     ('каталог', const TagCatalogBrowseMode()),
     ('выбор для намерения', TagCatalogSelectionMode(intention)),
-    ('выбор для связи «нужно»', TagCatalogSelectionMode(need)),
-    ('выбор для связи «можно»', TagCatalogSelectionMode(can)),
+    (
+      'выбор для архивированного действия',
+      TagCatalogSelectionMode(archivedAction),
+    ),
   ]) {
     testWidgets(
       '$description: только подтверждённая операция добавляет чтение, поиск сохраняет счётчики',
@@ -63,7 +54,9 @@ void main() {
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: TagCatalogPage(
-                target: mode is TagCatalogSelectionMode ? mode.target : null,
+                intentionId: mode is TagCatalogSelectionMode
+                    ? mode.intentionId
+                    : null,
               ),
             ),
           ),
