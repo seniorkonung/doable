@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final class TagCatalogTestRevision implements GraphRevision {
@@ -35,6 +35,7 @@ final class TagCatalogTestRepository extends Fake
   final command = Completer<TagCommandResult>();
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
   final statusReads = <Completer<TagAssignmentStatusResult>>[];
+  final statusQueries = <(TagId, IntentionId)>[];
   final observations = <TagId, StreamController<TagReadResult>>{};
 
   @override
@@ -61,8 +62,9 @@ final class TagCatalogTestRepository extends Fake
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId id,
-    TagTarget target,
+    IntentionId intentionId,
   ) {
+    statusQueries.add((id, intentionId));
     final result = Completer<TagAssignmentStatusResult>();
     statusReads.add(result);
     return result.future;
@@ -82,27 +84,26 @@ final class TagCatalogTestRepository extends Fake
     return read.future;
   }
 
-  void complete(
-    List<Tag> tags, {
-    int revision = 1,
-    Set<TagId>? assignedIds,
-  }) => reads.last.complete(
-    TagCatalogSuccess(switch (readModes.last) {
-      TagCatalogBrowseMode() => TagCatalogSnapshot(
-        items: tags,
-        revision: TagCatalogTestRevision(revision),
-      ),
-      TagCatalogSelectionMode(:final target) => TagCatalogSnapshot.selection(
-        target: target,
-        rows: [
-          for (var index = 0; index < tags.length; index++)
-            TagSelectionRow(
-              tag: tags[index],
-              isAssigned: assignedIds?.contains(tags[index].id) ?? index.isOdd,
+  void complete(List<Tag> tags, {int revision = 1, Set<TagId>? assignedIds}) =>
+      reads.last.complete(
+        TagCatalogSuccess(switch (readModes.last) {
+          TagCatalogBrowseMode() => TagCatalogSnapshot(
+            items: tags,
+            revision: TagCatalogTestRevision(revision),
+          ),
+          TagCatalogSelectionMode(:final intentionId) =>
+            TagCatalogSnapshot.selection(
+              intentionId: intentionId,
+              rows: [
+                for (var index = 0; index < tags.length; index++)
+                  TagSelectionRow(
+                    tag: tags[index],
+                    isAssigned:
+                        assignedIds?.contains(tags[index].id) ?? index.isOdd,
+                  ),
+              ],
+              revision: TagCatalogTestRevision(revision),
             ),
-        ],
-        revision: TagCatalogTestRevision(revision),
-      ),
-    }),
-  );
+        }),
+      );
 }

@@ -6,7 +6,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -16,20 +15,19 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  for (final relation in [false, true]) {
-    final recipient = relation ? 'долговременной связи' : 'намерения';
+  for (final intentionNumber in [100, 200]) {
+    final recipient = 'намерения $intentionNumber';
 
     test(
       'полный снимок обновляет имя выбранного тега до ответа наблюдения для $recipient',
       () async {
-        final harness = await _prepare(relation);
+        final harness = await _prepare(intentionNumber);
         await harness.startRefresh();
         final renamed = _rename(harness.selected, 'Имя из нового снимка');
 
@@ -50,7 +48,7 @@ void main() {
     test(
       'полный снимок снимает выбор исчезнувшего тега до ответа наблюдения для $recipient',
       () async {
-        final harness = await _prepare(relation);
+        final harness = await _prepare(intentionNumber);
         await harness.startRefresh();
 
         await harness.completeRefresh(selected: null);
@@ -71,7 +69,7 @@ void main() {
     test(
       'позднее наблюдение старой ревизии не возвращает прежнее имя после полного снимка для $recipient',
       () async {
-        final harness = await _prepare(relation);
+        final harness = await _prepare(intentionNumber);
         await harness.startRefresh();
         final renamed = _rename(harness.selected, 'Имя из нового снимка');
         await harness.completeRefresh(selected: renamed);
@@ -89,7 +87,7 @@ void main() {
     test(
       'позднее наблюдение старой ревизии не возвращает удалённый выбор после полного снимка для $recipient',
       () async {
-        final harness = await _prepare(relation);
+        final harness = await _prepare(intentionNumber);
         await harness.startRefresh();
         await harness.completeRefresh(selected: null);
 
@@ -112,7 +110,7 @@ void main() {
     test(
       'полный снимок сохраняет более новое имя из наблюдения выбранного тега для $recipient',
       () async {
-        final harness = await _prepare(relation);
+        final harness = await _prepare(intentionNumber);
         await harness.startRefresh();
         final newest = _rename(
           harness.selected,
@@ -139,7 +137,7 @@ void main() {
     test(
       'снимок новой эпохи разрешает последующие ответы наблюдения этой эпохи для $recipient',
       () async {
-        final harness = await _prepare(relation);
+        final harness = await _prepare(intentionNumber);
         await harness.startRefresh(revision: 1, epoch: 2);
         final renamed = _rename(harness.selected, 'Имя в новой эпохе');
         await harness.completeRefresh(selected: renamed, revision: 1, epoch: 2);
@@ -167,7 +165,7 @@ void main() {
     test(
       'успешный снимок сохраняет отказ наблюдения и отклоняет старый успех для $recipient',
       () async {
-        final harness = await _prepare(relation);
+        final harness = await _prepare(intentionNumber);
         await harness.startRefresh();
         harness.repository.observation.fail(const TagReadUnavailableFailure());
         await _flush();
@@ -197,33 +195,27 @@ void main() {
   }
 }
 
-Future<_Harness> _prepare(bool relation) async {
-  final target = relation
-      ? LongTermRelationTagTarget(
-          (LongTermRelationId.decode(
-            _id(200),
-          ) as LongTermRelationIdDecodingSuccess).id,
-        )
-      : IntentionTagTarget(
-          (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
-        );
+Future<_Harness> _prepare(int intentionNumber) async {
+  final intentionId = (IntentionId.decode(
+    _id(intentionNumber),
+  ) as IntentionIdDecodingSuccess).id;
   final repository = _Repository();
   final container = ProviderContainer(
     overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
   );
   final subscription = container.listen(
-    tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target)),
+    tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(intentionId)),
     (_, _) {},
   );
   addTearDown(() {
     subscription.close();
     container.dispose();
   });
-  final harness = _Harness(container, repository, target);
+  final harness = _Harness(container, repository, intentionId);
   repository.catalogReads.single.complete(
     TagCatalogSuccess(
       TagCatalogSnapshot.selection(
-        target: target,
+        intentionId: intentionId,
         rows: [
           TagSelectionRow(tag: harness.selected, isAssigned: false),
           TagSelectionRow(tag: harness.other, isAssigned: false),
@@ -239,20 +231,21 @@ Future<_Harness> _prepare(bool relation) async {
 }
 
 final class _Harness {
-  _Harness(this.container, this.repository, this.target);
+  _Harness(this.container, this.repository, this.intentionId);
 
   final ProviderContainer container;
   final _Repository repository;
-  final TagTarget target;
+  final IntentionId intentionId;
   final selected = _tag(1, 'Прежнее имя');
   final other = _tag(2, 'Другой тег');
 
   TagCatalogViewModel get model => container.read(
-    tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target)).notifier,
+    tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(intentionId))
+        .notifier,
   );
 
   TagCatalogLoaded get state => container.read(
-    tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target)),
+    tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(intentionId)),
   ) as TagCatalogLoaded;
 
   Future<void> startRefresh({int revision = 2, int epoch = 1}) async {
@@ -295,7 +288,7 @@ final class _Harness {
     repository.catalogReads.last.complete(
       TagCatalogSuccess(
         TagCatalogSnapshot.selection(
-          target: target,
+          intentionId: intentionId,
           rows: [
             if (selected != null)
               TagSelectionRow(tag: selected, isAssigned: false),
@@ -362,7 +355,7 @@ final class _Repository extends Fake implements PersonalGraphRepository {
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId id,
-    TagTarget target,
+    IntentionId intentionId,
   ) => Completer<TagAssignmentStatusResult>().future;
 
   @override
