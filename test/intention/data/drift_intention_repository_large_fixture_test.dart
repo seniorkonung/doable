@@ -79,10 +79,14 @@ void main() {
       trace.clear();
       trace.parameterLimit = 400;
 
-      for (final (pageSize, titleFilter) in [
-        (1, 'редкое %_'),
-        (_pageSize, 'редкое %_'),
-        (_pageSize, 'ре'),
+      // Без фильтра названия совпадение отсекают только теги среди
+      // 25 000 готовых активных кандидатов; «Другое название» проходит.
+      final tagOnlyMatchCount = _jointMatchCount + 1;
+      for (final (pageSize, titleFilter, matchCount) in [
+        (1, 'редкое %_', _jointMatchCount),
+        (_pageSize, 'редкое %_', _jointMatchCount),
+        (_pageSize, 'ре', _jointMatchCount),
+        (_pageSize, null, tagOnlyMatchCount),
       ]) {
         trace.clear();
         final first = _page(
@@ -90,7 +94,7 @@ void main() {
             _jointQuery(pageSize: pageSize, titleFilter: titleFilter),
           ),
         ) as IntentionCatalogFirstPage;
-        expect(first.totalCount, _jointMatchCount);
+        expect(first.totalCount, matchCount);
         expect(first.items, hasLength(pageSize));
         _expectJointMaterialization(
           first,
@@ -98,44 +102,105 @@ void main() {
           isFirst: true,
           pageSize: pageSize,
         );
-        _expectJointPlans(raw, trace, usesFts: titleFilter.length >= 3);
+        _expectJointPlans(raw, trace, titleFilter: titleFilter);
       }
 
-      final expected =
+      for (final (titleFilter, matches) in [
+        (
+          'редкое %_',
           [
             for (var index = 0; index < _jointMatchCount; index++)
               _jointIntentionIndex(index),
-          ]..sort((left, right) {
-            final timestampOrder = (right % 7).compareTo(left % 7);
-            return timestampOrder == 0 ? left.compareTo(right) : timestampOrder;
-          });
-      final actual = <String>[];
-      IntentionCatalogCursor? cursor;
-      var pageNumber = 0;
-      do {
-        trace.clear();
-        final page = _page(
-          await repository.getCatalogPage(_jointQuery(cursor: cursor)),
+          ],
+        ),
+        (
+          null,
+          [
+            for (var index = 0; index < _jointMatchCount; index++)
+              _jointIntentionIndex(index),
+            _jointIntentionIndex(241),
+          ],
+        ),
+      ]) {
+        await _expectJointTraversal(
+          repository,
+          raw,
+          trace,
+          titleFilter: titleFilter,
+          matches: matches,
         );
-        _expectJointMaterialization(page, trace, isFirst: pageNumber == 0);
-        if (pageNumber == 0) {
-          expect(
-            (page as IntentionCatalogFirstPage).totalCount,
-            _jointMatchCount,
-          );
-          _printJointCost(raw, trace);
-        }
-        actual.addAll(page.items.map((item) => item.id.toCanonicalString()));
-        cursor = page.nextCursor;
-        pageNumber++;
-      } while (cursor != null);
+      }
 
-      expect(pageNumber, 3);
-      expect(actual, expected.map(_fixtureId));
-      expect(actual.toSet(), hasLength(_jointMatchCount));
+      // Кандидат без тегов отсекается первой адресной проверкой назначения,
+      // но набор из json_each(?) не индексирован и читается заново для
+      // каждого кандидата: стоимость растёт с числом условий, а не только
+      // с числом совпадений. С одним условием в каждом наборе совпадают ещё
+      // кандидаты без последнего обязательного тега и с последним исключённым.
+      for (final (conditionCount, matchCount) in [
+        (1, tagOnlyMatchCount + 4),
+        (_conditionCount, tagOnlyMatchCount),
+      ]) {
+        trace.clear();
+        final first = _page(
+          await repository.getCatalogPage(
+            _jointQuery(titleFilter: null, conditionCount: conditionCount),
+          ),
+        ) as IntentionCatalogFirstPage;
+        expect(first.totalCount, matchCount);
+        expect(trace.writes, isEmpty);
+        expect(trace.selects, hasLength(4));
+        _expectJointPlans(raw, trace, titleFilter: null);
+        _printJointCost(
+          raw,
+          trace,
+          titleFilter: null,
+          page: 0,
+          conditionCount: conditionCount,
+        );
+      }
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
+}
+
+/// Полный обход совместного поиска: каждая порция, включая продолжения,
+/// материализует только себя и сохраняет адресные планы проверок тегов.
+Future<void> _expectJointTraversal(
+  DriftPersonalGraphRepository repository,
+  sqlite.Database raw,
+  _SelectTrace trace, {
+  required String? titleFilter,
+  required List<int> matches,
+}) async {
+  final expected = [...matches]
+    ..sort((left, right) {
+      final timestampOrder = (right % 7).compareTo(left % 7);
+      return timestampOrder == 0 ? left.compareTo(right) : timestampOrder;
+    });
+  final actual = <String>[];
+  IntentionCatalogCursor? cursor;
+  var pageNumber = 0;
+  do {
+    trace.clear();
+    final page = _page(
+      await repository.getCatalogPage(
+        _jointQuery(titleFilter: titleFilter, cursor: cursor),
+      ),
+    );
+    _expectJointMaterialization(page, trace, isFirst: pageNumber == 0);
+    _expectJointPlans(raw, trace, titleFilter: titleFilter);
+    if (pageNumber == 0) {
+      expect((page as IntentionCatalogFirstPage).totalCount, matches.length);
+    }
+    _printJointCost(raw, trace, titleFilter: titleFilter, page: pageNumber);
+    actual.addAll(page.items.map((item) => item.id.toCanonicalString()));
+    cursor = page.nextCursor;
+    pageNumber++;
+  } while (cursor != null);
+
+  expect(pageNumber, 3);
+  expect(actual, expected.map(_fixtureId));
+  expect(actual.toSet(), hasLength(matches.length));
 }
 
 /// Среди 50 000 намерений 245 кандидатов далеко за первой обычной порцией.
@@ -149,6 +214,8 @@ void _populateJointTagFixture(sqlite.Database database) {
   );
   database.execute('BEGIN');
   try {
+    // Все намерения готовы: редкость совпадений задают теги, а не готовность.
+    database.execute('UPDATE intentions SET is_action_ready = 1');
     for (final (base, count) in [
       (_requiredTagBase, _conditionCount),
       (_excludedTagBase, _conditionCount),
@@ -211,7 +278,8 @@ TagId _tagId(int number) => switch (TagId.decode(_fixtureId(number))) {
 
 IntentionCatalogQuery _jointQuery({
   int pageSize = _pageSize,
-  String titleFilter = 'редкое %_',
+  String? titleFilter = 'редкое %_',
+  int conditionCount = _conditionCount,
   IntentionCatalogCursor? cursor,
 }) => IntentionCatalogQuery(
   scope: IntentionScope.active,
@@ -219,11 +287,11 @@ IntentionCatalogQuery _jointQuery({
   titleFilter: titleFilter,
   tagFilter: IntentionTagFilter(
     requiredTagIds: [
-      for (var index = 0; index < _conditionCount; index++)
+      for (var index = 0; index < conditionCount; index++)
         _tagId(_requiredTagBase + index),
     ],
     excludedTagIds: [
-      for (var index = 0; index < _conditionCount; index++)
+      for (var index = 0; index < conditionCount; index++)
         _tagId(_excludedTagBase + index),
     ],
   ),
@@ -325,8 +393,9 @@ List<String> _observedPlan(sqlite.Database database, _TracedSelect select) => [
 void _expectJointPlans(
   sqlite.Database database,
   _SelectTrace trace, {
-  required bool usesFts,
+  required String? titleFilter,
 }) {
+  final usesFts = titleFilter != null && titleFilter.length >= 3;
   for (final select in trace.selects.where(
     (select) =>
         _isCatalogCountStatement(select.statement) ||
@@ -365,29 +434,35 @@ void _expectJointPlans(
   expect(tagPlan, isNot(contains('SCAN a')));
 }
 
-void _printJointCost(sqlite.Database database, _SelectTrace trace) {
-  final count = trace.selects.singleWhere(
-    (select) => _isCatalogCountStatement(select.statement),
-  );
-  final page = trace.selects.singleWhere(
+void _printJointCost(
+  sqlite.Database database,
+  _SelectTrace trace, {
+  required String? titleFilter,
+  required int page,
+  int conditionCount = _conditionCount,
+}) {
+  final count = trace.selects
+      .where((select) => _isCatalogCountStatement(select.statement))
+      .singleOrNull;
+  final read = trace.selects.singleWhere(
     (select) => select.statement.contains('LIMIT'),
   );
   final tags = trace.selects.singleWhere(
     (select) => select.statement.contains('FROM tag_assignments a'),
   );
+  String cost(String label, _TracedSelect select) =>
+      '$label=${select.elapsed.inMicroseconds} мкс/${select.rowCount} строк, '
+      'план: ${_observedPlan(database, select).join(' | ')}';
   // Измерения характеризуют эту фикстуру и материализацию, а не постоянное
-  // время поиска: COUNT и поиск редких совпадений зависят от объёма данных.
+  // время поиска: COUNT и поиск редких совпадений зависят от объёма данных
+  // и числа условий, а у наборов из json_each(?) нет собственного индекса.
   // ignore: avoid_print
   print(
-    'Совместный поиск: $_fixtureSize намерений, $_jointMatchCount совпадений, '
-    '$_conditionCount обязательных и $_conditionCount исключённых условий; '
+    'Совместный поиск, название ${titleFilter ?? 'без фильтра'}, '
+    'порция $page: $_fixtureSize намерений, '
+    '$conditionCount обязательных и $conditionCount исключённых условий; '
     '${trace.selects.length} чтения; '
-    'COUNT=${count.elapsed.inMicroseconds} мкс/${count.rowCount} строка; '
-    'порция=${page.elapsed.inMicroseconds} мкс/${page.rowCount} строк; '
-    'назначения=${tags.elapsed.inMicroseconds} мкс/${tags.rowCount} строк; '
-    'план COUNT=${_observedPlan(database, count).join(' | ')}; '
-    'план порции=${_observedPlan(database, page).join(' | ')}; '
-    'план назначений=${_observedPlan(database, tags).join(' | ')}',
+    '${[if (count != null) cost('COUNT', count), cost('порция', read), cost('назначения', tags)].join('; ')}',
   );
 }
 

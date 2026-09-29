@@ -163,7 +163,7 @@
   - **Ожидаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, `test/graph/data/drift_tagged_entities_read_test.dart`, `test/graph/data/tagged_entities_catalog_storage_scenarios.dart`, `test/intention/data/catalog_tag_filter_failure_scenarios.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`; при необходимости `test/tag/presentation/navigation/tag_navigation_catalog_integration_scenarios.dart`.
   - **Размер:** M.
 
-- [ ] 1.16 Подтвердить стоимость совместного поиска с наборами в параметре на больших данных
+- [x] 1.16 Подтвердить стоимость совместного поиска с наборами в параметре на больших данных
   - **Критерии приёмки:**
     - Большая воспроизводимая фикстура с большим числом обязательных и исключённых условий, редкими совпадениями и многими назначениями одной строки подтверждает ограниченную материализацию. Возвращаются только порция и её полные назначения, запросов на каждую строку нет. Число чтений не растёт на служебные записи, лишний служебный SELECT учёта не выполняется.
     - Планы SQL подтверждают адресные проверки назначений по индексу `(intention_id, tag_id)` при наборах из `json_each(?)` и существующие индексы порядка. Измерения количества и порции различаются, выводы о стоимости не обещают постоянного времени полного подсчёта.
