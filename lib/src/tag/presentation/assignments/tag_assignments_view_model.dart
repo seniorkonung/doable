@@ -7,12 +7,13 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../intention/application/intention_catalog.dart';
+import '../../../intention/domain/intention_id.dart';
 import '../../application/tag_assignments.dart';
 import '../../application/tag_change.dart';
 import '../../application/tag_read_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
-import '../../domain/tag_target.dart';
 import 'tag_assignments_state.dart';
 
 part 'tag_assignments_view_model.g.dart';
@@ -36,7 +37,7 @@ final tagAssignmentsChangesProvider =
 final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
   static const _maxStaleReads = 8;
 
-  late TagTarget _target;
+  late IntentionId _intentionId;
   late TagReadContract _reads;
   StreamSubscription<ConfirmedGraphChangePackage>? _changes;
   GraphRevision? _requiredRevision;
@@ -46,19 +47,16 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
   int _staleReadAttempts = 0;
 
   @override
-  TagAssignmentsState build(TagTarget target) {
+  TagAssignmentsState build(IntentionId intentionId) {
     unawaited(_changes?.cancel());
     final active = _activeRequest;
-    _target = target;
+    _intentionId = intentionId;
     _reads = ref.watch(tagAssignmentsReaderProvider);
     _requiredRevision = null;
     _refreshNeeded = false;
     _staleReadAttempts = 0;
     _generation++;
-    final generation = _generation;
-    _changes = ref.watch(tagAssignmentsChangesProvider).listen((package) {
-      if (generation == _generation) _onChange(package);
-    });
+    _changes = ref.watch(tagAssignmentsChangesProvider).listen(_onChange);
     ref.onDispose(() => unawaited(_changes?.cancel()));
     if (active == null) {
       unawaited(_startRead());
@@ -70,9 +68,9 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
 
   /// При повторном использовании той же модели прежнее чтение теряет право
   /// публикации. Пока оно выполняется, новый запрос ждёт его завершения.
-  void setTarget(TagTarget target) {
-    if (_target == target) return;
-    _target = target;
+  void setIntentionId(IntentionId intentionId) {
+    if (_intentionId == intentionId) return;
+    _intentionId = intentionId;
     _generation++;
     _staleReadAttempts = 0;
     state = const TagAssignmentsInitialLoading();
@@ -86,7 +84,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
   bool canActOn(TagId id) {
     final current = state;
     return current is TagAssignmentsLoaded &&
-        current.target == _target &&
+        current.intentionId == _intentionId &&
         current.canUseCurrentItems &&
         current.contains(id);
   }
@@ -114,7 +112,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
   }
 
   Future<void> _startRead() =>
-      _start(() => _loadAssignments(_target, _generation));
+      _start(() => _loadAssignments(_intentionId, _generation));
 
   Future<void> _start(Future<void> Function() read) {
     final active = _activeRequest;
@@ -134,9 +132,13 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     return future;
   }
 
-  Future<void> _loadAssignments(TagTarget target, int generation) async {
-    final result = await _readAssignments(target);
-    if (!ref.mounted || generation != _generation || target != _target) return;
+  Future<void> _loadAssignments(IntentionId intentionId, int generation) async {
+    final result = await _readAssignments(intentionId);
+    if (!ref.mounted ||
+        generation != _generation ||
+        intentionId != _intentionId) {
+      return;
+    }
     if (result is GraphResultFailure && _refreshNeeded) return;
     switch (result) {
       case GraphResultSuccess(:final value):
@@ -145,7 +147,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
             current is TagAssignmentsLoaded &&
             value.revision.compareTo(current.revision) ==
                 GraphRevisionOrder.older;
-        if (value.target != target || !_unique(value.items)) {
+        if (value.intentionId != intentionId || !_unique(value.items)) {
           _readFailure(const TagAssignmentsUnexpectedFailure());
           return;
         }
@@ -161,13 +163,13 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
         _refreshNeeded = false;
         _staleReadAttempts = 0;
         state = TagAssignmentsLoaded(
-          target: target,
+          intentionId: intentionId,
           items: value.items,
           revision: value.revision,
         );
-      case GraphResultFailure(failure: TagAssignmentsTargetNotFound()):
+      case GraphResultFailure(failure: TagAssignmentsIntentionNotFound()):
         _refreshNeeded = false;
-        state = const TagAssignmentsTargetMissing();
+        state = const TagAssignmentsIntentionMissing();
       case GraphResultFailure(:final failure):
         _refreshNeeded = false;
         _readFailure(failure);
@@ -187,6 +189,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     _requiredRevision = package.revision;
     _staleReadAttempts = 0;
     final current = state;
+    if (current is TagAssignmentsIntentionMissing) return;
     final snapshotAlreadyIncludes =
         current is TagAssignmentsLoaded &&
         switch (package.revision.compareTo(current.revision)) {
@@ -195,6 +198,16 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
           GraphRevisionOrder.differentEpoch => false,
         };
     if (snapshotAlreadyIncludes) return;
+    if (package.changes.any(
+      (change) =>
+          change is IntentionCatalogDeleted &&
+          change.entry.summary.id == _intentionId,
+    )) {
+      _generation++;
+      _refreshNeeded = false;
+      state = const TagAssignmentsIntentionMissing();
+      return;
+    }
     if (current is TagAssignmentsLoaded) {
       var items = current.items;
       for (final change in package.changes) {
@@ -210,7 +223,7 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
                 if (tag.id != tagId) tag,
             ];
           case TagAssignmentChangedChange(:final assignment, :final state)
-              when assignment.target == _target &&
+              when assignment.intentionId == _intentionId &&
                   state == TagAssignmentState.absent:
             items = [
               for (final tag in items)
@@ -256,9 +269,9 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
         order == GraphRevisionOrder.differentEpoch;
   }
 
-  Future<TagAssignmentsResult> _readAssignments(TagTarget target) async {
+  Future<TagAssignmentsResult> _readAssignments(IntentionId intentionId) async {
     try {
-      return await _reads.getTagAssignments(target);
+      return await _reads.getTagAssignments(intentionId);
     } on Object {
       return const TagAssignmentsError(TagAssignmentsUnexpectedFailure());
     }

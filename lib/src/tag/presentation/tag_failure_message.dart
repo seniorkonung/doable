@@ -17,7 +17,7 @@ String tagFailureMessage(
   },
   TagNameOccupiedFailure() => localizations.tagNameOccupied,
   TagNotFoundFailure() => localizations.tagNotFound,
-  TagTargetNotFoundFailure() => localizations.tagAssignmentTargetNotFound,
+  TagIntentionNotFoundFailure() => localizations.tagAssignmentTargetNotFound,
   TagUnavailableFailure() => localizations.tagUnavailable,
   TagCorruptionFailure() => localizations.tagCorruption,
   TagUnexpectedFailure() => localizations.tagUnexpected,
@@ -29,7 +29,7 @@ String tagAssignmentFailureMessage(
   TagCommandFailure failure,
 ) => switch (failure) {
   TagNotFoundFailure() => localizations.tagNotFound,
-  TagTargetNotFoundFailure() => localizations.tagAssignmentTargetNotFound,
+  TagIntentionNotFoundFailure() => localizations.tagAssignmentTargetNotFound,
   TagUnavailableFailure() => localizations.tagAssignmentUnavailable,
   TagCorruptionFailure() => localizations.tagAssignmentCorruption,
   TagUnexpectedFailure() => localizations.tagAssignmentUnexpected,

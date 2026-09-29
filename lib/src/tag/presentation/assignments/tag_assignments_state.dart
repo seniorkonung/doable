@@ -1,8 +1,8 @@
 import '../../../graph/application/graph_revision.dart';
+import '../../../intention/domain/intention_id.dart';
 import '../../application/tag_assignments.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
-import '../../domain/tag_target.dart';
 
 sealed class TagAssignmentsState {
   const TagAssignmentsState();
@@ -12,8 +12,8 @@ final class TagAssignmentsInitialLoading extends TagAssignmentsState {
   const TagAssignmentsInitialLoading();
 }
 
-final class TagAssignmentsTargetMissing extends TagAssignmentsState {
-  const TagAssignmentsTargetMissing();
+final class TagAssignmentsIntentionMissing extends TagAssignmentsState {
+  const TagAssignmentsIntentionMissing();
 }
 
 final class TagAssignmentsInitialFailure extends TagAssignmentsState {
@@ -29,14 +29,14 @@ enum TagAssignmentsFreshness { current, refreshing, stale }
 /// известные изменения показаны сразу, но действия с ними недоступны.
 final class TagAssignmentsLoaded extends TagAssignmentsState {
   TagAssignmentsLoaded({
-    required this.target,
+    required this.intentionId,
     required List<Tag> items,
     required this.revision,
     this.freshness = TagAssignmentsFreshness.current,
     this.refreshFailure,
   }) : items = List.unmodifiable(items);
 
-  final TagTarget target;
+  final IntentionId intentionId;
   final List<Tag> items;
   final GraphRevision revision;
   final TagAssignmentsFreshness freshness;
@@ -52,7 +52,7 @@ final class TagAssignmentsLoaded extends TagAssignmentsState {
     TagAssignmentsFreshness? freshness,
     TagAssignmentsReadFailure? refreshFailure,
   }) => TagAssignmentsLoaded(
-    target: target,
+    intentionId: intentionId,
     items: items ?? this.items,
     revision: revision,
     freshness: freshness ?? this.freshness,
