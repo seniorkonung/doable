@@ -26,6 +26,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   late IntentionCatalogPurpose _purpose;
   IntentionScope _scope = IntentionCatalogSelection.initial.scope;
   String _titleFilterText = IntentionCatalogSelection.initial.titleFilterText;
+  IntentionTagFilter _tagFilter = IntentionCatalogSelection.initial.tagFilter;
   IntentionCatalogOrder _order = IntentionCatalogSelection.initial.order;
   IntentionCatalogFilterValidationFailure? _filterValidationFailure;
   CatalogPagingPolicy _policy = CatalogPagingPolicy.production;
@@ -46,6 +47,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       SelectDailyChoiceSource() => IntentionScope.active,
     },
     titleFilterText: _titleFilterText,
+    tagFilter: _tagFilter,
     order: _order,
     filterValidationFailure: _filterValidationFailure,
   );
@@ -83,6 +85,14 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           SelectDailyChoiceSource() => IntentionReadinessFilter.all,
         },
         titleFilter: _titleFilterText,
+        tagFilter: _tagFilter,
+        excludedIntentionId: switch (purpose) {
+          SelectRelationParticipant(:final excludedIntentionId) =>
+            excludedIntentionId,
+          BrowseIntentionCatalog() ||
+          SelectDailyChoiceAction() ||
+          SelectDailyChoiceSource() => null,
+        },
         order: _order,
         pageSize: _policy.pageSize,
       );
@@ -142,6 +152,15 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       _isDebouncingFilter = false;
       ref.invalidateSelf();
     });
+  }
+
+  /// Сразу применяет оба набора вместе с текущим текстом и ограничениями.
+  void changeTagFilter(IntentionTagFilter filter) {
+    if (_tagFilter == filter) {
+      return;
+    }
+    _tagFilter = filter;
+    _applyParametersImmediately();
   }
 
   Future<void> retry() async {
@@ -550,6 +569,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         scope: confirmed.query.scope,
         readinessFilter: confirmed.query.readinessFilter,
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
+        tagFilter: confirmed.query.tagFilter,
+        excludedIntentionId: confirmed.query.excludedIntentionId,
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
         cursor: confirmed.nextCursor,
@@ -560,6 +581,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         scope: confirmed.query.scope,
         readinessFilter: confirmed.query.readinessFilter,
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
+        tagFilter: confirmed.query.tagFilter,
+        excludedIntentionId: confirmed.query.excludedIntentionId,
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
       );

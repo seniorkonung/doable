@@ -10,6 +10,7 @@ final class IntentionCatalogSelection {
   const IntentionCatalogSelection({
     required this.scope,
     required this.titleFilterText,
+    this.tagFilter = IntentionTagFilter.empty,
     required this.order,
     required this.filterValidationFailure,
   });
@@ -23,6 +24,7 @@ final class IntentionCatalogSelection {
 
   final IntentionScope scope;
   final String titleFilterText;
+  final IntentionTagFilter tagFilter;
   final IntentionCatalogOrder order;
   final IntentionCatalogFilterValidationFailure? filterValidationFailure;
 }
