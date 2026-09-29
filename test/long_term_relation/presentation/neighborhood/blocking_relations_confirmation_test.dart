@@ -37,15 +37,17 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 void main() {
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     testWidgets(
-      'подтверждение объясняет снятие назначений связей и сохранение тегов на ${locale.languageCode}',
+      'подтверждение сохраняет теги намерений и объясняет охват шагов на ${locale.languageCode}',
       (tester) async {
         final semantics = tester.ensureSemantics();
         tester.view.physicalSize = const Size(480, 720);
         tester.view.devicePixelRatio = 1;
-        tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+        tester.binding.platformDispatcher.textScaleFactorTestValue = 2.5;
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
         addTearDown(() {
           tester.view.resetPhysicalSize();
           tester.view.resetDevicePixelRatio();
+          tester.view.resetViewInsets();
           tester.binding.platformDispatcher.clearTextScaleFactorTestValue();
         });
         final harness = await _pumpAction(tester, locale);
@@ -62,18 +64,64 @@ void main() {
 
         final explanation = find.textContaining(
           locale.languageCode == 'ru'
-              ? 'Все назначения тегов выбранным долговременным связям'
-              : 'All tag assignments of the selected long-term relations',
+              ? 'Переиспользуемые теги и все их назначения намерениям сохранятся'
+              : 'The reusable tags and all their assignments to intentions will remain',
         );
         expect(explanation, findsOneWidget);
         expect(
-          tester.getSemantics(explanation).label,
+          tester.getSemantics(explanation).label.toLowerCase(),
           contains(
             locale.languageCode == 'ru'
                 ? 'переиспользуемые теги'
                 : 'reusable tags',
           ),
         );
+        expect(
+          find.textContaining(
+            locale.languageCode == 'ru'
+                ? 'назначения тегов выбранным долговременным связям'
+                : 'tag assignments of the selected long-term relations',
+          ),
+          findsNothing,
+        );
+        final warning = find.textContaining(
+          locale.languageCode == 'ru'
+              ? 'все принадлежащие им шаги пути'
+              : 'all their path steps',
+        );
+        expect(warning, findsOneWidget);
+        await tester.ensureVisible(warning);
+        expect(
+          tester.getSemantics(warning).label,
+          contains(
+            locale.languageCode == 'ru'
+                ? 'Удаление нельзя отменить'
+                : 'This cannot be undone',
+          ),
+        );
+        final cancel = find.byKey(const ValueKey('blocking-relations-cancel'));
+        final confirm = find.byKey(
+          const ValueKey('blocking-relations-confirm-delete'),
+        );
+        await tester.scrollUntilVisible(
+          confirm,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getSemantics(confirm).label, isNotEmpty);
+        expect(confirm.hitTestable(), findsOneWidget);
+        await tester.ensureVisible(cancel);
+        await tester.pumpAndSettle();
+        expect(tester.getSemantics(cancel).label, isNotEmpty);
+        expect(cancel.hitTestable(), findsOneWidget);
+        await tester.tap(cancel);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('blocking-relations-confirm-list')),
+          findsNothing,
+        );
+        expect(harness.repository.commands, isEmpty);
         expect(tester.takeException(), isNull);
         semantics.dispose();
       },
@@ -100,6 +148,14 @@ void main() {
                 : 'All tag assignments of the selected long-term relations',
           ),
           findsNothing,
+        );
+        expect(
+          find.textContaining(
+            locale.languageCode == 'ru'
+                ? 'Переиспользуемые теги и все их назначения намерениям сохранятся'
+                : 'The reusable tags and all their assignments to intentions will remain',
+          ),
+          findsOneWidget,
         );
       },
     );
@@ -199,7 +255,12 @@ void main() {
         'blocking-relations-confirm-daily-semantics-${daily.id.toCanonicalString()}',
       ),
     );
-    await tester.ensureVisible(dailySummary);
+    await tester.scrollUntilVisible(
+      dailySummary,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     expect(tester.getSemantics(dailySummary).label, contains('Daily choice'));
     expect(tester.getSemantics(dailySummary).label, contains('2026-09-24'));
     final openDaily = find.byKey(

@@ -14,11 +14,9 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
@@ -201,7 +199,7 @@ void _registerAssignmentScenarios() {
           AppLifecycleState.resumed,
         );
         tester.binding.platformDispatcher.localesTestValue = [locale];
-        tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+        tester.binding.platformDispatcher.textScaleFactorTestValue = 2.5;
         addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
         addTearDown(
           tester.binding.platformDispatcher.clearTextScaleFactorTestValue,

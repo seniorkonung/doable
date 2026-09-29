@@ -135,11 +135,23 @@ void _registerNavigationEntryScenarios() {
             await _tap(tester, open);
             await _until(tester, find.text(l10n.tagNavigationTag(longTag)));
             expect(
+              find.descendant(
+                of: find.byType(TagNavigationPage),
+                matching: find.text(
+                  locale.languageCode == 'ru'
+                      ? 'Намерения с тегом'
+                      : 'Tagged intentions',
+                ),
+              ),
+              findsOneWidget,
+            );
+            tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+            expect(
               router.current.argsAs<TagNavigationRouteArgs>().tagId,
               tagId,
             );
             final active = find.byKey(
-              const ValueKey(TaggedEntitiesScope.active),
+              const ValueKey(TaggedIntentionsScope.active),
             );
             await tester.pumpAndSettle();
             await tester.scrollUntilVisible(
@@ -158,6 +170,46 @@ void _registerNavigationEntryScenarios() {
               Tristate.isTrue,
             );
             _expectAction(tester.getSemantics(active));
+            final activeResult = find
+                .bySemanticsLabel(
+                  '${l10n.tagNavigationIntentionActive}: Одинаковое намерение',
+                )
+                .first;
+            await tester.ensureVisible(activeResult);
+            await tester.pumpAndSettle();
+            _expectAction(tester.getSemantics(activeResult));
+            final archived = find.byKey(
+              const ValueKey(TaggedIntentionsScope.archived),
+            );
+            final navigationScroll = find
+                .descendant(
+                  of: find.byType(TagNavigationPage),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            await tester.scrollUntilVisible(
+              archived,
+              -300,
+              scrollable: navigationScroll,
+            );
+            await _tap(tester, archived);
+            final archivedResult = find.bySemanticsLabel(
+              '${l10n.tagNavigationIntentionArchived}: Намерение 2',
+            );
+            await tester.scrollUntilVisible(
+              archivedResult,
+              300,
+              scrollable: navigationScroll,
+            );
+            await tester.ensureVisible(archivedResult);
+            await tester.pumpAndSettle();
+            _expectAction(tester.getSemantics(archivedResult));
+            expect(
+              tester.getSemantics(archivedResult).label,
+              contains(l10n.tagNavigationIntentionArchived),
+            );
+            expect(tester.takeException(), isNull);
+            tester.view.resetViewInsets();
             router.pop();
             await _until(tester, open);
             router.pop();

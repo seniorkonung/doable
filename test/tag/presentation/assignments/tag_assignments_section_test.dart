@@ -409,7 +409,7 @@ void main() {
     );
     reads.fail(0, const TagAssignmentsIntentionNotFound());
     await tester.pumpAndSettle();
-    expect(find.textContaining('получателя больше нет'), findsOneWidget);
+    expect(find.textContaining('намерения больше нет'), findsOneWidget);
     expect(find.text('Повторить'), findsNothing);
   });
 
@@ -672,7 +672,7 @@ void main() {
       );
       await tester.ensureVisible(open);
       await tester.pumpAndSettle();
-      expect(tester.getSemantics(open).label, contains('Сущности с тегом'));
+      expect(tester.getSemantics(open).label, contains('Намерения с тегом'));
       await tester.tap(open);
       expect(opened, [_tagId(301)]);
       await tester.ensureVisible(

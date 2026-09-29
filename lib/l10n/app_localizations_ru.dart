@@ -195,11 +195,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get blockingRelationsConfirmationWarning =>
-      'Проверьте каждую выбранную связь. Удаление нельзя отменить. Само намерение останется; для его удаления понадобится отдельное подтверждение.';
+      'Проверьте каждую выбранную связь. Удаляются только выбранные связи. Вместе с выбранными дневными выборами удаляются все принадлежащие им шаги пути. Удаление нельзя отменить. Само намерение останется; для его удаления понадобится отдельное подтверждение.';
 
   @override
-  String get blockingRelationsConfirmationTagAssignments =>
-      'Все назначения тегов выбранным долговременным связям, включая не показанные здесь, будут сняты. Сами переиспользуемые теги и их назначения другим сущностям сохранятся.';
+  String get blockingRelationsConfirmationPreservedTags =>
+      'Переиспользуемые теги и все их назначения намерениям сохранятся.';
 
   @override
   String blockingRelationsConfirmationCount(int count) {
@@ -781,7 +781,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationTagAssignment => 'назначение тега';
 
   @override
-  String get tagNavigationTitle => 'Сущности с тегом';
+  String get tagNavigationTitle => 'Намерения с тегом';
 
   @override
   String tagNavigationTag(String tagName) {
@@ -792,27 +792,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagNavigationScope => 'Охват результатов';
 
   @override
-  String get tagNavigationLoading => 'Загружаем сущности с тегом…';
+  String get tagNavigationLoading => 'Загружаем намерения с тегом…';
 
   @override
-  String get tagNavigationEmptyActive =>
-      'С этим тегом нет активных намерений и долговременных связей.';
+  String get tagNavigationEmptyActive => 'С этим тегом нет активных намерений.';
 
   @override
   String get tagNavigationEmptyArchived =>
-      'С этим тегом нет архивных намерений и долговременных связей.';
+      'С этим тегом нет архивированных намерений.';
 
   @override
   String get tagNavigationIntentionActive => 'Намерение, активно';
 
   @override
   String get tagNavigationIntentionArchived => 'Намерение, в архиве';
-
-  @override
-  String get tagNavigationRelationActive => 'Долговременная связь, активна';
-
-  @override
-  String get tagNavigationRelationArchived => 'Долговременная связь, в архиве';
 
   @override
   String get tagNavigationOpenDetails => 'Открыть подробности';
@@ -834,28 +827,28 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось обновить выдачу из-за непредвиденной ошибки. Показанные данные могут быть устаревшими.';
 
   @override
-  String get tagNavigationMoreAvailable => 'Есть ещё сущности с этим тегом.';
+  String get tagNavigationMoreAvailable => 'Есть ещё намерения с этим тегом.';
 
   @override
-  String get tagNavigationLoadMore => 'Показать ещё сущности';
+  String get tagNavigationLoadMore => 'Показать ещё намерения';
 
   @override
-  String get tagNavigationLoadingMore => 'Загружаем ещё сущности…';
+  String get tagNavigationLoadingMore => 'Загружаем ещё намерения…';
 
   @override
-  String get tagNavigationAllShown => 'Все сущности показаны.';
+  String get tagNavigationAllShown => 'Все намерения показаны.';
 
   @override
   String get tagNavigationUnavailable =>
-      'Не удалось загрузить сущности с тегом. Повторите попытку.';
+      'Не удалось загрузить намерения с тегом. Повторите попытку.';
 
   @override
   String get tagNavigationCorruption =>
-      'Сохранённые данные помеченных сущностей повреждены и не могут быть показаны.';
+      'Сохранённые данные помеченных намерений повреждены и не могут быть показаны.';
 
   @override
   String get tagNavigationUnexpected =>
-      'Не удалось загрузить сущности с тегом из-за непредвиденной ошибки.';
+      'Не удалось загрузить намерения с тегом из-за непредвиденной ошибки.';
 
   @override
   String get tagNavigationInvalidCursor =>
@@ -867,15 +860,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get tagNavigationLoadMoreUnavailable =>
-      'Не удалось загрузить следующую порцию сущностей.';
+      'Не удалось загрузить следующую порцию намерений.';
 
   @override
   String get tagNavigationLoadMoreCorruption =>
-      'Сохранённые данные повреждены; следующая порция сущностей недоступна.';
+      'Сохранённые данные повреждены; следующая порция намерений недоступна.';
 
   @override
   String get tagNavigationLoadMoreUnexpected =>
-      'Не удалось загрузить следующую порцию сущностей из-за непредвиденной ошибки.';
+      'Не удалось загрузить следующую порцию намерений из-за непредвиденной ошибки.';
 
   @override
   String get tagCatalogTitle => 'Теги';
@@ -950,7 +943,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get tagDeleteConfirmationScope =>
-      'Тег и все его назначения активным и архивированным намерениям и долговременным связям будут удалены необратимо, включая незагруженные назначения. Сами намерения, связи, дневные выборы и их пути сохраняются.';
+      'Тег и все его назначения активным и архивированным намерениям на момент выполнения будут удалены необратимо, включая незагруженные назначения. Сами намерения, связи, дневные выборы и их пути сохраняются.';
 
   @override
   String get tagDeleteCancel => 'Отмена';
@@ -1060,8 +1053,8 @@ class AppLocalizationsRu extends AppLocalizations {
       'Изменение назначения тега уже выполняется. Дождитесь результата.';
 
   @override
-  String get tagAssignmentTargetNotFound =>
-      'Этого получателя больше нет. Обновите подробности.';
+  String get tagAssignmentIntentionNotFound =>
+      'Этого намерения больше нет. Обновите подробности.';
 
   @override
   String get tagAssignmentUnavailable =>
@@ -1080,9 +1073,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get tagAssignmentsIntention => 'намерение';
-
-  @override
-  String get tagAssignmentsRelation => 'долговременная связь';
 
   @override
   String get tagAssignmentsActive => 'не в архиве';
@@ -1494,7 +1484,7 @@ class AppLocalizationsRu extends AppLocalizations {
     String relatedTitle,
     String scope,
   ) {
-    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Все назначения тегов этой связи, включая не показанные сейчас, будут сняты. Сами теги, оба намерения и все остальные связи сохранятся.';
+    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Связь и её описание будут удалены навсегда. Сами теги, все их назначения намерениям, оба намерения и все остальные связи сохранятся.';
   }
 
   @override

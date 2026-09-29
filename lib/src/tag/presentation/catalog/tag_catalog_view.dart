@@ -471,7 +471,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
               TagCatalogIntentionMissing() => SliverFillRemaining(
                 hasScrollBody: false,
                 child: _CatalogStatus(
-                  message: localizations.tagAssignmentTargetNotFound,
+                  message: localizations.tagAssignmentIntentionNotFound,
                 ),
               ),
               TagCatalogLoaded loaded => _LoadedCatalog(

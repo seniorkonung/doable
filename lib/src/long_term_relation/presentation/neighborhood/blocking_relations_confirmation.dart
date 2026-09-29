@@ -317,13 +317,11 @@ final class _BlockingRelationsConfirmationState
                         Text(
                           localizations.blockingRelationsConfirmationWarning,
                         ),
-                        if (snapshot.rows.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            localizations
-                                .blockingRelationsConfirmationTagAssignments,
-                          ),
-                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          localizations
+                              .blockingRelationsConfirmationPreservedTags,
+                        ),
                         if (!canConfirm) ...[
                           const SizedBox(height: 8),
                           Text(switch (selection) {

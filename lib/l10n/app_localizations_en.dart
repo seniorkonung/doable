@@ -194,11 +194,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get blockingRelationsConfirmationWarning =>
-      'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.';
+      'Review each selected relation. Only the selected relations will be deleted. Selected daily choices will be deleted with all their path steps. This cannot be undone. The intention will remain; deleting it requires a separate confirmation.';
 
   @override
-  String get blockingRelationsConfirmationTagAssignments =>
-      'All tag assignments of the selected long-term relations, including those not shown here, will be removed. The reusable tags and their assignments to other entities will remain.';
+  String get blockingRelationsConfirmationPreservedTags =>
+      'The reusable tags and all their assignments to intentions will remain.';
 
   @override
   String blockingRelationsConfirmationCount(int count) {
@@ -780,7 +780,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationTagAssignment => 'tag assignment';
 
   @override
-  String get tagNavigationTitle => 'Tagged entities';
+  String get tagNavigationTitle => 'Tagged intentions';
 
   @override
   String tagNavigationTag(String tagName) {
@@ -791,27 +791,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagNavigationScope => 'Result scope';
 
   @override
-  String get tagNavigationLoading => 'Loading tagged entities…';
+  String get tagNavigationLoading => 'Loading tagged intentions…';
 
   @override
-  String get tagNavigationEmptyActive =>
-      'No active intentions or long-term relations have this tag.';
+  String get tagNavigationEmptyActive => 'No active intentions have this tag.';
 
   @override
   String get tagNavigationEmptyArchived =>
-      'No archived intentions or long-term relations have this tag.';
+      'No archived intentions have this tag.';
 
   @override
   String get tagNavigationIntentionActive => 'Intention, active';
 
   @override
   String get tagNavigationIntentionArchived => 'Intention, archived';
-
-  @override
-  String get tagNavigationRelationActive => 'Long-term relation, active';
-
-  @override
-  String get tagNavigationRelationArchived => 'Long-term relation, archived';
 
   @override
   String get tagNavigationOpenDetails => 'Open details';
@@ -833,28 +826,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not refresh results because of an unexpected error. The displayed data may be out of date.';
 
   @override
-  String get tagNavigationMoreAvailable => 'More entities have this tag.';
+  String get tagNavigationMoreAvailable => 'More intentions have this tag.';
 
   @override
-  String get tagNavigationLoadMore => 'Show more entities';
+  String get tagNavigationLoadMore => 'Show more intentions';
 
   @override
-  String get tagNavigationLoadingMore => 'Loading more entities…';
+  String get tagNavigationLoadingMore => 'Loading more intentions…';
 
   @override
-  String get tagNavigationAllShown => 'All entities are shown.';
+  String get tagNavigationAllShown => 'All intentions are shown.';
 
   @override
   String get tagNavigationUnavailable =>
-      'Could not load tagged entities. Try again.';
+      'Could not load tagged intentions. Try again.';
 
   @override
   String get tagNavigationCorruption =>
-      'Stored tagged entity data is damaged and cannot be shown.';
+      'Stored tagged intention data is damaged and cannot be shown.';
 
   @override
   String get tagNavigationUnexpected =>
-      'Could not load tagged entities because of an unexpected error.';
+      'Could not load tagged intentions because of an unexpected error.';
 
   @override
   String get tagNavigationInvalidCursor =>
@@ -866,15 +859,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagNavigationLoadMoreUnavailable =>
-      'Could not load more entities.';
+      'Could not load more intentions.';
 
   @override
   String get tagNavigationLoadMoreCorruption =>
-      'Stored data is damaged; more entities cannot be shown.';
+      'Stored data is damaged; more intentions cannot be shown.';
 
   @override
   String get tagNavigationLoadMoreUnexpected =>
-      'Could not load more entities because of an unexpected error.';
+      'Could not load more intentions because of an unexpected error.';
 
   @override
   String get tagCatalogTitle => 'Tags';
@@ -948,7 +941,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagDeleteConfirmationScope =>
-      'This permanently deletes the tag and all its assignments to active and archived intentions and long-term relations, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.';
+      'This permanently deletes the tag and all its assignments to active and archived intentions at the time of execution, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.';
 
   @override
   String get tagDeleteCancel => 'Cancel';
@@ -1057,8 +1050,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'A tag assignment change is already in progress. Wait for its result.';
 
   @override
-  String get tagAssignmentTargetNotFound =>
-      'This recipient no longer exists. Refresh its details.';
+  String get tagAssignmentIntentionNotFound =>
+      'This intention no longer exists. Refresh its details.';
 
   @override
   String get tagAssignmentUnavailable =>
@@ -1077,9 +1070,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagAssignmentsIntention => 'intention';
-
-  @override
-  String get tagAssignmentsRelation => 'long-term relation';
 
   @override
   String get tagAssignmentsActive => 'active';
@@ -1489,7 +1479,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String relatedTitle,
     String scope,
   ) {
-    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. All tag assignments of this relation, including those not shown here, will be removed. The tags, both intentions and all other relations will remain.';
+    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. The relation and its description will be permanently deleted. The tags, all their assignments to intentions, both intentions and all other relations will remain.';
   }
 
   @override

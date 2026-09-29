@@ -153,7 +153,9 @@ void main() {
           isFalse,
         );
         expect(
-          find.text(russian ? 'Показать ещё сущности' : 'Show more entities'),
+          find.text(
+            russian ? 'Показать ещё намерения' : 'Show more intentions',
+          ),
           findsNothing,
         );
         reads.fail(1, const TaggedIntentionsUnavailableFailure());
@@ -244,7 +246,7 @@ void main() {
             '${l10n.tagNavigationIntentionArchived}: ${second.title}',
           );
           final more = find.text(
-            russian ? 'Показать ещё сущности' : 'Show more entities',
+            russian ? 'Показать ещё намерения' : 'Show more intentions',
           );
           await _scrollTo(tester, more);
           await tester.tap(more);
@@ -294,8 +296,8 @@ void main() {
         expect(
           find.text(
             russian
-                ? 'Загружаем сущности с тегом…'
-                : 'Loading tagged entities…',
+                ? 'Загружаем намерения с тегом…'
+                : 'Loading tagged intentions…',
           ),
           findsOneWidget,
         );
@@ -374,8 +376,8 @@ void main() {
       expect(
         find.text(
           russian
-              ? 'С этим тегом нет активных намерений и долговременных связей.'
-              : 'No active intentions or long-term relations have this tag.',
+              ? 'С этим тегом нет активных намерений.'
+              : 'No active intentions have this tag.',
         ),
         findsOneWidget,
       );
@@ -386,8 +388,8 @@ void main() {
       expect(
         find.text(
           russian
-              ? 'С этим тегом нет архивных намерений и долговременных связей.'
-              : 'No archived intentions or long-term relations have this tag.',
+              ? 'С этим тегом нет архивированных намерений.'
+              : 'No archived intentions have this tag.',
         ),
         findsOneWidget,
       );
@@ -458,16 +460,16 @@ void main() {
       final cursor = _Cursor();
       reads.page(0, [_intention(1)], cursor: cursor);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Показать ещё сущности'));
+      await tester.tap(find.text('Показать ещё намерения'));
       await tester.pump();
       expect(reads.queries, hasLength(2));
       expect(reads.queries.last.cursor, same(cursor));
-      expect(find.text('Загружаем ещё сущности…'), findsOneWidget);
+      expect(find.text('Загружаем ещё намерения…'), findsOneWidget);
       expect(find.text('Намерение 1'), findsOneWidget);
       reads.fail(1, const TaggedIntentionsUnavailableFailure());
       await tester.pumpAndSettle();
       expect(
-        find.text('Не удалось загрузить следующую порцию сущностей.'),
+        find.text('Не удалось загрузить следующую порцию намерений.'),
         findsOneWidget,
       );
       await tester.tap(find.text('Повторить'));
@@ -477,8 +479,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Намерение 1'), findsOneWidget);
       expect(_row(_intention(101)), findsOneWidget);
-      expect(find.text('Все сущности показаны.'), findsOneWidget);
-      expect(find.text('Показать ещё сущности'), findsNothing);
+      expect(find.text('Все намерения показаны.'), findsOneWidget);
+      expect(find.text('Показать ещё намерения'), findsNothing);
     },
   );
 
@@ -486,18 +488,18 @@ void main() {
     for (final (failure, russianMessage, englishMessage) in [
       (
         const TaggedIntentionsUnavailableFailure(),
-        'Не удалось загрузить сущности с тегом. Повторите попытку.',
-        'Could not load tagged entities. Try again.',
+        'Не удалось загрузить намерения с тегом. Повторите попытку.',
+        'Could not load tagged intentions. Try again.',
       ),
       (
         const TaggedIntentionsCorruptionFailure(),
-        'Сохранённые данные помеченных сущностей повреждены и не могут быть показаны.',
-        'Stored tagged entity data is damaged and cannot be shown.',
+        'Сохранённые данные помеченных намерений повреждены и не могут быть показаны.',
+        'Stored tagged intention data is damaged and cannot be shown.',
       ),
       (
         const TaggedIntentionsUnexpectedFailure(),
-        'Не удалось загрузить сущности с тегом из-за непредвиденной ошибки.',
-        'Could not load tagged entities because of an unexpected error.',
+        'Не удалось загрузить намерения с тегом из-за непредвиденной ошибки.',
+        'Could not load tagged intentions because of an unexpected error.',
       ),
       (
         const TaggedIntentionsInvalidCursor(),
@@ -536,15 +538,15 @@ void main() {
     for (final (failure, pageRu, pageEn, refreshRu, refreshEn) in [
       (
         const TaggedIntentionsCorruptionFailure(),
-        'Сохранённые данные повреждены; следующая порция сущностей недоступна.',
-        'Stored data is damaged; more entities cannot be shown.',
+        'Сохранённые данные повреждены; следующая порция намерений недоступна.',
+        'Stored data is damaged; more intentions cannot be shown.',
         'Не удалось обновить выдачу: сохранённые данные повреждены. Показанные данные могут быть устаревшими.',
         'Could not refresh results: stored data is damaged. The displayed data may be out of date.',
       ),
       (
         const TaggedIntentionsUnexpectedFailure(),
-        'Не удалось загрузить следующую порцию сущностей из-за непредвиденной ошибки.',
-        'Could not load more entities because of an unexpected error.',
+        'Не удалось загрузить следующую порцию намерений из-за непредвиденной ошибки.',
+        'Could not load more intentions because of an unexpected error.',
         'Не удалось обновить выдачу из-за непредвиденной ошибки. Показанные данные могут быть устаревшими.',
         'Could not refresh results because of an unexpected error. The displayed data may be out of date.',
       ),
@@ -569,8 +571,8 @@ void main() {
               await tester.tap(
                 find.text(
                   locale == 'ru'
-                      ? 'Показать ещё сущности'
-                      : 'Show more entities',
+                      ? 'Показать ещё намерения'
+                      : 'Show more intentions',
                 ),
               );
             }

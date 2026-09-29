@@ -240,7 +240,7 @@ void main() {
               ) as IntentionIdDecodingSuccess).id;
         final h = await _pumpCatalog(tester, intentionId: intentionId);
         final before = _tagData(h.raw);
-        expect(find.byTooltip('Сущности с тегом'), findsNothing);
+        expect(find.byTooltip('Намерения с тегом'), findsNothing);
         await tester.tap(
           find.byKey(ValueKey('tag-catalog-row-${tagFixtureId(303)}')),
         );
