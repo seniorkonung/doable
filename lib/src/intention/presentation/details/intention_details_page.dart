@@ -15,7 +15,6 @@ import '../../../long_term_relation/application/long_term_relation_projection.da
 import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
-import '../../../tag/domain/tag_target.dart';
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
@@ -336,11 +335,11 @@ final class _LoadedDetails extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
           sliver: SliverToBoxAdapter(
             child: TagAssignmentsSection(
-              target: IntentionTagTarget(intention.id),
+              intentionId: intention.id,
               isArchived:
                   intention.archiveState == IntentionArchiveState.archived,
-              onChooseTag: (target) => unawaited(
-                context.router.push(TagCatalogRoute(target: target)),
+              onChooseTag: (intentionId) => unawaited(
+                context.router.push(TagCatalogRoute(intentionId: intentionId)),
               ),
               onOpenTag: (tagId) => unawaited(
                 context.router.push<void>(TagNavigationRoute(tagId: tagId)),

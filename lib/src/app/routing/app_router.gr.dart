@@ -45,14 +45,13 @@ import 'package:doable/src/long_term_relation/presentation/editor/relation_edito
     as _i22;
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
     as _i12;
-import 'package:doable/src/tag/domain/tag_id.dart' as _i26;
-import 'package:doable/src/tag/domain/tag_target.dart' as _i24;
+import 'package:doable/src/tag/domain/tag_id.dart' as _i25;
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart'
     as _i13;
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart'
     as _i14;
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart'
-    as _i25;
+    as _i24;
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart'
     as _i15;
 import 'package:flutter/material.dart' as _i18;
@@ -508,12 +507,12 @@ class RelationParticipantPickerRouteArgs {
 /// [_i13.TagCatalogPage]
 class TagCatalogRoute extends _i16.PageRouteInfo<TagCatalogRouteArgs> {
   TagCatalogRoute({
-    _i24.TagTarget? target,
+    _i17.IntentionId? intentionId,
     _i18.Key? key,
     List<_i16.PageRouteInfo>? children,
   }) : super(
          TagCatalogRoute.name,
-         args: TagCatalogRouteArgs(target: target, key: key),
+         args: TagCatalogRouteArgs(intentionId: intentionId, key: key),
          initialChildren: children,
        );
 
@@ -525,39 +524,39 @@ class TagCatalogRoute extends _i16.PageRouteInfo<TagCatalogRouteArgs> {
       final args = data.argsAs<TagCatalogRouteArgs>(
         orElse: () => const TagCatalogRouteArgs(),
       );
-      return _i13.TagCatalogPage(target: args.target, key: args.key);
+      return _i13.TagCatalogPage(intentionId: args.intentionId, key: args.key);
     },
   );
 }
 
 class TagCatalogRouteArgs {
-  const TagCatalogRouteArgs({this.target, this.key});
+  const TagCatalogRouteArgs({this.intentionId, this.key});
 
-  final _i24.TagTarget? target;
+  final _i17.IntentionId? intentionId;
 
   final _i18.Key? key;
 
   @override
   String toString() {
-    return 'TagCatalogRouteArgs{target: $target, key: $key}';
+    return 'TagCatalogRouteArgs{intentionId: $intentionId, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! TagCatalogRouteArgs) return false;
-    return target == other.target && key == other.key;
+    return intentionId == other.intentionId && key == other.key;
   }
 
   @override
-  int get hashCode => target.hashCode ^ key.hashCode;
+  int get hashCode => intentionId.hashCode ^ key.hashCode;
 }
 
 /// generated route for
 /// [_i14.TagEditorPage]
 class TagEditorRoute extends _i16.PageRouteInfo<TagEditorRouteArgs> {
   TagEditorRoute({
-    required _i25.TagEditorContext editorContext,
+    required _i24.TagEditorContext editorContext,
     _i18.Key? key,
     List<_i16.PageRouteInfo>? children,
   }) : super(
@@ -583,7 +582,7 @@ class TagEditorRoute extends _i16.PageRouteInfo<TagEditorRouteArgs> {
 class TagEditorRouteArgs {
   const TagEditorRouteArgs({required this.editorContext, this.key});
 
-  final _i25.TagEditorContext editorContext;
+  final _i24.TagEditorContext editorContext;
 
   final _i18.Key? key;
 
@@ -607,7 +606,7 @@ class TagEditorRouteArgs {
 /// [_i15.TagNavigationPage]
 class TagNavigationRoute extends _i16.PageRouteInfo<TagNavigationRouteArgs> {
   TagNavigationRoute({
-    required _i26.TagId tagId,
+    required _i25.TagId tagId,
     _i18.Key? key,
     List<_i16.PageRouteInfo>? children,
   }) : super(
@@ -632,7 +631,7 @@ class TagNavigationRoute extends _i16.PageRouteInfo<TagNavigationRouteArgs> {
 class TagNavigationRouteArgs {
   const TagNavigationRouteArgs({required this.tagId, this.key});
 
-  final _i26.TagId tagId;
+  final _i25.TagId tagId;
 
   final _i18.Key? key;
 

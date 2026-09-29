@@ -21,10 +21,9 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
@@ -54,47 +53,21 @@ void main() {
           app.router.current.argsAs<TagNavigationRouteArgs>().tagId,
           _tagId(firstTagNumber),
         );
-        _expectNavigation(tester, state, TaggedEntitiesScope.active);
-        final l10n = _l10n(tester);
-        for (final scope in TaggedEntitiesScope.values) {
+        _expectNavigation(tester, state, TaggedIntentionsScope.active);
+        for (final scope in TaggedIntentionsScope.values) {
           await _selectScope(tester, scope);
           await _loadAll(tester, scope);
-          final archived = scope == TaggedEntitiesScope.archived;
+          final archived = scope == TaggedIntentionsScope.archived;
           for (final (target, title, description) in [
             if (!archived) ...[
-              (_intention(1), 'Одинаковое намерение', 'Описание 1'),
-              (_intention(4), 'Одинаковое намерение', 'Описание 4'),
-              (
-                _relation(101),
-                l10n.relationNeighborhoodNeedPhrase(
-                  'Одинаковое намерение',
-                  'Непомеченный сосед',
-                ),
-                null,
-              ),
-            ] else ...[
-              (_intention(2), 'Намерение 2', 'Описание 2'),
-              (
-                _relation(103),
-                l10n.relationNeighborhoodCanPhrase(
-                  'Одинаковое намерение',
-                  'Одинаковое намерение',
-                ),
-                null,
-              ),
-            ],
+              (_intentionId(1), 'Одинаковое намерение', 'Описание 1'),
+              (_intentionId(4), 'Одинаковое намерение', 'Описание 4'),
+            ] else
+              (_intentionId(2), 'Намерение 2', 'Описание 2'),
             (
-              _intention(archived ? 1150 : 1050),
+              _intentionId(archived ? 1150 : 1050),
               'Получатель ${archived ? 1 : 0}/50',
               'Описание ${archived ? 1 : 0}/50',
-            ),
-            (
-              _relation(archived ? 2150 : 2050),
-              l10n.relationNeighborhoodNeedPhrase(
-                'Одинаковое намерение',
-                'Получатель ${archived ? 1 : 0}/50',
-              ),
-              null,
             ),
           ]) {
             await _openDetailsAndReturn(
@@ -106,11 +79,11 @@ void main() {
             );
           }
         }
-        await _selectScope(tester, TaggedEntitiesScope.active);
+        await _selectScope(tester, TaggedIntentionsScope.active);
         _expectNavigation(
           tester,
           await _loaded(tester, firstTagNumber),
-          TaggedEntitiesScope.active,
+          TaggedIntentionsScope.active,
         );
         app.router.pop();
         await _until(
@@ -130,11 +103,9 @@ void main() {
       (tester) async {
         final app = await _pumpApp(tester, locale);
         final before = _snapshot(app.raw);
-        for (final target in [_intention(1), _intention(2)]) {
+        for (final target in [_intentionId(1), _intentionId(2)]) {
           unawaited(
-            app.router.push(
-              IntentionDetailsRoute(intentionId: target.intentionId),
-            ),
+            app.router.push(IntentionDetailsRoute(intentionId: target)),
           );
           final open = find.byKey(
             ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
@@ -144,30 +115,20 @@ void main() {
           _expectNavigation(
             tester,
             await _loaded(tester, firstTagNumber),
-            TaggedEntitiesScope.active,
+            TaggedIntentionsScope.active,
           );
-          await _selectScope(tester, TaggedEntitiesScope.archived);
+          await _selectScope(tester, TaggedIntentionsScope.archived);
           _expectNavigation(
             tester,
             await _loaded(tester, firstTagNumber),
-            TaggedEntitiesScope.archived,
+            TaggedIntentionsScope.archived,
           );
-          final l10n = _l10n(tester);
           await _openDetailsAndReturn(
             tester,
             app.router,
-            _intention(2),
+            _intentionId(2),
             title: 'Намерение 2',
             description: 'Описание 2',
-          );
-          await _openDetailsAndReturn(
-            tester,
-            app.router,
-            _relation(103),
-            title: l10n.relationNeighborhoodCanPhrase(
-              'Одинаковое намерение',
-              'Одинаковое намерение',
-            ),
           );
           app.router.pop();
           await _until(tester, open);
@@ -176,7 +137,7 @@ void main() {
           _expectNavigation(
             tester,
             await _loaded(tester, firstTagNumber),
-            TaggedEntitiesScope.active,
+            TaggedIntentionsScope.active,
           );
           app.router.pop();
           await _until(tester, open);
@@ -195,7 +156,7 @@ void main() {
         final before = _snapshot(app.raw);
         await _openCatalogTag(tester, firstTagNumber);
         await _loaded(tester, firstTagNumber);
-        for (final scope in TaggedEntitiesScope.values) {
+        for (final scope in TaggedIntentionsScope.values) {
           await _selectScope(tester, scope);
           await _loadAll(tester, scope);
           final loaded = await _loaded(tester, firstTagNumber);
@@ -224,23 +185,11 @@ void main() {
               tester.widget<ChoiceChip>(find.byKey(ValueKey(scope))).selected,
               isTrue,
             );
-            final archived = scope == TaggedEntitiesScope.archived;
+            final archived = scope == TaggedIntentionsScope.archived;
             for (final (target, title) in [
               (
-                _intention(archived ? 2 : 1),
+                _intentionId(archived ? 2 : 1),
                 archived ? 'Намерение 2' : 'Одинаковое намерение',
-              ),
-              (
-                _relation(archived ? 103 : 101),
-                archived
-                    ? l10n.relationNeighborhoodCanPhrase(
-                        'Одинаковое намерение',
-                        'Одинаковое намерение',
-                      )
-                    : l10n.relationNeighborhoodNeedPhrase(
-                        'Одинаковое намерение',
-                        'Непомеченный сосед',
-                      ),
               ),
             ]) {
               final row = find.byKey(ValueKey(target));
@@ -275,14 +224,14 @@ void main() {
           final l10n = _l10n(tester);
           expect(active.tagId, _tagId(number));
           expect(active.tag.name.value, name);
-          expect(active.scope, TaggedEntitiesScope.active);
+          expect(active.scope, TaggedIntentionsScope.active);
           expect(active.items, isEmpty);
           expect(find.text(l10n.tagNavigationTag(name)), findsOneWidget);
           expect(find.text(l10n.tagNavigationEmptyActive), findsOneWidget);
           expect(find.text(l10n.tagNotFound), findsNothing);
           await _selectScope(
             tester,
-            TaggedEntitiesScope.archived,
+            TaggedIntentionsScope.archived,
             tagNumber: number,
           );
           final archived = await _loaded(tester, number);
@@ -291,11 +240,11 @@ void main() {
             expect(archived.items, isEmpty);
             expect(find.text(l10n.tagNavigationEmptyArchived), findsOneWidget);
           } else {
-            expect(archived.items.map((item) => item.target), [_intention(2)]);
+            expect(archived.items.map((item) => item.id), [_intentionId(2)]);
             await _openDetailsAndReturn(
               tester,
               app.router,
-              _intention(2),
+              _intentionId(2),
               title: 'Намерение 2',
               description: 'Описание 2',
               tagNumber: number,
@@ -324,11 +273,11 @@ AppLocalizations _l10n(WidgetTester tester) =>
 void _expectNavigation(
   WidgetTester tester,
   TagNavigationLoaded state,
-  TaggedEntitiesScope scope,
+  TaggedIntentionsScope scope,
 ) {
   expect(state.tagId, _tagId(firstTagNumber));
   expect(state.scope, scope);
-  expect(state.items.map((item) => item.target), _targets(scope).take(50));
+  expect(state.items.map((item) => item.id), _targets(scope).take(50));
   expect(
     tester.widget<ChoiceChip>(find.byKey(ValueKey(scope))).selected,
     isTrue,
@@ -338,7 +287,7 @@ void _expectNavigation(
 
 Future<void> _selectScope(
   WidgetTester tester,
-  TaggedEntitiesScope scope, {
+  TaggedIntentionsScope scope, {
   int tagNumber = firstTagNumber,
 }) async {
   await _scrollToTop(tester);
@@ -353,13 +302,13 @@ Future<void> _scrollToTop(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _loadAll(WidgetTester tester, TaggedEntitiesScope scope) async {
+Future<void> _loadAll(WidgetTester tester, TaggedIntentionsScope scope) async {
   final expected = _targets(scope);
-  for (final count in [50, 100, expected.length]) {
+  for (final count in [50, expected.length]) {
     final state = await _loaded(tester, firstTagNumber);
     expect(state.scope, scope);
-    expect(state.items.map((item) => item.target), expected.take(count));
-    expect(state.items.map((item) => item.target).toSet(), hasLength(count));
+    expect(state.items.map((item) => item.id), expected.take(count));
+    expect(state.items.map((item) => item.id).toSet(), hasLength(count));
     if (count == expected.length) {
       expect(state.hasReachedEnd, isTrue);
       final allShown = find.text(_l10n(tester).tagNavigationAllShown);
@@ -385,27 +334,18 @@ Future<void> _loadAll(WidgetTester tester, TaggedEntitiesScope scope) async {
   }
 }
 
-void _expectDetailsRoute(AppRouter router, TagTarget target) {
-  switch (target) {
-    case IntentionTagTarget(:final intentionId):
-      expect(router.current.name, IntentionDetailsRoute.name);
-      expect(
-        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-        intentionId,
-      );
-    case LongTermRelationTagTarget(:final relationId):
-      expect(router.current.name, RelationDetailsRoute.name);
-      expect(
-        router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-        relationId,
-      );
-  }
+void _expectDetailsRoute(AppRouter router, IntentionId intentionId) {
+  expect(router.current.name, IntentionDetailsRoute.name);
+  expect(
+    router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+    intentionId,
+  );
 }
 
 Future<void> _openDetailsAndReturn(
   WidgetTester tester,
   AppRouter router,
-  TagTarget target, {
+  IntentionId target, {
   required String title,
   String? description,
   int tagNumber = firstTagNumber,
@@ -420,9 +360,7 @@ Future<void> _openDetailsAndReturn(
   );
   expect(find.descendant(of: row, matching: find.text(title)), findsOneWidget);
   await _tap(tester, row);
-  final titleKey = target is IntentionTagTarget
-      ? 'intention-details-title'
-      : 'relation-details-phrase';
+  const titleKey = 'intention-details-title';
   await _until(tester, find.byKey(ValueKey(titleKey)));
   _expectDetailsRoute(router, target);
   expect(tester.widget<Text>(find.byKey(ValueKey(titleKey))).data, title);
@@ -430,12 +368,7 @@ Future<void> _openDetailsAndReturn(
   final openTag = find.byKey(
     ValueKey('tag-assignment-open-${tagFixtureId(tagNumber)}'),
   );
-  if (target is IntentionTagTarget) {
-    await _until(tester, openTag);
-  } else {
-    expect(openTag, findsNothing);
-    expect(find.byKey(const ValueKey('tag-assignments-choose')), findsNothing);
-  }
+  await _until(tester, openTag);
   router.pop();
   final after = await _loaded(tester, tagNumber);
   expect(router.current.name, TagNavigationRoute.name);
@@ -443,8 +376,8 @@ Future<void> _openDetailsAndReturn(
   expect(after.tagId, before.tagId);
   expect(after.scope, before.scope);
   expect(
-    after.items.map((item) => item.target),
-    before.items.map((item) => item.target),
+    after.items.map((item) => item.id),
+    before.items.map((item) => item.id),
   );
   expect(after.nextCursor, before.nextCursor);
   expect(after.revision, before.revision);
@@ -455,37 +388,24 @@ Future<void> _openDetailsAndReturn(
   );
 }
 
-List<TagTarget> _targets(TaggedEntitiesScope scope) {
-  final archived = scope == TaggedEntitiesScope.archived;
+List<IntentionId> _targets(TaggedIntentionsScope scope) {
+  final archived = scope == TaggedIntentionsScope.archived;
   return [
-    if (archived) ...[
-      _intention(2),
-      _relation(102),
-      _relation(103),
-    ] else ...[
-      _intention(1),
-      _relation(101),
-      _intention(4),
-    ],
-    for (var index = 0; index < _extraPairs; index++) ...[
-      _intention(1000 + (archived ? 100 : 0) + index),
-      _relation(2000 + (archived ? 100 : 0) + index),
-    ],
+    if (archived) _intentionId(2) else ...[_intentionId(1), _intentionId(4)],
+    for (var index = 0; index < _extraPairs; index++)
+      _intentionId(1000 + (archived ? 100 : 0) + index),
   ];
 }
 
 TagId _tagId(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
 
-IntentionTagTarget _intention(int number) => IntentionTagTarget(
-  (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id,
-);
+IntentionId _intentionId(int number) =>
+    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
-LongTermRelationTagTarget _relation(int number) => LongTermRelationTagTarget(
-  (LongTermRelationId.decode(
-    tagFixtureId(number),
-  ) as LongTermRelationIdDecodingSuccess).id,
-);
+LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
+  tagFixtureId(number),
+) as LongTermRelationIdDecodingSuccess).id;
 
 Map<String, List<List<Object?>>> _snapshot(sqlite.Database raw) => {
   ...retainedTagFixtureGraph(raw),

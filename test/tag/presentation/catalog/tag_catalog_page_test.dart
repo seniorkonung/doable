@@ -12,7 +12,6 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
@@ -22,7 +21,6 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
@@ -37,9 +35,9 @@ String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
 void main() {
-  for (final (relation, recipient) in [
-    (false, 'намерения'),
-    (true, 'долговременной связи'),
+  for (final (second, recipient) in [
+    (false, 'первого намерения'),
+    (true, 'другого намерения'),
   ]) {
     for (final assigned in [false, true]) {
       testWidgets(
@@ -47,22 +45,14 @@ void main() {
         (tester) async {
           final repository = _CatalogRepository();
           addTearDown(repository.dispose);
-          final target = relation
-              ? LongTermRelationTagTarget(
-                  (LongTermRelationId.decode(
-                    _id(200),
-                  ) as LongTermRelationIdDecodingSuccess).id,
-                )
-              : IntentionTagTarget(
-                  (IntentionId.decode(
-                    _id(100),
-                  ) as IntentionIdDecodingSuccess).id,
-                );
-          await _pumpCatalog(tester, repository, target: target);
+          final intentionId = second
+              ? (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id
+              : (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+          await _pumpCatalog(tester, repository, intentionId: intentionId);
           repository.complete(
             TagCatalogSuccess(
               TagCatalogSnapshot.selection(
-                target: target,
+                intentionId: intentionId,
                 rows: [
                   TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
                 ],
@@ -78,7 +68,7 @@ void main() {
           container
               .read(
                 tagCatalogViewModelProvider(
-                  mode: TagCatalogSelectionMode(target),
+                  mode: TagCatalogSelectionMode(intentionId),
                 ).notifier,
               )
               .selectTag(_tag(52, 'Из редактора').id);
@@ -135,22 +125,14 @@ void main() {
         (tester) async {
           final repository = _CatalogRepository();
           addTearDown(repository.dispose);
-          final target = relation
-              ? LongTermRelationTagTarget(
-                  (LongTermRelationId.decode(
-                    _id(200),
-                  ) as LongTermRelationIdDecodingSuccess).id,
-                )
-              : IntentionTagTarget(
-                  (IntentionId.decode(
-                    _id(100),
-                  ) as IntentionIdDecodingSuccess).id,
-                );
-          await _pumpCatalog(tester, repository, target: target);
+          final intentionId = second
+              ? (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id
+              : (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+          await _pumpCatalog(tester, repository, intentionId: intentionId);
           repository.complete(
             TagCatalogSuccess(
               TagCatalogSnapshot.selection(
-                target: target,
+                intentionId: intentionId,
                 rows: [
                   TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
                 ],
@@ -166,7 +148,7 @@ void main() {
           container
               .read(
                 tagCatalogViewModelProvider(
-                  mode: TagCatalogSelectionMode(target),
+                  mode: TagCatalogSelectionMode(intentionId),
                 ).notifier,
               )
               .selectTag(_tag(52, 'Из редактора').id);
@@ -197,7 +179,7 @@ void main() {
           repository.complete(
             TagCatalogSuccess(
               TagCatalogSnapshot.selection(
-                target: target,
+                intentionId: intentionId,
                 rows: [
                   TagSelectionRow(
                     tag: _tag(52, 'Из редактора'),
@@ -232,9 +214,9 @@ void main() {
     }
   }
 
-  for (final (relation, recipient) in [
-    (false, 'намерения'),
-    (true, 'долговременной связи'),
+  for (final (second, recipient) in [
+    (false, 'первого намерения'),
+    (true, 'другого намерения'),
   ]) {
     for (final assigned in [false, true]) {
       for (final tagReadFirst in [false, true]) {
@@ -243,22 +225,18 @@ void main() {
           (tester) async {
             final repository = _CatalogRepository();
             addTearDown(repository.dispose);
-            final target = relation
-                ? LongTermRelationTagTarget(
-                    (LongTermRelationId.decode(
-                      _id(200),
-                    ) as LongTermRelationIdDecodingSuccess).id,
-                  )
-                : IntentionTagTarget(
-                    (IntentionId.decode(
-                      _id(100),
-                    ) as IntentionIdDecodingSuccess).id,
-                  );
-            await _pumpCatalog(tester, repository, target: target);
+            final intentionId = second
+                ? (IntentionId.decode(
+                    _id(101),
+                  ) as IntentionIdDecodingSuccess).id
+                : (IntentionId.decode(
+                    _id(100),
+                  ) as IntentionIdDecodingSuccess).id;
+            await _pumpCatalog(tester, repository, intentionId: intentionId);
             repository.complete(
               TagCatalogSuccess(
                 TagCatalogSnapshot.selection(
-                  target: target,
+                  intentionId: intentionId,
                   rows: [
                     TagSelectionRow(tag: _tag(1, 'Первый'), isAssigned: false),
                   ],
@@ -274,7 +252,7 @@ void main() {
             container
                 .read(
                   tagCatalogViewModelProvider(
-                    mode: TagCatalogSelectionMode(target),
+                    mode: TagCatalogSelectionMode(intentionId),
                   ).notifier,
                 )
                 .selectTag(_tag(52, 'Из редактора').id);
@@ -323,9 +301,9 @@ void main() {
     }
   }
 
-  for (final (relation, recipient) in [
-    (false, 'намерения'),
-    (true, 'долговременной связи'),
+  for (final (second, recipient) in [
+    (false, 'первого намерения'),
+    (true, 'другого намерения'),
   ]) {
     for (final assigned in [false, true]) {
       testWidgets(
@@ -355,8 +333,8 @@ void main() {
           }
           if (assigned) {
             raw.execute(
-              'INSERT INTO tag_assignments (tag_id, ${relation ? 'long_term_relation_id' : 'intention_id'}) VALUES (?, ?)',
-              [_id(52), _id(relation ? 200 : 100)],
+              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+              [_id(52), _id(second ? 101 : 100)],
             );
           }
           final repository = DriftPersonalGraphRepository(
@@ -381,18 +359,10 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          final target = relation
-              ? LongTermRelationTagTarget(
-                  (LongTermRelationId.decode(
-                    _id(200),
-                  ) as LongTermRelationIdDecodingSuccess).id,
-                )
-              : IntentionTagTarget(
-                  (IntentionId.decode(
-                    _id(100),
-                  ) as IntentionIdDecodingSuccess).id,
-                );
-          router.push<Object?>(TagCatalogRoute(target: target));
+          final intentionId = second
+              ? (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id
+              : (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+          router.push<Object?>(TagCatalogRoute(intentionId: intentionId));
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('tag-catalog-load-more')),
@@ -438,8 +408,8 @@ void main() {
             expect(
               raw
                   .select(
-                    'SELECT tag_id FROM tag_assignments WHERE ${relation ? 'long_term_relation_id' : 'intention_id'} = ?',
-                    [_id(relation ? 200 : 100)],
+                    'SELECT tag_id FROM tag_assignments WHERE intention_id = ?',
+                    [_id(second ? 101 : 100)],
                   )
                   .map((row) => row['tag_id']),
               [_id(52)],
@@ -503,10 +473,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final target = IntentionTagTarget(
-        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
+      final intentionId =
+          (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+      final result = router.push<Object?>(
+        TagCatalogRoute(intentionId: intentionId),
       );
-      final result = router.push<Object?>(TagCatalogRoute(target: target));
       await tester.pumpAndSettle();
 
       expect(find.text('Выбор тега'), findsOneWidget);
@@ -514,7 +485,7 @@ void main() {
         tester.element(find.byType(TagCatalogPage)),
       );
       final catalog = container.read(
-        tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target)),
+        tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(intentionId)),
       );
       expect(catalog, isA<TagCatalogLoaded>());
       expect(
@@ -582,8 +553,9 @@ void main() {
       expect(
         container
             .read(
-              tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target))
-                  .notifier,
+              tagCatalogViewModelProvider(
+                mode: TagCatalogSelectionMode(intentionId),
+              ).notifier,
             )
             .assignSelected(),
         isNull,
@@ -607,18 +579,15 @@ void main() {
       expect(await result, isNull);
       await tester.pumpAndSettle();
 
-      final relationTarget = LongTermRelationTagTarget(
-        (LongTermRelationId.decode(
-          _id(200),
-        ) as LongTermRelationIdDecodingSuccess).id,
-      );
-      final relationResult = router.push<Object?>(
-        TagCatalogRoute(target: relationTarget),
+      final secondIntentionId =
+          (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id;
+      final secondResult = router.push<Object?>(
+        TagCatalogRoute(intentionId: secondIntentionId),
       );
       await tester.pumpAndSettle();
       expect(
-        router.current.argsAs<TagCatalogRouteArgs>().target,
-        relationTarget,
+        router.current.argsAs<TagCatalogRouteArgs>().intentionId,
+        secondIntentionId,
       );
       await tester.tap(find.byKey(ValueKey('tag-catalog-row-${_id(2)}')));
       await tester.pumpAndSettle();
@@ -668,14 +637,14 @@ void main() {
         ),
         findsOneWidget,
       );
-      final relationContainer = ProviderScope.containerOf(
+      final secondContainer = ProviderScope.containerOf(
         tester.element(find.byType(TagCatalogPage)),
       );
       expect(
-        relationContainer
+        secondContainer
             .read(
               tagCatalogViewModelProvider(
-                mode: TagCatalogSelectionMode(relationTarget),
+                mode: TagCatalogSelectionMode(secondIntentionId),
               ).notifier,
             )
             .assignSelected(),
@@ -684,14 +653,14 @@ void main() {
       expect(
         raw
             .select(
-              'SELECT tag_id FROM tag_assignments WHERE long_term_relation_id = ?',
-              [_id(200)],
+              'SELECT tag_id FROM tag_assignments WHERE intention_id = ?',
+              [_id(101)],
             )
             .map((row) => row['tag_id']),
         containsAll([_id(2), _id(52)]),
       );
       router.pop();
-      expect(await relationResult, isNull);
+      expect(await secondResult, isNull);
     },
   );
 
@@ -865,101 +834,107 @@ void main() {
     expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
   });
 
-  testWidgets('новый тег из выбора сохраняется до явного назначения связи', (
-    tester,
-  ) async {
-    late sqlite.Database raw;
-    final database = AppDatabase(
-      openInMemoryLocalDatabase(setup: (db) => raw = db),
-    );
-    await database.open();
-    addTearDown(database.close);
-    raw.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [_id(100), 'Первое', 0, 0, 100, 100],
-    );
-    raw.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [_id(101), 'Второе', 0, 0, 101, 101],
-    );
-    raw.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-      [_id(200), _id(100), _id(101), 'need', 2, 1],
-    );
-    final repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 25),
-      InMemoryDiagnosticsSink(),
-    );
-    final router = AppRouter();
-    addTearDown(router.dispose);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-        ],
-        child: MaterialApp.router(
-          locale: const Locale('ru'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          routerConfig: router.config(),
+  testWidgets(
+    'новый тег из выбора сохраняется до явного назначения другому намерению',
+    (tester) async {
+      late sqlite.Database raw;
+      final database = AppDatabase(
+        openInMemoryLocalDatabase(setup: (db) => raw = db),
+      );
+      await database.open();
+      addTearDown(database.close);
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(100), 'Первое', 0, 0, 100, 100],
+      );
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(101), 'Второе', 0, 0, 101, 101],
+      );
+      raw.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(200), _id(100), _id(101), 'need', 2, 1],
+      );
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        InMemoryDiagnosticsSink(),
+      );
+      final router = AppRouter();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp.router(
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final target = LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        _id(200),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    );
-    final result = router.push<Object?>(TagCatalogRoute(target: target));
-    await tester.pumpAndSettle();
-    expect(find.text('Тегов пока нет.'), findsOneWidget);
+      );
+      await tester.pumpAndSettle();
+      final intentionId =
+          (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id;
+      final result = router.push<Object?>(
+        TagCatalogRoute(intentionId: intentionId),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Тегов пока нет.'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey('tag-editor-name')),
-      'Отмена',
-    );
-    await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
-    await tester.pumpAndSettle();
-    expect(router.current.argsAs<TagCatalogRouteArgs>().target, target);
-    expect(raw.select('SELECT * FROM tags'), isEmpty);
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('tag-editor-name')),
+        'Отмена',
+      );
+      await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+      await tester.pumpAndSettle();
+      expect(
+        router.current.argsAs<TagCatalogRouteArgs>().intentionId,
+        intentionId,
+      );
+      expect(raw.select('SELECT * FROM tags'), isEmpty);
 
-    await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey('tag-editor-name')),
-      'Дом',
-    );
-    await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-    await _waitForEditorToClose(tester);
-    final tagId = raw.select('SELECT id FROM tags').single['id'] as String;
-    expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
-    expect(find.text('Дом'), findsOneWidget);
-    expect(find.byKey(const ValueKey('tag-catalog-assign')), findsOneWidget);
-    expect(router.current.argsAs<TagCatalogRouteArgs>().target, target);
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('tag-editor-name')),
+        'Дом',
+      );
+      await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+      await _waitForEditorToClose(tester);
+      final tagId = raw.select('SELECT id FROM tags').single['id'] as String;
+      expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+      expect(find.text('Дом'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tag-catalog-assign')), findsOneWidget);
+      expect(
+        router.current.argsAs<TagCatalogRouteArgs>().intentionId,
+        intentionId,
+      );
 
-    router.pop();
-    expect(await result, isNull);
-    await tester.pumpAndSettle();
-    expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
-    router.push<Object?>(TagCatalogRoute(target: target));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(ValueKey('tag-catalog-row-$tagId')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
-    await tester.pumpAndSettle();
-    expect(
-      raw.select(
-        'SELECT tag_id FROM tag_assignments WHERE long_term_relation_id = ?',
-        [_id(200)],
-      ).single['tag_id'],
-      tagId,
-    );
-  });
+      router.pop();
+      expect(await result, isNull);
+      await tester.pumpAndSettle();
+      expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+      router.push<Object?>(TagCatalogRoute(intentionId: intentionId));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('tag-catalog-row-$tagId')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
+      await tester.pumpAndSettle();
+      expect(
+        raw.select(
+          'SELECT tag_id FROM tag_assignments WHERE intention_id = ?',
+          [_id(101)],
+        ).single['tag_id'],
+        tagId,
+      );
+    },
+  );
 
   testWidgets(
     'конфликт выбирает исходный тег, а исчезнувшего получателя не заменяет',
@@ -997,10 +972,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final target = IntentionTagTarget(
-        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
-      );
-      router.push<Object?>(TagCatalogRoute(target: target));
+      final intentionId =
+          (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+      router.push<Object?>(TagCatalogRoute(intentionId: intentionId));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
       await tester.pumpAndSettle();
@@ -1036,7 +1010,7 @@ void main() {
         tester.element(find.byType(TagCatalogPage)),
       );
       final catalog = container.read(
-        tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(target)),
+        tagCatalogViewModelProvider(mode: TagCatalogSelectionMode(intentionId)),
       ) as TagCatalogLoaded;
       expect(catalog.selection.id?.toCanonicalString(), _id(1));
       expect(find.byKey(const ValueKey('tag-catalog-assign')), findsOneWidget);
@@ -1050,7 +1024,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
       await tester.pumpAndSettle();
       expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
-      expect(router.current.argsAs<TagCatalogRouteArgs>().target, target);
+      expect(
+        router.current.argsAs<TagCatalogRouteArgs>().intentionId,
+        intentionId,
+      );
     },
   );
 
@@ -1247,9 +1224,8 @@ void main() {
       addTearDown(tester.view.reset);
       final repository = _CatalogRepository();
       addTearDown(repository.dispose);
-      final target = IntentionTagTarget(
-        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
-      );
+      final intentionId =
+          (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -1264,14 +1240,14 @@ void main() {
                   .copyWith(textScaler: const TextScaler.linear(2.5)),
               child: child!,
             ),
-            home: TagCatalogPage(target: target),
+            home: TagCatalogPage(intentionId: intentionId),
           ),
         ),
       );
       repository.complete(
         TagCatalogSuccess(
           TagCatalogSnapshot.selection(
-            target: target,
+            intentionId: intentionId,
             rows: [TagSelectionRow(tag: _tag(1, 'Home'), isAssigned: false)],
 
             revision: const _Revision(),
@@ -1306,14 +1282,13 @@ void main() {
     (tester) async {
       final repository = _CatalogRepository();
       addTearDown(repository.dispose);
-      final target = IntentionTagTarget(
-        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
-      );
-      await _pumpCatalog(tester, repository, target: target);
+      final intentionId =
+          (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+      await _pumpCatalog(tester, repository, intentionId: intentionId);
       repository.complete(
         TagCatalogSuccess(
           TagCatalogSnapshot.selection(
-            target: target,
+            intentionId: intentionId,
             rows: const [],
             revision: const _Revision(),
           ),
@@ -1476,10 +1451,9 @@ void main() {
     (tester) async {
       final repository = _CatalogRepository();
       addTearDown(repository.dispose);
-      final target = IntentionTagTarget(
-        (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
-      );
-      await _pumpCatalog(tester, repository, target: target);
+      final intentionId =
+          (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
+      await _pumpCatalog(tester, repository, intentionId: intentionId);
       final rows = [
         for (var number = 1; number <= 30; number++)
           TagSelectionRow(tag: _tag(number, 'Тег $number'), isAssigned: false),
@@ -1487,7 +1461,7 @@ void main() {
       repository.complete(
         TagCatalogSuccess(
           TagCatalogSnapshot.selection(
-            target: target,
+            intentionId: intentionId,
             rows: rows,
             revision: const _Revision(),
           ),
@@ -1505,7 +1479,7 @@ void main() {
       expect(offset, greaterThan(0));
       final container = ProviderScope.containerOf(tester.element(list));
       final provider = tagCatalogViewModelProvider(
-        mode: TagCatalogSelectionMode(target),
+        mode: TagCatalogSelectionMode(intentionId),
       );
       final model = container.read(provider.notifier);
       model.selectTag(_tag(21, 'Тег 21').id);
@@ -1554,7 +1528,7 @@ void main() {
       repository.complete(
         TagCatalogSuccess(
           TagCatalogSnapshot.selection(
-            target: target,
+            intentionId: intentionId,
             rows: [
               TagSelectionRow(tag: _tag(1, 'Новое имя'), isAssigned: false),
               ...rows.skip(1),
@@ -1655,7 +1629,7 @@ Future<void> _pumpCatalog(
   WidgetTester tester,
   _CatalogRepository repository, {
   bool largeText = false,
-  TagTarget? target,
+  IntentionId? intentionId,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -1671,7 +1645,7 @@ Future<void> _pumpCatalog(
               .copyWith(textScaler: TextScaler.linear(largeText ? 2.5 : 1)),
           child: child!,
         ),
-        home: TagCatalogPage(target: target),
+        home: TagCatalogPage(intentionId: intentionId),
       ),
     ),
   );
@@ -1714,7 +1688,7 @@ final class _CatalogRepository extends Fake implements PersonalGraphRepository {
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId id,
-    TagTarget target,
+    IntentionId intentionId,
   ) {
     final read = Completer<TagAssignmentStatusResult>();
     statusReads.add(read);
