@@ -47,8 +47,5 @@ dart run build_runner build --delete-conflicting-outputs
 dart run drift_dev schema dump \
   lib/src/data/local/app_database.dart \
   drift_schemas/
-dart run drift_dev schema steps \
-  drift_schemas/ \
-  lib/src/data/local/migrations/generated_schema.dart
 
 assert_clean_tree "после повторной генерации"

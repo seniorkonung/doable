@@ -178,6 +178,60 @@ void main() {
     );
 
     test(
+      'не обновляет и не пересоздаёт хранилище прежней линии версий 2–5',
+      () async {
+        for (final previousLineVersion in [2, 3, 4, 5]) {
+          final databaseFile = await _temporaryDatabaseFile();
+          late List<int> preservedBytes;
+          final bootstrap = _bootstrapFor(
+            databaseFile,
+            setup: (database) {
+              database
+                ..execute('''
+                  CREATE TABLE tag_assignments (
+                    creation_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tag_id TEXT NOT NULL,
+                    intention_id TEXT,
+                    long_term_relation_id TEXT
+                  )
+                ''')
+                ..execute('''
+                  INSERT INTO tag_assignments (tag_id, long_term_relation_id)
+                  VALUES ('тег', 'связь')
+                ''')
+                ..execute('PRAGMA user_version = $previousLineVersion');
+              preservedBytes = databaseFile.readAsBytesSync();
+            },
+          );
+
+          final result = await bootstrap.open();
+          await bootstrap.close();
+
+          expect(
+            result,
+            isA<LocalDataIncompatibleSchema>()
+                .having(
+                  (failure) => failure.expectedSchemaVersion,
+                  'ожидаемая',
+                  AppDatabase.currentSchemaVersion,
+                )
+                .having(
+                  (failure) => failure.detectedSchemaVersion,
+                  'обнаруженная',
+                  previousLineVersion,
+                ),
+            reason: 'маркер версии $previousLineVersion',
+          );
+          expect(
+            await databaseFile.readAsBytes(),
+            preservedBytes,
+            reason: 'маркер версии $previousLineVersion',
+          );
+        }
+      },
+    );
+
+    test(
       'классифицирует metadata версии 0 с сохранённой схемой как corruption',
       () async {
         final databaseFile = await _temporaryDatabaseFile();

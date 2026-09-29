@@ -24,27 +24,21 @@ void main() {
     await verifyDoableDatabaseSchema(database);
   });
 
-  test(
-    'новое хранилище создаётся в версии 5 с пустыми дневными выборами',
-    () async {
-      final version = await database
-          .customSelect('PRAGMA user_version')
-          .getSingle();
-      final choices = await database
-          .customSelect('SELECT id FROM daily_choices')
-          .get();
-      final steps = await database
-          .customSelect('SELECT id FROM daily_choice_path_steps')
-          .get();
+  test('новое хранилище создаётся в единственной версии схемы с пустыми дневными выборами', () async {
+    final version = await database
+        .customSelect('PRAGMA user_version')
+        .getSingle();
+    final choices = await database
+        .customSelect('SELECT id FROM daily_choices')
+        .get();
+    final steps = await database
+        .customSelect('SELECT id FROM daily_choice_path_steps')
+        .get();
 
-      expect(
-        version.read<int>('user_version'),
-        AppDatabase.currentSchemaVersion,
-      );
-      expect(choices, isEmpty);
-      expect(steps, isEmpty);
-    },
-  );
+    expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
+    expect(choices, isEmpty);
+    expect(steps, isEmpty);
+  });
 
   test('фикстура опубликованной схемы 1 использует снимок и обязательную настройку', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
@@ -252,13 +246,50 @@ void main() {
           _nextSchemaVersion,
           AppDatabase.currentSchemaVersion,
         ),
-        throwsA(isA<UnsupportedError>()),
+        throwsA(
+          isA<IncompatibleLocalDataSchemaException>()
+              .having(
+                (error) => error.expectedSchemaVersion,
+                'ожидаемая версия',
+                AppDatabase.currentSchemaVersion,
+              )
+              .having(
+                (error) => error.detectedSchemaVersion,
+                'обнаруженная версия',
+                _nextSchemaVersion,
+              ),
+        ),
       );
 
       final titles = await database
           .customSelect('SELECT title FROM intentions')
           .get();
 
+      expect(titles.single.read<String>('title'), 'Сохранённое намерение');
+    },
+  );
+
+  test(
+    'не обновляет хранилище с маркером ниже единственной версии схемы',
+    () async {
+      await _insertIntention(database);
+      await database.customStatement('PRAGMA user_version = -1');
+
+      await expectLater(
+        localDataMigrationStrategy(
+          database,
+        ).onUpgrade(Migrator(database), -1, AppDatabase.currentSchemaVersion),
+        throwsA(isA<CorruptLocalDataSchemaException>()),
+      );
+
+      final version = await database
+          .customSelect('PRAGMA user_version')
+          .getSingle();
+      final titles = await database
+          .customSelect('SELECT title FROM intentions')
+          .get();
+
+      expect(version.read<int>('user_version'), -1);
       expect(titles.single.read<String>('title'), 'Сохранённое намерение');
     },
   );

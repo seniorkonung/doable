@@ -2,8 +2,6 @@ import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart';
 
-import 'generated_schema.dart' as generated;
-
 typedef MigrationOperation = Future<void> Function();
 
 final class IncompatibleLocalDataSchemaException extends UnsupportedError {
@@ -53,13 +51,9 @@ MigrationStrategy localDataMigrationStrategy(
             detectedSchemaVersion: from,
           );
         }
-        if (from < 1) throw const CorruptLocalDataSchemaException();
-
-        await runAtomicMigration(
-          database,
-          targetSchemaVersion: to,
-          migrate: () => generated.stepByStep()(migrator, from, to),
-        );
+        // Схема 1 — единственная версия, путей обновления нет: меньший маркер
+        // возможен только ниже 1 и означает повреждение.
+        throw const CorruptLocalDataSchemaException();
       },
     ),
     beforeOpen: (details) async {
