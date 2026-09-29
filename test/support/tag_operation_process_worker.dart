@@ -18,10 +18,9 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_id_generator.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -132,7 +131,7 @@ void main() {
           operation == 'navigation_assignment_after_commit') {
         await _expectSuccess(
           coordinator.acceptTagAssign(
-            AssignTag(tagId: firstId, target: _intention(2)),
+            AssignTag(tagId: firstId, intentionId: _intention(2)),
           ),
         );
         if (operation == 'navigation_assignment_after_commit') {
@@ -151,7 +150,7 @@ void main() {
           operation == 'assignment_after_commit') {
         await _expectSuccess(
           coordinator.acceptTagAssign(
-            AssignTag(tagId: _tag(303), target: _intention(2)),
+            AssignTag(tagId: _tag(303), intentionId: _intention(2)),
           ),
         );
         if (operation == 'assignment_after_commit') await _reportReadyAndWait();
@@ -182,15 +181,12 @@ Future<TagCommandSuccess> _expectSuccess(TagCommandStart start) async {
 TagId _tag(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
 
-IntentionTagTarget _intention(int number) => IntentionTagTarget(
-  (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id,
-);
+IntentionId _intention(int number) =>
+    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
-LongTermRelationTagTarget _relation(int number) => LongTermRelationTagTarget(
-  (LongTermRelationId.decode(
-    tagFixtureId(number),
-  ) as LongTermRelationIdDecodingSuccess).id,
-);
+LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
+  tagFixtureId(number),
+) as LongTermRelationIdDecodingSuccess).id;
 
 Future<void> _mutateAssignments(GraphCommandCoordinator coordinator) async {
   for (final (number, name) in [
@@ -212,45 +208,40 @@ Future<void> _mutateAssignments(GraphCommandCoordinator coordinator) async {
     ),
   );
 
-  for (final (number, target) in <(int, TagTarget)>[
+  for (final (number, target) in <(int, IntentionId)>[
     (301, _intention(1)),
     (303, _intention(1)),
     (301, _intention(2)),
-    (301, _relation(101)),
-    (303, _relation(101)),
-    (301, _relation(102)),
     (302, _intention(3)),
-    (302, _relation(102)),
     (301, _intention(4)),
-    (303, _relation(103)),
   ]) {
     await _expectSuccess(
       coordinator.acceptTagAssign(
-        AssignTag(tagId: _tag(number), target: target),
+        AssignTag(tagId: _tag(number), intentionId: target),
       ),
     );
   }
   await _expectSuccess(
     coordinator.acceptTagRemoveAssignment(
-      RemoveTagAssignment(tagId: _tag(301), target: _intention(1)),
+      RemoveTagAssignment(tagId: _tag(301), intentionId: _intention(1)),
     ),
   );
   await _expectSuccess(
     coordinator.acceptTagRemoveAssignment(
-      RemoveTagAssignment(tagId: _tag(301), target: _intention(2)),
+      RemoveTagAssignment(tagId: _tag(301), intentionId: _intention(2)),
     ),
   );
   await _expectSuccess(coordinator.acceptTagDelete(DeleteTag(_tag(302))));
 
   final relationDelete = coordinator.acceptRelationDelete(
-    DeleteLongTermRelation(_relation(103).relationId),
+    DeleteLongTermRelation(_relation(103)),
   );
   if (relationDelete is! LongTermRelationCommandAccepted ||
       (await relationDelete.future).isFailure) {
     throw StateError('Удаление долговременной связи не подтверждено.');
   }
   final intentionDelete = coordinator.acceptExisting(
-    DeleteIntention(_intention(4).intentionId),
+    DeleteIntention(_intention(4)),
     presentationTitle: 'Удаляемое намерение',
   );
   if (intentionDelete is! IntentionCommandAccepted ||
@@ -259,7 +250,7 @@ Future<void> _mutateAssignments(GraphCommandCoordinator coordinator) async {
   }
 
   final accepted = coordinator.acceptTagAssign(
-    AssignTag(tagId: _tag(301), target: _intention(1)),
+    AssignTag(tagId: _tag(301), intentionId: _intention(1)),
   );
   await coordinator.shutdown();
   await _expectSuccess(accepted);
@@ -277,11 +268,11 @@ Future<void> _verifyAssignments(
     (_tag(301), 'Быт'),
     (_tag(303), 'Работа'),
   ]);
-  for (final target in <TagTarget>[_intention(1), _relation(101)]) {
+  for (final target in <IntentionId>[_intention(1)]) {
     final snapshot = (await repository.getTagAssignments(
       target,
     ) as TagAssignmentsSuccess).value;
-    expect(snapshot.target, target);
+    expect(snapshot.intentionId, target);
     expect(snapshot.items.map((tag) => (tag.id, tag.name.value)), [
       (_tag(301), 'Быт'),
       (_tag(303), 'Работа'),
@@ -300,14 +291,14 @@ Future<void> _verifyAssignments(
     repository,
     _tag(301),
     'Быт',
-    active: [_relation(101), _intention(1)],
-    archived: [_relation(102)],
+    active: [_intention(1)],
+    archived: [],
   );
   await _expectNavigation(
     repository,
     _tag(303),
     'Работа',
-    active: [_intention(1), _relation(101)],
+    active: [_intention(1)],
     archived: secondIntentionAssigned ? [_intention(2)] : [],
   );
 }
@@ -333,7 +324,7 @@ Future<void> _mutateNavigation(GraphCommandCoordinator coordinator) async {
   expect((created as TagCreated).tag.id, _tag(305));
 
   final relationDelete = coordinator.acceptRelationDelete(
-    DeleteLongTermRelation(_relation(106).relationId),
+    DeleteLongTermRelation(_relation(106)),
   );
   expect(relationDelete, isA<LongTermRelationCommandAccepted>());
   expect(
@@ -342,7 +333,7 @@ Future<void> _mutateNavigation(GraphCommandCoordinator coordinator) async {
     isFalse,
   );
   final intentionDelete = coordinator.acceptExisting(
-    DeleteIntention(_intention(5).intentionId),
+    DeleteIntention(_intention(5)),
     presentationTitle: 'Отдельное намерение',
   );
   expect(intentionDelete, isA<IntentionCommandAccepted>());
@@ -353,19 +344,22 @@ Future<void> _mutateNavigation(GraphCommandCoordinator coordinator) async {
   for (final target in [_intention(1), _intention(2)]) {
     await _expectSuccess(
       coordinator.acceptTagRemoveAssignment(
-        RemoveTagAssignment(tagId: _tag(firstTagNumber), target: target),
+        RemoveTagAssignment(tagId: _tag(firstTagNumber), intentionId: target),
       ),
     );
     await _expectSuccess(
       coordinator.acceptTagAssign(
-        AssignTag(tagId: _tag(firstTagNumber), target: target),
+        AssignTag(tagId: _tag(firstTagNumber), intentionId: target),
       ),
     );
   }
   // Подтверждённый последний номер удалён до остановки процесса.
   await _expectSuccess(
     coordinator.acceptTagRemoveAssignment(
-      RemoveTagAssignment(tagId: _tag(firstTagNumber), target: _intention(2)),
+      RemoveTagAssignment(
+        tagId: _tag(firstTagNumber),
+        intentionId: _intention(2),
+      ),
     ),
   );
 }
@@ -381,33 +375,22 @@ Future<void> _verifyNavigationFixture(
     _tag(firstTagNumber),
     name,
     active: changed
-        ? [_relation(101), _intention(4), _relation(104), _intention(1)]
-        : [
-            _intention(1),
-            _relation(101),
-            _intention(4),
-            _relation(104),
-            _relation(106),
-            _intention(5),
-          ],
+        ? [_intention(4), _intention(1)]
+        : [_intention(1), _intention(4), _intention(5)],
     archived: changed
-        ? [
-            _relation(102),
-            _relation(103),
-            if (secondIntentionAssigned) _intention(2),
-          ]
-        : [_intention(2), _relation(102), _relation(103)],
+        ? [_intention(6), if (secondIntentionAssigned) _intention(2)]
+        : [_intention(2), _intention(6)],
   );
   if (changed) {
-    for (final scope in TaggedEntitiesScope.values) {
+    for (final scope in TaggedIntentionsScope.values) {
       expect(
-        await repository.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(tagId: _tag(lastTagNumber), scope: scope),
+        await repository.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(tagId: _tag(lastTagNumber), scope: scope),
         ),
-        isA<TaggedEntitiesPageError>().having(
+        isA<TaggedIntentionsPageError>().having(
           (result) => result.failure,
           'удалённый тег',
-          isA<TaggedEntitiesTagNotFound>(),
+          isA<TaggedIntentionsTagNotFound>(),
         ),
       );
     }
@@ -425,31 +408,31 @@ Future<void> _expectNavigation(
   DriftPersonalGraphRepository repository,
   TagId tagId,
   String name, {
-  required List<TagTarget> active,
-  required List<TagTarget> archived,
+  required List<IntentionId> active,
+  required List<IntentionId> archived,
 }) async {
   final locale = TestWidgetsFlutterBinding.instance.platformDispatcher.locale;
   final l10n = await AppLocalizations.delegate.load(locale);
   expect(l10n.localeName, locale.languageCode);
   for (final (scope, expected) in [
-    (TaggedEntitiesScope.active, active),
-    (TaggedEntitiesScope.archived, archived),
+    (TaggedIntentionsScope.active, active),
+    (TaggedIntentionsScope.archived, archived),
   ]) {
     for (final pageSize in [1, 2, 50, 100]) {
-      final targets = <TagTarget>[];
-      TaggedEntitiesCursor? cursor;
+      final targets = <IntentionId>[];
+      TaggedIntentionsCursor? cursor;
       GraphRevision? revision;
       do {
-        final result = await repository.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        final result = await repository.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: tagId,
             scope: scope,
             pageSize: pageSize,
             cursor: cursor,
           ),
         );
-        expect(result, isA<TaggedEntitiesPageSuccess>());
-        final page = (result as TaggedEntitiesPageSuccess).value;
+        expect(result, isA<TaggedIntentionsPageSuccess>());
+        final page = (result as TaggedIntentionsPageSuccess).value;
         expect(page.tag.id, tagId);
         expect(page.tag.name.value, name);
         expect(l10n.tagNavigationTag(page.tag.name.value), contains(name));
@@ -460,7 +443,7 @@ Future<void> _expectNavigation(
           GraphRevisionOrder.same,
         );
         revision = page.revision;
-        targets.addAll(page.items.map((item) => item.target));
+        targets.addAll(page.items.map((item) => item.id));
         expect(targets.toSet(), hasLength(targets.length));
         expect(targets.length, lessThanOrEqualTo(expected.length));
         cursor = page.nextCursor;

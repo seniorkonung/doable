@@ -12,12 +12,12 @@ void _registerTerminalAppScenarios() {
           if (loaded) {
             await app.openNavigation(tester);
             await app.loaded(tester);
-            await _changeScope(tester, TaggedEntitiesScope.archived);
+            await _changeScope(tester, TaggedIntentionsScope.archived);
             before = await app.loaded(tester);
             oldOpen = tester
                 .widget<ListTile>(
                   find.descendant(
-                    of: find.byKey(ValueKey<TagTarget>(_intention(2))),
+                    of: find.byKey(ValueKey<IntentionId>(_intention(2))),
                     matching: find.byType(ListTile),
                   ),
                 )
@@ -36,7 +36,7 @@ void _registerTerminalAppScenarios() {
           await _waitFor(tester, () => app.repository.activePages == 0);
           await tester.pumpAndSettle();
           if (!loaded) {
-            await _changeScope(tester, TaggedEntitiesScope.archived);
+            await _changeScope(tester, TaggedIntentionsScope.archived);
             await _waitFor(tester, () => app.repository.activePages == 0);
           }
           final l10n = app.l10n(tester);
@@ -87,12 +87,12 @@ void _registerTerminalAppScenarios() {
           app.repository.releasePage(held);
           final restored = await app.loaded(tester);
           final snapshot =
-              (await held.ready.future as TaggedEntitiesPageSuccess).value;
+              (await held.ready.future as TaggedIntentionsPageSuccess).value;
           expect(restored.tagId, _tagId);
-          expect(restored.scope, TaggedEntitiesScope.archived);
+          expect(restored.scope, TaggedIntentionsScope.archived);
           expect(restored.items, snapshot.items);
           expect(
-            restored.items.map((item) => item.target).toSet(),
+            restored.items.map((item) => item.id).toSet(),
             hasLength(restored.items.length),
           );
           expect(restored.refreshFailure, isNull);
@@ -102,7 +102,7 @@ void _registerTerminalAppScenarios() {
           expect(app.repository.queries.last.tagId, _tagId);
           expect(
             app.repository.queries.last.scope,
-            TaggedEntitiesScope.archived,
+            TaggedIntentionsScope.archived,
           );
           expect(app.repository.queries.last.cursor, isNull);
           expect(app.repository.watchedIds, [_tagId, _tagId]);
@@ -128,7 +128,7 @@ void _registerTerminalAppScenarios() {
           );
           final renamed = await app.loaded(tester);
           expect(renamed.tag.name.value, 'Быт');
-          expect(renamed.scope, TaggedEntitiesScope.archived);
+          expect(renamed.scope, TaggedIntentionsScope.archived);
           tester
               .state<ScrollableState>(find.byType(Scrollable).last)
               .position
@@ -192,7 +192,7 @@ void _registerTerminalAppScenarios() {
 
       expect(app.state(tester), same(current));
       expect(current.canUseCurrentItems, isTrue);
-      expect(current.scope, TaggedEntitiesScope.active);
+      expect(current.scope, TaggedIntentionsScope.active);
       expect(app.repository.queries, hasLength(queryCount));
       final writes = app.raw
           .select('SELECT total_changes() AS count')

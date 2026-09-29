@@ -95,6 +95,7 @@ void seedTagRecipientGraphFixture(sqlite.Database database) {
 void seedTagNavigationFixture(
   sqlite.Database database, {
   required int extraPairsPerScope,
+  bool includeHistoricalRelationAssignments = true,
 }) {
   seedTagRecipientGraphFixture(database);
   database.execute('UPDATE intentions SET title = ? WHERE id = ?', [
@@ -125,11 +126,13 @@ void seedTagNavigationFixture(
   }
   for (final (column, number) in [
     ('intention_id', 1),
-    ('long_term_relation_id', 101),
+    if (includeHistoricalRelationAssignments) ('long_term_relation_id', 101),
     ('intention_id', 4),
     ('intention_id', 2),
-    ('long_term_relation_id', 102),
-    ('long_term_relation_id', 103),
+    if (includeHistoricalRelationAssignments) ...[
+      ('long_term_relation_id', 102),
+      ('long_term_relation_id', 103),
+    ],
   ]) {
     database.execute(
       'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
@@ -161,7 +164,8 @@ void seedTagNavigationFixture(
       );
       for (final (column, id) in [
         ('intention_id', intentionId),
-        ('long_term_relation_id', relationId),
+        if (includeHistoricalRelationAssignments)
+          ('long_term_relation_id', relationId),
       ]) {
         database.execute(
           'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
@@ -189,8 +193,15 @@ Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
 
 /// Входящая помеченная связь, свободные получатели и непомеченная связь
 /// позволяют проверить границы каскада и физического удаления в навигации.
-void seedTagNavigationLifecycleFixture(sqlite.Database database) {
-  seedTagNavigationFixture(database, extraPairsPerScope: 0);
+void seedTagNavigationLifecycleFixture(
+  sqlite.Database database, {
+  bool includeHistoricalRelationAssignments = true,
+}) {
+  seedTagNavigationFixture(
+    database,
+    extraPairsPerScope: 0,
+    includeHistoricalRelationAssignments: includeHistoricalRelationAssignments,
+  );
   database.execute(
     'INSERT INTO intentions (id, title, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
     [tagFixtureId(5), 'Отдельное намерение', 'Описание 5', 105, 205],
@@ -212,8 +223,10 @@ void seedTagNavigationLifecycleFixture(sqlite.Database database) {
     );
   }
   for (final (column, number) in [
-    ('long_term_relation_id', 104),
-    ('long_term_relation_id', 106),
+    if (includeHistoricalRelationAssignments) ...[
+      ('long_term_relation_id', 104),
+      ('long_term_relation_id', 106),
+    ],
     ('intention_id', 5),
   ]) {
     database.execute(
@@ -227,7 +240,7 @@ void seedTagNavigationLifecycleFixture(sqlite.Database database) {
   ]);
   for (final (column, number) in [
     ('intention_id', 3),
-    ('long_term_relation_id', 103),
+    if (includeHistoricalRelationAssignments) ('long_term_relation_id', 103),
   ]) {
     database.execute(
       'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
