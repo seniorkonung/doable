@@ -847,6 +847,130 @@ void main() {
         before,
       );
     });
+
+    test('отбирает по собственным назначениям без влияния назначений связям', () async {
+      // Номер намерения → (название, в архиве, собственные теги).
+      const intentions = <int, (String, bool, Set<int>)>{
+        1: ('Ходить в парк', false, {101, 102}),
+        2: ('Ходить в зал', false, {101}),
+        3: ('Читать книгу', false, {102, 103}),
+        4: ('Ходить на работу', false, {}),
+        5: ('Ходить к морю', true, {101, 102}),
+        6: ('Читать письма', true, {103}),
+        7: ('Ходить в горы', true, {101}),
+        8: ('Читать стихи', true, {}),
+      };
+      for (final MapEntry(key: number, value: (title, archived, _))
+          in intentions.entries) {
+        await _insertIntention(
+          database,
+          id: _uuid(number),
+          title: title,
+          isArchived: archived,
+          createdAt: DateTime.utc(2026, 9, 2, number),
+        );
+      }
+      for (final (number, name) in [
+        (101, 'Здоровье'),
+        (102, 'Отдых'),
+        (103, 'Работа'),
+      ]) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _uuid(number),
+          name,
+        ]);
+      }
+      for (final MapEntry(key: number, value: (_, _, tags))
+          in intentions.entries) {
+        for (final tag in tags) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_uuid(tag), _uuid(number)],
+          );
+        }
+      }
+      // Связи несут те же теги, но их назначения не являются собственными
+      // назначениями намерений и не содержат `intention_id`.
+      for (final (relation, source, related, archived, tags) in [
+        (500, 4, 1, 0, [101, 102, 103]),
+        (501, 2, 3, 0, [102, 103]),
+        (502, 8, 7, 1, [101, 102, 103]),
+      ]) {
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [_uuid(relation), _uuid(source), _uuid(related), 'need', 2, archived],
+        );
+        for (final tag in tags) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+            [_uuid(tag), _uuid(relation)],
+          );
+        }
+      }
+      // Тег 900 никогда не существовал либо физически удалён вместе с
+      // назначениями: хранилище не содержит ни его, ни ссылок на него.
+      final filters = [
+        (<int>[], [103]),
+        (<int>[], [101, 102, 103]),
+        (<int>[], [900]),
+        ([101, 102], <int>[]),
+        ([102], <int>[]),
+        ([900], <int>[]),
+        ([101, 900], <int>[]),
+        ([101], [103]),
+        ([101], [900]),
+        ([102], [102]),
+        ([101, 102], [103, 900]),
+      ];
+      for (final (required, excluded) in filters) {
+        for (final scope in [IntentionScope.active, IntentionScope.archived]) {
+          for (final titleFilter in [null, 'ходить']) {
+            final label =
+                'обязательные $required, исключённые $excluded, '
+                '$scope, название $titleFilter';
+            final expected = [
+              for (final MapEntry(key: number, value: (title, archived, tags))
+                  in intentions.entries)
+                if (archived == (scope == IntentionScope.archived) &&
+                    (titleFilter == null ||
+                        title.toLowerCase().contains(titleFilter)) &&
+                    tags.containsAll(required) &&
+                    !excluded.any(tags.contains))
+                  _id(_uuid(number)),
+            ];
+            final query = _tagQuery(
+              tagFilter: IntentionTagFilter(
+                requiredTagIds: [for (final tag in required) _tagId(tag)],
+                excludedTagIds: [for (final tag in excluded) _tagId(tag)],
+              ),
+              scope: scope,
+              titleFilter: titleFilter,
+            );
+
+            final first = _firstPage(await repository.getCatalogPage(query));
+            final loaded = [...first.items.map((item) => item.id)];
+            var cursor = first.nextCursor;
+            while (cursor != null) {
+              final next = _continuationPage(
+                await repository.getCatalogPage(
+                  _tagQuery(
+                    tagFilter: query.tagFilter,
+                    scope: scope,
+                    titleFilter: titleFilter,
+                    cursor: cursor,
+                  ),
+                ),
+              );
+              loaded.addAll(next.items.map((item) => item.id));
+              cursor = next.nextCursor;
+            }
+
+            expect(first.totalCount, expected.length, reason: label);
+            expect(loaded, expected, reason: label);
+          }
+        }
+      }
+    });
   });
 
   group('Порция каталога — собственные теги', () {
@@ -2887,7 +3011,7 @@ void main() {
 }
 
 bool _isCatalogCountStatement(String statement) =>
-    statement.contains('COUNT(') &&
+    statement.startsWith('SELECT COUNT(') &&
     !statement.contains('doable_relation_count_aggregates');
 
 void _expectSafeJointDiagnostics(

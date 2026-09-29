@@ -180,7 +180,7 @@ final class _CatalogFilterFailureObserver
     final sql = statement.statements.single;
     final matches = switch (point) {
       _CatalogFailurePoint.count =>
-        sql.contains('json_each(') && sql.contains('COUNT('),
+        sql.contains('json_each(') && sql.startsWith('SELECT COUNT('),
       _CatalogFailurePoint.rows =>
         sql.contains('json_each(') && sql.contains('LIMIT'),
       _CatalogFailurePoint.tags => sql.contains('FROM tag_assignments a'),

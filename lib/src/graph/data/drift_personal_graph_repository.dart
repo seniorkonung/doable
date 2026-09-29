@@ -1550,47 +1550,77 @@ final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
   );
 }
 
-/// Набор условий передаётся одним параметром: JSON-массивом канонических
-/// строк для `json_each(?)`. Чтение ничего не пишет на соединение, а число
-/// условий не ограничено числом параметров SQL-выражения.
-Variable<String> _catalogTagIdsParameter(Set<TagId> tagIds) => Variable<String>(
-  jsonEncode([for (final id in tagIds) id.toCanonicalString()]),
-);
+/// Набор условий передаётся одним параметром: JSON-массивом различных
+/// канонических строк для `json_each(?)`. Чтение ничего не пишет на
+/// соединение, а число условий не ограничено числом параметров SQL-выражения.
+final class _CatalogTagIdsParameter {
+  _CatalogTagIdsParameter(Set<TagId> tagIds)
+    : _canonicalIds = {for (final id in tagIds) id.toCanonicalString()};
+
+  final Set<String> _canonicalIds;
+
+  int get distinctCount => _canonicalIds.length;
+
+  void writeInto(GenerationContext context) =>
+      Variable<String>(jsonEncode([..._canonicalIds])).writeInto(context);
+}
 
 /// Намерение имеет собственные назначения всех обязательных тегов.
+///
+/// Набор читается из параметра один раз на выполнение запроса: некоррелированный
+/// подзапрос отбирает намерения, у которых число собственных назначений
+/// обязательных тегов равно числу различных обязательных идентификаторов, а
+/// кандидат проверяется адресным поиском в отобранном множестве. Уникальность
+/// `(tag_id, intention_id)` исключает повторный счёт одного назначения, а
+/// назначения связям без `intention_id` в отбор не попадают.
 final class _RequiredCatalogTagsExpression extends Expression<bool> {
-  const _RequiredCatalogTagsExpression(this._tagIds);
+  _RequiredCatalogTagsExpression(Set<TagId> tagIds)
+    : _tagIds = _CatalogTagIdsParameter(tagIds);
 
-  final Set<TagId> _tagIds;
+  final _CatalogTagIdsParameter _tagIds;
 
   @override
   void writeInto(GenerationContext context) {
-    context.buffer.write('NOT EXISTS (SELECT 1 FROM json_each(');
-    _catalogTagIdsParameter(_tagIds).writeInto(context);
     context.buffer.write(
-      ') AS required_tag WHERE NOT EXISTS ('
-      'SELECT 1 FROM tag_assignments AS assignment '
-      'WHERE assignment.intention_id = intentions.id '
-      'AND assignment.tag_id = required_tag.value))',
+      'intentions.id IN (SELECT assignment.intention_id '
+      'FROM tag_assignments AS assignment '
+      'WHERE assignment.intention_id IS NOT NULL '
+      'AND assignment.tag_id IN ('
+      'SELECT required_tag.value FROM json_each(',
     );
+    _tagIds.writeInto(context);
+    context.buffer.write(
+      ') AS required_tag) '
+      'GROUP BY assignment.intention_id HAVING COUNT(*) = ',
+    );
+    Variable<int>(_tagIds.distinctCount).writeInto(context);
+    context.buffer.write(')');
   }
 }
 
 /// Намерение не имеет собственных назначений ни одного исключённого тега.
+///
+/// Набор читается из параметра один раз на выполнение запроса:
+/// некоррелированный подзапрос отбирает намерения с назначением хотя бы одного
+/// исключённого тега, а кандидат проверяется адресным поиском в этом
+/// множестве. Назначения связям без `intention_id` отбрасываются, иначе
+/// `NULL` в множестве сделал бы `NOT IN` неопределённым для каждого кандидата.
 final class _ExcludedCatalogTagsExpression extends Expression<bool> {
-  const _ExcludedCatalogTagsExpression(this._tagIds);
+  _ExcludedCatalogTagsExpression(Set<TagId> tagIds)
+    : _tagIds = _CatalogTagIdsParameter(tagIds);
 
-  final Set<TagId> _tagIds;
+  final _CatalogTagIdsParameter _tagIds;
 
   @override
   void writeInto(GenerationContext context) {
     context.buffer.write(
-      'NOT EXISTS (SELECT 1 FROM tag_assignments AS assignment '
-      'WHERE assignment.intention_id = intentions.id '
+      'intentions.id NOT IN (SELECT assignment.intention_id '
+      'FROM tag_assignments AS assignment '
+      'WHERE assignment.intention_id IS NOT NULL '
       'AND assignment.tag_id IN ('
       'SELECT excluded_tag.value FROM json_each(',
     );
-    _catalogTagIdsParameter(_tagIds).writeInto(context);
+    _tagIds.writeInto(context);
     context.buffer.write(') AS excluded_tag))');
   }
 }

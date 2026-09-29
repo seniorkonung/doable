@@ -706,7 +706,7 @@ void _expectNoOffset(_SelectTrace trace) => expect(
 );
 
 bool _isCatalogCountStatement(String statement) =>
-    statement.contains('COUNT(') &&
+    statement.startsWith('SELECT COUNT(') &&
     !statement.contains('doable_relation_count_aggregates');
 
 Duration _percentile95(List<Duration> samples) {

@@ -34,7 +34,7 @@ LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
 
 /// Выражения чтений каталога с условиями по тегам, в которых внедряется отказ.
 bool _isCatalogCount(String sql) =>
-    sql.contains('json_each(') && sql.contains('COUNT(');
+    sql.contains('json_each(') && sql.startsWith('SELECT COUNT(');
 
 bool _isCatalogRows(String sql) =>
     sql.contains('json_each(') && sql.contains('LIMIT');
