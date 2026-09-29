@@ -58,13 +58,7 @@ MigrationStrategy localDataMigrationStrategy(
         await runAtomicMigration(
           database,
           targetSchemaVersion: to,
-          migrate: () => generated.stepByStep(
-            from1To2: _migrateFrom1To2,
-            from2To3: _migrateFrom2To3,
-            from3To4: _migrateFrom3To4,
-            from4To5: (migrator, schema) =>
-                _migrateFrom4To5(database, migrator, schema),
-          )(migrator, from, to),
+          migrate: () => generated.stepByStep()(migrator, from, to),
         );
       },
     ),
@@ -76,97 +70,6 @@ MigrationStrategy localDataMigrationStrategy(
       await database.customStatement('PRAGMA foreign_keys = ON');
     },
   );
-}
-
-Future<void> _migrateFrom1To2(
-  Migrator migrator,
-  generated.Schema2 schema,
-) async {
-  await migrator.create(schema.longTermRelations);
-  await migrator.create(schema.longTermRelationsSourceGroupOrder);
-  await migrator.create(schema.longTermRelationsRelatedGroupOrder);
-  await migrator.create(schema.longTermRelationsImmutableIdentity);
-  await migrator.create(schema.longTermRelationsActiveParticipantsAfterInsert);
-  await migrator.create(schema.longTermRelationsActiveParticipantsAfterUpdate);
-  await migrator.create(schema.intentionsArchiveRequiresNoActiveRelations);
-}
-
-Future<void> _migrateFrom2To3(
-  Migrator migrator,
-  generated.Schema3 schema,
-) async {
-  await migrator.create(schema.dailyChoices);
-  await migrator.create(schema.dailyChoicesDateCreationOrder);
-  await migrator.create(schema.dailyChoicesSourceDateCreationOrder);
-  await migrator.create(schema.dailyChoicesSelectedDateCreationOrder);
-  await migrator.create(schema.dailyChoicesSourceRecent);
-  await migrator.create(schema.dailyChoicesSelectedRecent);
-  await migrator.create(schema.dailyChoicesImmutableIdentity);
-  await migrator.create(schema.dailyChoicePathSteps);
-  await migrator.create(schema.dailyChoicePathStepsOneRoot);
-  await migrator.create(schema.dailyChoicePathStepsOneSuccessor);
-  await migrator.create(schema.dailyChoicePathStepsRelation);
-  await migrator.create(schema.longTermRelationsProtectDailyChoicePath);
-}
-
-Future<void> _migrateFrom3To4(
-  Migrator migrator,
-  generated.Schema4 schema,
-) async {
-  await migrator.create(schema.tags);
-  await migrator.create(schema.tagsImmutableIdentity);
-  await migrator.create(schema.tagAssignments);
-  await migrator.create(schema.tagAssignmentsTagOrder);
-  await migrator.create(schema.tagAssignmentsIntention);
-  await migrator.create(schema.tagAssignmentsLongTermRelation);
-  await migrator.create(schema.tagAssignmentsImmutableIdentity);
-}
-
-Future<void> _migrateFrom4To5(
-  GeneratedDatabase database,
-  Migrator migrator,
-  generated.Schema5 schema,
-) async {
-  final previousSequence = await database
-      .customSelect(
-        "SELECT seq FROM sqlite_sequence WHERE name = 'tag_assignments'",
-      )
-      .getSingleOrNull();
-  await database.customStatement('''
-    CREATE TEMP TABLE tag_assignments_v4 AS
-    SELECT creation_sequence, tag_id, intention_id, long_term_relation_id
-    FROM tag_assignments
-  ''');
-  await database.customStatement('DROP TABLE tag_assignments');
-  await migrator.create(schema.tagAssignments);
-  await database.customStatement('''
-    INSERT INTO tag_assignments (
-      creation_sequence, tag_id, tag_creation_sequence,
-      intention_id, long_term_relation_id
-    )
-    SELECT a.creation_sequence, a.tag_id, t.creation_sequence,
-      a.intention_id, a.long_term_relation_id
-    FROM tag_assignments_v4 a LEFT JOIN tags t ON t.id = a.tag_id
-  ''');
-  await database.customStatement('DROP TABLE tag_assignments_v4');
-  if (previousSequence != null) {
-    await database.customStatement(
-      "DELETE FROM sqlite_sequence WHERE name = 'tag_assignments'",
-    );
-    await database.customStatement(
-      'INSERT INTO sqlite_sequence (name, seq) VALUES (?, ?)',
-      ['tag_assignments', previousSequence.read<int>('seq')],
-    );
-  }
-  await migrator.create(schema.tagAssignmentsTagOrder);
-  await migrator.create(schema.tagAssignmentsIntention);
-  await migrator.create(schema.tagAssignmentsIntentionOrder);
-  await migrator.create(schema.tagAssignmentsLongTermRelation);
-  await migrator.create(schema.tagAssignmentsLongTermRelationOrder);
-  await migrator.create(schema.tagAssignmentsValidTagOrderInsert);
-  await migrator.create(schema.tagAssignmentsFillTagOrder);
-  await migrator.create(schema.tagAssignmentsValidTagOrderUpdate);
-  await migrator.create(schema.tagAssignmentsImmutableIdentity);
 }
 
 Future<void> _recordMigration(

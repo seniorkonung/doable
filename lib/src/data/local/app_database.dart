@@ -20,7 +20,7 @@ final class AppDatabase extends _$AppDatabase {
     this.diagnosticsSink,
   }) : super(connection._executor);
 
-  static const currentSchemaVersion = 5;
+  static const currentSchemaVersion = 1;
   final DiagnosticsSink? diagnosticsSink;
 
   @override

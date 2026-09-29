@@ -178,7 +178,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         .insert(
           local.TagAssignmentsCompanion.insert(
             tagId: tagId,
-            intentionId: Value(command.intentionId.toCanonicalString()),
+            intentionId: command.intentionId.toCanonicalString(),
           ),
         );
     return _CommittedTagAssignmentChanged(
