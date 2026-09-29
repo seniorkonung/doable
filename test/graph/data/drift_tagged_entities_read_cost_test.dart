@@ -7,7 +7,7 @@ import 'dart:io';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter_test/flutter_test.dart';
@@ -62,7 +62,7 @@ final class _Trace extends LocalDatabaseConnectionObserver {
 final class _Page {
   const _Page(this.value, this.microseconds, this.selects);
 
-  final TaggedEntitiesPage value;
+  final TaggedIntentionsPage value;
   final int microseconds;
   final List<_Select> selects;
 
@@ -115,7 +115,7 @@ void _emit(Map<String, Object?> record) =>
 void main() {
   for (final pairs in [5003, 15003]) {
     test(
-      'стоимость смешанных порций и редкого архива при ${pairs * 2} назначениях',
+      'стоимость порций намерений и редкого архива среди прежних назначений связям при ${pairs * 2} назначениях',
       () => _measure(pairs),
       timeout: const Timeout(Duration(minutes: 5)),
     );
@@ -154,7 +154,7 @@ Future<void> _measure(int pairs) async {
     expect(scalar('SELECT COUNT(*) FROM long_term_relations'), pairs);
     expect(scalar('SELECT COUNT(*) FROM tag_assignments'), pairs * 4);
     _emit({
-      'kind': 'tagged_entities_fixture',
+      'kind': 'tagged_intentions_fixture',
       'recipientPairs': pairs,
       'intentions': pairs + 1,
       'relations': pairs,
@@ -178,14 +178,14 @@ Future<void> _measure(int pairs) async {
       'sampleRepetitions': 5,
     });
     Future<_Page> read(
-      TaggedEntitiesScope scope,
+      TaggedIntentionsScope scope,
       int size,
-      TaggedEntitiesCursor? cursor,
+      TaggedIntentionsCursor? cursor,
     ) async {
       trace.clear();
       final timer = Stopwatch()..start();
-      final result = await graph.getTaggedEntitiesPage(
-        TaggedEntitiesQuery(
+      final result = await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
           tagId: tagId,
           scope: scope,
           pageSize: size,
@@ -193,8 +193,8 @@ Future<void> _measure(int pairs) async {
         ),
       );
       timer.stop();
-      expect(result, isA<TaggedEntitiesPageSuccess>());
-      final page = (result as TaggedEntitiesPageSuccess).value;
+      expect(result, isA<TaggedIntentionsPageSuccess>());
+      final page = (result as TaggedIntentionsPageSuccess).value;
       final selects = List<_Select>.of(trace.selects);
       expect(selects, hasLength(cursor == null ? 4 : 3));
       expect(selects[0].sql, contains('FROM pragma_data_version'));
@@ -210,6 +210,11 @@ Future<void> _measure(int pairs) async {
         expect(sql, isNot(contains('OFFSET')));
         expect(sql, isNot(contains('COUNT(')));
         expect(sql, isNot(contains('SELECT *')));
+        expect(sql, isNot(contains('LONG_TERM_RELATIONS')));
+        expect(sql, isNot(contains('SOURCE_INTENTION_ID')));
+        expect(sql, isNot(contains('RELATED_INTENTION_ID')));
+        expect(sql, isNot(contains('DESCRIPTION')));
+        expect(sql, isNot(contains('PRIORITY')));
         expect(sql, isNot(contains('DAILY_CHOICES')));
         expect(sql, isNot(contains('DAILY_CHOICE_PATH_STEPS')));
       }
@@ -224,7 +229,7 @@ Future<void> _measure(int pairs) async {
       return _Page(page, timer.elapsedMicroseconds, selects);
     }
 
-    for (final scope in TaggedEntitiesScope.values) {
+    for (final scope in TaggedIntentionsScope.values) {
       for (final size in [1, 50, 100]) {
         await _traverse(raw, pairs, scope, size, read);
       }
@@ -235,30 +240,25 @@ Future<void> _measure(int pairs) async {
   }
 }
 
-String _identity(TaggedEntity entity) => switch (entity) {
-  TaggedIntention(:final id) => 'intention:${id.toCanonicalString()}',
-  TaggedLongTermRelation(:final id) => 'relation:${id.toCanonicalString()}',
-};
+String _identity(TaggedIntention intention) => intention.id.toCanonicalString();
 
 Future<void> _traverse(
   sqlite.Database raw,
   int pairs,
-  TaggedEntitiesScope scope,
+  TaggedIntentionsScope scope,
   int size,
-  Future<_Page> Function(TaggedEntitiesScope, int, TaggedEntitiesCursor?) read,
+  Future<_Page> Function(TaggedIntentionsScope, int, TaggedIntentionsCursor?)
+  read,
 ) async {
   final expected = <(String, int)>[
-    for (var index = 0; index < pairs; index++) ...[
-      if ((index % 40 == 0) == (scope == TaggedEntitiesScope.archived))
-        ('intention:${tagFixtureId(100000 + index)}', index * 2),
-      if ((index % 20 == 0) == (scope == TaggedEntitiesScope.archived))
-        ('relation:${tagFixtureId(200000 + index)}', index * 2 + 1),
-    ],
+    for (var index = 0; index < pairs; index++)
+      if ((index % 40 == 0) == (scope == TaggedIntentionsScope.archived))
+        (tagFixtureId(100000 + index), index * 2),
   ];
   final pageCount = (expected.length / size).ceil();
-  final samples = <String, (TaggedEntitiesCursor?, _Page, int)>{};
+  final samples = <String, (TaggedIntentionsCursor?, _Page, int)>{};
   final ids = <String>[];
-  TaggedEntitiesCursor? cursor;
+  TaggedIntentionsCursor? cursor;
   var boundaryOrdinal = -1;
   var pages = 0;
   var queries = 0;
@@ -316,7 +316,7 @@ Future<void> _traverse(
   // допустим; повтор полного отбора на каждой порции — нет.
   expect(mainVisits, inInclusiveRange(pairs * 2, pairs * 4));
   _emit({
-    'kind': 'tagged_entities_traversal',
+    'kind': 'tagged_intentions_traversal',
     'recipientPairs': pairs,
     'scope': scope.name,
     'pageSize': size,
@@ -368,7 +368,7 @@ Future<void> _traverse(
       expect(plan.join(' '), isNot(contains('SCAN a')));
     }
     _emit({
-      'kind': 'tagged_entities_page',
+      'kind': 'tagged_intentions_page',
       'recipientPairs': pairs,
       'scope': scope.name,
       'pageSize': size,
