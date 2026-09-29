@@ -82,7 +82,7 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
                JOIN intentions i ON i.id = a.intention_id
                WHERE a.tag_id = ?
                  ${boundary == null ? '' : 'AND a.creation_sequence > ?'}
-                 AND a.intention_id IS NOT NULL AND i.is_archived = ?
+                 AND i.is_archived = ?
                ORDER BY a.creation_sequence ASC LIMIT ?''',
                 variables: [
                   Variable<String>(query.tagId.toCanonicalString()),
@@ -151,12 +151,8 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
       SELECT 1 FROM tag_assignments a
       LEFT JOIN intentions i ON i.id = a.intention_id
       WHERE a.tag_id = ? AND (
-        (a.intention_id IS NULL AND a.long_term_relation_id IS NULL)
-        OR (a.intention_id IS NOT NULL AND (
-          a.long_term_relation_id IS NOT NULL
-          OR i.id IS NULL
-          OR typeof(i.is_archived) <> 'integer' OR i.is_archived NOT IN (0, 1)
-        ))
+        i.id IS NULL
+        OR typeof(i.is_archived) <> 'integer' OR i.is_archived NOT IN (0, 1)
       ) LIMIT 1
     ''',
           variables: [Variable<String>(tagId.toCanonicalString())],
