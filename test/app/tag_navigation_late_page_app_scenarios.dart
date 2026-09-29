@@ -12,7 +12,7 @@ void _registerLatePageAppScenarios() {
           final app = await _App.pump(tester, locale: locale);
           await app.openNavigation(tester);
           await app.loaded(tester);
-          await _changeScope(tester, TaggedEntitiesScope.archived);
+          await _changeScope(tester, TaggedIntentionsScope.archived);
           final before = await app.loaded(tester);
           final target = _intention(2);
           final oldOpen = tester.widget<ListTile>(_latePageTile(target)).onTap!;
@@ -33,10 +33,10 @@ void _registerLatePageAppScenarios() {
           await _waitFor(tester, () => held.ready.isCompleted);
           expect(
             await held.ready.future,
-            isA<TaggedEntitiesPageError>().having(
+            isA<TaggedIntentionsPageError>().having(
               (result) => result.failure,
               'причина позднего продолжения',
-              isA<TaggedEntitiesUnavailableFailure>(),
+              isA<TaggedIntentionsUnavailableFailure>(),
             ),
           );
           expect(app.repository.queries.last.cursor, same(before.nextCursor));
@@ -57,7 +57,10 @@ void _registerLatePageAppScenarios() {
           );
           expect(app.repository.activePages, 1);
           final failed = app.state(tester) as TagNavigationLoaded;
-          expect(failed.refreshFailure, isA<TaggedEntitiesCorruptionFailure>());
+          expect(
+            failed.refreshFailure,
+            isA<TaggedIntentionsCorruptionFailure>(),
+          );
 
           app.repository.releasePage(held);
           await _waitFor(tester, () => app.repository.activePages == 0);
@@ -130,8 +133,8 @@ void _registerLateSuccessAppScenarios() {
               TagNavigationLoaded? before;
               VoidCallback? oldOpen;
               final scope = loaded
-                  ? TaggedEntitiesScope.archived
-                  : TaggedEntitiesScope.active;
+                  ? TaggedIntentionsScope.archived
+                  : TaggedIntentionsScope.active;
               final target = _intention(loaded ? 2 : 1);
               if (loaded) {
                 await app.openNavigation(tester);
@@ -153,7 +156,10 @@ void _registerLateSuccessAppScenarios() {
                 await app.openNavigation(tester);
               }
               await _waitFor(tester, () => held.ready.isCompleted);
-              expect(await held.ready.future, isA<TaggedEntitiesPageSuccess>());
+              expect(
+                await held.ready.future,
+                isA<TaggedIntentionsPageSuccess>(),
+              );
               final queryCount = app.repository.queries.length;
               final oldCallbacks = app.repository.watchCallbacks.single;
               app.readProbe.failure = injected;
@@ -236,7 +242,7 @@ void _registerLatePageSessionScenarios() {
           ),
         );
         await _waitFor(tester, () => held.ready.isCompleted);
-        expect(await held.ready.future, isA<TaggedEntitiesPageSuccess>());
+        expect(await held.ready.future, isA<TaggedIntentionsPageSuccess>());
         app.readProbe.failure = sqlite.SqliteException(
           extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
           message: 'занято',
@@ -281,7 +287,7 @@ void _registerLatePageSessionScenarios() {
 
         expect(app.state(tester), same(current));
         expect(current.items, hasLength(50));
-        expect(current.items.map((item) => item.target).toSet(), hasLength(50));
+        expect(current.items.map((item) => item.id).toSet(), hasLength(50));
         expect(current.canUseCurrentItems, isTrue);
         expect(current.refreshFailure, isNull);
         expect(app.model(tester).canActOn(target), isTrue);
@@ -321,8 +327,8 @@ String _lateWatchMessage(
 Future<void> _restoreAfterLatePage(
   WidgetTester tester,
   _App app,
-  IntentionTagTarget target,
-  TaggedEntitiesScope scope,
+  IntentionId target,
+  TaggedIntentionsScope scope,
   _WatchCallbacks oldCallbacks,
   TagReadError oldFailure,
   VoidCallback? oldOpen, {
@@ -360,12 +366,12 @@ Future<void> _restoreAfterLatePage(
   }
   final restored = await app.loaded(tester);
   final snapshot =
-      (await recovery.ready.future as TaggedEntitiesPageSuccess).value;
+      (await recovery.ready.future as TaggedIntentionsPageSuccess).value;
   expect(restored.tagId, _tagId);
   expect(restored.scope, scope);
   expect(restored.items, snapshot.items);
   expect(
-    restored.items.map((item) => item.target).toSet(),
+    restored.items.map((item) => item.id).toSet(),
     hasLength(restored.items.length),
   );
   expect(restored.refreshFailure, isNull);
@@ -407,7 +413,7 @@ Future<void> _restoreAfterLatePage(
   expect(find.text(l10n.tagNavigationTag('Быт после повтора')), findsOneWidget);
   expect(
     tester
-        .getSemantics(find.byKey(ValueKey<TagTarget>(target)))
+        .getSemantics(find.byKey(ValueKey<IntentionId>(target)))
         .getSemanticsData()
         .hasAction(SemanticsAction.tap),
     isTrue,
@@ -420,15 +426,15 @@ Future<void> _restoreAfterLatePage(
   expect(app.router.current.name, IntentionDetailsRoute.name);
   expect(
     app.router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-    target.intentionId,
+    target,
   );
   app.router.pop();
   await tester.pumpAndSettle();
   expect((await app.loaded(tester)).scope, scope);
 }
 
-Finder _latePageTile(TagTarget target) => find.descendant(
-  of: find.byKey(ValueKey<TagTarget>(target)),
+Finder _latePageTile(IntentionId target) => find.descendant(
+  of: find.byKey(ValueKey<IntentionId>(target)),
   matching: find.byType(ListTile),
 );
 
@@ -443,14 +449,14 @@ Future<void> _latePageScrollToStart(WidgetTester tester) async {
 void _expectLatePageTransitionBlocked(
   WidgetTester tester,
   _App app,
-  TagTarget target,
+  IntentionId target,
   VoidCallback oldOpen,
 ) {
   expect(app.model(tester).canActOn(target), isFalse);
   expect(tester.widget<ListTile>(_latePageTile(target)).onTap, isNull);
   expect(
     tester
-        .getSemantics(find.byKey(ValueKey<TagTarget>(target)))
+        .getSemantics(find.byKey(ValueKey<IntentionId>(target)))
         .getSemanticsData()
         .hasAction(SemanticsAction.tap),
     isFalse,

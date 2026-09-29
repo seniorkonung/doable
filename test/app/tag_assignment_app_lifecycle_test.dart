@@ -13,7 +13,6 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -21,7 +20,6 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
@@ -36,9 +34,9 @@ import '../support/tag_storage_fixture.dart';
 
 void main() {
   for (final (description, target) in [
-    ('намерение', _intentionTarget(1)),
-    ('связь «нужно»', _relationTarget(101)),
-    ('связь «можно»', _relationTarget(103)),
+    ('намерение', _intentionId(1)),
+    ('архивированное действие', _intentionId(2)),
+    ('действие из дневного пути', _intentionId(3)),
   ]) {
     testWidgets(
       '$description: поиск согласует редактор, назначения и позднее чтение после переименования и удаления',
@@ -92,7 +90,7 @@ void main() {
               supportedLocales: AppLocalizations.supportedLocales,
               routerConfig: router.config(
                 deepLinkBuilder: (_) =>
-                    DeepLink([TagCatalogRoute(target: target)]),
+                    DeepLink([TagCatalogRoute(intentionId: target)]),
               ),
             ),
           ),
@@ -143,7 +141,7 @@ void main() {
           findsOneWidget,
         );
         final removed = runtime.commandCoordinator.acceptTagRemoveAssignment(
-          RemoveTagAssignment(tagId: selectedId, target: target),
+          RemoveTagAssignment(tagId: selectedId, intentionId: target),
         ) as TagCommandAccepted;
         await tester.runAsync(() => removed.future);
         await _pumpUntil(
@@ -171,7 +169,7 @@ void main() {
         await tester.runAsync(() => unrelatedRename.future);
         await _pumpUntil(tester, () => repository.catalogReadStarted);
         final reassigned = runtime.commandCoordinator.acceptTagAssign(
-          AssignTag(tagId: selectedId, target: target),
+          AssignTag(tagId: selectedId, intentionId: target),
         ) as TagCommandAccepted;
         await tester.runAsync(() => reassigned.future);
         await _pumpUntil(
@@ -234,11 +232,11 @@ void main() {
         expect(tester.widget<FilledButton>(assign).onPressed, isNull);
         expect(tester.widget<TextField>(search).controller!.text, 'дом');
 
-        final nextTarget = _intentionTarget(3);
+        final nextTarget = _intentionId(3);
         final nextProvider = tagCatalogViewModelProvider(
           mode: TagCatalogSelectionMode(nextTarget),
         );
-        unawaited(router.push<void>(TagCatalogRoute(target: nextTarget)));
+        unawaited(router.push<void>(TagCatalogRoute(intentionId: nextTarget)));
         await _pumpUntil(
           tester,
           () => ready.container.read(nextProvider) is TagCatalogLoaded,
@@ -276,14 +274,16 @@ void main() {
     final ready = await runtime.bootstrap() as AppRuntimeReady;
     seedTagStorageFixture(raw);
     final container = ready.container;
-    final target = _intentionTarget(1);
-    final relation = _relationTarget(102);
+    final target = _intentionId(1);
+    final archivedIntention = _intentionId(2);
     final browse = tagCatalogViewModelProvider();
     final choose = tagCatalogViewModelProvider(
       mode: TagCatalogSelectionMode(target),
     );
     final assignments = tagAssignmentsViewModelProvider(target);
-    final archivedAssignments = tagAssignmentsViewModelProvider(relation);
+    final archivedAssignments = tagAssignmentsViewModelProvider(
+      archivedIntention,
+    );
     final subscriptions = [
       container.listen(browse, (_, _) {}),
       container.listen(choose, (_, _) {}),
@@ -392,7 +392,7 @@ void main() {
       addTearDown(runtime.shutdown);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       seedTagStorageFixture(raw);
-      final target = _intentionTarget(1);
+      final target = _intentionId(1);
       final assignments = tagAssignmentsViewModelProvider(target);
       final browse = tagCatalogViewModelProvider();
       repository.holdNextAssignmentsRead();
@@ -447,14 +447,14 @@ void main() {
       addTearDown(runtime.shutdown);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       seedTagStorageFixture(raw);
-      final first = _intentionTarget(1);
-      final second = _intentionTarget(3);
+      final first = _intentionId(1);
+      final second = _intentionId(3);
       final provider = tagAssignmentsViewModelProvider(first);
       repository.holdNextAssignmentsRead();
       final subscription = ready.container.listen(provider, (_, _) {});
       addTearDown(subscription.close);
       await repository.heldReadStarted;
-      ready.container.read(provider.notifier).setTarget(second);
+      ready.container.read(provider.notifier).setIntentionId(second);
       expect(
         ready.container.read(provider),
         isA<TagAssignmentsInitialLoading>(),
@@ -462,7 +462,7 @@ void main() {
       repository.releaseAssignmentsRead();
       await _until(() {
         final state = ready.container.read(provider);
-        return state is TagAssignmentsLoaded && state.target == second;
+        return state is TagAssignmentsLoaded && state.intentionId == second;
       });
       final state = ready.container.read(provider) as TagAssignmentsLoaded;
       expect(state.items.map((tag) => tag.id), [_tagId(lastTagNumber)]);
@@ -502,7 +502,7 @@ void main() {
         ]);
       }
       final provider = tagCatalogViewModelProvider(
-        mode: TagCatalogSelectionMode(_intentionTarget(1)),
+        mode: TagCatalogSelectionMode(_intentionId(1)),
       );
       final subscription = ready.container.listen(provider, (_, _) {});
       addTearDown(subscription.close);
@@ -570,7 +570,7 @@ void main() {
       addTearDown(runtime.shutdown);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       seedTagStorageFixture(raw);
-      final target = _intentionTarget(3);
+      final target = _intentionId(3);
       final id = _tagId(firstTagNumber);
       final assignments = tagAssignmentsViewModelProvider(target);
       var subscription = ready.container.listen(assignments, (_, _) {});
@@ -582,19 +582,19 @@ void main() {
 
       repository.holdNextAssign();
       final assigned = runtime.commandCoordinator.acceptTagAssign(
-        AssignTag(tagId: id, target: target),
+        AssignTag(tagId: id, intentionId: target),
       ) as TagCommandAccepted;
       await repository.heldCommandStarted;
       subscription.close();
       expect(
         runtime.commandCoordinator.acceptTagAssign(
-          AssignTag(tagId: id, target: target),
+          AssignTag(tagId: id, intentionId: target),
         ),
         isA<TagCommandAlreadyRunning>(),
       );
       expect(
         runtime.commandCoordinator.acceptTagRemoveAssignment(
-          RemoveTagAssignment(tagId: id, target: target),
+          RemoveTagAssignment(tagId: id, intentionId: target),
         ),
         isA<TagCommandAlreadyRunning>(),
       );
@@ -618,13 +618,13 @@ void main() {
 
       repository.holdNextRemove();
       final removed = runtime.commandCoordinator.acceptTagRemoveAssignment(
-        RemoveTagAssignment(tagId: id, target: target),
+        RemoveTagAssignment(tagId: id, intentionId: target),
       ) as TagCommandAccepted;
       await repository.heldCommandStarted;
       subscription.close();
       expect(
         runtime.commandCoordinator.acceptTagAssign(
-          AssignTag(tagId: id, target: target),
+          AssignTag(tagId: id, intentionId: target),
         ),
         isA<TagCommandAlreadyRunning>(),
       );
@@ -680,7 +680,7 @@ void main() {
       CREATE TEMP TRIGGER fail_assignment BEFORE INSERT ON tag_assignments
       BEGIN SELECT RAISE(ABORT, 'injected assignment failure'); END
     ''');
-      final target = _intentionTarget(3);
+      final target = _intentionId(3);
       final id = _tagId(firstTagNumber);
       final provider = tagCatalogViewModelProvider(
         mode: TagCatalogSelectionMode(target),
@@ -698,7 +698,7 @@ void main() {
 
       repository.holdNextAssign();
       final accepted = runtime.commandCoordinator.acceptTagAssign(
-        AssignTag(tagId: id, target: target),
+        AssignTag(tagId: id, intentionId: target),
       ) as TagCommandAccepted;
       await repository.heldCommandStarted;
       expect(model.assignSelected(), isA<TagCommandAlreadyRunning>());
@@ -731,16 +731,8 @@ void main() {
 TagId _tagId(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
 
-IntentionTagTarget _intentionTarget(int number) => IntentionTagTarget(
-  (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id,
-);
-
-LongTermRelationTagTarget _relationTarget(int number) =>
-    LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        tagFixtureId(number),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    );
+IntentionId _intentionId(int number) =>
+    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
 Future<void> _until(bool Function() condition) async {
   for (var attempt = 0; attempt < 100 && !condition(); attempt++) {
@@ -834,11 +826,11 @@ final class _ControlledReads extends Fake implements PersonalGraphRepository {
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId id,
-    TagTarget target,
+    IntentionId target,
   ) => delegate.getTagAssignmentStatus(id, target);
 
   @override
-  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) async {
+  Future<TagAssignmentsResult> getTagAssignments(IntentionId target) async {
     final result = await delegate.getTagAssignments(target);
     final gate = _assignmentsGate;
     if (gate != null) {

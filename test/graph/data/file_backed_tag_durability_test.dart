@@ -8,7 +8,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -53,7 +53,7 @@ void main() {
         }
         if (sourceVersion != 4) {
           expect(raw.select('SELECT id FROM tags'), isEmpty);
-          seedTagNavigationLifecycleFixture(raw);
+          _seedNavigationRecipients(raw);
         }
         final graphBefore = retainedTagFixtureGraph(raw);
         final assignmentsBefore = _assignmentRows(raw);
@@ -63,17 +63,17 @@ void main() {
           () => DateTime.utc(2026),
           InMemoryDiagnosticsSink(),
         );
-        final previousPages = <TaggedEntitiesPage>[];
-        for (final scope in TaggedEntitiesScope.values) {
-          final first = await repository.getTaggedEntitiesPage(
-            TaggedEntitiesQuery(
+        final previousPages = <TaggedIntentionsPage>[];
+        for (final scope in TaggedIntentionsScope.values) {
+          final first = await repository.getTaggedIntentionsPage(
+            TaggedIntentionsQuery(
               tagId: _navigationTagId(),
               scope: scope,
               pageSize: 1,
             ),
           );
-          expect(first, isA<TaggedEntitiesPageSuccess>());
-          final page = (first as TaggedEntitiesPageSuccess).value;
+          expect(first, isA<TaggedIntentionsPageSuccess>());
+          final page = (first as TaggedIntentionsPageSuccess).value;
           expect(page.nextCursor, isNotNull);
           previousPages.add(page);
         }
@@ -103,33 +103,33 @@ void main() {
         );
         for (final previous in previousPages) {
           expect(
-            await nextRepository.getTaggedEntitiesPage(
-              TaggedEntitiesQuery(
+            await nextRepository.getTaggedIntentionsPage(
+              TaggedIntentionsQuery(
                 tagId: previous.tag.id,
                 scope: previous.scope,
                 pageSize: 1,
                 cursor: previous.nextCursor,
               ),
             ),
-            isA<TaggedEntitiesPageError>().having(
+            isA<TaggedIntentionsPageError>().having(
               (result) => result.failure,
               'прежний курсор',
-              isA<TaggedEntitiesInvalidCursor>(),
+              isA<TaggedIntentionsInvalidCursor>(),
             ),
           );
-          final first = (await nextRepository.getTaggedEntitiesPage(
-            TaggedEntitiesQuery(
+          final first = (await nextRepository.getTaggedIntentionsPage(
+            TaggedIntentionsQuery(
               tagId: previous.tag.id,
               scope: previous.scope,
               pageSize: 1,
             ),
-          ) as TaggedEntitiesPageSuccess).value;
+          ) as TaggedIntentionsPageSuccess).value;
           expect(
             first.revision.compareTo(previous.revision),
             GraphRevisionOrder.differentEpoch,
           );
           expect(first.tag.name.value, 'Быт 🏷️');
-          expect(first.items.single.target, previous.items.single.target);
+          expect(first.items.single.id, previous.items.single.id);
         }
         expect(_assignmentRows(raw), assignmentsBefore);
         expect(retainedTagFixtureGraph(raw), graphBefore);
@@ -145,7 +145,7 @@ void main() {
     addTearDown(harness.dispose);
     late sqlite.Database raw;
     await harness.openReadyDatabase(setup: (db) => raw = db);
-    seedTagNavigationLifecycleFixture(raw);
+    _seedNavigationRecipients(raw);
     await harness.closePersistenceObjectGraph();
 
     await _runWorker(harness, 'navigation_mutate', killAtReady: true);
@@ -187,7 +187,7 @@ void main() {
       raw.select('''
         SELECT MAX(creation_sequence) AS last FROM tag_assignments
       ''').single['last'],
-      13,
+      8,
     );
     expect(
       raw
@@ -195,7 +195,7 @@ void main() {
             "SELECT seq FROM sqlite_sequence WHERE name = 'tag_assignments'",
           )
           .single['seq'],
-      14,
+      9,
     );
     expect(raw.select('SELECT id FROM daily_choices'), hasLength(1));
     expect(raw.select('SELECT id FROM daily_choice_path_steps'), hasLength(1));
@@ -217,7 +217,7 @@ void main() {
             "SELECT seq FROM sqlite_sequence WHERE name = 'tag_assignments'",
           )
           .single['seq'],
-      14,
+      9,
     );
     await harness.closePersistenceObjectGraph();
 
@@ -252,7 +252,7 @@ void main() {
             [tagFixtureId(firstTagNumber), tagFixtureId(2)],
           )
           .single['creation_sequence'],
-      15,
+      10,
     );
     expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
@@ -339,10 +339,7 @@ void main() {
               .toList(),
           [
             (2, tagFixtureId(303), tagFixtureId(1), null),
-            (4, tagFixtureId(301), null, tagFixtureId(101)),
-            (5, tagFixtureId(303), null, tagFixtureId(101)),
-            (6, tagFixtureId(301), null, tagFixtureId(102)),
-            (11, tagFixtureId(301), tagFixtureId(1), null),
+            (6, tagFixtureId(301), tagFixtureId(1), null),
           ],
         );
         expect(
@@ -418,7 +415,7 @@ void main() {
             )
             .map((row) => (row['creation_sequence'], row['tag_id']))
             .toList(),
-        [(12, tagFixtureId(303))],
+        [(7, tagFixtureId(303))],
       );
       expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
       expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
@@ -468,7 +465,7 @@ void main() {
       SELECT creation_sequence, tag_id, intention_id, long_term_relation_id
       FROM tag_assignments ORDER BY creation_sequence
     ''');
-    expect(assignments.map((row) => row['creation_sequence']), [1, 2, 3, 4]);
+    expect(assignments.map((row) => row['creation_sequence']), [1, 2]);
     expect(
       assignments.map((row) => row['tag_id']),
       everyElement(tagFixtureId(firstTagNumber)),
@@ -476,14 +473,10 @@ void main() {
     expect(assignments.map((row) => row['intention_id']), [
       tagFixtureId(1),
       tagFixtureId(2),
-      null,
-      null,
     ]);
     expect(assignments.map((row) => row['long_term_relation_id']), [
       null,
       null,
-      tagFixtureId(101),
-      tagFixtureId(102),
     ]);
     expect(
       raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [newId]),
@@ -536,7 +529,7 @@ void main() {
         'SELECT creation_sequence FROM tag_assignments WHERE tag_id = ?',
         [newId],
       ).single['creation_sequence'],
-      6,
+      4,
     );
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
   });
@@ -616,6 +609,22 @@ void main() {
   });
 }
 
+// По два результата в каждом охвате проверяют продолжения без назначений связям.
+void _seedNavigationRecipients(sqlite.Database raw) {
+  seedTagNavigationLifecycleFixture(
+    raw,
+    includeHistoricalRelationAssignments: false,
+  );
+  raw.execute(
+    'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, 1, 106, 206)',
+    [tagFixtureId(6), 'Архивное намерение'],
+  );
+  raw.execute(
+    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+    [tagFixtureId(firstTagNumber), tagFixtureId(6)],
+  );
+}
+
 void _seedAssignmentRecipients(sqlite.Database raw) {
   seedTagRecipientGraphFixture(raw);
   raw.execute(
@@ -659,7 +668,7 @@ Future<void> _createNavigationDatabaseFixture(File file, int version) async {
         [tagFixtureId(905), tagFixtureId(904), tagFixtureId(903)],
       );
     }
-    if (version == 4) seedTagNavigationLifecycleFixture(raw);
+    if (version == 4) _seedNavigationRecipients(raw);
   }
 
   switch (version) {
