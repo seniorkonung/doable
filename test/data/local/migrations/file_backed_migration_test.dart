@@ -96,7 +96,7 @@ void main() {
     await createSchemaV4Fixture(
       harness.databaseFile,
       seed: (raw) {
-        seedTagStorageFixture(raw);
+        seedHistoricalTagStorageFixture(raw);
         raw.execute('DELETE FROM tag_assignments WHERE creation_sequence = 5');
       },
     );
@@ -156,7 +156,7 @@ void main() {
       addTearDown(harness.dispose);
       await createSchemaV4Fixture(
         harness.databaseFile,
-        seed: seedTagStorageFixture,
+        seed: seedHistoricalTagStorageFixture,
       );
       final beforeSchema = _schemaContract(harness.databaseFile);
       final beforeAssignments = _assignmentRows(harness.databaseFile);

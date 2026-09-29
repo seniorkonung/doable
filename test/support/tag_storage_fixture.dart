@@ -6,7 +6,23 @@ String tagFixtureId(int number) =>
 const firstTagNumber = 301;
 const lastTagNumber = 302;
 
-void seedTagStorageFixture(sqlite.Database database) {
+/// Рабочие назначения относятся только к намерениям.
+void seedTagStorageFixture(sqlite.Database database) => _seedTagStorageFixture(
+  database,
+  includeHistoricalRelationAssignments: false,
+);
+
+/// Исходные смешанные назначения схемы 4 для проверок исторической миграции.
+void seedHistoricalTagStorageFixture(sqlite.Database database) =>
+    _seedTagStorageFixture(
+      database,
+      includeHistoricalRelationAssignments: true,
+    );
+
+void _seedTagStorageFixture(
+  sqlite.Database database, {
+  required bool includeHistoricalRelationAssignments,
+}) {
   seedTagRecipientGraphFixture(database);
   database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
     tagFixtureId(firstTagNumber),
@@ -22,11 +38,13 @@ void seedTagStorageFixture(sqlite.Database database) {
       [tagFixtureId(firstTagNumber), tagFixtureId(number)],
     );
   }
-  for (final number in [101, 102]) {
-    database.execute(
-      'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(number)],
-    );
+  if (includeHistoricalRelationAssignments) {
+    for (final number in [101, 102]) {
+      database.execute(
+        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+        [tagFixtureId(firstTagNumber), tagFixtureId(number)],
+      );
+    }
   }
   database.execute(
     'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

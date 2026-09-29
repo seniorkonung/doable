@@ -14,7 +14,6 @@ import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag_id.dart';
-import '../../tag/domain/tag_target.dart';
 import 'blocking_relation_reference.dart';
 import 'delete_blocking_relations.dart';
 import 'graph_command_result.dart';
@@ -657,28 +656,20 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   );
 
   TagCommandStart acceptTagAssign(AssignTag command) => _acceptTag(
-    _assignmentKeys(command.tagId, command.target),
+    _assignmentKeys(command.tagId, command.intentionId),
     command,
     TagCommandKind.assign,
   );
 
   TagCommandStart acceptTagRemoveAssignment(RemoveTagAssignment command) =>
       _acceptTag(
-        _assignmentKeys(command.tagId, command.target),
+        _assignmentKeys(command.tagId, command.intentionId),
         command,
         TagCommandKind.removeAssignment,
       );
 
-  Set<GraphCommandKey> _assignmentKeys(TagId tagId, TagTarget target) => {
-    ExistingTagKey(tagId),
-    switch (target) {
-      IntentionTagTarget(:final intentionId) => ExistingIntentionKey(
-        intentionId,
-      ),
-      LongTermRelationTagTarget(:final relationId) =>
-        ExistingLongTermRelationKey(relationId),
-    },
-  };
+  Set<GraphCommandKey> _assignmentKeys(TagId tagId, IntentionId intentionId) =>
+      {ExistingTagKey(tagId), ExistingIntentionKey(intentionId)};
 
   TagCommandStart _acceptTag(
     Set<GraphCommandKey> keys,
