@@ -21,7 +21,6 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/tag_failure_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -467,12 +466,12 @@ void main() {
   for (final scenario in <({Locale locale, String failure, String busy})>[
     (
       locale: const Locale('en'),
-      failure: 'This recipient no longer exists. Refresh its details.',
+      failure: 'This intention no longer exists. Refresh its details.',
       busy: 'A tag assignment change is already in progress. Wait for its result.',
     ),
     (
       locale: const Locale('ru'),
-      failure: 'Этого получателя больше нет. Обновите подробности.',
+      failure: 'Этого намерения больше нет. Обновите подробности.',
       busy: 'Изменение назначения тега уже выполняется. Дождитесь результата.',
     ),
   ]) {
@@ -492,9 +491,7 @@ void main() {
                     claim: claim,
                     message: tagAssignmentFailureMessage(
                       AppLocalizations.of(context),
-                      TagTargetNotFoundFailure(
-                        IntentionTagTarget(testDetailsIntentionId(1)),
-                      ),
+                      TagIntentionNotFoundFailure(testDetailsIntentionId(1)),
                     ),
                     messageKey: const ValueKey('assignment-failure-message'),
                   ),
@@ -858,13 +855,13 @@ final class _FailureHarness {
       TagIdDecodingSuccess(:final id) => id,
       InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
     };
-    final target = IntentionTagTarget(testDetailsIntentionId(1));
+    final intentionId = testDetailsIntentionId(1);
     final accepted = coordinator.acceptTagAssign(
-      AssignTag(tagId: tagId, target: target),
+      AssignTag(tagId: tagId, intentionId: intentionId),
     ) as TagCommandAccepted;
     repository.completeTagCommand(
       repository.tagCommands.length - 1,
-      TagCommandFailed(TagTargetNotFoundFailure(target)),
+      TagCommandFailed(TagIntentionNotFoundFailure(intentionId)),
     );
     await accepted.future;
     return coordinator.claimInitiatorFailure(accepted.token)!;

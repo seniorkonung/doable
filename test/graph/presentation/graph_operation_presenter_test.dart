@@ -25,7 +25,6 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -384,11 +383,9 @@ void main() {
       ru: 'Этого тега больше нет. Обновите каталог.',
     ),
     (
-      failure: TagTargetNotFoundFailure(
-        IntentionTagTarget(testDetailsIntentionId(1)),
-      ),
-      en: 'This recipient no longer exists. Refresh its details.',
-      ru: 'Этого получателя больше нет. Обновите подробности.',
+      failure: TagIntentionNotFoundFailure(testDetailsIntentionId(1)),
+      en: 'This intention no longer exists. Refresh its details.',
+      ru: 'Этого намерения больше нет. Обновите подробности.',
     ),
     (
       failure: const TagUnavailableFailure(),
@@ -1721,15 +1718,12 @@ final class _PresenterHarness {
       ),
       TagCommandKind.delete => _coordinator.acceptTagDelete(DeleteTag(_tagId)),
       TagCommandKind.assign => _coordinator.acceptTagAssign(
-        AssignTag(
-          tagId: _tagId,
-          target: IntentionTagTarget(testDetailsIntentionId(1)),
-        ),
+        AssignTag(tagId: _tagId, intentionId: testDetailsIntentionId(1)),
       ),
       TagCommandKind.removeAssignment => _coordinator.acceptTagRemoveAssignment(
         RemoveTagAssignment(
           tagId: _tagId,
-          target: IntentionTagTarget(testDetailsIntentionId(1)),
+          intentionId: testDetailsIntentionId(1),
         ),
       ),
     } as TagCommandAccepted;
@@ -1768,7 +1762,7 @@ final class _PresenterHarness {
                   revision: revision,
                   assignment: TagAssignment(
                     tagId: _tagId,
-                    target: IntentionTagTarget(testDetailsIntentionId(1)),
+                    intentionId: testDetailsIntentionId(1),
                   ),
                   state: kind == TagCommandKind.assign
                       ? TagAssignmentState.assigned
@@ -1780,7 +1774,7 @@ final class _PresenterHarness {
                   revision: revision,
                   assignment: TagAssignment(
                     tagId: _tagId,
-                    target: IntentionTagTarget(testDetailsIntentionId(1)),
+                    intentionId: testDetailsIntentionId(1),
                   ),
                   state: kind == TagCommandKind.assign
                       ? TagAssignmentState.assigned
