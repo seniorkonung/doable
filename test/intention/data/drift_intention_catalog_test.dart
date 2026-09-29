@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/sqlite_tag_functions.dart';
@@ -12,6 +13,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -2717,6 +2719,124 @@ void main() {
     );
   });
 
+  for (final (sinkFails, description) in [
+    (
+      false,
+      'диагностика совместного поиска сообщает только безопасный исход и длительность',
+    ),
+    (true, 'отказ диагностики не меняет исходы совместного поиска'),
+  ]) {
+    test(description, () async {
+      seedTagStorageFixture(raw);
+      raw.execute('UPDATE intentions SET title = ?', [
+        'CANARY-название-совместного-поиска',
+      ]);
+      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+        'CANARY-название-обязательного-тега',
+        _uuid(firstTagNumber),
+      ]);
+      if (sinkFails) {
+        repository = DriftPersonalGraphRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026, 9, 2),
+          _ThrowingCatalogDiagnosticsSink(diagnostics),
+        );
+      }
+      Future<Result<IntentionCatalogPage>> read(
+        IntentionCatalogQuery query, {
+        DiagnosticsFailureCode? failureCode,
+      }) async {
+        final offset = diagnostics.events.length;
+        final result = await repository.getCatalogPage(query);
+        _expectSafeJointDiagnostics(
+          diagnostics.events.skip(offset).toList(),
+          pageSize: query.pageSize,
+          failureCode: failureCode,
+        );
+        return result;
+      }
+
+      final filter = IntentionTagFilter(
+        requiredTagIds: [_tagId(firstTagNumber)],
+        excludedTagIds: [_tagId(lastTagNumber)],
+      );
+      IntentionCatalogQuery query({IntentionCatalogCursor? cursor}) =>
+          _tagQuery(
+            tagFilter: filter,
+            titleFilter: 'CANARY-название',
+            excludedIntentionId: _id(_uuid(3)),
+            cursor: cursor,
+          );
+      final first = _firstPage(await read(query()));
+      expect(first.totalCount, 2);
+      expect(first.items.single.id, _id(_uuid(1)));
+      expect(first.items.single.tags.single.id, _tagId(firstTagNumber));
+      final next = _continuationPage(
+        await read(query(cursor: first.nextCursor)),
+      );
+      expect(next.items.single.id, _id(_uuid(2)));
+      expect(next.items.single.tags.single.id, _tagId(firstTagNumber));
+      expect(next.nextCursor, isNull);
+      final empty = _firstPage(
+        await read(
+          _tagQuery(
+            tagFilter: IntentionTagFilter(
+              requiredTagIds: [_tagId(9999)],
+              excludedTagIds: filter.excludedTagIds,
+            ),
+            titleFilter: 'CANARY-название',
+          ),
+        ),
+      );
+      expect(empty.totalCount, 0);
+      expect(empty.items, isEmpty);
+      expect(empty.nextCursor, isNull);
+
+      for (final (error, expected, code)
+          in <(Object, Matcher, DiagnosticsFailureCode)>[
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_BUSY,
+                message: 'CANARY-ошибка-SQL-параметр ${_uuid(firstTagNumber)}',
+              ),
+              isA<IntentionUnavailableFailure>(),
+              DiagnosticsFailureCode.unavailable,
+            ),
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_CORRUPT,
+                message: 'CANARY-повреждение ${_uuid(1)}',
+              ),
+              isA<IntentionCorruptionFailure>(),
+              DiagnosticsFailureCode.corruption,
+            ),
+            (
+              StateError('CANARY-неожиданный-отказ'),
+              isA<IntentionUnexpectedFailure>(),
+              DiagnosticsFailureCode.unexpected,
+            ),
+          ]) {
+        trace.failure = error;
+        for (final cursor in [null, first.nextCursor]) {
+          final result = await read(query(cursor: cursor), failureCode: code);
+          expect(result, isA<ResultFailure<IntentionCatalogPage>>());
+          expect(
+            (result as ResultFailure<IntentionCatalogPage>).failure,
+            expected,
+          );
+        }
+        trace.failure = null;
+      }
+      final recovered = _firstPage(await read(query()));
+      expect(recovered.totalCount, first.totalCount);
+      expect(
+        recovered.items.single.tags.map((tag) => (tag.id, tag.name)),
+        first.items.single.tags.map((tag) => (tag.id, tag.name)),
+      );
+    });
+  }
+
   test('диагностирует typed failure чтения первой страницы без пользовательских данных', () async {
     trace.failure = SqliteException(
       extendedResultCode: SqlError.SQLITE_BUSY,
@@ -2769,6 +2889,69 @@ void main() {
 bool _isCatalogCountStatement(String statement) =>
     statement.contains('COUNT(') &&
     !statement.contains('doable_relation_count_aggregates');
+
+void _expectSafeJointDiagnostics(
+  List<DiagnosticsEvent> events, {
+  required int pageSize,
+  DiagnosticsFailureCode? failureCode,
+}) {
+  expect(events, hasLength(2));
+  expect(events, everyElement(isA<CatalogPageReadDiagnosticsEvent>()));
+  expect(events.first.status, isA<DiagnosticsStarted>());
+  final duration = switch (events.last.status) {
+    DiagnosticsSucceeded(:final duration) when failureCode == null => duration,
+    DiagnosticsFailed(:final duration, :final code) when code == failureCode =>
+      duration,
+    _ => throw StateError('Неверный диагностический исход совместного поиска.'),
+  };
+  expect(duration, greaterThanOrEqualTo(Duration.zero));
+  final messages = <String>[];
+  final sink = DeveloperDiagnosticsSink(messages.add);
+  for (final event in events) {
+    sink.record(event);
+  }
+  expect(messages, hasLength(2));
+  final outcome = failureCode == null ? 'succeeded' : 'failed';
+  for (var index = 0; index < messages.length; index++) {
+    final fields = switch (jsonDecode(messages[index])) {
+      final Map<String, dynamic> fields => fields,
+      _ => throw StateError('Диагностика не предоставила JSON-объект.'),
+    };
+    expect(fields, {
+      'operation': 'catalogPageRead',
+      'outcome': index == 0 ? 'started' : outcome,
+      'pageSize': pageSize,
+      if (index != 0) 'durationMicros': duration.inMicroseconds,
+      if (index != 0 && failureCode != null) 'failureCode': failureCode.name,
+    });
+  }
+  // Точное множество полей и значений запрещает условия, назначения, SQL
+  // и другие данные даже при добавлении нового способа их сериализации.
+  for (final canary in [
+    'CANARY',
+    'SELECT',
+    _uuid(1),
+    _uuid(2),
+    _uuid(3),
+    _uuid(firstTagNumber),
+    _uuid(lastTagNumber),
+    _uuid(9999),
+  ]) {
+    expect(messages.join(), isNot(contains(canary)));
+  }
+}
+
+final class _ThrowingCatalogDiagnosticsSink implements DiagnosticsSink {
+  const _ThrowingCatalogDiagnosticsSink(this.attempted);
+
+  final InMemoryDiagnosticsSink attempted;
+
+  @override
+  void record(DiagnosticsEvent event) {
+    attempted.record(event);
+    throw StateError('CANARY-отказ-приёмника-диагностики');
+  }
+}
 
 void _seedJointCatalogPagingFixture(Database database) {
   database.execute('BEGIN');

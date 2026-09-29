@@ -9,14 +9,23 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
 const _fixtureSize = 50000;
 const _pageSize = 100;
+const _jointMatchCount = 235;
+const _conditionCount = 1201;
+const _extraTagCount = 137;
+const _requiredTagBase = 100000;
+const _excludedTagBase = 110000;
+const _extraTagBase = 120000;
 
 void main() {
   test(
@@ -45,6 +54,312 @@ void main() {
       await _expectCompleteKeysetTraversal(repository, trace);
     },
     timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'материализует только порцию редких совместных совпадений и все её теги',
+    () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      final trace = _SelectTrace();
+      late sqlite.Database raw;
+      final database = await harness.openReadyDatabase(
+        observer: trace,
+        setup: (connection) => raw = connection,
+      );
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 3),
+        InMemoryDiagnosticsSink(),
+      );
+      await _populateFixture(database);
+      _populateJointTagFixture(raw);
+      trace.clear();
+      trace.parameterLimit = 400;
+
+      for (final (pageSize, titleFilter) in [
+        (1, 'редкое %_'),
+        (_pageSize, 'редкое %_'),
+        (_pageSize, 'ре'),
+      ]) {
+        trace.clear();
+        final first = _page(
+          await repository.getCatalogPage(
+            _jointQuery(pageSize: pageSize, titleFilter: titleFilter),
+          ),
+        ) as IntentionCatalogFirstPage;
+        expect(first.totalCount, _jointMatchCount);
+        expect(first.items, hasLength(pageSize));
+        _expectJointMaterialization(
+          first,
+          trace,
+          isFirst: true,
+          pageSize: pageSize,
+        );
+        _expectJointPlans(raw, trace, usesFts: titleFilter.length >= 3);
+      }
+
+      final expected =
+          [
+            for (var index = 0; index < _jointMatchCount; index++)
+              _jointIntentionIndex(index),
+          ]..sort((left, right) {
+            final timestampOrder = (right % 7).compareTo(left % 7);
+            return timestampOrder == 0 ? left.compareTo(right) : timestampOrder;
+          });
+      final actual = <String>[];
+      IntentionCatalogCursor? cursor;
+      var pageNumber = 0;
+      do {
+        trace.clear();
+        final page = _page(
+          await repository.getCatalogPage(_jointQuery(cursor: cursor)),
+        );
+        _expectJointMaterialization(page, trace, isFirst: pageNumber == 0);
+        if (pageNumber == 0) {
+          expect(
+            (page as IntentionCatalogFirstPage).totalCount,
+            _jointMatchCount,
+          );
+          _printJointCost(raw, trace);
+        }
+        actual.addAll(page.items.map((item) => item.id.toCanonicalString()));
+        cursor = page.nextCursor;
+        pageNumber++;
+      } while (cursor != null);
+
+      expect(pageNumber, 3);
+      expect(actual, expected.map(_fixtureId));
+      expect(actual.toSet(), hasLength(_jointMatchCount));
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+}
+
+/// Среди 50 000 намерений 245 кандидатов далеко за первой обычной порцией.
+/// Десять отсекаются разными частями запроса; остальные имеют все 1201 тега.
+void _populateJointTagFixture(sqlite.Database database) {
+  final insertTag = database.prepare(
+    'INSERT INTO tags (id, name) VALUES (?, ?)',
+  );
+  final insertAssignment = database.prepare(
+    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+  );
+  database.execute('BEGIN');
+  try {
+    for (final (base, count) in [
+      (_requiredTagBase, _conditionCount),
+      (_excludedTagBase, _conditionCount),
+      (_extraTagBase, _extraTagCount),
+    ]) {
+      for (var index = 0; index < count; index++) {
+        insertTag.execute([_fixtureId(base + index), 'Тег ${base + index}']);
+      }
+    }
+    for (var index = 0; index < _jointMatchCount + 10; index++) {
+      final id = _fixtureId(_jointIntentionIndex(index));
+      database.execute(
+        'UPDATE intentions SET title = ?, is_action_ready = ?, '
+        'is_archived = ? WHERE id = ?',
+        [
+          index == 241 ? 'Другое название' : 'Редкое %_ совпадение',
+          index == 243 ? 0 : 1,
+          index == 242 ? 1 : 0,
+          id,
+        ],
+      );
+      final requiredCount = index >= 235 && index <= 237
+          ? _conditionCount - 1
+          : _conditionCount;
+      for (var tag = 0; tag < requiredCount; tag++) {
+        insertAssignment.execute([_fixtureId(_requiredTagBase + tag), id]);
+      }
+      if (index >= 238 && index <= 240) {
+        insertAssignment.execute([
+          _fixtureId(
+            _excludedTagBase + (index == 240 ? _conditionCount - 1 : 0),
+          ),
+          id,
+        ]);
+      }
+    }
+    // Дополнительные собственные теги не входят в условия. Плотная строка
+    // вне результата проверяет, что чтение назначений не захватывает соседей.
+    for (final id in [_fixtureId(_jointIntentionIndex(0)), _fixtureId(0)]) {
+      for (var tag = 0; tag < _extraTagCount; tag++) {
+        insertAssignment.execute([_fixtureId(_extraTagBase + tag), id]);
+      }
+    }
+    database.execute('COMMIT');
+  } on Object {
+    database.execute('ROLLBACK');
+    rethrow;
+  } finally {
+    insertTag.close();
+    insertAssignment.close();
+  }
+}
+
+int _jointIntentionIndex(int index) => 1000 + index * 200;
+
+TagId _tagId(int number) => switch (TagId.decode(_fixtureId(number))) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw ArgumentError.value(number),
+};
+
+IntentionCatalogQuery _jointQuery({
+  int pageSize = _pageSize,
+  String titleFilter = 'редкое %_',
+  IntentionCatalogCursor? cursor,
+}) => IntentionCatalogQuery(
+  scope: IntentionScope.active,
+  readinessFilter: IntentionReadinessFilter.readyOnly,
+  titleFilter: titleFilter,
+  tagFilter: IntentionTagFilter(
+    requiredTagIds: [
+      for (var index = 0; index < _conditionCount; index++)
+        _tagId(_requiredTagBase + index),
+    ],
+    excludedTagIds: [
+      for (var index = 0; index < _conditionCount; index++)
+        _tagId(_excludedTagBase + index),
+    ],
+  ),
+  excludedIntentionId: switch (IntentionId.decode(
+    _fixtureId(_jointIntentionIndex(244)),
+  )) {
+    IntentionIdDecodingSuccess(:final id) => id,
+    InvalidIntentionIdDecoding() => throw StateError('Неверный UUID фикстуры.'),
+  },
+  order: IntentionCatalogOrder.createdAtDescending,
+  pageSize: pageSize,
+  cursor: cursor,
+);
+
+void _expectJointMaterialization(
+  IntentionCatalogPage page,
+  _SelectTrace trace, {
+  required bool isFirst,
+  int pageSize = _pageSize,
+}) {
+  final counts = trace.selects.where(
+    (select) => _isCatalogCountStatement(select.statement),
+  );
+  expect(counts, hasLength(isFirst ? 1 : 0));
+  if (isFirst) expect(counts.single.rowCount, 1);
+  final read = trace.selects
+      .where((select) => select.statement.contains('LIMIT'))
+      .single;
+  expect(read.rowCount, page.items.length + (page.nextCursor == null ? 0 : 1));
+  expect(read.statement, contains('LIMIT ${pageSize + 1}'));
+  final tags = trace.selects
+      .where((select) => select.statement.contains('FROM tag_assignments a'))
+      .single;
+  final aggregates = trace.selects
+      .where(
+        (select) =>
+            select.statement.contains('doable_relation_count_aggregates'),
+      )
+      .single;
+  final ids = page.items.map((item) => item.id.toCanonicalString()).toSet();
+  expect(tags.arguments, unorderedEquals(ids));
+  expect(tags.intentionIds, ids);
+  expect(aggregates.arguments, unorderedEquals(ids));
+  expect(aggregates.rowCount, page.items.length);
+  var tagCount = 0;
+  for (final item in page.items) {
+    final hasExtraTags =
+        item.id.toCanonicalString() == _fixtureId(_jointIntentionIndex(0));
+    final expectedTags = [
+      for (var index = 0; index < _conditionCount; index++)
+        _tagId(_requiredTagBase + index),
+      if (hasExtraTags)
+        for (var index = 0; index < _extraTagCount; index++)
+          _tagId(_extraTagBase + index),
+    ];
+    expect(item.tags.map((tag) => tag.id), expectedTags);
+    tagCount += expectedTags.length;
+  }
+  expect(tags.rowCount, tagCount);
+  // Объём назначений может превышать размер порции. Число чтений не растёт
+  // с числом намерений: количество, порция, агрегаты и назначения пакетны.
+  expect(trace.selects, hasLength(isFirst ? 4 : 3));
+  expect(trace.conditionBatchSizes, everyElement(lessThanOrEqualTo(400)));
+  expect(
+    trace.conditionBatchSizes.fold(0, (sum, size) => sum + size),
+    _conditionCount * 2,
+  );
+  _expectNoOffset(trace);
+}
+
+List<String> _observedPlan(sqlite.Database database, _TracedSelect select) => [
+  for (final row in database.select(
+    'EXPLAIN QUERY PLAN ${select.statement}',
+    select.arguments,
+  ))
+    row['detail'] as String,
+];
+
+void _expectJointPlans(
+  sqlite.Database database,
+  _SelectTrace trace, {
+  required bool usesFts,
+}) {
+  for (final select in trace.selects.where(
+    (select) =>
+        _isCatalogCountStatement(select.statement) ||
+        select.statement.contains('LIMIT'),
+  )) {
+    final plan = _observedPlan(database, select).join('\n');
+    expect(plan, contains('tag_assignments_intention'));
+    expect(plan, contains('required_tag'));
+    expect(plan, contains('excluded_tag USING PRIMARY KEY'));
+    expect(plan.contains('intention_titles_fts'), usesFts);
+  }
+  final pagePlan = _observedPlan(
+    database,
+    trace.selects.singleWhere((select) => select.statement.contains('LIMIT')),
+  ).join('\n');
+  if (usesFts) {
+    expect(pagePlan, contains('SEARCH intentions USING INTEGER PRIMARY KEY'));
+    expect(pagePlan, contains('USE TEMP B-TREE FOR ORDER BY'));
+  } else {
+    expect(pagePlan, contains('intentions_active_created_at_desc_id_asc'));
+  }
+  final tagPlan = _observedPlan(
+    database,
+    trace.selects.singleWhere(
+      (select) => select.statement.contains('FROM tag_assignments a'),
+    ),
+  ).join('\n');
+  expect(tagPlan, contains('tag_assignments_intention_order'));
+  expect(tagPlan, isNot(contains('SCAN a')));
+}
+
+void _printJointCost(sqlite.Database database, _SelectTrace trace) {
+  final count = trace.selects.singleWhere(
+    (select) => _isCatalogCountStatement(select.statement),
+  );
+  final page = trace.selects.singleWhere(
+    (select) => select.statement.contains('LIMIT'),
+  );
+  final tags = trace.selects.singleWhere(
+    (select) => select.statement.contains('FROM tag_assignments a'),
+  );
+  // Измерения характеризуют эту фикстуру и материализацию, а не постоянное
+  // время поиска: COUNT и поиск редких совпадений зависят от объёма данных.
+  // ignore: avoid_print
+  print(
+    'Совместный поиск: $_fixtureSize намерений, $_jointMatchCount совпадений, '
+    '$_conditionCount обязательных и $_conditionCount исключённых условий; '
+    '${trace.selects.length} чтения; '
+    'COUNT=${count.elapsed.inMicroseconds} мкс/${count.rowCount} строка; '
+    'порция=${page.elapsed.inMicroseconds} мкс/${page.rowCount} строк; '
+    'назначения=${tags.elapsed.inMicroseconds} мкс/${tags.rowCount} строк; '
+    'план COUNT=${_observedPlan(database, count).join(' | ')}; '
+    'план порции=${_observedPlan(database, page).join(' | ')}; '
+    'план назначений=${_observedPlan(database, tags).join(' | ')}',
   );
 }
 
@@ -366,24 +681,71 @@ enum _IndexDirection {
 
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final selects = <_TracedSelect>[];
+  final conditionBatchSizes = <int>[];
+  final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
+  int? parameterLimit;
   var isRecording = true;
 
-  void clear() => selects.clear();
+  void clear() {
+    selects.clear();
+    conditionBatchSizes.clear();
+  }
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
+    final limit = parameterLimit;
+    if (limit != null && statement.arguments.length > limit) {
+      throw StateError('Превышено число параметров SQL-выражения.');
+    }
+    if (isRecording &&
+        statement.statements.any(
+          (sql) => sql.startsWith('INSERT INTO temp.doable_catalog_'),
+        )) {
+      conditionBatchSizes.add(statement.arguments.length);
+    }
     if (isRecording &&
         statement.operation == LocalDatabaseSqlOperation.select) {
+      _started[statement] = Stopwatch()..start();
+    }
+  }
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    final stopwatch = _started.remove(statement);
+    if (stopwatch != null) {
+      stopwatch.stop();
       selects.add(
-        _TracedSelect(statement.statements.single, statement.arguments),
+        _TracedSelect(
+          statement.statements.single,
+          statement.arguments,
+          rows.length,
+          stopwatch.elapsed,
+          {
+            for (final row in rows)
+              if (row['intention_id'] case final String id) id,
+          },
+        ),
       );
     }
+    return rows;
   }
 }
 
 final class _TracedSelect {
-  const _TracedSelect(this.statement, this.arguments);
+  const _TracedSelect(
+    this.statement,
+    this.arguments,
+    this.rowCount,
+    this.elapsed,
+    this.intentionIds,
+  );
 
   final String statement;
   final List<Object?> arguments;
+  final int rowCount;
+  final Duration elapsed;
+  final Set<String> intentionIds;
 }
