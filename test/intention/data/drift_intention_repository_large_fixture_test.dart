@@ -23,10 +23,20 @@ const _fixtureSize = 50000;
 const _pageSize = 100;
 const _jointMatchCount = 235;
 const _conditionCount = 1201;
+const _smallConditionCount = 10;
 const _extraTagCount = 137;
+const _backgroundTagCount = 64;
+const _backgroundTagOffsets = [0, 21, 42];
 const _requiredTagBase = 100000;
 const _excludedTagBase = 110000;
 const _extraTagBase = 120000;
+const _backgroundTagBase = 130000;
+
+/// Число обязательных и исключённых условий запроса; условия берутся
+/// первыми тегами соответствующего диапазона фикстуры.
+typedef _Conditions = ({int required, int excluded});
+
+const _allConditions = (required: _conditionCount, excluded: _conditionCount);
 
 void main() {
   test(
@@ -131,31 +141,61 @@ void main() {
         );
       }
 
-      // Кандидат без тегов отсекается первой адресной проверкой назначения,
-      // но набор из json_each(?) не индексирован и читается заново для
-      // каждого кандидата: стоимость растёт с числом условий, а не только
-      // с числом совпадений. С одним условием в каждом наборе совпадают ещё
-      // кандидаты без последнего обязательного тега и с последним исключённым.
-      for (final (conditionCount, matchCount) in [
-        (1, tagOnlyMatchCount + 4),
-        (_conditionCount, tagOnlyMatchCount),
+      // Каждый из 25 000 активных кандидатов имеет несколько собственных
+      // назначений. Отсечение кандидата не должно перебирать набор условий:
+      // оба набора читаются из параметра один раз на запрос, поэтому малое и
+      // большое число условий дают одинаковую форму плана. Без фильтра
+      // названия из 24 997 готовых активных кандидатов, кроме исключённого
+      // намерения, первые десять исключённых тегов отсекают двух кандидатов,
+      // а все 1201 — трёх. Первые десять обязательных тегов есть у 242
+      // совместных кандидатов, все 1201 — у 239.
+      for (final (label, conditions, matchCount) in [
+        (
+          'только исключённые',
+          (required: 0, excluded: _smallConditionCount),
+          24995,
+        ),
+        ('только исключённые', (required: 0, excluded: _conditionCount), 24994),
+        (
+          'только обязательные',
+          (required: _smallConditionCount, excluded: 0),
+          242,
+        ),
+        ('только обязательные', (required: _conditionCount, excluded: 0), 239),
+        (
+          'совместные',
+          (required: _smallConditionCount, excluded: _smallConditionCount),
+          tagOnlyMatchCount + 4,
+        ),
+        ('совместные', _allConditions, tagOnlyMatchCount),
       ]) {
         trace.clear();
         final first = _page(
           await repository.getCatalogPage(
-            _jointQuery(titleFilter: null, conditionCount: conditionCount),
+            _jointQuery(titleFilter: null, conditions: conditions),
           ),
         ) as IntentionCatalogFirstPage;
         expect(first.totalCount, matchCount);
-        expect(trace.writes, isEmpty);
-        expect(trace.selects, hasLength(4));
-        _expectJointPlans(raw, trace, titleFilter: null);
+        expect(first.items, hasLength(_pageSize));
+        _expectJointPlans(
+          raw,
+          trace,
+          titleFilter: null,
+          conditions: conditions,
+        );
+        _expectJointMaterialization(
+          first,
+          trace,
+          isFirst: true,
+          conditions: conditions,
+        );
         _printJointCost(
           raw,
           trace,
           titleFilter: null,
           page: 0,
-          conditionCount: conditionCount,
+          label: label,
+          conditions: conditions,
         );
       }
     },
@@ -205,6 +245,7 @@ Future<void> _expectJointTraversal(
 
 /// Среди 50 000 намерений 245 кандидатов далеко за первой обычной порцией.
 /// Десять отсекаются разными частями запроса; остальные имеют все 1201 тега.
+/// Каждое намерение дополнительно имеет три фоновых тега вне условий.
 void _populateJointTagFixture(sqlite.Database database) {
   final insertTag = database.prepare(
     'INSERT INTO tags (id, name) VALUES (?, ?)',
@@ -220,12 +261,13 @@ void _populateJointTagFixture(sqlite.Database database) {
       (_requiredTagBase, _conditionCount),
       (_excludedTagBase, _conditionCount),
       (_extraTagBase, _extraTagCount),
+      (_backgroundTagBase, _backgroundTagCount),
     ]) {
       for (var index = 0; index < count; index++) {
         insertTag.execute([_fixtureId(base + index), 'Тег ${base + index}']);
       }
     }
-    for (var index = 0; index < _jointMatchCount + 10; index++) {
+    for (var index = 0; index < _jointCandidateCount; index++) {
       final id = _fixtureId(_jointIntentionIndex(index));
       database.execute(
         'UPDATE intentions SET title = ?, is_action_ready = ?, '
@@ -237,19 +279,11 @@ void _populateJointTagFixture(sqlite.Database database) {
           id,
         ],
       );
-      final requiredCount = index >= 235 && index <= 237
-          ? _conditionCount - 1
-          : _conditionCount;
-      for (var tag = 0; tag < requiredCount; tag++) {
+      for (var tag = 0; tag < _jointRequiredTagCount(index); tag++) {
         insertAssignment.execute([_fixtureId(_requiredTagBase + tag), id]);
       }
-      if (index >= 238 && index <= 240) {
-        insertAssignment.execute([
-          _fixtureId(
-            _excludedTagBase + (index == 240 ? _conditionCount - 1 : 0),
-          ),
-          id,
-        ]);
+      if (_jointExcludedTag(index) case final tag?) {
+        insertAssignment.execute([_fixtureId(_excludedTagBase + tag), id]);
       }
     }
     // Дополнительные собственные теги не входят в условия. Плотная строка
@@ -257,6 +291,16 @@ void _populateJointTagFixture(sqlite.Database database) {
     for (final id in [_fixtureId(_jointIntentionIndex(0)), _fixtureId(0)]) {
       for (var tag = 0; tag < _extraTagCount; tag++) {
         insertAssignment.execute([_fixtureId(_extraTagBase + tag), id]);
+      }
+    }
+    // У каждого намерения несколько собственных тегов вне условий: проверка
+    // кандидата не может отсечь его по одному отсутствию назначений.
+    for (var index = 0; index < _fixtureSize; index++) {
+      for (final tag in _backgroundTags(index)) {
+        insertAssignment.execute([
+          _fixtureId(_backgroundTagBase + tag),
+          _fixtureId(index),
+        ]);
       }
     }
     database.execute('COMMIT');
@@ -269,7 +313,52 @@ void _populateJointTagFixture(sqlite.Database database) {
   }
 }
 
+const _jointCandidateCount = _jointMatchCount + 10;
+
 int _jointIntentionIndex(int index) => 1000 + index * 200;
+
+/// Трём совместным кандидатам не хватает последнего обязательного тега.
+int _jointRequiredTagCount(int index) =>
+    index >= 235 && index <= 237 ? _conditionCount - 1 : _conditionCount;
+
+/// Номер исключённого тега совместного кандидата, если он назначен.
+int? _jointExcludedTag(int index) => switch (index) {
+  238 || 239 => 0,
+  240 => _conditionCount - 1,
+  _ => null,
+};
+
+/// Фоновые теги намерения фикстуры в порядке их создания.
+List<int> _backgroundTags(int fixtureIndex) => [
+  for (final offset in _backgroundTagOffsets)
+    (fixtureIndex + offset) % _backgroundTagCount,
+]..sort();
+
+/// Полный состав собственных тегов намерения фикстуры в порядке создания
+/// тегов: обязательные, исключённый, дополнительные, фоновые.
+List<TagId> _fixtureTagIds(int fixtureIndex) {
+  final offset = fixtureIndex - _jointIntentionIndex(0);
+  final joint = offset >= 0 && offset % 200 == 0 ? offset ~/ 200 : null;
+  final jointIndex = joint != null && joint < _jointCandidateCount
+      ? joint
+      : null;
+  return [
+    if (jointIndex != null) ...[
+      for (var tag = 0; tag < _jointRequiredTagCount(jointIndex); tag++)
+        _tagId(_requiredTagBase + tag),
+      if (_jointExcludedTag(jointIndex) case final tag?)
+        _tagId(_excludedTagBase + tag),
+    ],
+    if (fixtureIndex == 0 || jointIndex == 0)
+      for (var tag = 0; tag < _extraTagCount; tag++)
+        _tagId(_extraTagBase + tag),
+    for (final tag in _backgroundTags(fixtureIndex))
+      _tagId(_backgroundTagBase + tag),
+  ];
+}
+
+int _fixtureIndexOf(IntentionId id) =>
+    int.parse(id.toCanonicalString().substring(24), radix: 16);
 
 TagId _tagId(int number) => switch (TagId.decode(_fixtureId(number))) {
   TagIdDecodingSuccess(:final id) => id,
@@ -279,7 +368,7 @@ TagId _tagId(int number) => switch (TagId.decode(_fixtureId(number))) {
 IntentionCatalogQuery _jointQuery({
   int pageSize = _pageSize,
   String? titleFilter = 'редкое %_',
-  int conditionCount = _conditionCount,
+  _Conditions conditions = _allConditions,
   IntentionCatalogCursor? cursor,
 }) => IntentionCatalogQuery(
   scope: IntentionScope.active,
@@ -287,11 +376,11 @@ IntentionCatalogQuery _jointQuery({
   titleFilter: titleFilter,
   tagFilter: IntentionTagFilter(
     requiredTagIds: [
-      for (var index = 0; index < conditionCount; index++)
+      for (var index = 0; index < conditions.required; index++)
         _tagId(_requiredTagBase + index),
     ],
     excludedTagIds: [
-      for (var index = 0; index < conditionCount; index++)
+      for (var index = 0; index < conditions.excluded; index++)
         _tagId(_excludedTagBase + index),
     ],
   ),
@@ -311,6 +400,7 @@ void _expectJointMaterialization(
   _SelectTrace trace, {
   required bool isFirst,
   int pageSize = _pageSize,
+  _Conditions conditions = _allConditions,
 }) {
   final counts = trace.selects.where(
     (select) => _isCatalogCountStatement(select.statement),
@@ -338,15 +428,7 @@ void _expectJointMaterialization(
   expect(aggregates.rowCount, page.items.length);
   var tagCount = 0;
   for (final item in page.items) {
-    final hasExtraTags =
-        item.id.toCanonicalString() == _fixtureId(_jointIntentionIndex(0));
-    final expectedTags = [
-      for (var index = 0; index < _conditionCount; index++)
-        _tagId(_requiredTagBase + index),
-      if (hasExtraTags)
-        for (var index = 0; index < _extraTagCount; index++)
-          _tagId(_extraTagBase + index),
-    ];
+    final expectedTags = _fixtureTagIds(_fixtureIndexOf(item.id));
     expect(item.tags.map((tag) => tag.id), expectedTags);
     tagCount += expectedTags.length;
   }
@@ -369,31 +451,111 @@ void _expectJointMaterialization(
         .map((argument) => (jsonDecode(argument) as List).toSet())
         .toList();
     expect(conditionSets, [
-      {
-        for (var index = 0; index < _conditionCount; index++)
-          _fixtureId(_requiredTagBase + index),
-      },
-      {
-        for (var index = 0; index < _conditionCount; index++)
-          _fixtureId(_excludedTagBase + index),
-      },
+      if (conditions.required > 0)
+        {
+          for (var index = 0; index < conditions.required; index++)
+            _fixtureId(_requiredTagBase + index),
+        },
+      if (conditions.excluded > 0)
+        {
+          for (var index = 0; index < conditions.excluded; index++)
+            _fixtureId(_excludedTagBase + index),
+        },
     ]);
   }
   _expectNoOffset(trace);
 }
 
-List<String> _observedPlan(sqlite.Database database, _TracedSelect select) => [
+/// Строка `EXPLAIN QUERY PLAN`: подзапросы вложены через `parent`.
+typedef _PlanNode = ({int id, int parent, String detail});
+
+List<_PlanNode> _observedPlanTree(
+  sqlite.Database database,
+  _TracedSelect select,
+) => [
   for (final row in database.select(
     'EXPLAIN QUERY PLAN ${select.statement}',
     select.arguments,
   ))
-    row['detail'] as String,
+    (
+      id: row['id'] as int,
+      parent: row['parent'] as int,
+      detail: row['detail'] as String,
+    ),
 ];
+
+List<String> _observedPlan(sqlite.Database database, _TracedSelect select) => [
+  for (final node in _observedPlanTree(database, select)) node.detail,
+];
+
+/// Утверждения описывают свойство плана, а не порядок обхода: каждый набор
+/// условий из json_each(?) читается подзапросом, не коррелированным с
+/// текущим намерением, то есть один раз на выполнение запроса. Назначения
+/// выбранных тегов отбираются по индексу `(tag_id, intention_id)`, а
+/// кандидат проверяется поиском по ключу в отобранном множестве
+/// (`LIST SUBQUERY` оператора `IN`). Поэтому стоимость отсечения кандидата
+/// не растёт с числом условий.
+void _expectConditionSetsReadOnce(
+  List<_PlanNode> plan,
+  _Conditions conditions,
+) {
+  final nodes = {for (final node in plan) node.id: node};
+  List<String> ancestors(_PlanNode node) => [
+    for (
+      var parent = nodes[node.parent];
+      parent != null;
+      parent = nodes[parent.parent]
+    )
+      parent.detail,
+  ];
+  final correlated = startsWith('CORRELATED');
+  final details = plan.map((node) => node.detail).join('\n');
+  for (final alias in [
+    if (conditions.required > 0) 'required_tag',
+    if (conditions.excluded > 0) 'excluded_tag',
+  ]) {
+    final setReads = plan
+        .where((node) => node.detail.startsWith('SCAN $alias VIRTUAL TABLE'))
+        .toList();
+    expect(setReads, hasLength(1), reason: 'Набор $alias в плане:\n$details');
+    final chain = ancestors(setReads.single);
+    expect(
+      chain,
+      everyElement(isNot(correlated)),
+      reason:
+          'Набор $alias читается коррелированным подзапросом, то есть '
+          'заново для каждого кандидата:\n$details',
+    );
+    expect(
+      chain.last,
+      matches(RegExp(r'^LIST SUBQUERY \d+$')),
+      reason: 'Кандидат проверяется поиском в множестве:\n$details',
+    );
+  }
+  final assignmentReads = plan
+      .where(
+        (node) => RegExp(r'^(SCAN|SEARCH) assignment\b').hasMatch(node.detail),
+      )
+      .toList();
+  expect(
+    assignmentReads,
+    hasLength(
+      (conditions.required > 0 ? 1 : 0) + (conditions.excluded > 0 ? 1 : 0),
+    ),
+    reason: details,
+  );
+  for (final read in assignmentReads) {
+    expect(read.detail, startsWith('SEARCH assignment'), reason: details);
+    expect(read.detail, contains('(tag_id=?'), reason: details);
+    expect(ancestors(read), everyElement(isNot(correlated)), reason: details);
+  }
+}
 
 void _expectJointPlans(
   sqlite.Database database,
   _SelectTrace trace, {
   required String? titleFilter,
+  _Conditions conditions = _allConditions,
 }) {
   final usesFts = titleFilter != null && titleFilter.length >= 3;
   for (final select in trace.selects.where(
@@ -401,28 +563,12 @@ void _expectJointPlans(
         _isCatalogCountStatement(select.statement) ||
         select.statement.contains('LIMIT'),
   )) {
-    final plan = _observedPlan(database, select).join('\n');
-    expect(plan, contains('SCAN required_tag VIRTUAL TABLE'));
-    expect(plan, contains('SCAN excluded_tag VIRTUAL TABLE'));
-    // Наборы из json_each(?) не индексированы: назначения проверяются
-    // адресно по ключу намерения и тега, а не просмотром.
+    final plan = _observedPlanTree(database, select);
+    _expectConditionSetsReadOnce(plan, conditions);
     expect(
-      plan,
-      contains('tag_assignments_intention (intention_id=? AND tag_id=?)'),
+      plan.any((node) => node.detail.contains('intention_titles_fts')),
+      usesFts,
     );
-    expect(plan, contains('(tag_id=? AND intention_id=?)'));
-    expect(plan, isNot(contains('SCAN assignment')));
-    expect(plan.contains('intention_titles_fts'), usesFts);
-  }
-  final pagePlan = _observedPlan(
-    database,
-    trace.selects.singleWhere((select) => select.statement.contains('LIMIT')),
-  ).join('\n');
-  if (usesFts) {
-    expect(pagePlan, contains('SEARCH intentions USING INTEGER PRIMARY KEY'));
-    expect(pagePlan, contains('USE TEMP B-TREE FOR ORDER BY'));
-  } else {
-    expect(pagePlan, contains('intentions_active_created_at_desc_id_asc'));
   }
   final tagPlan = _observedPlan(
     database,
@@ -439,7 +585,8 @@ void _printJointCost(
   _SelectTrace trace, {
   required String? titleFilter,
   required int page,
-  int conditionCount = _conditionCount,
+  String label = 'совместные',
+  _Conditions conditions = _allConditions,
 }) {
   final count = trace.selects
       .where((select) => _isCatalogCountStatement(select.statement))
@@ -455,12 +602,13 @@ void _printJointCost(
       'план: ${_observedPlan(database, select).join(' | ')}';
   // Измерения характеризуют эту фикстуру и материализацию, а не постоянное
   // время поиска: COUNT и поиск редких совпадений зависят от объёма данных
-  // и числа условий, а у наборов из json_each(?) нет собственного индекса.
+  // и числа назначений выбранных тегов. Утверждения на них не опираются.
   // ignore: avoid_print
   print(
-    'Совместный поиск, название ${titleFilter ?? 'без фильтра'}, '
+    'Поиск по тегам ($label), название ${titleFilter ?? 'без фильтра'}, '
     'порция $page: $_fixtureSize намерений, '
-    '$conditionCount обязательных и $conditionCount исключённых условий; '
+    '${conditions.required} обязательных и '
+    '${conditions.excluded} исключённых условий; '
     '${trace.selects.length} чтения; '
     '${[if (count != null) cost('COUNT', count), cost('порция', read), cost('назначения', tags)].join('; ')}',
   );
