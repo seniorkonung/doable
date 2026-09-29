@@ -198,16 +198,25 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     }
 
     try {
+      final hasTagConditions =
+          query.tagFilter.requiredTagIds.isNotEmpty ||
+          query.tagFilter.excludedTagIds.isNotEmpty;
       final page = await _sequencer.run(
-        () async => switch (cursor) {
-          null => await _database.transaction(
-            () => _readFirstCatalogPage(query),
-          ),
-          _DriftIntentionCatalogCursor() => await _database.transaction(
-            () => _readCatalogContinuationPage(query, cursor),
-          ),
-          _ => throw StateError('Недопустимый cursor каталога.'),
-        },
+        () => _database.transaction(() async {
+          if (hasTagConditions) {
+            await _prepareCatalogTagFilter(query.tagFilter);
+          }
+          final page = await switch (cursor) {
+            null => _readFirstCatalogPage(query),
+            _DriftIntentionCatalogCursor() => _readCatalogContinuationPage(
+              query,
+              cursor,
+            ),
+            _ => throw StateError('Недопустимый cursor каталога.'),
+          };
+          if (hasTagConditions) await _clearCatalogTagFilter();
+          return page;
+        }),
       );
       _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
@@ -871,6 +880,40 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return row == null ? null : _StoredIntentionCommandSnapshot.fromRawRow(row);
   }
 
+  /// Условия живут на соединении транзакции; sequencer изолирует запросы.
+  /// Успех очищает временные данные, отказ откатывает их вместе с чтением.
+  Future<void> _prepareCatalogTagFilter(IntentionTagFilter filter) async {
+    for (final (table, tagIds) in [
+      ('doable_catalog_required_tags', filter.requiredTagIds),
+      ('doable_catalog_excluded_tags', filter.excludedTagIds),
+    ]) {
+      await _database.customStatement(
+        'CREATE TEMP TABLE IF NOT EXISTS $table '
+        '(tag_id TEXT NOT NULL PRIMARY KEY) WITHOUT ROWID',
+      );
+      await _database.customStatement('DELETE FROM temp.$table');
+      final ids = tagIds.toList(growable: false);
+      const batchSize = 400;
+      for (var start = 0; start < ids.length; start += batchSize) {
+        final batch = ids.skip(start).take(batchSize).toList(growable: false);
+        final values = List.filled(batch.length, '(?)').join(', ');
+        await _database.customStatement(
+          'INSERT INTO temp.$table (tag_id) VALUES $values',
+          [for (final id in batch) id.toCanonicalString()],
+        );
+      }
+    }
+  }
+
+  Future<void> _clearCatalogTagFilter() async {
+    await _database.customStatement(
+      'DELETE FROM temp.doable_catalog_required_tags',
+    );
+    await _database.customStatement(
+      'DELETE FROM temp.doable_catalog_excluded_tags',
+    );
+  }
+
   Future<IntentionCatalogFirstPage> _readFirstCatalogPage(
     IntentionCatalogQuery query,
   ) async {
@@ -954,7 +997,39 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         true,
       ),
     };
-    final condition = scopeCondition & readinessCondition;
+    var condition = scopeCondition & readinessCondition;
+    final excludedIntentionId = query.excludedIntentionId;
+    if (excludedIntentionId != null) {
+      condition =
+          condition &
+          intentions.id.equals(excludedIntentionId.toCanonicalString()).not();
+    }
+    if (query.tagFilter.requiredTagIds.isNotEmpty) {
+      condition =
+          condition &
+          const CustomExpression<bool>('''
+        NOT EXISTS (
+          SELECT 1 FROM temp.doable_catalog_required_tags AS required_tag
+          WHERE NOT EXISTS (
+            SELECT 1 FROM tag_assignments AS assignment
+            WHERE assignment.intention_id = intentions.id
+              AND assignment.tag_id = required_tag.tag_id
+          )
+        )
+      ''');
+    }
+    if (query.tagFilter.excludedTagIds.isNotEmpty) {
+      condition =
+          condition &
+          const CustomExpression<bool>('''
+        NOT EXISTS (
+          SELECT 1 FROM tag_assignments AS assignment
+          JOIN temp.doable_catalog_excluded_tags AS excluded_tag
+            ON excluded_tag.tag_id = assignment.tag_id
+          WHERE assignment.intention_id = intentions.id
+        )
+      ''');
+    }
     final filter = query.titleFilter;
     if (filter == null) return condition;
     return condition &
@@ -1406,7 +1481,12 @@ final class _DriftIntentionCatalogEntrySnapshot
       IntentionReadinessFilter.readyOnly =>
         summary.readiness == domain.IntentionReadiness.ready,
     };
-    if (!matchesScope || !matchesReadiness) return false;
+    if (!matchesScope ||
+        !matchesReadiness ||
+        summary.id == query.excludedIntentionId ||
+        !query.tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
+      return false;
+    }
 
     final filter = query.titleFilter;
     return filter == null ||

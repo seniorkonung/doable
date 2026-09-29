@@ -111,11 +111,15 @@ final class IntentionCatalogQueryValidationException implements Exception {
   final IntentionTextValidationFailure? textFailure;
 }
 
+/// Соединяет охват, готовность, название, собственные теги и исключение
+/// участника через «И». Условия не требуют существования выбранных тегов.
 final class IntentionCatalogQuery {
   factory IntentionCatalogQuery({
     required IntentionScope scope,
     IntentionReadinessFilter readinessFilter = IntentionReadinessFilter.all,
     required String? titleFilter,
+    IntentionTagFilter tagFilter = IntentionTagFilter.empty,
+    IntentionId? excludedIntentionId,
     required IntentionCatalogOrder order,
     required int pageSize,
     IntentionCatalogCursor? cursor,
@@ -131,6 +135,8 @@ final class IntentionCatalogQuery {
       scope: scope,
       readinessFilter: readinessFilter,
       titleFilter: normalizedFilter,
+      tagFilter: tagFilter,
+      excludedIntentionId: excludedIntentionId,
       order: order,
       pageSize: pageSize,
       cursor: cursor,
@@ -141,6 +147,8 @@ final class IntentionCatalogQuery {
     required this.scope,
     required this.readinessFilter,
     required this.titleFilter,
+    required this.tagFilter,
+    required this.excludedIntentionId,
     required this.order,
     required this.pageSize,
     required this.cursor,
@@ -153,6 +161,10 @@ final class IntentionCatalogQuery {
   final IntentionScope scope;
   final IntentionReadinessFilter readinessFilter;
   final IntentionTitleFilter? titleFilter;
+  final IntentionTagFilter tagFilter;
+
+  /// Второй участник связи, исключаемый по идентичности до подсчёта и порции.
+  final IntentionId? excludedIntentionId;
   final IntentionCatalogOrder order;
   final int pageSize;
   final IntentionCatalogCursor? cursor;
@@ -170,7 +182,10 @@ final class IntentionCatalogQuery {
       IntentionReadinessFilter.readyOnly =>
         summary.readiness == IntentionReadiness.ready,
     };
-    if (!matchesScope || !matchesReadiness) {
+    if (!matchesScope ||
+        !matchesReadiness ||
+        summary.id == excludedIntentionId ||
+        !tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
       return false;
     }
     return titleFilter?.matchesTitle(summary.title) ?? true;

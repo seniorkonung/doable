@@ -293,6 +293,114 @@ void main() {
   });
 
   group('контракт каталога намерений', () {
+    test('соединяет название, теги и ограничения допустимости через «И»', () {
+      final health = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000101'),
+        name: TagName.fromStored('Здоровье'),
+      );
+      final rest = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000102'),
+        name: TagName.fromStored('Отдых'),
+      );
+      final sport = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000103'),
+        name: TagName.fromStored('Спорт'),
+      );
+      const candidateId = '00000000-0000-4000-8000-000000000001';
+      final otherParticipant = _intentionId(
+        '00000000-0000-4000-8000-000000000002',
+      );
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health.id, rest.id],
+        excludedTagIds: [sport.id],
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: 'ХОДИТЬ',
+        tagFilter: filter,
+        excludedIntentionId: otherParticipant,
+        order: IntentionCatalogOrder.createdAtAscending,
+        pageSize: 1,
+      );
+
+      expect(query.tagFilter, filter);
+      expect(query.excludedIntentionId, otherParticipant);
+      for (final (id, title, tags, readiness, archiveState, expected) in [
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, rest],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          true,
+        ),
+        (
+          candidateId,
+          'Читать',
+          [health, rest],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, rest, sport],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, rest],
+          IntentionReadiness.notReady,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, rest],
+          IntentionReadiness.ready,
+          IntentionArchiveState.archived,
+          false,
+        ),
+        (
+          otherParticipant.toCanonicalString(),
+          'Ходить в парк',
+          [health, rest],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+      ]) {
+        expect(
+          query.includes(
+            _summary(
+              id: id,
+              title: title,
+              tags: tags,
+              readiness: readiness,
+              archiveState: archiveState,
+            ),
+          ),
+          expected,
+        );
+      }
+      expect(_query().tagFilter, IntentionTagFilter.empty);
+      expect(_query().excludedIntentionId, isNull);
+    });
+
     test('замена счётчика связей сохраняет теги и остальные данные сводки', () {
       final suppliedTags = [
         Tag(
@@ -962,6 +1070,7 @@ IntentionSummary _summary({
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   DateTime? createdAt,
   DateTime? updatedAt,
+  List<Tag> tags = const [],
 }) {
   final created = IntentionTimestamp(
     createdAt ?? DateTime.utc(2026, 8, 30, 12),
@@ -975,6 +1084,7 @@ IntentionSummary _summary({
     activeRelationCount: 0,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
+    tags: tags,
   );
 }
 
