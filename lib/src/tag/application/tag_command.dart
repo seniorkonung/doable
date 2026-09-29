@@ -40,6 +40,7 @@ final class DeleteTag extends TagLifecycleCommand {
 }
 
 /// Назначение относится только к указанным существующим тегу и намерению.
+/// Намерение допустимо в обоих архивных состояниях, включая действие.
 final class AssignTag extends TagCommand {
   const AssignTag({required this.tagId, required this.intentionId});
 
@@ -50,7 +51,7 @@ final class AssignTag extends TagCommand {
       TagAssignment(tagId: tagId, intentionId: intentionId);
 }
 
-/// Снятие сохраняет сам тег и все другие его назначения.
+/// Снятие указанной пары тега и намерения сохраняет сам тег и другие назначения.
 final class RemoveTagAssignment extends TagCommand {
   const RemoveTagAssignment({required this.tagId, required this.intentionId});
 

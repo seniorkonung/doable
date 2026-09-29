@@ -35,7 +35,7 @@ final class TagCatalogIntentionMissing extends TagCatalogState {
 
 enum TagCatalogFreshness { current, refreshing, stale }
 
-/// Признак относится только к выбранному тегу и получателю текущего режима.
+/// Признак относится только к выбранному тегу и намерению текущего режима выбора.
 /// Неизвестный признак не разрешает отправку назначения.
 enum TagCatalogSelectedAssignment {
   unknown,

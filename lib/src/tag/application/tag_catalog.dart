@@ -17,6 +17,7 @@ final class TagCatalogBrowseMode extends TagCatalogMode {
   int get hashCode => 0;
 }
 
+/// Выбор тега для назначения конкретному намерению по его идентичности.
 final class TagCatalogSelectionMode extends TagCatalogMode {
   const TagCatalogSelectionMode(this.intentionId);
 
@@ -60,6 +61,7 @@ final class TagBrowseSnapshot extends TagCatalogSnapshot {
   const TagBrowseSnapshot._(super.items, super.revision) : super._();
 }
 
+/// Признак назначения относится к намерению снимка выбора.
 final class TagSelectionRow {
   const TagSelectionRow({required this.tag, required this.isAssigned});
   final Tag tag;
