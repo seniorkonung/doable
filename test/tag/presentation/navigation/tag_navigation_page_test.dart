@@ -13,11 +13,8 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -43,113 +40,74 @@ void main() {
   _registerNavigationSemanticsScenarios();
   _registerTerminalNavigationScenarios();
   _registerLatePageWidgetScenarios();
-  for (final (relation, archived, number) in [
-    (false, false, 4),
-    (false, true, 2),
-    (true, false, 101),
-    (true, true, 102),
-  ]) {
-    testWidgets(
-      'точный переход к ${relation ? 'связи' : 'намерению'} $number и возврат к охвату',
-      (tester) async {
-        final h = await _pumpStoredPage(tester);
-        if (archived) {
-          await tester.tap(_scope(TaggedEntitiesScope.archived));
-          await tester.pumpAndSettle();
-        }
-        final item = relation
-            ? _relation(number, archived: archived)
-            : _intention(number, archived: archived);
-        await tester.tap(_row(item));
+  for (final (archived, number) in [(false, 1), (false, 4), (true, 2)]) {
+    testWidgets('точный переход к намерению $number и возврат к охвату', (
+      tester,
+    ) async {
+      final h = await _pumpStoredPage(tester);
+      if (archived) {
+        await tester.tap(_scope(TaggedIntentionsScope.archived));
         await tester.pumpAndSettle();
-        if (relation) {
-          expect(h.router.current.name, RelationDetailsRoute.name);
-          expect(
-            h.router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-            (item as TaggedLongTermRelation).id,
-          );
-          expect(
-            find.byKey(const ValueKey('relation-details-phrase')),
-            findsOneWidget,
-          );
-        } else {
-          expect(h.router.current.name, IntentionDetailsRoute.name);
-          expect(
-            h.router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-            (item as TaggedIntention).id,
-          );
-          expect(find.text('Общее название'), findsOneWidget);
-        }
-        h.router.pop();
-        await tester.pumpAndSettle();
-        expect(h.router.current.name, TagNavigationRoute.name);
-        expect(
-          h.router.current.argsAs<TagNavigationRouteArgs>().tagId,
-          _tag.id,
-        );
-        expect(
-          tester
-              .widget<ChoiceChip>(
-                _scope(
-                  archived
-                      ? TaggedEntitiesScope.archived
-                      : TaggedEntitiesScope.active,
-                ),
-              )
-              .selected,
-          isTrue,
-        );
-        expect(_row(item), findsOneWidget);
-        if (!archived && !relation) {
-          expect(find.text('Общее название'), findsNWidgets(2));
-        }
-        expect(tester.takeException(), isNull);
-      },
-    );
+      }
+      final item = _intention(number, archived: archived);
+      expect(_row(_intention(3)), findsNothing);
+      expect(find.byType(ListTile), findsNWidgets(archived ? 1 : 2));
+      expect(find.textContaining('Чтобы'), findsNothing);
+      await tester.tap(_row(item));
+      await tester.pumpAndSettle();
+      expect(h.router.current.name, IntentionDetailsRoute.name);
+      expect(
+        h.router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+        item.id,
+      );
+      expect(find.text('Общее название'), findsOneWidget);
+      h.router.pop();
+      await tester.pumpAndSettle();
+      expect(h.router.current.name, TagNavigationRoute.name);
+      expect(h.router.current.argsAs<TagNavigationRouteArgs>().tagId, _tag.id);
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              _scope(
+                archived
+                    ? TaggedIntentionsScope.archived
+                    : TaggedIntentionsScope.active,
+              ),
+            )
+            .selected,
+        isTrue,
+      );
+      expect(_row(item), findsOneWidget);
+      if (!archived) expect(find.text('Общее название'), findsNWidgets(2));
+      expect(tester.takeException(), isNull);
+    });
   }
 
-  for (final relation in [false, true]) {
-    testWidgets(
-      'удалённая перед переходом ${relation ? 'связь' : 'намерение'} не подменяется прежними данными',
-      (tester) async {
-        final reads = _Reads();
-        addTearDown(reads.dispose);
-        final h = await _pumpStoredPage(tester, reads: reads);
-        final item = relation ? _relation(104) : _intention(4);
-        reads.page(0, [item]);
-        await tester.pumpAndSettle();
-        final l10n = AppLocalizations.of(
-          tester.element(find.byType(TagNavigationPage)),
-        );
-        // Навигация удерживает старый снимок, пока доставка её сигнала задержана.
-        // Подробности получают актуальные данные из настоящего репозитория.
-        if (item case TaggedIntention(:final id)) {
-          expect(
-            await h.repository.execute(DeleteIntention(id)),
-            isA<GraphResultSuccess>(),
-          );
-        } else if (item case TaggedLongTermRelation(:final id)) {
-          expect(
-            await h.repository.execute(DeleteLongTermRelation(id)),
-            isA<GraphResultSuccess>(),
-          );
-        }
-        await tester.tap(_row(item));
-        await tester.pumpAndSettle();
-        expect(
-          find.text(
-            relation ? l10n.relationDetailsNotFound : l10n.detailsNotFound,
-          ),
-          findsOneWidget,
-        );
-        expect(
-          h.router.current.name,
-          relation ? RelationDetailsRoute.name : IntentionDetailsRoute.name,
-        );
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
+  testWidgets(
+    'удалённое перед переходом намерение не подменяется прежними данными',
+    (tester) async {
+      final reads = _Reads();
+      addTearDown(reads.dispose);
+      final h = await _pumpStoredPage(tester, reads: reads);
+      final item = _intention(4);
+      reads.page(0, [item]);
+      await tester.pumpAndSettle();
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(TagNavigationPage)),
+      );
+      // Навигация удерживает снимок при задержанном сигнале;
+      // подробности читают актуальные данные реального репозитория.
+      expect(
+        await h.repository.execute(DeleteIntention(item.id)),
+        isA<GraphResultSuccess>(),
+      );
+      await tester.tap(_row(item));
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.detailsNotFound), findsOneWidget);
+      expect(h.router.current.name, IntentionDetailsRoute.name);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final locale in ['ru', 'en']) {
     final russian = locale == 'ru';
@@ -198,7 +156,7 @@ void main() {
           find.text(russian ? 'Показать ещё сущности' : 'Show more entities'),
           findsNothing,
         );
-        reads.fail(1, const TaggedEntitiesUnavailableFailure());
+        reads.fail(1, const TaggedIntentionsUnavailableFailure());
         await tester.pumpAndSettle();
         expect(
           find.text(
@@ -221,110 +179,109 @@ void main() {
       }
     });
 
-    testWidgets('длинный текст, охваты, подгрузка и повтор доступны на $locale', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(360, 640);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final semantics = tester.ensureSemantics();
-      try {
-        final reads = _Reads();
-        addTearDown(reads.dispose);
-        await _pumpPage(tester, reads, locale: locale, textScale: 3);
-        final l10n = AppLocalizations.of(
-          tester.element(find.byType(TagNavigationPage)),
-        );
-        final tag = Tag(
-          id: _tag.id,
-          name: TagName.fromInput('Длинный тег ' * 20),
-        );
-        reads.page(0, [], tag: tag);
-        await tester.pumpAndSettle();
-        expect(
-          find.text(
-            russian ? 'Тег: ${tag.name.value}' : 'Tag: ${tag.name.value}',
-          ),
-          findsOneWidget,
-        );
-        await _scrollTo(tester, _scope(TaggedEntitiesScope.archived));
-        await tester.tap(_scope(TaggedEntitiesScope.archived));
-        await tester.pump();
-        final intention = _intention(
-          2,
-          archived: true,
-          title: 'Очень длинное намерение ' * 10,
-        );
-        final relation = TaggedLongTermRelation(
-          id: _relation(103).id,
-          type: LongTermRelationType.can,
-          sourceTitle: 'Длинное исходное намерение ' * 9,
-          relatedTitle: 'Длинное связанное намерение ' * 9,
-          scope: RelationScope.archived,
-        );
-        reads.page(1, [intention, relation], tag: tag, cursor: _Cursor());
-        await tester.pumpAndSettle();
-        await _scrollTo(tester, _row(intention));
-        expect(
-          tester.getSemantics(_row(intention)).label,
-          '${l10n.tagNavigationIntentionArchived}: ${intention.title}',
-        );
-        expect(
-          tester
-              .getSize(
-                find
-                    .descendant(
-                      of: _row(intention),
-                      matching: find.byType(Text),
-                    )
-                    .first,
-              )
-              .height,
-          greaterThan(100),
-        );
-        await _scrollTo(tester, _row(relation));
-        expect(
-          tester.getSemantics(_row(relation)).label,
-          '${l10n.tagNavigationRelationArchived}: ${l10n.relationNeighborhoodCanPhrase(relation.sourceTitle, relation.relatedTitle)}',
-        );
-        final more = find.text(
-          russian ? 'Показать ещё сущности' : 'Show more entities',
-        );
-        await _scrollTo(tester, more);
-        await tester.tap(more);
-        await tester.pump();
-        await _expectNavigationStatusSemantics(
-          tester,
-          l10n.tagNavigationLoadingMore,
-        );
-        reads.fail(2, const TaggedEntitiesUnavailableFailure());
-        await tester.pumpAndSettle();
-        await _expectNavigationStatusSemantics(
-          tester,
-          l10n.tagNavigationLoadMoreUnavailable,
-        );
-        final retry = find.text(russian ? 'Повторить' : 'Try again');
-        await _scrollTo(tester, retry);
-        final retrySemantics = tester.getSemantics(retry);
-        expect(retrySemantics.flagsCollection.isButton, isTrue);
-        expect(
-          retrySemantics.getSemanticsData().hasAction(SemanticsAction.tap),
-          isTrue,
-        );
-        await tester.tap(retry);
-        await tester.pump();
-        reads.page(3, [_intention(3, archived: true)], tag: tag);
-        await tester.pumpAndSettle();
-        await _scrollTo(tester, _row(_intention(3, archived: true)));
-        expect(_row(_intention(3, archived: true)), findsOneWidget);
-        expect(reads.queries.last.scope, TaggedEntitiesScope.archived);
-        expect(tester.takeException(), isNull);
-      } finally {
-        semantics.dispose();
-      }
-    });
+    testWidgets(
+      'длинный текст, охваты, подгрузка и повтор доступны на $locale',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final semantics = tester.ensureSemantics();
+        try {
+          final reads = _Reads();
+          addTearDown(reads.dispose);
+          await _pumpPage(tester, reads, locale: locale, textScale: 3);
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(TagNavigationPage)),
+          );
+          final tag = Tag(
+            id: _tag.id,
+            name: TagName.fromInput('Длинный тег ' * 20),
+          );
+          reads.page(0, [], tag: tag);
+          await tester.pumpAndSettle();
+          expect(
+            find.text(
+              russian ? 'Тег: ${tag.name.value}' : 'Tag: ${tag.name.value}',
+            ),
+            findsOneWidget,
+          );
+          await _scrollTo(tester, _scope(TaggedIntentionsScope.archived));
+          await tester.tap(_scope(TaggedIntentionsScope.archived));
+          await tester.pump();
+          final intention = _intention(
+            2,
+            archived: true,
+            title: 'Очень длинное намерение ' * 10,
+          );
+          final second = _intention(
+            103,
+            archived: true,
+            title: 'Ещё одно длинное намерение ' * 7,
+          );
+          reads.page(1, [intention, second], tag: tag, cursor: _Cursor());
+          await tester.pumpAndSettle();
+          await _scrollTo(tester, _row(intention));
+          expect(
+            tester.getSemantics(_row(intention)).label,
+            '${l10n.tagNavigationIntentionArchived}: ${intention.title}',
+          );
+          expect(
+            tester
+                .getSize(
+                  find
+                      .descendant(
+                        of: _row(intention),
+                        matching: find.byType(Text),
+                      )
+                      .first,
+                )
+                .height,
+            greaterThan(100),
+          );
+          await _scrollTo(tester, _row(second));
+          expect(
+            tester.getSemantics(_row(second)).label,
+            '${l10n.tagNavigationIntentionArchived}: ${second.title}',
+          );
+          final more = find.text(
+            russian ? 'Показать ещё сущности' : 'Show more entities',
+          );
+          await _scrollTo(tester, more);
+          await tester.tap(more);
+          await tester.pump();
+          await _expectNavigationStatusSemantics(
+            tester,
+            l10n.tagNavigationLoadingMore,
+          );
+          reads.fail(2, const TaggedIntentionsUnavailableFailure());
+          await tester.pumpAndSettle();
+          await _expectNavigationStatusSemantics(
+            tester,
+            l10n.tagNavigationLoadMoreUnavailable,
+          );
+          final retry = find.text(russian ? 'Повторить' : 'Try again');
+          await _scrollTo(tester, retry);
+          final retrySemantics = tester.getSemantics(retry);
+          expect(retrySemantics.flagsCollection.isButton, isTrue);
+          expect(
+            retrySemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+            isTrue,
+          );
+          await tester.tap(retry);
+          await tester.pump();
+          reads.page(3, [_intention(3, archived: true)], tag: tag);
+          await tester.pumpAndSettle();
+          await _scrollTo(tester, _row(_intention(3, archived: true)));
+          expect(_row(_intention(3, archived: true)), findsOneWidget);
+          expect(reads.queries.last.scope, TaggedIntentionsScope.archived);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
 
-    testWidgets('смешанные строки, охват и семантика на $locale', (
+    testWidgets('строки намерений, охват и семантика на $locale', (
       tester,
     ) async {
       final semantics = tester.ensureSemantics();
@@ -333,7 +290,7 @@ void main() {
         addTearDown(reads.dispose);
         await _pumpPage(tester, reads, locale: locale);
         expect(reads.queries.single.tagId, _tag.id);
-        expect(reads.queries.single.scope, TaggedEntitiesScope.active);
+        expect(reads.queries.single.scope, TaggedIntentionsScope.active);
         expect(
           find.text(
             russian
@@ -343,29 +300,15 @@ void main() {
           findsOneWidget,
         );
         final intention = _intention(1);
-        final need = _relation(101);
-        final can = _relation(102, type: LongTermRelationType.can);
+        final need = _intention(101);
+        final can = _intention(102);
         reads.page(0, [intention, need, can]);
         await tester.pumpAndSettle();
 
         expect(find.text(russian ? 'Тег: Дом' : 'Tag: Дом'), findsOneWidget);
         expect(find.text('Намерение 1'), findsOneWidget);
-        expect(
-          find.text(
-            russian
-                ? 'Чтобы Источник, нужно Результат'
-                : 'To Источник, you need Результат',
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.text(
-            russian
-                ? 'Чтобы Источник, можно Результат'
-                : 'To Источник, you can Результат',
-          ),
-          findsOneWidget,
-        );
+        expect(find.text('Намерение 101'), findsOneWidget);
+        expect(find.text('Намерение 102'), findsOneWidget);
         final intentionSemantics = tester.getSemantics(_row(intention));
         expect(intentionSemantics.flagsCollection.isButton, isTrue);
         expect(
@@ -378,26 +321,22 @@ void main() {
         );
         expect(
           tester.getSemantics(_row(need)).label,
-          contains(
-            russian
-                ? 'Долговременная связь, активна'
-                : 'Long-term relation, active',
-          ),
+          contains(russian ? 'Намерение, активно' : 'Intention, active'),
         );
         expect(
           tester
-              .getSemantics(_scope(TaggedEntitiesScope.active))
+              .getSemantics(_scope(TaggedIntentionsScope.active))
               .flagsCollection
               .isSelected,
           Tristate.isTrue,
         );
 
-        await tester.tap(_scope(TaggedEntitiesScope.archived));
+        await tester.tap(_scope(TaggedIntentionsScope.archived));
         await tester.pump();
         expect(find.text('Намерение 1'), findsNothing);
         reads.page(1, [
           _intention(2, archived: true),
-          _relation(103, archived: true),
+          _intention(103, archived: true),
         ]);
         await tester.pumpAndSettle();
         expect(find.text('Намерение 2'), findsOneWidget);
@@ -406,16 +345,12 @@ void main() {
           contains(russian ? 'Намерение, в архиве' : 'Intention, archived'),
         );
         expect(
-          tester.getSemantics(_row(_relation(103, archived: true))).label,
-          contains(
-            russian
-                ? 'Долговременная связь, в архиве'
-                : 'Long-term relation, archived',
-          ),
+          tester.getSemantics(_row(_intention(103, archived: true))).label,
+          contains(russian ? 'Намерение, в архиве' : 'Intention, archived'),
         );
         expect(
           tester
-              .getSemantics(_scope(TaggedEntitiesScope.archived))
+              .getSemantics(_scope(TaggedIntentionsScope.archived))
               .flagsCollection
               .isSelected,
           Tristate.isTrue,
@@ -444,7 +379,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.tap(_scope(TaggedEntitiesScope.archived));
+      await tester.tap(_scope(TaggedIntentionsScope.archived));
       await tester.pump();
       reads.page(1, []);
       await tester.pumpAndSettle();
@@ -479,17 +414,19 @@ void main() {
     await _pumpPage(tester, reads);
     reads.page(0, []);
     await tester.pumpAndSettle();
-    await tester.tap(_scope(TaggedEntitiesScope.archived));
+    await tester.tap(_scope(TaggedIntentionsScope.archived));
     await tester.pump();
-    reads.page(1, [_relation(102, archived: true)]);
+    reads.page(1, [_intention(102, archived: true)]);
     await tester.pumpAndSettle();
     await _pumpPage(tester, reads, locale: 'en');
     await tester.pumpAndSettle();
     expect(reads.queries, hasLength(2));
     expect(find.text('Tag: Дом'), findsOneWidget);
-    expect(find.text('To Источник, you need Результат'), findsOneWidget);
+    expect(find.text('Намерение 102'), findsOneWidget);
     expect(
-      tester.widget<ChoiceChip>(_scope(TaggedEntitiesScope.archived)).selected,
+      tester
+          .widget<ChoiceChip>(_scope(TaggedIntentionsScope.archived))
+          .selected,
       isTrue,
     );
   });
@@ -500,11 +437,11 @@ void main() {
     final reads = _Reads();
     addTearDown(reads.dispose);
     await _pumpPage(tester, reads);
-    await tester.tap(_scope(TaggedEntitiesScope.archived));
+    await tester.tap(_scope(TaggedIntentionsScope.archived));
     await tester.pump();
     reads.page(0, [_intention(1)]);
     await tester.pump();
-    expect(reads.queries.last.scope, TaggedEntitiesScope.archived);
+    expect(reads.queries.last.scope, TaggedIntentionsScope.archived);
     expect(find.text('Намерение 1'), findsNothing);
     reads.page(1, [_intention(2, archived: true)]);
     await tester.pumpAndSettle();
@@ -527,7 +464,7 @@ void main() {
       expect(reads.queries.last.cursor, same(cursor));
       expect(find.text('Загружаем ещё сущности…'), findsOneWidget);
       expect(find.text('Намерение 1'), findsOneWidget);
-      reads.fail(1, const TaggedEntitiesUnavailableFailure());
+      reads.fail(1, const TaggedIntentionsUnavailableFailure());
       await tester.pumpAndSettle();
       expect(
         find.text('Не удалось загрузить следующую порцию сущностей.'),
@@ -536,10 +473,10 @@ void main() {
       await tester.tap(find.text('Повторить'));
       await tester.pump();
       expect(reads.queries.last.cursor, same(cursor));
-      reads.page(2, [_relation(101)]);
+      reads.page(2, [_intention(101)]);
       await tester.pumpAndSettle();
       expect(find.text('Намерение 1'), findsOneWidget);
-      expect(_row(_relation(101)), findsOneWidget);
+      expect(_row(_intention(101)), findsOneWidget);
       expect(find.text('Все сущности показаны.'), findsOneWidget);
       expect(find.text('Показать ещё сущности'), findsNothing);
     },
@@ -548,22 +485,22 @@ void main() {
   for (final locale in ['ru', 'en']) {
     for (final (failure, russianMessage, englishMessage) in [
       (
-        const TaggedEntitiesUnavailableFailure(),
+        const TaggedIntentionsUnavailableFailure(),
         'Не удалось загрузить сущности с тегом. Повторите попытку.',
         'Could not load tagged entities. Try again.',
       ),
       (
-        const TaggedEntitiesCorruptionFailure(),
+        const TaggedIntentionsCorruptionFailure(),
         'Сохранённые данные помеченных сущностей повреждены и не могут быть показаны.',
         'Stored tagged entity data is damaged and cannot be shown.',
       ),
       (
-        const TaggedEntitiesUnexpectedFailure(),
+        const TaggedIntentionsUnexpectedFailure(),
         'Не удалось загрузить сущности с тегом из-за непредвиденной ошибки.',
         'Could not load tagged entities because of an unexpected error.',
       ),
       (
-        const TaggedEntitiesInvalidCursor(),
+        const TaggedIntentionsInvalidCursor(),
         'Продолжение выдачи недействительно. Откройте навигацию по тегу заново.',
         'This result continuation is invalid. Reopen tag navigation.',
       ),
@@ -581,7 +518,7 @@ void main() {
           findsOneWidget,
         );
         final retry = find.text(locale == 'ru' ? 'Повторить' : 'Try again');
-        if (failure is TaggedEntitiesUnavailableFailure) {
+        if (failure is TaggedIntentionsUnavailableFailure) {
           expect(retry, findsOneWidget);
           await tester.tap(retry);
           await tester.pump();
@@ -598,14 +535,14 @@ void main() {
     }
     for (final (failure, pageRu, pageEn, refreshRu, refreshEn) in [
       (
-        const TaggedEntitiesCorruptionFailure(),
+        const TaggedIntentionsCorruptionFailure(),
         'Сохранённые данные повреждены; следующая порция сущностей недоступна.',
         'Stored data is damaged; more entities cannot be shown.',
         'Не удалось обновить выдачу: сохранённые данные повреждены. Показанные данные могут быть устаревшими.',
         'Could not refresh results: stored data is damaged. The displayed data may be out of date.',
       ),
       (
-        const TaggedEntitiesUnexpectedFailure(),
+        const TaggedIntentionsUnexpectedFailure(),
         'Не удалось загрузить следующую порцию сущностей из-за непредвиденной ошибки.',
         'Could not load more entities because of an unexpected error.',
         'Не удалось обновить выдачу из-за непредвиденной ошибки. Показанные данные могут быть устаревшими.',
@@ -687,22 +624,8 @@ TaggedIntention _intention(
       : IntentionArchiveState.active,
 );
 
-TaggedLongTermRelation _relation(
-  int number, {
-  bool archived = false,
-  LongTermRelationType type = LongTermRelationType.need,
-}) => TaggedLongTermRelation(
-  id: (LongTermRelationId.decode(
-    tagFixtureId(number),
-  ) as LongTermRelationIdDecodingSuccess).id,
-  type: type,
-  sourceTitle: 'Источник',
-  relatedTitle: 'Результат',
-  scope: archived ? RelationScope.archived : RelationScope.active,
-);
-
-Finder _row(TaggedEntity item) => find.byKey(ValueKey(item.target));
-Finder _scope(TaggedEntitiesScope scope) => find.byKey(ValueKey(scope));
+Finder _row(TaggedIntention item) => find.byKey(ValueKey(item.id));
+Finder _scope(TaggedIntentionsScope scope) => find.byKey(ValueKey(scope));
 
 Future<void> _pumpPage(
   WidgetTester tester,
@@ -799,34 +722,34 @@ _pumpStoredPage(WidgetTester tester, {_Reads? reads}) async {
 }
 
 final class _Reads with TagReadContractTestFallback implements TagReadContract {
-  final queries = <TaggedEntitiesQuery>[];
-  final pending = <Completer<TaggedEntitiesPageResult>>[];
+  final queries = <TaggedIntentionsQuery>[];
+  final pending = <Completer<TaggedIntentionsPageResult>>[];
   final watch = StreamController<TagReadResult>.broadcast(sync: true);
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => watch.stream;
 
   @override
-  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
-    TaggedEntitiesQuery query,
+  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
+    TaggedIntentionsQuery query,
   ) {
     queries.add(query);
-    final result = Completer<TaggedEntitiesPageResult>();
+    final result = Completer<TaggedIntentionsPageResult>();
     pending.add(result);
     return result.future;
   }
 
   void page(
     int index,
-    List<TaggedEntity> items, {
-    TaggedEntitiesCursor? cursor,
+    List<TaggedIntention> items, {
+    TaggedIntentionsCursor? cursor,
     Tag? tag,
     int revision = 1,
   }) {
     final query = queries[index];
     pending[index].complete(
-      TaggedEntitiesPageSuccess(
-        TaggedEntitiesPage(
+      TaggedIntentionsPageSuccess(
+        TaggedIntentionsPage(
           tag: tag ?? _tag,
           scope: query.scope,
           items: items,
@@ -838,13 +761,13 @@ final class _Reads with TagReadContractTestFallback implements TagReadContract {
     );
   }
 
-  void fail(int index, TaggedEntitiesReadFailure failure) =>
-      pending[index].complete(TaggedEntitiesPageError(failure));
+  void fail(int index, TaggedIntentionsReadFailure failure) =>
+      pending[index].complete(TaggedIntentionsPageError(failure));
 
   void dispose() => unawaited(watch.close());
 }
 
-final class _Cursor implements TaggedEntitiesCursor {}
+final class _Cursor implements TaggedIntentionsCursor {}
 
 final class _Revision implements GraphRevision {
   const _Revision(this.value);

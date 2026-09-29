@@ -9,12 +9,10 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
@@ -54,12 +52,12 @@ void main() {
           );
           expect(
             tester
-                .widget<ChoiceChip>(_scope(TaggedEntitiesScope.active))
+                .widget<ChoiceChip>(_scope(TaggedIntentionsScope.active))
                 .selected,
             isTrue,
           );
           expect(find.text(l10n.tagNavigationEmptyActive), findsOneWidget);
-          await tester.tap(_scope(TaggedEntitiesScope.archived));
+          await tester.tap(_scope(TaggedIntentionsScope.archived));
           await tester.pumpAndSettle();
           expect(
             archivedOnly
@@ -83,7 +81,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(
             tester
-                .widget<ChoiceChip>(_scope(TaggedEntitiesScope.active))
+                .widget<ChoiceChip>(_scope(TaggedIntentionsScope.active))
                 .selected,
             isTrue,
           );
@@ -229,22 +227,18 @@ void main() {
     },
   );
 
-  for (final relation in [false, true]) {
+  for (final archived in [false, true]) {
     testWidgets(
-      'режим назначения ${relation ? 'связи' : 'намерению'} сохраняет явный выбор',
+      'режим назначения ${archived ? 'архивированному действию' : 'активному намерению'} сохраняет явный выбор',
       (tester) async {
-        final target = relation
-            ? LongTermRelationTagTarget(
-                (LongTermRelationId.decode(
-                  tagFixtureId(101),
-                ) as LongTermRelationIdDecodingSuccess).id,
-              )
-            : IntentionTagTarget(
-                (IntentionId.decode(
-                  tagFixtureId(1),
-                ) as IntentionIdDecodingSuccess).id,
-              );
-        final h = await _pumpCatalog(tester, target: target);
+        final intentionId = archived
+            ? (IntentionId.decode(
+                tagFixtureId(2),
+              ) as IntentionIdDecodingSuccess).id
+            : (IntentionId.decode(
+                tagFixtureId(1),
+              ) as IntentionIdDecodingSuccess).id;
+        final h = await _pumpCatalog(tester, intentionId: intentionId);
         final before = _tagData(h.raw);
         expect(find.byTooltip('Сущности с тегом'), findsNothing);
         await tester.tap(
@@ -252,7 +246,10 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(h.router.current.name, TagCatalogRoute.name);
-        expect(h.router.current.argsAs<TagCatalogRouteArgs>().target, target);
+        expect(
+          h.router.current.argsAs<TagCatalogRouteArgs>().intentionId,
+          intentionId,
+        );
         expect(_tagData(h.raw), before);
         final assign = find.byKey(const ValueKey('tag-catalog-assign'));
         expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
@@ -278,7 +275,7 @@ TagId _tagId(int number) =>
 Finder _open(int number) =>
     find.byKey(ValueKey('tag-catalog-open-${tagFixtureId(number)}'));
 
-Finder _scope(TaggedEntitiesScope scope) => find.byKey(ValueKey(scope));
+Finder _scope(TaggedIntentionsScope scope) => find.byKey(ValueKey(scope));
 
 Map<String, List<List<Object?>>> _tagData(sqlite.Database raw) => {
   for (final table in ['tags', 'tag_assignments'])
@@ -292,7 +289,7 @@ Future<({AppRouter router, sqlite.Database raw, ProviderContainer container})>
 _pumpCatalog(
   WidgetTester tester, {
   String locale = 'ru',
-  TagTarget? target,
+  IntentionId? intentionId,
   void Function(sqlite.Database)? seed,
   double textScale = 1,
   Size size = const Size(1000, 1600),
@@ -339,7 +336,8 @@ _pumpCatalog(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(
-          deepLinkBuilder: (_) => DeepLink([TagCatalogRoute(target: target)]),
+          deepLinkBuilder: (_) =>
+              DeepLink([TagCatalogRoute(intentionId: intentionId)]),
         ),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)

@@ -7,10 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../intention/domain/intention.dart';
-import '../../../long_term_relation/domain/long_term_relation.dart';
-import '../../application/tagged_entities_page.dart';
+import '../../application/tagged_intentions_page.dart';
 import '../../domain/tag_id.dart';
-import '../../domain/tag_target.dart';
 import 'tag_navigation_state.dart';
 import 'tag_navigation_view_model.dart';
 
@@ -68,13 +66,13 @@ final class TagNavigationPage extends ConsumerWidget
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        for (final scope in TaggedEntitiesScope.values)
+                        for (final scope in TaggedIntentionsScope.values)
                           ChoiceChip(
                             key: ValueKey(scope),
                             label: Text(switch (scope) {
-                              TaggedEntitiesScope.active =>
+                              TaggedIntentionsScope.active =>
                                 l10n.catalogScopeActive,
-                              TaggedEntitiesScope.archived =>
+                              TaggedIntentionsScope.archived =>
                                 l10n.catalogScopeArchived,
                             }),
                             selected: state.scope == scope,
@@ -115,16 +113,16 @@ final class TagNavigationPage extends ConsumerWidget
                         loaded.freshness == TagNavigationFreshness.refreshing,
                     onAction:
                         loaded.refreshFailure
-                            is TaggedEntitiesUnavailableFailure
+                            is TaggedIntentionsUnavailableFailure
                         ? model.retryRefresh
                         : null,
                   ),
                 if (loaded.isEmpty && loaded.canUseCurrentItems)
                   _NavigationStatus(
                     message: switch (loaded.scope) {
-                      TaggedEntitiesScope.active =>
+                      TaggedIntentionsScope.active =>
                         l10n.tagNavigationEmptyActive,
-                      TaggedEntitiesScope.archived =>
+                      TaggedIntentionsScope.archived =>
                         l10n.tagNavigationEmptyArchived,
                     },
                   ),
@@ -132,27 +130,18 @@ final class TagNavigationPage extends ConsumerWidget
                   itemCount: loaded.items.length,
                   itemBuilder: (context, index) {
                     final item = loaded.items[index];
-                    return _EntityRow(
-                      key: ValueKey(item.target),
+                    return _IntentionRow(
+                      key: ValueKey(item.id),
                       item: item,
                       onOpen: loaded.canUseCurrentItems
                           ? () {
                               // Между кадром и нажатием могла подтвердиться
                               // новая ревизия: проверяем право перехода заново.
-                              if (!model.canActOn(item.target)) return;
+                              if (!model.canActOn(item.id)) return;
                               unawaited(
-                                context.router.push(switch (item.target) {
-                                  IntentionTagTarget(:final intentionId) =>
-                                    IntentionDetailsRoute(
-                                      intentionId: intentionId,
-                                    ),
-                                  LongTermRelationTagTarget(
-                                    :final relationId,
-                                  ) =>
-                                    RelationDetailsRoute(
-                                      relationId: relationId,
-                                    ),
-                                }),
+                                context.router.push(
+                                  IntentionDetailsRoute(intentionId: item.id),
+                                ),
                               );
                             }
                           : null,
@@ -187,44 +176,19 @@ final class TagNavigationPage extends ConsumerWidget
   }
 }
 
-final class _EntityRow extends StatelessWidget {
-  const _EntityRow({required this.item, required this.onOpen, super.key});
+final class _IntentionRow extends StatelessWidget {
+  const _IntentionRow({required this.item, required this.onOpen, super.key});
 
-  final TaggedEntity item;
+  final TaggedIntention item;
   final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final (title, kindAndState) = switch (item) {
-      TaggedIntention(:final title, :final archiveState) => (
-        title,
-        archiveState == IntentionArchiveState.active
-            ? l10n.tagNavigationIntentionActive
-            : l10n.tagNavigationIntentionArchived,
-      ),
-      TaggedLongTermRelation(
-        :final type,
-        :final sourceTitle,
-        :final relatedTitle,
-        :final scope,
-      ) =>
-        (
-          switch (type) {
-            LongTermRelationType.need => l10n.relationNeighborhoodNeedPhrase(
-              sourceTitle,
-              relatedTitle,
-            ),
-            LongTermRelationType.can => l10n.relationNeighborhoodCanPhrase(
-              sourceTitle,
-              relatedTitle,
-            ),
-          },
-          scope == RelationScope.active
-              ? l10n.tagNavigationRelationActive
-              : l10n.tagNavigationRelationArchived,
-        ),
-    };
+    final title = item.title;
+    final kindAndState = item.archiveState == IntentionArchiveState.active
+        ? l10n.tagNavigationIntentionActive
+        : l10n.tagNavigationIntentionArchived;
     return Semantics(
       container: true,
       button: true,
@@ -289,32 +253,35 @@ final class _NavigationStatus extends StatelessWidget {
   );
 }
 
-String _readFailure(AppLocalizations l10n, TaggedEntitiesReadFailure failure) =>
-    switch (failure) {
-      TaggedEntitiesTagNotFound() => l10n.tagNotFound,
-      TaggedEntitiesInvalidCursor() => l10n.tagNavigationInvalidCursor,
-      TaggedEntitiesSnapshotExpired() => l10n.tagNavigationSnapshotExpired,
-      TaggedEntitiesUnavailableFailure() => l10n.tagNavigationUnavailable,
-      TaggedEntitiesCorruptionFailure() => l10n.tagNavigationCorruption,
-      TaggedEntitiesUnexpectedFailure() => l10n.tagNavigationUnexpected,
-    };
+String _readFailure(
+  AppLocalizations l10n,
+  TaggedIntentionsReadFailure failure,
+) => switch (failure) {
+  TaggedIntentionsTagNotFound() => l10n.tagNotFound,
+  TaggedIntentionsInvalidCursor() => l10n.tagNavigationInvalidCursor,
+  TaggedIntentionsSnapshotExpired() => l10n.tagNavigationSnapshotExpired,
+  TaggedIntentionsUnavailableFailure() => l10n.tagNavigationUnavailable,
+  TaggedIntentionsCorruptionFailure() => l10n.tagNavigationCorruption,
+  TaggedIntentionsUnexpectedFailure() => l10n.tagNavigationUnexpected,
+};
 
-String _pageFailure(AppLocalizations l10n, TaggedEntitiesReadFailure failure) =>
-    switch (failure) {
-      TaggedEntitiesUnavailableFailure() =>
-        l10n.tagNavigationLoadMoreUnavailable,
-      TaggedEntitiesCorruptionFailure() => l10n.tagNavigationLoadMoreCorruption,
-      TaggedEntitiesUnexpectedFailure() => l10n.tagNavigationLoadMoreUnexpected,
-      _ => _readFailure(l10n, failure),
-    };
+String _pageFailure(
+  AppLocalizations l10n,
+  TaggedIntentionsReadFailure failure,
+) => switch (failure) {
+  TaggedIntentionsUnavailableFailure() => l10n.tagNavigationLoadMoreUnavailable,
+  TaggedIntentionsCorruptionFailure() => l10n.tagNavigationLoadMoreCorruption,
+  TaggedIntentionsUnexpectedFailure() => l10n.tagNavigationLoadMoreUnexpected,
+  _ => _readFailure(l10n, failure),
+};
 
 String _refreshFailure(
   AppLocalizations l10n,
-  TaggedEntitiesReadFailure? failure,
+  TaggedIntentionsReadFailure? failure,
 ) => switch (failure) {
-  TaggedEntitiesUnavailableFailure() => l10n.tagNavigationRefreshUnavailable,
-  TaggedEntitiesCorruptionFailure() => l10n.tagNavigationRefreshCorruption,
-  TaggedEntitiesUnexpectedFailure() ||
+  TaggedIntentionsUnavailableFailure() => l10n.tagNavigationRefreshUnavailable,
+  TaggedIntentionsCorruptionFailure() => l10n.tagNavigationRefreshCorruption,
+  TaggedIntentionsUnexpectedFailure() ||
   null => l10n.tagNavigationRefreshUnexpected,
   _ => _readFailure(l10n, failure),
 };

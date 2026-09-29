@@ -6,25 +6,20 @@ import 'package:flutter/material.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../application/tag_catalog.dart';
 import '../../domain/tag.dart';
-import '../../domain/tag_target.dart';
+import '../../../intention/domain/intention_id.dart';
 import 'tag_catalog_view.dart';
 
 @RoutePage()
 final class TagCatalogPage extends StatelessWidget {
-  const TagCatalogPage({this.target, super.key});
+  const TagCatalogPage({this.intentionId, super.key});
 
-  final TagTarget? target;
+  final IntentionId? intentionId;
 
   @override
   Widget build(BuildContext context) => TagCatalogView(
-    mode: switch (target) {
+    mode: switch (intentionId) {
       null => const TagCatalogBrowseMode(),
-      IntentionTagTarget(:final intentionId) => TagCatalogSelectionMode(
-        intentionId,
-      ),
-      LongTermRelationTagTarget() => throw ArgumentError(
-        'Тег можно назначить только намерению.',
-      ),
+      final intentionId => TagCatalogSelectionMode(intentionId),
     },
     onOpenEditor: (editorContext) =>
         context.router.push<Tag>(TagEditorRoute(editorContext: editorContext)),

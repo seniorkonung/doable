@@ -3,10 +3,10 @@ part of 'tag_navigation_page_test.dart';
 void _registerNavigationSemanticsScenarios() {
   for (final locale in ['ru', 'en']) {
     for (final failure in [
-      const TaggedEntitiesUnavailableFailure(),
-      const TaggedEntitiesCorruptionFailure(),
-      const TaggedEntitiesUnexpectedFailure(),
-      const TaggedEntitiesInvalidCursor(),
+      const TaggedIntentionsUnavailableFailure(),
+      const TaggedIntentionsCorruptionFailure(),
+      const TaggedIntentionsUnexpectedFailure(),
+      const TaggedIntentionsInvalidCursor(),
     ]) {
       testWidgets(
         'причина отказа и допустимые действия доступны при масштабе 3 на $locale: ${failure.runtimeType}',
@@ -29,15 +29,18 @@ void _registerNavigationSemanticsScenarios() {
             reads.fail(0, failure);
             await tester.pumpAndSettle();
             final message = switch (failure) {
-              TaggedEntitiesUnavailableFailure() =>
+              TaggedIntentionsUnavailableFailure() =>
                 l10n.tagNavigationUnavailable,
-              TaggedEntitiesCorruptionFailure() => l10n.tagNavigationCorruption,
-              TaggedEntitiesUnexpectedFailure() => l10n.tagNavigationUnexpected,
-              TaggedEntitiesInvalidCursor() => l10n.tagNavigationInvalidCursor,
+              TaggedIntentionsCorruptionFailure() =>
+                l10n.tagNavigationCorruption,
+              TaggedIntentionsUnexpectedFailure() =>
+                l10n.tagNavigationUnexpected,
+              TaggedIntentionsInvalidCursor() =>
+                l10n.tagNavigationInvalidCursor,
               _ => throw StateError('Непредусмотренный отказ фикстуры'),
             };
             await _expectNavigationStatusSemantics(tester, message);
-            if (failure is TaggedEntitiesUnavailableFailure) {
+            if (failure is TaggedIntentionsUnavailableFailure) {
               final retry = find.widgetWithText(
                 OutlinedButton,
                 l10n.commonRetry,
@@ -94,7 +97,7 @@ void _registerNavigationSemanticsScenarios() {
             tester,
             l10n.tagNavigationEmptyActive,
           );
-          final archived = _scope(TaggedEntitiesScope.archived);
+          final archived = _scope(TaggedIntentionsScope.archived);
           await tester.scrollUntilVisible(archived, -300, maxScrolls: 100);
           await tester.pumpAndSettle();
           await tester.tap(archived);
@@ -116,7 +119,7 @@ void _registerNavigationSemanticsScenarios() {
             find.text(l10n.tagNavigationTag(tag.name.value)),
             findsNothing,
           );
-          for (final scope in TaggedEntitiesScope.values) {
+          for (final scope in TaggedIntentionsScope.values) {
             await tester.scrollUntilVisible(
               _scope(scope),
               -300,
@@ -149,19 +152,15 @@ void _registerNavigationSemanticsScenarios() {
         final reads = _Reads();
         addTearDown(reads.dispose);
         await _pumpPage(tester, reads, locale: locale);
-        final items = [
-          _intention(1),
-          _relation(101),
-          _relation(102, type: LongTermRelationType.can),
-        ];
+        final items = [_intention(1), _intention(101), _intention(102)];
         final cursor = _Cursor();
         reads.page(0, items, cursor: cursor);
         await tester.pumpAndSettle();
         final l10n = AppLocalizations.of(
           tester.element(find.byType(TagNavigationPage)),
         );
-        final active = _scope(TaggedEntitiesScope.active);
-        final archived = _scope(TaggedEntitiesScope.archived);
+        final active = _scope(TaggedIntentionsScope.active);
+        final archived = _scope(TaggedIntentionsScope.archived);
         final more = find.widgetWithText(
           OutlinedButton,
           l10n.tagNavigationLoadMore,

@@ -12,7 +12,6 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -22,7 +21,6 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
@@ -38,31 +36,14 @@ import '../../../support/tag_storage_fixture.dart';
 
 part 'tag_catalog_search_recovery_scenarios.dart';
 
-final _modes = <(String, TagTarget?)>[
+final _modes = <(String, IntentionId?)>[
   ('каталог', null),
-  (
-    'выбор для намерения',
-    IntentionTagTarget(
-      (IntentionId.decode(_id(1)) as IntentionIdDecodingSuccess).id,
-    ),
-  ),
-  (
-    'выбор для связи «нужно»',
-    LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        _id(101),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    ),
-  ),
-  (
-    'выбор для связи «можно»',
-    LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        _id(103),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    ),
-  ),
+  ('выбор для активного намерения', _intentionId(1)),
+  ('выбор для архивированного действия', _intentionId(2)),
 ];
+
+IntentionId _intentionId(int number) =>
+    (IntentionId.decode(_id(number)) as IntentionIdDecodingSuccess).id;
 
 final _search = find.byKey(const ValueKey('tag-catalog-search'));
 final _list = find.byKey(const ValueKey('tag-catalog-list'));
@@ -76,11 +57,11 @@ final _editable = find.descendant(
 
 void main() {
   _registerSearchRecoveryScenarios();
-  for (final (description, target) in _modes) {
+  for (final (description, intentionId) in _modes) {
     testWidgets(
       '$description: поиск использует наблюдаемое имя выбранного тега до обновления полного снимка',
       (tester) async {
-        final repository = await _pumpCatalog(tester, target: target);
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
         final home = _tag(1, 'Дом');
         final renamed = _tag(1, 'Спорт');
         repository.complete([home, _tag(2, 'Для дома'), _tag(3, 'Работа')]);
@@ -90,9 +71,9 @@ void main() {
               tester.element(find.byType(TagCatalogPage)),
             ).read(
               tagCatalogViewModelProvider(
-                mode: target == null
+                mode: intentionId == null
                     ? const TagCatalogBrowseMode()
-                    : TagCatalogSelectionMode(target),
+                    : TagCatalogSelectionMode(intentionId),
               ).notifier,
             );
         model.selectTag(home.id);
@@ -100,7 +81,7 @@ void main() {
         await tester.pump();
         repository.observe(renamed, revision: 2);
         await tester.pumpAndSettle();
-        expect(_loaded(tester, target).items.first.name.value, 'Дом');
+        expect(_loaded(tester, intentionId).items.first.name.value, 'Дом');
         expect(_visibleNames(tester), ['Для дома']);
         expect(find.text('Дом'), findsNothing);
         await tester.enterText(_search, 'спорт');
@@ -109,7 +90,7 @@ void main() {
         repository.observe(home);
         await tester.pumpAndSettle();
         expect(_visibleNames(tester), ['Спорт']);
-        expect(_loaded(tester, target).selection.id, home.id);
+        expect(_loaded(tester, intentionId).selection.id, home.id);
         expect(tester.takeException(), isNull);
       },
     );
@@ -117,7 +98,7 @@ void main() {
     testWidgets(
       '$description: изменение запроса возвращает начало списка, выбор и обновление сохраняют прокрутку и ввод',
       (tester) async {
-        final repository = await _pumpCatalog(tester, target: target);
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
         final tags = [
           _tag(1, 'Работа'),
           for (var index = 2; index <= 60; index++) _tag(index, 'Дом $index'),
@@ -137,7 +118,7 @@ void main() {
         final offset = scroll.offset;
         expect(offset, greaterThan(0));
 
-        if (target != null) {
+        if (intentionId != null) {
           await tester.tap(
             find
                 .descendant(of: _list, matching: find.byType(ListTile))
@@ -187,7 +168,7 @@ void main() {
         final router = AppRouter();
         final repository = await _pumpCatalog(
           tester,
-          target: target,
+          intentionId: intentionId,
           router: router,
         );
         repository.complete([_tag(1, 'Дом'), _tag(2, 'Работа')]);
@@ -195,7 +176,7 @@ void main() {
         await tester.enterText(_search, 'работ');
         await tester.pump();
         final firstInput = tester.widget<TextField>(_search).controller!;
-        unawaited(router.push<void>(TagCatalogRoute(target: target)));
+        unawaited(router.push<void>(TagCatalogRoute(intentionId: intentionId)));
         await tester.pumpAndSettle();
         final secondInput = tester.widget<TextField>(_search).controller!;
         expect(secondInput, isNot(same(firstInput)));
@@ -211,7 +192,7 @@ void main() {
         expect(tester.widget<TextField>(_search).controller, same(firstInput));
         expect(_visibleNames(tester), ['Работа']);
         expect(() => secondInput.addListener(() {}), throwsFlutterError);
-        unawaited(router.push<void>(TagCatalogRoute(target: target)));
+        unawaited(router.push<void>(TagCatalogRoute(intentionId: intentionId)));
         await tester.pumpAndSettle();
         expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
         expect(_visibleNames(tester), ['Дом', 'Работа']);
@@ -225,12 +206,15 @@ void main() {
       },
     );
 
-    if (target != null) {
+    if (intentionId != null) {
       for (final assigned in [false, true]) {
         testWidgets(
           '$description: скрытый ${assigned ? 'назначенный' : 'свободный'} выбор показан у действия, очистка возвращает выделение',
           (tester) async {
-            final repository = await _pumpCatalog(tester, target: target);
+            final repository = await _pumpCatalog(
+              tester,
+              intentionId: intentionId,
+            );
             final tags = [
               _tag(1, 'Дом'),
               _tag(2, 'Для дома'),
@@ -248,7 +232,7 @@ void main() {
               await tester.pump();
               expect(_visibleNames(tester), query == 'работ' ? ['Работа'] : []);
               expect(_row(selected), findsNothing);
-              expect(_loaded(tester, target).selection.id, selected.id);
+              expect(_loaded(tester, intentionId).selection.id, selected.id);
               expect(_selected, findsOneWidget);
               expect(
                 find.descendant(
@@ -305,7 +289,10 @@ void main() {
       testWidgets(
         '$description: явное назначение скрытого выбора сохраняет идентичность при вводе во время операции',
         (tester) async {
-          final repository = await _pumpCatalog(tester, target: target);
+          final repository = await _pumpCatalog(
+            tester,
+            intentionId: intentionId,
+          );
           final home = _tag(1, 'Дом');
           final work = _tag(2, 'Работа');
           repository.complete([home, work]);
@@ -324,11 +311,11 @@ void main() {
           await tester.pump();
           final command = repository.commands.single as AssignTag;
           expect(command.tagId, home.id);
-          expect(command.target, target);
+          expect(command.intentionId, intentionId);
           for (final query in ['спорт', '', 'работ']) {
             await tester.enterText(_search, query);
             await tester.pump();
-            expect(_loaded(tester, target).selection.id, home.id);
+            expect(_loaded(tester, intentionId).selection.id, home.id);
             expect(tester.widget<FilledButton>(_assign).onPressed, isNull);
             expect(repository.commands.single, same(command));
           }
@@ -343,7 +330,10 @@ void main() {
                 value: TagAssignmentChanged(
                   TagAssignmentChangedChange(
                     revision: const TagCatalogTestRevision(2),
-                    assignment: TagAssignment(tagId: home.id, target: target),
+                    assignment: TagAssignment(
+                      tagId: home.id,
+                      intentionId: intentionId,
+                    ),
                     state: TagAssignmentState.assigned,
                   ),
                 ),
@@ -380,7 +370,10 @@ void main() {
       testWidgets(
         '$description: скрытый выбор вне снимка показывает подтверждённое имя, ожидает признак назначения и исчезает после удаления',
         (tester) async {
-          final repository = await _pumpCatalog(tester, target: target);
+          final repository = await _pumpCatalog(
+            tester,
+            intentionId: intentionId,
+          );
           repository.complete([_tag(1, 'Работа')]);
           await tester.pumpAndSettle();
           await tester.enterText(_search, 'работ');
@@ -391,7 +384,7 @@ void main() {
                 tester.element(find.byType(TagCatalogPage)),
               ).read(
                 tagCatalogViewModelProvider(
-                  mode: TagCatalogSelectionMode(target),
+                  mode: TagCatalogSelectionMode(intentionId),
                 ).notifier,
               );
           model.selectTag(selected.id);
@@ -454,7 +447,7 @@ void main() {
           await tester.pump();
           await tester.pump();
           expect(
-            _loaded(tester, target).selection,
+            _loaded(tester, intentionId).selection,
             isA<TagCatalogNoSelection>(),
           );
           expect(_selected, findsNothing);
@@ -470,7 +463,7 @@ void main() {
           final router = AppRouter();
           final repository = await _pumpCatalog(
             tester,
-            target: target,
+            intentionId: intentionId,
             router: router,
           );
           final work = _tag(1, 'Работа');
@@ -495,8 +488,8 @@ void main() {
 
           expect(tester.widget<TextField>(_search).controller!.text, 'работ');
           expect(_visibleNames(tester), ['Работа']);
-          expect(_loaded(tester, target).items, [work]);
-          expect(_loaded(tester, target).selection.id, selected.id);
+          expect(_loaded(tester, intentionId).items, [work]);
+          expect(_loaded(tester, intentionId).selection.id, selected.id);
           expect(
             find.descendant(of: _selected, matching: find.text('Дом')),
             findsOneWidget,
@@ -515,8 +508,8 @@ void main() {
           await tester.pump();
           final command = repository.commands.single as AssignTag;
           expect(command.tagId, selected.id);
-          expect(command.target, target);
-          expect(_loaded(tester, target).selection.id, selected.id);
+          expect(command.intentionId, intentionId);
+          expect(_loaded(tester, intentionId).selection.id, selected.id);
           expect(tester.takeException(), isNull);
         },
       );
@@ -525,7 +518,7 @@ void main() {
     testWidgets(
       '$description: текущий ввод сразу фильтрует пары в прежнем порядке, очистка возвращает снимок',
       (tester) async {
-        final repository = await _pumpCatalog(tester, target: target);
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
         final tags = [
           _tag(1, 'Работа'),
           _tag(2, 'Дом'),
@@ -538,7 +531,7 @@ void main() {
         await tester.enterText(_search, 'ДОМ');
         await tester.pump();
         expect(_visibleNames(tester), ['Дом', 'Для дома', 'Домашнее']);
-        if (target != null) {
+        if (intentionId != null) {
           expect(_assignment(tester, tags[1]), 'Назначен');
           expect(_assignment(tester, tags[2]), 'Доступен для назначения');
           expect(_assignment(tester, tags[3]), 'Назначен');
@@ -548,7 +541,7 @@ void main() {
         await tester.pump();
         expect(tester.widget<TextField>(_search).controller!.text, 'работ');
         expect(_visibleNames(tester), ['Работа']);
-        if (target != null) {
+        if (intentionId != null) {
           expect(_assignment(tester, tags[0]), 'Доступен для назначения');
         }
 
@@ -556,9 +549,9 @@ void main() {
         await tester.pump();
         expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
         expect(_visibleNames(tester), tags.map((tag) => tag.name.value));
-        final state = _loaded(tester, target);
+        final state = _loaded(tester, intentionId);
         expect(state.items, tags);
-        if (target != null) {
+        if (intentionId != null) {
           expect(state.selectionRows.map((row) => row.isAssigned), [
             false,
             true,
@@ -572,7 +565,7 @@ void main() {
     testWidgets('$description: поиск находит тег вне видимой области', (
       tester,
     ) async {
-      final repository = await _pumpCatalog(tester, target: target);
+      final repository = await _pumpCatalog(tester, intentionId: intentionId);
       repository.complete([
         for (var index = 1; index <= 132; index++) _tag(index, 'Тег $index'),
         _tag(133, 'Straße'),
@@ -584,7 +577,7 @@ void main() {
       await tester.pump();
 
       expect(_visibleNames(tester), ['Straße']);
-      expect(_loaded(tester, target).items, hasLength(133));
+      expect(_loaded(tester, intentionId).items, hasLength(133));
     });
 
     for (final language in ['ru', 'en']) {
@@ -593,7 +586,7 @@ void main() {
         (tester) async {
           final repository = await _pumpCatalog(
             tester,
-            target: target,
+            intentionId: intentionId,
             language: language,
           );
           final l10n = _localizations(tester);
@@ -630,7 +623,7 @@ void main() {
           try {
             final repository = await _pumpCatalog(
               tester,
-              target: target,
+              intentionId: intentionId,
               language: language,
             );
             final l10n = _localizations(tester);
@@ -675,7 +668,7 @@ void main() {
               );
               expect(_visibleNames(tester), ['Дом', 'Для дома']);
               expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
-              if (target != null) {
+              if (intentionId != null) {
                 expect(_assignment(tester, tags[1]), l10n.tagCatalogAssigned);
                 expect(_assignment(tester, tags[2]), l10n.tagCatalogAvailable);
               }
@@ -712,7 +705,10 @@ void main() {
     testWidgets(
       '$description: некорректный ввод и фильтр сохраняются после редактора, переименования и назначения',
       (tester) async {
-        final router = await _pumpStoredCatalog(tester, target: target);
+        final router = await _pumpStoredCatalog(
+          tester,
+          intentionId: intentionId,
+        );
         final l10n = _localizations(tester);
         final home = _tag(firstTagNumber, 'Дом 🏷️');
         final unused = _tag(303, 'Дом без назначений');
@@ -758,7 +754,7 @@ void main() {
           tester,
           () =>
               router.current.name == TagCatalogRoute.name &&
-              _loaded(tester, target).canUseCurrentItems &&
+              _loaded(tester, intentionId).canUseCurrentItems &&
               _visibleNames(tester).contains('Новый дом'),
         );
         expect(
@@ -785,8 +781,8 @@ void main() {
         await _pumpUntil(
           tester,
           () =>
-              _loaded(tester, target).canUseCurrentItems &&
-              _loaded(tester, target).items.first.name.value == 'Спорт',
+              _loaded(tester, intentionId).canUseCurrentItems &&
+              _loaded(tester, intentionId).items.first.name.value == 'Спорт',
         );
         await tester.pumpAndSettle();
         expect(router.current.name, TagCatalogRoute.name);
@@ -802,7 +798,7 @@ void main() {
         ]);
         expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
 
-        if (target != null) {
+        if (intentionId != null) {
           expect(_assignment(tester, unused), l10n.tagCatalogAvailable);
           await tester.tap(_row(unused));
           await tester.pump();
@@ -810,8 +806,8 @@ void main() {
           await _pumpUntil(
             tester,
             () =>
-                _loaded(tester, target).canUseCurrentItems &&
-                _loaded(tester, target).selectedAssignment ==
+                _loaded(tester, intentionId).canUseCurrentItems &&
+                _loaded(tester, intentionId).selectedAssignment ==
                     TagCatalogSelectedAssignment.assigned,
           );
           await tester.pumpAndSettle();
@@ -832,7 +828,7 @@ void main() {
         await tester.pump();
         expect(_visibleNames(tester), ['Спорт']);
         expect(find.text(l10n.tagCatalogInvalidSearch), findsNothing);
-        if (target != null) {
+        if (intentionId != null) {
           expect(_assignment(tester, home), l10n.tagCatalogAssigned);
         }
         await tester.enterText(_search, invalid);
@@ -847,7 +843,7 @@ void main() {
         ]);
         expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
         expect(find.text(l10n.tagCatalogInvalidSearch), findsNothing);
-        if (target != null) {
+        if (intentionId != null) {
           expect(_assignment(tester, unused), l10n.tagCatalogAssigned);
         }
         expect(tester.takeException(), isNull);
@@ -857,7 +853,7 @@ void main() {
     testWidgets(
       '$description: отказ и повтор обновления сохраняют некорректный ввод и применённый фильтр',
       (tester) async {
-        final repository = await _pumpCatalog(tester, target: target);
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
         final l10n = _localizations(tester);
         final home = _tag(2, 'Дом');
         final forHome = _tag(3, 'Для дома');
@@ -888,7 +884,7 @@ void main() {
         expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
         expect(tester.widget<TextField>(_search).controller!.text, invalid);
         expect(_visibleNames(tester), ['Дом', 'Для дома']);
-        if (target != null) {
+        if (intentionId != null) {
           expect(_assignment(tester, home), l10n.tagCatalogAssigned);
           expect(_assignment(tester, forHome), l10n.tagCatalogAvailable);
         }
@@ -903,7 +899,7 @@ void main() {
     testWidgets(
       '$description: загрузка и отказ первоначального чтения имеют приоритет перед отсутствием совпадений',
       (tester) async {
-        final repository = await _pumpCatalog(tester, target: target);
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
         final l10n = _localizations(tester);
         await tester.enterText(_search, 'спорт');
         await tester.pump();
@@ -931,7 +927,7 @@ void main() {
     testWidgets(
       '$description: при отказе обновления поиск сохраняет неактуальные строки и ограничения действий',
       (tester) async {
-        final repository = await _pumpCatalog(tester, target: target);
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
         final l10n = _localizations(tester);
         repository.complete([_tag(1, 'Работа'), _tag(2, 'Дом')]);
         await tester.pumpAndSettle();
@@ -953,7 +949,7 @@ void main() {
         );
         expect(tile.onTap, isNull);
         expect(tile.trailing, isNull);
-        if (target != null) {
+        if (intentionId != null) {
           expect(_assignment(tester, _tag(2, 'Дом')), l10n.tagCatalogAssigned);
           expect(
             tester
@@ -984,7 +980,10 @@ void main() {
     testWidgets(
       '$description: реальный каталог включает неиспользуемые теги и назначения только в архиве, создание доступно из пустого результата',
       (tester) async {
-        final router = await _pumpStoredCatalog(tester, target: target);
+        final router = await _pumpStoredCatalog(
+          tester,
+          intentionId: intentionId,
+        );
         await tester.enterText(_search, 'дом');
         await tester.pump();
         expect(_visibleNames(tester), [
@@ -992,7 +991,7 @@ void main() {
           'Дом без назначений',
           'Дом в архиве',
         ]);
-        if (target != null) {
+        if (intentionId != null) {
           expect(_assignment(tester, _tag(301, 'Дом 🏷️')), 'Назначен');
           expect(
             _assignment(tester, _tag(303, 'Дом без назначений')),
@@ -1000,7 +999,9 @@ void main() {
           );
           expect(
             _assignment(tester, _tag(304, 'Дом в архиве')),
-            'Доступен для назначения',
+            intentionId == _intentionId(2)
+                ? 'Назначен'
+                : 'Доступен для назначения',
           );
         }
 
@@ -1018,7 +1019,7 @@ void main() {
     testWidgets(
       '$description: ввод с emoji сохраняет область набора и исправляется после непарного surrogate',
       (tester) async {
-        final repository = await _pumpCatalog(tester, target: target);
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
         repository.complete([_tag(1, 'Дом 😀'), _tag(2, 'Работа')]);
         await tester.pumpAndSettle();
         await tester.showKeyboard(_search);
@@ -1059,25 +1060,21 @@ void main() {
     );
   }
 
-  final secondIntention = IntentionTagTarget(
-    (IntentionId.decode(_id(2)) as IntentionIdDecodingSuccess).id,
-  );
+  final secondIntention = _intentionId(2);
   for (final (description, before, after) in [
     ('из каталога в выбор', null, _modes[1].$2),
     ('другое намерение', _modes[1].$2, secondIntention),
-    ('из намерения в связь', _modes[1].$2, _modes[2].$2),
-    ('из связи «нужно» в «можно»', _modes[2].$2, _modes[3].$2),
-    ('из выбора в каталог', _modes[3].$2, null),
+    ('из выбора в каталог', _modes[2].$2, null),
   ]) {
     testWidgets('$description: смена экранной сессии сбрасывает поиск', (
       tester,
     ) async {
-      final sessionTarget = ValueNotifier<TagTarget?>(before);
-      addTearDown(sessionTarget.dispose);
+      final sessionIntention = ValueNotifier<IntentionId?>(before);
+      addTearDown(sessionIntention.dispose);
       final repository = await _pumpCatalog(
         tester,
-        target: before,
-        sessionTarget: sessionTarget,
+        intentionId: before,
+        sessionIntention: sessionIntention,
       );
       final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
       repository.complete(tags);
@@ -1085,7 +1082,7 @@ void main() {
       await tester.enterText(_search, 'дом');
       await tester.pump();
       final input = tester.widget<TextField>(_search).controller!;
-      sessionTarget.value = after;
+      sessionIntention.value = after;
       await tester.pump();
       expect(tester.widget<TextField>(_search).controller, same(input));
       expect(input.text, isEmpty);
@@ -1148,7 +1145,7 @@ Future<void> _beginRefresh(
 
 Future<AppRouter> _pumpStoredCatalog(
   WidgetTester tester, {
-  TagTarget? target,
+  IntentionId? intentionId,
 }) async {
   late sqlite.Database raw;
   final database = AppDatabase(
@@ -1184,7 +1181,8 @@ Future<AppRouter> _pumpStoredCatalog(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(
-          deepLinkBuilder: (_) => DeepLink([TagCatalogRoute(target: target)]),
+          deepLinkBuilder: (_) =>
+              DeepLink([TagCatalogRoute(intentionId: intentionId)]),
         ),
       ),
     ),
@@ -1195,11 +1193,11 @@ Future<AppRouter> _pumpStoredCatalog(
 
 Future<TagCatalogTestRepository> _pumpCatalog(
   WidgetTester tester, {
-  TagTarget? target,
+  IntentionId? intentionId,
   String language = 'ru',
   double scale = 1,
   AppRouter? router,
-  ValueNotifier<TagTarget?>? sessionTarget,
+  ValueNotifier<IntentionId?>? sessionIntention,
 }) async {
   final repository = TagCatalogTestRepository();
   addTearDown(() async {
@@ -1222,12 +1220,12 @@ Future<TagCatalogTestRepository> _pumpCatalog(
               ),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
-              home: sessionTarget == null
-                  ? TagCatalogPage(target: target)
-                  : ValueListenableBuilder<TagTarget?>(
-                      valueListenable: sessionTarget,
-                      builder: (context, currentTarget, _) =>
-                          TagCatalogPage(target: currentTarget),
+              home: sessionIntention == null
+                  ? TagCatalogPage(intentionId: intentionId)
+                  : ValueListenableBuilder<IntentionId?>(
+                      valueListenable: sessionIntention,
+                      builder: (context, currentIntention, _) =>
+                          TagCatalogPage(intentionId: currentIntention),
                     ),
             )
           : MaterialApp.router(
@@ -1236,7 +1234,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
               supportedLocales: AppLocalizations.supportedLocales,
               routerConfig: router.config(
                 deepLinkBuilder: (_) =>
-                    DeepLink([TagCatalogRoute(target: target)]),
+                    DeepLink([TagCatalogRoute(intentionId: intentionId)]),
               ),
             ),
     ),
@@ -1279,12 +1277,12 @@ String _assignment(WidgetTester tester, Tag tag) =>
             as Text)
         .data!;
 
-TagCatalogLoaded _loaded(WidgetTester tester, TagTarget? target) =>
+TagCatalogLoaded _loaded(WidgetTester tester, IntentionId? intentionId) =>
     ProviderScope.containerOf(tester.element(find.byType(TagCatalogPage))).read(
       tagCatalogViewModelProvider(
-        mode: target == null
+        mode: intentionId == null
             ? const TagCatalogBrowseMode()
-            : TagCatalogSelectionMode(target),
+            : TagCatalogSelectionMode(intentionId),
       ),
     ) as TagCatalogLoaded;
 

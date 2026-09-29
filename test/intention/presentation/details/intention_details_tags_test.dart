@@ -8,9 +8,8 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -72,7 +71,7 @@ void main() {
         unawaited(router.push(TagNavigationRoute(tagId: tagId)));
         await tester.pumpAndSettle();
         await tester.tap(
-          find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+          find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
         );
         await tester.pumpAndSettle();
         unawaited(
@@ -102,7 +101,7 @@ void main() {
         expect(
           tester
               .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedEntitiesScope.active)),
+                find.byKey(const ValueKey(TaggedIntentionsScope.active)),
               )
               .selected,
           isTrue,
@@ -126,8 +125,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(router.current.name, TagCatalogRoute.name);
         expect(
-          router.current.argsAs<TagCatalogRouteArgs>().target,
-          IntentionTagTarget(_intentionId(number)),
+          router.current.argsAs<TagCatalogRouteArgs>().intentionId,
+          _intentionId(number),
         );
 
         await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
@@ -224,7 +223,7 @@ void main() {
         expect(
           tester
               .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+                find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
               )
               .selected,
           isTrue,
