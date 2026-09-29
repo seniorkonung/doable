@@ -1,8 +1,8 @@
 part of 'drift_personal_graph_repository.dart';
 
 extension _TagReading on DriftPersonalGraphRepository {
-  /// Получает полные назначения только возвращаемым намерениям порции.
-  /// Вызывается внутри транзакции и последовательного исполнения чтения.
+  /// Получает полные собственные назначения запрошенных намерений.
+  /// Вызывается внутри транзакции и последовательного исполнения чтения или команды.
   Future<Map<IntentionId, List<tag_domain.Tag>>> _readIntentionTags(
     List<IntentionId> intentionIds,
   ) async {

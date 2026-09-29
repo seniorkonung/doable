@@ -293,6 +293,50 @@ void main() {
   });
 
   group('контракт каталога намерений', () {
+    test('замена счётчика связей сохраняет теги и остальные данные сводки', () {
+      final suppliedTags = [
+        Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000002'),
+          name: TagName.fromStored('Первый тег'),
+        ),
+        Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000001'),
+          name: TagName.fromStored('Второй тег'),
+        ),
+      ];
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: true,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+        activeRelationCount: 2,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        tags: suppliedTags,
+      );
+
+      final copy = summary.withActiveRelationCount(7);
+
+      expect(copy.activeRelationCount, 7);
+      expect(summary.activeRelationCount, 2);
+      expect(copy.id, summary.id);
+      expect(copy.title, summary.title);
+      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.readiness, summary.readiness);
+      expect(copy.archiveState, summary.archiveState);
+      expect(copy.createdAt, summary.createdAt);
+      expect(copy.updatedAt, summary.updatedAt);
+      expect(copy.tags, suppliedTags);
+      suppliedTags.clear();
+      expect(copy.tags, summary.tags);
+      expect(copy.tags.map((tag) => tag.name.value), [
+        'Первый тег',
+        'Второй тег',
+      ]);
+      expect(() => copy.tags.clear(), throwsUnsupportedError);
+    });
+
     test(
       'нормализует фильтр, ограничивает порцию и применяет scope с фильтром',
       () {

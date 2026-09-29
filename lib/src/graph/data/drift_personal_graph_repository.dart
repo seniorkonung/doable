@@ -604,7 +604,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final counts = await _readVerifiedRelationCounts(intention.id);
     return _CommittedIntentionCreated(
       intention: _rehydrateStored(stored.detail),
-      after: _catalogEntrySnapshot(stored, counts),
+      after: await _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -621,7 +621,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
     final existing = _rehydrateStored(storedBefore.detail);
     final counts = await _readVerifiedRelationCounts(command.id);
-    final before = _catalogEntrySnapshot(storedBefore, counts);
+    final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.title == title && existing.description == description) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -649,7 +649,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored, counts),
+      after: await _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -662,7 +662,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
     final existing = _rehydrateStored(storedBefore.detail);
     final counts = await _readVerifiedRelationCounts(id);
-    final before = _catalogEntrySnapshot(storedBefore, counts);
+    final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.readiness == readiness) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -689,7 +689,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored, counts),
+      after: await _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -702,7 +702,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
     final existing = _rehydrateStored(storedBefore.detail);
     final counts = await _readVerifiedRelationCounts(id);
-    final before = _catalogEntrySnapshot(storedBefore, counts);
+    final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.archiveState == archiveState) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -742,7 +742,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored, affectedCounts[id] ?? counts),
+      after: await _catalogEntrySnapshot(stored, affectedCounts[id] ?? counts),
       affectedCounts: affectedCounts,
     );
   }
@@ -809,7 +809,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       throw _IntentionHasBlockingRelations(id);
     }
     final counts = await _readVerifiedRelationCounts(id);
-    final before = _catalogEntrySnapshot(storedBefore, counts);
+    final before = await _catalogEntrySnapshot(storedBefore, counts);
     final deletedRows = await (_database.delete(
       _database.intentions,
     )..where((row) => row.id.equals(id.toCanonicalString()))).go();
@@ -1105,11 +1105,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         updatedAt: stored.updatedAt,
       );
 
-  IntentionCatalogEntrySnapshot _catalogEntrySnapshot(
+  Future<IntentionCatalogEntrySnapshot> _catalogEntrySnapshot(
     _StoredIntentionCommandSnapshot stored,
     RelationCounts relationCounts,
-  ) {
+  ) async {
     final intention = _rehydrateStored(stored.detail);
+    final tags = await _readIntentionTags([intention.id]);
     return _DriftIntentionCatalogEntrySnapshot(
       summary: IntentionSummary(
         id: intention.id,
@@ -1120,6 +1121,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         activeRelationCount: relationCounts.active,
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
+        tags: tags[intention.id] ?? (throw const _StoredIntentionCorruption()),
       ),
       storedTitleSearchKey: stored.titleSearchKey,
     );
