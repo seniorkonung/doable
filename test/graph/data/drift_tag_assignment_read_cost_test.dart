@@ -8,10 +8,8 @@ import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -56,7 +54,7 @@ int _measureMainQueryVisits(sqlite.Database database, _Select select) {
     },
   );
   final measuredSql = select.sql.replaceFirstMapped(
-    RegExp(r'WHERE a\.(intention_id|long_term_relation_id) = \?'),
+    RegExp(r'WHERE a\.intention_id = \?'),
     (match) =>
         '${match.group(0)} AND measure_assignment_scan(a.creation_sequence) = 1',
   );
@@ -147,43 +145,31 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       () => DateTime.utc(2026, 9, 27),
       InMemoryDiagnosticsSink(),
     );
-    final intention = IntentionTagTarget(
-      (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id,
-    );
-    final relation = LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        tagFixtureId(101),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    );
-    final denseIntention = IntentionTagTarget(
-      (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id,
-    );
-    final denseRelation = LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        tagFixtureId(102),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    );
+    final intention =
+        (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
+    final denseIntention =
+        (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
 
-    Future<_Snapshot> read(TagTarget target, String kind) async {
+    Future<_Snapshot> read(IntentionId intentionId, String kind) async {
       trace.selects.clear();
       final timer = Stopwatch()..start();
       final List<String> ids;
       final List<bool> assigned;
       if (kind == 'assignments') {
-        final result = await repository.getTagAssignments(target);
+        final result = await repository.getTagAssignments(intentionId);
         expect(result, isA<TagAssignmentsSuccess>());
         final snapshot = (result as TagAssignmentsSuccess).value;
-        expect(snapshot.target, target);
+        expect(snapshot.intentionId, intentionId);
         ids = [for (final tag in snapshot.items) tag.id.toCanonicalString()];
         assigned = const [];
       } else {
         final result = await repository.getTagCatalog(
-          TagCatalogSelectionMode(target),
+          TagCatalogSelectionMode(intentionId),
         );
         expect(result, isA<TagCatalogSuccess>());
         final snapshot =
             (result as TagCatalogSuccess).value as TagSelectionSnapshot;
-        expect(snapshot.target, target);
+        expect(snapshot.intentionId, intentionId);
         ids = [for (final row in snapshot.rows) row.tag.id.toCanonicalString()];
         assigned = [for (final row in snapshot.rows) row.isAssigned];
       }
@@ -205,6 +191,12 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       )) {
         expect(select.rows, lessThanOrEqualTo(1));
       }
+      for (final select in selects) {
+        expect(select.sql, isNot(contains('long_term_relation')));
+        expect(select.sql, isNot(contains('daily_choice')));
+        expect(select.sql, isNot(contains('description')));
+        expect(select.sql, isNot(contains('title')));
+      }
       final sql = main.sql.toUpperCase();
       expect(sql, contains('ORDER BY'));
       expect(sql, isNot(contains('OFFSET')));
@@ -217,26 +209,26 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       return _Snapshot(ids, assigned, timer.elapsedMicroseconds, selects);
     }
 
-    Future<void> sample(TagTarget target, bool dense, String kind) async {
+    Future<void> sample(
+      IntentionId intentionId,
+      bool dense,
+      String kind,
+    ) async {
       final expectedIds = [
         for (var index = 0; index < tagCount; index++)
-          if (kind == 'selection' ||
-              dense ||
-              (target is IntentionTagTarget ? index.isEven : index % 3 == 0))
+          if (kind == 'selection' || dense || index.isEven)
             tagFixtureId(10000 + index),
       ];
       final expectedAssigned = [
-        for (var index = 0; index < tagCount; index++)
-          dense ||
-              (target is IntentionTagTarget ? index.isEven : index % 3 == 0),
+        for (var index = 0; index < tagCount; index++) dense || index.isEven,
       ];
-      final snapshot = await read(target, kind);
+      final snapshot = await read(intentionId, kind);
       expect(snapshot.ids, expectedIds);
       expect(snapshot.ids.toSet(), hasLength(expectedIds.length));
       if (kind == 'selection') expect(snapshot.assigned, expectedAssigned);
       final durations = [snapshot.elapsed];
       for (var repetition = 1; repetition < 5; repetition++) {
-        final again = await read(target, kind);
+        final again = await read(intentionId, kind);
         expect(again.ids, expectedIds);
         expect(again.assigned, snapshot.assigned);
         expect(again.selects.length, snapshot.selects.length);
@@ -266,19 +258,13 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
         raw,
         referenceCheck,
       );
-      final assignmentCount = dense
-          ? tagCount
-          : target is IntentionTagTarget
-          ? (tagCount + 1) ~/ 2
-          : (tagCount + 2) ~/ 3;
+      final assignmentCount = dense ? tagCount : (tagCount + 1) ~/ 2;
       expect(referenceCheckVisits, assignmentCount);
       final mainVisits = kind == 'assignments'
           ? _measureMainQueryVisits(raw, main)
           : null;
       if (kind == 'assignments') {
-        final index = target is IntentionTagTarget
-            ? 'tag_assignments_intention_order'
-            : 'tag_assignments_long_term_relation_order';
+        const index = 'tag_assignments_intention_order';
         expect(mainPlan.first, contains('SEARCH a USING INDEX $index'));
         expect(mainPlan.join(' '), isNot(contains('USE TEMP B-TREE')));
         expect(mainPlan.join(' '), isNot(contains('SCAN tags')));
@@ -287,7 +273,7 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       debugPrintSynchronously(
         jsonEncode({
           'kind': 'tag_assignment_snapshot',
-          'target': target is IntentionTagTarget ? 'intention' : 'relation',
+          'recipient': 'intention',
           'density': dense ? 'dense' : 'sparse',
           'read': kind,
           'tags': tagCount,
@@ -309,9 +295,7 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
 
     for (final (target, dense) in [
       (intention, false),
-      (relation, false),
       (denseIntention, true),
-      (denseRelation, true),
     ]) {
       for (final kind in ['assignments', 'selection']) {
         await sample(target, dense, kind);
