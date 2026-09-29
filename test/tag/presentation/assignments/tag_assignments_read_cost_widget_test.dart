@@ -29,6 +29,13 @@ void main() {
     );
     await database.open();
     seedLargeTagReadFixture(raw);
+    expect(
+      raw.select('SELECT COUNT(*) FROM tag_assignments').single.values.single,
+      largeTagReadFixtureAssignmentCount(
+        tagCount: 1203,
+        includeDenseRecipients: false,
+      ),
+    );
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),

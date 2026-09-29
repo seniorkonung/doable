@@ -115,7 +115,7 @@ void _emit(Map<String, Object?> record) =>
 void main() {
   for (final pairs in [5003, 15003]) {
     test(
-      'стоимость порций намерений и редкого архива среди прежних назначений связям при ${pairs * 2} назначениях',
+      'стоимость порций намерений и редкого архива среди назначений противоположного охвата и другого тега при ${pairs * 2} назначениях',
       () => _measure(pairs),
       timeout: const Timeout(Duration(minutes: 5)),
     );
@@ -150,13 +150,13 @@ Future<void> _measure(int pairs) async {
       InvalidTagIdDecoding() => throw StateError('Некорректная фикстура'),
     };
     int scalar(String sql) => raw.select(sql).single.values.single as int;
-    expect(scalar('SELECT COUNT(*) FROM intentions'), pairs + 1);
+    expect(scalar('SELECT COUNT(*) FROM intentions'), pairs * 2 + 1);
     expect(scalar('SELECT COUNT(*) FROM long_term_relations'), pairs);
     expect(scalar('SELECT COUNT(*) FROM tag_assignments'), pairs * 4);
     _emit({
       'kind': 'tagged_intentions_fixture',
       'recipientPairs': pairs,
-      'intentions': pairs + 1,
+      'intentions': pairs * 2 + 1,
       'relations': pairs,
       'selectedTagAssignments': pairs * 2,
       'unrelatedTagAssignments': pairs * 2,
@@ -250,11 +250,10 @@ Future<void> _traverse(
   Future<_Page> Function(TaggedIntentionsScope, int, TaggedIntentionsCursor?)
   read,
 ) async {
-  final expected = <(String, int)>[
-    for (var index = 0; index < pairs; index++)
-      if ((index % 40 == 0) == (scope == TaggedIntentionsScope.archived))
-        (tagFixtureId(100000 + index), index * 2),
-  ];
+  final expected = largeTaggedIntentions(
+    pairs,
+    archived: scope == TaggedIntentionsScope.archived,
+  );
   final pageCount = (expected.length / size).ceil();
   final samples = <String, (TaggedIntentionsCursor?, _Page, int)>{};
   final ids = <String>[];
@@ -356,14 +355,27 @@ Future<void> _traverse(
       for (final select in first.selects)
         _plan(raw, select.sql, select.arguments),
     ];
+    expect(
+      plans.last.first,
+      contains('SEARCH a USING INDEX tag_assignments_tag_order'),
+    );
+    // Аудиту порядок не нужен: пара тега и намерения покрывает его поиск
+    // по тегу так же, как индекс порядка.
+    if (first.referenceCheck != null) {
+      expect(
+        plans[2].first,
+        matches(
+          RegExp(
+            r'^SEARCH a USING (COVERING INDEX sqlite_autoindex_tag_assignments_1'
+            r'|INDEX tag_assignments_tag_order) \(tag_id=\?\)$',
+          ),
+        ),
+      );
+    }
     for (final plan in [
       plans.last,
       if (first.referenceCheck != null) plans[2],
     ]) {
-      expect(
-        plan.first,
-        contains('SEARCH a USING INDEX tag_assignments_tag_order'),
-      );
       expect(plan.join(' '), isNot(contains('USE TEMP B-TREE')));
       expect(plan.join(' '), isNot(contains('SCAN a')));
     }

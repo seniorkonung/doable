@@ -139,6 +139,23 @@ Future<void> _measureTagAssignmentReadCost(int tagCount) async {
       tagCount: tagCount,
       includeDenseRecipients: true,
     );
+    // Посторонние назначения тех же тегов другим намерениям обоих охватов
+    // не уменьшают объём, среди которого читаются снимки.
+    expect(
+      raw.select('SELECT COUNT(*) FROM tag_assignments').single.values.single,
+      largeTagReadFixtureAssignmentCount(
+        tagCount: tagCount,
+        includeDenseRecipients: true,
+      ),
+    );
+    expect(
+      raw
+          .select('SELECT COUNT(DISTINCT intention_id) FROM tag_assignments')
+          .single
+          .values
+          .single,
+      4,
+    );
     final repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),

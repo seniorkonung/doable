@@ -139,6 +139,7 @@ void main() {
         (tagFixtureId(firstTagNumber), 'Быт 🏷️'),
         (tagFixtureId(303), 'Без назначений'),
         (tagFixtureId(304), 'Только в архиве'),
+        (tagFixtureId(restTagNumber), 'Отдых'),
         (tagFixtureId(305), 'Работа'),
       ],
     );
@@ -158,7 +159,7 @@ void main() {
       raw.select('''
         SELECT MAX(creation_sequence) AS last FROM tag_assignments
       ''').single['last'],
-      8,
+      14,
     );
     expect(
       raw
@@ -166,7 +167,7 @@ void main() {
             "SELECT seq FROM sqlite_sequence WHERE name = 'tag_assignments'",
           )
           .single['seq'],
-      9,
+      15,
     );
     expect(raw.select('SELECT id FROM daily_choices'), hasLength(1));
     expect(raw.select('SELECT id FROM daily_choice_path_steps'), hasLength(1));
@@ -188,7 +189,7 @@ void main() {
             "SELECT seq FROM sqlite_sequence WHERE name = 'tag_assignments'",
           )
           .single['seq'],
-      9,
+      15,
     );
     await harness.closePersistenceObjectGraph();
 
@@ -223,7 +224,7 @@ void main() {
             [tagFixtureId(firstTagNumber), tagFixtureId(2)],
           )
           .single['creation_sequence'],
-      10,
+      16,
     );
     expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
@@ -404,7 +405,7 @@ void main() {
     ]);
 
     final assignments = raw.select('''
-      SELECT creation_sequence, tag_id, intention_id, long_term_relation_id
+      SELECT creation_sequence, tag_id, intention_id
       FROM tag_assignments ORDER BY creation_sequence
     ''');
     expect(assignments.map((row) => row['creation_sequence']), [1, 2]);
@@ -416,10 +417,14 @@ void main() {
       tagFixtureId(1),
       tagFixtureId(2),
     ]);
-    expect(assignments.map((row) => row['long_term_relation_id']), [
-      null,
-      null,
-    ]);
+    expect(
+      raw
+          .select('SELECT name FROM pragma_table_info(?) ORDER BY cid', [
+            'tag_assignments',
+          ])
+          .map((row) => row['name']),
+      ['creation_sequence', 'tag_id', 'tag_creation_sequence', 'intention_id'],
+    );
     expect(
       raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [newId]),
       isEmpty,
@@ -450,10 +455,6 @@ void main() {
       [tagFixtureId(999), tagFixtureId(1)],
     );
     rejected('INSERT INTO tag_assignments (tag_id) VALUES (?)', [newId]);
-    rejected(
-      'INSERT INTO tag_assignments (tag_id, intention_id, long_term_relation_id) VALUES (?, ?, ?)',
-      [newId, tagFixtureId(1), tagFixtureId(101)],
-    );
     rejected(
       'UPDATE tag_assignments SET intention_id = ? WHERE creation_sequence = 1',
       [tagFixtureId(3)],
@@ -551,12 +552,10 @@ void main() {
   });
 }
 
-// По два результата в каждом охвате проверяют продолжения без назначений связям.
+// По два результата в каждом охвате проверяют продолжения среди назначений
+// других тегов.
 void _seedNavigationRecipients(sqlite.Database raw) {
-  seedTagNavigationLifecycleFixture(
-    raw,
-    includeHistoricalRelationAssignments: false,
-  );
+  seedTagNavigationLifecycleFixture(raw);
   raw.execute(
     'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, 1, 106, 206)',
     [tagFixtureId(6), 'Архивное намерение'],

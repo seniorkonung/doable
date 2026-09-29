@@ -239,45 +239,51 @@ void main() {
     );
   }
 
-  test('снятие последнего назначения сохраняет тег для нового назначения', () async {
-    final tagId = _tagId(firstTagNumber);
-    for (final number in [1, 2]) {
+  test(
+    'снятие последнего назначения сохраняет тег для нового назначения',
+    () async {
+      final tagId = _tagId(firstTagNumber);
+      for (final number in [1, 2]) {
+        final result = await repository.execute(
+          RemoveTagAssignment(tagId: tagId, intentionId: _intention(number)),
+        );
+        expect(
+          (result as TagCommandSucceeded).value.value,
+          isA<TagAssignmentChanged>(),
+        );
+      }
+      expect(
+        raw.select('SELECT 1 FROM tag_assignments WHERE tag_id = ?', [
+          tagFixtureId(firstTagNumber),
+        ]),
+        isEmpty,
+      );
+      expect(
+        raw.select('SELECT name FROM tags WHERE id = ?', [
+          tagFixtureId(firstTagNumber),
+        ]).single['name'],
+        'Дом',
+      );
+
       final result = await repository.execute(
-        RemoveTagAssignment(tagId: tagId, intentionId: _intention(number)),
+        AssignTag(tagId: tagId, intentionId: _intention(4)),
       );
       expect(
         (result as TagCommandSucceeded).value.value,
         isA<TagAssignmentChanged>(),
       );
-    }
-    expect(
-      raw.select('SELECT 1 FROM tag_assignments WHERE tag_id = ?', [
-        tagFixtureId(firstTagNumber),
-      ]),
-      isEmpty,
-    );
-    expect(
-      raw.select('SELECT name FROM tags WHERE id = ?', [
-        tagFixtureId(firstTagNumber),
-      ]).single['name'],
-      'Дом',
-    );
-
-    final result = await repository.execute(
-      AssignTag(tagId: tagId, intentionId: _intention(4)),
-    );
-    expect(
-      (result as TagCommandSucceeded).value.value,
-      isA<TagAssignmentChanged>(),
-    );
-    expect(assignment(firstTagNumber, _intention(4)), hasLength(1));
-    expect(
-      raw.select(
-        'SELECT 1 FROM tag_assignments WHERE long_term_relation_id IS NOT NULL',
-      ),
-      isEmpty,
-    );
-  });
+      expect(assignment(firstTagNumber, _intention(4)), hasLength(1));
+      expect(
+        raw
+            .select('SELECT tag_id, intention_id FROM tag_assignments')
+            .map((row) => row.values.toList()),
+        [
+          [tagFixtureId(lastTagNumber), tagFixtureId(3)],
+          [tagFixtureId(firstTagNumber), tagFixtureId(4)],
+        ],
+      );
+    },
+  );
 
   test('отсутствие обеих идентичностей проверяется даже при повторе', () async {
     final existingTag = _tagId(firstTagNumber);

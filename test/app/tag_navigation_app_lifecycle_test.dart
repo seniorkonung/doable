@@ -649,11 +649,7 @@ final class _App {
       await runtime.shutdown();
     });
     final ready = await tester.runAsync(runtime.bootstrap) as AppRuntimeReady;
-    seedTagNavigationFixture(
-      raw,
-      extraPairsPerScope: 51,
-      includeHistoricalRelationAssignments: false,
-    );
+    seedTagNavigationFixture(raw, extraPairsPerScope: 51);
     final router = ready.container.read(appRouterProvider);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await _waitFor(

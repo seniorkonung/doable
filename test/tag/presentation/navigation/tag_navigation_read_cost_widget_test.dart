@@ -36,7 +36,7 @@ import '../../../support/tag_storage_fixture.dart';
 void main() {
   for (final (pairs, repetition) in [(5003, 1), (5003, 2), (15003, 1)]) {
     testWidgets(
-      'прокрутка обоих охватов при $pairs назначениях намерениям и $pairs исторических назначениях связям, повтор $repetition',
+      'прокрутка обоих охватов при ${pairs * 2} назначениях выбранного тега и ${pairs * 2} назначениях другого тега, повтор $repetition',
       (tester) async {
         final app = await _App.pump(tester, pairs);
         for (final scope in TaggedIntentionsScope.values) {
@@ -232,11 +232,11 @@ void _emit(Map<String, Object?> record) =>
     debugPrintSynchronously(jsonEncode(record));
 
 List<IntentionId> _expected(int pairs, TaggedIntentionsScope scope) => [
-  for (var index = 0; index < pairs; index++)
-    if ((index % 40 == 0) == (scope == TaggedIntentionsScope.archived))
-      (IntentionId.decode(
-        tagFixtureId(100000 + index),
-      ) as IntentionIdDecodingSuccess).id,
+  for (final (id, _) in largeTaggedIntentions(
+    pairs,
+    archived: scope == TaggedIntentionsScope.archived,
+  ))
+    (IntentionId.decode(id) as IntentionIdDecodingSuccess).id,
 ];
 
 final _tagId = (TagId.decode(tagFixtureId(9000)) as TagIdDecodingSuccess).id;
@@ -348,7 +348,7 @@ final class _App {
     _emit({
       'kind': 'tag_navigation_widget_fixture',
       'recipientPairs': pairs,
-      'intentions': pairs + 1,
+      'intentions': pairs * 2 + 1,
       'relations': pairs,
       'selectedTagAssignments': pairs * 2,
       'unrelatedTagAssignments': pairs * 2,

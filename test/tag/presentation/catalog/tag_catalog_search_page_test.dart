@@ -839,6 +839,7 @@ void main() {
           'Спорт',
           'Дом без назначений',
           'Дом в архиве',
+          'Работа',
           'Новый дом',
         ]);
         expect(tester.widget<TextField>(_search).controller!.text, isEmpty);

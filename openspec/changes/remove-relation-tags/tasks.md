@@ -262,7 +262,7 @@
   - **Вероятные файлы:** `lib/src/graph/data/drift_personal_graph_repository_tagged_intentions.dart`, `test/graph/data/drift_tagged_entities_read_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.6 Общие фикстуры и проверки первой фазы заполняют схему только назначениями намерениям
+- [x] 2.6 Общие фикстуры и проверки первой фазы заполняют схему только назначениями намерениям
   - **Критерии приёмки:**
     - Помощники `test/support/tag_storage_fixture.dart` не записывают `tag_assignments.long_term_relation_id`: параметр `includeHistoricalRelationAssignments`, вставки назначений связям в `seedTagNavigationFixture`, `seedTagNavigationLifecycleFixture`, `seedLargeTagReadFixture`, `seedWidelyAssignedTagFixture` и `seedLargeTaggedEntitiesFixture`, а также набор прежней схемы `seedHistoricalTagStorageFixture` удалены.
     - Посторонняя нагрузка, которую давали назначения связям, заменяется представимой нагрузкой не меньшего объёма: назначениями других тегов тем же и другим намерениям и назначениями выбранного тега намерениям противоположного архивного охвата. Число строк `tag_assignments`, в том числе назначений удаляемого или выбранного тега, от которого зависят пределы стоимости, не уменьшается.

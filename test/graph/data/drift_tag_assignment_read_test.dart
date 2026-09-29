@@ -231,83 +231,75 @@ void main() {
     },
   );
 
-  test(
-    'прежние назначения связям не становятся назначениями намерений',
-    () async {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(303),
-        'Только прежним связям',
-      ]);
-      for (final number in [101, 102]) {
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-          [tagFixtureId(303), tagFixtureId(number)],
-        );
-      }
-      final oldAssignments = raw.select('SELECT * FROM tag_assignments');
-      final loaded = selection(
-        await graph.getTagCatalog(TagCatalogSelectionMode(_intention(2))),
-      );
-      expect(loaded.rows.map((row) => row.isAssigned), [true, false, false]);
-      expect(loaded.items.map((tag) => tag.name.value), [
-        'Дом',
-        'Работа',
-        'Только прежним связям',
-      ]);
-      expect(
-        (await graph.getTagCatalog(
-          const TagCatalogBrowseMode(),
-        ) as TagCatalogSuccess).value.items.map((tag) => tag.id),
-        loaded.items.map((tag) => tag.id),
-      );
-      expect(
-        assignments(await graph.getTagAssignments(_intention(2))).items
-            .map((tag) => tag.id.toCanonicalString()),
-        [tagFixtureId(firstTagNumber)],
-      );
-      expect(
-        await graph.getTagAssignments(_intention(101)),
-        isA<TagAssignmentsError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagAssignmentsIntentionNotFound>(),
-        ),
-      );
-
+  test('назначения другим намерениям и идентичность связи не становятся назначениями намерения', () async {
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      tagFixtureId(303),
+      'Только другим намерениям',
+    ]);
+    for (final number in [1, 3]) {
       raw.execute(
-        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-        [tagFixtureId(101), 'Отдельное намерение', 1, 1],
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(303), tagFixtureId(number)],
       );
-      final empty = assignments(await graph.getTagAssignments(_intention(101)));
-      expect(empty.items, isEmpty);
-      final unassigned = selection(
-        await graph.getTagCatalog(TagCatalogSelectionMode(_intention(101))),
-      );
-      expect(unassigned.items, hasLength(3));
-      expect(unassigned.rows.map((row) => row.isAssigned), [
-        false,
-        false,
-        false,
-      ]);
-      final tagId =
-          (TagId.decode(tagFixtureId(303)) as TagIdDecodingSuccess).id;
-      expect(
-        (await graph.getTagAssignmentStatus(
-          tagId,
-          _intention(101),
-        ) as TagAssignmentStatusSuccess).value.value,
-        isFalse,
-      );
-      expect(raw.select('SELECT * FROM tag_assignments'), oldAssignments);
-      for (final sql in probe.statements) {
-        expect(sql, isNot(contains('long_term_relations')));
-        expect(sql, isNot(contains('long_term_relation_id')));
-        expect(sql, isNot(contains('daily_choice')));
-        expect(sql, isNot(contains('description')));
-        expect(sql, isNot(contains('title')));
-      }
-    },
-  );
+    }
+    final oldAssignments = raw.select('SELECT * FROM tag_assignments');
+    final loaded = selection(
+      await graph.getTagCatalog(TagCatalogSelectionMode(_intention(2))),
+    );
+    expect(loaded.rows.map((row) => row.isAssigned), [true, false, false]);
+    expect(loaded.items.map((tag) => tag.name.value), [
+      'Дом',
+      'Работа',
+      'Только другим намерениям',
+    ]);
+    expect(
+      (await graph.getTagCatalog(
+        const TagCatalogBrowseMode(),
+      ) as TagCatalogSuccess).value.items.map((tag) => tag.id),
+      loaded.items.map((tag) => tag.id),
+    );
+    expect(
+      assignments(await graph.getTagAssignments(_intention(2))).items
+          .map((tag) => tag.id.toCanonicalString()),
+      [tagFixtureId(firstTagNumber)],
+    );
+    expect(
+      await graph.getTagAssignments(_intention(101)),
+      isA<TagAssignmentsError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TagAssignmentsIntentionNotFound>(),
+      ),
+    );
+
+    raw.execute(
+      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+      [tagFixtureId(101), 'Отдельное намерение', 1, 1],
+    );
+    final empty = assignments(await graph.getTagAssignments(_intention(101)));
+    expect(empty.items, isEmpty);
+    final unassigned = selection(
+      await graph.getTagCatalog(TagCatalogSelectionMode(_intention(101))),
+    );
+    expect(unassigned.items, hasLength(3));
+    expect(unassigned.rows.map((row) => row.isAssigned), [false, false, false]);
+    final tagId = (TagId.decode(tagFixtureId(303)) as TagIdDecodingSuccess).id;
+    expect(
+      (await graph.getTagAssignmentStatus(
+        tagId,
+        _intention(101),
+      ) as TagAssignmentStatusSuccess).value.value,
+      isFalse,
+    );
+    expect(raw.select('SELECT * FROM tag_assignments'), oldAssignments);
+    for (final sql in probe.statements) {
+      expect(sql, isNot(contains('long_term_relations')));
+      expect(sql, isNot(contains('long_term_relation_id')));
+      expect(sql, isNot(contains('daily_choice')));
+      expect(sql, isNot(contains('description')));
+      expect(sql, isNot(contains('title')));
+    }
+  });
 
   test('неизменяемые снимки сохраняют порядок тегов и общую ревизию', () async {
     final intentionId = _intention(1);
