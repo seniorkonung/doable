@@ -752,6 +752,48 @@ void main() {
         }
       },
     );
+
+    test(
+      'единственная версия схемы сохраняет ссылку шага дневного пути на связь',
+      () async {
+        final version = await database
+            .customSelect('PRAGMA user_version')
+            .getSingle();
+        final foreignKeys = await database
+            .customSelect('PRAGMA foreign_key_list(daily_choice_path_steps)')
+            .get();
+        final relationObjects = await database.customSelect('''
+          SELECT name
+          FROM sqlite_schema
+          WHERE name IN (
+            'daily_choice_path_steps_relation',
+            'long_term_relations_protect_daily_choice_path'
+          )
+          ORDER BY name
+        ''').get();
+
+        expect(AppDatabase.currentSchemaVersion, 1);
+        expect(version.read<int>('user_version'), 1);
+        expect(
+          foreignKeys.map(
+            (row) => (
+              row.read<String>('table'),
+              row.read<String>('from'),
+              row.read<String>('on_delete'),
+            ),
+          ),
+          contains((
+            'long_term_relations',
+            'long_term_relation_id',
+            'RESTRICT',
+          )),
+        );
+        expect(relationObjects.map((row) => row.read<String>('name')), [
+          'daily_choice_path_steps_relation',
+          'long_term_relations_protect_daily_choice_path',
+        ]);
+      },
+    );
   });
 }
 
