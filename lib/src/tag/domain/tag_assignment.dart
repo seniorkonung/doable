@@ -1,7 +1,9 @@
 import '../../intention/domain/intention_id.dart';
 import 'tag_id.dart';
 
-/// Назначение определяется парой идентичностей тега и намерения.
+/// Назначение одному намерению определяется парой идентичностей тега и намерения.
+/// Архивное состояние и готовность к действию не меняют получателя.
+/// Назначение не распространяется на соседние намерения или связи.
 final class TagAssignment {
   const TagAssignment({required this.tagId, required this.intentionId});
 

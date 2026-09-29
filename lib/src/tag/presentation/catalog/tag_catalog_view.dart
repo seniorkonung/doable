@@ -21,7 +21,8 @@ import 'tag_catalog_state.dart';
 import 'tag_catalog_view_model.dart';
 import 'tag_delete_confirmation.dart';
 
-/// Каталог хранит поиск одного открытия; маршруты задаются потребителем.
+/// Общий каталог или выбор тега для назначения конкретному намерению.
+/// Поиск принадлежит одному открытию; маршруты задаются потребителем.
 final class TagCatalogView extends ConsumerStatefulWidget {
   const TagCatalogView({
     required this.onOpenEditor,

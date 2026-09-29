@@ -77,7 +77,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     return TagCatalogInitialLoading(mode: mode);
   }
 
-  /// Смена режима или получателя отменяет право прежних снимков и выбора
+  /// Смена режима или намерения отменяет право прежних снимков и выбора
   /// изменять новое состояние, не прерывая уже принятую команду.
   void setMode(TagCatalogMode mode) {
     if (_mode == mode) return;
