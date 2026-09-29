@@ -317,13 +317,24 @@ extension _TagReading on DriftPersonalGraphRepository {
   }
 
   Future<_TagReadStorageVersion> _tagReadStorageVersion() async {
+    // Маркер живёт на физическом соединении, включая соединения из изолята.
+    // CREATE TABLE AS SELECT не увеличивает total_changes() и не меняет граф.
+    await _database.customStatement(
+      'CREATE TEMP TABLE IF NOT EXISTS doable_catalog_connection AS '
+      'SELECT hex(randomblob(16)) AS connection_id',
+    );
     final row = await _database
         .customSelect(
-          'SELECT total_changes() AS connection_changes, data_version FROM pragma_data_version',
+          'SELECT connection_id, total_changes() AS connection_changes, '
+          'data_version FROM pragma_data_version, temp.doable_catalog_connection',
         )
         .getSingle();
+    final connectionId = _requiredStoredString(row.data, 'connection_id');
     return (
-      connectionChanges: _requiredStoredInteger(row.data, 'connection_changes'),
+      connectionId: connectionId,
+      connectionChanges:
+          _requiredStoredInteger(row.data, 'connection_changes') -
+          (_catalogTemporaryChanges[connectionId] ?? 0),
       dataVersion: _requiredStoredInteger(row.data, 'data_version'),
     );
   }
@@ -438,7 +449,11 @@ final class _TagReadTargetSql {
   final String id;
 }
 
-typedef _TagReadStorageVersion = ({int connectionChanges, int dataVersion});
+typedef _TagReadStorageVersion = ({
+  String connectionId,
+  int connectionChanges,
+  int dataVersion,
+});
 
 final class _TagReadTargetMissing implements Exception {
   const _TagReadTargetMissing();

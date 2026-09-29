@@ -284,7 +284,13 @@ void _expectJointMaterialization(
   expect(tags.rowCount, tagCount);
   // Объём назначений может превышать размер порции. Число чтений не растёт
   // с числом намерений: количество, порция, агрегаты и назначения пакетны.
-  expect(trace.selects, hasLength(isFirst ? 4 : 3));
+  // Одно служебное чтение привязывает учёт TEMP к физическому соединению.
+  final connectionReads = trace.selects.where(
+    (select) => select.statement.contains('total_changes()'),
+  );
+  expect(connectionReads, hasLength(1));
+  expect(connectionReads.single.rowCount, 1);
+  expect(trace.selects, hasLength(isFirst ? 5 : 4));
   expect(trace.conditionBatchSizes, everyElement(lessThanOrEqualTo(400)));
   expect(
     trace.conditionBatchSizes.fold(0, (sum, size) => sum + size),

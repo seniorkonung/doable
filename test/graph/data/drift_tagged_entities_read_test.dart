@@ -1,12 +1,16 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tagged_entities_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -285,6 +289,200 @@ void main() {
       );
     },
   );
+
+  for (final (scope, scopeLabel) in [
+    (TaggedEntitiesScope.active, 'активный охват'),
+    (TaggedEntitiesScope.archived, 'архивный охват'),
+  ]) {
+    for (final (label, filter) in [
+      ('без условий', IntentionTagFilter.empty),
+      (
+        'обязательный тег',
+        IntentionTagFilter(requiredTagIds: [_tag(firstTagNumber)]),
+      ),
+      (
+        'исключённый тег',
+        IntentionTagFilter(excludedTagIds: [_tag(lastTagNumber)]),
+      ),
+      (
+        'совместные условия',
+        IntentionTagFilter(
+          requiredTagIds: [_tag(firstTagNumber)],
+          excludedTagIds: [_tag(lastTagNumber)],
+        ),
+      ),
+      (
+        'пересечение условий',
+        IntentionTagFilter(
+          requiredTagIds: [_tag(firstTagNumber)],
+          excludedTagIds: [_tag(firstTagNumber)],
+        ),
+      ),
+      (
+        'отсутствующий обязательный тег',
+        IntentionTagFilter(requiredTagIds: [_tag(999)]),
+      ),
+    ]) {
+      test(
+        'совместный поиск сохраняет курсор навигации: $scopeLabel, $label',
+        () async {
+          final additionalIds = <IntentionId>[];
+          for (var number = 10; number < 17; number++) {
+            raw.execute(
+              'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+              [
+                tagFixtureId(number),
+                'Намерение $number',
+                scope == TaggedEntitiesScope.archived ? 1 : 0,
+                number,
+                number,
+              ],
+            );
+            additionalIds.add(_intention(number));
+            for (final tagNumber in [
+              firstTagNumber,
+              if (number.isEven) lastTagNumber,
+            ]) {
+              raw.execute(
+                'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+                [tagFixtureId(tagNumber), tagFixtureId(number)],
+              );
+            }
+          }
+          Map<String, List<List<Object?>>> storedGraph() => {
+            ...retainedTagFixtureGraph(raw),
+            for (final table in ['tags', 'tag_assignments', 'sqlite_sequence'])
+              table: raw
+                  .select('SELECT * FROM $table ORDER BY rowid')
+                  .map((row) => row.values.toList())
+                  .toList(),
+          };
+          final before = storedGraph();
+          final schemaBefore = raw
+              .select('SELECT * FROM main.sqlite_schema ORDER BY name')
+              .map((row) => row.values.toList())
+              .toList();
+          final first = page(
+            await graph.getTaggedEntitiesPage(
+              TaggedEntitiesQuery(
+                tagId: _tag(firstTagNumber),
+                scope: scope,
+                pageSize: 1,
+              ),
+            ),
+          );
+          expect(first.nextCursor, isNotNull);
+          IntentionCatalogQuery catalogQuery({
+            IntentionCatalogCursor? cursor,
+          }) => IntentionCatalogQuery(
+            scope: scope == TaggedEntitiesScope.active
+                ? IntentionScope.active
+                : IntentionScope.archived,
+            titleFilter: null,
+            tagFilter: filter,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+            cursor: cursor,
+          );
+          final targets = [...first.items.map((item) => item.target)];
+          var cursor = first.nextCursor;
+          probe.statements.clear();
+          while (cursor != null) {
+            final catalog = await graph.getCatalogPage(catalogQuery());
+            expect(catalog, isA<ResultSuccess<IntentionCatalogPage>>());
+            final catalogPage =
+                (catalog as ResultSuccess<IntentionCatalogPage>).value;
+            expect(
+              catalogPage.revision.compareTo(first.revision),
+              GraphRevisionOrder.same,
+            );
+            final repeated = await graph.getCatalogPage(catalogQuery());
+            expect(repeated, isA<ResultSuccess<IntentionCatalogPage>>());
+            final repeatedPage =
+                (repeated as ResultSuccess<IntentionCatalogPage>).value;
+            expect(
+              repeatedPage.items.map((item) => item.id),
+              catalogPage.items.map((item) => item.id),
+            );
+            expect(
+              (repeatedPage as IntentionCatalogFirstPage).totalCount,
+              (catalogPage as IntentionCatalogFirstPage).totalCount,
+            );
+            if (catalogPage.nextCursor != null) {
+              final continuation = await graph.getCatalogPage(
+                catalogQuery(cursor: catalogPage.nextCursor),
+              );
+              expect(continuation, isA<ResultSuccess<IntentionCatalogPage>>());
+              final continuedPage =
+                  (continuation as ResultSuccess<IntentionCatalogPage>).value;
+              expect(
+                continuedPage.revision.compareTo(first.revision),
+                GraphRevisionOrder.same,
+              );
+              expect(
+                continuedPage.items.single.id,
+                isNot(catalogPage.items.single.id),
+              );
+            }
+            final result = await graph.getTaggedEntitiesPage(
+              TaggedEntitiesQuery(
+                tagId: _tag(firstTagNumber),
+                scope: scope,
+                pageSize: 1,
+                cursor: cursor,
+              ),
+            );
+            expect(
+              result,
+              isA<TaggedEntitiesPageSuccess>(),
+              reason: result is TaggedEntitiesPageError
+                  ? '${result.failure.runtimeType}'
+                  : null,
+            );
+            final next = page(result);
+            expect(
+              next.revision.compareTo(first.revision),
+              GraphRevisionOrder.same,
+            );
+            expect(next.tag.name, first.tag.name);
+            targets.addAll(next.items.map((item) => item.target));
+            cursor = next.nextCursor;
+          }
+          expect(targets, [
+            IntentionTagTarget(
+              scope == TaggedEntitiesScope.active
+                  ? _intention(1)
+                  : _intention(2),
+            ),
+            LongTermRelationTagTarget(
+              scope == TaggedEntitiesScope.active
+                  ? _relation(101)
+                  : _relation(102),
+            ),
+            ...additionalIds.map(IntentionTagTarget.new),
+          ]);
+          expect(targets.toSet(), hasLength(targets.length));
+          expect(storedGraph(), before);
+          expect(
+            raw
+                .select('SELECT * FROM main.sqlite_schema ORDER BY name')
+                .map((row) => row.values.toList())
+                .toList(),
+            schemaBefore,
+          );
+          expect(
+            probe.statements.where(
+              (sql) =>
+                  sql.contains('LEFT JOIN') &&
+                  sql.contains('tag_assignments a') &&
+                  sql.contains('LIMIT 1'),
+            ),
+            isEmpty,
+          );
+        },
+      );
+    }
+  }
 
   test(
     'смена хранилища лишает продолжение свидетельства целостности',

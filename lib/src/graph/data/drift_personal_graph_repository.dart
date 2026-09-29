@@ -107,6 +107,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   final TagIdGenerator _tagIdGenerator;
   final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
+  final Map<String, int> _catalogTemporaryChanges = {};
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
   final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
   _dailyChoiceWatchers = {};
@@ -203,9 +204,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           query.tagFilter.excludedTagIds.isNotEmpty;
       final page = await _sequencer.run(
         () => _database.transaction(() async {
-          if (hasTagConditions) {
-            await _prepareCatalogTagFilter(query.tagFilter);
-          }
+          final filterConnectionId = hasTagConditions
+              ? await _prepareCatalogTagFilter(query.tagFilter)
+              : null;
           final page = await switch (cursor) {
             null => _readFirstCatalogPage(query),
             _DriftIntentionCatalogCursor() => _readCatalogContinuationPage(
@@ -214,7 +215,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
             ),
             _ => throw StateError('Недопустимый cursor каталога.'),
           };
-          if (hasTagConditions) await _clearCatalogTagFilter();
+          if (filterConnectionId != null) {
+            await _clearCatalogTagFilter(filterConnectionId);
+          }
           return page;
         }),
       );
@@ -882,7 +885,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   /// Условия живут на соединении транзакции; sequencer изолирует запросы.
   /// Успех очищает временные данные, отказ откатывает их вместе с чтением.
-  Future<void> _prepareCatalogTagFilter(IntentionTagFilter filter) async {
+  Future<String> _prepareCatalogTagFilter(IntentionTagFilter filter) async {
+    final connectionId = (await _tagReadStorageVersion()).connectionId;
     for (final (table, tagIds) in [
       ('doable_catalog_required_tags', filter.requiredTagIds),
       ('doable_catalog_excluded_tags', filter.excludedTagIds),
@@ -891,26 +895,48 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         'CREATE TEMP TABLE IF NOT EXISTS $table '
         '(tag_id TEXT NOT NULL PRIMARY KEY) WITHOUT ROWID',
       );
-      await _database.customStatement('DELETE FROM temp.$table');
+      await _writeCatalogTagFilter(connectionId, 'DELETE FROM temp.$table');
       final ids = tagIds.toList(growable: false);
       const batchSize = 400;
       for (var start = 0; start < ids.length; start += batchSize) {
         final batch = ids.skip(start).take(batchSize).toList(growable: false);
         final values = List.filled(batch.length, '(?)').join(', ');
-        await _database.customStatement(
+        await _writeCatalogTagFilter(
+          connectionId,
           'INSERT INTO temp.$table (tag_id) VALUES $values',
           [for (final id in batch) id.toCanonicalString()],
         );
       }
     }
+    return connectionId;
   }
 
-  Future<void> _clearCatalogTagFilter() async {
-    await _database.customStatement(
+  Future<void> _clearCatalogTagFilter(String connectionId) async {
+    await _writeCatalogTagFilter(
+      connectionId,
       'DELETE FROM temp.doable_catalog_required_tags',
     );
-    await _database.customStatement(
+    await _writeCatalogTagFilter(
+      connectionId,
       'DELETE FROM temp.doable_catalog_excluded_tags',
+    );
+  }
+
+  Future<void> _writeCatalogTagFilter(
+    String connectionId,
+    String statement, [
+    List<String> arguments = const [],
+  ]) async {
+    final changedRows = await _database.customUpdate(
+      statement,
+      variables: [for (final argument in arguments) Variable<String>(argument)],
+    );
+    // Считаем только фактически изменённые строки служебной таблицы.
+    // Как total_changes(), этот учёт переживает откат транзакции.
+    _catalogTemporaryChanges.update(
+      connectionId,
+      (previous) => previous + changedRows,
+      ifAbsent: () => changedRows,
     );
   }
 
