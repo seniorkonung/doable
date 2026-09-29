@@ -241,7 +241,7 @@ final class _TagAssignmentsSectionState
               loading: true,
             ),
             TagAssignmentsIntentionMissing() => _AssignmentStatus(
-              message: l10n.tagAssignmentTargetNotFound,
+              message: l10n.tagAssignmentIntentionNotFound,
             ),
             TagAssignmentsInitialFailure(:final failure, :final canRetry) =>
               _AssignmentStatus(

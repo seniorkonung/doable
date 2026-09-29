@@ -13,7 +13,9 @@ void main() {
       (tester) async {
         tester.view.physicalSize = const Size(360, 640);
         tester.view.devicePixelRatio = 1;
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
         addTearDown(tester.view.reset);
+        final semantics = tester.ensureSemantics();
         final name = '${'Длинный тег ' * 18}Дом';
         final tag = Tag(
           id: (TagId.decode(
@@ -61,7 +63,7 @@ void main() {
                     'активным',
                     'архивированным',
                     'намерениям',
-                    'связям',
+                    'на момент выполнения',
                     'незагруженные',
                     'сохраняются',
                     'дневные выборы',
@@ -73,18 +75,33 @@ void main() {
                     'intentions',
                     'relations',
                     'not loaded',
+                    'at the time',
                     'remain',
                     'daily choices',
                   ]) {
           expect(text.toLowerCase(), contains(term));
         }
+        expect(text, isNot(contains('долговременным связям')));
+        expect(text, isNot(contains('intentions and long-term relations')));
+        await tester.ensureVisible(message);
+        expect(tester.getSemantics(message).label, contains(text));
+        final confirm = find.byKey(const ValueKey('tag-delete-confirm'));
+        await tester.ensureVisible(confirm);
+        expect(tester.getSemantics(confirm).label, isNotEmpty);
         expect(tester.takeException(), isNull);
         await tester.ensureVisible(
           find.byKey(const ValueKey('tag-delete-cancel')),
         );
+        expect(
+          tester
+              .getSemantics(find.byKey(const ValueKey('tag-delete-cancel')))
+              .label,
+          isNotEmpty,
+        );
         await tester.tap(find.byKey(const ValueKey('tag-delete-cancel')));
         await tester.pumpAndSettle();
         expect(result, isFalse);
+        semantics.dispose();
       },
     );
   }
