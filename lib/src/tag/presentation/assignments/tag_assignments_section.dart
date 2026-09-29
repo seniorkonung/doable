@@ -7,29 +7,29 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/domain/intention_id.dart';
 import '../../application/tag_assignments.dart';
 import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
-import '../../domain/tag_target.dart';
 import '../tag_failure_message.dart';
 import 'tag_assignments_state.dart';
 import 'tag_assignments_view_model.dart';
 
-/// Общий блок для подробностей обоих допустимых получателей.
+/// Назначения тегов намерению в его собственном архивном состоянии.
 final class TagAssignmentsSection extends ConsumerStatefulWidget {
   const TagAssignmentsSection({
-    required this.target,
+    required this.intentionId,
     required this.isArchived,
     required this.onChooseTag,
     required this.onOpenTag,
     super.key,
   });
 
-  final TagTarget target;
+  final IntentionId intentionId;
   final bool isArchived;
-  final ValueChanged<TagTarget> onChooseTag;
+  final ValueChanged<IntentionId> onChooseTag;
   final ValueChanged<TagId> onOpenTag;
 
   @override
@@ -60,7 +60,7 @@ final class _TagAssignmentsSectionState
   @override
   void didUpdateWidget(TagAssignmentsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.target != widget.target) {
+    if (oldWidget.intentionId != widget.intentionId) {
       _releasePresentation();
       _activeRemoveToken = null;
       _removeFailure = null;
@@ -86,32 +86,34 @@ final class _TagAssignmentsSectionState
     _failureClaim = null;
   }
 
-  GraphCommandKey get _targetKey => switch (widget.target) {
-    IntentionTagTarget(:final intentionId) => ExistingIntentionKey(intentionId),
-    LongTermRelationTagTarget(:final relationId) => ExistingLongTermRelationKey(
-      relationId,
-    ),
-  };
+  bool get _intentionBusy =>
+      _activeRemoveToken != null || _coordinator.isRunning(widget.intentionId);
 
-  bool get _targetBusy =>
-      _activeRemoveToken != null || _coordinator.isKeyRunning(_targetKey);
+  void _choose(IntentionId intentionId) {
+    if (!mounted || widget.intentionId != intentionId || _intentionBusy) return;
+    final state = ref.read(tagAssignmentsViewModelProvider(intentionId));
+    if (state is! TagAssignmentsLoaded || !state.canUseCurrentItems) return;
+    widget.onChooseTag(intentionId);
+  }
 
-  void _open(TagId tagId) {
+  void _open(IntentionId intentionId, TagId tagId) {
+    if (!mounted || widget.intentionId != intentionId) return;
     final model = ref.read(
-      tagAssignmentsViewModelProvider(widget.target).notifier,
+      tagAssignmentsViewModelProvider(intentionId).notifier,
     );
     if (!model.canActOn(tagId)) return;
     widget.onOpenTag(tagId);
   }
 
-  void _remove(Tag tag) {
+  void _remove(IntentionId intentionId, Tag tag) {
+    if (!mounted || widget.intentionId != intentionId) return;
     final model = ref.read(
-      tagAssignmentsViewModelProvider(widget.target).notifier,
+      tagAssignmentsViewModelProvider(intentionId).notifier,
     );
     if (_activeRemoveToken != null || !model.canActOn(tag.id)) return;
     _releasePresentation();
     final start = _coordinator.acceptTagRemoveAssignment(
-      RemoveTagAssignment(tagId: tag.id, target: widget.target),
+      RemoveTagAssignment(tagId: tag.id, intentionId: intentionId),
     );
     switch (start) {
       case TagCommandAccepted(:final token, :final future):
@@ -120,7 +122,7 @@ final class _TagAssignmentsSectionState
           _removeFailure = null;
           _commandBusy = false;
         });
-        unawaited(_finishRemove(widget.target, token, future));
+        unawaited(_finishRemove(intentionId, token, future));
       case TagCommandAlreadyRunning():
         setState(() {
           _removeFailure = null;
@@ -135,14 +137,14 @@ final class _TagAssignmentsSectionState
   }
 
   Future<void> _finishRemove(
-    TagTarget target,
+    IntentionId intentionId,
     TagOperationToken token,
     Future<TagCommandCompletion> future,
   ) async {
     try {
       final completion = await future;
       if (!mounted ||
-          widget.target != target ||
+          widget.intentionId != intentionId ||
           !identical(_activeRemoveToken, token)) {
         return;
       }
@@ -165,7 +167,7 @@ final class _TagAssignmentsSectionState
       }
     } on Object {
       if (!mounted ||
-          widget.target != target ||
+          widget.intentionId != intentionId ||
           !identical(_activeRemoveToken, token)) {
         return;
       }
@@ -180,26 +182,24 @@ final class _TagAssignmentsSectionState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final state = ref.watch(tagAssignmentsViewModelProvider(widget.target));
+    final intentionId = widget.intentionId;
+    final state = ref.watch(tagAssignmentsViewModelProvider(intentionId));
     final model = ref.read(
-      tagAssignmentsViewModelProvider(widget.target).notifier,
+      tagAssignmentsViewModelProvider(intentionId).notifier,
     );
-    final targetKind = switch (widget.target) {
-      IntentionTagTarget() => l10n.tagAssignmentsIntention,
-      LongTermRelationTagTarget() => l10n.tagAssignmentsRelation,
-    };
+    final intentionKind = l10n.tagAssignmentsIntention;
     final archiveState = widget.isArchived
         ? l10n.tagAssignmentsArchived
         : l10n.tagAssignmentsActive;
     final canChoose =
         state is TagAssignmentsLoaded &&
         state.canUseCurrentItems &&
-        !_targetBusy;
+        !_intentionBusy;
 
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: l10n.tagAssignmentsContext(targetKind, archiveState),
+      label: l10n.tagAssignmentsContext(intentionKind, archiveState),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -209,14 +209,12 @@ final class _TagAssignmentsSectionState
           ),
           Tooltip(
             message: l10n.tagAssignmentsChooseSemantic(
-              targetKind,
+              intentionKind,
               archiveState,
             ),
             child: TextButton.icon(
               key: const ValueKey('tag-assignments-choose'),
-              onPressed: canChoose
-                  ? () => widget.onChooseTag(widget.target)
-                  : null,
+              onPressed: canChoose ? () => _choose(intentionId) : null,
               icon: const Icon(Icons.add),
               label: Text(l10n.tagAssignmentsChoose),
             ),
@@ -242,7 +240,7 @@ final class _TagAssignmentsSectionState
               message: l10n.tagAssignmentsLoading,
               loading: true,
             ),
-            TagAssignmentsTargetMissing() => _AssignmentStatus(
+            TagAssignmentsIntentionMissing() => _AssignmentStatus(
               message: l10n.tagAssignmentTargetNotFound,
             ),
             TagAssignmentsInitialFailure(:final failure, :final canRetry) =>
@@ -254,10 +252,10 @@ final class _TagAssignmentsSectionState
             TagAssignmentsLoaded loaded => _LoadedAssignments(
               state: loaded,
               model: model,
-              canRemove: !_targetBusy,
+              canRemove: !_intentionBusy,
               isTagBusy: _coordinator.isTagRunning,
-              onRemove: _remove,
-              onOpen: _open,
+              onRemove: (tag) => _remove(intentionId, tag),
+              onOpen: (tagId) => _open(intentionId, tagId),
             ),
           },
         ],
@@ -397,6 +395,6 @@ String _readFailure(AppLocalizations l10n, TagAssignmentsReadFailure failure) =>
     switch (failure) {
       TagAssignmentsUnavailableFailure() => l10n.tagAssignmentsUnavailable,
       TagAssignmentsCorruptionFailure() => l10n.tagAssignmentsCorruption,
-      TagAssignmentsTargetNotFound() ||
+      TagAssignmentsIntentionNotFound() ||
       TagAssignmentsUnexpectedFailure() => l10n.tagAssignmentsUnexpected,
     };

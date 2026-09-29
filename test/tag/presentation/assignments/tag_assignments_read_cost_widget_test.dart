@@ -7,8 +7,6 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
@@ -40,98 +38,81 @@ void main() {
   });
   tearDown(() => database.close());
 
-  for (final (kind, target, expectedCount) in [
-    (
-      'намерения',
-      IntentionTagTarget(
-        (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id,
-      ),
-      602,
-    ),
-    (
-      'долговременной связи',
-      LongTermRelationTagTarget(
-        (LongTermRelationId.decode(
-          tagFixtureId(101),
-        ) as LongTermRelationIdDecodingSuccess).id,
-      ),
-      401,
-    ),
-  ]) {
-    testWidgets(
-      'полная загрузка и прокрутка $expectedCount назначений $kind остаются доступными',
-      (tester) async {
-        tester.view.physicalSize = const Size(600, 900);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              personalGraphRepositoryProvider.overrideWithValue(repository),
-            ],
-            child: MaterialApp(
-              locale: const Locale('ru'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: Scaffold(
-                body: SingleChildScrollView(
-                  key: const ValueKey('assignment-cost-scroll'),
-                  child: TagAssignmentsSection(
-                    target: target,
-                    isArchived: false,
-                    onChooseTag: (_) {},
-                    onOpenTag: (_) {},
-                  ),
+  final intentionId =
+      (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
+  const expectedCount = 602;
+  testWidgets(
+    'полная загрузка и прокрутка $expectedCount назначений намерения остаются доступными',
+    (tester) async {
+      tester.view.physicalSize = const Size(600, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp(
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                key: const ValueKey('assignment-cost-scroll'),
+                child: TagAssignmentsSection(
+                  intentionId: intentionId,
+                  isArchived: false,
+                  onChooseTag: (_) {},
+                  onOpenTag: (_) {},
                 ),
               ),
             ),
           ),
-        );
-        await tester.pump();
-        final scroll = find.byKey(const ValueKey('assignment-cost-scroll'));
-        expect(scroll, findsOneWidget);
-        final container = ProviderScope.containerOf(tester.element(scroll));
-        await _pumpUntil(
-          tester,
-          () =>
-              container.read(tagAssignmentsViewModelProvider(target))
-                  is TagAssignmentsLoaded,
-        );
-        final state = container.read(tagAssignmentsViewModelProvider(target));
-        expect(state, isA<TagAssignmentsLoaded>());
-        final loaded = state as TagAssignmentsLoaded;
-        expect(loaded.items, hasLength(expectedCount));
-        expect(
-          find.byKey(const ValueKey('tag-assignments-load-more')),
-          findsNothing,
-        );
-        expect(loaded.items.first.id.toCanonicalString(), tagFixtureId(10000));
-        expect(
-          loaded.items.last.id.toCanonicalString(),
-          tagFixtureId(target is IntentionTagTarget ? 11202 : 11200),
-        );
+        ),
+      );
+      await tester.pump();
+      final scroll = find.byKey(const ValueKey('assignment-cost-scroll'));
+      expect(scroll, findsOneWidget);
+      final container = ProviderScope.containerOf(tester.element(scroll));
+      await _pumpUntil(
+        tester,
+        () =>
+            container.read(tagAssignmentsViewModelProvider(intentionId))
+                is TagAssignmentsLoaded,
+      );
+      final state = container.read(
+        tagAssignmentsViewModelProvider(intentionId),
+      );
+      expect(state, isA<TagAssignmentsLoaded>());
+      final loaded = state as TagAssignmentsLoaded;
+      expect(loaded.items, hasLength(expectedCount));
+      expect(
+        find.byKey(const ValueKey('tag-assignments-load-more')),
+        findsNothing,
+      );
+      expect(loaded.items.first.id.toCanonicalString(), tagFixtureId(10000));
+      expect(loaded.items.last.id.toCanonicalString(), tagFixtureId(11202));
 
-        final scrollable = tester.state<ScrollableState>(
-          find.byType(Scrollable).last,
-        );
-        var farthestOffset = 0.0;
-        for (var movement = 0; movement < 20; movement++) {
-          await tester.drag(scroll, Offset(0, movement < 10 ? -600 : 600));
-          await tester.pumpAndSettle();
-          if (scrollable.position.pixels > farthestOffset) {
-            farthestOffset = scrollable.position.pixels;
-          }
-          expect(tester.takeException(), isNull);
+      final scrollable = tester.state<ScrollableState>(
+        find.byType(Scrollable).last,
+      );
+      var farthestOffset = 0.0;
+      for (var movement = 0; movement < 20; movement++) {
+        await tester.drag(scroll, Offset(0, movement < 10 ? -600 : 600));
+        await tester.pumpAndSettle();
+        if (scrollable.position.pixels > farthestOffset) {
+          farthestOffset = scrollable.position.pixels;
         }
-        expect(farthestOffset, greaterThan(0));
-        expect(scrollable.position.pixels, lessThan(100));
-        expect(
-          container.read(tagAssignmentsViewModelProvider(target)),
-          same(state),
-        );
-      },
-    );
-  }
+        expect(tester.takeException(), isNull);
+      }
+      expect(farthestOffset, greaterThan(0));
+      expect(scrollable.position.pixels, lessThan(100));
+      expect(
+        container.read(tagAssignmentsViewModelProvider(intentionId)),
+        same(state),
+      );
+    },
+  );
 }
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
