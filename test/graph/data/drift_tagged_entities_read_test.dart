@@ -32,9 +32,20 @@ LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
   tagFixtureId(number),
 ) as LongTermRelationIdDecodingSuccess).id;
 
+/// Выражения чтений каталога с условиями по тегам, в которых внедряется отказ.
+bool _isCatalogCount(String sql) =>
+    sql.contains('json_each(') && sql.contains('COUNT(');
+
+bool _isCatalogRows(String sql) =>
+    sql.contains('json_each(') && sql.contains('LIMIT');
+
+bool _isCatalogTags(String sql) => sql.contains('FROM tag_assignments a');
+
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
   final statements = <String>[];
-  var failAfterFilterInsert = false;
+
+  /// Однократный отказ после первого подходящего выражения.
+  bool Function(String sql)? failAfter;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
@@ -45,12 +56,10 @@ final class _ReadProbe extends LocalDatabaseConnectionObserver {
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (failAfterFilterInsert &&
-        statement.statements.single.startsWith(
-          'INSERT INTO temp.doable_catalog_excluded_tags',
-        )) {
-      failAfterFilterInsert = false;
-      throw StateError('CANARY-отказ после служебной вставки');
+    final matches = failAfter;
+    if (matches != null && matches(statement.statements.single)) {
+      failAfter = null;
+      throw StateError('CANARY-отказ совместного поиска');
     }
   }
 }
@@ -526,6 +535,103 @@ void main() {
         },
       );
     }
+  }
+
+  for (final (label, filter) in [
+    (
+      'обязательные теги',
+      IntentionTagFilter(requiredTagIds: [_tag(firstTagNumber)]),
+    ),
+    (
+      'исключённые теги',
+      IntentionTagFilter(excludedTagIds: [_tag(lastTagNumber), _tag(999)]),
+    ),
+    (
+      'совместные условия',
+      IntentionTagFilter(
+        requiredTagIds: [_tag(firstTagNumber)],
+        excludedTagIds: [_tag(lastTagNumber), _tag(999)],
+      ),
+    ),
+  ]) {
+    test('успешные и отказавшие чтения каталога ($label) '
+        'не меняют total_changes() соединения', () async {
+      for (var number = 10; number < 17; number++) {
+        raw.execute(
+          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+          [tagFixtureId(number), 'Намерение $number', number, number],
+        );
+        for (final tagNumber in [
+          firstTagNumber,
+          if (number.isEven) lastTagNumber,
+        ]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(tagNumber), tagFixtureId(number)],
+          );
+        }
+      }
+      int connectionChanges() =>
+          raw.select('SELECT total_changes() AS count').single['count'] as int;
+      IntentionCatalogQuery query({IntentionCatalogCursor? cursor}) =>
+          IntentionCatalogQuery(
+            scope: IntentionScope.active,
+            titleFilter: null,
+            tagFilter: filter,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+            cursor: cursor,
+          );
+      IntentionCatalogPage success(Result<IntentionCatalogPage> result) =>
+          (result as ResultSuccess<IntentionCatalogPage>).value;
+      final before = connectionChanges();
+
+      final first = success(await graph.getCatalogPage(query()));
+      expect(first.nextCursor, isNotNull);
+      expect(connectionChanges(), before);
+      final repeated = success(await graph.getCatalogPage(query()));
+      expect(
+        repeated.items.map((item) => item.id),
+        first.items.map((item) => item.id),
+      );
+      expect(connectionChanges(), before);
+      final continuation = success(
+        await graph.getCatalogPage(query(cursor: first.nextCursor)),
+      );
+      expect(continuation.items.single.id, isNot(first.items.single.id));
+      expect(connectionChanges(), before);
+
+      for (final (point, failAfter, cursor) in [
+        ('количество', _isCatalogCount, null),
+        ('первая порция', _isCatalogRows, null),
+        ('теги первой порции', _isCatalogTags, null),
+        ('продолжение', _isCatalogRows, first.nextCursor),
+        ('теги продолжения', _isCatalogTags, first.nextCursor),
+      ]) {
+        probe.failAfter = failAfter;
+        expect(
+          await graph.getCatalogPage(query(cursor: cursor)),
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (result) => result.failure,
+            'отказ: $point',
+            isA<IntentionUnexpectedFailure>(),
+          ),
+        );
+        expect(probe.failAfter, isNull, reason: point);
+        expect(connectionChanges(), before, reason: point);
+      }
+      expect(
+        success(await graph.getCatalogPage(query())).items.single.id,
+        first.items.single.id,
+      );
+      expect(connectionChanges(), before);
+      expect(
+        raw
+            .select("SELECT name FROM temp.sqlite_schema WHERE type = 'table'")
+            .map((row) => row['name']),
+        everyElement('doable_catalog_connection'),
+      );
+    });
   }
 
   test(

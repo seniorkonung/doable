@@ -52,7 +52,7 @@ void _taggedEntitiesCatalogStorageScenarios(
             }
 
             if (writeBeforeSearch) write();
-            h.probe.failAfterFilterInsert = searchFails;
+            h.probe.failAfter = searchFails ? _isCatalogRows : null;
             final search = await h.graph.getCatalogPage(
               _storageScenarioQuery(),
             );
@@ -121,7 +121,7 @@ void _taggedEntitiesCatalogStorageScenarios(
     }
   }
 
-  test('служебный учёт двух соединений изолирован, предметная команда устаревает курсоры обоих', () async {
+  test('поиски на двух соединениях сохраняют курсоры обоих, предметная команда устаревает курсоры обоих', () async {
     final h = await open();
     final other = AppDatabase(openFileBackedLocalDatabase(h.file));
     addTearDown(other.close);
@@ -130,7 +130,7 @@ void _taggedEntitiesCatalogStorageScenarios(
     final first = await _storageScenarioPage(h.graph);
     final otherFirst = await _storageScenarioPage(otherGraph);
     for (var index = 0; index < 3; index++) {
-      h.probe.failAfterFilterInsert = index.isEven;
+      h.probe.failAfter = index.isEven ? _isCatalogRows : null;
       await h.graph.getCatalogPage(_storageScenarioQuery());
       expect(
         await otherGraph.getCatalogPage(_storageScenarioQuery()),

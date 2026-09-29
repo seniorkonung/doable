@@ -329,12 +329,9 @@ extension _TagReading on DriftPersonalGraphRepository {
           'data_version FROM pragma_data_version, temp.doable_catalog_connection',
         )
         .getSingle();
-    final connectionId = _requiredStoredString(row.data, 'connection_id');
     return (
-      connectionId: connectionId,
-      connectionChanges:
-          _requiredStoredInteger(row.data, 'connection_changes') -
-          (_catalogTemporaryChanges[connectionId] ?? 0),
+      connectionId: _requiredStoredString(row.data, 'connection_id'),
+      connectionChanges: _requiredStoredInteger(row.data, 'connection_changes'),
       dataVersion: _requiredStoredInteger(row.data, 'data_version'),
     );
   }

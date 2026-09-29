@@ -1,6 +1,7 @@
 @Tags(['slow'])
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
@@ -284,18 +285,32 @@ void _expectJointMaterialization(
   expect(tags.rowCount, tagCount);
   // Объём назначений может превышать размер порции. Число чтений не растёт
   // с числом намерений: количество, порция, агрегаты и назначения пакетны.
-  // Одно служебное чтение привязывает учёт TEMP к физическому соединению.
-  final connectionReads = trace.selects.where(
-    (select) => select.statement.contains('total_changes()'),
-  );
-  expect(connectionReads, hasLength(1));
-  expect(connectionReads.single.rowCount, 1);
-  expect(trace.selects, hasLength(isFirst ? 5 : 4));
-  expect(trace.conditionBatchSizes, everyElement(lessThanOrEqualTo(400)));
+  // Наборы условий передаются параметрами, служебных записей и чтений нет.
   expect(
-    trace.conditionBatchSizes.fold(0, (sum, size) => sum + size),
-    _conditionCount * 2,
+    trace.selects.where(
+      (select) => select.statement.contains('total_changes()'),
+    ),
+    isEmpty,
   );
+  expect(trace.writes, isEmpty);
+  expect(trace.selects, hasLength(isFirst ? 4 : 3));
+  for (final select in [...counts, read]) {
+    final conditionSets = select.arguments
+        .whereType<String>()
+        .where((argument) => argument.startsWith('['))
+        .map((argument) => (jsonDecode(argument) as List).toSet())
+        .toList();
+    expect(conditionSets, [
+      {
+        for (var index = 0; index < _conditionCount; index++)
+          _fixtureId(_requiredTagBase + index),
+      },
+      {
+        for (var index = 0; index < _conditionCount; index++)
+          _fixtureId(_excludedTagBase + index),
+      },
+    ]);
+  }
   _expectNoOffset(trace);
 }
 
@@ -318,9 +333,16 @@ void _expectJointPlans(
         select.statement.contains('LIMIT'),
   )) {
     final plan = _observedPlan(database, select).join('\n');
-    expect(plan, contains('tag_assignments_intention'));
-    expect(plan, contains('required_tag'));
-    expect(plan, contains('excluded_tag USING PRIMARY KEY'));
+    expect(plan, contains('SCAN required_tag VIRTUAL TABLE'));
+    expect(plan, contains('SCAN excluded_tag VIRTUAL TABLE'));
+    // Наборы из json_each(?) не индексированы: назначения проверяются
+    // адресно по ключу намерения и тега, а не просмотром.
+    expect(
+      plan,
+      contains('tag_assignments_intention (intention_id=? AND tag_id=?)'),
+    );
+    expect(plan, contains('(tag_id=? AND intention_id=?)'));
+    expect(plan, isNot(contains('SCAN assignment')));
     expect(plan.contains('intention_titles_fts'), usesFts);
   }
   final pagePlan = _observedPlan(
@@ -687,14 +709,14 @@ enum _IndexDirection {
 
 final class _SelectTrace extends LocalDatabaseConnectionObserver {
   final selects = <_TracedSelect>[];
-  final conditionBatchSizes = <int>[];
+  final writes = <String>[];
   final _started = <LocalDatabaseSqlStatement, Stopwatch>{};
   int? parameterLimit;
   var isRecording = true;
 
   void clear() {
     selects.clear();
-    conditionBatchSizes.clear();
+    writes.clear();
   }
 
   @override
@@ -704,10 +726,8 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
       throw StateError('Превышено число параметров SQL-выражения.');
     }
     if (isRecording &&
-        statement.statements.any(
-          (sql) => sql.startsWith('INSERT INTO temp.doable_catalog_'),
-        )) {
-      conditionBatchSizes.add(statement.arguments.length);
+        statement.operation != LocalDatabaseSqlOperation.select) {
+      writes.addAll(statement.statements);
     }
     if (isRecording &&
         statement.operation == LocalDatabaseSqlOperation.select) {

@@ -107,7 +107,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   final TagIdGenerator _tagIdGenerator;
   final _GraphEpoch _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
-  final Map<String, int> _catalogTemporaryChanges = {};
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
   final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
   _dailyChoiceWatchers = {};
@@ -199,23 +198,17 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     }
 
     try {
-      final hasTagConditions =
-          query.tagFilter.requiredTagIds.isNotEmpty ||
-          query.tagFilter.excludedTagIds.isNotEmpty;
       final page = await _sequencer.run(
-        () => _database.transaction(() async {
-          Future<IntentionCatalogPage> read() => switch (cursor) {
+        () => _database.transaction(
+          () => switch (cursor) {
             null => _readFirstCatalogPage(query),
             _DriftIntentionCatalogCursor() => _readCatalogContinuationPage(
               query,
               cursor,
             ),
             _ => throw StateError('Недопустимый cursor каталога.'),
-          };
-          return hasTagConditions
-              ? _withCatalogTagFilter(query.tagFilter, read)
-              : read();
-        }),
+          },
+        ),
       );
       _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
@@ -879,92 +872,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return row == null ? null : _StoredIntentionCommandSnapshot.fromRawRow(row);
   }
 
-  /// Условия живут на соединении транзакции; sequencer изолирует запросы.
-  /// Успех очищает временные данные, отказ откатывает их вместе с чтением.
-  Future<T> _withCatalogTagFilter<T>(
-    IntentionTagFilter filter,
-    Future<T> Function() read,
-  ) async {
-    final before = await _tagReadStorageVersion();
-    try {
-      await _prepareCatalogTagFilter(before.connectionId, filter);
-      final result = await read();
-      await _clearCatalogTagFilter(before.connectionId);
-      return result;
-    } on Object {
-      // В этой транзакции чтения пишет только подготовка и очистка TEMP.
-      // SQL мог выполниться до исключения, не вернув число изменённых строк.
-      // Учитываем оставшиеся записи до отката на том же соединении.
-      final after = await _tagReadStorageVersion();
-      if (after.connectionId != before.connectionId) {
-        throw const _StoredIntentionCorruption();
-      }
-      final unaccounted = after.connectionChanges - before.connectionChanges;
-      _catalogTemporaryChanges.update(
-        before.connectionId,
-        (previous) => previous + unaccounted,
-        ifAbsent: () => unaccounted,
-      );
-      rethrow;
-    }
-  }
-
-  Future<void> _prepareCatalogTagFilter(
-    String connectionId,
-    IntentionTagFilter filter,
-  ) async {
-    for (final (table, tagIds) in [
-      ('doable_catalog_required_tags', filter.requiredTagIds),
-      ('doable_catalog_excluded_tags', filter.excludedTagIds),
-    ]) {
-      await _database.customStatement(
-        'CREATE TEMP TABLE IF NOT EXISTS $table '
-        '(tag_id TEXT NOT NULL PRIMARY KEY) WITHOUT ROWID',
-      );
-      await _writeCatalogTagFilter(connectionId, 'DELETE FROM temp.$table');
-      final ids = tagIds.toList(growable: false);
-      const batchSize = 400;
-      for (var start = 0; start < ids.length; start += batchSize) {
-        final batch = ids.skip(start).take(batchSize).toList(growable: false);
-        final values = List.filled(batch.length, '(?)').join(', ');
-        await _writeCatalogTagFilter(
-          connectionId,
-          'INSERT INTO temp.$table (tag_id) VALUES $values',
-          [for (final id in batch) id.toCanonicalString()],
-        );
-      }
-    }
-  }
-
-  Future<void> _clearCatalogTagFilter(String connectionId) async {
-    await _writeCatalogTagFilter(
-      connectionId,
-      'DELETE FROM temp.doable_catalog_required_tags',
-    );
-    await _writeCatalogTagFilter(
-      connectionId,
-      'DELETE FROM temp.doable_catalog_excluded_tags',
-    );
-  }
-
-  Future<void> _writeCatalogTagFilter(
-    String connectionId,
-    String statement, [
-    List<String> arguments = const [],
-  ]) async {
-    final changedRows = await _database.customUpdate(
-      statement,
-      variables: [for (final argument in arguments) Variable<String>(argument)],
-    );
-    // Считаем только фактически изменённые строки служебной таблицы.
-    // Как total_changes(), этот учёт переживает откат транзакции.
-    _catalogTemporaryChanges.update(
-      connectionId,
-      (previous) => previous + changedRows,
-      ifAbsent: () => changedRows,
-    );
-  }
-
   Future<IntentionCatalogFirstPage> _readFirstCatalogPage(
     IntentionCatalogQuery query,
   ) async {
@@ -1055,31 +962,13 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           condition &
           intentions.id.equals(excludedIntentionId.toCanonicalString()).not();
     }
-    if (query.tagFilter.requiredTagIds.isNotEmpty) {
-      condition =
-          condition &
-          const CustomExpression<bool>('''
-        NOT EXISTS (
-          SELECT 1 FROM temp.doable_catalog_required_tags AS required_tag
-          WHERE NOT EXISTS (
-            SELECT 1 FROM tag_assignments AS assignment
-            WHERE assignment.intention_id = intentions.id
-              AND assignment.tag_id = required_tag.tag_id
-          )
-        )
-      ''');
+    final requiredTagIds = query.tagFilter.requiredTagIds;
+    if (requiredTagIds.isNotEmpty) {
+      condition = condition & _RequiredCatalogTagsExpression(requiredTagIds);
     }
-    if (query.tagFilter.excludedTagIds.isNotEmpty) {
-      condition =
-          condition &
-          const CustomExpression<bool>('''
-        NOT EXISTS (
-          SELECT 1 FROM tag_assignments AS assignment
-          JOIN temp.doable_catalog_excluded_tags AS excluded_tag
-            ON excluded_tag.tag_id = assignment.tag_id
-          WHERE assignment.intention_id = intentions.id
-        )
-      ''');
+    final excludedTagIds = query.tagFilter.excludedTagIds;
+    if (excludedTagIds.isNotEmpty) {
+      condition = condition & _ExcludedCatalogTagsExpression(excludedTagIds);
     }
     final filter = query.titleFilter;
     if (filter == null) return condition;
@@ -1659,6 +1548,51 @@ final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
     id,
     catalogMutation: IntentionCatalogDeleted(revision: revision, entry: before),
   );
+}
+
+/// Набор условий передаётся одним параметром: JSON-массивом канонических
+/// строк для `json_each(?)`. Чтение ничего не пишет на соединение, а число
+/// условий не ограничено числом параметров SQL-выражения.
+Variable<String> _catalogTagIdsParameter(Set<TagId> tagIds) => Variable<String>(
+  jsonEncode([for (final id in tagIds) id.toCanonicalString()]),
+);
+
+/// Намерение имеет собственные назначения всех обязательных тегов.
+final class _RequiredCatalogTagsExpression extends Expression<bool> {
+  const _RequiredCatalogTagsExpression(this._tagIds);
+
+  final Set<TagId> _tagIds;
+
+  @override
+  void writeInto(GenerationContext context) {
+    context.buffer.write('NOT EXISTS (SELECT 1 FROM json_each(');
+    _catalogTagIdsParameter(_tagIds).writeInto(context);
+    context.buffer.write(
+      ') AS required_tag WHERE NOT EXISTS ('
+      'SELECT 1 FROM tag_assignments AS assignment '
+      'WHERE assignment.intention_id = intentions.id '
+      'AND assignment.tag_id = required_tag.value))',
+    );
+  }
+}
+
+/// Намерение не имеет собственных назначений ни одного исключённого тега.
+final class _ExcludedCatalogTagsExpression extends Expression<bool> {
+  const _ExcludedCatalogTagsExpression(this._tagIds);
+
+  final Set<TagId> _tagIds;
+
+  @override
+  void writeInto(GenerationContext context) {
+    context.buffer.write(
+      'NOT EXISTS (SELECT 1 FROM tag_assignments AS assignment '
+      'WHERE assignment.intention_id = intentions.id '
+      'AND assignment.tag_id IN ('
+      'SELECT excluded_tag.value FROM json_each(',
+    );
+    _catalogTagIdsParameter(_tagIds).writeInto(context);
+    context.buffer.write(') AS excluded_tag))');
+  }
 }
 
 final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {

@@ -12,10 +12,9 @@ void _catalogTagFilterFailureScenarios(
   replace,
 ) {
   for (final (point, label) in [
-    (_CatalogFailurePoint.afterInsert, 'после вставки условий'),
-    (_CatalogFailurePoint.read, 'при чтении после вставок'),
-    (_CatalogFailurePoint.beforeCleanup, 'перед очисткой условий'),
-    (_CatalogFailurePoint.afterCleanup, 'после удаления условий'),
+    (_CatalogFailurePoint.count, 'при подсчёте совпадений'),
+    (_CatalogFailurePoint.rows, 'при чтении порции'),
+    (_CatalogFailurePoint.tags, 'при чтении тегов порции'),
   ]) {
     for (final (error, failure, code)
         in <(Object, Matcher, DiagnosticsFailureCode)>[
@@ -79,6 +78,7 @@ void _catalogTagFilterFailureScenarios(
           ) as TaggedEntitiesPageSuccess).value;
           expect(first.nextCursor, isNotNull);
           final before = _storedFilterFailureGraph(raw);
+          final changesBefore = _connectionChanges(raw);
           observer.arm();
 
           expect(
@@ -91,6 +91,7 @@ void _catalogTagFilterFailureScenarios(
           );
           expect(observer.hasFailed, isTrue);
           expect(_storedFilterFailureGraph(raw), before);
+          expect(_connectionChanges(raw), changesBefore);
           expect(
             diagnostics.events.last,
             isA<CatalogPageReadDiagnosticsEvent>().having(
@@ -138,12 +139,7 @@ void _catalogTagFilterFailureScenarios(
             GraphRevisionOrder.same,
           );
           expect(_storedFilterFailureGraph(raw), before);
-          for (final table in [
-            'doable_catalog_required_tags',
-            'doable_catalog_excluded_tags',
-          ]) {
-            expect(raw.select('SELECT * FROM temp.$table'), isEmpty);
-          }
+          expect(_connectionChanges(raw), changesBefore);
         });
       }
     }
@@ -162,7 +158,10 @@ Map<String, List<List<Object?>>> _storedFilterFailureGraph(Database raw) => {
         .toList(),
 };
 
-enum _CatalogFailurePoint { afterInsert, read, beforeCleanup, afterCleanup }
+int _connectionChanges(Database raw) =>
+    raw.select('SELECT total_changes() AS count').single['count'] as int;
+
+enum _CatalogFailurePoint { count, rows, tags }
 
 final class _CatalogFilterFailureObserver
     extends LocalDatabaseConnectionObserver {
@@ -172,40 +171,23 @@ final class _CatalogFilterFailureObserver
   final Object failure;
   var _armed = false;
   var hasFailed = false;
-  var _requiredDeletes = 0;
 
   void arm() => _armed = true;
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (!_armed || hasFailed) return;
-    if (statement.statements.single ==
-        'DELETE FROM temp.doable_catalog_required_tags') {
-      _requiredDeletes++;
-      if (point == _CatalogFailurePoint.beforeCleanup &&
-          _requiredDeletes == 2) {
-        _fail();
-      }
-    }
-  }
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
     if (!_armed || hasFailed) return;
     final sql = statement.statements.single;
-    if ((point == _CatalogFailurePoint.afterInsert &&
-            sql.startsWith('INSERT INTO temp.doable_catalog_excluded_tags')) ||
-        (point == _CatalogFailurePoint.afterCleanup &&
-            sql == 'DELETE FROM temp.doable_catalog_required_tags' &&
-            _requiredDeletes == 2) ||
-        (point == _CatalogFailurePoint.read &&
-            sql.contains('FROM tag_assignments a'))) {
-      _fail();
+    final matches = switch (point) {
+      _CatalogFailurePoint.count =>
+        sql.contains('json_each(') && sql.contains('COUNT('),
+      _CatalogFailurePoint.rows =>
+        sql.contains('json_each(') && sql.contains('LIMIT'),
+      _CatalogFailurePoint.tags => sql.contains('FROM tag_assignments a'),
+    };
+    if (matches) {
+      hasFailed = true;
+      throw failure;
     }
-  }
-
-  Never _fail() {
-    hasFailed = true;
-    throw failure;
   }
 }

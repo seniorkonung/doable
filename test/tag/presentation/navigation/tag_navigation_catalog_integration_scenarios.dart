@@ -25,7 +25,7 @@ void _realTagNavigationCatalogScenarios() {
           expect(first.nextCursor, isNotNull);
           h.probe.navigationReads.clear();
           final stateOffset = h.states.length;
-          h.probe.failAfterFilterInsert = searchFails;
+          h.probe.failCatalogSearch = searchFails;
 
           final search = await h.graph.getCatalogPage(
             IntentionCatalogQuery(
@@ -212,7 +212,7 @@ final class _RealNavigationHarness {
 
 final class _NavigationCatalogSqlProbe extends LocalDatabaseConnectionObserver {
   final navigationReads = <String>[];
-  var failAfterFilterInsert = false;
+  var failCatalogSearch = false;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
@@ -225,11 +225,11 @@ final class _NavigationCatalogSqlProbe extends LocalDatabaseConnectionObserver {
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (failAfterFilterInsert &&
-        statement.statements.single.startsWith(
-          'INSERT INTO temp.doable_catalog_excluded_tags',
-        )) {
-      failAfterFilterInsert = false;
+    final sql = statement.statements.single;
+    if (failCatalogSearch &&
+        sql.contains('json_each(') &&
+        sql.contains('LIMIT')) {
+      failCatalogSearch = false;
       throw StateError('CANARY-отказ совместного поиска');
     }
   }
