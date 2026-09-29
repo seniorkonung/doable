@@ -38,7 +38,7 @@
   - **Вероятные файлы:** `lib/src/tag/application/tag_catalog.dart`, `lib/src/tag/application/tag_assignments.dart`, `lib/src/tag/application/tag_assignment_status.dart`, `lib/src/tag/application/tag_read_result.dart`, `test/tag/application/tag_read_contract_test.dart`, `test/support/tag_read_contract_test_fallback.dart`.
   - **Размер:** M.
 
-- [ ] 1.4 Контракт навигации возвращает ограниченные страницы кратких данных помеченных намерений
+- [x] 1.4 Контракт навигации возвращает ограниченные страницы кратких данных помеченных намерений
   - **Критерии приёмки:**
     - Страница содержит только `TaggedIntention` с идентификатором, названием и собственным архивным состоянием. `TaggedEntity` и `TaggedLongTermRelation` удалены; запрос, страница, продолжение и отказы называются по помеченным намерениям.
     - Сохраняются конечный размер страницы, неизменяемость результата, принадлежность выбранному охвату и различение неверного продолжения, устаревшего снимка, отсутствия тега и отказов чтения.
