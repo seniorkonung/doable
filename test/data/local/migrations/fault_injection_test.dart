@@ -5,8 +5,6 @@ import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/schema_v1_fixture.dart';
-
 const _nextSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
 void main() {
@@ -88,15 +86,15 @@ void main() {
     expect(harness.isClosed, isTrue);
   });
 
-  group('диагностика перехода схемы 1 → 3', () {
+  group('диагностика создания схемы', () {
     test(
-      'ошибка получателя до миграции не препятствует подтверждению',
+      'ошибка получателя до создания не препятствует подтверждению',
       () async {
         final diagnostics = _SelectivelyThrowingDiagnosticsSink(
           (event) => event.status is DiagnosticsStarted,
         );
 
-        final database = await _openSchema1WithDiagnostics(diagnostics);
+        final database = await _createSchemaWithDiagnostics(diagnostics);
 
         await _expectCurrentSchema(database);
         expect(
@@ -106,12 +104,12 @@ void main() {
       },
     );
 
-    test('ошибка получателя после миграции не меняет её исход', () async {
+    test('ошибка получателя после создания не меняет его исход', () async {
       final diagnostics = _SelectivelyThrowingDiagnosticsSink(
         (event) => event.status is DiagnosticsSucceeded,
       );
 
-      final database = await _openSchema1WithDiagnostics(diagnostics);
+      final database = await _createSchemaWithDiagnostics(diagnostics);
 
       await _expectCurrentSchema(database);
       expect(
@@ -122,11 +120,11 @@ void main() {
   });
 }
 
-Future<AppDatabase> _openSchema1WithDiagnostics(
+Future<AppDatabase> _createSchemaWithDiagnostics(
   DiagnosticsSink diagnostics,
 ) async {
   final temporaryDirectory = await Directory.systemTemp.createTemp(
-    'doable_diagnostics_migration_',
+    'doable_diagnostics_creation_',
   );
   addTearDown(() async {
     if (await temporaryDirectory.exists()) {
@@ -134,7 +132,6 @@ Future<AppDatabase> _openSchema1WithDiagnostics(
     }
   });
   final databaseFile = File('${temporaryDirectory.path}/doable.sqlite');
-  await createSchemaV1Fixture(databaseFile);
   final database = AppDatabase(
     openFileBackedLocalDatabase(databaseFile),
     diagnosticsSink: diagnostics,

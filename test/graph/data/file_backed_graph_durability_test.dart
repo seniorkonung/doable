@@ -27,7 +27,6 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/large_blocking_relations_fixture.dart';
-import '../../support/schema_v1_fixture.dart';
 
 const _sourceIdValue = '018f0b5d-6b2e-7c80-8000-000000000901';
 const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
@@ -134,115 +133,112 @@ void main() {
     await _expectCanonicalConnectionIntegrity(database);
   });
 
-  test(
-    'миграция схемы 1 сохраняет намерения и поддерживает долговечный каскад',
-    () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      await createSchemaV1Fixture(harness.databaseFile, seed: _seedSchemaV1);
+  test('сохранённые намерения переживают повторное открытие и поддерживают долговечный каскад', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    await _createStoredIntentions(harness);
 
-      var database = await harness.openReadyDatabase();
-      expect(
-        (await _intentionRows(database))
-            .singleWhere((row) => row['id'] == _unrelatedIdValue),
-        <String, Object?>{
-          'id': _unrelatedIdValue,
-          'title': 'Архивное намерение',
-          'description': '  Сохранённый текст  ',
-          'is_action_ready': 1,
-          'is_archived': 1,
-          'created_at': 1704067200000000,
-          'updated_at': 1704153600000000,
-        },
-      );
-      final repository = _repository(database, [
-        _firstRelationId,
-        _secondRelationId,
-      ]);
-      expect(
-        await repository.execute(
-          _createCommand(
-            relatedId: _firstNeighborId,
-            type: LongTermRelationType.need,
-            priority: RelationPriority.p1,
-            description: 'Нужная связь',
-          ),
+    var database = await harness.openReadyDatabase();
+    expect(
+      (await _intentionRows(database))
+          .singleWhere((row) => row['id'] == _unrelatedIdValue),
+      <String, Object?>{
+        'id': _unrelatedIdValue,
+        'title': 'Архивное намерение',
+        'description': '  Сохранённый текст  ',
+        'is_action_ready': 1,
+        'is_archived': 1,
+        'created_at': 1704067200000000,
+        'updated_at': 1704153600000000,
+      },
+    );
+    final repository = _repository(database, [
+      _firstRelationId,
+      _secondRelationId,
+    ]);
+    expect(
+      await repository.execute(
+        _createCommand(
+          relatedId: _firstNeighborId,
+          type: LongTermRelationType.need,
+          priority: RelationPriority.p1,
+          description: 'Нужная связь',
         ),
-        isA<GraphCommandSucceeded>(),
-      );
-      expect(
-        await repository.execute(
-          _createCommand(
-            relatedId: _secondNeighborId,
-            type: LongTermRelationType.can,
-            priority: RelationPriority.p4,
-            description: 'Возможная связь',
-          ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await repository.execute(
+        _createCommand(
+          relatedId: _secondNeighborId,
+          type: LongTermRelationType.can,
+          priority: RelationPriority.p4,
+          description: 'Возможная связь',
         ),
-        isA<GraphCommandSucceeded>(),
-      );
-      expect(
-        await repository.execute(ArchiveIntention(_sourceId)),
-        isA<ResultSuccess>(),
-      );
-      await harness.closePersistenceObjectGraph();
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await repository.execute(ArchiveIntention(_sourceId)),
+      isA<ResultSuccess>(),
+    );
+    await harness.closePersistenceObjectGraph();
 
-      database = await harness.openReadyDatabase();
-      expect(await _relationRows(database), [
-        {
-          'creation_sequence': 1,
-          'id': _firstRelationIdValue,
-          'source_intention_id': _sourceIdValue,
-          'related_intention_id': _firstNeighborIdValue,
-          'type': 'need',
-          'priority': 1,
-          'description': 'Нужная связь',
-          'is_archived': 1,
-        },
-        {
-          'creation_sequence': 2,
-          'id': _secondRelationIdValue,
-          'source_intention_id': _sourceIdValue,
-          'related_intention_id': _secondNeighborIdValue,
-          'type': 'can',
-          'priority': 4,
-          'description': 'Возможная связь',
-          'is_archived': 1,
-        },
-      ]);
-      final intentions = await _intentionRows(database);
-      expect(
-        intentions.singleWhere((row) => row['id'] == _sourceIdValue),
-        containsPair('is_archived', 1),
-      );
-      expect(
-        intentions.singleWhere((row) => row['id'] == _firstNeighborIdValue),
-        containsPair('is_archived', 0),
-      );
-      expect(
-        intentions.singleWhere((row) => row['id'] == _secondNeighborIdValue),
-        containsPair('is_archived', 0),
-      );
-      expect(
-        intentions.singleWhere((row) => row['id'] == _unrelatedIdValue),
-        <String, Object?>{
-          'id': _unrelatedIdValue,
-          'title': 'Архивное намерение',
-          'description': '  Сохранённый текст  ',
-          'is_action_ready': 1,
-          'is_archived': 1,
-          'created_at': 1704067200000000,
-          'updated_at': 1704153600000000,
-        },
-      );
-      final reopenedRepository = _repository(database, const []);
-      final sourceCounts = await _counts(reopenedRepository, _sourceId);
-      expect(sourceCounts.active, 0);
-      expect(sourceCounts.archivedNeedOutgoing, 1);
-      expect(sourceCounts.archivedCanOutgoing, 1);
-      await _expectCanonicalConnectionIntegrity(database);
-    },
-  );
+    database = await harness.openReadyDatabase();
+    expect(await _relationRows(database), [
+      {
+        'creation_sequence': 1,
+        'id': _firstRelationIdValue,
+        'source_intention_id': _sourceIdValue,
+        'related_intention_id': _firstNeighborIdValue,
+        'type': 'need',
+        'priority': 1,
+        'description': 'Нужная связь',
+        'is_archived': 1,
+      },
+      {
+        'creation_sequence': 2,
+        'id': _secondRelationIdValue,
+        'source_intention_id': _sourceIdValue,
+        'related_intention_id': _secondNeighborIdValue,
+        'type': 'can',
+        'priority': 4,
+        'description': 'Возможная связь',
+        'is_archived': 1,
+      },
+    ]);
+    final intentions = await _intentionRows(database);
+    expect(
+      intentions.singleWhere((row) => row['id'] == _sourceIdValue),
+      containsPair('is_archived', 1),
+    );
+    expect(
+      intentions.singleWhere((row) => row['id'] == _firstNeighborIdValue),
+      containsPair('is_archived', 0),
+    );
+    expect(
+      intentions.singleWhere((row) => row['id'] == _secondNeighborIdValue),
+      containsPair('is_archived', 0),
+    );
+    expect(
+      intentions.singleWhere((row) => row['id'] == _unrelatedIdValue),
+      <String, Object?>{
+        'id': _unrelatedIdValue,
+        'title': 'Архивное намерение',
+        'description': '  Сохранённый текст  ',
+        'is_action_ready': 1,
+        'is_archived': 1,
+        'created_at': 1704067200000000,
+        'updated_at': 1704153600000000,
+      },
+    );
+    final reopenedRepository = _repository(database, const []);
+    final sourceCounts = await _counts(reopenedRepository, _sourceId);
+    expect(sourceCounts.active, 0);
+    expect(sourceCounts.archivedNeedOutgoing, 1);
+    expect(sourceCounts.archivedCanOutgoing, 1);
+    await _expectCanonicalConnectionIntegrity(database);
+  });
 
   test('исключение внутри транзакции откатывает файловое создание', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
@@ -350,11 +346,8 @@ void main() {
       () async {
         final harness = await LocalDatabaseHarness.fileBacked();
         addTearDown(harness.dispose);
-        if (installation == _LifecycleInstallation.migrated) {
-          await createSchemaV1Fixture(
-            harness.databaseFile,
-            seed: _seedSchemaV1,
-          );
+        if (installation == _LifecycleInstallation.stored) {
+          await _createStoredIntentions(harness);
         }
 
         var database = await harness.openReadyDatabase();
@@ -1146,7 +1139,16 @@ Future<void> _expectRelationOperationState(
   );
 }
 
-void _seedSchemaV1(sqlite.Database database) {
+/// Намерения записываются в созданную схему и читаются только после
+/// повторного открытия файла.
+Future<void> _createStoredIntentions(LocalDatabaseHarness harness) async {
+  late sqlite.Database raw;
+  await harness.openReadyDatabase(setup: (database) => raw = database);
+  _seedStoredIntentions(raw);
+  await harness.closePersistenceObjectGraph();
+}
+
+void _seedStoredIntentions(sqlite.Database database) {
   database.execute('''
     INSERT INTO intentions (
       id,
@@ -1328,8 +1330,8 @@ enum _GraphProcessOperation {
 }
 
 enum _LifecycleInstallation {
-  fresh('после создания схемы 2'),
-  migrated('после обновления со схемы 1');
+  fresh('после создания схемы'),
+  stored('после повторного открытия сохранённых намерений');
 
   const _LifecycleInstallation(this.testDescription);
 

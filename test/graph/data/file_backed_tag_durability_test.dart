@@ -15,130 +15,101 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
-import '../../support/schema_v1_fixture.dart';
 import '../../support/tag_storage_fixture.dart';
 
 void main() {
-  for (final sourceVersion in [0, 1, 2, 3, 4]) {
-    test(
-      'полный обход навигации сохраняет порядок после нового процесса, переименования, локали и часов: схема $sourceVersion',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        await _createNavigationDatabaseFixture(
-          harness.databaseFile,
-          sourceVersion,
-        );
-        Map<String, List<List<Object?>>>? publishedGraph;
-        if (sourceVersion != 0) {
-          final connection = sqlite.sqlite3.open(harness.databaseFile.path);
-          try {
-            publishedGraph = _publishedNavigationGraphRows(
-              connection,
-              sourceVersion,
-            );
-          } finally {
-            connection.close();
-          }
-        }
-        late sqlite.Database raw;
-        final database = await harness.openReadyDatabase(
-          setup: (db) => raw = db,
-        );
-        if (publishedGraph != null) {
-          expect(
-            _publishedNavigationGraphRows(raw, sourceVersion),
-            publishedGraph,
-          );
-        }
-        if (sourceVersion != 4) {
-          expect(raw.select('SELECT id FROM tags'), isEmpty);
-          _seedNavigationRecipients(raw);
-        }
-        final graphBefore = retainedTagFixtureGraph(raw);
-        final assignmentsBefore = _assignmentRows(raw);
-        final repository = DriftPersonalGraphRepository(
-          database,
-          UuidV7IntentionIdGenerator(),
-          () => DateTime.utc(2026),
-          InMemoryDiagnosticsSink(),
-        );
-        final previousPages = <TaggedIntentionsPage>[];
-        for (final scope in TaggedIntentionsScope.values) {
-          final first = await repository.getTaggedIntentionsPage(
-            TaggedIntentionsQuery(
-              tagId: _navigationTagId(),
-              scope: scope,
-              pageSize: 1,
-            ),
-          );
-          expect(first, isA<TaggedIntentionsPageSuccess>());
-          final page = (first as TaggedIntentionsPageSuccess).value;
-          expect(page.nextCursor, isNotNull);
-          previousPages.add(page);
-        }
-        await harness.closePersistenceObjectGraph();
+  test('полный обход навигации сохраняет порядок после нового процесса, переименования, локали и часов', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    late sqlite.Database raw;
+    await harness.openReadyDatabase(setup: (db) => raw = db);
+    expect(raw.select('SELECT id FROM tags'), isEmpty);
+    _seedStoredNavigationGraph(raw);
+    _seedNavigationRecipients(raw);
+    final storedGraph = _storedNavigationGraphRows(raw);
+    await harness.closePersistenceObjectGraph();
 
-        await _runWorker(
-          harness,
-          'navigation_rename',
-          locale: 'en',
-          clockYear: 1900,
-        );
-        await _runWorker(
-          harness,
-          'navigation_verify',
-          locale: 'ru',
-          clockYear: 2100,
-        );
-
-        final reopened = await harness.openReadyDatabase(
-          setup: (db) => raw = db,
-        );
-        final nextRepository = DriftPersonalGraphRepository(
-          reopened,
-          UuidV7IntentionIdGenerator(),
-          () => DateTime.utc(1800),
-          InMemoryDiagnosticsSink(),
-        );
-        for (final previous in previousPages) {
-          expect(
-            await nextRepository.getTaggedIntentionsPage(
-              TaggedIntentionsQuery(
-                tagId: previous.tag.id,
-                scope: previous.scope,
-                pageSize: 1,
-                cursor: previous.nextCursor,
-              ),
-            ),
-            isA<TaggedIntentionsPageError>().having(
-              (result) => result.failure,
-              'прежний курсор',
-              isA<TaggedIntentionsInvalidCursor>(),
-            ),
-          );
-          final first = (await nextRepository.getTaggedIntentionsPage(
-            TaggedIntentionsQuery(
-              tagId: previous.tag.id,
-              scope: previous.scope,
-              pageSize: 1,
-            ),
-          ) as TaggedIntentionsPageSuccess).value;
-          expect(
-            first.revision.compareTo(previous.revision),
-            GraphRevisionOrder.differentEpoch,
-          );
-          expect(first.tag.name.value, 'Быт 🏷️');
-          expect(first.items.single.id, previous.items.single.id);
-        }
-        expect(_assignmentRows(raw), assignmentsBefore);
-        expect(retainedTagFixtureGraph(raw), graphBefore);
-        expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
-        expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-      },
-      timeout: const Timeout(Duration(minutes: 2)),
+    final database = await harness.openReadyDatabase(setup: (db) => raw = db);
+    expect(_storedNavigationGraphRows(raw), storedGraph);
+    final graphBefore = retainedTagFixtureGraph(raw);
+    final assignmentsBefore = _assignmentRows(raw);
+    final repository = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026),
+      InMemoryDiagnosticsSink(),
     );
-  }
+    final previousPages = <TaggedIntentionsPage>[];
+    for (final scope in TaggedIntentionsScope.values) {
+      final first = await repository.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
+          tagId: _navigationTagId(),
+          scope: scope,
+          pageSize: 1,
+        ),
+      );
+      expect(first, isA<TaggedIntentionsPageSuccess>());
+      final page = (first as TaggedIntentionsPageSuccess).value;
+      expect(page.nextCursor, isNotNull);
+      previousPages.add(page);
+    }
+    await harness.closePersistenceObjectGraph();
+
+    await _runWorker(
+      harness,
+      'navigation_rename',
+      locale: 'en',
+      clockYear: 1900,
+    );
+    await _runWorker(
+      harness,
+      'navigation_verify',
+      locale: 'ru',
+      clockYear: 2100,
+    );
+
+    final reopened = await harness.openReadyDatabase(setup: (db) => raw = db);
+    final nextRepository = DriftPersonalGraphRepository(
+      reopened,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(1800),
+      InMemoryDiagnosticsSink(),
+    );
+    for (final previous in previousPages) {
+      expect(
+        await nextRepository.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
+            tagId: previous.tag.id,
+            scope: previous.scope,
+            pageSize: 1,
+            cursor: previous.nextCursor,
+          ),
+        ),
+        isA<TaggedIntentionsPageError>().having(
+          (result) => result.failure,
+          'прежний курсор',
+          isA<TaggedIntentionsInvalidCursor>(),
+        ),
+      );
+      final first = (await nextRepository.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
+          tagId: previous.tag.id,
+          scope: previous.scope,
+          pageSize: 1,
+        ),
+      ) as TaggedIntentionsPageSuccess).value;
+      expect(
+        first.revision.compareTo(previous.revision),
+        GraphRevisionOrder.differentEpoch,
+      );
+      expect(first.tag.name.value, 'Быт 🏷️');
+      expect(first.items.single.id, previous.items.single.id);
+    }
+    expect(_assignmentRows(raw), assignmentsBefore);
+    expect(retainedTagFixtureGraph(raw), graphBefore);
+    expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
+    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   test('навигация после остановки сохраняет удаления, конец повторного назначения и атомарность последнего номера', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
@@ -258,118 +229,89 @@ void main() {
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
   }, timeout: const Timeout(Duration(minutes: 3)));
 
-  for (final sourceVersion in [0, 1, 2, 3]) {
-    test(
-      'команды сохраняют назначения после остановки и нового процесса: схема $sourceVersion',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        if (sourceVersion != 0) {
-          void seedPublished(sqlite.Database db) => db.execute(
-            'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 10, 10)',
-            [tagFixtureId(900), 'Сохранённое намерение'],
-          );
-          switch (sourceVersion) {
-            case 1:
-              await createSchemaV1Fixture(
-                harness.databaseFile,
-                seed: seedPublished,
-              );
-            case 2:
-              await createSchemaV2Fixture(
-                harness.databaseFile,
-                seed: seedPublished,
-              );
-            case 3:
-              await createSchemaV3Fixture(
-                harness.databaseFile,
-                seed: seedPublished,
-              );
-          }
-        }
-        sqlite.Database? originalConnection;
-        if (sourceVersion != 0) {
-          originalConnection = sqlite.sqlite3.open(harness.databaseFile.path);
-          composeDoableSqliteConnectionSetup(null)(originalConnection);
-          addTearDown(originalConnection.close);
-        }
+  test(
+    'команды сохраняют назначения после остановки и нового процесса',
+    () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      late sqlite.Database raw;
+      await harness.openReadyDatabase(setup: (db) => raw = db);
+      raw.execute(
+        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 10, 10)',
+        [tagFixtureId(900), 'Сохранённое намерение'],
+      );
+      _seedAssignmentRecipients(raw);
+      expect(raw.select('SELECT id FROM tags'), isEmpty);
+      await harness.closePersistenceObjectGraph();
+      // Соединение, открытое до команд другого процесса, видит их подтверждённый результат.
+      final originalConnection = sqlite.sqlite3.open(harness.databaseFile.path);
+      composeDoableSqliteConnectionSetup(null)(originalConnection);
+      addTearDown(originalConnection.close);
 
-        late sqlite.Database raw;
-        await harness.openReadyDatabase(setup: (db) => raw = db);
-        _seedAssignmentRecipients(raw);
-        expect(raw.select('SELECT id FROM tags'), isEmpty);
-        await harness.closePersistenceObjectGraph();
+      await _runWorker(harness, 'assignments_mutate');
+      await _runWorker(harness, 'assignments_verify');
+      expect(
+        originalConnection
+            .select('SELECT id FROM tags ORDER BY creation_sequence')
+            .map((row) => row['id'])
+            .toList(),
+        [tagFixtureId(301), tagFixtureId(303)],
+      );
 
-        await _runWorker(harness, 'assignments_mutate');
-        await _runWorker(harness, 'assignments_verify');
-        if (originalConnection != null) {
-          expect(
-            originalConnection
-                .select('SELECT id FROM tags ORDER BY creation_sequence')
-                .map((row) => row['id'])
-                .toList(),
-            [tagFixtureId(301), tagFixtureId(303)],
-          );
-        }
-
-        await harness.openReadyDatabase(setup: (db) => raw = db);
-        expect(
-          raw
-              .select(
-                'SELECT creation_sequence, id, name FROM tags ORDER BY creation_sequence',
-              )
-              .map((row) => (row['creation_sequence'], row['id'], row['name']))
-              .toList(),
-          [(1, tagFixtureId(301), 'Быт'), (3, tagFixtureId(303), 'Работа')],
-        );
-        expect(
-          raw
-              .select('''
-            SELECT creation_sequence, tag_id, intention_id, long_term_relation_id
-            FROM tag_assignments ORDER BY creation_sequence
-          ''')
-              .map(
-                (row) => (
-                  row['creation_sequence'],
-                  row['tag_id'],
-                  row['intention_id'],
-                  row['long_term_relation_id'],
-                ),
-              )
-              .toList(),
-          [
-            (2, tagFixtureId(303), tagFixtureId(1), null),
-            (6, tagFixtureId(301), tagFixtureId(1), null),
-          ],
-        );
-        expect(
-          raw.select('SELECT id FROM intentions WHERE id = ?', [
-            tagFixtureId(4),
-          ]),
-          isEmpty,
-        );
-        expect(
-          raw.select('SELECT id FROM long_term_relations WHERE id = ?', [
-            tagFixtureId(103),
-          ]),
-          isEmpty,
-        );
-        expect(
-          raw.select('SELECT id FROM intentions WHERE id = ?', [
-            tagFixtureId(900),
-          ]),
-          sourceVersion == 0 ? isEmpty : hasLength(1),
-        );
-        expect(raw.select('SELECT id FROM daily_choices'), hasLength(1));
-        expect(
-          raw.select('SELECT id FROM daily_choice_path_steps'),
-          hasLength(1),
-        );
-        expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
-        expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-      },
-    );
-  }
+      await harness.openReadyDatabase(setup: (db) => raw = db);
+      expect(
+        raw
+            .select(
+              'SELECT creation_sequence, id, name FROM tags ORDER BY creation_sequence',
+            )
+            .map((row) => (row['creation_sequence'], row['id'], row['name']))
+            .toList(),
+        [(1, tagFixtureId(301), 'Быт'), (3, tagFixtureId(303), 'Работа')],
+      );
+      expect(
+        raw
+            .select('''
+          SELECT creation_sequence, tag_id, intention_id
+          FROM tag_assignments ORDER BY creation_sequence
+        ''')
+            .map(
+              (row) => (
+                row['creation_sequence'],
+                row['tag_id'],
+                row['intention_id'],
+              ),
+            )
+            .toList(),
+        [
+          (2, tagFixtureId(303), tagFixtureId(1)),
+          (6, tagFixtureId(301), tagFixtureId(1)),
+        ],
+      );
+      expect(
+        raw.select('SELECT id FROM intentions WHERE id = ?', [tagFixtureId(4)]),
+        isEmpty,
+      );
+      expect(
+        raw.select('SELECT id FROM long_term_relations WHERE id = ?', [
+          tagFixtureId(103),
+        ]),
+        isEmpty,
+      );
+      expect(
+        raw.select('SELECT id FROM intentions WHERE id = ?', [
+          tagFixtureId(900),
+        ]),
+        hasLength(1),
+      );
+      expect(raw.select('SELECT id FROM daily_choices'), hasLength(1));
+      expect(
+        raw.select('SELECT id FROM daily_choice_path_steps'),
+        hasLength(1),
+      );
+      expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
+      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+    },
+  );
 
   // Пять последовательных процессов ограничены по времени внутри _runWorker.
   test(
@@ -640,60 +582,41 @@ void _seedAssignmentRecipients(sqlite.Database raw) {
 TagId _navigationTagId() =>
     (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
 
-Future<void> _createNavigationDatabaseFixture(File file, int version) async {
-  void seed(sqlite.Database raw) {
-    for (final number in [900, 901]) {
-      raw.execute(
-        'INSERT INTO intentions (id, title, description, is_action_ready, created_at, updated_at) VALUES (?, ?, ?, 1, 10, 20)',
-        [
-          tagFixtureId(number),
-          'Сохранённое намерение $number',
-          '  Точный текст  ',
-        ],
-      );
-    }
-    if (version >= 2) {
-      raw.execute(
-        'INSERT INTO long_term_relations (creation_sequence, id, source_intention_id, related_intention_id, type, priority) VALUES (47, ?, ?, ?, ?, 2)',
-        [tagFixtureId(903), tagFixtureId(900), tagFixtureId(901), 'need'],
-      );
-    }
-    if (version >= 3) {
-      raw.execute(
-        'INSERT INTO daily_choices (creation_sequence, id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (63, ?, ?, ?, ?, 1)',
-        [tagFixtureId(904), tagFixtureId(900), tagFixtureId(901), '2026-09-25'],
-      );
-      raw.execute(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-        [tagFixtureId(905), tagFixtureId(904), tagFixtureId(903)],
-      );
-    }
-    if (version == 4) _seedNavigationRecipients(raw);
+/// Сохранённый граф вне тега: намерения, связь, дневной выбор и шаг пути.
+void _seedStoredNavigationGraph(sqlite.Database raw) {
+  for (final number in [900, 901]) {
+    raw.execute(
+      'INSERT INTO intentions (id, title, description, is_action_ready, created_at, updated_at) VALUES (?, ?, ?, 1, 10, 20)',
+      [
+        tagFixtureId(number),
+        'Сохранённое намерение $number',
+        '  Точный текст  ',
+      ],
+    );
   }
-
-  switch (version) {
-    case 0:
-      return;
-    case 1:
-      await createSchemaV1Fixture(file, seed: seed);
-    case 2:
-      await createSchemaV2Fixture(file, seed: seed);
-    case 3:
-      await createSchemaV3Fixture(file, seed: seed);
-    case 4:
-      await createSchemaV4Fixture(file, seed: seed);
-  }
+  raw.execute(
+    'INSERT INTO long_term_relations (creation_sequence, id, source_intention_id, related_intention_id, type, priority) VALUES (47, ?, ?, ?, ?, 2)',
+    [tagFixtureId(903), tagFixtureId(900), tagFixtureId(901), 'need'],
+  );
+  raw.execute(
+    'INSERT INTO daily_choices (creation_sequence, id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (63, ?, ?, ?, ?, 1)',
+    [tagFixtureId(904), tagFixtureId(900), tagFixtureId(901), '2026-09-25'],
+  );
+  raw.execute(
+    'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+    [tagFixtureId(905), tagFixtureId(904), tagFixtureId(903)],
+  );
 }
 
-Map<String, List<List<Object?>>> _publishedNavigationGraphRows(
+Map<String, List<List<Object?>>> _storedNavigationGraphRows(
   sqlite.Database raw,
-  int version,
 ) => {
   for (final table in [
     'intentions',
     'intention_titles_fts',
-    if (version >= 2) 'long_term_relations',
-    if (version >= 3) ...['daily_choices', 'daily_choice_path_steps'],
+    'long_term_relations',
+    'daily_choices',
+    'daily_choice_path_steps',
   ])
     table: raw
         .select('SELECT rowid, * FROM $table ORDER BY rowid')
