@@ -12,7 +12,7 @@ import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,7 +56,7 @@ final class _ReadFault extends LocalDatabaseConnectionObserver {
   }
 }
 
-final class _ForeignTaggedCursor implements TaggedEntitiesCursor {}
+final class _ForeignTaggedCursor implements TaggedIntentionsCursor {}
 
 void main() {
   late AppDatabase database;
@@ -92,23 +92,23 @@ void main() {
       final id = (TagId.decode(
         tagFixtureId(firstTagNumber),
       ) as TagIdDecodingSuccess).id;
-      TaggedEntitiesQuery query({TaggedEntitiesCursor? cursor}) =>
-          TaggedEntitiesQuery(
+      TaggedIntentionsQuery query({TaggedIntentionsCursor? cursor}) =>
+          TaggedIntentionsQuery(
             tagId: id,
-            scope: TaggedEntitiesScope.active,
+            scope: TaggedIntentionsScope.active,
             pageSize: 1,
             cursor: cursor,
           );
 
       expect(
-        await graph.getTaggedEntitiesPage(query()),
-        isA<TaggedEntitiesPageSuccess>(),
+        await graph.getTaggedIntentionsPage(query()),
+        isA<TaggedIntentionsPageSuccess>(),
       );
       expect(
-        await graph.getTaggedEntitiesPage(
+        await graph.getTaggedIntentionsPage(
           query(cursor: _ForeignTaggedCursor()),
         ),
-        isA<TaggedEntitiesPageError>(),
+        isA<TaggedIntentionsPageError>(),
       );
       final validation = sink.events
           .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
@@ -126,11 +126,11 @@ void main() {
         parametersToStatement: [tagFixtureId(firstTagNumber)],
       );
       expect(
-        await graph.getTaggedEntitiesPage(query()),
-        isA<TaggedEntitiesPageError>().having(
+        await graph.getTaggedIntentionsPage(query()),
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesUnavailableFailure>(),
+          isA<TaggedIntentionsUnavailableFailure>(),
         ),
       );
       final unavailable = sink.events
@@ -144,11 +144,11 @@ void main() {
 
       readFault.failure = StateError('CANARY-неизвестная-причина');
       expect(
-        await graph.getTaggedEntitiesPage(query()),
-        isA<TaggedEntitiesPageError>().having(
+        await graph.getTaggedIntentionsPage(query()),
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesUnexpectedFailure>(),
+          isA<TaggedIntentionsUnexpectedFailure>(),
         ),
       );
       final unknown = sink.events
@@ -166,11 +166,11 @@ void main() {
         [tagFixtureId(firstTagNumber), tagFixtureId(999)],
       );
       expect(
-        await graph.getTaggedEntitiesPage(query()),
-        isA<TaggedEntitiesPageError>().having(
+        await graph.getTaggedIntentionsPage(query()),
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesCorruptionFailure>(),
+          isA<TaggedIntentionsCorruptionFailure>(),
         ),
       );
       final corruption = sink.events
@@ -223,10 +223,10 @@ void main() {
     final id =
         (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
     expect(
-      await graph.getTaggedEntitiesPage(
-        TaggedEntitiesQuery(tagId: id, scope: TaggedEntitiesScope.active),
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(tagId: id, scope: TaggedIntentionsScope.active),
       ),
-      isA<TaggedEntitiesPageSuccess>(),
+      isA<TaggedIntentionsPageSuccess>(),
     );
     expect(sink.attempts, 2);
   });
