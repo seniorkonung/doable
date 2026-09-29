@@ -1,8 +1,8 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../intention/domain/intention_id.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
-import '../domain/tag_target.dart';
 import 'tag_assignment_status.dart';
 import 'tag_assignments.dart';
 import 'tag_catalog.dart';
@@ -44,19 +44,20 @@ typedef TagReadError = GraphResultFailure<GraphSnapshot<Tag?>, TagReadFailure>;
 /// Согласованное чтение и проверка данных принадлежат адаптеру графа.
 abstract interface class TagReadContract {
   /// Полный каталог на одной ревизии, в порядке создания тегов.
-  /// Режим выбора содержит подтверждённые признаки назначения получателю.
-  /// Отсутствующий получатель — отдельный отказ даже при пустом каталоге.
+  /// Режим выбора содержит подтверждённые признаки назначения намерению.
+  /// Отсутствующее намерение — отдельный отказ даже при пустом каталоге.
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode);
 
-  /// Все теги существующего получателя на одной ревизии, в порядке создания.
-  /// Пустой успех отличается от отсутствия получателя.
-  Future<TagAssignmentsResult> getTagAssignments(TagTarget target);
+  /// Все теги существующего намерения на одной ревизии, в порядке создания.
+  /// Пустой успех отличается от отсутствия намерения.
+  Future<TagAssignmentsResult> getTagAssignments(IntentionId intentionId);
 
-  /// Проверяет одну пару на согласованном снимке. Отсутствие каждого участника
-  /// и отказ чтения различны; остальные назначения не загружаются.
+  /// Проверяет пару тега и намерения на согласованном снимке. Отсутствие
+  /// каждого участника и отказ чтения различны; остальные назначения
+  /// не загружаются.
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId tagId,
-    TagTarget target,
+    IntentionId intentionId,
   );
 
   /// Возвращает одну порцию непосредственно помеченных сущностей выбранного

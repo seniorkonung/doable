@@ -10,28 +10,28 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tagged_entities_page.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_read_contract_test_fallback.dart';
+
 void main() {
   test(
-    'режим выбора хранит тип получателя и отличается от обычного каталога',
+    'режим выбора хранит идентичность намерения и отличается от каталога',
     () {
-      final intention = IntentionTagTarget(_intentionId(1));
-      final relation = LongTermRelationTagTarget(_relationId(2));
+      final intentionId = _intentionId(1);
+      final sameIntentionId = _intentionId(1);
+      final anotherIntentionId = _intentionId(2);
       expect(const TagCatalogBrowseMode(), const TagCatalogBrowseMode());
-      expect(TagCatalogSelectionMode(intention).target, intention);
-      expect(TagCatalogSelectionMode(relation).target, relation);
-      expect(
-        TagCatalogSelectionMode(intention),
-        isNot(TagCatalogSelectionMode(relation)),
-      );
-      expect(
-        TagCatalogSelectionMode(intention),
-        isNot(const TagCatalogBrowseMode()),
-      );
+      final mode = TagCatalogSelectionMode(intentionId);
+      expect(mode.intentionId, intentionId);
+      expect(mode, TagCatalogSelectionMode(sameIntentionId));
+      expect(mode.hashCode, TagCatalogSelectionMode(sameIntentionId).hashCode);
+      expect(mode, isNot(TagCatalogSelectionMode(anotherIntentionId)));
+      expect(mode, isNot(const TagCatalogBrowseMode()));
     },
   );
 
@@ -52,7 +52,7 @@ void main() {
   });
 
   test('полный выбор хранит подтверждённый признак каждой из 137 строк', () {
-    final target = IntentionTagTarget(_intentionId(1));
+    final intentionId = _intentionId(1);
     final rows = [
       for (var number = 1; number <= 137; number++)
         TagSelectionRow(
@@ -62,14 +62,14 @@ void main() {
     ];
     const revision = _Revision();
     final snapshot = TagCatalogSnapshot.selection(
-      target: target,
+      intentionId: intentionId,
       rows: rows,
       revision: revision,
     );
     rows.clear();
     expect(snapshot, isA<TagSelectionSnapshot>());
     final selection = snapshot as TagSelectionSnapshot;
-    expect(selection.target, target);
+    expect(selection.intentionId, intentionId);
     expect(selection.revision, same(revision));
     expect(selection.items.map((tag) => tag.name.value), [
       for (var number = 1; number <= 137; number++) 'Тег $number',
@@ -81,19 +81,19 @@ void main() {
     expect(() => selection.items.clear(), throwsUnsupportedError);
   });
 
-  test('полный снимок назначений хранит получателя и все 137 тегов', () {
-    final target = LongTermRelationTagTarget(_relationId(1));
+  test('полный снимок назначений хранит намерение и все 137 тегов', () {
+    final intentionId = _intentionId(1);
     final tags = [
       for (var number = 1; number <= 137; number++) _tag(number, 'Тег $number'),
     ];
     const revision = _Revision();
     final snapshot = TagAssignmentsSnapshot(
-      target: target,
+      intentionId: intentionId,
       items: tags,
       revision: revision,
     );
     tags.clear();
-    expect(snapshot.target, target);
+    expect(snapshot.intentionId, intentionId);
     expect(snapshot.revision, same(revision));
     expect(snapshot.items.map((tag) => tag.name.value), [
       for (var number = 1; number <= 137; number++) 'Тег $number',
@@ -101,18 +101,18 @@ void main() {
     expect(() => snapshot.items.clear(), throwsUnsupportedError);
   });
 
-  test('контракт возвращает полный выбор для обоих получателей', () async {
-    final TagReadContract source = _TagReadSource(const []);
-    for (final target in <TagTarget>[
-      IntentionTagTarget(_intentionId(1)),
-      LongTermRelationTagTarget(_relationId(2)),
-    ]) {
+  test('контракт возвращает выбор по идентичности каждого намерения', () async {
+    final TagReadContract source = _TagReadSource(
+      const [],
+      tags: [_tag(1, 'Дом')],
+    );
+    for (final intentionId in [_intentionId(1), _intentionId(2)]) {
       final result = await source.getTagCatalog(
-        TagCatalogSelectionMode(target),
+        TagCatalogSelectionMode(intentionId),
       );
       final snapshot =
           (result as TagCatalogSuccess).value as TagSelectionSnapshot;
-      expect(snapshot.target, target);
+      expect(snapshot.intentionId, intentionId);
       expect(snapshot.rows.single.isAssigned, isFalse);
       expect(snapshot.revision, isA<GraphRevision>());
     }
@@ -125,7 +125,7 @@ void main() {
       final result = await source.getTagCatalog(const TagCatalogBrowseMode());
       expect((result as TagCatalogSuccess).value.items, isEmpty);
       const failures = <TagCatalogReadFailure>[
-        TagCatalogTargetNotFound(),
+        TagCatalogIntentionNotFound(),
         TagCatalogUnavailableFailure(),
         TagCatalogCorruptionFailure(),
         TagCatalogUnexpectedFailure(),
@@ -144,15 +144,15 @@ void main() {
   );
 
   test(
-    'контракт различает отсутствие получателя и категории отказов назначений',
+    'контракт различает отсутствие намерения и категории отказов назначений',
     () async {
-      final target = IntentionTagTarget(_intentionId(1));
+      final intentionId = _intentionId(1);
       final TagReadContract source = _TagReadSource(const []);
-      final result = await source.getTagAssignments(target);
-      expect((result as TagAssignmentsSuccess).value.target, target);
+      final result = await source.getTagAssignments(intentionId);
+      expect((result as TagAssignmentsSuccess).value.intentionId, intentionId);
       expect(result.value.items, isEmpty);
       const failures = <TagAssignmentsReadFailure>[
-        TagAssignmentsTargetNotFound(),
+        TagAssignmentsIntentionNotFound(),
         TagAssignmentsUnavailableFailure(),
         TagAssignmentsCorruptionFailure(),
         TagAssignmentsUnexpectedFailure(),
@@ -167,6 +167,208 @@ void main() {
         final TagAssignmentsResult outcome = TagAssignmentsError(failure);
         expect(outcome, isA<TagAssignmentsError>());
       }
+    },
+  );
+
+  test(
+    'чтения возвращают все 137 тегов в порядке создания на одной ревизии',
+    () async {
+      final intentionId = _intentionId(1);
+      final otherIntentionId = _intentionId(2);
+      final tags = [
+        for (var number = 1; number <= 137; number++)
+          _tag(number, 'Тег ${138 - number}'),
+      ];
+      final pairs = {
+        for (final tag in tags)
+          TagAssignment(tagId: tag.id, intentionId: intentionId),
+        TagAssignment(tagId: tags.last.id, intentionId: otherIntentionId),
+      };
+      const revision = _Revision();
+      final TagReadContract source = _TagReadSource(
+        const [],
+        tags: tags,
+        assignments: pairs,
+        revision: revision,
+      );
+
+      final catalog = (await source.getTagCatalog(
+        const TagCatalogBrowseMode(),
+      ) as TagCatalogSuccess).value;
+      final selection =
+          (await source.getTagCatalog(
+                TagCatalogSelectionMode(intentionId),
+              ) as TagCatalogSuccess).value
+              as TagSelectionSnapshot;
+      final assignments = (await source.getTagAssignments(
+        intentionId,
+      ) as TagAssignmentsSuccess).value;
+      final otherSelection =
+          (await source.getTagCatalog(
+                TagCatalogSelectionMode(otherIntentionId),
+              ) as TagCatalogSuccess).value
+              as TagSelectionSnapshot;
+      final otherAssignments = (await source.getTagAssignments(
+        otherIntentionId,
+      ) as TagAssignmentsSuccess).value;
+      final expectedIds = tags.map((tag) => tag.id).toList();
+      tags.clear();
+      pairs.clear();
+
+      expect(catalog.items.map((tag) => tag.id), expectedIds);
+      expect(selection.items.map((tag) => tag.id), expectedIds);
+      expect(selection.rows.every((row) => row.isAssigned), isTrue);
+      expect(selection.intentionId, intentionId);
+      expect(assignments.items.map((tag) => tag.id), expectedIds);
+      expect(assignments.intentionId, intentionId);
+      expect(
+        otherSelection.rows.where((row) => row.isAssigned).single.tag.id,
+        expectedIds.last,
+      );
+      expect(otherAssignments.items.single.id, expectedIds.last);
+      for (final snapshot in [catalog, selection, otherSelection]) {
+        expect(snapshot.revision, same(revision));
+        expect(() => snapshot.items.clear(), throwsUnsupportedError);
+      }
+      for (final snapshot in [assignments, otherAssignments]) {
+        expect(snapshot.revision, same(revision));
+        expect(() => snapshot.items.clear(), throwsUnsupportedError);
+      }
+      expect(() => selection.rows.clear(), throwsUnsupportedError);
+    },
+  );
+
+  test(
+    'пустые снимки существующего намерения отличаются от его отсутствия',
+    () async {
+      final intentionId = _intentionId(1);
+      final missingIntentionId = _intentionId(99);
+      final TagReadContract source = _TagReadSource(const []);
+
+      final selection =
+          (await source.getTagCatalog(
+                TagCatalogSelectionMode(intentionId),
+              ) as TagCatalogSuccess).value
+              as TagSelectionSnapshot;
+      final assignments = (await source.getTagAssignments(
+        intentionId,
+      ) as TagAssignmentsSuccess).value;
+      expect(selection.intentionId, intentionId);
+      expect(selection.rows, isEmpty);
+      expect(assignments.intentionId, intentionId);
+      expect(assignments.items, isEmpty);
+      expect(
+        (await source.getTagCatalog(
+          TagCatalogSelectionMode(missingIntentionId),
+        ) as TagCatalogError).failure,
+        isA<TagCatalogIntentionNotFound>(),
+      );
+      expect(
+        (await source.getTagAssignments(
+          missingIntentionId,
+        ) as TagAssignmentsError).failure,
+        isA<TagAssignmentsIntentionNotFound>(),
+      );
+    },
+  );
+
+  test(
+    'точечный статус проверяет обе идентичности без чтения полных списков',
+    () async {
+      final tag = _tag(1, 'Дом');
+      final unassignedTag = _tag(2, 'Работа');
+      final intentionId = _intentionId(1);
+      final otherIntentionId = _intentionId(2);
+      const revision = _Revision();
+      final source = _TagReadSource(
+        const [],
+        tags: [tag, unassignedTag],
+        assignments: {TagAssignment(tagId: tag.id, intentionId: intentionId)},
+        revision: revision,
+      );
+      final TagReadContract contract = source;
+
+      for (final (tagId, id, isAssigned) in [
+        (tag.id, intentionId, true),
+        (tag.id, otherIntentionId, false),
+        (unassignedTag.id, intentionId, false),
+      ]) {
+        final status = (await contract.getTagAssignmentStatus(
+          tagId,
+          id,
+        ) as TagAssignmentStatusSuccess).value;
+        expect(status.value, isAssigned);
+        expect(status.revision, same(revision));
+      }
+      expect(
+        (await contract.getTagAssignmentStatus(
+          _tag(99, 'Дом').id,
+          intentionId,
+        ) as TagAssignmentStatusError).failure,
+        isA<TagAssignmentStatusTagNotFound>(),
+      );
+      expect(
+        (await contract.getTagAssignmentStatus(
+          tag.id,
+          _intentionId(99),
+        ) as TagAssignmentStatusError).failure,
+        isA<TagAssignmentStatusIntentionNotFound>(),
+      );
+      expect(source.catalogReads, 0);
+      expect(source.assignmentReads, 0);
+    },
+  );
+
+  test(
+    'отказы статуса различают отсутствующих участников и причины чтения',
+    () {
+      const failures = <TagAssignmentStatusFailure>[
+        TagAssignmentStatusTagNotFound(),
+        TagAssignmentStatusIntentionNotFound(),
+        TagAssignmentStatusUnavailable(),
+        TagAssignmentStatusCorruption(),
+        TagAssignmentStatusUnexpected(),
+      ];
+      expect(failures.map((failure) => failure.category), [
+        GraphFailureCategory.notFound,
+        GraphFailureCategory.notFound,
+        GraphFailureCategory.unavailable,
+        GraphFailureCategory.corruption,
+        GraphFailureCategory.unexpected,
+      ]);
+      for (final failure in failures) {
+        final TagAssignmentStatusResult result = TagAssignmentStatusError(
+          failure,
+        );
+        expect((result as TagAssignmentStatusError).failure, same(failure));
+      }
+    },
+  );
+
+  test(
+    'запасная тестовая реализация возвращает отказы вместо пустого успеха',
+    () async {
+      final TagReadContract source = _FallbackTagReadSource();
+      final intentionId = _intentionId(1);
+      expect(
+        (await source.getTagCatalog(
+          TagCatalogSelectionMode(intentionId),
+        ) as TagCatalogError).failure,
+        isA<TagCatalogUnexpectedFailure>(),
+      );
+      expect(
+        (await source.getTagAssignments(
+          intentionId,
+        ) as TagAssignmentsError).failure,
+        isA<TagAssignmentsUnexpectedFailure>(),
+      );
+      expect(
+        (await source.getTagAssignmentStatus(
+          _tag(1, 'Дом').id,
+          intentionId,
+        ) as TagAssignmentStatusError).failure,
+        isA<TagAssignmentStatusUnexpected>(),
+      );
     },
   );
 
@@ -411,26 +613,68 @@ final class _Revision implements GraphRevision {
 }
 
 final class _TagReadSource implements TagReadContract {
-  _TagReadSource(this.results);
+  _TagReadSource(
+    this.results, {
+    this.tags = const [],
+    Set<IntentionId>? intentions,
+    this.assignments = const {},
+    this.revision = const _Revision(),
+  }) : intentions = intentions ?? {_intentionId(1), _intentionId(2)};
 
   final List<TagReadResult> results;
+  final List<Tag> tags;
+  final Set<IntentionId> intentions;
+  final Set<TagAssignment> assignments;
+  final GraphRevision revision;
   TagId? requestedId;
+  var catalogReads = 0;
+  var assignmentReads = 0;
 
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId tagId,
-    TagTarget target,
-  ) async => const TagAssignmentStatusError(TagAssignmentStatusUnexpected());
+    IntentionId intentionId,
+  ) async {
+    if (!tags.any((tag) => tag.id == tagId)) {
+      return const TagAssignmentStatusError(TagAssignmentStatusTagNotFound());
+    }
+    if (!intentions.contains(intentionId)) {
+      return const TagAssignmentStatusError(
+        TagAssignmentStatusIntentionNotFound(),
+      );
+    }
+    return TagAssignmentStatusSuccess(
+      GraphSnapshot(
+        value: assignments.contains(
+          TagAssignment(tagId: tagId, intentionId: intentionId),
+        ),
+        revision: revision,
+      ),
+    );
+  }
 
   @override
-  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) async =>
-      TagAssignmentsSuccess(
-        TagAssignmentsSnapshot(
-          target: target,
-          items: const [],
-          revision: const _Revision(),
-        ),
-      );
+  Future<TagAssignmentsResult> getTagAssignments(
+    IntentionId intentionId,
+  ) async {
+    assignmentReads++;
+    if (!intentions.contains(intentionId)) {
+      return const TagAssignmentsError(TagAssignmentsIntentionNotFound());
+    }
+    return TagAssignmentsSuccess(
+      TagAssignmentsSnapshot(
+        intentionId: intentionId,
+        items: tags
+            .where(
+              (tag) => assignments.contains(
+                TagAssignment(tagId: tag.id, intentionId: intentionId),
+              ),
+            )
+            .toList(),
+        revision: revision,
+      ),
+    );
+  }
 
   @override
   Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
@@ -448,16 +692,30 @@ final class _TagReadSource implements TagReadContract {
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async {
+    catalogReads++;
+    if (mode case TagCatalogSelectionMode(:final intentionId)
+        when !intentions.contains(intentionId)) {
+      return const TagCatalogError(TagCatalogIntentionNotFound());
+    }
     return TagCatalogSuccess(switch (mode) {
       TagCatalogBrowseMode() => TagCatalogSnapshot(
-        items: const [],
-        revision: const _Revision(),
+        items: tags,
+        revision: revision,
       ),
-      TagCatalogSelectionMode(:final target) => TagCatalogSnapshot.selection(
-        target: target,
-        rows: [TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: false)],
-        revision: const _Revision(),
-      ),
+      TagCatalogSelectionMode(:final intentionId) =>
+        TagCatalogSnapshot.selection(
+          intentionId: intentionId,
+          rows: [
+            for (final tag in tags)
+              TagSelectionRow(
+                tag: tag,
+                isAssigned: assignments.contains(
+                  TagAssignment(tagId: tag.id, intentionId: intentionId),
+                ),
+              ),
+          ],
+          revision: revision,
+        ),
     });
   }
 
@@ -467,3 +725,5 @@ final class _TagReadSource implements TagReadContract {
     return Stream.fromIterable(results);
   }
 }
+
+final class _FallbackTagReadSource with TagReadContractTestFallback {}

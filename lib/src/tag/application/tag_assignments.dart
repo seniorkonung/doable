@@ -1,17 +1,17 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../intention/domain/intention_id.dart';
 import '../domain/tag.dart';
-import '../domain/tag_target.dart';
 
-/// Все назначенные получателю теги в порядке создания тегов.
-/// Пустой успех означает существующего получателя без назначений.
+/// Все назначенные намерению теги в порядке создания тегов на одной ревизии.
+/// Пустой успех означает существующее намерение без назначений.
 final class TagAssignmentsSnapshot {
   TagAssignmentsSnapshot({
-    required this.target,
+    required this.intentionId,
     required List<Tag> items,
     required this.revision,
   }) : items = List.unmodifiable(items);
-  final TagTarget target;
+  final IntentionId intentionId;
   final List<Tag> items;
   final GraphRevision revision;
 }
@@ -20,8 +20,8 @@ sealed class TagAssignmentsReadFailure implements GraphCommandFailure {
   const TagAssignmentsReadFailure();
 }
 
-final class TagAssignmentsTargetNotFound extends TagAssignmentsReadFailure {
-  const TagAssignmentsTargetNotFound();
+final class TagAssignmentsIntentionNotFound extends TagAssignmentsReadFailure {
+  const TagAssignmentsIntentionNotFound();
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.notFound;
