@@ -4,7 +4,7 @@ import '../../application/tag_catalog.dart';
 import '../../application/tag_read_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
-import '../../domain/tag_target.dart';
+import '../../../intention/domain/intention_id.dart';
 
 sealed class TagCatalogState {
   const TagCatalogState();
@@ -27,10 +27,10 @@ final class TagCatalogInitialFailure extends TagCatalogState {
   bool get canRetry => failure is TagCatalogUnavailableFailure;
 }
 
-final class TagCatalogTargetMissing extends TagCatalogState {
-  const TagCatalogTargetMissing(this.target);
+final class TagCatalogIntentionMissing extends TagCatalogState {
+  const TagCatalogIntentionMissing(this.intentionId);
 
-  final TagTarget target;
+  final IntentionId intentionId;
 }
 
 enum TagCatalogFreshness { current, refreshing, stale }

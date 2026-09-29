@@ -6,28 +6,25 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  for (final (relation, language, scale) in [
-    (false, 'ru', 1.0),
-    (false, 'en', 2.5),
-    (true, 'en', 1.0),
-    (true, 'ru', 2.5),
+  for (final (intentionNumber, language, scale) in [
+    (100, 'ru', 1.0),
+    (100, 'en', 2.5),
+    (200, 'en', 1.0),
+    (200, 'ru', 2.5),
   ]) {
-    final description =
-        '${relation ? 'долговременная связь' : 'намерение'}, $language, текст $scale';
+    final description = 'намерение $intentionNumber, $language, текст $scale';
 
     testWidgets(
       'переключение скрытого выбора на найденную строку сохраняет область назначения и прокрутку: $description',
@@ -36,7 +33,7 @@ void main() {
         try {
           final repository = await _showCatalog(
             tester,
-            relation: relation,
+            intentionNumber: intentionNumber,
             language: language,
             scale: scale,
           );
@@ -52,7 +49,7 @@ void main() {
             findsOneWidget,
           );
           final l10n = AppLocalizations.of(
-            tester.element(find.byType(TagCatalogPage)),
+            tester.element(find.byType(TagCatalogView)),
           );
           final selectionLabel = tester
               .getSemantics(
@@ -119,7 +116,7 @@ void main() {
       (tester) async {
         final repository = await _showCatalog(
           tester,
-          relation: relation,
+          intentionNumber: intentionNumber,
           language: language,
           scale: scale,
         );
@@ -223,7 +220,7 @@ void main() {
       (tester) async {
         final repository = await _showCatalog(
           tester,
-          relation: relation,
+          intentionNumber: intentionNumber,
           language: language,
           scale: scale,
         );
@@ -236,13 +233,13 @@ void main() {
     );
   }
 
-  for (final relation in [false, true]) {
+  for (final intentionNumber in [100, 200]) {
     testWidgets(
-      'поздний ответ прежнего выбора не заменяет текущий тег: ${relation ? 'долговременная связь' : 'намерение'}',
+      'поздний ответ прежнего выбора не заменяет текущий тег: намерение $intentionNumber',
       (tester) async {
         final repository = await _showCatalog(
           tester,
-          relation: relation,
+          intentionNumber: intentionNumber,
           language: 'ru',
           scale: 1,
         );
@@ -303,23 +300,17 @@ void main() {
 
 Future<_ControlledRepository> _showCatalog(
   WidgetTester tester, {
-  required bool relation,
+  required int intentionNumber,
   required String language,
   required double scale,
 }) async {
   tester.view.physicalSize = const Size(420, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final target = relation
-      ? LongTermRelationTagTarget(
-          (LongTermRelationId.decode(
-            _id(200),
-          ) as LongTermRelationIdDecodingSuccess).id,
-        )
-      : IntentionTagTarget(
-          (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
-        );
-  final repository = _ControlledRepository(target);
+  final intentionId = (IntentionId.decode(
+    _id(intentionNumber),
+  ) as IntentionIdDecodingSuccess).id;
+  final repository = _ControlledRepository(intentionId);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -334,15 +325,19 @@ Future<_ControlledRepository> _showCatalog(
               .copyWith(textScaler: TextScaler.linear(scale)),
           child: child!,
         ),
-        home: TagCatalogPage(target: target),
+        home: TagCatalogView(
+          mode: TagCatalogSelectionMode(intentionId),
+          onOpenEditor: (_) async => null,
+          onOpenNavigation: (_) {},
+        ),
       ),
     ),
   );
-  expect(repository.catalogModes, [TagCatalogSelectionMode(target)]);
+  expect(repository.catalogModes, [TagCatalogSelectionMode(intentionId)]);
   repository.catalogRead.complete(
     TagCatalogSuccess(
       TagCatalogSnapshot.selection(
-        target: target,
+        intentionId: intentionId,
         rows: repository.rows,
         revision: const _Revision(),
       ),
@@ -379,9 +374,9 @@ final class _Revision implements GraphRevision {
 
 final class _ControlledRepository extends Fake
     implements PersonalGraphRepository {
-  _ControlledRepository(this.target);
+  _ControlledRepository(this.intentionId);
 
-  final TagTarget target;
+  final IntentionId intentionId;
   final rows = [
     for (var index = 1; index <= 132; index++)
       TagSelectionRow(
@@ -407,7 +402,7 @@ final class _ControlledRepository extends Fake
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId id,
-    TagTarget target,
+    IntentionId intentionId,
   ) async {
     assignmentReads++;
     return TagAssignmentStatusSuccess(
