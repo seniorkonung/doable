@@ -175,7 +175,7 @@ dependencies:
 - repo_url: seniorkonung/agent-skills
   name: agent-skills
   host: github.com
-  resolved_commit: 85d9757f4f8928a758e53898c77ec3e7f64fa7b5
+  resolved_commit: af2dab8e57c336675ebab41e3b878a2ff6644cba
   resolved_ref: main
   version: 0.0.1
   package_type: apm_package
@@ -255,6 +255,7 @@ dependencies:
   - .claude/agents/test-engineer.md
   - .claude/rules/commit-message-conventions.md
   - .claude/rules/domain-language.md
+  - .claude/rules/process-discipline.md
   - .claude/rules/production-readiness.md
   - .claude/skills/c4-diagrams
   - .claude/skills/c4-diagrams/SKILL.md
@@ -387,6 +388,7 @@ dependencies:
     .claude/agents/test-engineer.md: sha256:7fa49278ec977731a18f7ce743561a6d62945db0be15578e748945cf19ae822a
     .claude/rules/commit-message-conventions.md: sha256:4d0e01e3f8628b9f4e2a90b932935cd819bd50a0969862294e140ae6e4aeb8ba
     .claude/rules/domain-language.md: sha256:047b781ee08264502823b2594ab7851095bbf1ed455d6e51ff1883baa95b9861
+    .claude/rules/process-discipline.md: sha256:0881e04e71d1480690e708917090c885e9c3230dc3541e789e0030a4073e9d40
     .claude/rules/production-readiness.md: sha256:1f8352e4fad91fc1f1bee955d70521636e1da6453a96022fb3a8939cc6646e55
     .claude/skills/c4-diagrams/SKILL.md: sha256:1e7d597f24a015fc44cb9052fc0f8b665d136bd5c2f3a60a242adfedd98d17b4
     .claude/skills/c4-diagrams/templates.md: sha256:d5f6096cccd57d0d6b36adabd7d027c41b71961304db825dba8ea53ddbebc5a0
@@ -443,7 +445,7 @@ dependencies:
     .codex/agents/code-reviewer.toml: sha256:68551392550f16bad4545b154ec710ba215623bcb35f95f8ab2e613d798b50dd
     .codex/agents/security-auditor.toml: sha256:6f2bec3bded4da237fa14b74fd77720f0e7d96982f09288652aec26b228110dd
     .codex/agents/test-engineer.toml: sha256:729261399bedbfa7af957725773fddea919b1e094a81ebe6d8a6e476d54c7ff8
-  content_hash: sha256:229d534954d7339becdb7212fce868d9d8a2d07cdb1191f05e1a4de9a6371b3c
+  content_hash: sha256:2324842f40ccf56701a2bc3e809b0a13eb3c5269b5594e7957a32c1bae770fae
   skill_subset:
   - c4-diagrams
   - change-summary
@@ -486,7 +488,7 @@ dependencies:
   content_hash: sha256:7973e746e8e2ea5004d520da970c15a106824b8d6be1bcff48908aec021f3677
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-19T12:21:44+00:00'
+  resolved_at: '2026-09-29T21:34:11+00:00'
 - repo_url: addyosmani/agent-skills
   name: debugging-and-error-recovery
   host: github.com
@@ -509,7 +511,7 @@ dependencies:
   content_hash: sha256:1a119d27e8f1d27ed6317adf3115826336491346780dcb7d7a7a7f79fe3ffe10
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-19T12:21:44+00:00'
+  resolved_at: '2026-09-29T21:34:11+00:00'
 - repo_url: addyosmani/agent-skills
   name: source-driven-development
   host: github.com
@@ -532,7 +534,7 @@ dependencies:
   content_hash: sha256:c48d3c3abb2cb8a5c4a8584ab95db64f8a0261f3acfe2cdb7b8ff88ec3d90211
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-19T12:21:44+00:00'
+  resolved_at: '2026-09-29T21:34:11+00:00'
 - repo_url: mattpocock/skills
   name: grill-with-docs
   host: github.com
@@ -1583,6 +1585,15 @@ deployments:
   - .
   active_owner: .
   content_hash: sha256:e500f4facb5fc936b79aa3b7eb140bbd2f456d5d497da76a269ae7d5322ca1e8
+- kind: project-relative
+  target: claude
+  value: .claude/rules/process-discipline.md
+  runtime: null
+  scope: project
+  owners:
+  - seniorkonung/agent-skills
+  active_owner: seniorkonung/agent-skills
+  content_hash: sha256:0881e04e71d1480690e708917090c885e9c3230dc3541e789e0030a4073e9d40
 - kind: project-relative
   target: claude
   value: .claude/rules/production-readiness.md
