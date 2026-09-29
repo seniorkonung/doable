@@ -1,10 +1,10 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../intention/domain/intention_id.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
 import '../domain/tag_name.dart';
 import '../domain/tag_assignment.dart';
-import '../domain/tag_target.dart';
 import 'tag_change.dart';
 
 sealed class TagCommandFailure implements GraphCommandFailure {
@@ -38,10 +38,10 @@ final class TagNotFoundFailure extends TagCommandFailure {
   GraphFailureCategory get category => GraphFailureCategory.notFound;
 }
 
-final class TagTargetNotFoundFailure extends TagCommandFailure {
-  const TagTargetNotFoundFailure(this.target);
+final class TagIntentionNotFoundFailure extends TagCommandFailure {
+  const TagIntentionNotFoundFailure(this.intentionId);
 
-  final TagTarget target;
+  final IntentionId intentionId;
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.notFound;

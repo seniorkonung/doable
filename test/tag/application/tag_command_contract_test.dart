@@ -1,7 +1,6 @@
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -9,7 +8,6 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -149,25 +147,32 @@ void main() {
     expect((failures[2] as TagNotFoundFailure).tagId, existingId);
   });
 
-  test('команды назначения хранят одну пару обоих видов получателя', () {
+  test('команды назначения и снятия хранят пару тега и намерения', () {
     final tagId = _tag(1, 'Дом').id;
-    final targets = <TagTarget>[
-      IntentionTagTarget(_intentionId(1)),
-      LongTermRelationTagTarget(_relationId(1)),
-    ];
+    final intentionIds = [_intentionId(1), _intentionId(2)];
 
-    for (final target in targets) {
-      final TagCommand assign = AssignTag(tagId: tagId, target: target);
+    for (final intentionId in intentionIds) {
+      final TagCommand assign = AssignTag(
+        tagId: tagId,
+        intentionId: intentionId,
+      );
       final TagCommand remove = RemoveTagAssignment(
         tagId: tagId,
-        target: target,
+        intentionId: intentionId,
       );
-      final pair = TagAssignment(tagId: tagId, target: target);
+      final pair = TagAssignment(tagId: tagId, intentionId: intentionId);
 
       expect((assign as AssignTag).assignment, pair);
+      expect(assign.tagId, tagId);
+      expect(assign.intentionId, intentionId);
       expect((remove as RemoveTagAssignment).assignment, pair);
+      expect(remove.tagId, tagId);
+      expect(remove.intentionId, intentionId);
     }
-    expect(targets.first, isNot(targets.last));
+    expect(
+      AssignTag(tagId: tagId, intentionId: intentionIds.first).assignment,
+      isNot(AssignTag(tagId: tagId, intentionId: intentionIds.last).assignment),
+    );
   });
 
   test('изменение назначения и подтверждённый повтор дают один факт', () {
@@ -175,7 +180,7 @@ void main() {
     const newRevision = _Revision(5);
     final pair = TagAssignment(
       tagId: _tag(1, 'Дом').id,
-      target: IntentionTagTarget(_intentionId(2)),
+      intentionId: _intentionId(2),
     );
 
     for (final state in TagAssignmentState.values) {
@@ -203,9 +208,14 @@ void main() {
       );
 
       expect(changed.assignment, pair);
+      expect(changed.assignment.intentionId, _intentionId(2));
       expect(changed.state, state);
       expect(repeated.assignment, pair);
       expect(repeated.state, state);
+      expect(confirmedChange.revision, same(newRevision));
+      expect(confirmedRepeat.revision, same(oldRevision));
+      expect(changed.change, isNot(isA<TagAssignmentUnchangedChange>()));
+      expect(repeated.change, isNot(isA<TagAssignmentChangedChange>()));
       expect(confirmedChange.changes, [same(changed.change)]);
       expect(confirmedRepeat.changes, [same(repeated.change)]);
       expect(() => confirmedRepeat.changes.clear(), throwsUnsupportedError);
@@ -225,26 +235,22 @@ void main() {
     }
   });
 
-  test('отсутствие тега и получателя различаются по идентичности', () {
+  test('отсутствие тега и намерения различаются по идентичности', () {
     final tagId = _tag(1, 'Дом').id;
-    final target = LongTermRelationTagTarget(_relationId(2));
+    final intentionId = _intentionId(2);
     final missingTag = TagNotFoundFailure(tagId);
-    final missingTarget = TagTargetNotFoundFailure(target);
+    final missingIntention = TagIntentionNotFoundFailure(intentionId);
 
     expect(missingTag.category, GraphFailureCategory.notFound);
-    expect(missingTarget.category, GraphFailureCategory.notFound);
+    expect(missingIntention.category, GraphFailureCategory.notFound);
     expect(missingTag.tagId, tagId);
-    expect(missingTarget.target, target);
+    expect(missingIntention.intentionId, intentionId);
   });
 }
 
 IntentionId _intentionId(int suffix) => (IntentionId.decode(
   '00000000-0000-4000-8000-${suffix.toString().padLeft(12, '0')}',
 ) as IntentionIdDecodingSuccess).id;
-
-LongTermRelationId _relationId(int suffix) => (LongTermRelationId.decode(
-  '00000000-0000-4000-8000-${suffix.toString().padLeft(12, '0')}',
-) as LongTermRelationIdDecodingSuccess).id;
 
 Tag _tag(int suffix, String name) {
   final text = '00000000-0000-4000-8000-${suffix.toString().padLeft(12, '0')}';
