@@ -103,6 +103,23 @@ void main() {
           expect(find.text('Дом'), findsNothing);
           expect(_storedGraph(raw), storedBefore);
           expect(retainedTagFixtureGraph(raw), graphBefore);
+          if (number == 102) {
+            await _tap(
+              tester,
+              find.byKey(const ValueKey('relation-details-delete-relation')),
+            );
+            final confirm = find.byKey(
+              const ValueKey('relation-details-confirm-delete'),
+            );
+            await _until(tester, confirm);
+            final l10n = AppLocalizations.of(tester.element(confirm));
+            await _tap(
+              tester,
+              find.widgetWithText(TextButton, l10n.detailsCancelEditAction),
+            );
+            await tester.pumpAndSettle();
+            expect(_storedGraph(raw), storedBefore);
+          }
           expect(tester.takeException(), isNull);
           return;
         }
