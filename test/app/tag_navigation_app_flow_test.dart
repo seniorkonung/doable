@@ -126,25 +126,15 @@ void main() {
     );
 
     testWidgets(
-      'назначения намерений и связей открывают тот же тег с активным входом на $locale',
+      'назначения намерений открывают тот же тег с активным входом на $locale',
       (tester) async {
         final app = await _pumpApp(tester, locale);
         final before = _snapshot(app.raw);
-        for (final target in [
-          _intention(1),
-          _intention(2),
-          _relation(101),
-          _relation(102),
-          _relation(103),
-        ]) {
+        for (final target in [_intention(1), _intention(2)]) {
           unawaited(
-            app.router.push(switch (target) {
-              IntentionTagTarget(:final intentionId) => IntentionDetailsRoute(
-                intentionId: intentionId,
-              ),
-              LongTermRelationTagTarget(:final relationId) =>
-                RelationDetailsRoute(relationId: relationId),
-            }),
+            app.router.push(
+              IntentionDetailsRoute(intentionId: target.intentionId),
+            ),
           );
           final open = find.byKey(
             ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
@@ -437,10 +427,15 @@ Future<void> _openDetailsAndReturn(
   _expectDetailsRoute(router, target);
   expect(tester.widget<Text>(find.byKey(ValueKey(titleKey))).data, title);
   if (description != null) expect(find.text(description), findsOneWidget);
-  await _until(
-    tester,
-    find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(tagNumber)}')),
+  final openTag = find.byKey(
+    ValueKey('tag-assignment-open-${tagFixtureId(tagNumber)}'),
   );
+  if (target is IntentionTagTarget) {
+    await _until(tester, openTag);
+  } else {
+    expect(openTag, findsNothing);
+    expect(find.byKey(const ValueKey('tag-assignments-choose')), findsNothing);
+  }
   router.pop();
   final after = await _loaded(tester, tagNumber);
   expect(router.current.name, TagNavigationRoute.name);
