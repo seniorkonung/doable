@@ -2,18 +2,16 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_read_contract_test_fallback.dart';
@@ -369,187 +367,352 @@ void main() {
         ) as TagAssignmentStatusError).failure,
         isA<TagAssignmentStatusUnexpected>(),
       );
+      expect(
+        (await source.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
+            tagId: _tag(1, 'Дом').id,
+            scope: TaggedIntentionsScope.active,
+          ),
+        ) as TaggedIntentionsPageError).failure,
+        isA<TaggedIntentionsUnexpectedFailure>(),
+      );
     },
   );
 
-  test('запрос помеченных сущностей проверяет размер и сохраняет выбор', () {
+  test('запрос помеченных намерений проверяет размер и сохраняет выбор', () {
     final tagId = _tag(1, 'Дом').id;
-    const cursor = _TaggedEntitiesCursor();
-    final defaultQuery = TaggedEntitiesQuery(
+    const cursor = _TaggedIntentionsCursor();
+    final defaultQuery = TaggedIntentionsQuery(
       tagId: tagId,
-      scope: TaggedEntitiesScope.active,
+      scope: TaggedIntentionsScope.active,
     );
     expect(defaultQuery.pageSize, 50);
     expect(defaultQuery.cursor, isNull);
 
     for (final size in [1, 100]) {
-      final query = TaggedEntitiesQuery(
+      final query = TaggedIntentionsQuery(
         tagId: tagId,
-        scope: TaggedEntitiesScope.archived,
+        scope: TaggedIntentionsScope.archived,
         pageSize: size,
         cursor: cursor,
       );
       expect(query.tagId, tagId);
-      expect(query.scope, TaggedEntitiesScope.archived);
+      expect(query.scope, TaggedIntentionsScope.archived);
       expect(query.pageSize, size);
       expect(query.cursor, same(cursor));
     }
-    for (final size in [0, 101]) {
+    for (final size in [-1, 0, 101]) {
       expect(
-        () => TaggedEntitiesQuery(
+        () => TaggedIntentionsQuery(
           tagId: tagId,
-          scope: TaggedEntitiesScope.active,
+          scope: TaggedIntentionsScope.active,
           pageSize: size,
         ),
-        throwsA(isA<TaggedEntitiesQueryValidationException>()),
+        throwsA(
+          isA<TaggedIntentionsQueryValidationException>().having(
+            (error) => error.failure,
+            'причина отказа',
+            TaggedIntentionsQueryValidationFailure.pageSizeOutOfRange,
+          ),
+        ),
       );
     }
   });
 
-  test('смешанная страница хранит типы сущностей и защищает снимок', () {
+  test('страницы обоих охватов сохраняют одноимённые намерения и снимок', () {
     final tag = _tag(1, 'Дом');
-    final intention = TaggedIntention(
-      id: _intentionId(2),
-      title: ' Намерение ',
-      archiveState: IntentionArchiveState.active,
-    );
-    final relation = TaggedLongTermRelation(
-      id: _relationId(3),
-      type: LongTermRelationType.need,
-      sourceTitle: ' Источник ',
-      relatedTitle: ' Результат ',
-      scope: RelationScope.active,
-    );
-    final rows = <TaggedEntity>[intention, relation];
-    const cursor = _TaggedEntitiesCursor();
+    const cursor = _TaggedIntentionsCursor();
     const revision = _Revision();
-    final page = TaggedEntitiesPage(
-      tag: tag,
-      scope: TaggedEntitiesScope.active,
-      items: rows,
-      pageSize: 2,
-      nextCursor: cursor,
-      revision: revision,
-    );
-    rows.clear();
-
-    expect(page.tag, same(tag));
-    expect(page.scope, TaggedEntitiesScope.active);
-    expect(page.revision, same(revision));
-    expect(page.nextCursor, same(cursor));
-    expect(page.items, hasLength(2));
-    expect(intention.target, IntentionTagTarget(_intentionId(2)));
-    expect(intention.title, 'Намерение');
-    expect(relation.target, LongTermRelationTagTarget(_relationId(3)));
-    expect(relation.type, LongTermRelationType.need);
-    expect(relation.sourceTitle, 'Источник');
-    expect(relation.relatedTitle, 'Результат');
-    expect(() => page.items.clear(), throwsUnsupportedError);
-    expect(
-      () => TaggedEntitiesPage(
+    for (final (scope, archiveState) in [
+      (TaggedIntentionsScope.active, IntentionArchiveState.active),
+      (TaggedIntentionsScope.archived, IntentionArchiveState.archived),
+    ]) {
+      final rows = [
+        for (final id in [_intentionId(2), _intentionId(1)])
+          TaggedIntention(
+            id: id,
+            title: ' Намерение ',
+            archiveState: archiveState,
+          ),
+      ];
+      final page = TaggedIntentionsPage(
         tag: tag,
-        scope: TaggedEntitiesScope.active,
-        items: [intention, relation],
-        pageSize: 1,
-        nextCursor: null,
+        scope: scope,
+        items: rows,
+        pageSize: 2,
+        nextCursor: cursor,
         revision: revision,
-      ),
-      throwsA(isA<TaggedEntitiesPageValidationException>()),
-    );
+      );
+      rows.clear();
+
+      final List<TaggedIntention> items = page.items;
+      expect(page.tag, same(tag));
+      expect(page.scope, scope);
+      expect(page.pageSize, 2);
+      expect(page.revision, same(revision));
+      expect(page.nextCursor, same(cursor));
+      expect(items.map((item) => item.id), [_intentionId(2), _intentionId(1)]);
+      expect(items.map((item) => item.title), ['Намерение', 'Намерение']);
+      expect(items.map((item) => item.archiveState), [
+        archiveState,
+        archiveState,
+      ]);
+      expect(() => items.clear(), throwsUnsupportedError);
+    }
   });
 
-  test('пустой охват и ошибочная страница различаются', () {
+  test('пустой охват сохраняет тег и ревизию без продолжения', () {
     final tag = _tag(1, 'Дом');
     const revision = _Revision();
-    final empty = TaggedEntitiesPage(
-      tag: tag,
-      scope: TaggedEntitiesScope.archived,
-      items: const [],
-      pageSize: 50,
-      nextCursor: null,
-      revision: revision,
-    );
-    expect(empty.items, isEmpty);
-    expect(empty.tag.id, tag.id);
-    final archivedRelation = TaggedLongTermRelation(
-      id: _relationId(3),
-      type: LongTermRelationType.can,
-      sourceTitle: 'Источник',
-      relatedTitle: 'Результат',
-      scope: RelationScope.archived,
-    );
-    expect(
-      TaggedEntitiesPage(
+    for (final scope in TaggedIntentionsScope.values) {
+      final empty = TaggedIntentionsPage(
         tag: tag,
-        scope: TaggedEntitiesScope.archived,
-        items: [archivedRelation],
-        pageSize: 1,
-        nextCursor: null,
-        revision: revision,
-      ).items.single,
-      same(archivedRelation),
-    );
-    expect(
-      () => TaggedEntitiesPage(
-        tag: tag,
-        scope: TaggedEntitiesScope.active,
+        scope: scope,
         items: const [],
         pageSize: 50,
-        nextCursor: const _TaggedEntitiesCursor(),
+        nextCursor: null,
         revision: revision,
-      ),
-      throwsA(isA<TaggedEntitiesPageValidationException>()),
+      );
+      expect(empty.items, isEmpty);
+      expect(empty.tag.id, tag.id);
+      expect(empty.scope, scope);
+      expect(empty.revision, same(revision));
+      expect(empty.nextCursor, isNull);
+      expect(() => empty.items.clear(), throwsUnsupportedError);
+    }
+  });
+
+  test('страница отклоняет недопустимый размер и превышение границы', () {
+    final intention = TaggedIntention(
+      id: _intentionId(1),
+      title: 'Намерение',
+      archiveState: IntentionArchiveState.active,
     );
+    for (final size in [-1, 0, 101]) {
+      expect(
+        () => TaggedIntentionsPage(
+          tag: _tag(1, 'Дом'),
+          scope: TaggedIntentionsScope.active,
+          items: [intention],
+          pageSize: size,
+          nextCursor: null,
+          revision: const _Revision(),
+        ),
+        throwsA(isA<TaggedIntentionsPageValidationException>()),
+      );
+    }
     expect(
-      () => TaggedEntitiesPage(
-        tag: tag,
-        scope: TaggedEntitiesScope.active,
+      () => TaggedIntentionsPage(
+        tag: _tag(1, 'Дом'),
+        scope: TaggedIntentionsScope.active,
         items: [
+          intention,
           TaggedIntention(
             id: _intentionId(2),
-            title: 'Намерение',
-            archiveState: IntentionArchiveState.archived,
+            title: 'Другое намерение',
+            archiveState: IntentionArchiveState.active,
           ),
         ],
         pageSize: 1,
         nextCursor: null,
-        revision: revision,
+        revision: const _Revision(),
       ),
-      throwsA(isA<TaggedEntitiesPageValidationException>()),
+      throwsA(isA<TaggedIntentionsPageValidationException>()),
     );
   });
 
-  test('исходы чтения различают отсутствие тега и категории отказов', () async {
-    final TagReadContract source = _TagReadSource(const []);
-    final result = await source.getTaggedEntitiesPage(
-      TaggedEntitiesQuery(
-        tagId: _tag(1, 'Дом').id,
-        scope: TaggedEntitiesScope.active,
-      ),
-    );
-    expect((result as TaggedEntitiesPageSuccess).value.items, isEmpty);
-
-    const failures = <TaggedEntitiesReadFailure>[
-      TaggedEntitiesInvalidCursor(),
-      TaggedEntitiesSnapshotExpired(),
-      TaggedEntitiesTagNotFound(),
-      TaggedEntitiesUnavailableFailure(),
-      TaggedEntitiesCorruptionFailure(),
-      TaggedEntitiesUnexpectedFailure(),
+  test('страница допускает 100 намерений и отклоняет 101 без усечения', () {
+    final rows = [
+      for (var number = 1; number <= 101; number++)
+        TaggedIntention(
+          id: _intentionId(number),
+          title: 'Намерение $number',
+          archiveState: IntentionArchiveState.active,
+        ),
     ];
-    expect(failures.map((failure) => failure.category), [
-      GraphFailureCategory.validation,
-      GraphFailureCategory.conflict,
-      GraphFailureCategory.notFound,
-      GraphFailureCategory.unavailable,
-      GraphFailureCategory.corruption,
-      GraphFailureCategory.unexpected,
+    final page = TaggedIntentionsPage(
+      tag: _tag(1, 'Дом'),
+      scope: TaggedIntentionsScope.active,
+      items: rows.take(100).toList(),
+      pageSize: 100,
+      nextCursor: null,
+      revision: const _Revision(),
+    );
+    expect(page.items.map((item) => item.id), [
+      for (var number = 1; number <= 100; number++) _intentionId(number),
     ]);
-    for (final failure in failures) {
-      final TaggedEntitiesPageResult outcome = TaggedEntitiesPageError(failure);
-      expect(outcome, isA<TaggedEntitiesPageError>());
+    expect(
+      () => TaggedIntentionsPage(
+        tag: _tag(1, 'Дом'),
+        scope: TaggedIntentionsScope.active,
+        items: rows,
+        pageSize: 100,
+        nextCursor: null,
+        revision: const _Revision(),
+      ),
+      throwsA(isA<TaggedIntentionsPageValidationException>()),
+    );
+  });
+
+  test('пустая страница не допускает продолжения', () {
+    expect(
+      () => TaggedIntentionsPage(
+        tag: _tag(1, 'Дом'),
+        scope: TaggedIntentionsScope.active,
+        items: const [],
+        pageSize: 50,
+        nextCursor: const _TaggedIntentionsCursor(),
+        revision: const _Revision(),
+      ),
+      throwsA(isA<TaggedIntentionsPageValidationException>()),
+    );
+  });
+
+  test('страница отклоняет намерение из другого архивного охвата', () {
+    for (final (scope, archiveState) in [
+      (TaggedIntentionsScope.active, IntentionArchiveState.archived),
+      (TaggedIntentionsScope.archived, IntentionArchiveState.active),
+    ]) {
+      expect(
+        () => TaggedIntentionsPage(
+          tag: _tag(1, 'Дом'),
+          scope: scope,
+          items: [
+            TaggedIntention(
+              id: _intentionId(1),
+              title: 'Намерение',
+              archiveState: archiveState,
+            ),
+          ],
+          pageSize: 1,
+          nextCursor: null,
+          revision: const _Revision(),
+        ),
+        throwsA(isA<TaggedIntentionsPageValidationException>()),
+      );
     }
   });
+
+  test('страница не допускает повтор одной идентичности намерения', () {
+    expect(
+      () => TaggedIntentionsPage(
+        tag: _tag(1, 'Дом'),
+        scope: TaggedIntentionsScope.active,
+        items: [
+          for (final title in ['Название', 'Другое название'])
+            TaggedIntention(
+              id: _intentionId(1),
+              title: title,
+              archiveState: IntentionArchiveState.active,
+            ),
+        ],
+        pageSize: 2,
+        nextCursor: null,
+        revision: const _Revision(),
+      ),
+      throwsA(isA<TaggedIntentionsPageValidationException>()),
+    );
+  });
+
+  test('краткие данные намерения отклоняют недопустимое название', () {
+    for (final title in [' ', 'а' * 256, 'а\u0000', '\uD800']) {
+      expect(
+        () => TaggedIntention(
+          id: _intentionId(1),
+          title: title,
+          archiveState: IntentionArchiveState.active,
+        ),
+        throwsA(isA<IntentionTextValidationException>()),
+      );
+    }
+  });
+
+  test(
+    'контракт чтения передаёт запрос и страницу намерений обоих охватов',
+    () async {
+      final tag = _tag(1, 'Дом');
+      const revision = _Revision();
+      for (final (scope, archiveState) in [
+        (TaggedIntentionsScope.active, IntentionArchiveState.active),
+        (TaggedIntentionsScope.archived, IntentionArchiveState.archived),
+      ]) {
+        final page = TaggedIntentionsPage(
+          tag: tag,
+          scope: scope,
+          items: [
+            TaggedIntention(
+              id: _intentionId(1),
+              title: 'Намерение',
+              archiveState: archiveState,
+            ),
+          ],
+          pageSize: 1,
+          nextCursor: const _TaggedIntentionsCursor(),
+          revision: revision,
+        );
+        final source = _TaggedIntentionsReadSource(
+          TaggedIntentionsPageSuccess(page),
+        );
+        final TagReadContract contract = source;
+        final query = TaggedIntentionsQuery(
+          tagId: tag.id,
+          scope: scope,
+          pageSize: 1,
+        );
+        final result = await contract.getTaggedIntentionsPage(query);
+        expect(source.requestedQuery, same(query));
+        expect((result as TaggedIntentionsPageSuccess).value, same(page));
+      }
+    },
+  );
+
+  test(
+    'исходы чтения различают пустой охват и все категории отказов',
+    () async {
+      final query = TaggedIntentionsQuery(
+        tagId: _tag(1, 'Дом').id,
+        scope: TaggedIntentionsScope.active,
+      );
+      final TagReadContract emptySource = _TaggedIntentionsReadSource(
+        TaggedIntentionsPageSuccess(
+          TaggedIntentionsPage(
+            tag: _tag(1, 'Дом'),
+            scope: query.scope,
+            items: const [],
+            pageSize: query.pageSize,
+            nextCursor: null,
+            revision: const _Revision(),
+          ),
+        ),
+      );
+      final result = await emptySource.getTaggedIntentionsPage(query);
+      expect((result as TaggedIntentionsPageSuccess).value.items, isEmpty);
+
+      const failures = <TaggedIntentionsReadFailure>[
+        TaggedIntentionsInvalidCursor(),
+        TaggedIntentionsSnapshotExpired(),
+        TaggedIntentionsTagNotFound(),
+        TaggedIntentionsUnavailableFailure(),
+        TaggedIntentionsCorruptionFailure(),
+        TaggedIntentionsUnexpectedFailure(),
+      ];
+      expect(failures.map((failure) => failure.category), [
+        GraphFailureCategory.validation,
+        GraphFailureCategory.conflict,
+        GraphFailureCategory.notFound,
+        GraphFailureCategory.unavailable,
+        GraphFailureCategory.corruption,
+        GraphFailureCategory.unexpected,
+      ]);
+      for (final failure in failures) {
+        final TagReadContract source = _TaggedIntentionsReadSource(
+          TaggedIntentionsPageError(failure),
+        );
+        final outcome = await source.getTaggedIntentionsPage(query);
+        expect((outcome as TaggedIntentionsPageError).failure, same(failure));
+      }
+    },
+  );
 
   test('наблюдение различает найденный тег, его отсутствие и отказ', () async {
     final tag = _tag(1, 'Дом');
@@ -595,12 +758,23 @@ IntentionId _intentionId(int value) => (IntentionId.decode(
   '00000000-0000-4000-8000-${value.toString().padLeft(12, '0')}',
 ) as IntentionIdDecodingSuccess).id;
 
-LongTermRelationId _relationId(int value) => (LongTermRelationId.decode(
-  '00000000-0000-4000-8000-${value.toString().padLeft(12, '0')}',
-) as LongTermRelationIdDecodingSuccess).id;
+final class _TaggedIntentionsCursor implements TaggedIntentionsCursor {
+  const _TaggedIntentionsCursor();
+}
 
-final class _TaggedEntitiesCursor implements TaggedEntitiesCursor {
-  const _TaggedEntitiesCursor();
+final class _TaggedIntentionsReadSource with TagReadContractTestFallback {
+  _TaggedIntentionsReadSource(this.result);
+
+  final TaggedIntentionsPageResult result;
+  TaggedIntentionsQuery? requestedQuery;
+
+  @override
+  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
+    TaggedIntentionsQuery query,
+  ) async {
+    requestedQuery = query;
+    return result;
+  }
 }
 
 final class _Revision implements GraphRevision {
@@ -612,7 +786,7 @@ final class _Revision implements GraphRevision {
       : GraphRevisionOrder.differentEpoch;
 }
 
-final class _TagReadSource implements TagReadContract {
+final class _TagReadSource with TagReadContractTestFallback {
   _TagReadSource(
     this.results, {
     this.tags = const [],
@@ -675,20 +849,6 @@ final class _TagReadSource implements TagReadContract {
       ),
     );
   }
-
-  @override
-  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
-    TaggedEntitiesQuery query,
-  ) async => TaggedEntitiesPageSuccess(
-    TaggedEntitiesPage(
-      tag: _tag(1, 'Дом'),
-      scope: query.scope,
-      items: const [],
-      pageSize: query.pageSize,
-      nextCursor: null,
-      revision: const _Revision(),
-    ),
-  );
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async {
