@@ -297,35 +297,32 @@ void main() {
     },
   );
 
-  test('прерванное первичное создание не оставляет schema objects и допускает повтор', () async {
-    final harness = await LocalDatabaseHarness.fileBacked();
-    addTearDown(harness.dispose);
-    final failureInterceptor = _InitialSchemaCreationFailureInterceptor();
+  for (final failurePoint in _InitialCreationFailurePoint.values) {
+    test(
+      'отказ создания ${failurePoint.testDescription} не оставляет частичной '
+      'схемы, сохраняет файл и допускает повторное создание',
+      () async {
+        final harness = await LocalDatabaseHarness.fileBacked();
+        addTearDown(harness.dispose);
+        _markEmptyStorageFile(harness.databaseFile);
+        final failureInterceptor = _InitialSchemaCreationFailureInterceptor(
+          failurePoint,
+        );
 
-    final failedResult = await harness.open(observer: failureInterceptor);
+        final failedResult = await harness.open(observer: failureInterceptor);
 
-    expect(failedResult, isA<LocalDataUnexpectedFailure>());
-    expect(failureInterceptor.didInjectFailure, isTrue);
-    expect(failureInterceptor.didCloseExecutor, isTrue);
+        expect(failedResult, isA<LocalDataUnexpectedFailure>());
+        expect(failureInterceptor.didInjectFailure, isTrue);
+        expect(failureInterceptor.didCloseExecutor, isTrue);
 
-    await harness.closePersistenceObjectGraph();
-    await _expectStorageWithoutUserSchema(harness.databaseFile);
+        await harness.closePersistenceObjectGraph();
+        await _expectStorageWithoutUserSchema(harness.databaseFile);
+        _expectStorageFileKept(harness.databaseFile);
 
-    final reopenedDatabase = await harness.openReadyDatabase();
-    final version = await reopenedDatabase
-        .customSelect('PRAGMA user_version')
-        .getSingle();
-    final foreignKeys = await reopenedDatabase
-        .customSelect('PRAGMA foreign_keys')
-        .getSingle();
-
-    expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
-    expect(foreignKeys.read<int>('foreign_keys'), 1);
-    await expectLater(
-      verifyIntentionTitlesFtsIntegrity(reopenedDatabase),
-      completes,
+        await _expectRecreatedSchemaSurvivesReopen(harness);
+      },
     );
-  });
+  }
 
   test('файловая миграция с внедрённым отказом оставляет целую схему после повторного открытия', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
@@ -491,37 +488,23 @@ void main() {
   }
 
   for (final stopPoint in _MigrationProcessStopPoint.values) {
-    test(
-      'принудительное завершение ${stopPoint.testDescription} сохраняет целое хранилище',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        await createSchemaV1Fixture(
-          harness.databaseFile,
-          seed: _seedPublishedIntentions,
-        );
+    test('остановка процесса ${stopPoint.testDescription} создания схемы '
+        'оставляет либо целую схему, либо файл без схемы', () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      _markEmptyStorageFile(harness.databaseFile);
 
-        await _runMigrationWorkerUntilStopPoint(harness, stopPoint);
+      await _runMigrationWorkerUntilStopPoint(harness, stopPoint);
 
-        _expectPublishedIntentions(
-          harness.databaseFile,
-          expectedSchemaVersion: stopPoint.expectedInterruptedVersion,
-          hasRelationSchema: stopPoint.isAfterCommit,
-        );
+      if (stopPoint.isAfterCommit) {
+        _expectCurrentSchemaContract(harness.databaseFile);
+      } else {
+        await _expectStorageWithoutUserSchema(harness.databaseFile);
+      }
+      _expectStorageFileKept(harness.databaseFile);
 
-        final recoveredDatabase = await harness.openReadyDatabase();
-        await expectLater(
-          verifyDoableDatabaseSchema(recoveredDatabase),
-          completes,
-        );
-        await harness.closePersistenceObjectGraph();
-        _expectPublishedIntentions(
-          harness.databaseFile,
-          expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-          hasRelationSchema: true,
-        );
-      },
-    );
+      await _expectRecreatedSchemaSurvivesReopen(harness);
+    });
   }
 }
 
@@ -1041,24 +1024,20 @@ String _findFlutterExecutable() {
 enum _MigrationProcessStopPoint {
   beforeCommit(
     environmentValue: 'before_commit',
-    testDescription: 'до подтверждения миграции',
-    expectedInterruptedVersion: publishedIntentionSchemaVersion,
+    testDescription: 'до подтверждения',
   ),
   afterCommit(
     environmentValue: 'after_commit',
-    testDescription: 'после подтверждения миграции',
-    expectedInterruptedVersion: AppDatabase.currentSchemaVersion,
+    testDescription: 'после подтверждения',
   );
 
   const _MigrationProcessStopPoint({
     required this.environmentValue,
     required this.testDescription,
-    required this.expectedInterruptedVersion,
   });
 
   final String environmentValue;
   final String testDescription;
-  final int expectedInterruptedVersion;
 
   bool get isAfterCommit => this == afterCommit;
 }
@@ -1080,6 +1059,83 @@ Future<void> _expectStorageWithoutUserSchema(File databaseFile) async {
 
   expect(schemaObjects, isEmpty);
   expect(version.single['user_version'], 0);
+}
+
+/// Метка файла в заголовке SQLite: не является объектом схемы, но теряется,
+/// если файл хранилища удалён или создан заново.
+const _storageFileMarker = 0x444F4142;
+
+void _markEmptyStorageFile(File databaseFile) {
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    database.execute('PRAGMA application_id = $_storageFileMarker');
+  } finally {
+    database.close();
+  }
+}
+
+void _expectStorageFileKept(File databaseFile) {
+  expect(databaseFile.existsSync(), isTrue);
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    expect(
+      database.select('PRAGMA application_id').single['application_id'],
+      _storageFileMarker,
+      reason: 'Файл хранилища не должен удаляться или создаваться заново.',
+    );
+  } finally {
+    database.close();
+  }
+}
+
+void _expectCurrentSchemaContract(File databaseFile) {
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    expect(
+      database.select('PRAGMA user_version').single['user_version'],
+      AppDatabase.currentSchemaVersion,
+    );
+    expect(
+      database.select(
+        "SELECT name FROM sqlite_schema WHERE type = 'table' "
+        "AND name = 'tag_assignments'",
+      ),
+      hasLength(1),
+    );
+  } finally {
+    database.close();
+  }
+}
+
+/// Следующий запуск создаёт или открывает схему на том же файле, а повторное
+/// открытие после закрытия видит тот же подтверждённый контракт схемы.
+Future<void> _expectRecreatedSchemaSurvivesReopen(
+  LocalDatabaseHarness harness,
+) async {
+  final createdDatabase = await harness.openReadyDatabase();
+  await expectLater(verifyDoableDatabaseSchema(createdDatabase), completes);
+  await expectLater(
+    verifyIntentionTitlesFtsIntegrity(createdDatabase),
+    completes,
+  );
+  expect(
+    (await createdDatabase.customSelect('PRAGMA foreign_keys').getSingle())
+        .read<int>('foreign_keys'),
+    1,
+  );
+  await harness.closePersistenceObjectGraph();
+  final createdSchema = _schemaContract(harness.databaseFile);
+  _expectStorageFileKept(harness.databaseFile);
+
+  final reopenedDatabase = await harness.openReadyDatabase();
+  await expectLater(verifyDoableDatabaseSchema(reopenedDatabase), completes);
+  final version = await reopenedDatabase
+      .customSelect('PRAGMA user_version')
+      .getSingle();
+  expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
+  await harness.closePersistenceObjectGraph();
+  expect(_schemaContract(harness.databaseFile), createdSchema);
+  _expectStorageFileKept(harness.databaseFile);
 }
 
 final class _InjectedInitialCreationFailure implements Exception {
@@ -1179,19 +1235,41 @@ final class _Schema1To2FailureInterceptor
   }
 }
 
+enum _InitialCreationFailurePoint {
+  firstSchemaObject(testDescription: 'на первом объекте схемы'),
+  versionMarker(testDescription: 'после всех объектов и проверок схемы');
+
+  const _InitialCreationFailurePoint({required this.testDescription});
+
+  final String testDescription;
+}
+
 final class _InitialSchemaCreationFailureInterceptor
     extends LocalDatabaseConnectionObserver {
+  _InitialSchemaCreationFailureInterceptor(this.failurePoint);
+
+  final _InitialCreationFailurePoint failurePoint;
   var didInjectFailure = false;
   var didCloseExecutor = false;
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (!didInjectFailure &&
-        statement.operation == LocalDatabaseSqlOperation.custom &&
-        _isSchemaCreate(statement.statements.single)) {
-      didInjectFailure = true;
-      throw const _InjectedInitialCreationFailure();
+    if (didInjectFailure ||
+        statement.operation != LocalDatabaseSqlOperation.custom) {
+      return;
     }
+    final isFailurePoint = switch (failurePoint) {
+      _InitialCreationFailurePoint.firstSchemaObject => _isSchemaCreate(
+        statement.statements.single,
+      ),
+      _InitialCreationFailurePoint.versionMarker => _isVersionMarker(
+        statement.statements.single,
+      ),
+    };
+    if (!isFailurePoint) return;
+
+    didInjectFailure = true;
+    throw const _InjectedInitialCreationFailure();
   }
 
   @override
@@ -1204,6 +1282,15 @@ final class _InitialSchemaCreationFailureInterceptor
       r'^CREATE (?:TABLE|VIRTUAL TABLE|INDEX|TRIGGER|VIEW)\b',
       caseSensitive: false,
     ).hasMatch(statement.trimLeft());
+  }
+
+  // Маркер версии — последняя запись создания: к этому моменту все объекты
+  // схемы созданы, а проверки внешних ключей и поискового индекса пройдены.
+  bool _isVersionMarker(String statement) {
+    return RegExp(
+      '^PRAGMA user_version\\s*=\\s*${AppDatabase.currentSchemaVersion};?\$',
+      caseSensitive: false,
+    ).hasMatch(statement.trim());
   }
 }
 
