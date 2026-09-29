@@ -25,6 +25,7 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/domain/tag.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 
@@ -240,6 +241,7 @@ IntentionSummary testSummary({
   int activeRelationCount = 0,
   int? createdDay,
   int? updatedDay,
+  List<Tag> tags = const [],
 }) {
   final encodedId =
       '018f0000-0000-7000-8000-${index.toString().padLeft(12, '0')}';
@@ -264,6 +266,7 @@ IntentionSummary testSummary({
     activeRelationCount: activeRelationCount,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    tags: tags,
   );
 }
 

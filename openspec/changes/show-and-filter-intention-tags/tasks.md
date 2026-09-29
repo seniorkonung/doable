@@ -86,7 +86,7 @@
   - **Ожидаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.g.dart`, `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.9 Поздние ответы прежних условий не заменяют новую выдачу через реальное соединение модели поиска и репозитория
+- [x] 1.9 Поздние ответы прежних условий не заменяют новую выдачу через реальное соединение модели поиска и репозитория
   - **Критерии приёмки:**
     - Первые порции, продолжения и восстановления прежнего поколения не публикуются после изменения любого набора; повтор использует актуальные совместные условия, а существующие ограничения параллельной подгрузки сохраняются.
     - Контролируемые перестановки ответов подтверждают защиту при изменении тегов во время debounce и подгрузки. Успешный пустой результат, недопустимый ввод и отказ чтения остаются разными исходами.
