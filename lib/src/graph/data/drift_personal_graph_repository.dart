@@ -51,7 +51,6 @@ import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_id.dart';
 import '../../tag/domain/tag_name.dart';
-import '../../tag/domain/tag_target.dart';
 import '../application/blocking_relation_reference.dart';
 import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
@@ -124,8 +123,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _readTagCatalog(mode);
 
   @override
-  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) =>
-      _readTagAssignments(target);
+  Future<TagAssignmentsResult> getTagAssignments(IntentionId intentionId) =>
+      _readTagAssignments(intentionId);
 
   @override
   Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
@@ -135,8 +134,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId tagId,
-    TagTarget target,
-  ) => _readTagAssignmentStatus(tagId, target);
+    IntentionId intentionId,
+  ) => _readTagAssignmentStatus(tagId, intentionId);
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);
