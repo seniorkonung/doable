@@ -35,6 +35,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -335,7 +336,7 @@ void main() {
   }
 
   testWidgets(
-    'удаляет выбранные связи из разных порций и групп, сохраняя остальные зависимости',
+    'отмена и удаление связей из разных групп сохраняют назначения намерениям',
     (tester) async {
       await _prepareAppSurface(tester);
       final semantics = tester.ensureSemantics();
@@ -344,9 +345,13 @@ void main() {
       ))!;
       await _seedBlockingFlow(database, largeGroup: true);
       final runtimes = <AppRuntime>[];
-      final runtime = _fileRuntime(
-        database,
-        diagnostics: InMemoryDiagnosticsSink(),
+      late sqlite.Database raw;
+      final runtime = AppRuntime(
+        connectionFactory: () => openFileBackedLocalDatabase(
+          database.databaseFile,
+          setup: (database) => raw = database,
+        ),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
       )..also(runtimes.add);
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
@@ -357,6 +362,14 @@ void main() {
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
       await _pumpUntilFound(tester, find.text(_blockingOwnerTitle));
+      Map<String, List<List<Object?>>> tagState() => {
+        for (final table in ['tags', 'tag_assignments'])
+          table: raw
+              .select('SELECT * FROM $table ORDER BY rowid')
+              .map((row) => row.values.toList())
+              .toList(),
+      };
+      final tagsBefore = tagState();
       await _openIntention(tester, _blockingOwnerTitle);
       expect(find.text('Active relations: 53'), findsWidgets);
       expect(find.text('Archived relations: 2'), findsWidgets);
@@ -434,6 +447,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('blocking-relations-cancel')));
       await tester.pumpAndSettle();
       expect(find.text('Selected relations: 3'), findsOneWidget);
+      expect(tagState(), tagsBefore);
 
       await _reviewBlockingSelection(tester);
       await tester.scrollUntilVisible(
@@ -457,6 +471,7 @@ void main() {
       expect(find.text('Selected relations: 0'), findsOneWidget);
       expect(find.text('Active relations: 51'), findsWidgets);
       expect(find.text('Archived relations: 1'), findsWidgets);
+      expect(tagState(), tagsBefore);
 
       for (final key in [
         'relation-neighborhood-scope-active',
@@ -530,6 +545,7 @@ void main() {
       expect(find.text('Selected relations: 0'), findsOneWidget);
       expect(find.text('Active relations: 49'), findsWidgets);
       expect(find.text('Archived relations: 0'), findsWidgets);
+      expect(tagState(), tagsBefore);
       await _deleteCurrentIntention(tester);
       await _pumpUntilFound(
         tester,
@@ -1384,6 +1400,18 @@ Future<void> _seedBlockingFlow(
       );
     }
   });
+  if (largeGroup) {
+    await database.customStatement(
+      'INSERT INTO tags (id, name) VALUES (?, ?)',
+      [_blockingUuid(3000), 'Общий'],
+    );
+    for (final number in [1, 100, 150, 200]) {
+      await database.customStatement(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_blockingUuid(3000), _blockingIntentionId(number).toCanonicalString()],
+      );
+    }
+  }
   await harness.closePersistenceObjectGraph();
 }
 

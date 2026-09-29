@@ -13,7 +13,6 @@ import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -68,9 +67,11 @@ void main() {
     );
   }
 
-  Future<void> assign(int tag, TagTarget target) async {
+  Future<void> assign(int tag, IntentionId intentionId) async {
     expect(
-      await repository.execute(AssignTag(tagId: _tag(tag), target: target)),
+      await repository.execute(
+        AssignTag(tagId: _tag(tag), intentionId: intentionId),
+      ),
       isA<TagCommandSucceeded>(),
     );
   }
@@ -93,18 +94,18 @@ void main() {
       table: rows(table),
   };
 
-  List<Object?> assigned(String column, int number) => raw
+  List<Object?> assigned(int number) => raw
       .select(
-        'SELECT tag_id FROM tag_assignments WHERE $column = ? ORDER BY creation_sequence',
+        'SELECT tag_id FROM tag_assignments WHERE intention_id = ? ORDER BY creation_sequence',
         [tagFixtureId(number)],
       )
       .map((row) => row['tag_id'])
       .toList();
 
-  Future<void> expectCompleteAssignments(TagTarget target) async {
-    final result = await repository.getTagAssignments(target);
+  Future<void> expectCompleteAssignments(IntentionId intentionId) async {
+    final result = await repository.getTagAssignments(intentionId);
     final snapshot = (result as TagAssignmentsSuccess).value;
-    expect(snapshot.target, target);
+    expect(snapshot.intentionId, intentionId);
     expect(snapshot.items.map((tag) => tag.id), [
       _tag(firstTagNumber),
       _tag(lastTagNumber),
@@ -123,19 +124,20 @@ void main() {
       tagFixtureId(303),
       'Единственный',
     ]);
-    await assign(firstTagNumber, IntentionTagTarget(_intention(4)));
-    await assign(lastTagNumber, IntentionTagTarget(_intention(4)));
-    await assign(303, IntentionTagTarget(_intention(5)));
+    await assign(firstTagNumber, _intention(4));
+    await assign(lastTagNumber, _intention(4));
+    await assign(303, _intention(5));
     final tagsBefore = rows('tags');
-    final otherAssignments = assigned('intention_id', 1);
-    final otherRelationAssignments = assigned('long_term_relation_id', 101);
+    final otherAssignments = [
+      for (final id in [1, 2, 3]) assigned(id),
+    ];
     final otherGraph = [
       rows('long_term_relations'),
       rows('daily_choices'),
       rows('daily_choice_path_steps'),
     ];
 
-    await expectCompleteAssignments(IntentionTagTarget(_intention(4)));
+    await expectCompleteAssignments(_intention(4));
     expect(
       await repository.execute(DeleteIntention(_intention(4))),
       isA<ResultSuccess>(),
@@ -144,9 +146,11 @@ void main() {
       raw.select('SELECT id FROM intentions WHERE id = ?', [tagFixtureId(4)]),
       isEmpty,
     );
-    expect(assigned('intention_id', 4), isEmpty);
-    expect(assigned('intention_id', 1), otherAssignments);
-    expect(assigned('long_term_relation_id', 101), otherRelationAssignments);
+    expect(assigned(4), isEmpty);
+    expect([
+      for (final id in [1, 2, 3]) assigned(id),
+    ], otherAssignments);
+    expect(assigned(5), [tagFixtureId(303)]);
     expect(rows('tags'), tagsBefore);
     expect([
       rows('long_term_relations'),
@@ -162,55 +166,51 @@ void main() {
       raw.select('SELECT id FROM intentions WHERE id = ?', [tagFixtureId(5)]),
       isEmpty,
     );
-    expect(assigned('intention_id', 5), isEmpty);
+    expect(assigned(5), isEmpty);
+    expect([
+      for (final id in [1, 2, 3]) assigned(id),
+    ], otherAssignments);
     expect(rows('tags'), tagsBefore);
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
   });
 
   test(
-    'удаление свободной активной и архивной связи снимает все их назначения',
+    'удаление активной и архивной связи сохраняет все назначения намерениям',
     () async {
       addIntention(4);
       addRelation(103, 3, 4);
-      await assign(firstTagNumber, LongTermRelationTagTarget(_relation(103)));
-      await assign(lastTagNumber, LongTermRelationTagTarget(_relation(103)));
-      await assign(lastTagNumber, LongTermRelationTagTarget(_relation(102)));
+      await assign(firstTagNumber, _intention(3));
+      await assign(firstTagNumber, _intention(4));
+      await assign(lastTagNumber, _intention(4));
+      await assign(lastTagNumber, _intention(2));
       final intentionsBefore = rows('intentions');
       final tagsBefore = rows('tags');
-      final otherAssignments = assigned('long_term_relation_id', 101);
-      final otherIntentionAssignments = assigned('intention_id', 1);
+      final assignmentsBefore = rows('tag_assignments');
       final dailyChoicesBefore = rows('daily_choices');
       final pathBefore = rows('daily_choice_path_steps');
 
-      await expectCompleteAssignments(
-        LongTermRelationTagTarget(_relation(103)),
-      );
+      await expectCompleteAssignments(_intention(4));
       expect(
         await repository.execute(DeleteLongTermRelation(_relation(103))),
         isA<GraphCommandSucceeded>(),
       );
-      expect(assigned('long_term_relation_id', 103), isEmpty);
       expect(
         raw.select('SELECT id FROM long_term_relations WHERE id = ?', [
           tagFixtureId(103),
         ]),
         isEmpty,
       );
-      expect(assigned('long_term_relation_id', 101), otherAssignments);
-      expect(assigned('intention_id', 1), otherIntentionAssignments);
+      expect(rows('tag_assignments'), assignmentsBefore);
       expect(rows('intentions'), intentionsBefore);
       expect(rows('tags'), tagsBefore);
       expect(rows('daily_choices'), dailyChoicesBefore);
       expect(rows('daily_choice_path_steps'), pathBefore);
 
-      await expectCompleteAssignments(
-        LongTermRelationTagTarget(_relation(102)),
-      );
+      await expectCompleteAssignments(_intention(2));
       expect(
         await repository.execute(DeleteLongTermRelation(_relation(102))),
         isA<GraphCommandSucceeded>(),
       );
-      expect(assigned('long_term_relation_id', 102), isEmpty);
       expect(
         raw.select('SELECT id FROM long_term_relations WHERE id = ?', [
           tagFixtureId(102),
@@ -218,6 +218,10 @@ void main() {
         isEmpty,
       );
       expect(rows('tags'), tagsBefore);
+      expect(rows('tag_assignments'), assignmentsBefore);
+      expect(rows('intentions'), intentionsBefore);
+      expect(rows('daily_choices'), dailyChoicesBefore);
+      expect(rows('daily_choice_path_steps'), pathBefore);
       expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
     },
   );
@@ -254,7 +258,7 @@ void main() {
 
   test('новая зависимость после пустой проверки блокирует удаление в момент команды', () async {
     addIntention(4);
-    await assign(firstTagNumber, IntentionTagTarget(_intention(4)));
+    await assign(firstTagNumber, _intention(4));
     expect(
       raw.select(
         'SELECT id FROM long_term_relations WHERE source_intention_id = ? OR related_intention_id = ?',
@@ -278,8 +282,8 @@ void main() {
     'отказ после начала каскада намерения откатывает получателя и назначения',
     () async {
       addIntention(4);
-      await assign(firstTagNumber, IntentionTagTarget(_intention(4)));
-      await assign(lastTagNumber, IntentionTagTarget(_intention(4)));
+      await assign(firstTagNumber, _intention(4));
+      await assign(lastTagNumber, _intention(4));
       final before = graph();
       final revisionBefore = await revision(4);
       await database.customStatement('''
@@ -306,38 +310,35 @@ void main() {
     },
   );
 
-  test(
-    'отказ после начала каскада связи откатывает получателя и назначения',
-    () async {
-      addIntention(4);
-      addRelation(103, 3, 4);
-      await assign(firstTagNumber, LongTermRelationTagTarget(_relation(103)));
-      await assign(lastTagNumber, LongTermRelationTagTarget(_relation(103)));
-      final before = graph();
-      final revisionBefore = await revision(3);
-      await database.customStatement('''
-      CREATE TEMP TRIGGER fail_relation_assignment_cascade
-      AFTER DELETE ON tag_assignments
-      WHEN OLD.long_term_relation_id = '${tagFixtureId(103)}'
+  test('отказ после удаления связи откатывает её и сохраняет назначения намерениям', () async {
+    addIntention(4);
+    addRelation(103, 3, 4);
+    await assign(firstTagNumber, _intention(4));
+    await assign(lastTagNumber, _intention(4));
+    final before = graph();
+    final revisionBefore = await revision(3);
+    await database.customStatement('''
+      CREATE TEMP TRIGGER fail_relation_delete
+      AFTER DELETE ON long_term_relations
+      WHEN OLD.id = '${tagFixtureId(103)}'
       BEGIN
-        SELECT RAISE(ABORT, 'canary relation assignment cascade');
+        SELECT RAISE(ABORT, 'canary relation deletion');
       END
     ''');
 
-      final result = await repository.execute(
-        DeleteLongTermRelation(_relation(103)),
-      );
+    final result = await repository.execute(
+      DeleteLongTermRelation(_relation(103)),
+    );
 
-      expect(
-        (result as GraphCommandFailed).failure,
-        isA<LongTermRelationUnexpectedFailure>(),
-      );
-      expect(graph(), before);
-      expect(
-        (await revision(3)).compareTo(revisionBefore),
-        GraphRevisionOrder.same,
-      );
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-    },
-  );
+    expect(
+      (result as GraphCommandFailed).failure,
+      isA<LongTermRelationUnexpectedFailure>(),
+    );
+    expect(graph(), before);
+    expect(
+      (await revision(3)).compareTo(revisionBefore),
+      GraphRevisionOrder.same,
+    );
+    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+  });
 }
