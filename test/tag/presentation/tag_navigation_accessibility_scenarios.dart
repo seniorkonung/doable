@@ -1,6 +1,6 @@
 part of 'tag_accessibility_test.dart';
 
-enum _NavigationEntry { catalog, intention, relation }
+enum _NavigationEntry { catalog, intention }
 
 void _registerNavigationEntryScenarios() {
   for (final locale in [const Locale('ru'), const Locale('en')]) {
@@ -58,7 +58,6 @@ void _registerNavigationEntryScenarios() {
                 const ValueKey('tag-catalog-list'),
               ),
               _NavigationEntry.intention => find.byType(IntentionDetailsPage),
-              _NavigationEntry.relation => find.byType(RelationDetailsPage),
             };
             if (entry == _NavigationEntry.catalog) {
               await _tap(
@@ -73,11 +72,6 @@ void _registerNavigationEntryScenarios() {
                       tagFixtureId(2),
                     ) as IntentionIdDecodingSuccess).id,
                   ),
-                  _NavigationEntry.relation => RelationDetailsRoute(
-                    relationId: (LongTermRelationId.decode(
-                      tagFixtureId(102),
-                    ) as LongTermRelationIdDecodingSuccess).id,
-                  ),
                   _NavigationEntry.catalog => throw StateError(
                     'Каталог открыт отдельным действием',
                   ),
@@ -91,13 +85,7 @@ void _registerNavigationEntryScenarios() {
             if (entry != _NavigationEntry.catalog) {
               await _until(
                 tester,
-                find.byKey(
-                  ValueKey(
-                    entry == _NavigationEntry.intention
-                        ? 'intention-details-title'
-                        : 'relation-details-phrase',
-                  ),
-                ),
+                find.byKey(const ValueKey('intention-details-title')),
               );
               await tester.scrollUntilVisible(
                 find.descendant(

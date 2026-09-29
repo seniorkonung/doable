@@ -9,6 +9,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,7 +26,7 @@ void main() {
     (false, 102, const Locale('en')),
   ]) {
     testWidgets(
-      '${isIntention ? 'намерение' : 'долговременная связь'} $number: сквозное назначение и снятие на ${locale.languageCode}',
+      '${isIntention ? 'намерение $number: сквозное назначение и снятие' : 'долговременная связь $number: собственные теги недоступны'} на ${locale.languageCode}',
       (tester) async {
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.resumed,
@@ -74,18 +75,41 @@ void main() {
             find.byKey(const ValueKey('relation-details-phrase')),
           );
           await tester.pumpAndSettle();
+          final storedBefore = _storedGraph(raw);
+          final participant = find.byKey(
+            const ValueKey('relation-details-related-participant'),
+          );
+          await tester.scrollUntilVisible(
+            participant,
+            200,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.pumpAndSettle();
+          expect(find.byType(TagAssignmentsSection), findsNothing);
+          expect(
+            find.byKey(const ValueKey('tag-assignments-choose')),
+            findsNothing,
+          );
+          for (final action in ['open', 'remove']) {
+            expect(
+              find.byKey(
+                ValueKey(
+                  'tag-assignment-$action-${tagFixtureId(firstTagNumber)}',
+                ),
+              ),
+              findsNothing,
+            );
+          }
+          expect(find.text('Дом'), findsNothing);
+          expect(_storedGraph(raw), storedBefore);
+          expect(retainedTagFixtureGraph(raw), graphBefore);
+          expect(tester.takeException(), isNull);
+          return;
         }
         final choose = find.byKey(const ValueKey('tag-assignments-choose'));
         await _until(tester, choose);
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
-        if (!isIntention) {
-          await tester.scrollUntilVisible(
-            choose,
-            200,
-            scrollable: find.byType(Scrollable).last,
-          );
-        }
         await _tap(tester, choose);
 
         final homeTagId = tagFixtureId(firstTagNumber);
@@ -259,7 +283,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text(newName), findsOneWidget);
         expect(_storedGraph(raw), storedBeforeBrowseSearch);
-        if (isIntention && number == 1) {
+        if (number == 1) {
           router.pop();
           final choiceId = (DailyChoiceId.decode(
             tagFixtureId(201),
@@ -300,7 +324,7 @@ List<sqlite.Row> _assignments(sqlite.Database raw, String tagId) =>
 
 bool _assigned(sqlite.Database raw, String tagId, int number) =>
     raw.select(
-      'SELECT * FROM tag_assignments WHERE tag_id = ? AND ${number < 100 ? 'intention_id' : 'long_term_relation_id'} = ?',
+      'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
       [tagId, tagFixtureId(number)],
     ).length ==
     1;
