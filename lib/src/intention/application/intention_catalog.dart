@@ -1,4 +1,5 @@
 import '../../graph/application/graph_revision.dart';
+import '../../tag/domain/tag.dart';
 import '../../tag/domain/tag_id.dart';
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
@@ -251,8 +252,10 @@ final class IntentionSummary {
     required int activeRelationCount,
     required this.createdAt,
     required this.updatedAt,
+    List<Tag> tags = const [],
   }) : title = IntentionText.normalizeTitle(title),
-       activeRelationCount = _requireNonNegativeCount(activeRelationCount);
+       activeRelationCount = _requireNonNegativeCount(activeRelationCount),
+       tags = List.unmodifiable(tags);
 
   final IntentionId id;
   final String title;
@@ -262,6 +265,10 @@ final class IntentionSummary {
   final int activeRelationCount;
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
+
+  /// Полный подтверждённый состав собственных тегов в порядке создания тегов.
+  /// Пустой список означает проверенное отсутствие назначений.
+  final List<Tag> tags;
 
   /// Заменяет только производный счётчик активных связей.
   ///
@@ -277,6 +284,7 @@ final class IntentionSummary {
         activeRelationCount: activeRelationCount,
         createdAt: createdAt,
         updatedAt: updatedAt,
+        tags: tags,
       );
 
   static int _requireNonNegativeCount(int value) {

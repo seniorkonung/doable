@@ -1011,11 +1011,14 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final itemRows = validatedRows.take(pageSize).toList(growable: false);
     final intentionIds = [for (final row in itemRows) row.intentionId];
     final aggregates = await _relationCountAggregates.read(intentionIds);
+    final tags = await _readIntentionTags(intentionIds);
     return [
       for (var index = 0; index < itemRows.length; index++)
         _rehydrateSummary(
           itemRows[index],
           _requireValidAggregate(aggregates[intentionIds[index]]),
+          tags[intentionIds[index]] ??
+              (throw const _StoredIntentionCorruption()),
         ),
     ];
   }
@@ -1062,6 +1065,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   IntentionSummary _rehydrateSummary(
     ({IntentionId intentionId, _StoredIntentionDetail stored}) row,
     RelationCounts relationCounts,
+    List<tag_domain.Tag> tags,
   ) => IntentionSummary(
     id: row.intentionId,
     title: row.stored.title,
@@ -1071,6 +1075,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     activeRelationCount: relationCounts.active,
     createdAt: row.stored.createdAt,
     updatedAt: row.stored.updatedAt,
+    tags: tags,
   );
 
   IntentionCatalogCursor _cursorAt(

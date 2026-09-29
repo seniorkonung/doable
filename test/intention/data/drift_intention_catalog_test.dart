@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/data/local/sqlite_tag_functions.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -10,11 +12,17 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_storage_fixture.dart';
 
 void main() {
   late AppDatabase database;
@@ -43,6 +51,325 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  group('Порция каталога — собственные теги', () {
+    test(
+      'пакетно получает теги только возвращаемых одноимённых намерений',
+      () async {
+        for (var number = 1; number <= 4; number++) {
+          await _insertIntention(
+            database,
+            id: _uuid(number),
+            title: 'Гулять',
+            createdAt: DateTime.utc(2026, 9, 2, number),
+          );
+        }
+        for (final (number, name) in [
+          (110, 'Здоровье'),
+          (109, 'Отдых'),
+          (108, 'Семья'),
+        ]) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _uuid(number),
+            name,
+          ]);
+        }
+        for (final (tag, intention) in [(109, 1), (110, 1), (108, 2)]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_uuid(tag), _uuid(intention)],
+          );
+        }
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+          [_uuid(500), _uuid(1), _uuid(3), 'need', 2],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+          [_uuid(108), _uuid(500)],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(109), _uuid(4)],
+        );
+        raw.execute('PRAGMA foreign_keys = OFF');
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _uuid(111),
+          'Недоступный тег за границей порции',
+        ]);
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(111), _uuid(4)],
+        );
+        raw.execute('DELETE FROM tags WHERE id = ?', [_uuid(111)]);
+        trace.measured.clear();
+
+        final page = _firstPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtAscending,
+              pageSize: 3,
+            ),
+          ),
+        );
+
+        expect(page.totalCount, 4);
+        expect(page.nextCursor, isNotNull);
+        expect(page.items.map((item) => item.id), [
+          _id(_uuid(1)),
+          _id(_uuid(2)),
+          _id(_uuid(3)),
+        ]);
+        expect(
+          page.items.map((item) => item.tags.map((tag) => tag.name.value)),
+          [
+            ['Здоровье', 'Отдых'],
+            ['Семья'],
+            <String>[],
+          ],
+        );
+        expect(page.items.first.activeRelationCount, 1);
+        expect(() => page.items.first.tags.clear(), throwsUnsupportedError);
+        final suppliedTags = List.of(page.items.first.tags);
+        final original = page.items.first;
+        final summary = IntentionSummary(
+          id: original.id,
+          title: original.title,
+          hasDescription: original.hasDescription,
+          readiness: original.readiness,
+          archiveState: original.archiveState,
+          activeRelationCount: original.activeRelationCount,
+          createdAt: original.createdAt,
+          updatedAt: original.updatedAt,
+          tags: suppliedTags,
+        );
+        suppliedTags.clear();
+        expect(summary.tags, original.tags);
+        final assignmentRead = trace.measured
+            .where((read) => read.sql.contains('FROM tag_assignments'))
+            .single;
+        expect(assignmentRead.rows, 3);
+        expect(assignmentRead.arguments, [_uuid(1), _uuid(2), _uuid(3)]);
+        final assignments = (await repository.getTagAssignments(
+          IntentionTagTarget(page.items.first.id),
+        ) as TagAssignmentsSuccess).value;
+        expect(
+          page.items.first.tags.map((tag) => tag.id),
+          assignments.items.map((tag) => tag.id),
+        );
+        expect(
+          page.revision.compareTo(assignments.revision),
+          GraphRevisionOrder.same,
+        );
+      },
+    );
+
+    test(
+      'продолжение получает все 1203 назначения независимо от размера порции',
+      () async {
+        seedLargeTagReadFixture(raw, includeDenseRecipients: true);
+        var cursor = _firstPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtAscending,
+              pageSize: 1,
+            ),
+          ),
+        ).nextCursor;
+        trace.measured.clear();
+
+        final dense = _continuationPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtAscending,
+              pageSize: 1,
+              cursor: cursor,
+            ),
+          ),
+        );
+
+        expect(dense.items.single.id, _id(_uuid(2)));
+        expect(
+          dense.items.single.tags.map((tag) => tag.id.toCanonicalString()),
+          [for (var index = 0; index < 1203; index++) _uuid(10000 + index)],
+        );
+        final read = trace.measured
+            .where((read) => read.sql.contains('FROM tag_assignments'))
+            .single;
+        expect(read.rows, 1203);
+        expect(read.arguments, [_uuid(2)]);
+        cursor = dense.nextCursor;
+        final empty = _continuationPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtAscending,
+              pageSize: 1,
+              cursor: cursor,
+            ),
+          ),
+        );
+        expect(empty.items.single.id, _id(_uuid(3)));
+        expect(empty.items.single.tags, isEmpty);
+        expect(empty.nextCursor, isNull);
+      },
+    );
+
+    test(
+      'состав тегов и ревизия порции предшествуют ожидающей команде',
+      () async {
+        seedTagStorageFixture(raw);
+        trace.blockNextSelect(containing: 'FROM tag_assignments');
+        final pageFuture = repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+          ),
+        );
+        await trace.selectBlocked;
+        var commandCompleted = false;
+        final commandFuture = repository
+            .execute(
+              RenameTag(
+                tagId: (TagId.decode(
+                  _uuid(firstTagNumber),
+                ) as TagIdDecodingSuccess).id,
+                name: TagName.fromInput('Новое название'),
+              ),
+            )
+            .whenComplete(() => commandCompleted = true);
+        await pumpEventQueue();
+        final completedBeforeRead = commandCompleted;
+        trace.releaseSelect();
+
+        final page = _firstPage(await pageFuture);
+        final command = await commandFuture;
+        expect(completedBeforeRead, isFalse);
+        expect(page.items.single.tags.single.name.value, 'Дом');
+        expect(command, isA<GraphCommandSucceeded>());
+        expect(
+          page.revision.compareTo(
+            (command as GraphCommandSucceeded).value.revision,
+          ),
+          GraphRevisionOrder.older,
+        );
+      },
+    );
+
+    for (final (label, corrupt) in <(String, void Function(Database))>[
+      (
+        'начальный BOM в идентификаторе тега',
+        (connection) {
+          final tagId = '\ufeff${_uuid(440)}';
+          connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            tagId,
+            'Тег с повреждённым идентификатором',
+          ]);
+          connection.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagId, _uuid(1)],
+          );
+        },
+      ),
+      (
+        'неверный идентификатор тега после сотого назначения',
+        (connection) {
+          for (var number = 303; number <= 439; number++) {
+            connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+              _uuid(number),
+              'Тег $number',
+            ]);
+            connection.execute(
+              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+              [_uuid(number), _uuid(1)],
+            );
+          }
+          connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            'некорректный идентификатор',
+            'Последний тег',
+          ]);
+          connection.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            ['некорректный идентификатор', _uuid(1)],
+          );
+        },
+      ),
+      for (final (reason, invalidName) in <(String, Object)>[
+        ('окружающие пробелы', ' Дом '),
+        ('символ NUL', 'Дом\u0000'),
+        ('начальный BOM', '\ufeffДом'),
+        ('двоичные данные', <int>[1, 2, 3]),
+      ])
+        (
+          'недопустимое название: $reason',
+          (connection) {
+            connection.execute('PRAGMA ignore_check_constraints = ON');
+            connection.createFunction(
+              functionName: tagNameKeyFunctionName,
+              argumentCount: const AllowedArgumentCount(1),
+              deterministic: true,
+              directOnly: false,
+              function: (_) => 'повреждённый ключ',
+            );
+            connection.execute('UPDATE tags SET name = ? WHERE id = ?', [
+              invalidName,
+              _uuid(firstTagNumber),
+            ]);
+          },
+        ),
+      for (final order in <Object>[0, 1000, 'не число'])
+        (
+          'несогласованный порядок назначения $order',
+          (connection) {
+            connection.execute(
+              'DROP TRIGGER tag_assignments_valid_tag_order_update',
+            );
+            connection.execute(
+              'UPDATE tag_assignments SET tag_creation_sequence = ? WHERE intention_id = ?',
+              [order, _uuid(1)],
+            );
+          },
+        ),
+    ]) {
+      test('отклоняет всю порцию: $label', () async {
+        seedTagStorageFixture(raw);
+        corrupt(raw);
+
+        expect(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtAscending,
+              pageSize: 3,
+            ),
+          ),
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionCorruptionFailure>(),
+          ),
+        );
+        expect(
+          await repository.getTagAssignments(IntentionTagTarget(_id(_uuid(1)))),
+          isA<TagAssignmentsError>().having(
+            (result) => result.failure,
+            'причина',
+            isA<TagAssignmentsCorruptionFailure>(),
+          ),
+        );
+      });
+    }
+  });
 
   test('отбирает действия в SQL до порции и считает только совпадения', () async {
     for (var index = 1; index <= 60; index++) {
@@ -1726,13 +2053,15 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
   Object? failure;
   Completer<void>? _blockedSelectStarted;
   Completer<void>? _blockedSelectRelease;
+  String? _blockedSelectPattern;
 
-  void blockNextSelect() {
+  void blockNextSelect({String? containing}) {
     if (_blockedSelectStarted != null) {
       throw StateError('SELECT уже заблокирован.');
     }
     _blockedSelectStarted = Completer<void>();
     _blockedSelectRelease = Completer<void>();
+    _blockedSelectPattern = containing;
   }
 
   Future<void> get selectBlocked {
@@ -1756,6 +2085,10 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     if (failure != null) throw failure;
     final started = _blockedSelectStarted;
     if (started == null || started.isCompleted) return;
+    final pattern = _blockedSelectPattern;
+    if (pattern != null && !statement.statements.single.contains(pattern)) {
+      return;
+    }
     final release = _blockedSelectRelease!;
     started.complete();
     await release.future;
