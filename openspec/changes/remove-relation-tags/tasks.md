@@ -225,6 +225,18 @@
   - **Вероятные файлы:** `lib/src/graph/data/drift_personal_graph_repository_tagged_intentions.dart`, `test/graph/data/drift_tagged_entities_read_test.dart`.
   - **Размер:** S.
 
+- [ ] 2.11 Общие фикстуры и проверки первой фазы заполняют схему 6 только назначениями намерениям
+  - **Критерии приёмки:**
+    - Помощники `test/support/tag_storage_fixture.dart`, заполняющие текущую схему, не записывают `tag_assignments.long_term_relation_id`: параметр `includeHistoricalRelationAssignments` и вставки назначений связям в `seedTagNavigationFixture`, `seedTagNavigationLifecycleFixture`, `seedLargeTagReadFixture`, `seedWidelyAssignedTagFixture` и `seedLargeTaggedEntitiesFixture` удалены. Назначения связям остаются только во входных наборах прежних схем для проверок миграции, таких как `seedHistoricalTagStorageFixture` и наборы задачи 2.3.
+    - Посторонняя нагрузка, которую давали назначения связям, заменяется представимой в схеме 6 нагрузкой не меньшего объёма: назначениями других тегов тем же и другим намерениям и назначениями выбранного тега намерениям противоположного архивного охвата. Число строк `tag_assignments`, в том числе назначений удаляемого или выбранного тега, от которого зависят пределы стоимости, не уменьшается.
+    - Проверки стоимости чтения назначений и навигации, стоимости удаления тега, согласования представлений и сценариев навигации приложения сохраняют прежние пределы и продолжают доказывать, что посторонние назначения не попадают в выдачу и не увеличивают материализацию. Утверждения о назначениях связям в проверках текущей схемы заменяются утверждениями о новой посторонней нагрузке, а не удаляются без замены и не отключаются.
+  - **Проверка:**
+    - `flutter analyze` и `flutter test test/graph test/tag/presentation test/app` на схеме 6, включая `test/graph/data/drift_tag_assignment_read_cost_test.dart`, `test/graph/data/drift_tagged_entities_read_cost_test.dart`, `test/graph/data/drift_tag_delete_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/tag/presentation/assignments/tag_assignments_read_cost_widget_test.dart`, `test/tag/presentation/navigation/tag_navigation_read_cost_widget_test.dart`, `test/tag/presentation/catalog/tag_catalog_search_page_test.dart` и `test/app/tag_navigation_app_flow_test.dart`.
+    - Найти в `test/` вставки в `tag_assignments` со столбцом `long_term_relation_id` и подтвердить, что каждая строит входной набор прежней схемы для проверки миграции.
+  - **Зависимости:** 2.1.
+  - **Вероятные файлы:** `test/support/tag_storage_fixture.dart`, `test/graph/data/drift_tag_assignment_read_cost_test.dart`, `test/graph/data/drift_tagged_entities_read_cost_test.dart`, `test/graph/data/tag_delete_cost.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/tag/presentation/assignments/tag_assignments_read_cost_widget_test.dart`, `test/tag/presentation/navigation/tag_navigation_read_cost_widget_test.dart`, `test/app/tag_navigation_graph_lifecycle_scenarios.dart`, `test/app/tag_navigation_app_lifecycle_test.dart`, `test/graph/data/file_backed_tag_durability_test.dart`.
+  - **Размер:** M.
+
 - [ ] 2.2 Переход отвергает повреждённые прежние назначения вместо молчаливой очистки
   - **Критерии приёмки:**
     - До отбрасывания строк связей переход проверяет инварианты прежних назначений: ровно один получатель и целостность ссылок на теги, намерения и связи. Нарушение приводит к отказу обновления существующей категории, а не к удалению записи под видом предусмотренной очистки.
