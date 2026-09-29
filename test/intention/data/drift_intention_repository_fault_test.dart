@@ -14,11 +14,16 @@ import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_storage_fixture.dart';
+
+part 'catalog_tag_filter_failure_scenarios.dart';
 
 void main() {
   late AppDatabase database;
@@ -33,6 +38,22 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  _catalogTagFilterFailureScenarios((observer, setup) async {
+    final replacement = await _replaceDatabase(
+      observer,
+      database,
+      diagnostics,
+      setup: setup,
+    );
+    database = replacement.database;
+    repository = replacement.repository;
+    return (
+      database: database,
+      repository: repository,
+      diagnostics: diagnostics,
+    );
+  });
 
   group('Порция каталога — отказы получения собственных тегов', () {
     test('повреждённая ссылка отклоняет всю порцию и её продолжение', () async {
@@ -716,12 +737,13 @@ Future<({AppDatabase database, DriftPersonalGraphRepository repository})>
 _replaceDatabase(
   LocalDatabaseConnectionObserver observer,
   AppDatabase previousDatabase,
-  InMemoryDiagnosticsSink diagnostics,
-) async {
+  InMemoryDiagnosticsSink diagnostics, {
+  void Function(Database)? setup,
+}) async {
   await previousDatabase.close();
   final database = AppDatabase(
     observeConfiguredLocalDatabaseConnection(
-      openInMemoryLocalDatabase(),
+      openInMemoryLocalDatabase(setup: setup),
       observer,
     ),
   );

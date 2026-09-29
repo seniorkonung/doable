@@ -204,10 +204,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           query.tagFilter.excludedTagIds.isNotEmpty;
       final page = await _sequencer.run(
         () => _database.transaction(() async {
-          final filterConnectionId = hasTagConditions
-              ? await _prepareCatalogTagFilter(query.tagFilter)
-              : null;
-          final page = await switch (cursor) {
+          Future<IntentionCatalogPage> read() => switch (cursor) {
             null => _readFirstCatalogPage(query),
             _DriftIntentionCatalogCursor() => _readCatalogContinuationPage(
               query,
@@ -215,10 +212,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
             ),
             _ => throw StateError('Недопустимый cursor каталога.'),
           };
-          if (filterConnectionId != null) {
-            await _clearCatalogTagFilter(filterConnectionId);
-          }
-          return page;
+          return hasTagConditions
+              ? _withCatalogTagFilter(query.tagFilter, read)
+              : read();
         }),
       );
       _recordDiagnostics(
@@ -885,8 +881,38 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   /// Условия живут на соединении транзакции; sequencer изолирует запросы.
   /// Успех очищает временные данные, отказ откатывает их вместе с чтением.
-  Future<String> _prepareCatalogTagFilter(IntentionTagFilter filter) async {
-    final connectionId = (await _tagReadStorageVersion()).connectionId;
+  Future<T> _withCatalogTagFilter<T>(
+    IntentionTagFilter filter,
+    Future<T> Function() read,
+  ) async {
+    final before = await _tagReadStorageVersion();
+    try {
+      await _prepareCatalogTagFilter(before.connectionId, filter);
+      final result = await read();
+      await _clearCatalogTagFilter(before.connectionId);
+      return result;
+    } on Object {
+      // В этой транзакции чтения пишет только подготовка и очистка TEMP.
+      // SQL мог выполниться до исключения, не вернув число изменённых строк.
+      // Учитываем оставшиеся записи до отката на том же соединении.
+      final after = await _tagReadStorageVersion();
+      if (after.connectionId != before.connectionId) {
+        throw const _StoredIntentionCorruption();
+      }
+      final unaccounted = after.connectionChanges - before.connectionChanges;
+      _catalogTemporaryChanges.update(
+        before.connectionId,
+        (previous) => previous + unaccounted,
+        ifAbsent: () => unaccounted,
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> _prepareCatalogTagFilter(
+    String connectionId,
+    IntentionTagFilter filter,
+  ) async {
     for (final (table, tagIds) in [
       ('doable_catalog_required_tags', filter.requiredTagIds),
       ('doable_catalog_excluded_tags', filter.excludedTagIds),
@@ -908,7 +934,6 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         );
       }
     }
-    return connectionId;
   }
 
   Future<void> _clearCatalogTagFilter(String connectionId) async {

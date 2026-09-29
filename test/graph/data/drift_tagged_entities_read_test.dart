@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -17,6 +20,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
+part 'tagged_entities_catalog_storage_scenarios.dart';
+
 TagId _tag(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
 
@@ -29,11 +34,23 @@ LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
 
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
   final statements = <String>[];
+  var failAfterFilterInsert = false;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation == LocalDatabaseSqlOperation.select) {
       statements.add(statement.statements.single);
+    }
+  }
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (failAfterFilterInsert &&
+        statement.statements.single.startsWith(
+          'INSERT INTO temp.doable_catalog_excluded_tags',
+        )) {
+      failAfterFilterInsert = false;
+      throw StateError('CANARY-отказ после служебной вставки');
     }
   }
 }
@@ -43,6 +60,7 @@ void main() {
   late sqlite.Database raw;
   late DriftPersonalGraphRepository graph;
   late _ReadProbe probe;
+  Directory? fileDirectory;
 
   setUp(() async {
     probe = _ReadProbe();
@@ -62,7 +80,33 @@ void main() {
     );
     probe.statements.clear();
   });
-  tearDown(() => database.close());
+  tearDown(() async {
+    await database.close();
+    await fileDirectory?.delete(recursive: true);
+    fileDirectory = null;
+  });
+
+  _taggedEntitiesCatalogStorageScenarios(() async {
+    await database.close();
+    fileDirectory = await Directory.systemTemp.createTemp('doable_tag_cursor_');
+    final file = File('${fileDirectory!.path}/graph.sqlite');
+    database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openFileBackedLocalDatabase(file, setup: (db) => raw = db),
+        probe,
+      ),
+    );
+    await database.open();
+    seedTagStorageFixture(raw);
+    graph = _storageScenarioRepository(database);
+    return (
+      database: database,
+      raw: raw,
+      graph: graph,
+      probe: probe,
+      file: file,
+    );
+  });
 
   TaggedEntitiesPage page(TaggedEntitiesPageResult result) =>
       (result as TaggedEntitiesPageSuccess).value;

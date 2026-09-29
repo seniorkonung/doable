@@ -1,7 +1,12 @@
 import 'dart:async';
 
+import 'package:doable/src/data/local/app_database.dart' hide Tag;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -16,13 +21,19 @@ import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/tag_storage_fixture.dart';
 
 part 'tag_navigation_terminal_watch_scenarios.dart';
 part 'tag_navigation_late_page_scenarios.dart';
+part 'tag_navigation_catalog_integration_scenarios.dart';
 
 void main() {
+  _realTagNavigationCatalogScenarios();
+
   test(
     'отсутствие наблюдения действует и после более нового постороннего пакета',
     () async {
