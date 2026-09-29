@@ -45,7 +45,7 @@ import '../../tag/application/tag_change.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_id_generator.dart';
 import '../../tag/application/tag_read_result.dart';
-import '../../tag/application/tagged_entities_page.dart';
+import '../../tag/application/tagged_intentions_page.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
@@ -75,7 +75,7 @@ part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_choice_path_suggestions.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
-part 'drift_personal_graph_repository_tagged_entities.dart';
+part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
@@ -127,9 +127,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _readTagAssignments(intentionId);
 
   @override
-  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
-    TaggedEntitiesQuery query,
-  ) => _readTaggedEntitiesPage(query);
+  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
+    TaggedIntentionsQuery query,
+  ) => _readTaggedIntentionsPage(query);
 
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
