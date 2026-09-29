@@ -53,6 +53,257 @@ void main() {
   tearDown(() => database.close());
 
   group('Совместный запрос каталога', () {
+    final originalFilter = IntentionTagFilter(
+      requiredTagIds: [_tagId(firstTagNumber)],
+      excludedTagIds: [_tagId(lastTagNumber)],
+    );
+    for (final (label, filter, originalExcluded, excluded) in [
+      (
+        'заменён обязательный тег при том же числе условий',
+        IntentionTagFilter(
+          requiredTagIds: [_tagId(lastTagNumber)],
+          excludedTagIds: [_tagId(lastTagNumber)],
+        ),
+        null,
+        null,
+      ),
+      (
+        'заменён исключённый тег при том же числе условий',
+        IntentionTagFilter(
+          requiredTagIds: [_tagId(firstTagNumber)],
+          excludedTagIds: [_tagId(firstTagNumber)],
+        ),
+        null,
+        null,
+      ),
+      (
+        'обязательный и исключённый теги поменялись местами',
+        IntentionTagFilter(
+          requiredTagIds: [_tagId(lastTagNumber)],
+          excludedTagIds: [_tagId(firstTagNumber)],
+        ),
+        null,
+        null,
+      ),
+      ('сняты условия по тегам', IntentionTagFilter.empty, null, null),
+      ('добавлен исключённый участник', originalFilter, null, _id(_uuid(3))),
+      ('удалён исключённый участник', originalFilter, _id(_uuid(3)), null),
+      (
+        'заменён исключённый участник',
+        originalFilter,
+        _id(_uuid(3)),
+        _id(_uuid(1)),
+      ),
+    ]) {
+      test('отклоняет несовместимый курсор до SQL: $label', () async {
+        seedTagStorageFixture(raw);
+        final first = _firstPage(
+          await repository.getCatalogPage(
+            _tagQuery(
+              tagFilter: originalFilter,
+              excludedIntentionId: originalExcluded,
+            ),
+          ),
+        );
+        expect(first.nextCursor, isNotNull);
+        trace.statements.clear();
+
+        final result = await repository.getCatalogPage(
+          _tagQuery(
+            tagFilter: filter,
+            excludedIntentionId: excluded,
+            cursor: first.nextCursor,
+          ),
+        );
+
+        expect(
+          result,
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionGenericValidationFailure>(),
+          ),
+        );
+        expect(trace.statements, isEmpty);
+      });
+    }
+
+    test(
+      'продолжает выдачу при другом порядке и повторах тех же условий',
+      () async {
+        seedTagStorageFixture(raw);
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _uuid(303),
+          'Отдых',
+        ]);
+        for (final number in [1, 2]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_uuid(303), _uuid(number)],
+          );
+        }
+        final first = _firstPage(
+          await repository.getCatalogPage(
+            _tagQuery(
+              tagFilter: IntentionTagFilter(
+                requiredTagIds: [_tagId(firstTagNumber), _tagId(303)],
+                excludedTagIds: [_tagId(lastTagNumber), _tagId(304)],
+              ),
+              excludedIntentionId: _id(_uuid(3)),
+            ),
+          ),
+        );
+        expect(first.totalCount, 2);
+        expect(first.items.single.id, _id(_uuid(1)));
+        expect(first.nextCursor, isNotNull);
+
+        final next = _continuationPage(
+          await repository.getCatalogPage(
+            _tagQuery(
+              tagFilter: IntentionTagFilter(
+                requiredTagIds: [
+                  _tagId(303),
+                  _tagId(firstTagNumber),
+                  _tagId(303),
+                ],
+                excludedTagIds: [
+                  _tagId(304),
+                  _tagId(lastTagNumber),
+                  _tagId(304),
+                ],
+              ),
+              excludedIntentionId: _id(_uuid(3)),
+              cursor: first.nextCursor,
+            ),
+          ),
+        );
+        expect(next.items.single.id, _id(_uuid(2)));
+        expect(next.nextCursor, isNull);
+      },
+    );
+
+    test(
+      'переименование выбранного тега сохраняет совместимость курсора',
+      () async {
+        seedTagStorageFixture(raw);
+        final first = _firstPage(
+          await repository.getCatalogPage(_tagQuery(tagFilter: originalFilter)),
+        );
+        expect(first.nextCursor, isNotNull);
+        expect(
+          await repository.execute(
+            RenameTag(
+              tagId: _tagId(firstTagNumber),
+              name: TagName.fromInput('Семья'),
+            ),
+          ),
+          isA<GraphCommandSucceeded>(),
+        );
+
+        final next = _continuationPage(
+          await repository.getCatalogPage(
+            _tagQuery(tagFilter: originalFilter, cursor: first.nextCursor),
+          ),
+        );
+        expect(next.items.single.id, _id(_uuid(2)));
+        expect(next.items.single.tags.single.id, _tagId(firstTagNumber));
+        expect(next.items.single.tags.single.name.value, 'Семья');
+        expect(next.nextCursor, isNull);
+      },
+    );
+
+    for (final (label, order, expectedNumbers) in [
+      (
+        'по созданию по возрастанию',
+        IntentionCatalogOrder.createdAtAscending,
+        [for (var number = 1; number <= 235; number++) number],
+      ),
+      (
+        'по созданию по убыванию',
+        IntentionCatalogOrder.createdAtDescending,
+        [
+          for (var number = 121; number <= 235; number++) number,
+          for (var number = 1; number <= 120; number++) number,
+        ],
+      ),
+      (
+        'по обновлению по возрастанию',
+        IntentionCatalogOrder.updatedAtAscending,
+        [
+          for (var number = 161; number <= 235; number++) number,
+          for (var number = 81; number <= 160; number++) number,
+          for (var number = 1; number <= 80; number++) number,
+        ],
+      ),
+      (
+        'по обновлению по убыванию',
+        IntentionCatalogOrder.updatedAtDescending,
+        [for (var number = 1; number <= 235; number++) number],
+      ),
+    ]) {
+      test('235 совместных совпадений ровно один раз: $label', () async {
+        _seedJointCatalogPagingFixture(raw);
+        final filter = IntentionTagFilter(
+          requiredTagIds: [_tagId(1001), _tagId(1002)],
+          excludedTagIds: [_tagId(1003), _tagId(1004)],
+        );
+        IntentionCatalogQuery query(IntentionCatalogCursor? cursor) =>
+            IntentionCatalogQuery(
+              scope: IntentionScope.active,
+              readinessFilter: IntentionReadinessFilter.readyOnly,
+              titleFilter: 'гулять',
+              tagFilter: filter,
+              excludedIntentionId: _id(_uuid(236)),
+              order: order,
+              pageSize: 100,
+              cursor: cursor,
+            );
+        trace.statements.clear();
+        final first = _firstPage(await repository.getCatalogPage(query(null)));
+        expect(first.totalCount, 235);
+        expect(first.items, hasLength(100));
+        expect(first.nextCursor, isNotNull);
+        expect(trace.statements.where(_isCatalogCountStatement), hasLength(1));
+        trace.statements.clear();
+
+        final items = [...first.items];
+        final pageLengths = [first.items.length];
+        var cursor = first.nextCursor;
+        while (cursor != null) {
+          final next = _continuationPage(
+            await repository.getCatalogPage(query(cursor)),
+          );
+          expect(
+            next.revision.compareTo(first.revision),
+            GraphRevisionOrder.same,
+          );
+          items.addAll(next.items);
+          pageLengths.add(next.items.length);
+          cursor = next.nextCursor;
+        }
+
+        expect(pageLengths, [100, 100, 35]);
+        expect(items.map((item) => item.id), [
+          for (final number in expectedNumbers) _id(_uuid(number)),
+        ]);
+        expect(items.map((item) => item.id).toSet(), hasLength(235));
+        expect(items.every(query(null).includes), isTrue);
+        expect(
+          items.every(
+            (item) =>
+                item.tags.length == 2 &&
+                item.tags
+                    .map((tag) => tag.id)
+                    .toSet()
+                    .containsAll(filter.requiredTagIds),
+          ),
+          isTrue,
+        );
+        expect(trace.statements.where(_isCatalogCountStatement), isEmpty);
+        expect(trace.statements, isNot(anyElement(contains('OFFSET'))));
+      });
+    }
+
     test(
       'изолирует параллельные чтения, продолжение и запрос после отказа',
       () async {
@@ -2518,6 +2769,47 @@ void main() {
 bool _isCatalogCountStatement(String statement) =>
     statement.contains('COUNT(') &&
     !statement.contains('doable_relation_count_aggregates');
+
+void _seedJointCatalogPagingFixture(Database database) {
+  database.execute('BEGIN');
+  for (final (number, name) in [
+    (1001, 'Здоровье'),
+    (1002, 'Отдых'),
+    (1003, 'Спорт'),
+    (1004, 'Работа'),
+  ]) {
+    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      _uuid(number),
+      name,
+    ]);
+  }
+  for (var number = 1; number <= 285; number++) {
+    database.execute(
+      'INSERT INTO intentions '
+      '(id, title, is_action_ready, is_archived, created_at, updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        _uuid(number),
+        number >= 256 && number <= 265 ? 'Читать' : 'Гулять',
+        number < 276 ? 1 : 0,
+        number >= 266 && number <= 275 ? 1 : 0,
+        100 + (number - 1) ~/ 120,
+        300 - (number - 1) ~/ 80,
+      ],
+    );
+    for (final tag in [
+      1001,
+      if (number < 246 || number > 255) 1002,
+      if (number >= 237 && number <= 245) number.isOdd ? 1003 : 1004,
+    ]) {
+      database.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_uuid(tag), _uuid(number)],
+      );
+    }
+  }
+  database.execute('COMMIT');
+}
 
 Future<void> _insertIntention(
   AppDatabase database, {

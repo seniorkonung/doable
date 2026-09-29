@@ -1161,6 +1161,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     scope: query.scope,
     readinessFilter: query.readinessFilter,
     normalizedTitleFilter: query.titleFilter?.map((value) => value),
+    tagFilter: query.tagFilter,
+    excludedIntentionId: query.excludedIntentionId,
     order: query.order,
     boundaryTimestamp: switch (query.order.field) {
       IntentionCatalogSortField.createdAt => boundary.createdAt,
@@ -1614,6 +1616,8 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
     required this.scope,
     required this.readinessFilter,
     required this.normalizedTitleFilter,
+    required this.tagFilter,
+    required this.excludedIntentionId,
     required this.order,
     required this.boundaryTimestamp,
     required this.boundaryId,
@@ -1623,6 +1627,8 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   final IntentionScope scope;
   final IntentionReadinessFilter readinessFilter;
   final String? normalizedTitleFilter;
+  final IntentionTagFilter tagFilter;
+  final IntentionId? excludedIntentionId;
   final IntentionCatalogOrder order;
   final domain.IntentionTimestamp boundaryTimestamp;
   final IntentionId boundaryId;
@@ -1633,6 +1639,8 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
       scope == query.scope &&
       readinessFilter == query.readinessFilter &&
       normalizedTitleFilter == query.titleFilter?.map((value) => value) &&
+      tagFilter == query.tagFilter &&
+      excludedIntentionId == query.excludedIntentionId &&
       order == query.order;
 }
 
