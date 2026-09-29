@@ -1,4 +1,5 @@
 import '../../graph/application/graph_revision.dart';
+import '../../tag/domain/tag_id.dart';
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
@@ -7,6 +8,51 @@ import 'title_search_key.dart';
 enum IntentionScope { active, archived, all }
 
 enum IntentionReadinessFilter { all, readyOnly }
+
+/// Неизменяемые условия наличия и отсутствия собственных тегов намерения.
+///
+/// Повторы и порядок идентификаторов не меняют равенство условий.
+/// Пересечение наборов сохраняется и делает сочетание невыполнимым.
+/// Переименование и удаление тега сохраняют его идентификатор в условиях.
+final class IntentionTagFilter {
+  IntentionTagFilter({
+    Iterable<TagId> requiredTagIds = const [],
+    Iterable<TagId> excludedTagIds = const [],
+  }) : requiredTagIds = Set.unmodifiable(requiredTagIds),
+       excludedTagIds = Set.unmodifiable(excludedTagIds);
+
+  const IntentionTagFilter._({
+    required this.requiredTagIds,
+    required this.excludedTagIds,
+  });
+
+  static const empty = IntentionTagFilter._(
+    requiredTagIds: {},
+    excludedTagIds: {},
+  );
+
+  final Set<TagId> requiredTagIds;
+  final Set<TagId> excludedTagIds;
+
+  /// Проверяет полный набор собственных назначений искомому намерению.
+  bool matches(Set<TagId> ownTagIds) =>
+      ownTagIds.containsAll(requiredTagIds) &&
+      !excludedTagIds.any(ownTagIds.contains);
+
+  @override
+  bool operator ==(Object other) =>
+      other is IntentionTagFilter &&
+      requiredTagIds.length == other.requiredTagIds.length &&
+      excludedTagIds.length == other.excludedTagIds.length &&
+      requiredTagIds.containsAll(other.requiredTagIds) &&
+      excludedTagIds.containsAll(other.excludedTagIds);
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAllUnordered(requiredTagIds),
+    Object.hashAllUnordered(excludedTagIds),
+  );
+}
 
 enum IntentionCatalogSortField { createdAt, updatedAt }
 

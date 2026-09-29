@@ -24,6 +24,9 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_read_contract_test_fallback.dart';
@@ -101,6 +104,192 @@ void main() {
         expect(mappingCount, 1585);
       },
     );
+  });
+
+  group('условия собственных тегов намерения', () {
+    final health = _tagId('00000000-0000-4000-8000-000000000001');
+    final rest = _tagId('00000000-0000-4000-8000-000000000002');
+    final sport = _tagId('00000000-0000-4000-8000-000000000003');
+    final work = _tagId('00000000-0000-4000-8000-000000000004');
+
+    test('пустые условия допускают намерения с тегами и без них', () {
+      final filter = IntentionTagFilter();
+
+      expect(filter.requiredTagIds, isEmpty);
+      expect(filter.excludedTagIds, isEmpty);
+      expect(filter.matches({}), isTrue);
+      expect(filter.matches({health, sport}), isTrue);
+      expect(filter, IntentionTagFilter.empty);
+      expect(filter.hashCode, IntentionTagFilter.empty.hashCode);
+    });
+
+    test('требует каждый обязательный тег и допускает дополнительные', () {
+      final filter = IntentionTagFilter(requiredTagIds: [health, rest]);
+
+      expect(filter.matches({health, rest}), isTrue);
+      expect(filter.matches({health, rest, sport}), isTrue);
+      expect(filter.matches({health}), isFalse);
+      expect(filter.matches({rest}), isFalse);
+      expect(filter.matches({}), isFalse);
+    });
+
+    test('исключает любой запрещённый тег и допускает отсутствие тегов', () {
+      final filter = IntentionTagFilter(excludedTagIds: [sport, work]);
+
+      expect(filter.matches({}), isTrue);
+      expect(filter.matches({health}), isTrue);
+      expect(filter.matches({sport}), isFalse);
+      expect(filter.matches({work}), isFalse);
+      expect(filter.matches({health, sport, work}), isFalse);
+    });
+
+    test('соединяет обязательные и исключённые условия через «И»', () {
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health, rest],
+        excludedTagIds: [sport, work],
+      );
+      final ownTagIds = {health, rest};
+
+      expect(filter.matches(ownTagIds), isTrue);
+      expect(filter.matches({health}), isFalse);
+      expect(filter.matches({health, rest, sport}), isFalse);
+      expect(filter.matches({health, rest, work}), isFalse);
+      expect(filter.matches({}), isFalse);
+      expect(ownTagIds, {health, rest});
+    });
+
+    test('сохраняет противоречивые условия и не допускает совпадений', () {
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health, rest],
+        excludedTagIds: [rest, sport],
+      );
+
+      expect(filter.requiredTagIds, {health, rest});
+      expect(filter.excludedTagIds, {rest, sport});
+      expect(filter.matches({}), isFalse);
+      expect(filter.matches({health}), isFalse);
+      expect(filter.matches({health, rest}), isFalse);
+      expect(filter.matches({health, rest, sport, work}), isFalse);
+    });
+
+    test('повторы и порядок не меняют равенство, хеш и смысл условий', () {
+      final first = IntentionTagFilter(
+        requiredTagIds: [health, rest, health],
+        excludedTagIds: [sport, work, sport],
+      );
+      final reordered = IntentionTagFilter(
+        requiredTagIds: [rest, _tagId(health.toCanonicalString())],
+        excludedTagIds: [work, sport],
+      );
+
+      expect(first.requiredTagIds, {health, rest});
+      expect(first.excludedTagIds, {sport, work});
+      expect(first == reordered, isTrue);
+      expect(reordered == first, isTrue);
+      expect(first.hashCode, reordered.hashCode);
+      expect({first, reordered}, hasLength(1));
+      for (final ownTagIds in <Set<TagId>>[
+        {},
+        {health},
+        {health, rest},
+        {health, rest, sport},
+      ]) {
+        expect(first.matches(ownTagIds), reordered.matches(ownTagIds));
+      }
+    });
+
+    test('состав и роль каждого набора различают условия', () {
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health],
+        excludedTagIds: [sport],
+      );
+
+      expect(
+        filter ==
+            IntentionTagFilter(requiredTagIds: [rest], excludedTagIds: [sport]),
+        isFalse,
+      );
+      expect(
+        filter ==
+            IntentionTagFilter(
+              requiredTagIds: [health],
+              excludedTagIds: [work],
+            ),
+        isFalse,
+      );
+      expect(
+        filter ==
+            IntentionTagFilter(
+              requiredTagIds: [sport],
+              excludedTagIds: [health],
+            ),
+        isFalse,
+      );
+      expect(filter == IntentionTagFilter(requiredTagIds: [health]), isFalse);
+      expect(filter == IntentionTagFilter(excludedTagIds: [sport]), isFalse);
+      expect(filter == Object(), isFalse);
+    });
+
+    test('копирует входные наборы и запрещает изменение своих условий', () {
+      final requiredTagIds = [health, rest];
+      final excludedTagIds = {sport, work};
+      final filter = IntentionTagFilter(
+        requiredTagIds: requiredTagIds,
+        excludedTagIds: excludedTagIds,
+      );
+      final originalHashCode = filter.hashCode;
+      requiredTagIds.clear();
+      excludedTagIds
+        ..clear()
+        ..add(health);
+
+      expect(filter.requiredTagIds, {health, rest});
+      expect(filter.excludedTagIds, {sport, work});
+      expect(() => filter.requiredTagIds.add(work), throwsUnsupportedError);
+      expect(
+        () => filter.requiredTagIds.remove(health),
+        throwsUnsupportedError,
+      );
+      expect(() => filter.excludedTagIds.add(health), throwsUnsupportedError);
+      expect(() => filter.excludedTagIds.clear(), throwsUnsupportedError);
+      expect(filter.matches({health, rest}), isTrue);
+      expect(filter.hashCode, originalHashCode);
+    });
+
+    test(
+      'переименование и одноимённый новый тег не подменяют идентичность',
+      () {
+        final original = Tag(id: health, name: TagName.fromInput('Здоровье'));
+        final renamed = Tag(
+          id: health,
+          name: TagName.fromInput('Самочувствие'),
+        );
+        final sameName = Tag(id: rest, name: TagName.fromInput('Здоровье'));
+        final required = IntentionTagFilter(requiredTagIds: [original.id]);
+        final excluded = IntentionTagFilter(excludedTagIds: [original.id]);
+
+        expect(original.name, sameName.name);
+        expect(required.matches({renamed.id}), isTrue);
+        expect(required.matches({sameName.id}), isFalse);
+        expect(excluded.matches({renamed.id}), isFalse);
+        expect(excluded.matches({sameName.id}), isTrue);
+      },
+    );
+
+    test('сохраняет идентификатор после удаления тега из назначений', () {
+      final required = IntentionTagFilter(requiredTagIds: [health]);
+      final excluded = IntentionTagFilter(excludedTagIds: [health]);
+      final ownTagIds = {health, rest};
+
+      expect(required.matches(ownTagIds), isTrue);
+      expect(excluded.matches(ownTagIds), isFalse);
+      ownTagIds.remove(health);
+
+      expect(required.matches(ownTagIds), isFalse);
+      expect(excluded.matches(ownTagIds), isTrue);
+      expect(required.requiredTagIds, {health});
+      expect(excluded.excludedTagIds, {health});
+    });
   });
 
   group('контракт каталога намерений', () {
@@ -840,6 +1029,11 @@ Matcher _throwsInvalidUnicodeFilter() => throwsA(
 IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw StateError('Ожидался корректный UUID.'),
+};
+
+TagId _tagId(String value) => switch (TagId.decode(value)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw StateError('Ожидался корректный UUID тега.'),
 };
 
 final class _FailingPersonalGraphRepository
