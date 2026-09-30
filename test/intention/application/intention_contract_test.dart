@@ -887,29 +887,29 @@ void main() {
   });
 
   group('контракт чтения согласования каталога', () {
-    test('запрос несёт фильтр, границу и неизменяемые сохранённые строки', () {
+    test('запрос несёт фильтр, границу, курсор и окно сохранённых строк', () {
       final query = _query(pageSize: 2);
-      final first = _intentionId('00000000-0000-4000-8000-000000000001');
-      final second = _intentionId('00000000-0000-4000-8000-000000000002');
-      final stored = [second, first, second];
+      final second = _summary(id: '00000000-0000-4000-8000-000000000002');
+      final first = _summary(id: '00000000-0000-4000-8000-000000000001');
+      final stored = [second, first];
       const continuation = _TestCatalogCursor();
       const cursor = _TestReconciliationCursor();
 
       final reconciliation = IntentionCatalogReconciliationQuery(
         catalogQuery: query,
         boundary: const IntentionCatalogPartialPrefixBoundary(continuation),
-        storedIntentionIds: stored,
+        window: IntentionCatalogInnerReconciliationWindow(stored),
         cursor: cursor,
       );
       stored.clear();
 
       expect(reconciliation.catalogQuery, same(query));
-      expect(reconciliation.storedIntentionIds, {first, second});
       expect(reconciliation.cursor, same(cursor));
-      expect(
-        () => reconciliation.storedIntentionIds.add(first),
-        throwsUnsupportedError,
-      );
+      final window =
+          reconciliation.window as IntentionCatalogInnerReconciliationWindow;
+      expect(window.storedIntentionIds, [second.id, first.id]);
+      expect(window.upperEdgeRow, same(first));
+      expect(() => window.storedRows.add(first), throwsUnsupportedError);
       expect(switch (reconciliation.boundary) {
         IntentionCatalogPartialPrefixBoundary(:final continuation) =>
           continuation,
@@ -917,15 +917,24 @@ void main() {
       }, same(continuation));
     });
 
-    test('ранее завершённая выдача, включая пустую, — отдельная граница', () {
+    test('внутреннее окно без сохранённых строк не создаётся', () {
+      expect(
+        () => IntentionCatalogInnerReconciliationWindow(const []),
+        throwsArgumentError,
+      );
+    });
+
+    test('ранее завершённая выдача, включая пустую, — отдельная граница, '
+        'а окно с последней строкой области может быть пустым', () {
       final reconciliation = IntentionCatalogReconciliationQuery(
         catalogQuery: _query(),
         boundary: const IntentionCatalogCompletedBoundary(),
-        storedIntentionIds: const [],
+        window: IntentionCatalogFinalReconciliationWindow(const []),
       );
 
       expect(_boundaryDescription(reconciliation.boundary), 'completed');
-      expect(reconciliation.storedIntentionIds, isEmpty);
+      expect(_windowDescription(reconciliation.window), 'final');
+      expect(reconciliation.window.storedIntentionIds, isEmpty);
       expect(reconciliation.cursor, isNull);
     });
 
@@ -1116,7 +1125,9 @@ void main() {
           IntentionCatalogReconciliationQuery(
             catalogQuery: _query(),
             boundary: const IntentionCatalogCompletedBoundary(),
-            storedIntentionIds: [id],
+            window: IntentionCatalogFinalReconciliationWindow([
+              _summary(id: '00000000-0000-4000-8000-000000000001'),
+            ]),
           ),
         ),
         isA<ResultFailure<IntentionCatalogReconciliationOutcome>>(),
@@ -1336,6 +1347,12 @@ String _boundaryDescription(IntentionCatalogReconciliationBoundary boundary) =>
     switch (boundary) {
       IntentionCatalogPartialPrefixBoundary() => 'partial',
       IntentionCatalogCompletedBoundary() => 'completed',
+    };
+
+String _windowDescription(IntentionCatalogReconciliationWindow window) =>
+    switch (window) {
+      IntentionCatalogInnerReconciliationWindow() => 'inner',
+      IntentionCatalogFinalReconciliationWindow() => 'final',
     };
 
 String _reconciliationDescription(

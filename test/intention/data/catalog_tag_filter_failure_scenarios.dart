@@ -202,7 +202,7 @@ void _catalogReconciliationFailureScenarios(
             pageSize: 1,
           ),
           boundary: const IntentionCatalogCompletedBoundary(),
-          storedIntentionIds: const [],
+          window: IntentionCatalogFinalReconciliationWindow(const []),
         );
         final before = _storedFilterFailureGraph(raw);
         final changesBefore = _connectionChanges(raw);

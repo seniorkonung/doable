@@ -351,7 +351,7 @@ void main() {
       final repeated = repository.reconciliationQueryAt(2);
       expect(repeated.catalogQuery, same(before.query));
       expect(repeated.boundary, isA<IntentionCatalogCompletedBoundary>());
-      expect(repeated.storedIntentionIds, {eighth.id});
+      expect(repeated.window.storedIntentionIds, [eighth.id]);
       expect(repeated.cursor, isNull);
       expect(published, isEmpty);
 
@@ -435,11 +435,11 @@ void main() {
             await waitForReconciliationQueries(repository, 2);
             final repeated = repository.reconciliationQueryAt(1);
             expect(repeated.catalogQuery, same(before.query));
-            expect(repeated.storedIntentionIds, {
+            expect(repeated.window.storedIntentionIds, [
               tenth.id,
               eighth.id,
               seventh.id,
-            });
+            ]);
             expect(published, isEmpty);
             repository.completeReconciliation(
               1,
@@ -503,7 +503,7 @@ void main() {
       expect(published, isEmpty);
       final repeated = repository.reconciliationQueryAt(1);
       expect(repeated.catalogQuery, same(before.query));
-      expect(repeated.storedIntentionIds, {tenth.id});
+      expect(repeated.window.storedIntentionIds, [tenth.id]);
       expect(repeated.cursor, isNull);
 
       final ninth = testSummary(index: 9, tags: [health]);

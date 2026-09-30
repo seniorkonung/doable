@@ -537,26 +537,67 @@ final class IntentionCatalogCompletedBoundary
 }
 
 /// Непрозрачное продолжение одного согласования. Оно связано с запросом,
-/// границей области, сохранёнными идентификаторами и ревизией первой порции.
+/// границей области, позицией в действующем порядке, строками своего окна,
+/// следующими за позицией, и ревизией первой порции.
 abstract interface class IntentionCatalogReconciliationCursor {}
+
+/// Окно сохранённых строк области, следующих за курсором согласования в
+/// действующем порядке. Строки окна исключаются из порции по идентичности, а
+/// недостающие совпадения читаются не дальше верхнего края окна. Окно больше
+/// размера порции запроса отклоняется как недопустимый ввод без чтения.
+sealed class IntentionCatalogReconciliationWindow {
+  IntentionCatalogReconciliationWindow._(Iterable<IntentionSummary> storedRows)
+    : storedRows = List.unmodifiable(storedRows);
+
+  /// Сохранённые строки окна в действующем порядке.
+  final List<IntentionSummary> storedRows;
+
+  List<IntentionId> get storedIntentionIds => [
+    for (final row in storedRows) row.id,
+  ];
+}
+
+/// За окном следуют другие сохранённые строки области: верхний край окна —
+/// ключ сортировки его последней строки.
+final class IntentionCatalogInnerReconciliationWindow
+    extends IntentionCatalogReconciliationWindow {
+  IntentionCatalogInnerReconciliationWindow(super.storedRows) : super._() {
+    if (storedRows.isEmpty) {
+      throw ArgumentError.value(
+        storedRows,
+        'storedRows',
+        'Внутреннее окно содержит хотя бы одну сохранённую строку.',
+      );
+    }
+  }
+
+  IntentionSummary get upperEdgeRow => storedRows.last;
+}
+
+/// Окно содержит последнюю сохранённую строку области либо пусто, потому что
+/// сохранённых строк после курсора нет: верхний край окна — граница области.
+final class IntentionCatalogFinalReconciliationWindow
+    extends IntentionCatalogReconciliationWindow {
+  IntentionCatalogFinalReconciliationWindow(super.storedRows) : super._();
+}
 
 /// Запрос недостающих совпадений внутри уже загруженной области.
 ///
 /// [catalogQuery] задаёт текущий совместный фильтр и порядок открытой выдачи
-/// без курсора обычного продолжения. Сохранённые строки области исключаются
-/// из порций по идентичности; повторы и порядок идентификаторов не меняют
-/// смысл запроса.
+/// без курсора обычного продолжения. Область передаётся не целиком, а
+/// скользящим окном сохранённых строк после [cursor]; без курсора окно
+/// начинается с первой сохранённой строки области.
 final class IntentionCatalogReconciliationQuery {
-  IntentionCatalogReconciliationQuery({
+  const IntentionCatalogReconciliationQuery({
     required this.catalogQuery,
     required this.boundary,
-    required Iterable<IntentionId> storedIntentionIds,
+    required this.window,
     this.cursor,
-  }) : storedIntentionIds = Set.unmodifiable(storedIntentionIds);
+  });
 
   final IntentionCatalogQuery catalogQuery;
   final IntentionCatalogReconciliationBoundary boundary;
-  final Set<IntentionId> storedIntentionIds;
+  final IntentionCatalogReconciliationWindow window;
   final IntentionCatalogReconciliationCursor? cursor;
 }
 
@@ -570,6 +611,12 @@ sealed class IntentionCatalogReconciliationOutcome {
 /// Порция недостающих совпадений области в действующем порядке с полным
 /// составом собственных тегов. Все порции одного согласования отражают одну
 /// ревизию.
+///
+/// Порция содержит совпадения после курсора и не дальше верхнего края окна.
+/// Продолжение заполненной порции начинается с ключа её последней строки,
+/// незаполненной порции внутреннего окна — с верхнего края окна. Отсутствие
+/// продолжения означает, что окно было последним и совпадений в нём больше
+/// нет.
 sealed class IntentionCatalogReconciliationPortion
     extends IntentionCatalogReconciliationOutcome {
   IntentionCatalogReconciliationPortion({

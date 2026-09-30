@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/sqlite_tag_functions.dart';
@@ -3161,8 +3162,23 @@ void main() {
     int connectionChanges() =>
         raw.select('SELECT total_changes() AS count').single['count'] as int;
 
+    Future<List<IntentionSummary>> loadWholeCatalog(
+      IntentionCatalogQuery Function() query,
+    ) async {
+      final rows = <IntentionSummary>[];
+      IntentionCatalogCursor? cursor;
+      do {
+        final page = (await repository.getCatalogPage(
+          cursor == null ? query() : query().withCursorForTest(cursor),
+        ) as ResultSuccess<IntentionCatalogPage>).value;
+        rows.addAll(page.items);
+        cursor = page.nextCursor;
+      } while (cursor != null);
+      return rows;
+    }
+
     test(
-      'частичный префикс получает только недостающие совпадения до границы',
+      'частичный префикс читает недостающие совпадения окнами до границы',
       () async {
         _seedReconciliationFixture(raw);
         final query = excludingQuery();
@@ -3172,8 +3188,8 @@ void main() {
             excludingQuery().withCursorForTest(first.nextCursor!),
           ),
         );
-        final stored = [...first.items, ...second.items].map((item) => item.id);
-        expect(stored, [
+        final stored = [...first.items, ...second.items];
+        expect(stored.map((item) => item.id), [
           for (final n in [1, 3, 5, 7]) _id(_uuid(n)),
         ]);
         expect(second.nextCursor, isNotNull);
@@ -3183,45 +3199,51 @@ void main() {
         );
         final changesBefore = connectionChanges();
         trace.measured.clear();
-
-        final reconciliation = IntentionCatalogReconciliationQuery(
-          catalogQuery: query,
-          boundary: IntentionCatalogPartialPrefixBoundary(second.nextCursor!),
-          storedIntentionIds: stored,
+        final boundary = IntentionCatalogPartialPrefixBoundary(
+          second.nextCursor!,
         );
+
         final firstPortion = _reconciliationFirstPortion(
-          await repository.getCatalogReconciliationPortion(reconciliation),
+          await repository.getCatalogReconciliationPortion(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: boundary,
+              window: IntentionCatalogInnerReconciliationWindow(stored.take(2)),
+            ),
+          ),
         );
 
         // Количество абсолютно: оно учитывает совпадения после границы (8–10)
-        // и сохранённые строки, а не только недостающие до границы.
+        // и сохранённые строки, а не только недостающие в окне.
         expect(firstPortion.totalCount, 10);
-        expect(firstPortion.items.map((item) => item.id), [
-          _id(_uuid(2)),
-          _id(_uuid(4)),
-        ]);
-        expect(
-          firstPortion.items.map((item) => item.tags.map((tag) => tag.id)),
-          [
-            [keptTag],
-            [_tagId(1103)],
-          ],
-        );
+        // Незаполненная порция внутреннего окна останавливается на его
+        // верхнем крае: совпадение 4 после края относится к следующему окну.
+        expect(firstPortion.items.map((item) => item.id), [_id(_uuid(2))]);
+        expect(firstPortion.items.single.tags.map((tag) => tag.id), [keptTag]);
         expect(firstPortion.nextCursor, isNotNull);
 
         final continuation = _reconciliationContinuationPortion(
           await repository.getCatalogReconciliationPortion(
             IntentionCatalogReconciliationQuery(
               catalogQuery: query,
-              boundary: IntentionCatalogPartialPrefixBoundary(
-                second.nextCursor!,
-              ),
-              storedIntentionIds: stored.toList().reversed,
+              boundary: boundary,
+              window: IntentionCatalogFinalReconciliationWindow(stored.skip(2)),
               cursor: firstPortion.nextCursor,
             ),
           ),
         );
-        expect(continuation.items.map((item) => item.id), [_id(_uuid(6))]);
+        // Совпадения сразу после края прежнего окна и перед границей области.
+        expect(continuation.items.map((item) => item.id), [
+          _id(_uuid(4)),
+          _id(_uuid(6)),
+        ]);
+        expect(
+          continuation.items.map((item) => item.tags.map((tag) => tag.id)),
+          [
+            [_tagId(1103)],
+            [_tagId(1103)],
+          ],
+        );
         expect(continuation.nextCursor, isNull);
         expect(
           continuation.revision.compareTo(firstPortion.revision),
@@ -3234,8 +3256,8 @@ void main() {
           (select) => select.sql.contains('FROM tag_assignments a'),
         );
         expect(tagReads.map((select) => select.arguments), [
-          [_uuid(2), _uuid(4)],
-          [_uuid(6)],
+          [_uuid(2)],
+          [_uuid(4), _uuid(6)],
         ]);
         final portionReads = trace.measured.where(
           (select) => select.sql.contains('LIMIT'),
@@ -3258,6 +3280,54 @@ void main() {
         ]);
       },
     );
+
+    test('заполненная порция продолжается с последней строки и оставляет '
+        'строки окна после неё следующему окну', () async {
+      _seedReconciliationFixture(raw);
+      final query = excludingQuery();
+      final all = await loadWholeCatalog(
+        () => _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
+      );
+      IntentionSummary row(int number) =>
+          all.singleWhere((item) => item.id == _id(_uuid(number)));
+      expect(
+        await repository.execute(DeleteTag(excludedTag)),
+        isA<GraphCommandSucceeded>(),
+      );
+      const boundary = IntentionCatalogCompletedBoundary();
+
+      final firstPortion = _reconciliationFirstPortion(
+        await repository.getCatalogReconciliationPortion(
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: boundary,
+            window: IntentionCatalogInnerReconciliationWindow([row(1), row(7)]),
+          ),
+        ),
+      );
+      expect(firstPortion.totalCount, 10);
+      expect(firstPortion.items.map((item) => item.id), [
+        _id(_uuid(2)),
+        _id(_uuid(3)),
+      ]);
+      expect(firstPortion.nextCursor, isNotNull);
+
+      final continuation = _reconciliationContinuationPortion(
+        await repository.getCatalogReconciliationPortion(
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: boundary,
+            window: IntentionCatalogFinalReconciliationWindow([row(7), row(9)]),
+            cursor: firstPortion.nextCursor,
+          ),
+        ),
+      );
+      expect(continuation.items.map((item) => item.id), [
+        _id(_uuid(4)),
+        _id(_uuid(5)),
+      ]);
+      expect(continuation.nextCursor, isNotNull);
+    });
 
     test('граница префикса учитывает убывающий порядок изменения', () async {
       _seedReconciliationFixture(raw);
@@ -3283,7 +3353,7 @@ void main() {
           IntentionCatalogReconciliationQuery(
             catalogQuery: query,
             boundary: IntentionCatalogPartialPrefixBoundary(first.nextCursor!),
-            storedIntentionIds: first.items.map((item) => item.id),
+            window: IntentionCatalogFinalReconciliationWindow(first.items),
           ),
         ),
       );
@@ -3296,48 +3366,40 @@ void main() {
       expect(portion.nextCursor, isNull);
     });
 
-    test(
-      'ранее завершённая выдача читает недостающие совпадения до нового конца',
-      () async {
-        _seedReconciliationFixture(raw);
-        final query = excludingQuery();
-        final stored = <IntentionId>[];
-        IntentionCatalogCursor? cursor;
-        do {
-          final page = (await repository.getCatalogPage(
-            cursor == null ? query : excludingQuery().withCursorForTest(cursor),
-          ) as ResultSuccess<IntentionCatalogPage>).value;
-          stored.addAll(page.items.map((item) => item.id));
-          cursor = page.nextCursor;
-        } while (cursor != null);
-        expect(stored, [
-          for (final n in [1, 3, 5, 7, 9]) _id(_uuid(n)),
-        ]);
-        expect(
-          await repository.execute(DeleteTag(excludedTag)),
-          isA<GraphCommandSucceeded>(),
-        );
+    test('ранее завершённая выдача в несколько окон читает недостающие '
+        'совпадения до нового конца', () async {
+      _seedReconciliationFixture(raw);
+      final stored = await loadWholeCatalog(excludingQuery);
+      expect(stored.map((item) => item.id), [
+        for (final n in [1, 3, 5, 7, 9]) _id(_uuid(n)),
+      ]);
+      expect(
+        await repository.execute(DeleteTag(excludedTag)),
+        isA<GraphCommandSucceeded>(),
+      );
 
-        final missing = await _readWholeReconciliation(
-          repository,
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            storedIntentionIds: stored,
-          ),
-        );
+      final missing = await _readWholeReconciliation(
+        repository,
+        excludingQuery(),
+        const IntentionCatalogCompletedBoundary(),
+        stored,
+      );
 
-        expect(missing.totalCount, 10);
-        expect(
-          missing.portions.map((portion) => portion.map((item) => item.id)),
-          [
-            [_id(_uuid(2)), _id(_uuid(4))],
-            [_id(_uuid(6)), _id(_uuid(8))],
-            [_id(_uuid(10))],
-          ],
-        );
-      },
-    );
+      expect(missing.totalCount, 10);
+      expect(
+        missing.portions.map((portion) => portion.map((item) => item.id)),
+        [
+          [_id(_uuid(2))],
+          [_id(_uuid(4)), _id(_uuid(6))],
+          [_id(_uuid(8)), _id(_uuid(10))],
+        ],
+      );
+      expect(missing.windows, [
+        [_id(_uuid(1)), _id(_uuid(3))],
+        [_id(_uuid(5)), _id(_uuid(7))],
+        [_id(_uuid(7)), _id(_uuid(9))],
+      ]);
+    });
 
     test(
       'пустая завершённая выдача получает все новые совпадения порциями',
@@ -3360,11 +3422,9 @@ void main() {
 
         final missing = await _readWholeReconciliation(
           repository,
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            storedIntentionIds: const [],
-          ),
+          query,
+          const IntentionCatalogCompletedBoundary(),
+          const [],
         );
 
         expect(missing.totalCount, 3);
@@ -3375,6 +3435,7 @@ void main() {
             [_id(_uuid(8))],
           ],
         );
+        expect(missing.windows, [<IntentionId>[], <IntentionId>[]]);
         expect(
           missing.portions
               .expand((portion) => portion)
@@ -3389,20 +3450,20 @@ void main() {
       () async {
         _seedReconciliationFixture(raw);
         final query = excludingQuery();
+        final firstStored = (await loadWholeCatalog(excludingQuery)).first;
+        expect(firstStored.id, _id(_uuid(1)));
         expect(
           await repository.execute(DeleteTag(excludedTag)),
           isA<GraphCommandSucceeded>(),
         );
-        IntentionCatalogReconciliationQuery reconciliation({
-          IntentionCatalogReconciliationCursor? cursor,
-        }) => IntentionCatalogReconciliationQuery(
-          catalogQuery: query,
-          boundary: const IntentionCatalogCompletedBoundary(),
-          storedIntentionIds: [_id(_uuid(1))],
-          cursor: cursor,
-        );
         final firstPortion = _reconciliationFirstPortion(
-          await repository.getCatalogReconciliationPortion(reconciliation()),
+          await repository.getCatalogReconciliationPortion(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: IntentionCatalogFinalReconciliationWindow([firstStored]),
+            ),
+          ),
         );
         expect(firstPortion.nextCursor, isNotNull);
         expect(
@@ -3417,7 +3478,12 @@ void main() {
         final changesBefore = connectionChanges();
 
         final retried = await repository.getCatalogReconciliationPortion(
-          reconciliation(cursor: firstPortion.nextCursor),
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: IntentionCatalogFinalReconciliationWindow(const []),
+            cursor: firstPortion.nextCursor,
+          ),
         );
 
         expect(
@@ -3430,7 +3496,13 @@ void main() {
         );
         expect(connectionChanges(), changesBefore);
         final restarted = _reconciliationFirstPortion(
-          await repository.getCatalogReconciliationPortion(reconciliation()),
+          await repository.getCatalogReconciliationPortion(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: IntentionCatalogFinalReconciliationWindow([firstStored]),
+            ),
+          ),
         );
         expect(
           restarted.revision.compareTo(firstPortion.revision),
@@ -3443,163 +3515,292 @@ void main() {
       },
     );
 
-    test('отклоняет чужие границу и продолжение до SQL', () async {
-      _seedReconciliationFixture(raw);
-      final query = excludingQuery();
-      final first = _firstPage(await repository.getCatalogPage(query));
-      final second = _continuationPage(
-        await repository.getCatalogPage(
-          excludingQuery().withCursorForTest(first.nextCursor!),
-        ),
-      );
-      final otherFilterPage = _firstPage(
-        await repository.getCatalogPage(
-          _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
-        ),
-      );
-      expect(
-        await repository.execute(DeleteTag(excludedTag)),
-        isA<GraphCommandSucceeded>(),
-      );
-      final stored = [
-        for (final n in [1, 3, 5, 7]) _id(_uuid(n)),
-      ];
-      final boundary = IntentionCatalogPartialPrefixBoundary(
-        second.nextCursor!,
-      );
-      final firstPortion = _reconciliationFirstPortion(
-        await repository.getCatalogReconciliationPortion(
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: boundary,
-            storedIntentionIds: stored,
+    test(
+      'отклоняет недопустимое окно, чужие границу и продолжение до SQL',
+      () async {
+        _seedReconciliationFixture(raw);
+        final query = excludingQuery();
+        final first = _firstPage(await repository.getCatalogPage(query));
+        final second = _continuationPage(
+          await repository.getCatalogPage(
+            excludingQuery().withCursorForTest(first.nextCursor!),
           ),
-        ),
-      );
-      final foreignRepository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 2),
-        diagnostics,
-      );
-      final foreignPortion = _reconciliationFirstPortion(
-        await foreignRepository.getCatalogReconciliationPortion(
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            storedIntentionIds: stored,
-          ),
-        ),
-      );
-      // Для сравнения: подходящее продолжение принимается.
-      expect(firstPortion.nextCursor, isNotNull);
-      expect(foreignPortion.nextCursor, isNotNull);
-
-      for (final (label, invalid) in [
-        (
-          'продолжение с другими сохранёнными строками',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: boundary,
-            storedIntentionIds: stored.take(3),
-            cursor: firstPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение с завершённой границей вместо префикса',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            storedIntentionIds: stored,
-            cursor: firstPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение с другой границей префикса',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: IntentionCatalogPartialPrefixBoundary(first.nextCursor!),
-            storedIntentionIds: stored,
-            cursor: firstPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение с другими условиями',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: _tagQuery(
-              tagFilter: IntentionTagFilter(excludedTagIds: [keptTag]),
-              pageSize: 2,
-            ),
-            boundary: boundary,
-            storedIntentionIds: stored,
-            cursor: firstPortion.nextCursor,
-          ),
-        ),
-        (
-          'продолжение другого экземпляра репозитория',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogCompletedBoundary(),
-            storedIntentionIds: stored,
-            cursor: foreignPortion.nextCursor,
-          ),
-        ),
-        (
-          'посторонняя реализация продолжения',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: boundary,
-            storedIntentionIds: stored,
-            cursor: const _ForeignReconciliationCursor(),
-          ),
-        ),
-        (
-          'граница выдачи других условий',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: IntentionCatalogPartialPrefixBoundary(
-              otherFilterPage.nextCursor!,
-            ),
-            storedIntentionIds: stored,
-          ),
-        ),
-        (
-          'посторонняя реализация границы',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: query,
-            boundary: const IntentionCatalogPartialPrefixBoundary(
-              _ForeignCatalogCursor(),
-            ),
-            storedIntentionIds: stored,
-          ),
-        ),
-        (
-          'запрос выдачи с курсором обычного продолжения',
-          IntentionCatalogReconciliationQuery(
-            catalogQuery: excludingQuery().withCursorForTest(first.nextCursor!),
-            boundary: const IntentionCatalogCompletedBoundary(),
-            storedIntentionIds: stored,
-          ),
-        ),
-      ]) {
-        trace.statements.clear();
-
-        final result = await repository.getCatalogReconciliationPortion(
-          invalid,
         );
-
+        final otherFilterPage = _firstPage(
+          await repository.getCatalogPage(
+            _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
+          ),
+        );
+        final all = await loadWholeCatalog(
+          () => _tagQuery(tagFilter: IntentionTagFilter.empty, pageSize: 2),
+        );
+        IntentionSummary row(int number) =>
+            all.singleWhere((item) => item.id == _id(_uuid(number)));
         expect(
-          result,
-          isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionGenericValidationFailure>(),
-          ),
-          reason: label,
+          await repository.execute(DeleteTag(excludedTag)),
+          isA<GraphCommandSucceeded>(),
         );
-        expect(trace.statements, isEmpty, reason: label);
-      }
-    });
+        final stored = [...first.items, ...second.items];
+        final boundary = IntentionCatalogPartialPrefixBoundary(
+          second.nextCursor!,
+        );
+        final firstWindow = IntentionCatalogInnerReconciliationWindow(
+          stored.take(2),
+        );
+        final nextWindow = IntentionCatalogFinalReconciliationWindow(
+          stored.skip(2),
+        );
+        final firstPortion = _reconciliationFirstPortion(
+          await repository.getCatalogReconciliationPortion(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: boundary,
+              window: firstWindow,
+            ),
+          ),
+        );
+        final foreignRepository = DriftPersonalGraphRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026, 9, 2),
+          diagnostics,
+        );
+        final foreignPortion = _reconciliationFirstPortion(
+          await foreignRepository.getCatalogReconciliationPortion(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: firstWindow,
+            ),
+          ),
+        );
+        // Заполненные порции оставляют строки окна после своей последней
+        // строки: внутреннее окно — следующему окну, последнее окно — ровно
+        // им же.
+        final fullInnerPortion = _reconciliationFirstPortion(
+          await repository.getCatalogReconciliationPortion(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: IntentionCatalogInnerReconciliationWindow([
+                row(1),
+                row(7),
+              ]),
+            ),
+          ),
+        );
+        final fullFinalPortion = _reconciliationFirstPortion(
+          await repository.getCatalogReconciliationPortion(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: IntentionCatalogFinalReconciliationWindow([
+                row(1),
+                row(7),
+              ]),
+            ),
+          ),
+        );
+        // Для сравнения: подходящие продолжения принимаются.
+        for (final valid in [
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: boundary,
+            window: nextWindow,
+            cursor: firstPortion.nextCursor,
+          ),
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: IntentionCatalogFinalReconciliationWindow([row(7), row(9)]),
+            cursor: fullInnerPortion.nextCursor,
+          ),
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: IntentionCatalogFinalReconciliationWindow([row(7)]),
+            cursor: fullFinalPortion.nextCursor,
+          ),
+        ]) {
+          expect(
+            await repository.getCatalogReconciliationPortion(valid),
+            isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>(),
+          );
+        }
+        expect(foreignPortion.nextCursor, isNotNull);
+
+        for (final (label, invalid) in [
+          (
+            'окно больше размера порции',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: boundary,
+              window: IntentionCatalogInnerReconciliationWindow(stored.take(3)),
+            ),
+          ),
+          (
+            'окно не в действующем порядке',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: boundary,
+              window: IntentionCatalogInnerReconciliationWindow(
+                stored.take(2).toList().reversed,
+              ),
+            ),
+          ),
+          (
+            'окно с повтором строки',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: boundary,
+              window: IntentionCatalogInnerReconciliationWindow([
+                stored.first,
+                stored.first,
+              ]),
+            ),
+          ),
+          (
+            'окно за границей частичного префикса',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: IntentionCatalogPartialPrefixBoundary(
+                first.nextCursor!,
+              ),
+              window: nextWindow,
+            ),
+          ),
+          (
+            'продолжение с окном, не следующим за курсором',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: boundary,
+              window: IntentionCatalogFinalReconciliationWindow(
+                stored.skip(1).take(2),
+              ),
+              cursor: firstPortion.nextCursor,
+            ),
+          ),
+          (
+            'продолжение без строк своего окна после курсора',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: IntentionCatalogFinalReconciliationWindow([row(9)]),
+              cursor: fullInnerPortion.nextCursor,
+            ),
+          ),
+          (
+            'продолжение последнего окна с другими строками',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: IntentionCatalogInnerReconciliationWindow([
+                row(7),
+                row(9),
+              ]),
+              cursor: fullFinalPortion.nextCursor,
+            ),
+          ),
+          (
+            'продолжение с завершённой границей вместо префикса',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: nextWindow,
+              cursor: firstPortion.nextCursor,
+            ),
+          ),
+          (
+            'продолжение с другой границей префикса',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: IntentionCatalogPartialPrefixBoundary(
+                first.nextCursor!,
+              ),
+              window: IntentionCatalogFinalReconciliationWindow(const []),
+              cursor: firstPortion.nextCursor,
+            ),
+          ),
+          (
+            'продолжение с другими условиями',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: _tagQuery(
+                tagFilter: IntentionTagFilter(excludedTagIds: [keptTag]),
+                pageSize: 2,
+              ),
+              boundary: boundary,
+              window: nextWindow,
+              cursor: firstPortion.nextCursor,
+            ),
+          ),
+          (
+            'продолжение другого экземпляра репозитория',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: nextWindow,
+              cursor: foreignPortion.nextCursor,
+            ),
+          ),
+          (
+            'посторонняя реализация продолжения',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: boundary,
+              window: nextWindow,
+              cursor: const _ForeignReconciliationCursor(),
+            ),
+          ),
+          (
+            'граница выдачи других условий',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: IntentionCatalogPartialPrefixBoundary(
+                otherFilterPage.nextCursor!,
+              ),
+              window: firstWindow,
+            ),
+          ),
+          (
+            'посторонняя реализация границы',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogPartialPrefixBoundary(
+                _ForeignCatalogCursor(),
+              ),
+              window: firstWindow,
+            ),
+          ),
+          (
+            'запрос выдачи с курсором обычного продолжения',
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: excludingQuery().withCursorForTest(
+                first.nextCursor!,
+              ),
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: firstWindow,
+            ),
+          ),
+        ]) {
+          trace.statements.clear();
+
+          final result = await repository.getCatalogReconciliationPortion(
+            invalid,
+          );
+
+          expect(
+            result,
+            isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
+              (result) => result.failure,
+              'причина',
+              isA<IntentionGenericValidationFailure>(),
+            ),
+            reason: label,
+          );
+          expect(trace.statements, isEmpty, reason: label);
+        }
+      },
+    );
   });
 }
 
@@ -3872,34 +4073,66 @@ _reconciliationContinuationPortion(
   return outcome as IntentionCatalogReconciliationContinuationPortion;
 }
 
-/// Читает все порции одного согласования и проверяет единую ревизию.
-Future<({int totalCount, List<List<IntentionSummary>> portions})>
+/// Читает все порции одного согласования скользящим окном сохранённых строк
+/// так же, как модель представления, и проверяет единую ревизию.
+Future<
+  ({
+    int totalCount,
+    List<List<IntentionSummary>> portions,
+    List<List<IntentionId>> windows,
+  })
+>
 _readWholeReconciliation(
   DriftPersonalGraphRepository repository,
-  IntentionCatalogReconciliationQuery query,
+  IntentionCatalogQuery query,
+  IntentionCatalogReconciliationBoundary boundary,
+  List<IntentionSummary> stored,
 ) async {
-  final first = _reconciliationFirstPortion(
-    await repository.getCatalogReconciliationPortion(query),
-  );
-  final portions = [first.items];
-  var cursor = first.nextCursor;
-  while (cursor != null) {
-    final next = _reconciliationContinuationPortion(
-      await repository.getCatalogReconciliationPortion(
-        IntentionCatalogReconciliationQuery(
-          catalogQuery: query.catalogQuery,
-          boundary: query.boundary,
-          storedIntentionIds: query.storedIntentionIds,
-          cursor: cursor,
-        ),
+  final portions = <List<IntentionSummary>>[];
+  final windows = <List<IntentionId>>[];
+  IntentionCatalogReconciliationFirstPortion? first;
+  IntentionCatalogReconciliationCursor? cursor;
+  var windowStart = 0;
+  do {
+    final windowEnd = min(windowStart + query.pageSize, stored.length);
+    final rows = stored.sublist(windowStart, windowEnd);
+    final IntentionCatalogReconciliationWindow window =
+        windowEnd < stored.length
+        ? IntentionCatalogInnerReconciliationWindow(rows)
+        : IntentionCatalogFinalReconciliationWindow(rows);
+    windows.add(window.storedIntentionIds);
+    final result = await repository.getCatalogReconciliationPortion(
+      IntentionCatalogReconciliationQuery(
+        catalogQuery: query,
+        boundary: boundary,
+        window: window,
+        cursor: cursor,
       ),
     );
-    expect(next.revision.compareTo(first.revision), GraphRevisionOrder.same);
-    expect(next.items, isNotEmpty);
-    portions.add(next.items);
-    cursor = next.nextCursor;
-  }
-  return (totalCount: first.totalCount, portions: portions);
+    final IntentionCatalogReconciliationPortion portion;
+    if (first == null) {
+      portion = first = _reconciliationFirstPortion(result);
+    } else {
+      portion = _reconciliationContinuationPortion(result);
+      expect(
+        portion.revision.compareTo(first.revision),
+        GraphRevisionOrder.same,
+      );
+    }
+    expect(portion.items.length, lessThanOrEqualTo(query.pageSize));
+    portions.add(portion.items);
+    cursor = portion.nextCursor;
+    if (cursor != null) {
+      final position = portion.items.length == query.pageSize
+          ? portion.items.last
+          : (window as IntentionCatalogInnerReconciliationWindow).upperEdgeRow;
+      while (windowStart < stored.length &&
+          query.compare(stored[windowStart], position) <= 0) {
+        windowStart += 1;
+      }
+    }
+  } while (cursor != null);
+  return (totalCount: first.totalCount, portions: portions, windows: windows);
 }
 
 final class _ForeignReconciliationCursor

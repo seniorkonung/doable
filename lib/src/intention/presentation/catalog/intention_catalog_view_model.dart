@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -865,12 +866,18 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// Читает недостающие совпадения области сохранённого содержимого на его
   /// ревизии: абсолютное количество первой порции заменяет прежнее, поэтому
   /// изменения до этой ревизии не учитываются в количестве повторно.
+  ///
+  /// Сохранённые строки передаются скользящим окном не больше порции,
+  /// следующим за курсором согласования, поэтому вход каждого чтения не
+  /// зависит от размера области, а число чтений растёт линейно с числом
+  /// сохранённых и недостающих строк.
   Future<_AreaReadOutcome> _readMissingAreaMatches(
     _AreaReconciliation area,
   ) async {
     final repository = ref.read(personalGraphRepositoryProvider);
     final content = area.content;
     final query = content.query;
+    final pageSize = query.pageSize;
     final IntentionCatalogReconciliationBoundary boundary = switch (content
         .nextCursor) {
       null => const IntentionCatalogCompletedBoundary(),
@@ -880,19 +887,26 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCatalogLoaded(:final items) => items,
       IntentionCatalogEmpty() => const <IntentionSummary>[],
     };
-    final storedIds = {for (final item in stored) item.id};
 
     read:
     while (true) {
       int? totalCount;
       final missing = <IntentionSummary>[];
       IntentionCatalogReconciliationCursor? cursor;
-      do {
+      IntentionSummary? position;
+      var windowStart = 0;
+      while (true) {
+        final windowEnd = min(windowStart + pageSize, stored.length);
+        final windowRows = stored.sublist(windowStart, windowEnd);
+        final IntentionCatalogReconciliationWindow window =
+            windowEnd < stored.length
+            ? IntentionCatalogInnerReconciliationWindow(windowRows)
+            : IntentionCatalogFinalReconciliationWindow(windowRows);
         final result = await repository.getCatalogReconciliationPortion(
           IntentionCatalogReconciliationQuery(
             catalogQuery: query,
             boundary: boundary,
-            storedIntentionIds: storedIds,
+            window: window,
             cursor: cursor,
           ),
         );
@@ -921,7 +935,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           default:
             return const _AreaReadFailed(IntentionCatalogRefreshUnexpected());
         }
-        if (portion.items.length > query.pageSize) {
+        if (!_isWithinWindow(query, portion.items, position, window)) {
           return const _AreaReadFailed(IntentionCatalogRefreshUnexpected());
         }
         switch (portion.revision.compareTo(content.revision)) {
@@ -935,14 +949,68 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
             return const _AreaReadUnreconcilable();
         }
         missing.addAll(portion.items);
-        cursor = portion.nextCursor;
-      } while (cursor != null);
+
+        final nextCursor = portion.nextCursor;
+        switch ((nextCursor, window)) {
+          case (null, IntentionCatalogFinalReconciliationWindow()):
+            break;
+          case (null, IntentionCatalogInnerReconciliationWindow()):
+            return const _AreaReadFailed(IntentionCatalogRefreshUnexpected());
+          case (_?, _) when portion.items.length == pageSize:
+            position = portion.items.last;
+          case (
+            _?,
+            IntentionCatalogInnerReconciliationWindow(:final upperEdgeRow),
+          ):
+            position = upperEdgeRow;
+          case (_?, IntentionCatalogFinalReconciliationWindow()):
+            return const _AreaReadFailed(IntentionCatalogRefreshUnexpected());
+        }
+        if (nextCursor == null) {
+          break;
+        }
+        cursor = nextCursor;
+        final nextPosition = position!;
+        while (windowStart < stored.length &&
+            query.compare(stored[windowStart], nextPosition) <= 0) {
+          windowStart += 1;
+        }
+      }
 
       final candidate = _areaCandidate(content, stored, missing, totalCount!);
       return candidate == null
           ? const _AreaReadFailed(IntentionCatalogRefreshUnexpected())
           : _AreaReadCompleted(candidate);
     }
+  }
+
+  /// Порция не больше размера порции, строго по возрастанию, после позиции
+  /// продолжения и не за верхним краем внутреннего окна. Верхний край
+  /// последнего окна проверяет сборка кандидата по границе области.
+  bool _isWithinWindow(
+    IntentionCatalogQuery query,
+    List<IntentionSummary> items,
+    IntentionSummary? position,
+    IntentionCatalogReconciliationWindow window,
+  ) {
+    if (items.length > query.pageSize) {
+      return false;
+    }
+    var previous = position;
+    for (final item in items) {
+      if (previous != null && query.compare(previous, item) >= 0) {
+        return false;
+      }
+      previous = item;
+    }
+    return switch ((window, previous)) {
+      (
+        IntentionCatalogInnerReconciliationWindow(:final upperEdgeRow),
+        final last?,
+      ) =>
+        query.compare(last, upperEdgeRow) < 0,
+      _ => true,
+    };
   }
 
   /// Собирает согласованный префикс из сохранённых строк и недостающих

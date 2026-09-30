@@ -3,6 +3,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -336,18 +337,18 @@ void main() {
           if (!_hasMassTag(index)) index,
       ];
       expect(before, hasLength(500));
-      final loaded = <int>[];
+      final loaded = <IntentionSummary>[];
       final continuations = <IntentionCatalogCursor>[];
       IntentionCatalogCursor? cursor;
       do {
         final page = _page(
           await repository.getCatalogPage(_massQuery(cursor: cursor)),
         );
-        loaded.addAll(page.items.map((item) => _fixtureIndexOf(item.id)));
+        loaded.addAll(page.items);
         cursor = page.nextCursor;
         if (cursor != null) continuations.add(cursor);
       } while (cursor != null);
-      expect(loaded, before);
+      expect(loaded.map((item) => _fixtureIndexOf(item.id)), before);
       expect(continuations, hasLength(4));
 
       trace.isRecording = false;
@@ -372,6 +373,7 @@ void main() {
           2 * _pageSize,
         ),
       ]) {
+        final storedRows = loaded.take(storedCount).toList();
         final stored = before.take(storedCount).toList();
         final areaEnd = switch (boundary) {
           IntentionCatalogCompletedBoundary() => null,
@@ -394,7 +396,7 @@ void main() {
           trace,
           label: label,
           boundary: boundary,
-          stored: stored,
+          stored: storedRows,
           missing: missing,
           totalCount: after.length,
           revision: deletionRevision,
@@ -410,7 +412,7 @@ void main() {
         repository,
         raw,
         trace,
-        stored: before,
+        stored: loaded,
       );
     },
     timeout: const Timeout(Duration(minutes: 5)),
@@ -458,34 +460,42 @@ IntentionCatalogQuery _massQuery({IntentionCatalogCursor? cursor}) =>
       cursor: cursor,
     );
 
-/// Проходит согласование области до конца и возвращает номера недостающих
-/// совпадений в порядке получения. Каждая порция читает только себя: строка
-/// после границы порции не выбирается повторно, сохранённые строки и
-/// предшествующие порции не перечитываются.
+/// Проходит согласование области до конца скользящим окном сохранённых
+/// строк и возвращает номера недостающих совпадений в порядке получения.
+/// Каждая порция читает только себя: строка после границы порции не
+/// выбирается повторно, сохранённые строки и предшествующие порции не
+/// перечитываются.
 Future<List<int>> _expectMassReconciliation(
   DriftPersonalGraphRepository repository,
   sqlite.Database raw,
   _SelectTrace trace, {
   required String label,
   required IntentionCatalogReconciliationBoundary boundary,
-  required List<int> stored,
+  required List<IntentionSummary> stored,
   required List<int> missing,
   required int totalCount,
   required GraphRevision revision,
 }) async {
-  final storedIds = [for (final index in stored) _intentionId(index)];
+  final storedIndexes = [for (final row in stored) _fixtureIndexOf(row.id)];
   final changesBefore = _connectionChanges(raw);
   final reconciled = <int>[];
   final costs = <_TracedSelect>[];
   IntentionCatalogReconciliationCursor? cursor;
+  var windowStart = 0;
   var portionNumber = 0;
   do {
+    final windowEnd = min(windowStart + _pageSize, stored.length);
+    final windowRows = stored.sublist(windowStart, windowEnd);
+    final IntentionCatalogReconciliationWindow window =
+        windowEnd < stored.length
+        ? IntentionCatalogInnerReconciliationWindow(windowRows)
+        : IntentionCatalogFinalReconciliationWindow(windowRows);
     trace.clear();
     final result = await repository.getCatalogReconciliationPortion(
       IntentionCatalogReconciliationQuery(
         catalogQuery: _massQuery(),
         boundary: boundary,
-        storedIntentionIds: storedIds,
+        window: window,
         cursor: cursor,
       ),
     );
@@ -517,20 +527,34 @@ Future<List<int>> _expectMassReconciliation(
     final indexes = [
       for (final item in portion.items) _fixtureIndexOf(item.id),
     ];
-    final expected = missing.skip(portionNumber * _pageSize).take(_pageSize);
+    // Порция — следующие недостающие совпадения не дальше верхнего края
+    // окна: последней строки внутреннего окна либо границы области.
+    final upperEdge = switch (window) {
+      IntentionCatalogInnerReconciliationWindow(:final upperEdgeRow) =>
+        _fixtureIndexOf(upperEdgeRow.id),
+      IntentionCatalogFinalReconciliationWindow() => null,
+    };
+    final expected = missing
+        .skip(reconciled.length)
+        .takeWhile(
+          (index) =>
+              upperEdge == null || _compareCatalogOrder(index, upperEdge) < 0,
+        )
+        .take(_pageSize);
     expect(indexes, expected, reason: '$label, порция $portionNumber');
     expect(
       portion.nextCursor == null,
-      reconciled.length + indexes.length == missing.length,
+      window is IntentionCatalogFinalReconciliationWindow &&
+          reconciled.length + indexes.length == missing.length,
       reason: '$label, порция $portionNumber',
     );
     _expectReconciliationMaterialization(
       portion,
       trace,
       isFirst: isFirst,
-      storedIds: storedIds,
+      window: window,
     );
-    _expectReconciliationPlans(raw, trace);
+    _expectReconciliationPlans(raw, trace, window: window);
     costs.add(
       trace.selects.singleWhere((select) => select.statement.contains('LIMIT')),
     );
@@ -546,17 +570,34 @@ Future<List<int>> _expectMassReconciliation(
     }
     reconciled.addAll(indexes);
     cursor = portion.nextCursor;
+    if (cursor != null) {
+      final position = indexes.length == _pageSize
+          ? indexes.last
+          : _fixtureIndexOf(
+              (window as IntentionCatalogInnerReconciliationWindow)
+                  .upperEdgeRow
+                  .id,
+            );
+      while (windowStart < stored.length &&
+          _compareCatalogOrder(storedIndexes[windowStart], position) <= 0) {
+        windowStart += 1;
+      }
+    }
     portionNumber++;
   } while (cursor != null);
 
-  expect(portionNumber, (missing.length + _pageSize - 1) ~/ _pageSize);
   expect(reconciled, missing, reason: label);
   // Каждое чтение выбирает не больше `pageSize + 1` строк после своей
   // позиции, поэтому все порции вместе читают недостающие совпадения
   // однократно, а сохранённые строки не читают вовсе.
   expect(
+    costs.map((select) => select.rowCount),
+    everyElement(lessThanOrEqualTo(_pageSize + 1)),
+    reason: label,
+  );
+  expect(
     costs.fold<int>(0, (sum, select) => sum + select.rowCount),
-    missing.length + portionNumber - 1,
+    lessThanOrEqualTo(missing.length + portionNumber),
     reason: label,
   );
   expect(_connectionChanges(raw), changesBefore, reason: label);
@@ -581,7 +622,7 @@ void _expectReconciliationMaterialization(
   IntentionCatalogReconciliationPortion portion,
   _SelectTrace trace, {
   required bool isFirst,
-  required List<IntentionId> storedIds,
+  required IntentionCatalogReconciliationWindow window,
 }) {
   final conditionSets = [
     {_fixtureId(_popularTag)},
@@ -610,14 +651,12 @@ void _expectReconciliationMaterialization(
   final read = trace.selects
       .where((select) => select.statement.contains('LIMIT'))
       .single;
-  expect(
-    read.rowCount,
-    portion.items.length + (portion.nextCursor == null ? 0 : 1),
-  );
+  expect(read.rowCount, inInclusiveRange(portion.items.length, _pageSize + 1));
   expect(read.statement, contains('LIMIT ${_pageSize + 1}'));
   expect(jsonSets(read), [
     ...conditionSets,
-    {for (final id in storedIds) id.toCanonicalString()},
+    if (window.storedRows.isNotEmpty)
+      {for (final id in window.storedIntentionIds) id.toCanonicalString()},
   ]);
 
   final ids = portion.items.map((item) => item.id.toCanonicalString()).toSet();
@@ -652,7 +691,11 @@ void _expectReconciliationMaterialization(
 /// сохранённых идентификаторов читаются из своих `json_each(?)` один раз на
 /// выполнение запроса, а кандидат проверяется поиском в отобранном
 /// множестве, поэтому стоимость его отсечения не растёт с размером наборов.
-void _expectReconciliationPlans(sqlite.Database database, _SelectTrace trace) {
+void _expectReconciliationPlans(
+  sqlite.Database database,
+  _SelectTrace trace, {
+  required IntentionCatalogReconciliationWindow window,
+}) {
   _expectJointPlans(
     database,
     trace,
@@ -663,7 +706,9 @@ void _expectReconciliationPlans(sqlite.Database database, _SelectTrace trace) {
     database,
     trace.selects.singleWhere((select) => select.statement.contains('LIMIT')),
   );
-  _expectParameterSetReadOnce(read, 'stored_row');
+  if (window.storedRows.isNotEmpty) {
+    _expectParameterSetReadOnce(read, 'stored_row');
+  }
 }
 
 /// Отказавшие чтения согласования, в том числе продолжения, откатываются
@@ -672,22 +717,40 @@ Future<void> _expectFailedReconciliationReadsKeepConnection(
   DriftPersonalGraphRepository repository,
   sqlite.Database raw,
   _SelectTrace trace, {
-  required List<int> stored,
+  required List<IntentionSummary> stored,
 }) async {
+  // Первое окно — начало сохранённой области; окно продолжения — сохранённые
+  // строки после последней строки заполненной первой порции.
+  final firstWindow = IntentionCatalogInnerReconciliationWindow(
+    stored.take(_pageSize),
+  );
+  final first = await repository.getCatalogReconciliationPortion(
+    IntentionCatalogReconciliationQuery(
+      catalogQuery: _massQuery(),
+      boundary: const IntentionCatalogCompletedBoundary(),
+      window: firstWindow,
+    ),
+  );
+  final firstPortion =
+      (first as ResultSuccess<IntentionCatalogReconciliationOutcome>).value
+          as IntentionCatalogReconciliationPortion;
+  final continuation = firstPortion.nextCursor;
+  expect(continuation, isA<IntentionCatalogReconciliationCursor>());
+  expect(firstPortion.items, hasLength(_pageSize));
+  final position = firstPortion.items.last;
+  final continuationWindow = IntentionCatalogInnerReconciliationWindow(
+    stored
+        .where((row) => _massQuery().compare(row, position) > 0)
+        .take(_pageSize),
+  );
   IntentionCatalogReconciliationQuery query({
     IntentionCatalogReconciliationCursor? cursor,
   }) => IntentionCatalogReconciliationQuery(
     catalogQuery: _massQuery(),
     boundary: const IntentionCatalogCompletedBoundary(),
-    storedIntentionIds: [for (final index in stored) _intentionId(index)],
+    window: cursor == null ? firstWindow : continuationWindow,
     cursor: cursor,
   );
-  final first = await repository.getCatalogReconciliationPortion(query());
-  final continuation =
-      ((first as ResultSuccess<IntentionCatalogReconciliationOutcome>).value
-              as IntentionCatalogReconciliationPortion)
-          .nextCursor;
-  expect(continuation, isA<IntentionCatalogReconciliationCursor>());
 
   for (final (label, cursor, failsOn)
       in <
@@ -740,12 +803,6 @@ Future<void> _expectFailedReconciliationReadsKeepConnection(
 
 int _connectionChanges(sqlite.Database raw) =>
     raw.select('SELECT total_changes() AS count').single['count'] as int;
-
-IntentionId _intentionId(int fixtureIndex) =>
-    switch (IntentionId.decode(_fixtureId(fixtureIndex))) {
-      IntentionIdDecodingSuccess(:final id) => id,
-      InvalidIntentionIdDecoding() => throw ArgumentError.value(fixtureIndex),
-    };
 
 /// Файловая база с большой фикстурой, совместными кандидатами и популярным
 /// тегом; трассировка очищена и ограничивает число SQL-параметров.

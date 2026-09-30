@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -630,6 +632,130 @@ void main() {
     expect(reconciled.totalCount, 9);
     expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
   });
+  test('ранее полностью загруженная выдача в несколько окон согласуется '
+      'через настоящий репозиторий окнами не больше порции', () async {
+    await _seedWindowedArea(database);
+    final provider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    final subscription = container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await container.read(provider.future);
+    final model = container.read(provider.notifier);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [_tagId(301)],
+      excludedTagIds: [_tagId(302)],
+    );
+    model.changeTagFilter(filter);
+    var loaded =
+        await container.read(provider.future) as IntentionCatalogLoaded;
+    while (loaded.nextCursor != null) {
+      await model.loadNextPageIfNeeded(visibleIndex: loaded.items.length - 1);
+      loaded = container.read(provider).requireValue as IntentionCatalogLoaded;
+    }
+    final storedBefore = [
+      for (var number = 38; number >= 20; number -= 2) number,
+      10,
+      6,
+      5,
+      2,
+      1,
+    ];
+    expect(loaded.items.map((item) => item.id), [
+      for (final number in storedBefore) _intentionId(number),
+    ]);
+    expect(loaded.totalCount, storedBefore.length);
+    final pageReadsBefore = _catalogPageReads(diagnostics);
+    final eventsBefore = diagnostics.events.length;
+    final states = <AsyncValue<IntentionCatalogState>>[];
+    final observer = container.listen(provider, (_, next) => states.add(next));
+    addTearDown(observer.close);
+    fault.boundedReads.clear();
+
+    await _deleteTag(container, _tagId(302));
+    final current = await _awaitRevisionAfter(container, provider, loaded);
+
+    // Совпадения лежат перед первой сохранённой строкой, внутри окон и сразу
+    // после их краёв; итог равен сравнению со всей сохранённой областью.
+    const expectedAfter = [
+      39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, //
+      22, 21, 20, 10, 6, 5, 4, 2, 1,
+    ];
+    expect(current, isA<IntentionCatalogLoaded>());
+    final reconciled = current as IntentionCatalogLoaded;
+    expect(reconciled.items.map((item) => item.id), [
+      for (final number in expectedAfter) _intentionId(number),
+    ]);
+    expect(reconciled.totalCount, expectedAfter.length);
+    expect(reconciled.nextCursor, isNull);
+    expect(reconciled.query, same(loaded.query));
+    for (final item in reconciled.items) {
+      expect(item.tags.map((tag) => tag.id), contains(_tagId(301)));
+      expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
+    }
+    expect(states.where((state) => state.isLoading), isEmpty);
+    expect(states.map((state) => state.requireValue), [same(reconciled)]);
+    expect(_catalogPageReads(diagnostics), pageReadsBefore);
+
+    // Каждое чтение согласования получает не больше порции сохранённых
+    // идентификаторов, а число чтений линейно по сохранённым и недостающим
+    // строкам.
+    const pageSize = 2;
+    final missingCount = expectedAfter.length - storedBefore.length;
+    final windows = fault.boundedReads;
+    expect(windows, isNotEmpty);
+    expect(windows, everyElement(lessThanOrEqualTo(pageSize)));
+    expect(
+      windows.length,
+      lessThanOrEqualTo(
+        (storedBefore.length + pageSize - 1) ~/ pageSize +
+            (missingCount + pageSize - 1) ~/ pageSize +
+            1,
+      ),
+    );
+    // Восемь внутренних окон и последнее окно области, каждое из двух
+    // сохранённых строк.
+    expect(windows, List.filled(9, pageSize));
+    // Диагностика не получает курсор, окно и идентификаторы согласования:
+    // кроме событий самой команды удаления, событий нет.
+    expect(
+      diagnostics.events.skip(eventsBefore),
+      everyElement(isA<TagCommandDiagnosticsEvent>()),
+    );
+
+    // Результат совпадает с новым чтением той же выдачи.
+    final fresh = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+        catalogPagingPolicyProvider.overrideWithValue(
+          CatalogPagingPolicy(
+            pageSize: pageSize,
+            prefetchRemaining: 0,
+            filterDebounce: const Duration(milliseconds: 250),
+          ),
+        ),
+      ],
+      retry: (retryCount, error) => null,
+    );
+    addTearDown(fresh.dispose);
+    final freshSubscription = fresh.listen(provider, (_, _) {});
+    addTearDown(freshSubscription.close);
+    await fresh.read(provider.future);
+    fresh.read(provider.notifier).changeTagFilter(filter);
+    var reread = await fresh.read(provider.future) as IntentionCatalogLoaded;
+    while (reread.nextCursor != null) {
+      await fresh
+          .read(provider.notifier)
+          .loadNextPageIfNeeded(visibleIndex: reread.items.length - 1);
+      reread = fresh.read(provider).requireValue as IntentionCatalogLoaded;
+    }
+    expect(reread.totalCount, reconciled.totalCount);
+    List<List<Object>> contents(IntentionCatalogLoaded state) => [
+      for (final item in state.items)
+        [item.id, ...item.tags.map((tag) => tag.id)],
+    ];
+    expect(contents(reread), contents(reconciled));
+  });
 }
 
 Future<void> _seedCatalog(AppDatabase database) =>
@@ -676,6 +802,25 @@ Future<void> _seedExcludedMatches(AppDatabase database) =>
           [tagFixtureId(number), 'Ходить в бассейн', number, number],
         );
         for (final tag in [301, 302]) {
+          await database.customStatement(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(tag), tagFixtureId(number)],
+          );
+        }
+      }
+    });
+
+/// Намерения 20–39 со «Здоровьем»; нечётные отсечены исключённым «Спортом».
+Future<void> _seedWindowedArea(AppDatabase database) =>
+    database.transaction(() async {
+      for (var number = 20; number <= 39; number++) {
+        await database.customStatement(
+          '''INSERT INTO intentions
+         (id, title, is_action_ready, is_archived, created_at, updated_at)
+         VALUES (?, ?, 1, 0, ?, ?)''',
+          [tagFixtureId(number), 'Плавать $number', number, number],
+        );
+        for (final tag in [301, if (number.isOdd) 302]) {
           await database.customStatement(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [tagFixtureId(tag), tagFixtureId(number)],
@@ -761,10 +906,26 @@ final class _CatalogReadFault extends LocalDatabaseConnectionObserver {
   bool failNextFilteredSelect = false;
   int selects = 0;
 
+  /// Число сохранённых идентификаторов, переданных каждой ограниченной
+  /// выборкой с условиями по тегам.
+  final boundedReads = <int>[];
+
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     selects++;
+    final sql = statement.statements.join('\n');
+    if (sql.contains('json_each') && sql.contains('LIMIT')) {
+      boundedReads.add(
+        sql.contains('stored_row')
+            ? (jsonDecode(
+                statement.arguments.whereType<String>().lastWhere(
+                  (argument) => argument.startsWith('['),
+                ),
+              ) as List).length
+            : 0,
+      );
+    }
     if (failNextFilteredSelect &&
         statement.statements.any((sql) => sql.contains('json_each'))) {
       failNextFilteredSelect = false;

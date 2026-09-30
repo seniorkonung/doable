@@ -1568,7 +1568,7 @@ void main() {
         same(before.nextCursor),
       ),
     );
-    expect(first.storedIntentionIds, {tenth.id, eighth.id});
+    expect(first.window.storedIntentionIds, [tenth.id, eighth.id]);
     expect(first.cursor, isNull);
     await container
         .read(provider.notifier)
@@ -1592,7 +1592,10 @@ void main() {
     final continuation = repository.reconciliationQueryAt(1);
     expect(continuation.catalogQuery, same(before.query));
     expect(continuation.boundary, same(first.boundary));
-    expect(continuation.storedIntentionIds, first.storedIntentionIds);
+    expect(
+      continuation.window.storedIntentionIds,
+      first.window.storedIntentionIds,
+    );
     expect(continuation.cursor, isA<TestReconciliationCursor>());
     expect(confirmedStates, isEmpty);
     expect(container.read(provider).requireValue, same(before));
@@ -1696,7 +1699,7 @@ void main() {
     final first = repository.reconciliationQueryAt(0);
     expect(first.catalogQuery, same(before.query));
     expect(first.boundary, isA<IntentionCatalogCompletedBoundary>());
-    expect(first.storedIntentionIds, {tenth.id, eighth.id});
+    expect(first.window.storedIntentionIds, [tenth.id, eighth.id]);
     final twelfth = testSummary(index: 12, tags: [health]);
     final ninth = testSummary(index: 9, tags: [health]);
     final third = testSummary(index: 3, tags: [health]);
@@ -1778,7 +1781,7 @@ void main() {
       final query = repository.reconciliationQueryAt(0);
       expect(query.catalogQuery, same(before.query));
       expect(query.boundary, isA<IntentionCatalogCompletedBoundary>());
-      expect(query.storedIntentionIds, isEmpty);
+      expect(query.window.storedIntentionIds, isEmpty);
       expect(confirmedStates, isEmpty);
       repository.completeReconciliation(
         0,
@@ -1912,7 +1915,7 @@ void main() {
     final merged = repository.reconciliationQueryAt(1);
     expect(merged.catalogQuery, same(before.query));
     expect(merged.boundary, isA<IntentionCatalogCompletedBoundary>());
-    expect(merged.storedIntentionIds, {ninth.id, eighth.id});
+    expect(merged.window.storedIntentionIds, [ninth.id, eighth.id]);
     expect(merged.cursor, isNull);
     expect(confirmedStates, isEmpty);
     final seventh = testSummary(index: 7, tags: [health]);
@@ -1996,7 +1999,7 @@ void main() {
 
     final repeated = repository.reconciliationQueryAt(1);
     expect(repeated.catalogQuery, same(before.query));
-    expect(repeated.storedIntentionIds, {tenth.id});
+    expect(repeated.window.storedIntentionIds, [tenth.id]);
     expect(repeated.cursor, isNull);
     expect(confirmedStates, isEmpty);
     final ninth = testSummary(index: 9, tags: [renamed]);
@@ -2060,7 +2063,7 @@ void main() {
     final query = repository.reconciliationQueryAt(0);
     expect(query.catalogQuery, same(first.query));
     expect(query.boundary, isA<IntentionCatalogCompletedBoundary>());
-    expect(query.storedIntentionIds, {tenth.id});
+    expect(query.window.storedIntentionIds, [tenth.id]);
     final ninth = testSummary(index: 9, tags: [health]);
     repository.completeReconciliation(
       0,
@@ -2292,7 +2295,7 @@ void main() {
             same(before.nextCursor),
           ),
         );
-        expect(repeated.storedIntentionIds, {tenth.id, eighth.id});
+        expect(repeated.window.storedIntentionIds, [tenth.id, eighth.id]);
         expect(repeated.cursor, isNull);
         final ninth = testSummary(index: 9, tags: [renamed]);
         repository.completeReconciliation(
@@ -2456,6 +2459,226 @@ void main() {
     expect(repository.reconciliationQueries, hasLength(1));
     expect(container.read(provider).requireValue, same(replaced));
   });
+
+  /// Загружает выдачу с условиями по тегам до конца порциями по две строки.
+  Future<IntentionCatalogLoaded> loadCompletedArea(
+    ProviderContainer container,
+    ControlledCatalogRepository repository,
+    IntentionTagFilter filter,
+    List<List<IntentionSummary>> pages,
+  ) async {
+    await _loadFiltered(
+      container,
+      repository,
+      browse,
+      filter,
+      IntentionCatalogFirstPage(
+        items: pages.first,
+        totalCount: pages.expand((page) => page).length,
+        nextCursor: const TestCatalogCursor(),
+        revision: const TestCatalogRevision(1),
+      ),
+    );
+    final model = container.read(
+      intentionCatalogViewModelProvider(browse).notifier,
+    );
+    for (var index = 1; index < pages.length; index++) {
+      final loaded = _loaded(container, browse);
+      final request = model.loadNextPageIfNeeded(
+        visibleIndex: loaded.items.length - 1,
+      );
+      await waitForCatalogQueries(repository, index + 2);
+      repository.complete(
+        index + 1,
+        ResultSuccess(
+          IntentionCatalogContinuationPage(
+            items: pages[index],
+            nextCursor: index == pages.length - 1
+                ? null
+                : const TestCatalogCursor(),
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await request;
+    }
+    return _loaded(container, browse);
+  }
+
+  test('удаление исключённого тега сдвигает окно сохранённых строк не больше '
+      'порции по ранее завершённой выдаче в несколько окон', () async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(
+      repository,
+      pageSize: 2,
+      prefetchRemaining: 0,
+    );
+    final confirmedStates = _observeConfirmedStates(container, browse);
+    IntentionSummary row(int index) =>
+        testSummary(index: index, tags: [health]);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [health.id],
+      excludedTagIds: [rest.id],
+    );
+    final before = await loadCompletedArea(container, repository, filter, [
+      [row(10), row(8)],
+      [row(6), row(4)],
+      [row(2)],
+    ]);
+    expect(before.nextCursor, isNull);
+    confirmedStates.clear();
+    final loadingStates = _observeLoadingStates(container, browse);
+    final catalogReads = repository.queries.length;
+    const cursors = [_WindowCursor(1), _WindowCursor(2), _WindowCursor(3)];
+
+    await _completeTagDelete(
+      container,
+      repository,
+      tagId: rest.id,
+      revision: const TestCatalogRevision(2),
+    );
+
+    // Внутреннее окно: заполненная порция перед его краем и строка перед
+    // первой сохранённой строкой.
+    await waitForReconciliationQueries(repository, 1);
+    final first = repository.reconciliationQueryAt(0);
+    expect(first.catalogQuery, same(before.query));
+    expect(first.boundary, isA<IntentionCatalogCompletedBoundary>());
+    expect(first.window, isA<IntentionCatalogInnerReconciliationWindow>());
+    expect(first.window.storedIntentionIds, [row(10).id, row(8).id]);
+    expect(first.cursor, isNull);
+    repository.completeReconciliation(
+      0,
+      _firstPortion(
+        [row(11), row(9)],
+        totalCount: 11,
+        nextCursor: cursors[0],
+        revision: 2,
+      ),
+    );
+
+    // После заполненной порции окно начинается с сохранённых строк после её
+    // последней строки; незаполненная порция доходит до края окна.
+    await waitForReconciliationQueries(repository, 2);
+    final second = repository.reconciliationQueryAt(1);
+    expect(second.window, isA<IntentionCatalogInnerReconciliationWindow>());
+    expect(second.window.storedIntentionIds, [row(8).id, row(6).id]);
+    expect(second.cursor, same(cursors[0]));
+    repository.completeReconciliation(
+      1,
+      _continuationPortion([row(7)], nextCursor: cursors[1], revision: 2),
+    );
+
+    // Совпадение сразу после края прежнего окна читает следующее окно,
+    // содержащее последнюю сохранённую строку области.
+    await waitForReconciliationQueries(repository, 3);
+    final third = repository.reconciliationQueryAt(2);
+    expect(third.window, isA<IntentionCatalogFinalReconciliationWindow>());
+    expect(third.window.storedIntentionIds, [row(4).id, row(2).id]);
+    expect(third.cursor, same(cursors[1]));
+    repository.completeReconciliation(
+      2,
+      _continuationPortion(
+        [row(5), row(3)],
+        nextCursor: cursors[2],
+        revision: 2,
+      ),
+    );
+
+    await waitForReconciliationQueries(repository, 4);
+    final fourth = repository.reconciliationQueryAt(3);
+    expect(fourth.window, isA<IntentionCatalogFinalReconciliationWindow>());
+    expect(fourth.window.storedIntentionIds, [row(2).id]);
+    expect(fourth.cursor, same(cursors[2]));
+    expect(confirmedStates, isEmpty);
+    repository.completeReconciliation(
+      3,
+      _continuationPortion([row(1)], revision: 2),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    final current = _loaded(container, browse);
+    expect(current.items.map((item) => item.id), [
+      for (var index = 11; index >= 1; index--) row(index).id,
+    ]);
+    expect(current.totalCount, 11);
+    expect(current.nextCursor, isNull);
+    expect(current.revision, const TestCatalogRevision(2));
+    expect(current.query, same(before.query));
+    expect(confirmedStates, [same(current)]);
+    expect(loadingStates, isEmpty);
+    expect(repository.reconciliationQueries, hasLength(4));
+    expect(
+      repository.reconciliationQueries.map(
+        (query) => query.window.storedRows.length,
+      ),
+      everyElement(lessThanOrEqualTo(2)),
+    );
+    expect(repository.queries, hasLength(catalogReads));
+  });
+
+  for (final (name, portion) in [
+    (
+      'за верхним краем внутреннего окна',
+      (IntentionSummary Function(int) row) => [row(7)],
+    ),
+    (
+      'не по возрастанию в действующем порядке',
+      (IntentionSummary Function(int) row) => [row(9), row(11)],
+    ),
+  ]) {
+    test('порция согласования $name — непредвиденный отказ обновления '
+        'без замены подтверждённого содержимого', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(
+        repository,
+        pageSize: 2,
+        prefetchRemaining: 0,
+      );
+      final confirmedStates = _observeConfirmedStates(container, browse);
+      IntentionSummary row(int index) =>
+          testSummary(index: index, tags: [health]);
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health.id],
+        excludedTagIds: [rest.id],
+      );
+      final before = await loadCompletedArea(container, repository, filter, [
+        [row(10), row(8)],
+        [row(6)],
+      ]);
+      confirmedStates.clear();
+
+      await _completeTagDelete(
+        container,
+        repository,
+        tagId: rest.id,
+        revision: const TestCatalogRevision(2),
+      );
+      await waitForReconciliationQueries(repository, 1);
+      expect(
+        repository.reconciliationQueryAt(0).window,
+        isA<IntentionCatalogInnerReconciliationWindow>(),
+      );
+      repository.completeReconciliation(
+        0,
+        _firstPortion(
+          portion(row),
+          totalCount: 5,
+          nextCursor: const _WindowCursor(1),
+          revision: 2,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final current = _loaded(container, browse);
+      expect(current.items, before.items);
+      expect(current.totalCount, before.totalCount);
+      expect(current.revision, before.revision);
+      expect(current.query, same(before.query));
+      expect(current.refresh, isA<IntentionCatalogRefreshUnexpected>());
+      expect(repository.reconciliationQueries, hasLength(1));
+    });
+  }
 }
 
 Result<IntentionCatalogReconciliationOutcome> _firstPortion(
@@ -2628,4 +2851,10 @@ Future<void> _completeTagDelete(
       ),
     ),
   );
+}
+
+final class _WindowCursor implements IntentionCatalogReconciliationCursor {
+  const _WindowCursor(this.number);
+
+  final int number;
 }
