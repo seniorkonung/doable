@@ -1,5 +1,6 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../intention/application/intention_catalog.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
 import '../domain/tag_name.dart';
@@ -112,14 +113,45 @@ final class TagDeleted extends TagCommandSuccess {
   TagId get tagId => change.tagId;
 }
 
+enum TagCommandSuccessValidationFailure { catalogMutationTargetMismatch }
+
+final class TagCommandSuccessValidationException implements Exception {
+  const TagCommandSuccessValidationException(this.failure);
+
+  final TagCommandSuccessValidationFailure failure;
+}
+
 /// Возвращается после commit при изменении ровно одной пары.
+///
+/// Для намерения пакет дополнительно несёт каталожную мутацию с полными
+/// краткими снимками до и после операции: принадлежность каталогу задаёт
+/// только она, а компактный факт пары не перечисляет других получателей.
+/// Назначение долговременной связи каталожной мутации не имеет.
 final class TagAssignmentChanged extends TagCommandSuccess {
-  const TagAssignmentChanged(this.change);
+  TagAssignmentChanged(this.change, {this.catalogMutation}) {
+    final mutation = catalogMutation;
+    if (mutation == null) return;
+    final matchesTarget = switch (change.assignment.target) {
+      IntentionTagTarget(:final intentionId) =>
+        mutation.before.summary.id == intentionId &&
+            mutation.after.summary.id == intentionId,
+      LongTermRelationTagTarget() => false,
+    };
+    if (!matchesTarget) {
+      throw const TagCommandSuccessValidationException(
+        TagCommandSuccessValidationFailure.catalogMutationTargetMismatch,
+      );
+    }
+  }
 
   @override
   final TagAssignmentChangedChange change;
+  final IntentionCatalogUpdated? catalogMutation;
   TagAssignment get assignment => change.assignment;
   TagAssignmentState get state => change.state;
+
+  @override
+  Iterable<GraphChange> get changes => [change, ?catalogMutation];
 }
 
 /// Возвращается после проверки существования обеих сторон без новой записи.

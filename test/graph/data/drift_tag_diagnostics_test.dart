@@ -442,7 +442,8 @@ void main() {
         .whereType<TagCommandDiagnosticsEvent>()
         .last;
     expect(assignedEvent.commandType, TagCommandDiagnosticsType.assign);
-    expect(assignedEvent.stage, TagCommandDiagnosticsStage.write);
+    // После записи команда читает каталожный снимок намерения.
+    expect(assignedEvent.stage, TagCommandDiagnosticsStage.resultRead);
     expect(assignedEvent.status, isA<DiagnosticsSucceeded>());
     final repeated = await graph.execute(AssignTag(tagId: tag, target: target));
     expect(
@@ -466,7 +467,7 @@ void main() {
       removedEvent.commandType,
       TagCommandDiagnosticsType.removeAssignment,
     );
-    expect(removedEvent.stage, TagCommandDiagnosticsStage.write);
+    expect(removedEvent.stage, TagCommandDiagnosticsStage.resultRead);
     expect(removedEvent.status, isA<DiagnosticsSucceeded>());
     final diagnostics = [
       ...sink.events.map((event) => event.toString()),

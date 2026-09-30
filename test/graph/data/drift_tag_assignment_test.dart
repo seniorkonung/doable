@@ -1,6 +1,7 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -129,7 +130,10 @@ void main() {
           (assignmentResult.value as TagAssignmentChanged).state,
           TagAssignmentState.assigned,
         );
-        expect(assignmentResult.changes, hasLength(1));
+        expect(assignmentResult.changes, [
+          isA<TagAssignmentChangedChange>(),
+          if (target is IntentionTagTarget) isA<IntentionCatalogUpdated>(),
+        ]);
         expect(
           assignmentResult.revision.compareTo(firstRevision),
           GraphRevisionOrder.newer,

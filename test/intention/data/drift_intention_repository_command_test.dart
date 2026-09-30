@@ -9,8 +9,14 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -362,6 +368,260 @@ void main() {
           },
         );
       }
+
+      group('Команды назначения тега', () {
+        IntentionCatalogQuery requiring(int tagNumber) => IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: null,
+          tagFilter: IntentionTagFilter(
+            requiredTagIds: [_tagId(tagFixtureId(tagNumber))],
+          ),
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
+        );
+        final catalogQuery = IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
+        );
+
+        for (final (name, command, tagNumber, beforeNames, afterNames)
+            in <
+              (
+                String,
+                TagCommand Function(TagId, TagTarget),
+                int,
+                List<String> Function(List<String>),
+                List<String> Function(List<String>),
+              )
+            >[
+              (
+                'назначение',
+                (tagId, target) => AssignTag(tagId: tagId, target: target),
+                lastTagNumber,
+                (names) => names,
+                (names) => [names.first, 'Работа', ...names.skip(1)],
+              ),
+              (
+                'снятие',
+                (tagId, target) =>
+                    RemoveTagAssignment(tagId: tagId, target: target),
+                firstTagNumber,
+                (names) => names,
+                (names) => names.skip(1).toList(),
+              ),
+            ]) {
+          test(
+            '$name добавляет полные снимки намерения в пакет той же ревизии',
+            () async {
+              final revisionBefore = _firstCatalogPage(
+                await repository.getCatalogPage(catalogQuery),
+              ).revision;
+              final tagId = _tagId(tagFixtureId(tagNumber));
+
+              final confirmed = _tagCommandSuccess(
+                await repository.execute(
+                  command(tagId, IntentionTagTarget(id)),
+                ),
+              );
+              final changed = confirmed.value as TagAssignmentChanged;
+              final mutation = changed.catalogMutation!;
+
+              expect(
+                confirmed.revision.compareTo(revisionBefore),
+                GraphRevisionOrder.newer,
+              );
+              expect(confirmed.changes, [same(changed.change), same(mutation)]);
+              expect(
+                confirmed.changes.whereType<IntentionCatalogMutation>(),
+                hasLength(1),
+              );
+              expect(
+                mutation.before.summary.tags.map((tag) => tag.name.value),
+                beforeNames(expectedTagNames),
+              );
+              expect(
+                mutation.after.summary.tags.map((tag) => tag.name.value),
+                afterNames(expectedTagNames),
+              );
+              final assigned = changed.state == TagAssignmentState.assigned;
+              expect(mutation.before.matches(requiring(tagNumber)), !assigned);
+              expect(mutation.after.matches(requiring(tagNumber)), assigned);
+              for (final entry in [mutation.before, mutation.after]) {
+                expect(entry.summary.id, id);
+                expect(entry.summary.title, 'Намерение 1');
+                expect(entry.summary.activeRelationCount, 1);
+                expect(
+                  entry.summary.createdAt.value.microsecondsSinceEpoch,
+                  101,
+                );
+                expect(
+                  entry.summary.updatedAt.value.microsecondsSinceEpoch,
+                  201,
+                );
+              }
+              expect(clock.calls, 0);
+              expect(
+                raw
+                    .select(
+                      'SELECT created_at, updated_at FROM intentions WHERE id = ?',
+                      [id.toCanonicalString()],
+                    )
+                    .single
+                    .values,
+                [101, 201],
+              );
+              final pageAfter = _firstCatalogPage(
+                await repository.getCatalogPage(catalogQuery),
+              );
+              expect(
+                pageAfter.revision.compareTo(confirmed.revision),
+                GraphRevisionOrder.same,
+              );
+              expect(
+                pageAfter.items
+                    .singleWhere((item) => item.id == id)
+                    .tags
+                    .map((tag) => tag.name.value),
+                afterNames(expectedTagNames),
+              );
+            },
+          );
+
+          test(
+            '$name у долговременной связи не даёт каталожной мутации',
+            () async {
+              final relationTarget = switch (LongTermRelationId.decode(
+                tagFixtureId(101),
+              )) {
+                LongTermRelationIdDecodingSuccess(:final id) =>
+                  LongTermRelationTagTarget(id),
+                InvalidLongTermRelationIdDecoding() => throw StateError(
+                  'Некорректный ID связи.',
+                ),
+              };
+              final tagId = _tagId(tagFixtureId(tagNumber));
+
+              final confirmed = _tagCommandSuccess(
+                await repository.execute(command(tagId, relationTarget)),
+              );
+              final changed = confirmed.value as TagAssignmentChanged;
+
+              expect(changed.catalogMutation, isNull);
+              expect(confirmed.changes, [same(changed.change)]);
+              expect(
+                diagnostics.events.whereType<TagCommandDiagnosticsEvent>().last,
+                isA<TagCommandDiagnosticsEvent>()
+                    .having(
+                      (event) => event.stage,
+                      'stage',
+                      TagCommandDiagnosticsStage.write,
+                    )
+                    .having(
+                      (event) => event.status,
+                      'status',
+                      isA<DiagnosticsSucceeded>(),
+                    ),
+              );
+            },
+          );
+        }
+
+        for (final (name, command) in <(String, TagCommand)>[
+          (
+            'назначения',
+            AssignTag(
+              tagId: _tagId(tagFixtureId(firstTagNumber)),
+              target: IntentionTagTarget(_id(tagFixtureId(1))),
+            ),
+          ),
+          (
+            'снятия',
+            RemoveTagAssignment(
+              tagId: _tagId(tagFixtureId(lastTagNumber)),
+              target: IntentionTagTarget(_id(tagFixtureId(1))),
+            ),
+          ),
+        ]) {
+          test('повтор $name не даёт мутации и новой ревизии', () async {
+            final revisionBefore = _firstCatalogPage(
+              await repository.getCatalogPage(catalogQuery),
+            ).revision;
+
+            final confirmed = _tagCommandSuccess(
+              await repository.execute(command),
+            );
+
+            expect(confirmed.value, isA<TagAssignmentUnchanged>());
+            expect(confirmed.changes, [isA<TagAssignmentUnchangedChange>()]);
+            expect(
+              confirmed.revision.compareTo(revisionBefore),
+              GraphRevisionOrder.same,
+            );
+          });
+        }
+
+        for (final (side, skippedTagReads, stage) in [
+          ('до', 0, TagCommandDiagnosticsStage.validation),
+          ('после', 1, TagCommandDiagnosticsStage.resultRead),
+        ]) {
+          test(
+            'повреждение тегов снимка $side записи отклоняет команду без пакета',
+            () async {
+              final revisionBefore = _firstCatalogPage(
+                await repository.getCatalogPage(catalogQuery),
+              ).revision;
+              writeTrace.overrideSelectWithColumn(
+                'assigned_tag_id',
+                skippedMatchingSelects: skippedTagReads,
+                overrides: const {'assigned_tag_id': 'повреждённая ссылка'},
+              );
+
+              final result = await repository.execute(
+                AssignTag(
+                  tagId: _tagId(tagFixtureId(lastTagNumber)),
+                  target: IntentionTagTarget(id),
+                ),
+              );
+
+              expect(
+                result,
+                isA<TagCommandFailed>().having(
+                  (result) => result.failure,
+                  'failure',
+                  isA<TagCorruptionFailure>(),
+                ),
+              );
+              expect(
+                diagnostics.events.whereType<TagCommandDiagnosticsEvent>().last,
+                isA<TagCommandDiagnosticsEvent>()
+                    .having((event) => event.stage, 'stage', stage)
+                    .having(
+                      (event) => event.status,
+                      'status',
+                      isA<DiagnosticsFailed>(),
+                    ),
+              );
+              expect(
+                raw.select(
+                  'SELECT 1 FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+                  [tagFixtureId(lastTagNumber), id.toCanonicalString()],
+                ),
+                isEmpty,
+              );
+              final pageAfter = _firstCatalogPage(
+                await repository.getCatalogPage(catalogQuery),
+              );
+              expect(
+                pageAfter.revision.compareTo(revisionBefore),
+                GraphRevisionOrder.same,
+              );
+              expect(clock.calls, 0);
+            },
+          );
+        }
+      });
     });
 
     test('создаёт active not-ready намерение с нормализованными данными и единым UTC-временем', () async {
@@ -1675,6 +1935,18 @@ IntentionCommandSuccess _commandSuccess(
   return confirmed.value;
 }
 
+ConfirmedGraphResult<TagCommandSuccess> _tagCommandSuccess(
+  TagCommandResult result,
+) {
+  expect(result, isA<TagCommandSucceeded>());
+  return (result as TagCommandSucceeded).value;
+}
+
+TagId _tagId(String value) => switch (TagId.decode(value)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw ArgumentError.value(value, 'value'),
+};
+
 IntentionCatalogFirstPage _firstCatalogPage(
   Result<IntentionCatalogPage> result,
 ) {
@@ -1812,6 +2084,7 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
   final List<String> updateStatements = [];
   Map<String, Object?>? _nextSelectOverrides;
   var _nonEmptySelectsToSkip = 0;
+  String? _requiredColumn;
 
   void overrideNextSelect(Map<String, Object?> overrides) {
     overrideSelectAfter(skippedNonEmptySelects: 0, overrides: overrides);
@@ -1826,6 +2099,21 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
     }
     _nonEmptySelectsToSkip = skippedNonEmptySelects;
     _nextSelectOverrides = overrides;
+    _requiredColumn = null;
+  }
+
+  /// Подменяет строки непустого SELECT с указанным столбцом после пропуска
+  /// заданного числа таких же чтений.
+  void overrideSelectWithColumn(
+    String column, {
+    required int skippedMatchingSelects,
+    required Map<String, Object?> overrides,
+  }) {
+    overrideSelectAfter(
+      skippedNonEmptySelects: skippedMatchingSelects,
+      overrides: overrides,
+    );
+    _requiredColumn = column;
   }
 
   @override
@@ -1843,11 +2131,14 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
   ) {
     final overrides = _nextSelectOverrides;
     if (overrides == null || rows.isEmpty) return rows;
+    final column = _requiredColumn;
+    if (column != null && !rows.first.containsKey(column)) return rows;
     if (_nonEmptySelectsToSkip > 0) {
       _nonEmptySelectsToSkip--;
       return rows;
     }
     _nextSelectOverrides = null;
+    _requiredColumn = null;
     return [
       for (final row in rows) {...row, ...overrides},
     ];

@@ -1,5 +1,7 @@
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -225,6 +227,152 @@ void main() {
     }
   });
 
+  test(
+    'изменение назначения намерению несёт каталожный снимок той же ревизии',
+    () {
+      const revision = _Revision(6);
+      final tag = _tag(1, 'Дом');
+      final intentionId = _intentionId(2);
+      final pair = TagAssignment(
+        tagId: tag.id,
+        target: IntentionTagTarget(intentionId),
+      );
+
+      for (final state in TagAssignmentState.values) {
+        final mutation = IntentionCatalogUpdated(
+          revision: revision,
+          before: _entry(intentionId, [
+            if (state == TagAssignmentState.absent) tag,
+          ]),
+          after: _entry(intentionId, [
+            if (state == TagAssignmentState.assigned) tag,
+          ]),
+        );
+        final changed = TagAssignmentChanged(
+          TagAssignmentChangedChange(
+            revision: revision,
+            assignment: pair,
+            state: state,
+          ),
+          catalogMutation: mutation,
+        );
+        final confirmed = ConfirmedGraphResult<TagCommandSuccess>(
+          revision: revision,
+          value: changed,
+        );
+
+        expect(changed.catalogMutation, same(mutation));
+        expect(confirmed.changes, [same(changed.change), same(mutation)]);
+        expect(confirmed.changes.whereType<IntentionCatalogMutation>(), [
+          same(mutation),
+        ]);
+      }
+    },
+  );
+
+  test('изменение назначения связи не несёт каталожного снимка', () {
+    const revision = _Revision(6);
+    final changed = TagAssignmentChanged(
+      TagAssignmentChangedChange(
+        revision: revision,
+        assignment: TagAssignment(
+          tagId: _tag(1, 'Дом').id,
+          target: LongTermRelationTagTarget(_relationId(1)),
+        ),
+        state: TagAssignmentState.assigned,
+      ),
+    );
+
+    expect(changed.catalogMutation, isNull);
+    expect(
+      ConfirmedGraphResult<TagCommandSuccess>(
+        revision: revision,
+        value: changed,
+      ).changes,
+      [same(changed.change)],
+    );
+  });
+
+  test('каталожный снимок принадлежит только намерению из пары', () {
+    const revision = _Revision(6);
+    final tagId = _tag(1, 'Дом').id;
+    final intentionId = _intentionId(2);
+    final otherId = _intentionId(3);
+    TagAssignmentChangedChange change(TagTarget target) =>
+        TagAssignmentChangedChange(
+          revision: revision,
+          assignment: TagAssignment(tagId: tagId, target: target),
+          state: TagAssignmentState.assigned,
+        );
+    IntentionCatalogUpdated mutation(IntentionId before, IntentionId after) =>
+        IntentionCatalogUpdated(
+          revision: revision,
+          before: _entry(before, const []),
+          after: _entry(after, const []),
+        );
+    final mismatch = throwsA(
+      isA<TagCommandSuccessValidationException>().having(
+        (error) => error.failure,
+        'причина',
+        TagCommandSuccessValidationFailure.catalogMutationTargetMismatch,
+      ),
+    );
+
+    expect(
+      () => TagAssignmentChanged(
+        change(LongTermRelationTagTarget(_relationId(1))),
+        catalogMutation: mutation(intentionId, intentionId),
+      ),
+      mismatch,
+    );
+    for (final (before, after) in [
+      (otherId, otherId),
+      (intentionId, otherId),
+      (otherId, intentionId),
+    ]) {
+      expect(
+        () => TagAssignmentChanged(
+          change(IntentionTagTarget(intentionId)),
+          catalogMutation: mutation(before, after),
+        ),
+        mismatch,
+      );
+    }
+  });
+
+  test('каталожный снимок другой ревизии отклоняется пакетом', () {
+    final intentionId = _intentionId(2);
+    final changed = TagAssignmentChanged(
+      TagAssignmentChangedChange(
+        revision: const _Revision(6),
+        assignment: TagAssignment(
+          tagId: _tag(1, 'Дом').id,
+          target: IntentionTagTarget(intentionId),
+        ),
+        state: TagAssignmentState.assigned,
+      ),
+      catalogMutation: IntentionCatalogUpdated(
+        revision: const _Revision(5),
+        before: _entry(intentionId, const []),
+        after: _entry(intentionId, const []),
+      ),
+    );
+
+    expect(
+      () => ConfirmedGraphResult<TagCommandSuccess>(
+        revision: const _Revision(6),
+        value: changed,
+      ),
+      throwsA(
+        isA<ConfirmedGraphResultValidationException>().having(
+          (error) => error.failure,
+          'причина',
+          ConfirmedGraphResultValidationFailure.revisionMismatch,
+        ),
+      ),
+    );
+  });
+
   test('отсутствие тега и получателя различаются по идентичности', () {
     final tagId = _tag(1, 'Дом').id;
     final target = LongTermRelationTagTarget(_relationId(2));
@@ -250,6 +398,30 @@ Tag _tag(int suffix, String name) {
   final text = '00000000-0000-4000-8000-${suffix.toString().padLeft(12, '0')}';
   final decoded = TagId.decode(text) as TagIdDecodingSuccess;
   return Tag(id: decoded.id, name: TagName.fromInput(name));
+}
+
+IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(
+  IntentionSummary(
+    id: id,
+    title: 'Намерение',
+    hasDescription: false,
+    readiness: IntentionReadiness.notReady,
+    archiveState: IntentionArchiveState.active,
+    activeRelationCount: 0,
+    createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+    updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+    tags: tags,
+  ),
+);
+
+final class _Entry implements IntentionCatalogEntrySnapshot {
+  const _Entry(this.summary);
+
+  @override
+  final IntentionSummary summary;
+
+  @override
+  bool matches(IntentionCatalogQuery query) => true;
 }
 
 final class _Revision implements GraphRevision {
