@@ -419,7 +419,7 @@
   - **Ожидаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart` — только если адресная проверка обнаружит отклонение; `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`, `test/graph/data/drift_choice_path_suggestions_test.dart`, `test/intention/presentation/details/intention_details_tags_test.dart`, `test/long_term_relation/presentation/details/relation_details_view_model_test.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`, `test/graph/application/selected_relations_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.15 Подтвердить готовность второй фазы после проверки существующих потребителей каталожных мутаций
+- [x] 2.15 Подтвердить готовность второй фазы после проверки существующих потребителей каталожных мутаций
   - **Критерии приёмки:**
     - Задачи 2.13 и 2.14 подтверждены: расширение подтверждённых пакетов команд тегов каталожной мутацией не меняет наблюдаемое поведение существующих потребителей, а результат второй фазы, включая согласование открытого поиска, сохранение фильтра и позиции просмотра и ограниченность массового согласования, остаётся выполненным.
     - Проверки ошибок, больших данных, формата, анализа и регрессий проходят, generated-артефакты воспроизводимы. Исторические задачи и их отметки сохранены. Интерфейс четырёх поисков и подключение предъявления тегов не объявляются выполненными.
