@@ -5,12 +5,15 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,6 +35,7 @@ const _excludedTagBase = 110000;
 const _extraTagBase = 120000;
 const _backgroundTagBase = 130000;
 const _popularTag = 140000;
+const _massTag = 150000;
 
 /// Условия запроса: популярный обязательный тег и число редких обязательных
 /// и исключённых условий, которые берутся первыми тегами соответствующего
@@ -318,7 +322,430 @@ void main() {
       }
     }
   }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test(
+    'согласует массовое удаление исключённого тега ограниченными порциями',
+    () async {
+      final (:repository, :raw, :trace) = await _openJointFixture();
+      _populateMassExcludedTag(raw);
+
+      // До удаления массовый тег оставляет в выдаче 500 намерений с номерами
+      // вида 100k + 4. Выдача загружена до конца пятью обычными порциями.
+      final before = [
+        for (final index in _expectedTagOnlyMatches(_massConditions))
+          if (!_hasMassTag(index)) index,
+      ];
+      expect(before, hasLength(500));
+      final loaded = <int>[];
+      final continuations = <IntentionCatalogCursor>[];
+      IntentionCatalogCursor? cursor;
+      do {
+        final page = _page(
+          await repository.getCatalogPage(_massQuery(cursor: cursor)),
+        );
+        loaded.addAll(page.items.map((item) => _fixtureIndexOf(item.id)));
+        cursor = page.nextCursor;
+        if (cursor != null) continuations.add(cursor);
+      } while (cursor != null);
+      expect(loaded, before);
+      expect(continuations, hasLength(4));
+
+      trace.isRecording = false;
+      final deletion = await repository.execute(DeleteTag(_tagId(_massTag)));
+      trace.isRecording = true;
+      expect(deletion, isA<TagCommandSucceeded>());
+      final deletionRevision = (deletion as TagCommandSucceeded).value.revision;
+
+      // Удаление открывает почти 20 000 совпадений внутри сохранённой
+      // области. Условие по удалённому тегу остаётся в запросе.
+      final after = _expectedTagOnlyMatches(_massConditions);
+      expect(after, hasLength(19994));
+      for (final (label, boundary, storedCount) in [
+        (
+          'ранее полностью загруженная выдача',
+          const IntentionCatalogCompletedBoundary(),
+          before.length,
+        ),
+        (
+          'частично загруженный префикс',
+          IntentionCatalogPartialPrefixBoundary(continuations[1]),
+          2 * _pageSize,
+        ),
+      ]) {
+        final stored = before.take(storedCount).toList();
+        final areaEnd = switch (boundary) {
+          IntentionCatalogCompletedBoundary() => null,
+          IntentionCatalogPartialPrefixBoundary() => stored.last,
+        };
+        final area = [
+          for (final index in after)
+            if (areaEnd == null || _compareCatalogOrder(index, areaEnd) <= 0)
+              index,
+        ];
+        final missing = [
+          for (final index in area)
+            if (!stored.contains(index)) index,
+        ];
+        expect(missing, hasLength(area.length - stored.length), reason: label);
+
+        final reconciled = await _expectMassReconciliation(
+          repository,
+          raw,
+          trace,
+          label: label,
+          boundary: boundary,
+          stored: stored,
+          missing: missing,
+          totalCount: after.length,
+          revision: deletionRevision,
+        );
+        expect(
+          [...stored, ...reconciled]..sort(_compareCatalogOrder),
+          area,
+          reason: label,
+        );
+      }
+
+      await _expectFailedReconciliationReadsKeepConnection(
+        repository,
+        raw,
+        trace,
+        stored: before,
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
 }
+
+/// Массовый тег назначен всем намерениям фикстуры, кроме номеров вида
+/// 100k + 4: среди активных готовых намерений с популярным тегом он
+/// оставляет только их.
+void _populateMassExcludedTag(sqlite.Database database) {
+  final insertAssignment = database.prepare(
+    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+  );
+  database.execute('BEGIN');
+  try {
+    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      _fixtureId(_massTag),
+      'Тег $_massTag',
+    ]);
+    for (var index = 0; index < _fixtureSize; index++) {
+      if (_hasMassTag(index)) {
+        insertAssignment.execute([_fixtureId(_massTag), _fixtureId(index)]);
+      }
+    }
+    database.execute('COMMIT');
+  } on Object {
+    database.execute('ROLLBACK');
+    rethrow;
+  } finally {
+    insertAssignment.close();
+  }
+}
+
+bool _hasMassTag(int fixtureIndex) => fixtureIndex % 100 != 4;
+
+/// Популярный обязательный тег и все исключённые условия; массовый тег
+/// добавляется к исключённым условиям запросом [_massQuery].
+const _massConditions = (popular: true, required: 0, excluded: _conditionCount);
+
+IntentionCatalogQuery _massQuery({IntentionCatalogCursor? cursor}) =>
+    _jointQuery(
+      titleFilter: null,
+      conditions: _massConditions,
+      excludesMassTag: true,
+      cursor: cursor,
+    );
+
+/// Проходит согласование области до конца и возвращает номера недостающих
+/// совпадений в порядке получения. Каждая порция читает только себя: строка
+/// после границы порции не выбирается повторно, сохранённые строки и
+/// предшествующие порции не перечитываются.
+Future<List<int>> _expectMassReconciliation(
+  DriftPersonalGraphRepository repository,
+  sqlite.Database raw,
+  _SelectTrace trace, {
+  required String label,
+  required IntentionCatalogReconciliationBoundary boundary,
+  required List<int> stored,
+  required List<int> missing,
+  required int totalCount,
+  required GraphRevision revision,
+}) async {
+  final storedIds = [for (final index in stored) _intentionId(index)];
+  final changesBefore = _connectionChanges(raw);
+  final reconciled = <int>[];
+  final costs = <_TracedSelect>[];
+  IntentionCatalogReconciliationCursor? cursor;
+  var portionNumber = 0;
+  do {
+    trace.clear();
+    final result = await repository.getCatalogReconciliationPortion(
+      IntentionCatalogReconciliationQuery(
+        catalogQuery: _massQuery(),
+        boundary: boundary,
+        storedIntentionIds: storedIds,
+        cursor: cursor,
+      ),
+    );
+    expect(
+      result,
+      isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>(),
+      reason: '$label, порция $portionNumber',
+    );
+    final outcome =
+        (result as ResultSuccess<IntentionCatalogReconciliationOutcome>).value;
+    expect(
+      outcome,
+      isA<IntentionCatalogReconciliationPortion>(),
+      reason: '$label, порция $portionNumber',
+    );
+    final portion = outcome as IntentionCatalogReconciliationPortion;
+    final isFirst = portionNumber == 0;
+    if (isFirst) {
+      expect(
+        (portion as IntentionCatalogReconciliationFirstPortion).totalCount,
+        totalCount,
+        reason: label,
+      );
+    } else {
+      expect(portion, isA<IntentionCatalogReconciliationContinuationPortion>());
+    }
+    expect(portion.revision.compareTo(revision), GraphRevisionOrder.same);
+
+    final indexes = [
+      for (final item in portion.items) _fixtureIndexOf(item.id),
+    ];
+    final expected = missing.skip(portionNumber * _pageSize).take(_pageSize);
+    expect(indexes, expected, reason: '$label, порция $portionNumber');
+    expect(
+      portion.nextCursor == null,
+      reconciled.length + indexes.length == missing.length,
+      reason: '$label, порция $portionNumber',
+    );
+    _expectReconciliationMaterialization(
+      portion,
+      trace,
+      isFirst: isFirst,
+      storedIds: storedIds,
+    );
+    _expectReconciliationPlans(raw, trace);
+    costs.add(
+      trace.selects.singleWhere((select) => select.statement.contains('LIMIT')),
+    );
+    if (isFirst || portion.nextCursor == null) {
+      _printJointCost(
+        raw,
+        trace,
+        titleFilter: null,
+        page: portionNumber,
+        label: 'согласование: $label',
+        conditions: _massConditions,
+      );
+    }
+    reconciled.addAll(indexes);
+    cursor = portion.nextCursor;
+    portionNumber++;
+  } while (cursor != null);
+
+  expect(portionNumber, (missing.length + _pageSize - 1) ~/ _pageSize);
+  expect(reconciled, missing, reason: label);
+  // Каждое чтение выбирает не больше `pageSize + 1` строк после своей
+  // позиции, поэтому все порции вместе читают недостающие совпадения
+  // однократно, а сохранённые строки не читают вовсе.
+  expect(
+    costs.fold<int>(0, (sum, select) => sum + select.rowCount),
+    missing.length + portionNumber - 1,
+    reason: label,
+  );
+  expect(_connectionChanges(raw), changesBefore, reason: label);
+  final elapsed = [for (final select in costs) select.elapsed]..sort();
+  // Измерения характеризуют фикстуру и не становятся порогом.
+  // ignore: avoid_print
+  print(
+    'Согласование ($label): ${stored.length} сохранённых строк, '
+    '${missing.length} недостающих совпадений, $portionNumber порций; '
+    'чтение порции: медиана ${elapsed[elapsed.length ~/ 2].inMicroseconds} '
+    'мкс, максимум ${elapsed.last.inMicroseconds} мкс, всего '
+    '${elapsed.fold(Duration.zero, (sum, value) => sum + value).inMilliseconds} '
+    'мс',
+  );
+  return reconciled;
+}
+
+/// Порция согласования материализует только себя и полные назначения своих
+/// строк, а абсолютное количество считается отдельным агрегатом полного
+/// предиката без границы области и сохранённых строк.
+void _expectReconciliationMaterialization(
+  IntentionCatalogReconciliationPortion portion,
+  _SelectTrace trace, {
+  required bool isFirst,
+  required List<IntentionId> storedIds,
+}) {
+  final conditionSets = [
+    {_fixtureId(_popularTag)},
+    {
+      _fixtureId(_massTag),
+      for (var index = 0; index < _conditionCount; index++)
+        _fixtureId(_excludedTagBase + index),
+    },
+  ];
+  List<Set<Object?>> jsonSets(_TracedSelect select) => [
+    for (final argument in select.arguments.whereType<String>())
+      if (argument.startsWith('[')) (jsonDecode(argument) as List).toSet(),
+  ];
+
+  final counts = trace.selects
+      .where((select) => _isCatalogCountStatement(select.statement))
+      .toList();
+  expect(counts, hasLength(isFirst ? 1 : 0));
+  if (isFirst) {
+    final count = counts.single;
+    expect(count.rowCount, 1);
+    expect(count.statement, isNot(contains('stored_row')));
+    expect(count.statement, isNot(contains('LIMIT')));
+    expect(jsonSets(count), conditionSets);
+  }
+  final read = trace.selects
+      .where((select) => select.statement.contains('LIMIT'))
+      .single;
+  expect(
+    read.rowCount,
+    portion.items.length + (portion.nextCursor == null ? 0 : 1),
+  );
+  expect(read.statement, contains('LIMIT ${_pageSize + 1}'));
+  expect(jsonSets(read), [
+    ...conditionSets,
+    {for (final id in storedIds) id.toCanonicalString()},
+  ]);
+
+  final ids = portion.items.map((item) => item.id.toCanonicalString()).toSet();
+  final tags = trace.selects
+      .where((select) => select.statement.contains('FROM tag_assignments a'))
+      .single;
+  expect(tags.arguments, unorderedEquals(ids));
+  expect(tags.intentionIds, ids);
+  final aggregates = trace.selects
+      .where(
+        (select) =>
+            select.statement.contains('doable_relation_count_aggregates'),
+      )
+      .single;
+  expect(aggregates.arguments, unorderedEquals(ids));
+  expect(aggregates.rowCount, portion.items.length);
+  var tagCount = 0;
+  for (final item in portion.items) {
+    final expectedTags = _fixtureTagIds(_fixtureIndexOf(item.id));
+    expect(item.tags.map((tag) => tag.id), expectedTags);
+    tagCount += expectedTags.length;
+  }
+  expect(tags.rowCount, tagCount);
+  // Число чтений не растёт с числом строк порции, сохранённых строк и
+  // условий: количество, порция, агрегаты и назначения пакетны.
+  expect(trace.writes, isEmpty);
+  expect(trace.selects, hasLength(isFirst ? 4 : 3));
+  _expectNoOffset(trace);
+}
+
+/// Порцию согласования ведёт индекс порядка охвата. Наборы условий и
+/// сохранённых идентификаторов читаются из своих `json_each(?)` один раз на
+/// выполнение запроса, а кандидат проверяется поиском в отобранном
+/// множестве, поэтому стоимость его отсечения не растёт с размером наборов.
+void _expectReconciliationPlans(sqlite.Database database, _SelectTrace trace) {
+  _expectJointPlans(
+    database,
+    trace,
+    titleFilter: null,
+    conditions: _massConditions,
+  );
+  final read = _observedPlanTree(
+    database,
+    trace.selects.singleWhere((select) => select.statement.contains('LIMIT')),
+  );
+  _expectParameterSetReadOnce(read, 'stored_row');
+}
+
+/// Отказавшие чтения согласования, в том числе продолжения, откатываются
+/// без записей на соединении, а повтор того же чтения успешен.
+Future<void> _expectFailedReconciliationReadsKeepConnection(
+  DriftPersonalGraphRepository repository,
+  sqlite.Database raw,
+  _SelectTrace trace, {
+  required List<int> stored,
+}) async {
+  IntentionCatalogReconciliationQuery query({
+    IntentionCatalogReconciliationCursor? cursor,
+  }) => IntentionCatalogReconciliationQuery(
+    catalogQuery: _massQuery(),
+    boundary: const IntentionCatalogCompletedBoundary(),
+    storedIntentionIds: [for (final index in stored) _intentionId(index)],
+    cursor: cursor,
+  );
+  final first = await repository.getCatalogReconciliationPortion(query());
+  final continuation =
+      ((first as ResultSuccess<IntentionCatalogReconciliationOutcome>).value
+              as IntentionCatalogReconciliationPortion)
+          .nextCursor;
+  expect(continuation, isA<IntentionCatalogReconciliationCursor>());
+
+  for (final (label, cursor, failsOn)
+      in <
+        (String, IntentionCatalogReconciliationCursor?, bool Function(String))
+      >[
+        ('количество', null, _isCatalogCountStatement),
+        ('первая порция', null, (sql) => sql.contains('LIMIT')),
+        (
+          'теги первой порции',
+          null,
+          (sql) => sql.contains('FROM tag_assignments a'),
+        ),
+        ('продолжение', continuation, (sql) => sql.contains('LIMIT')),
+        (
+          'теги продолжения',
+          continuation,
+          (sql) => sql.contains('FROM tag_assignments a'),
+        ),
+      ]) {
+    final changesBefore = _connectionChanges(raw);
+    trace.failWhen = failsOn;
+    final failed = await repository.getCatalogReconciliationPortion(
+      query(cursor: cursor),
+    );
+    trace.failWhen = null;
+    expect(trace.hasFailed, isTrue, reason: label);
+    trace.hasFailed = false;
+    expect(
+      failed,
+      isA<ResultFailure<IntentionCatalogReconciliationOutcome>>(),
+      reason: label,
+    );
+    expect(_connectionChanges(raw), changesBefore, reason: label);
+
+    final recovered = await repository.getCatalogReconciliationPortion(
+      query(cursor: cursor),
+    );
+    expect(
+      recovered,
+      isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>().having(
+        (result) => result.value,
+        'исход',
+        isA<IntentionCatalogReconciliationPortion>(),
+      ),
+      reason: label,
+    );
+    expect(_connectionChanges(raw), changesBefore, reason: label);
+  }
+}
+
+int _connectionChanges(sqlite.Database raw) =>
+    raw.select('SELECT total_changes() AS count').single['count'] as int;
+
+IntentionId _intentionId(int fixtureIndex) =>
+    switch (IntentionId.decode(_fixtureId(fixtureIndex))) {
+      IntentionIdDecodingSuccess(:final id) => id,
+      InvalidIntentionIdDecoding() => throw ArgumentError.value(fixtureIndex),
+    };
 
 /// Файловая база с большой фикстурой, совместными кандидатами и популярным
 /// тегом; трассировка очищена и ограничивает число SQL-параметров.
@@ -556,6 +983,7 @@ IntentionCatalogQuery _jointQuery({
   int pageSize = _pageSize,
   String? titleFilter = 'редкое %_',
   _Conditions conditions = _allConditions,
+  bool excludesMassTag = false,
   IntentionCatalogCursor? cursor,
 }) => IntentionCatalogQuery(
   scope: IntentionScope.active,
@@ -568,6 +996,7 @@ IntentionCatalogQuery _jointQuery({
         _tagId(_requiredTagBase + index),
     ],
     excludedTagIds: [
+      if (excludesMassTag) _tagId(_massTag),
       for (var index = 0; index < conditions.excluded; index++)
         _tagId(_excludedTagBase + index),
     ],
@@ -677,6 +1106,38 @@ List<String> _observedPlan(sqlite.Database database, _TracedSelect select) => [
   for (final node in _observedPlanTree(database, select)) node.detail,
 ];
 
+/// Набор [alias] из `json_each(?)` читается один раз подзапросом, не
+/// коррелированным с текущим намерением, а кандидат проверяется поиском по
+/// ключу в отобранном множестве (`LIST SUBQUERY` оператора `IN`).
+void _expectParameterSetReadOnce(List<_PlanNode> plan, String alias) {
+  final nodes = {for (final node in plan) node.id: node};
+  final details = plan.map((node) => node.detail).join('\n');
+  final setReads = plan
+      .where((node) => node.detail.startsWith('SCAN $alias VIRTUAL TABLE'))
+      .toList();
+  expect(setReads, hasLength(1), reason: 'Набор $alias в плане:\n$details');
+  final chain = [
+    for (
+      var parent = nodes[setReads.single.parent];
+      parent != null;
+      parent = nodes[parent.parent]
+    )
+      parent.detail,
+  ];
+  expect(
+    chain,
+    everyElement(isNot(startsWith('CORRELATED'))),
+    reason:
+        'Набор $alias читается коррелированным подзапросом, то есть '
+        'заново для каждого кандидата:\n$details',
+  );
+  expect(
+    chain.last,
+    matches(RegExp(r'^LIST SUBQUERY \d+$')),
+    reason: 'Кандидат проверяется поиском в множестве:\n$details',
+  );
+}
+
 /// Утверждения описывают свойство плана, а не порядок обхода: каждый набор
 /// условий из json_each(?) читается подзапросом, не коррелированным с
 /// текущим намерением, то есть один раз на выполнение запроса. Назначения
@@ -704,23 +1165,7 @@ void _expectConditionSetsReadOnce(
     if (hasRequired) 'required_tag',
     if (conditions.excluded > 0) 'excluded_tag',
   ]) {
-    final setReads = plan
-        .where((node) => node.detail.startsWith('SCAN $alias VIRTUAL TABLE'))
-        .toList();
-    expect(setReads, hasLength(1), reason: 'Набор $alias в плане:\n$details');
-    final chain = ancestors(setReads.single);
-    expect(
-      chain,
-      everyElement(isNot(correlated)),
-      reason:
-          'Набор $alias читается коррелированным подзапросом, то есть '
-          'заново для каждого кандидата:\n$details',
-    );
-    expect(
-      chain.last,
-      matches(RegExp(r'^LIST SUBQUERY \d+$')),
-      reason: 'Кандидат проверяется поиском в множестве:\n$details',
-    );
+    _expectParameterSetReadOnce(plan, alias);
   }
   final assignmentReads = plan
       .where(
@@ -1153,6 +1598,10 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
   int? parameterLimit;
   var isRecording = true;
 
+  /// Чтение, на котором соединение отказывает; отказ однократен.
+  bool Function(String statement)? failWhen;
+  var hasFailed = false;
+
   void clear() {
     selects.clear();
     writes.clear();
@@ -1171,6 +1620,15 @@ final class _SelectTrace extends LocalDatabaseConnectionObserver {
     if (isRecording &&
         statement.operation == LocalDatabaseSqlOperation.select) {
       _started[statement] = Stopwatch()..start();
+    }
+  }
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    final fails = failWhen;
+    if (fails != null && !hasFailed && fails(statement.statements.single)) {
+      hasFailed = true;
+      throw StateError('CANARY-отказ чтения');
     }
   }
 

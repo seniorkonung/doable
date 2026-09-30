@@ -1144,6 +1144,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     IntentionCatalogSortField.updatedAt => intentions.updatedAt,
   };
 
+  /// Строка следует за курсором в действующем порядке. Отдельное сравнение
+  /// временной метки ограничивает диапазон обхода индекса порядка: вместе с
+  /// границей области согласования оно не даёт планировщику объединить
+  /// диапазоны `OR` и сортировать все строки области.
   Expression<bool> _keysetCondition(
     IntentionCatalogQuery query,
     _DriftIntentionCatalogCursor cursor,
@@ -1152,16 +1156,21 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final timestamp = _primaryOrderingColumn(intentions, query.order);
     final boundaryTimestamp =
         cursor.boundaryTimestamp.value.microsecondsSinceEpoch;
-    final afterTimestamp = switch (query.order.direction) {
-      IntentionCatalogSortDirection.ascending => timestamp.isBiggerThanValue(
-        boundaryTimestamp,
+    final (
+      notBeforeTimestamp,
+      afterTimestamp,
+    ) = switch (query.order.direction) {
+      IntentionCatalogSortDirection.ascending => (
+        timestamp.isBiggerOrEqualValue(boundaryTimestamp),
+        timestamp.isBiggerThanValue(boundaryTimestamp),
       ),
-      IntentionCatalogSortDirection.descending => timestamp.isSmallerThanValue(
-        boundaryTimestamp,
+      IntentionCatalogSortDirection.descending => (
+        timestamp.isSmallerOrEqualValue(boundaryTimestamp),
+        timestamp.isSmallerThanValue(boundaryTimestamp),
       ),
     };
-    return afterTimestamp |
-        (timestamp.equals(boundaryTimestamp) &
+    return notBeforeTimestamp &
+        (afterTimestamp |
             intentions.id.isBiggerThanValue(
               cursor.boundaryId.toCanonicalString(),
             ));
