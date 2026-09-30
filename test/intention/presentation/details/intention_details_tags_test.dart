@@ -5,9 +5,12 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/tag/application/tagged_entities_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_target.dart';
@@ -175,6 +178,17 @@ void main() {
         final remove = find.byKey(ValueKey('tag-assignment-remove-$newTagId'));
         await Scrollable.ensureVisible(tester.element(remove), alignment: 0.3);
         await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(tester.element(remove));
+        final detailsProvider = intentionDetailsViewModelProvider(
+          _intentionId(number),
+        );
+        final detailsBefore =
+            container.read(detailsProvider) as IntentionDetailsLoaded;
+        final detailsStates = <IntentionDetailsState>[];
+        final detailsSubscription = container.listen(
+          detailsProvider,
+          (_, next) => detailsStates.add(next),
+        );
         await tester.tap(remove);
         await _waitUntil(
           tester,
@@ -182,6 +196,34 @@ void main() {
             newTagId,
           ]).isEmpty,
         );
+        detailsSubscription.close();
+        // Пакет снятия несёт снимок этого же намерения: страница не
+        // сбрасывается и публикует новую ревизию ровно один раз.
+        expect(detailsStates, everyElement(isA<IntentionDetailsLoaded>()));
+        final loadedStates = detailsStates.cast<IntentionDetailsLoaded>();
+        final newRevisions = <IntentionDetailsLoaded>[
+          for (final (index, state) in loadedStates.indexed)
+            if (state.revision.compareTo(
+                  index == 0
+                      ? detailsBefore.revision
+                      : loadedStates[index - 1].revision,
+                ) !=
+                GraphRevisionOrder.same)
+              state,
+        ];
+        expect(newRevisions, hasLength(1));
+        final detailsAfter =
+            container.read(detailsProvider) as IntentionDetailsLoaded;
+        expect(detailsAfter.intention.title, detailsBefore.intention.title);
+        expect(
+          detailsAfter.intention.updatedAt,
+          detailsBefore.intention.updatedAt,
+        );
+        expect(
+          detailsAfter.details.relationCounts,
+          detailsBefore.details.relationCounts,
+        );
+        expect(detailsAfter.edit, isNull);
         expect(
           raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
             newTagId,
