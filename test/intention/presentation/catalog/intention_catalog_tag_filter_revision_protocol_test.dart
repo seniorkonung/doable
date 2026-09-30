@@ -1,12 +1,17 @@
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
@@ -281,6 +286,287 @@ void main() {
       }
     }
   }
+
+  group('согласование после удаления исключённого тега', () {
+    final health = _tag(1);
+    final rest = _tag(2);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [health.id],
+      excludedTagIds: [rest.id],
+    );
+
+    test('новая ревизия между порциями оставляет кандидата неопубликованным '
+        'и повторяет получение для неё', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(
+        repository,
+        pageSize: 2,
+        prefetchRemaining: 0,
+      );
+      final published = _observePublished(container);
+      final tenth = testSummary(index: 10, tags: [health]);
+      final eighth = testSummary(index: 8, tags: [health]);
+      final before = await _loadCompleted(container, repository, filter, [
+        tenth,
+        eighth,
+      ]);
+      published.clear();
+
+      await _completeTagDelete(container, repository, rest.id, revision: 2);
+      await waitForReconciliationQueries(repository, 1);
+      final twelfth = testSummary(index: 12, tags: [health]);
+      final eleventh = testSummary(index: 11, tags: [health]);
+      repository.completeReconciliation(
+        0,
+        _reconciliationFirst(
+          [twelfth, eleventh],
+          totalCount: 5,
+          nextCursor: const TestReconciliationCursor(),
+          revision: 2,
+        ),
+      );
+      await waitForReconciliationQueries(repository, 2);
+      // Продолжение отражает уже следующую ревизию: смесь ревизий не
+      // публикуется, чтение ждёт её подтверждённый пакет.
+      repository.completeReconciliation(
+        1,
+        _reconciliationContinuation([
+          testSummary(index: 9, tags: [health]),
+        ], revision: 3),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(published, isEmpty);
+      expect(repository.reconciliationQueries, hasLength(2));
+
+      await completeIntentionTagAssignment(
+        container,
+        repository,
+        state: TagAssignmentState.absent,
+        tagId: health.id,
+        before: tenth,
+        after: testSummary(index: 10),
+        revision: const TestCatalogRevision(3),
+      );
+      await waitForReconciliationQueries(repository, 3);
+      final repeated = repository.reconciliationQueryAt(2);
+      expect(repeated.catalogQuery, same(before.query));
+      expect(repeated.boundary, isA<IntentionCatalogCompletedBoundary>());
+      expect(repeated.storedIntentionIds, {eighth.id});
+      expect(repeated.cursor, isNull);
+      expect(published, isEmpty);
+
+      final ninth = testSummary(index: 9, tags: [health]);
+      repository.completeReconciliation(
+        2,
+        _reconciliationFirst(
+          [twelfth, eleventh],
+          totalCount: 4,
+          nextCursor: const TestReconciliationCursor(),
+          revision: 3,
+        ),
+      );
+      await waitForReconciliationQueries(repository, 4);
+      expect(repository.reconciliationQueryAt(3).cursor, isNotNull);
+      repository.completeReconciliation(
+        3,
+        _reconciliationContinuation([ninth], revision: 3),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final current = _currentLoaded(container);
+      expect(current.items.map((item) => item.id), [
+        twelfth.id,
+        eleventh.id,
+        ninth.id,
+        eighth.id,
+      ]);
+      expect(current.totalCount, 4);
+      expect(current.revision, _revision(3));
+      expect(current.refresh, isA<IntentionCatalogRefreshIdle>());
+      expect(current.query, same(before.query));
+      expect(published, [same(current)]);
+      expect(repository.queries, hasLength(2));
+    });
+
+    for (final responseFirst in [false, true]) {
+      test(
+        responseFirst
+            ? 'ответ более новой ревизии до её пакета не применяет пакет дважды'
+            : 'пакет во время чтения применяется к кандидату один раз',
+        () async {
+          final repository = ControlledCatalogRepository();
+          final container = reconciliationCatalogContainer(repository);
+          final published = _observePublished(container);
+          final tenth = testSummary(index: 10, tags: [health]);
+          final eighth = testSummary(index: 8, tags: [health]);
+          final before = await _loadCompleted(container, repository, filter, [
+            tenth,
+            eighth,
+          ]);
+          published.clear();
+
+          await _completeTagDelete(container, repository, rest.id, revision: 2);
+          await waitForReconciliationQueries(repository, 1);
+          final ninth = testSummary(index: 9, tags: [health]);
+          final seventh = testSummary(index: 7, tags: [health]);
+          Future<void> assignSeventh() => completeIntentionTagAssignment(
+            container,
+            repository,
+            state: TagAssignmentState.assigned,
+            tagId: health.id,
+            before: testSummary(index: 7),
+            after: seventh,
+            revision: const TestCatalogRevision(3),
+          );
+
+          if (responseFirst) {
+            repository.completeReconciliation(
+              0,
+              _reconciliationFirst(
+                [ninth, seventh],
+                totalCount: 4,
+                revision: 3,
+              ),
+            );
+            await Future<void>.delayed(Duration.zero);
+            expect(published, isEmpty);
+            expect(repository.reconciliationQueries, hasLength(1));
+            await assignSeventh();
+            await waitForReconciliationQueries(repository, 2);
+            final repeated = repository.reconciliationQueryAt(1);
+            expect(repeated.catalogQuery, same(before.query));
+            expect(repeated.storedIntentionIds, {
+              tenth.id,
+              eighth.id,
+              seventh.id,
+            });
+            expect(published, isEmpty);
+            repository.completeReconciliation(
+              1,
+              _reconciliationFirst([ninth], totalCount: 4, revision: 3),
+            );
+          } else {
+            await assignSeventh();
+            expect(published, isEmpty);
+            expect(repository.reconciliationQueries, hasLength(1));
+            repository.completeReconciliation(
+              0,
+              _reconciliationFirst([ninth], totalCount: 3, revision: 2),
+            );
+          }
+          await Future<void>.delayed(Duration.zero);
+
+          final current = _currentLoaded(container);
+          expect(current.items.map((item) => item.id), [
+            tenth.id,
+            ninth.id,
+            eighth.id,
+            seventh.id,
+          ]);
+          expect(current.totalCount, 4);
+          expect(current.revision, _revision(3));
+          expect(current.query, same(before.query));
+          expect(published, [same(current)]);
+          expect(
+            repository.reconciliationQueries,
+            hasLength(responseFirst ? 2 : 1),
+          );
+          expect(repository.queries, hasLength(2));
+        },
+      );
+    }
+
+    test('запоздалое чтение старой ревизии не возвращает удалённый тег и '
+        'прежнее количество', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      final published = _observePublished(container);
+      final tenth = testSummary(index: 10, tags: [health]);
+      final before = await _loadCompleted(container, repository, filter, [
+        tenth,
+      ]);
+      published.clear();
+
+      await _completeTagDelete(container, repository, rest.id, revision: 2);
+      await waitForReconciliationQueries(repository, 1);
+      repository.completeReconciliation(
+        0,
+        _reconciliationFirst(
+          [
+            testSummary(index: 9, tags: [health, rest]),
+          ],
+          totalCount: 1,
+          revision: 1,
+        ),
+      );
+      await waitForReconciliationQueries(repository, 2);
+      expect(published, isEmpty);
+      final repeated = repository.reconciliationQueryAt(1);
+      expect(repeated.catalogQuery, same(before.query));
+      expect(repeated.storedIntentionIds, {tenth.id});
+      expect(repeated.cursor, isNull);
+
+      final ninth = testSummary(index: 9, tags: [health]);
+      repository.completeReconciliation(
+        1,
+        _reconciliationFirst([ninth], totalCount: 2, revision: 2),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final current = _currentLoaded(container);
+      expect(current.items.map((item) => item.id), [tenth.id, ninth.id]);
+      for (final item in current.items) {
+        expect(item.tags.map((tag) => tag.id), [health.id]);
+      }
+      expect(current.totalCount, 2);
+      expect(current.revision, _revision(2));
+      expect(published, [same(current)]);
+    });
+
+    test('непрерывные изменения задерживают публикацию, но опубликованное '
+        'содержимое остаётся подтверждённым', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      final published = _observePublished(container);
+      final tenth = testSummary(index: 10, tags: [health]);
+      final before = await _loadCompleted(container, repository, filter, [
+        tenth,
+      ]);
+      published.clear();
+
+      await _completeTagDelete(container, repository, rest.id, revision: 2);
+      for (var revision = 3; revision <= 5; revision++) {
+        final index = revision - 3;
+        await waitForReconciliationQueries(repository, index + 1);
+        repository.completeReconciliation(
+          index,
+          _reconciliationFirst([], totalCount: 1, revision: revision),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(published, isEmpty);
+        expect(container.read(_provider).requireValue, same(before));
+        await _completeTagRename(
+          container,
+          repository,
+          health,
+          revision: revision,
+        );
+      }
+      await waitForReconciliationQueries(repository, 4);
+      repository.completeReconciliation(
+        3,
+        _reconciliationFirst([], totalCount: 1, revision: 5),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final current = _currentLoaded(container);
+      expect(current.items.map((item) => item.id), [tenth.id]);
+      expect(current.items.single.tags.single.name.value, 'Тег 1 (5)');
+      expect(current.totalCount, 1);
+      expect(current.revision, _revision(5));
+      expect(published, [same(current)]);
+    });
+  });
 }
 
 Result<IntentionCatalogPage> _emptyPage() => ResultSuccess(
@@ -321,4 +607,131 @@ Tag _tag(int number) => Tag(
     InvalidTagIdDecoding() => throw StateError('Неверный ID тега.'),
   },
   name: TagName.fromInput('Тег $number'),
+);
+
+const _browse = BrowseIntentionCatalog();
+final _provider = intentionCatalogViewModelProvider(_browse);
+
+/// Загружает полностью завершённую выдачу с условиями по тегам.
+Future<IntentionCatalogLoaded> _loadCompleted(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  IntentionTagFilter filter,
+  List<IntentionSummary> items,
+) async {
+  await waitForCatalogQueries(repository, 1);
+  repository.complete(0, _emptyPage());
+  await container.read(_provider.future);
+  container.read(_provider.notifier).changeTagFilter(filter);
+  await waitForCatalogQueries(repository, 2);
+  repository.complete(
+    1,
+    ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: items,
+        totalCount: items.length,
+        nextCursor: null,
+        revision: const TestCatalogRevision(1),
+      ),
+    ),
+  );
+  return await container.read(_provider.future) as IntentionCatalogLoaded;
+}
+
+/// Собирает подтверждённые состояния, опубликованные после подписки.
+List<IntentionCatalogConfirmedState> _observePublished(
+  ProviderContainer container,
+) {
+  final published = <IntentionCatalogConfirmedState>[];
+  final subscription = container.listen(_provider, (_, next) {
+    if (next.value case final IntentionCatalogConfirmedState confirmed) {
+      published.add(confirmed);
+    }
+  });
+  addTearDown(container.dispose);
+  addTearDown(subscription.close);
+  return published;
+}
+
+IntentionCatalogLoaded _currentLoaded(ProviderContainer container) =>
+    container.read(_provider).requireValue as IntentionCatalogLoaded;
+
+Result<IntentionCatalogReconciliationOutcome> _reconciliationFirst(
+  List<IntentionSummary> items, {
+  required int totalCount,
+  IntentionCatalogReconciliationCursor? nextCursor,
+  required int revision,
+}) => ResultSuccess(
+  IntentionCatalogReconciliationFirstPortion(
+    items: items,
+    totalCount: totalCount,
+    nextCursor: nextCursor,
+    revision: TestCatalogRevision(revision),
+  ),
+);
+
+Result<IntentionCatalogReconciliationOutcome> _reconciliationContinuation(
+  List<IntentionSummary> items, {
+  required int revision,
+}) => ResultSuccess(
+  IntentionCatalogReconciliationContinuationPortion(
+    items: items,
+    nextCursor: null,
+    revision: TestCatalogRevision(revision),
+  ),
+);
+
+Future<void> _completeTagDelete(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  TagId tagId, {
+  required int revision,
+}) async {
+  final graphRevision = TestCatalogRevision(revision);
+  await completeTagCommand(
+    container,
+    repository,
+    DeleteTag(tagId),
+    TagCommandSucceeded(
+      ConfirmedGraphResult(
+        revision: graphRevision,
+        value: TagDeleted(
+          TagDeletedChange(revision: graphRevision, tagId: tagId),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Переименовывает тег в «<прежнее название> (<ревизия>)».
+Future<void> _completeTagRename(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  Tag tag, {
+  required int revision,
+}) async {
+  final graphRevision = TestCatalogRevision(revision);
+  final after = Tag(
+    id: tag.id,
+    name: TagName.fromInput('${tag.name.value} ($revision)'),
+  );
+  await completeTagCommand(
+    container,
+    repository,
+    RenameTag(tagId: tag.id, name: after.name),
+    TagCommandSucceeded(
+      ConfirmedGraphResult(
+        revision: graphRevision,
+        value: TagRenamed(
+          TagRenamedChange(revision: graphRevision, before: tag, after: after),
+        ),
+      ),
+    ),
+  );
+}
+
+Matcher _revision(int sequence) => isA<TestCatalogRevision>().having(
+  (revision) => revision.sequence,
+  'sequence',
+  sequence,
 );

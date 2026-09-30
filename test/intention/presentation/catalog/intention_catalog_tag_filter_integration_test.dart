@@ -504,6 +504,132 @@ void main() {
     expect(states.map((state) => state.requireValue), [same(reconciled)]);
     expect(_catalogPageReads(diagnostics), pageReadsBefore);
   });
+
+  test('отказ SQLite при чтении согласования сохраняет выдачу с явным '
+      'отказом обновления, а повтор достраивает её через настоящий '
+      'репозиторий', () async {
+    await _seedExcludedMatches(database);
+    final provider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    final subscription = container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await container.read(provider.future);
+    final model = container.read(provider.notifier);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [_tagId(301)],
+      excludedTagIds: [_tagId(302)],
+    );
+    model.changeTagFilter(filter);
+    final loaded =
+        await container.read(provider.future) as IntentionCatalogLoaded;
+    expect(loaded.items.map((item) => item.id), [
+      _intentionId(10),
+      _intentionId(6),
+    ]);
+    expect(loaded.totalCount, 5);
+    final pageReadsBefore = _catalogPageReads(diagnostics);
+    final eventsBefore = diagnostics.events.length;
+    final states = <AsyncValue<IntentionCatalogState>>[];
+    final observer = container.listen(provider, (_, next) => states.add(next));
+    addTearDown(observer.close);
+
+    fault.failNextFilteredSelect = true;
+    await _deleteTag(container, _tagId(302));
+    final failed = await _awaitRefreshFailure(container, provider);
+
+    expect(failed, isA<IntentionCatalogLoaded>());
+    expect((failed as IntentionCatalogLoaded).items, loaded.items);
+    expect(failed.totalCount, 5);
+    expect(failed.nextCursor, same(loaded.nextCursor));
+    expect(failed.revision, same(loaded.revision));
+    expect(failed.query, same(loaded.query));
+    expect(failed.selection.tagFilter, filter);
+    expect(failed.refresh, isA<IntentionCatalogRefreshUnavailable>());
+    expect(fault.failNextFilteredSelect, isFalse);
+    expect(states.where((state) => state.isLoading), isEmpty);
+    expect(_catalogPageReads(diagnostics), pageReadsBefore);
+    // Отказ не сбрасывает выдачу: кроме событий самой команды удаления,
+    // диагностика не получает событий повторного чтения каталога.
+    expect(
+      diagnostics.events.skip(eventsBefore),
+      everyElement(isA<TagCommandDiagnosticsEvent>()),
+    );
+
+    await model.retryRefresh();
+
+    final reconciled =
+        container.read(provider).requireValue as IntentionCatalogLoaded;
+    expect(reconciled.items.map((item) => item.id), [
+      for (final number in [13, 12, 11, 10, 6]) _intentionId(number),
+    ]);
+    expect(reconciled.totalCount, 9);
+    expect(reconciled.nextCursor, same(loaded.nextCursor));
+    expect(reconciled.query, same(loaded.query));
+    expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
+    for (final item in reconciled.items) {
+      expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
+    }
+    expect(states.where((state) => state.isLoading), isEmpty);
+    expect(_catalogPageReads(diagnostics), pageReadsBefore);
+  });
+
+  test('отказ диагностического приёмника не меняет согласование после '
+      'удаления исключённого тега', () async {
+    await _seedExcludedMatches(database);
+    final throwingContainer = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(
+          DriftPersonalGraphRepository(
+            database,
+            UuidV7IntentionIdGenerator(),
+            () => DateTime.utc(2026, 9, 29),
+            _ThrowingDiagnosticsSink(),
+          ),
+        ),
+        catalogPagingPolicyProvider.overrideWithValue(
+          CatalogPagingPolicy(
+            pageSize: 2,
+            prefetchRemaining: 0,
+            filterDebounce: const Duration(milliseconds: 250),
+          ),
+        ),
+      ],
+      retry: (retryCount, error) => null,
+    );
+    addTearDown(throwingContainer.dispose);
+    final provider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    final subscription = throwingContainer.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await throwingContainer.read(provider.future);
+    throwingContainer
+        .read(provider.notifier)
+        .changeTagFilter(
+          IntentionTagFilter(
+            requiredTagIds: [_tagId(301)],
+            excludedTagIds: [_tagId(302)],
+          ),
+        );
+    final loaded =
+        await throwingContainer.read(provider.future) as IntentionCatalogLoaded;
+
+    await _deleteTag(throwingContainer, _tagId(302));
+    final current = await _awaitRevisionAfter(
+      throwingContainer,
+      provider,
+      loaded,
+    );
+
+    expect(current, isA<IntentionCatalogLoaded>());
+    final reconciled = current as IntentionCatalogLoaded;
+    expect(reconciled.items.map((item) => item.id), [
+      for (final number in [13, 12, 11, 10, 6]) _intentionId(number),
+    ]);
+    expect(reconciled.totalCount, 9);
+    expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
+  });
 }
 
 Future<void> _seedCatalog(AppDatabase database) =>
@@ -567,6 +693,22 @@ Future<void> _deleteTag(ProviderContainer container, TagId tagId) async {
   expect(completion.isFailure, isFalse);
 }
 
+/// Ждёт публикации явного отказа обновления.
+Future<IntentionCatalogConfirmedState> _awaitRefreshFailure(
+  ProviderContainer container,
+  IntentionCatalogViewModelProvider provider,
+) async {
+  for (var attempt = 0; attempt < 1000; attempt++) {
+    final current = container.read(provider).value;
+    if (current is IntentionCatalogConfirmedState &&
+        current.refresh is! IntentionCatalogRefreshIdle) {
+      return current;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  fail('Отказ обновления не опубликован.');
+}
+
 /// Ждёт публикации подтверждённого состояния более новой ревизии.
 Future<IntentionCatalogConfirmedState> _awaitRevisionAfter(
   ProviderContainer container,
@@ -604,14 +746,33 @@ TagId _tagId(int number) => switch (TagId.decode(tagFixtureId(number))) {
   InvalidTagIdDecoding() => throw StateError('Неверный ID тега.'),
 };
 
+final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
+  @override
+  void record(DiagnosticsEvent event) {
+    throw StateError('Контролируемый отказ диагностики.');
+  }
+}
+
 final class _CatalogReadFault extends LocalDatabaseConnectionObserver {
   bool failNextSelect = false;
+
+  /// Отказывает следующему чтению с условиями по тегам: команды тегов таких
+  /// чтений не выполняют.
+  bool failNextFilteredSelect = false;
   int selects = 0;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     selects++;
+    if (failNextFilteredSelect &&
+        statement.statements.any((sql) => sql.contains('json_each'))) {
+      failNextFilteredSelect = false;
+      throw SqliteException(
+        extendedResultCode: SqlError.SQLITE_BUSY,
+        message: 'Контролируемая недоступность чтения согласования.',
+      );
+    }
     if (failNextSelect) {
       failNextSelect = false;
       throw SqliteException(

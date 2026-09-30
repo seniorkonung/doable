@@ -107,6 +107,10 @@ final class ControlledCatalogRepository
     _reconciliationRequests[index].complete(result);
   }
 
+  void failReconciliation(int index, Object error) {
+    _reconciliationRequests[index].completeError(error);
+  }
+
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
     _commandRequests[index].complete(switch (result) {
       ResultSuccess(:final value) => ResultSuccess(

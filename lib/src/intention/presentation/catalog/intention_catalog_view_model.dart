@@ -179,6 +179,20 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
+  /// Повторяет отказавшее согласование загруженной области с текущими
+  /// условиями и сохранённым содержимым, к которому применены пакеты,
+  /// подтверждённые после отказа.
+  Future<void> retryRefresh() {
+    final area = _areaReconciliation;
+    if (area == null ||
+        !area.isFailed ||
+        area.isReading ||
+        !_ownsAreaReconciliation(area)) {
+      return Future.value();
+    }
+    return _readArea(area);
+  }
+
   Future<void> loadNextPageIfNeeded({required int visibleIndex}) {
     final current = state.value;
     if (current is! IntentionCatalogLoaded ||
@@ -589,6 +603,19 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       const IntentionCatalogRecoveryUnexpected(),
   };
 
+  IntentionCatalogRefreshState _refreshFailure(
+    IntentionFailure failure,
+  ) => switch (failure) {
+    IntentionUnavailableFailure() => const IntentionCatalogRefreshUnavailable(),
+    IntentionCorruptionFailure() => const IntentionCatalogRefreshCorruption(),
+    IntentionValidationFailure() ||
+    IntentionUnexpectedFailure() ||
+    IntentionNotFoundFailure() ||
+    IntentionConflictFailure() ||
+    IntentionHasBlockingRelationsFailure() =>
+      const IntentionCatalogRefreshUnexpected(),
+  };
+
   IntentionCatalogQuery _continuationQuery(IntentionCatalogLoaded confirmed) =>
       IntentionCatalogQuery(
         scope: confirmed.query.scope,
@@ -717,12 +744,19 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return;
     }
     area.isReading = true;
+    if (area.isFailed) {
+      area.isFailed = false;
+      _publishRefresh(const IntentionCatalogRefreshIdle());
+    }
     final _AreaReadOutcome outcome;
     try {
       outcome = await _readMissingAreaMatches(area);
     } on Object {
       if (_ownsAreaReconciliation(area)) {
-        _abandonAreaReconciliation();
+        _failAreaReconciliation(
+          area,
+          const IntentionCatalogRefreshUnexpected(),
+        );
       }
       return;
     }
@@ -742,8 +776,59 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         if (area.packages.isNotEmpty) {
           _advanceAreaReconciliation(area, readRequired: true);
         }
+      case _AreaReadFailed(:final refresh):
+        _failAreaReconciliation(area, refresh);
       case _AreaReadUnreconcilable():
         _abandonAreaReconciliation();
+    }
+  }
+
+  /// Сохраняет последнее целиком подтверждённое содержимое с явным отказом
+  /// обновления. Пакеты, подтверждённые во время чтения и после отказа,
+  /// применяются к сохранённому содержимому области, а чтение недостающей
+  /// части повторяется только явным повтором.
+  void _failAreaReconciliation(
+    _AreaReconciliation area,
+    IntentionCatalogRefreshState refresh,
+  ) {
+    area
+      ..isReading = false
+      ..isFailed = true;
+    _advanceAreaReconciliation(area, readRequired: false);
+    if (identical(_areaReconciliation, area)) {
+      _publishRefresh(refresh);
+    }
+  }
+
+  /// Заменяет состояние обновления опубликованного содержимого тем же
+  /// объектом запроса, чтобы страница сохранила позицию просмотра.
+  /// Продолжение выдачи, отменённое согласованием, снова свободно.
+  void _publishRefresh(IntentionCatalogRefreshState refresh) {
+    final IntentionCatalogConfirmedState? published = switch (state.value) {
+      final IntentionCatalogLoaded loaded => IntentionCatalogLoaded(
+        selection: loaded.selection,
+        query: loaded.query,
+        items: loaded.items,
+        totalCount: loaded.totalCount,
+        nextCursor: loaded.nextCursor,
+        revision: loaded.revision,
+        refresh: refresh,
+        continuation: switch (loaded.continuation) {
+          IntentionCatalogContinuationLoading() =>
+            const IntentionCatalogContinuationIdle(),
+          final continuation => continuation,
+        },
+      ),
+      final IntentionCatalogEmpty empty => IntentionCatalogEmpty(
+        selection: empty.selection,
+        query: empty.query,
+        revision: empty.revision,
+        refresh: refresh,
+      ),
+      _ => null,
+    };
+    if (published != null) {
+      state = AsyncData(published);
     }
   }
 
@@ -772,7 +857,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     area.packages.clear();
     if (area.isConsistent) {
       _publishAreaReconciliation(area);
-    } else if (needsRead) {
+    } else if (needsRead && !area.isFailed) {
       unawaited(_readArea(area));
     }
   }
@@ -816,8 +901,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         }
         final IntentionCatalogReconciliationPortion portion;
         switch (result) {
-          case ResultFailure():
-            return const _AreaReadUnreconcilable();
+          case ResultFailure(:final failure):
+            return _AreaReadFailed(_refreshFailure(failure));
           case ResultSuccess(value: IntentionCatalogReconciliationRetry()):
             return const _AreaReadStale();
           case ResultSuccess(
@@ -834,10 +919,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           case (IntentionCatalogReconciliationContinuationPortion(), _?):
             break;
           default:
-            return const _AreaReadUnreconcilable();
+            return const _AreaReadFailed(IntentionCatalogRefreshUnexpected());
         }
         if (portion.items.length > query.pageSize) {
-          return const _AreaReadUnreconcilable();
+          return const _AreaReadFailed(IntentionCatalogRefreshUnexpected());
         }
         switch (portion.revision.compareTo(content.revision)) {
           case GraphRevisionOrder.same:
@@ -855,7 +940,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
       final candidate = _areaCandidate(content, stored, missing, totalCount!);
       return candidate == null
-          ? const _AreaReadUnreconcilable()
+          ? const _AreaReadFailed(IntentionCatalogRefreshUnexpected())
           : _AreaReadCompleted(candidate);
     }
   }
@@ -1344,6 +1429,9 @@ final class _AreaReconciliation {
   bool isConsistent = false;
   bool isReading = false;
 
+  /// Последнее чтение отказало; опубликован явный отказ обновления.
+  bool isFailed = false;
+
   /// Пакеты, подтверждённые во время чтения, в порядке получения.
   final packages = <_CatalogChangePackage>[];
 }
@@ -1364,6 +1452,15 @@ final class _AreaReadStale extends _AreaReadOutcome {
   const _AreaReadStale();
 }
 
+/// Безопасно классифицированный отказ чтения: подтверждённое содержимое
+/// сохраняется до повтора.
+final class _AreaReadFailed extends _AreaReadOutcome {
+  const _AreaReadFailed(this.refresh);
+
+  final IntentionCatalogRefreshState refresh;
+}
+
+/// Чтение отражает хранилище другой эпохи: выдачу нужно прочитать заново.
 final class _AreaReadUnreconcilable extends _AreaReadOutcome {
   const _AreaReadUnreconcilable();
 }
