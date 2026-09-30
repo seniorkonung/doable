@@ -408,3 +408,25 @@
   - **Зависимости:** 2.10, 2.11, 2.12.
   - **Ожидаемые файлы:** нет, итоговая контрольная проверка.
   - **Размер:** XS.
+
+- [ ] 2.14 Существующие потребители каталожных мутаций сохраняют наблюдаемое поведение при пакетах команд тегов
+  - **Критерии приёмки:**
+    - По решению 6 [design](design.md) пакет `AssignTag` или `RemoveTagAssignment` с `IntentionTagTarget` и каталожной мутацией из 2.1 обрабатывается существующими потребителями `IntentionCatalogMutation` как изменение кратких данных существующего намерения: наблюдатели намерения в `DriftPersonalGraphRepository`, чтения дневных выборов, подробностей связи и выбранных связей, модели каталога дневных выборов, предложений пути, подробностей намерения, подробностей и окрестности долговременной связи.
+    - Потребитель, наблюдающий затронутое намерение, обновляется не более одного раза на пакет, сохраняет подтверждённое состояние, незавершённую форму и выбор, не публикует удаление, отказ или пустой результат и не меняет видимое содержимое, кроме уже предъявляемых тегов этого намерения. Назначение из подробностей намерения не сбрасывает саму страницу подробностей и не обновляет её повторно. Потребители, не наблюдающие намерение, и пакеты с `LongTermRelationTagTarget` не вызывают дополнительных чтений, уведомлений и изменений состояния.
+    - Для каждого вида потребителя добавлена адресная проверка пакета команды тега, а существующие проверки потребителей проходят без изменения их ожиданий. Утверждение контрольной 2.4 об отсутствии регрессий у существующих потребителей подтверждается результатом этой задачи; при выполнении задач по зависимостям 2.14 выполняется сразу после 2.1.
+  - **Проверка:** `mise exec --no-deps -- flutter test --no-pub test/graph test/daily_choice test/long_term_relation test/intention/presentation/details test/intention/data/drift_intention_repository_command_test.dart test/app/intention_app_lifecycle_test.dart` — однократное обновление наблюдающих потребителей, отсутствие реакции у ненаблюдающих, сохранение формы и выбора, неизменность видимого содержимого и отсутствие реакции на `LongTermRelationTagTarget` на реальной SQLite-базе тестового контура и через модели представления.
+  - **Зависимости:** 2.1.
+  - **Ожидаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart` — только если адресная проверка обнаружит отклонение; `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`, `test/graph/data/drift_choice_path_suggestions_test.dart`, `test/intention/presentation/details/intention_details_tags_test.dart`, `test/long_term_relation/presentation/details/relation_details_view_model_test.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`, `test/graph/application/selected_relations_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.15 Подтвердить готовность второй фазы после проверки существующих потребителей каталожных мутаций
+  - **Критерии приёмки:**
+    - Задачи 2.13 и 2.14 подтверждены: расширение подтверждённых пакетов команд тегов каталожной мутацией не меняет наблюдаемое поведение существующих потребителей, а результат второй фазы, включая согласование открытого поиска, сохранение фильтра и позиции просмотра и ограниченность массового согласования, остаётся выполненным.
+    - Проверки ошибок, больших данных, формата, анализа и регрессий проходят, generated-артефакты воспроизводимы. Исторические задачи и их отметки сохранены. Интерфейс четырёх поисков и подключение предъявления тегов не объявляются выполненными.
+  - **Проверка:**
+    - `mise run --skip-tools check`, включая медленные тесты.
+    - На чистой закоммиченной рабочей копии: `mise run --skip-tools codegen-check` и `mise run --skip-tools codegen-check-test`; подтвердить отсутствие изменений после генерации. Выполнить ревью соответствия и качества инкремента.
+    - `mise exec --no-deps -- openspec validate show-and-filter-intention-tags --type change --strict --no-interactive --json` и сверка покрытия второй фазы без требования выполнить третью.
+  - **Зависимости:** 2.13, 2.14.
+  - **Ожидаемые файлы:** нет, итоговая контрольная проверка.
+  - **Размер:** XS.
