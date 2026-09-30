@@ -117,20 +117,20 @@ void main() {
       },
     );
 
-    test('миграция тегов использует общий канал без нового вида события', () {
+    test('создание схемы использует общий канал без нового вида события', () {
       final messages = <String>[];
       DeveloperDiagnosticsSink(messages.add).record(
         const MigrationDiagnosticsEvent(
-          fromSchemaVersion: 3,
-          toSchemaVersion: 4,
+          fromSchemaVersion: 0,
+          toSchemaVersion: 1,
           status: DiagnosticsSucceeded(Duration(microseconds: 29)),
         ),
       );
 
       expect(jsonDecode(messages.single), {
         'operation': 'migration',
-        'fromSchemaVersion': 3,
-        'toSchemaVersion': 4,
+        'fromSchemaVersion': 0,
+        'toSchemaVersion': 1,
         'outcome': 'succeeded',
         'durationMicros': 29,
       });
@@ -377,8 +377,8 @@ void main() {
           'operation': 'migration',
           'outcome': 'succeeded',
           'durationMicros': 24000,
-          'fromSchemaVersion': 1,
-          'toSchemaVersion': 2,
+          'fromSchemaVersion': 0,
+          'toSchemaVersion': 1,
         },
         {
           'operation': 'catalogPageRead',
@@ -489,8 +489,8 @@ List<DiagnosticsEvent> _events() => [
     status: DiagnosticsStarted(),
   ),
   const MigrationDiagnosticsEvent(
-    fromSchemaVersion: 1,
-    toSchemaVersion: 2,
+    fromSchemaVersion: 0,
+    toSchemaVersion: 1,
     status: DiagnosticsSucceeded(Duration(milliseconds: 24)),
   ),
   const CatalogPageReadDiagnosticsEvent(
