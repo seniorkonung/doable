@@ -330,13 +330,14 @@ void main() {
       final (:repository, :raw, :trace) = await _openJointFixture();
       _populateMassExcludedTag(raw);
 
-      // До удаления массовый тег оставляет в выдаче 500 намерений с номерами
-      // вида 100k + 4. Выдача загружена до конца пятью обычными порциями.
+      // До удаления массовый тег оставляет в выдаче 2500 намерений с номерами
+      // вида 20k + 4. Выдача загружена до конца 25 обычными порциями, поэтому
+      // сохранённая область во много раз больше порции согласования.
       final before = [
         for (final index in _expectedTagOnlyMatches(_massConditions))
           if (!_hasMassTag(index)) index,
       ];
-      expect(before, hasLength(500));
+      expect(before, hasLength(25 * _pageSize));
       final loaded = <IntentionSummary>[];
       final continuations = <IntentionCatalogCursor>[];
       IntentionCatalogCursor? cursor;
@@ -349,7 +350,7 @@ void main() {
         if (cursor != null) continuations.add(cursor);
       } while (cursor != null);
       expect(loaded.map((item) => _fixtureIndexOf(item.id)), before);
-      expect(continuations, hasLength(4));
+      expect(continuations, hasLength(24));
 
       trace.isRecording = false;
       final deletion = await repository.execute(DeleteTag(_tagId(_massTag)));
@@ -420,7 +421,7 @@ void main() {
 }
 
 /// Массовый тег назначен всем намерениям фикстуры, кроме номеров вида
-/// 100k + 4: среди активных готовых намерений с популярным тегом он
+/// 20k + 4: среди активных готовых намерений с популярным тегом он
 /// оставляет только их.
 void _populateMassExcludedTag(sqlite.Database database) {
   final insertAssignment = database.prepare(
@@ -446,7 +447,7 @@ void _populateMassExcludedTag(sqlite.Database database) {
   }
 }
 
-bool _hasMassTag(int fixtureIndex) => fixtureIndex % 100 != 4;
+bool _hasMassTag(int fixtureIndex) => fixtureIndex % 20 != 4;
 
 /// Популярный обязательный тег и все исключённые условия; массовый тег
 /// добавляется к исключённым условиям запросом [_massQuery].
@@ -464,7 +465,9 @@ IntentionCatalogQuery _massQuery({IntentionCatalogCursor? cursor}) =>
 /// строк и возвращает номера недостающих совпадений в порядке получения.
 /// Каждая порция читает только себя: строка после границы порции не
 /// выбирается повторно, сохранённые строки и предшествующие порции не
-/// перечитываются.
+/// перечитываются. Вход каждого чтения — не больше порции сохранённых
+/// идентификаторов независимо от размера области, а число чтений растёт
+/// линейно с числом сохранённых и недостающих строк.
 Future<List<int>> _expectMassReconciliation(
   DriftPersonalGraphRepository repository,
   sqlite.Database raw,
@@ -480,6 +483,7 @@ Future<List<int>> _expectMassReconciliation(
   final changesBefore = _connectionChanges(raw);
   final reconciled = <int>[];
   final costs = <_TracedSelect>[];
+  final storedInputSizes = <int>[];
   IntentionCatalogReconciliationCursor? cursor;
   var windowStart = 0;
   var portionNumber = 0;
@@ -527,6 +531,11 @@ Future<List<int>> _expectMassReconciliation(
     final indexes = [
       for (final item in portion.items) _fixtureIndexOf(item.id),
     ];
+    expect(
+      indexes,
+      hasLength(lessThanOrEqualTo(_pageSize)),
+      reason: '$label, порция $portionNumber',
+    );
     // Порция — следующие недостающие совпадения не дальше верхнего края
     // окна: последней строки внутреннего окна либо границы области.
     final upperEdge = switch (window) {
@@ -555,9 +564,11 @@ Future<List<int>> _expectMassReconciliation(
       window: window,
     );
     _expectReconciliationPlans(raw, trace, window: window);
-    costs.add(
-      trace.selects.singleWhere((select) => select.statement.contains('LIMIT')),
+    final read = trace.selects.singleWhere(
+      (select) => select.statement.contains('LIMIT'),
     );
+    costs.add(read);
+    storedInputSizes.add(_storedRowParameterSize(read, window: window));
     if (isFirst || portion.nextCursor == null) {
       _printJointCost(
         raw,
@@ -587,6 +598,30 @@ Future<List<int>> _expectMassReconciliation(
   } while (cursor != null);
 
   expect(reconciled, missing, reason: label);
+  // Вход чтения ограничен окном: порция сохранённых идентификаторов для
+  // области любого размера, меньше — только для области меньше порции.
+  expect(
+    storedInputSizes,
+    everyElement(lessThanOrEqualTo(_pageSize)),
+    reason: label,
+  );
+  expect(
+    storedInputSizes.reduce(max),
+    min(stored.length, _pageSize),
+    reason: label,
+  );
+  // Заполненная порция забирает `pageSize` недостающих строк, а незаполненная
+  // исчерпывает окно из `pageSize` сохранённых строк либо завершает область,
+  // поэтому число чтений линейно по обоим размерам.
+  expect(
+    portionNumber,
+    inInclusiveRange(
+      (missing.length + _pageSize - 1) ~/ _pageSize,
+      missing.length ~/ _pageSize +
+          max(1, (stored.length + _pageSize - 1) ~/ _pageSize),
+    ),
+    reason: label,
+  );
   // Каждое чтение выбирает не больше `pageSize + 1` строк после своей
   // позиции, поэтому все порции вместе читают недостающие совпадения
   // однократно, а сохранённые строки не читают вовсе.
@@ -607,12 +642,27 @@ Future<List<int>> _expectMassReconciliation(
   print(
     'Согласование ($label): ${stored.length} сохранённых строк, '
     '${missing.length} недостающих совпадений, $portionNumber порций; '
-    'чтение порции: медиана ${elapsed[elapsed.length ~/ 2].inMicroseconds} '
+    'вход чтения: не больше ${storedInputSizes.reduce(max)} сохранённых '
+    'идентификаторов; чтение порции: медиана ${elapsed[elapsed.length ~/ 2].inMicroseconds} '
     'мкс, максимум ${elapsed.last.inMicroseconds} мкс, всего '
     '${elapsed.fold(Duration.zero, (sum, value) => sum + value).inMilliseconds} '
     'мс',
   );
   return reconciled;
+}
+
+/// Число сохранённых идентификаторов в SQL-параметре чтения порции: набор
+/// передаётся последним `json_each(?)` и отсутствует для пустого окна.
+int _storedRowParameterSize(
+  _TracedSelect read, {
+  required IntentionCatalogReconciliationWindow window,
+}) {
+  if (window.storedRows.isEmpty) return 0;
+  final sets = [
+    for (final argument in read.arguments.whereType<String>())
+      if (argument.startsWith('[')) jsonDecode(argument) as List,
+  ];
+  return sets.last.length;
 }
 
 /// Порция согласования материализует только себя и полные назначения своих

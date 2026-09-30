@@ -388,7 +388,7 @@
   - **Ожидаемые файлы:** `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/application/intention_contract_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.12 Большая фикстура закрепляет независимость входа согласования от размера сохранённой области
+- [x] 2.12 Большая фикстура закрепляет независимость входа согласования от размера сохранённой области
   - **Критерии приёмки:**
     - Воспроизводимая большая фикстура согласует ранее полностью загруженную выдачу, во много раз превышающую размер порции, после удаления исключённого тега. Утверждаются ожидаемое абсолютное количество, то, что каждое чтение согласования получает не больше размера порции сохранённых идентификаторов и возвращает не больше порции строк, а также число чтений, соответствующее линейному росту от числа сохранённых и недостающих строк.
     - Планы SQL для чтения с окном сохраняют доказательства 2.9: обход по индексу порядка охвата без `USE TEMP B-TREE FOR ORDER BY`, однократное чтение каждого набора и окна из своего `json_each(?)`, адресный поиск при проверке кандидата. Чтения, включая отказавшие, не меняют `total_changes()`. Измерения фиксируются в выводе проверки и не становятся порогом, зависящим от машины.
