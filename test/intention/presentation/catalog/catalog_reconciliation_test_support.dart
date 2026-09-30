@@ -50,6 +50,19 @@ Future<void> waitForCatalogQueries(
   fail('Не дождались $count запросов каталога.');
 }
 
+Future<void> waitForReconciliationQueries(
+  ControlledCatalogRepository repository,
+  int count,
+) async {
+  for (var attempt = 0; attempt < 1000; attempt++) {
+    if (repository.reconciliationQueries.length >= count) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  fail('Не дождались $count чтений согласования каталога.');
+}
+
 Future<IntentionCommandCompletion> completeCatalogCommand(
   ProviderContainer container,
   ControlledCatalogRepository repository,

@@ -1,4 +1,6 @@
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -8,6 +10,8 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,9 +27,11 @@ void main() {
   late ProviderContainer container;
   late DriftPersonalGraphRepository repository;
   late _CatalogReadFault fault;
+  late InMemoryDiagnosticsSink diagnostics;
 
   setUp(() async {
     fault = _CatalogReadFault();
+    diagnostics = InMemoryDiagnosticsSink();
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(),
@@ -38,7 +44,7 @@ void main() {
       database,
       UuidV7IntentionIdGenerator(),
       () => DateTime.utc(2026, 9, 29),
-      InMemoryDiagnosticsSink(),
+      diagnostics,
     );
     container = ProviderContainer(
       overrides: [
@@ -371,6 +377,133 @@ void main() {
       expect(recovered.nextCursor, isNotNull);
     },
   );
+
+  for (final (name, loadAll, expectedBefore, expectedAfter, hasNext) in [
+    (
+      'частично загруженный префикс',
+      false,
+      [10, 6, 5, 2],
+      [13, 12, 11, 10, 6, 5, 4, 2],
+      true,
+    ),
+    (
+      'полностью загруженная выдача',
+      true,
+      [10, 6, 5, 2, 1],
+      [13, 12, 11, 10, 6, 5, 4, 2, 1],
+      false,
+    ),
+  ]) {
+    test('удаление исключённого тега достраивает загруженную область через '
+        'настоящий репозиторий: $name', () async {
+      await _seedExcludedMatches(database);
+      final provider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await container.read(provider.future);
+      final model = container.read(provider.notifier);
+      final filter = IntentionTagFilter(
+        requiredTagIds: [_tagId(301)],
+        excludedTagIds: [_tagId(302)],
+      );
+      model.changeTagFilter(filter);
+      var loaded =
+          await container.read(provider.future) as IntentionCatalogLoaded;
+      while (loaded.items.length < expectedBefore.length) {
+        await model.loadNextPageIfNeeded(visibleIndex: loaded.items.length - 1);
+        loaded =
+            container.read(provider).requireValue as IntentionCatalogLoaded;
+      }
+      expect(loaded.items.map((item) => item.id), [
+        for (final number in expectedBefore) _intentionId(number),
+      ]);
+      expect(loaded.totalCount, 5);
+      expect(loaded.nextCursor == null, loadAll);
+      final pageReadsBefore = _catalogPageReads(diagnostics);
+      final states = <AsyncValue<IntentionCatalogState>>[];
+      final observer = container.listen(
+        provider,
+        (_, next) => states.add(next),
+      );
+      addTearDown(observer.close);
+
+      await _deleteTag(container, _tagId(302));
+      final current = await _awaitRevisionAfter(container, provider, loaded);
+
+      expect(current, isA<IntentionCatalogLoaded>());
+      final reconciled = current as IntentionCatalogLoaded;
+      expect(reconciled.items.map((item) => item.id), [
+        for (final number in expectedAfter) _intentionId(number),
+      ]);
+      expect(reconciled.totalCount, 9);
+      expect(reconciled.nextCursor, same(loaded.nextCursor));
+      expect(reconciled.query, same(loaded.query));
+      expect(reconciled.selection.tagFilter, filter);
+      for (final item in reconciled.items) {
+        expect(item.tags.map((tag) => tag.id), contains(_tagId(301)));
+        expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
+      }
+      expect(states.where((state) => state.isLoading), isEmpty);
+      expect(states.map((state) => state.requireValue), [same(reconciled)]);
+      expect(_catalogPageReads(diagnostics), pageReadsBefore);
+
+      if (hasNext) {
+        await model.loadNextPageIfNeeded(
+          visibleIndex: reconciled.items.length - 1,
+        );
+        final completed =
+            container.read(provider).requireValue as IntentionCatalogLoaded;
+        expect(completed.items.map((item) => item.id), [
+          for (final number in [...expectedAfter, 1]) _intentionId(number),
+        ]);
+        expect(completed.totalCount, 9);
+        expect(completed.nextCursor, isNull);
+      }
+    });
+  }
+
+  test('удаление исключённого тега открывает совпадение в пустой выдаче через '
+      'настоящий репозиторий', () async {
+    final provider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    final subscription = container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await container.read(provider.future);
+    final model = container.read(provider.notifier);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [_tagId(301)],
+      excludedTagIds: [_tagId(302)],
+    );
+    model.changeTitleFilter('зал');
+    model.changeTagFilter(filter);
+    final empty =
+        await container.read(provider.future) as IntentionCatalogEmpty;
+    final pageReadsBefore = _catalogPageReads(diagnostics);
+    final states = <AsyncValue<IntentionCatalogState>>[];
+    final observer = container.listen(provider, (_, next) => states.add(next));
+    addTearDown(observer.close);
+
+    await _deleteTag(container, _tagId(302));
+    final current = await _awaitRevisionAfter(container, provider, empty);
+
+    expect(current, isA<IntentionCatalogLoaded>());
+    final reconciled = current as IntentionCatalogLoaded;
+    expect(reconciled.items.map((item) => item.id), [_intentionId(4)]);
+    expect(reconciled.items.single.tags.map((tag) => tag.id), [
+      _tagId(301),
+      _tagId(303),
+    ]);
+    expect(reconciled.totalCount, 1);
+    expect(reconciled.nextCursor, isNull);
+    expect(reconciled.query, same(empty.query));
+    expect(reconciled.selection.tagFilter, filter);
+    expect(states.where((state) => state.isLoading), isEmpty);
+    expect(states.map((state) => state.requireValue), [same(reconciled)]);
+    expect(_catalogPageReads(diagnostics), pageReadsBefore);
+  });
 }
 
 Future<void> _seedCatalog(AppDatabase database) =>
@@ -405,6 +538,57 @@ Future<void> _seedCatalog(AppDatabase database) =>
         }
       }
     });
+
+/// Намерения новее каталога, отсечённые только исключённым «Спорт».
+Future<void> _seedExcludedMatches(AppDatabase database) =>
+    database.transaction(() async {
+      for (final number in [11, 12, 13]) {
+        await database.customStatement(
+          '''INSERT INTO intentions
+         (id, title, is_action_ready, is_archived, created_at, updated_at)
+         VALUES (?, ?, 1, 0, ?, ?)''',
+          [tagFixtureId(number), 'Ходить в бассейн', number, number],
+        );
+        for (final tag in [301, 302]) {
+          await database.customStatement(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(tag), tagFixtureId(number)],
+          );
+        }
+      }
+    });
+
+/// Проводит физическое удаление тега настоящим адаптером через coordinator.
+Future<void> _deleteTag(ProviderContainer container, TagId tagId) async {
+  final start = container
+      .read(graphCommandCoordinatorProvider.notifier)
+      .acceptTagDelete(DeleteTag(tagId));
+  final completion = await (start as TagCommandAccepted).future;
+  expect(completion.isFailure, isFalse);
+}
+
+/// Ждёт публикации подтверждённого состояния более новой ревизии.
+Future<IntentionCatalogConfirmedState> _awaitRevisionAfter(
+  ProviderContainer container,
+  IntentionCatalogViewModelProvider provider,
+  IntentionCatalogConfirmedState previous,
+) async {
+  for (var attempt = 0; attempt < 1000; attempt++) {
+    final current = container.read(provider).value;
+    if (current is IntentionCatalogConfirmedState &&
+        current.revision.compareTo(previous.revision) ==
+            GraphRevisionOrder.newer) {
+      return current;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  fail('Согласованная выдача не опубликована.');
+}
+
+int _catalogPageReads(InMemoryDiagnosticsSink diagnostics) => diagnostics.events
+    .whereType<CatalogPageReadDiagnosticsEvent>()
+    .where((event) => event.status is DiagnosticsStarted)
+    .length;
 
 const _tagNames = {301: 'Здоровье', 302: 'Спорт', 303: 'Отдых', 304: 'Работа'};
 

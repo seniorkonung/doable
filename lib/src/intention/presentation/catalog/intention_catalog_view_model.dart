@@ -42,6 +42,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   final _packagesBeforeFirstPage = <_CatalogChangePackage>[];
   IntentionSummary? _cursorBoundary;
   _PendingCatalogContinuation? _pendingContinuation;
+  _AreaReconciliation? _areaReconciliation;
 
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
     scope: switch (_purpose) {
@@ -236,16 +237,32 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       if (mapped case final IntentionCatalogConfirmedState confirmed) {
         _cursorBoundary = _boundaryFromFirstPage(confirmed);
         var reconciled = confirmed;
+        var requiresAreaReconciliation = false;
         for (final package in _packagesBeforeFirstPage) {
-          final next = _applyPackage(reconciled, package);
-          if (next == null) {
-            _packagesBeforeFirstPage.clear();
-            scheduleMicrotask(_restartFromFirstPage);
-            return confirmed;
+          switch (_applyPackage(reconciled, package)) {
+            case null:
+              _packagesBeforeFirstPage.clear();
+              scheduleMicrotask(_restartFromFirstPage);
+              return confirmed;
+            case _PackageApplied(:final content):
+              reconciled = content;
+            case _AreaReconciliationRequired(:final content):
+              reconciled = content;
+              requiresAreaReconciliation = true;
           }
-          reconciled = next;
         }
         _packagesBeforeFirstPage.clear();
+        if (requiresAreaReconciliation) {
+          // Первая порция согласована целиком на своей ревизии; содержимое
+          // после пакетов публикуется только после достраивания области.
+          final area = _AreaReconciliation(
+            generation: generation,
+            content: reconciled,
+          );
+          _areaReconciliation = area;
+          scheduleMicrotask(() => unawaited(_readArea(area)));
+          return confirmed;
+        }
         return reconciled;
       }
       _packagesBeforeFirstPage.clear();
@@ -337,7 +354,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   };
 
   Future<void> _loadNextPage(IntentionCatalogLoaded confirmed) async {
-    if (_activePageRequest != null || confirmed.nextCursor == null) {
+    // Во время согласования загруженной области её граница не сдвигается:
+    // продолжение прочитало бы строки, не учтённые согласованием.
+    if (_activePageRequest != null ||
+        _areaReconciliation != null ||
+        confirmed.nextCursor == null) {
       return;
     }
     final request = Object();
@@ -612,6 +633,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   void _invalidatePageRequest() {
     _queryGeneration += 1;
     _activePageRequest = null;
+    _areaReconciliation = null;
   }
 
   void _applyParametersImmediately() {
@@ -640,22 +662,285 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     if (!ref.mounted) {
       return;
     }
+    final area = _areaReconciliation;
+    if (area != null) {
+      area.packages.add(package);
+      if (!area.isReading) {
+        _advanceAreaReconciliation(area, readRequired: true);
+      }
+      return;
+    }
     final current = state.value;
     if (_isLoadingFirstPage || current is! IntentionCatalogConfirmedState) {
       _packagesBeforeFirstPage.add(package);
       return;
     }
 
-    final reconciled = _applyPackage(current, package);
-    if (reconciled == null) {
-      _restartFromFirstPage();
+    switch (_applyPackage(current, package)) {
+      case null:
+        _restartFromFirstPage();
+      case _PackageApplied(content: final reconciled):
+        if (!identical(reconciled, current)) {
+          state = AsyncData(reconciled);
+        }
+        _resolvePendingContinuation(reconciled);
+      case _AreaReconciliationRequired(:final content):
+        _startAreaReconciliation(current, content);
+    }
+  }
+
+  /// Начинает достраивание загруженной области после изменения, которое не
+  /// перечисляет затронутые намерения.
+  ///
+  /// Опубликованное содержимое остаётся прежним, пока кандидат не согласован
+  /// целиком. Незавершённое продолжение выдачи отменяется: оно читало бы
+  /// строки после границы, ещё не учтённой согласованием.
+  void _startAreaReconciliation(
+    IntentionCatalogConfirmedState published,
+    IntentionCatalogConfirmedState content,
+  ) {
+    if (published is IntentionCatalogLoaded &&
+        published.continuation is IntentionCatalogContinuationLoading) {
+      _activePageRequest = null;
+    }
+    _pendingContinuation = null;
+    final area = _AreaReconciliation(
+      generation: _queryGeneration,
+      content: content,
+    );
+    _areaReconciliation = area;
+    unawaited(_readArea(area));
+  }
+
+  Future<void> _readArea(_AreaReconciliation area) async {
+    if (!_ownsAreaReconciliation(area)) {
       return;
     }
-    if (!identical(reconciled, current)) {
-      state = AsyncData(reconciled);
+    area.isReading = true;
+    final _AreaReadOutcome outcome;
+    try {
+      outcome = await _readMissingAreaMatches(area);
+    } on Object {
+      if (_ownsAreaReconciliation(area)) {
+        _abandonAreaReconciliation();
+      }
+      return;
     }
-    _resolvePendingContinuation(reconciled);
+    if (!_ownsAreaReconciliation(area)) {
+      return;
+    }
+    area.isReading = false;
+    switch (outcome) {
+      case _AreaReadCompleted(:final candidate):
+        area
+          ..content = candidate
+          ..isConsistent = true;
+        _advanceAreaReconciliation(area, readRequired: false);
+      case _AreaReadStale():
+        // Пакет более новой ревизии ещё не получен: его приход повторит
+        // чтение, а полученные ранее пакеты применяются сразу.
+        if (area.packages.isNotEmpty) {
+          _advanceAreaReconciliation(area, readRequired: true);
+        }
+      case _AreaReadUnreconcilable():
+        _abandonAreaReconciliation();
+    }
   }
+
+  /// Последовательно применяет пакеты, накопленные во время чтения, к
+  /// сохранённому содержимому области и публикует его, если оно согласовано
+  /// целиком; иначе повторяет чтение недостающей части для новой ревизии.
+  void _advanceAreaReconciliation(
+    _AreaReconciliation area, {
+    required bool readRequired,
+  }) {
+    var needsRead = readRequired && !area.isConsistent;
+    for (final package in area.packages) {
+      switch (_applyPackage(area.content, package)) {
+        case null:
+          _abandonAreaReconciliation();
+          return;
+        case _PackageApplied(:final content):
+          area.content = content;
+        case _AreaReconciliationRequired(:final content):
+          area
+            ..content = content
+            ..isConsistent = false;
+          needsRead = true;
+      }
+    }
+    area.packages.clear();
+    if (area.isConsistent) {
+      _publishAreaReconciliation(area);
+    } else if (needsRead) {
+      unawaited(_readArea(area));
+    }
+  }
+
+  /// Читает недостающие совпадения области сохранённого содержимого на его
+  /// ревизии: абсолютное количество первой порции заменяет прежнее, поэтому
+  /// изменения до этой ревизии не учитываются в количестве повторно.
+  Future<_AreaReadOutcome> _readMissingAreaMatches(
+    _AreaReconciliation area,
+  ) async {
+    final repository = ref.read(personalGraphRepositoryProvider);
+    final content = area.content;
+    final query = content.query;
+    final IntentionCatalogReconciliationBoundary boundary = switch (content
+        .nextCursor) {
+      null => const IntentionCatalogCompletedBoundary(),
+      final continuation => IntentionCatalogPartialPrefixBoundary(continuation),
+    };
+    final stored = switch (content) {
+      IntentionCatalogLoaded(:final items) => items,
+      IntentionCatalogEmpty() => const <IntentionSummary>[],
+    };
+    final storedIds = {for (final item in stored) item.id};
+
+    read:
+    while (true) {
+      int? totalCount;
+      final missing = <IntentionSummary>[];
+      IntentionCatalogReconciliationCursor? cursor;
+      do {
+        final result = await repository.getCatalogReconciliationPortion(
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: query,
+            boundary: boundary,
+            storedIntentionIds: storedIds,
+            cursor: cursor,
+          ),
+        );
+        if (!_ownsAreaReconciliation(area)) {
+          return const _AreaReadStale();
+        }
+        final IntentionCatalogReconciliationPortion portion;
+        switch (result) {
+          case ResultFailure():
+            return const _AreaReadUnreconcilable();
+          case ResultSuccess(value: IntentionCatalogReconciliationRetry()):
+            return const _AreaReadStale();
+          case ResultSuccess(
+            value: final IntentionCatalogReconciliationPortion value,
+          ):
+            portion = value;
+        }
+        switch ((portion, totalCount)) {
+          case (
+            IntentionCatalogReconciliationFirstPortion(totalCount: final count),
+            null,
+          ):
+            totalCount = count;
+          case (IntentionCatalogReconciliationContinuationPortion(), _?):
+            break;
+          default:
+            return const _AreaReadUnreconcilable();
+        }
+        if (portion.items.length > query.pageSize) {
+          return const _AreaReadUnreconcilable();
+        }
+        switch (portion.revision.compareTo(content.revision)) {
+          case GraphRevisionOrder.same:
+            break;
+          case GraphRevisionOrder.older:
+            continue read;
+          case GraphRevisionOrder.newer:
+            return const _AreaReadStale();
+          case GraphRevisionOrder.differentEpoch:
+            return const _AreaReadUnreconcilable();
+        }
+        missing.addAll(portion.items);
+        cursor = portion.nextCursor;
+      } while (cursor != null);
+
+      final candidate = _areaCandidate(content, stored, missing, totalCount!);
+      return candidate == null
+          ? const _AreaReadUnreconcilable()
+          : _AreaReadCompleted(candidate);
+    }
+  }
+
+  /// Собирает согласованный префикс из сохранённых строк и недостающих
+  /// совпадений в действующем порядке с абсолютным количеством.
+  IntentionCatalogConfirmedState? _areaCandidate(
+    IntentionCatalogConfirmedState content,
+    List<IntentionSummary> stored,
+    List<IntentionSummary> missing,
+    int totalCount,
+  ) {
+    final knownIds = {for (final item in stored) item.id};
+    final items = [...stored];
+    for (final item in missing) {
+      if (!knownIds.add(item.id) || !_belongsToLoadedPrefix(content, item)) {
+        return null;
+      }
+      items.add(item);
+    }
+    if (items.length > totalCount ||
+        content.nextCursor == null && items.length != totalCount) {
+      return null;
+    }
+    items.sort(content.query.compare);
+    if (items.isEmpty && content.nextCursor == null) {
+      return IntentionCatalogEmpty(
+        selection: content.selection,
+        query: content.query,
+        revision: content.revision,
+      );
+    }
+    return IntentionCatalogLoaded(
+      selection: content.selection,
+      query: content.query,
+      items: items,
+      totalCount: totalCount,
+      nextCursor: content.nextCursor,
+      revision: content.revision,
+    );
+  }
+
+  /// Публикует целиком согласованный префикс тем же объектом запроса, чтобы
+  /// страница сохранила позицию просмотра. Отменённое продолжение выдачи
+  /// снова доступно; прочие состояния продолжения сохраняются.
+  void _publishAreaReconciliation(_AreaReconciliation area) {
+    _areaReconciliation = null;
+    final current = state.value;
+    if (current is! IntentionCatalogConfirmedState) {
+      return;
+    }
+    switch (current.revision.compareTo(area.content.revision)) {
+      case GraphRevisionOrder.older:
+        break;
+      case GraphRevisionOrder.same || GraphRevisionOrder.newer:
+        // Опубликованное содержимое уже отражает эту ревизию целиком.
+        return;
+      case GraphRevisionOrder.differentEpoch:
+        _restartFromFirstPage();
+        return;
+    }
+    final published = switch (area.content) {
+      final IntentionCatalogLoaded loaded => _withContinuation(
+        loaded,
+        switch (current) {
+          IntentionCatalogLoaded(:final continuation)
+              when continuation is! IntentionCatalogContinuationLoading =>
+            continuation,
+          _ => const IntentionCatalogContinuationIdle(),
+        },
+      ),
+      final IntentionCatalogEmpty empty => empty,
+    };
+    state = AsyncData(published);
+  }
+
+  void _abandonAreaReconciliation() {
+    _areaReconciliation = null;
+    _restartFromFirstPage();
+  }
+
+  bool _ownsAreaReconciliation(_AreaReconciliation area) =>
+      ref.mounted &&
+      identical(_areaReconciliation, area) &&
+      area.generation == _queryGeneration;
 
   void _resolvePendingContinuation(IntentionCatalogConfirmedState confirmed) {
     final pending = _pendingContinuation;
@@ -703,7 +988,9 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
-  IntentionCatalogConfirmedState? _applyPackage(
+  /// Применяет пакет к подтверждённому содержимому; `null` означает, что
+  /// пакет несогласуем и выдачу нужно прочитать заново.
+  _PackageApplication? _applyPackage(
     IntentionCatalogConfirmedState confirmed,
     _CatalogChangePackage package,
   ) {
@@ -713,7 +1000,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
     switch (package.revision.compareTo(confirmed.revision)) {
       case GraphRevisionOrder.older || GraphRevisionOrder.same:
-        return confirmed;
+        return _PackageApplied(confirmed);
       case GraphRevisionOrder.differentEpoch:
         return null;
       case GraphRevisionOrder.newer:
@@ -764,15 +1051,21 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     for (final renamed in package.renamedTags) {
       reconciled = _applyRenamedTagContent(reconciled, renamed);
     }
+    final tagFilter = confirmed.query.tagFilter;
+    var opensExcludedMatches = false;
+    var removesRequiredTag = false;
     for (final deletedTagId in package.deletedTagIds) {
-      final next = _applyDeletedTagContent(reconciled, deletedTagId);
-      if (next == null) {
-        return null;
-      }
-      reconciled = next;
+      reconciled = _applyDeletedTagContent(reconciled, deletedTagId);
+      opensExcludedMatches |= tagFilter.excludedTagIds.contains(deletedTagId);
+      removesRequiredTag |= tagFilter.requiredTagIds.contains(deletedTagId);
     }
 
-    return _withRevision(reconciled, package.revision);
+    final content = _withRevision(reconciled, package.revision);
+    // Обязательный удалённый тег оставляет выдачу пустой при любых
+    // исключениях, поэтому достраивать область не нужно.
+    return opensExcludedMatches && !removesRequiredTag
+        ? _AreaReconciliationRequired(content)
+        : _PackageApplied(content);
   }
 
   /// Заменяет абсолютное количество активных связей загруженной строки.
@@ -839,11 +1132,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   ///
   /// Условие по удалённому идентификатору не снимается. Обязательный тег
   /// больше не назначен ни одному намерению, поэтому выдача становится
-  /// успешно пустой без продолжения. Тег вне условий только исчезает из
-  /// загруженных строк. Удаление исключённого тега может открыть совпадения
-  /// вне загруженных строк; локально их не восстановить, поэтому пакет
-  /// несогласуем и выдача читается заново с теми же условиями.
-  IntentionCatalogConfirmedState? _applyDeletedTagContent(
+  /// успешно пустой без продолжения. Иначе тег исчезает из загруженных
+  /// строк; совпадения, открытые удалением исключённого тега, достраивает
+  /// согласование загруженной области.
+  IntentionCatalogConfirmedState _applyDeletedTagContent(
     IntentionCatalogConfirmedState confirmed,
     TagId deletedTagId,
   ) {
@@ -857,9 +1149,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           revision: confirmed.revision,
         ),
       };
-    }
-    if (tagFilter.excludedTagIds.contains(deletedTagId)) {
-      return null;
     }
     if (confirmed is! IntentionCatalogLoaded) {
       return confirmed;
@@ -1022,6 +1311,61 @@ final class _CatalogChangePackage {
 
   bool _isForeign(GraphChange change) =>
       change.revision.compareTo(revision) != GraphRevisionOrder.same;
+}
+
+/// Итог применения согласуемого пакета к подтверждённому содержимому.
+sealed class _PackageApplication {
+  const _PackageApplication(this.content);
+
+  final IntentionCatalogConfirmedState content;
+}
+
+/// Содержимое целиком согласовано с пакетом.
+final class _PackageApplied extends _PackageApplication {
+  const _PackageApplied(super.content);
+}
+
+/// Сохранённые строки обновлены по известным фактам пакета, но удаление
+/// исключённого тега могло открыть совпадения внутри загруженной области:
+/// состав и количество согласует чтение недостающих совпадений.
+final class _AreaReconciliationRequired extends _PackageApplication {
+  const _AreaReconciliationRequired(super.content);
+}
+
+/// Согласование загруженной области одного поколения поиска.
+final class _AreaReconciliation {
+  _AreaReconciliation({required this.generation, required this.content});
+
+  final int generation;
+
+  /// Сохранённое содержимое со всеми применёнными пакетами. Пока
+  /// [isConsistent] ложно, состав области и количество ещё не согласованы.
+  IntentionCatalogConfirmedState content;
+  bool isConsistent = false;
+  bool isReading = false;
+
+  /// Пакеты, подтверждённые во время чтения, в порядке получения.
+  final packages = <_CatalogChangePackage>[];
+}
+
+sealed class _AreaReadOutcome {
+  const _AreaReadOutcome();
+}
+
+final class _AreaReadCompleted extends _AreaReadOutcome {
+  const _AreaReadCompleted(this.candidate);
+
+  final IntentionCatalogConfirmedState candidate;
+}
+
+/// Чтение отражает не ревизию сохранённого содержимого: оно повторяется
+/// после применения подтверждённых пакетов.
+final class _AreaReadStale extends _AreaReadOutcome {
+  const _AreaReadStale();
+}
+
+final class _AreaReadUnreconcilable extends _AreaReadOutcome {
+  const _AreaReadUnreconcilable();
 }
 
 final class _PendingCatalogContinuation {
