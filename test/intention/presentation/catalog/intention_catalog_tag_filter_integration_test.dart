@@ -15,6 +15,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -588,6 +589,76 @@ void main() {
     expect(_catalogPageReads(diagnostics), pageReadsBefore);
   });
 
+  test('после отказа SQLite при чтении согласования следующее подтверждённое '
+      'назначение тега само повторяет чтение через настоящий репозиторий и '
+      'записывает его диагностику', () async {
+    await _seedExcludedMatches(database);
+    final provider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    final subscription = container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await container.read(provider.future);
+    final model = container.read(provider.notifier);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [_tagId(301)],
+      excludedTagIds: [_tagId(302)],
+    );
+    model.changeTagFilter(filter);
+    final loaded =
+        await container.read(provider.future) as IntentionCatalogLoaded;
+    final pageReadsBefore = _catalogPageReads(diagnostics);
+    final states = <AsyncValue<IntentionCatalogState>>[];
+    final observer = container.listen(provider, (_, next) => states.add(next));
+    addTearDown(observer.close);
+
+    fault.failNextFilteredSelect = true;
+    await _deleteTag(container, _tagId(302));
+    final failed = await _awaitRefreshFailure(container, provider);
+    expect(failed.refresh, isA<IntentionCatalogRefreshUnavailable>());
+    final eventsAfterFailure = diagnostics.events.length;
+
+    // «Ходить без тегов» получает «Здоровье» и становится совпадением.
+    await _assignTag(container, _tagId(301), _intentionId(7));
+    final current = await _awaitRevisionAfter(container, provider, failed);
+
+    expect(current, isA<IntentionCatalogLoaded>());
+    final reconciled = current as IntentionCatalogLoaded;
+    expect(reconciled.items.map((item) => item.id), [
+      for (final number in [13, 12, 11, 10, 7, 6]) _intentionId(number),
+    ]);
+    expect(
+      reconciled.items
+          .singleWhere((item) => item.id == _intentionId(7))
+          .tags
+          .map((tag) => tag.id),
+      [_tagId(301)],
+    );
+    expect(reconciled.totalCount, 10);
+    expect(reconciled.nextCursor, same(loaded.nextCursor));
+    expect(reconciled.query, same(loaded.query));
+    expect(reconciled.selection.tagFilter, filter);
+    expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
+    expect(states.where((state) => state.isLoading), isEmpty);
+    expect(_catalogPageReads(diagnostics), pageReadsBefore);
+    // Автоматический повтор записывает обычные события чтения согласования.
+    final retryEvents = diagnostics.events
+        .skip(eventsAfterFailure)
+        .where((event) => event is! TagCommandDiagnosticsEvent)
+        .toList();
+    final reads = retryEvents.length ~/ 2;
+    expect(reads, greaterThan(0));
+    expect(retryEvents, [
+      for (var read = 0; read < reads; read++) ...[
+        _reconciliationRead(isA<DiagnosticsStarted>()),
+        _reconciliationRead(
+          isA<DiagnosticsSucceeded>(),
+          completion: CatalogReconciliationReadCompletion.portion,
+        ),
+      ],
+    ]);
+  });
+
   test('отказ диагностического приёмника не меняет согласование после '
       'удаления исключённого тега', () async {
     await _seedExcludedMatches(database);
@@ -857,6 +928,21 @@ Future<void> _deleteTag(ProviderContainer container, TagId tagId) async {
   final start = container
       .read(graphCommandCoordinatorProvider.notifier)
       .acceptTagDelete(DeleteTag(tagId));
+  final completion = await (start as TagCommandAccepted).future;
+  expect(completion.isFailure, isFalse);
+}
+
+/// Назначает тег намерению настоящим адаптером через coordinator.
+Future<void> _assignTag(
+  ProviderContainer container,
+  TagId tagId,
+  IntentionId intentionId,
+) async {
+  final start = container
+      .read(graphCommandCoordinatorProvider.notifier)
+      .acceptTagAssign(
+        AssignTag(tagId: tagId, target: IntentionTagTarget(intentionId)),
+      );
   final completion = await (start as TagCommandAccepted).future;
   expect(completion.isFailure, isFalse);
 }

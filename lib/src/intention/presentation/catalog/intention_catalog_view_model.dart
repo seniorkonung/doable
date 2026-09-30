@@ -181,8 +181,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   /// Повторяет отказавшее согласование загруженной области с текущими
-  /// условиями и сохранённым содержимым, к которому применены пакеты,
-  /// подтверждённые после отказа.
+  /// условиями и сохранённым содержимым тем же чтением, которое запускает
+  /// подтверждённый после отказа пакет.
   Future<void> retryRefresh() {
     final area = _areaReconciliation;
     if (area == null ||
@@ -785,9 +785,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   /// Сохраняет последнее целиком подтверждённое содержимое с явным отказом
-  /// обновления. Пакеты, подтверждённые во время чтения и после отказа,
-  /// применяются к сохранённому содержимому области, а чтение недостающей
-  /// части повторяется только явным повтором.
+  /// обновления. Пакеты, подтверждённые во время чтения, применяются к
+  /// сохранённому содержимому области без нового чтения. Чтение недостающей
+  /// части повторяет следующий подтверждённый пакет либо явный повтор:
+  /// таймеров и повторов без нового события нет.
   void _failAreaReconciliation(
     _AreaReconciliation area,
     IntentionCatalogRefreshState refresh,
@@ -836,11 +837,15 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// Последовательно применяет пакеты, накопленные во время чтения, к
   /// сохранённому содержимому области и публикует его, если оно согласовано
   /// целиком; иначе повторяет чтение недостающей части для новой ревизии.
+  ///
+  /// [readRequired] означает пакет, полученный вне чтения, либо устаревшее
+  /// чтение: оно повторяется и после отказа. Пакеты, накопленные во время
+  /// отказавшего чтения, отказ не снимают.
   void _advanceAreaReconciliation(
     _AreaReconciliation area, {
     required bool readRequired,
   }) {
-    var needsRead = readRequired && !area.isConsistent;
+    var packagesRequireRead = false;
     for (final package in area.packages) {
       switch (_applyPackage(area.content, package)) {
         case null:
@@ -852,13 +857,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           area
             ..content = content
             ..isConsistent = false;
-          needsRead = true;
+          packagesRequireRead = true;
       }
     }
     area.packages.clear();
     if (area.isConsistent) {
       _publishAreaReconciliation(area);
-    } else if (needsRead && !area.isFailed) {
+    } else if (readRequired || packagesRequireRead && !area.isFailed) {
       unawaited(_readArea(area));
     }
   }
