@@ -237,10 +237,26 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   getCatalogReconciliationPortion(
     IntentionCatalogReconciliationQuery query,
   ) async {
-    const invalidInput = ResultFailure<IntentionCatalogReconciliationOutcome>(
-      IntentionGenericValidationFailure(),
-    );
     final catalogQuery = query.catalogQuery;
+    final pageSize = catalogQuery.pageSize;
+    final stopwatch = Stopwatch()..start();
+    _recordDiagnostics(
+      CatalogReconciliationReadDiagnosticsEvent.started(pageSize: pageSize),
+    );
+    Result<IntentionCatalogReconciliationOutcome> fail(
+      IntentionFailure failure,
+    ) {
+      _recordDiagnostics(
+        CatalogReconciliationReadDiagnosticsEvent.failed(
+          pageSize: pageSize,
+          duration: stopwatch.elapsed,
+          code: _diagnosticsFailureCode(failure),
+        ),
+      );
+      return ResultFailure(failure);
+    }
+
+    const invalidInput = IntentionGenericValidationFailure();
     final _DriftIntentionCatalogCursor? area;
     switch (query.boundary) {
       case IntentionCatalogCompletedBoundary():
@@ -252,7 +268,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
               continuation.matches(catalogQuery):
         area = continuation;
       case IntentionCatalogPartialPrefixBoundary():
-        return invalidInput;
+        return fail(invalidInput);
     }
     final cursor = query.cursor;
     if (catalogQuery.cursor != null ||
@@ -265,11 +281,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           area,
           cursor is _DriftIntentionCatalogReconciliationCursor ? cursor : null,
         )) {
-      return invalidInput;
+      return fail(invalidInput);
     }
 
+    final IntentionCatalogReconciliationOutcome outcome;
     try {
-      final outcome = await _sequencer.run(
+      outcome = await _sequencer.run(
         () => _database.transaction(
           () => switch (cursor) {
             null => _readFirstReconciliationPortion(query, area),
@@ -279,10 +296,23 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
           },
         ),
       );
-      return ResultSuccess(outcome);
     } on Object catch (error) {
-      return ResultFailure(_classifyCatalogReadFailure(error));
+      return fail(_classifyCatalogReadFailure(error));
     }
+    // Повтор из-за новой ревизии — штатное завершение чтения, а не отказ.
+    _recordDiagnostics(
+      CatalogReconciliationReadDiagnosticsEvent.completed(
+        pageSize: pageSize,
+        duration: stopwatch.elapsed,
+        completion: switch (outcome) {
+          IntentionCatalogReconciliationPortion() =>
+            CatalogReconciliationReadCompletion.portion,
+          IntentionCatalogReconciliationRetry() =>
+            CatalogReconciliationReadCompletion.retry,
+        },
+      ),
+    );
+    return ResultSuccess(outcome);
   }
 
   @override

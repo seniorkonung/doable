@@ -3801,7 +3801,234 @@ void main() {
         }
       },
     );
+
+    for (final (sinkFails, description) in [
+      (
+        false,
+        'чтение согласования записывает собственную безопасную диагностику '
+            'успешной порции, повтора и недопустимого ввода',
+      ),
+      (true, 'отказ диагностики не меняет исходы чтения согласования'),
+    ]) {
+      test(description, () async {
+        _seedReconciliationFixture(raw);
+        raw.execute('UPDATE intentions SET title = ?', [
+          'CANARY-название-согласования',
+        ]);
+        raw.execute("UPDATE tags SET name = 'CANARY-тег-' || rowid");
+        if (sinkFails) {
+          repository = DriftPersonalGraphRepository(
+            database,
+            UuidV7IntentionIdGenerator(),
+            () => DateTime.utc(2026, 9, 2),
+            _ThrowingCatalogDiagnosticsSink(diagnostics),
+          );
+        }
+        final foreignRepository = DriftPersonalGraphRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026, 9, 2),
+          sinkFails
+              ? _ThrowingCatalogDiagnosticsSink(diagnostics)
+              : diagnostics,
+        );
+        final query = excludingQuery();
+        final stored = await loadWholeCatalog(excludingQuery);
+        expect(stored.map((item) => item.id), [
+          for (final n in [1, 3, 5, 7, 9]) _id(_uuid(n)),
+        ]);
+        expect(
+          await repository.execute(DeleteTag(excludedTag)),
+          isA<GraphCommandSucceeded>(),
+        );
+        Future<Result<IntentionCatalogReconciliationOutcome>> read(
+          IntentionCatalogReconciliationQuery request, {
+          DriftPersonalGraphRepository? reader,
+          CatalogReconciliationReadCompletion? completion,
+          DiagnosticsFailureCode? failureCode,
+        }) async {
+          final offset = diagnostics.events.length;
+          final changesBefore = connectionChanges();
+          final result = await (reader ?? repository)
+              .getCatalogReconciliationPortion(request);
+          expect(connectionChanges(), changesBefore);
+          _expectSafeReconciliationDiagnostics(
+            diagnostics.events.skip(offset).toList(),
+            pageSize: request.catalogQuery.pageSize,
+            completion: completion,
+            failureCode: failureCode,
+          );
+          return result;
+        }
+
+        final firstQuery = IntentionCatalogReconciliationQuery(
+          catalogQuery: query,
+          boundary: const IntentionCatalogCompletedBoundary(),
+          window: IntentionCatalogFinalReconciliationWindow([stored.first]),
+        );
+        final firstPortion = _reconciliationFirstPortion(
+          await read(
+            firstQuery,
+            completion: CatalogReconciliationReadCompletion.portion,
+          ),
+        );
+        expect(firstPortion.totalCount, 10);
+        expect(firstPortion.items.map((item) => item.id), [
+          _id(_uuid(2)),
+          _id(_uuid(3)),
+        ]);
+        final continuationQuery = IntentionCatalogReconciliationQuery(
+          catalogQuery: query,
+          boundary: const IntentionCatalogCompletedBoundary(),
+          window: IntentionCatalogFinalReconciliationWindow(const []),
+          cursor: firstPortion.nextCursor,
+        );
+        final continuation = _reconciliationContinuationPortion(
+          await read(
+            continuationQuery,
+            completion: CatalogReconciliationReadCompletion.portion,
+          ),
+        );
+        expect(continuation.items.map((item) => item.id), [
+          _id(_uuid(4)),
+          _id(_uuid(5)),
+        ]);
+
+        expect(
+          await read(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: IntentionCatalogFinalReconciliationWindow(stored.take(3)),
+            ),
+            failureCode: DiagnosticsFailureCode.validation,
+          ),
+          isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionGenericValidationFailure>(),
+          ),
+        );
+        final foreignPortion = _reconciliationFirstPortion(
+          await read(
+            firstQuery,
+            reader: foreignRepository,
+            completion: CatalogReconciliationReadCompletion.portion,
+          ),
+        );
+        expect(
+          await read(
+            IntentionCatalogReconciliationQuery(
+              catalogQuery: query,
+              boundary: const IntentionCatalogCompletedBoundary(),
+              window: IntentionCatalogFinalReconciliationWindow(const []),
+              cursor: foreignPortion.nextCursor,
+            ),
+            failureCode: DiagnosticsFailureCode.validation,
+          ),
+          isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionGenericValidationFailure>(),
+          ),
+        );
+
+        expect(
+          await repository.execute(
+            AssignTag(
+              tagId: keptTag,
+              target: IntentionTagTarget(_id(_uuid(9))),
+            ),
+          ),
+          isA<GraphCommandSucceeded>(),
+        );
+        expect(
+          await read(
+            continuationQuery,
+            completion: CatalogReconciliationReadCompletion.retry,
+          ),
+          isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>().having(
+            (result) => result.value,
+            'исход',
+            isA<IntentionCatalogReconciliationRetry>(),
+          ),
+        );
+        // Обычные порции каталога остаются своими событиями: три порции
+        // исходной выдачи, а шесть чтений согласования — только своими.
+        expect(
+          diagnostics.events.whereType<CatalogPageReadDiagnosticsEvent>(),
+          hasLength(6),
+        );
+        expect(
+          diagnostics.events
+              .whereType<CatalogReconciliationReadDiagnosticsEvent>(),
+          hasLength(12),
+        );
+      });
+    }
   });
+}
+
+/// Проверяет ровно одно начало и одно завершение чтения согласования и
+/// точное множество закодированных полей без данных графа и запроса.
+void _expectSafeReconciliationDiagnostics(
+  List<DiagnosticsEvent> events, {
+  required int pageSize,
+  CatalogReconciliationReadCompletion? completion,
+  DiagnosticsFailureCode? failureCode,
+}) {
+  expect(events, hasLength(2));
+  expect(
+    events,
+    everyElement(isA<CatalogReconciliationReadDiagnosticsEvent>()),
+  );
+  final [started, finished] = events
+      .cast<CatalogReconciliationReadDiagnosticsEvent>();
+  expect(started.status, isA<DiagnosticsStarted>());
+  expect(started.completion, isNull);
+  expect(finished.completion, completion);
+  final duration = switch (finished.status) {
+    DiagnosticsSucceeded(:final duration)
+        when completion != null && failureCode == null =>
+      duration,
+    DiagnosticsFailed(:final duration, :final code)
+        when completion == null && code == failureCode =>
+      duration,
+    _ => throw StateError('Неверный диагностический исход согласования.'),
+  };
+  expect(duration, greaterThanOrEqualTo(Duration.zero));
+  final messages = <String>[];
+  final sink = DeveloperDiagnosticsSink(messages.add);
+  for (final event in events) {
+    sink.record(event);
+  }
+  expect(messages.map(jsonDecode), [
+    {
+      'operation': 'catalogReconciliationRead',
+      'outcome': 'started',
+      'pageSize': pageSize,
+    },
+    {
+      'operation': 'catalogReconciliationRead',
+      'outcome': failureCode == null ? 'succeeded' : 'failed',
+      'durationMicros': duration.inMicroseconds,
+      'pageSize': pageSize,
+      'completion': ?completion?.name,
+      'failureCode': ?failureCode?.name,
+    },
+  ]);
+  // Точное множество полей уже запрещает остальное; канарейки дополнительно
+  // ловят названия, идентификаторы намерений и тегов и SQL.
+  for (final canary in [
+    'CANARY',
+    'SELECT',
+    for (var number = 1; number <= 10; number++) _uuid(number),
+    _uuid(1101),
+    _uuid(1102),
+    _uuid(1103),
+  ]) {
+    expect(messages.join(), isNot(contains(canary)));
+  }
 }
 
 bool _isCatalogCountStatement(String statement) =>

@@ -162,31 +162,35 @@ void _catalogReconciliationFailureScenarios(
     (_CatalogFailurePoint.rows, 'при чтении недостающих совпадений'),
     (_CatalogFailurePoint.tags, 'при чтении тегов порции'),
   ]) {
-    for (final (error, failure) in <(Object, Matcher)>[
-      (
-        StateError('CANARY-неизвестный отказ'),
-        isA<IntentionUnexpectedFailure>(),
-      ),
-      (
-        SqliteException(
-          extendedResultCode: SqlError.SQLITE_BUSY,
-          message: 'CANARY-недоступность',
-        ),
-        isA<IntentionUnavailableFailure>(),
-      ),
-      (
-        SqliteException(
-          extendedResultCode: SqlError.SQLITE_CORRUPT,
-          message: 'CANARY-повреждение',
-        ),
-        isA<IntentionCorruptionFailure>(),
-      ),
-    ]) {
+    for (final (error, failure, code)
+        in <(Object, Matcher, DiagnosticsFailureCode)>[
+          (
+            StateError('CANARY-неизвестный отказ'),
+            isA<IntentionUnexpectedFailure>(),
+            DiagnosticsFailureCode.unexpected,
+          ),
+          (
+            SqliteException(
+              extendedResultCode: SqlError.SQLITE_BUSY,
+              message: 'CANARY-недоступность',
+            ),
+            isA<IntentionUnavailableFailure>(),
+            DiagnosticsFailureCode.unavailable,
+          ),
+          (
+            SqliteException(
+              extendedResultCode: SqlError.SQLITE_CORRUPT,
+              message: 'CANARY-повреждение',
+            ),
+            isA<IntentionCorruptionFailure>(),
+            DiagnosticsFailureCode.corruption,
+          ),
+        ]) {
       test('отказ чтения согласования $label сохраняет категорию, граф и '
-          'соединение: $error', () async {
+          'соединение и записывает безопасную диагностику: $error', () async {
         final observer = _CatalogFilterFailureObserver(point, error);
         late Database raw;
-        final (:repository, diagnostics: _, database: _) = await replace(
+        final (:repository, :diagnostics, database: _) = await replace(
           observer,
           (db) => raw = db,
         );
@@ -207,6 +211,7 @@ void _catalogReconciliationFailureScenarios(
         final before = _storedFilterFailureGraph(raw);
         final changesBefore = _connectionChanges(raw);
         observer.arm();
+        final failureOffset = diagnostics.events.length;
 
         expect(
           await repository.getCatalogReconciliationPortion(query),
@@ -219,10 +224,32 @@ void _catalogReconciliationFailureScenarios(
         expect(observer.hasFailed, isTrue);
         expect(_storedFilterFailureGraph(raw), before);
         expect(_connectionChanges(raw), changesBefore);
+        // Отказ SQLite виден только в событиях самого чтения согласования и
+        // только безопасной категорией, без сообщения исключения.
+        expect(diagnostics.events.skip(failureOffset), [
+          _reconciliationDiagnostics(isA<DiagnosticsStarted>()),
+          _reconciliationDiagnostics(
+            isA<DiagnosticsFailed>()
+                .having((status) => status.code, 'категория', code)
+                .having(
+                  (status) => status.duration,
+                  'длительность',
+                  greaterThanOrEqualTo(Duration.zero),
+                ),
+          ),
+        ]);
 
+        final recoveryOffset = diagnostics.events.length;
         final recovered = await repository.getCatalogReconciliationPortion(
           query,
         );
+        expect(diagnostics.events.skip(recoveryOffset), [
+          _reconciliationDiagnostics(isA<DiagnosticsStarted>()),
+          _reconciliationDiagnostics(
+            isA<DiagnosticsSucceeded>(),
+            completion: CatalogReconciliationReadCompletion.portion,
+          ),
+        ]);
         final portion =
             (recovered as ResultSuccess<IntentionCatalogReconciliationOutcome>)
                     .value
@@ -239,6 +266,14 @@ void _catalogReconciliationFailureScenarios(
     }
   }
 }
+
+Matcher _reconciliationDiagnostics(
+  Matcher status, {
+  CatalogReconciliationReadCompletion? completion,
+}) => isA<CatalogReconciliationReadDiagnosticsEvent>()
+    .having((event) => event.pageSize, 'размер порции', 1)
+    .having((event) => event.completion, 'завершение', completion)
+    .having((event) => event.status, 'статус', status);
 
 TagId _fixtureTag(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;

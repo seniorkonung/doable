@@ -552,10 +552,22 @@ void main() {
     expect(states.where((state) => state.isLoading), isEmpty);
     expect(_catalogPageReads(diagnostics), pageReadsBefore);
     // Отказ не сбрасывает выдачу: кроме событий самой команды удаления,
-    // диагностика не получает событий повторного чтения каталога.
+    // диагностика получает только начало и безопасный отказ чтения
+    // согласования, но не события повторного чтения каталога.
     expect(
-      diagnostics.events.skip(eventsBefore),
-      everyElement(isA<TagCommandDiagnosticsEvent>()),
+      diagnostics.events
+          .skip(eventsBefore)
+          .where((event) => event is! TagCommandDiagnosticsEvent),
+      [
+        _reconciliationRead(isA<DiagnosticsStarted>()),
+        _reconciliationRead(
+          isA<DiagnosticsFailed>().having(
+            (status) => status.code,
+            'категория',
+            DiagnosticsFailureCode.unavailable,
+          ),
+        ),
+      ],
     );
 
     await model.retryRefresh();
@@ -716,11 +728,22 @@ void main() {
     // Восемь внутренних окон и последнее окно области, каждое из двух
     // сохранённых строк.
     expect(windows, List.filled(9, pageSize));
-    // Диагностика не получает курсор, окно и идентификаторы согласования:
-    // кроме событий самой команды удаления, событий нет.
+    // Кроме событий самой команды удаления, диагностика получает только
+    // начало и завершение каждого чтения согласования. Их тип не содержит
+    // курсора, окна и идентификаторов согласования.
     expect(
-      diagnostics.events.skip(eventsBefore),
-      everyElement(isA<TagCommandDiagnosticsEvent>()),
+      diagnostics.events
+          .skip(eventsBefore)
+          .where((event) => event is! TagCommandDiagnosticsEvent),
+      [
+        for (var read = 0; read < windows.length; read++) ...[
+          _reconciliationRead(isA<DiagnosticsStarted>()),
+          _reconciliationRead(
+            isA<DiagnosticsSucceeded>(),
+            completion: CatalogReconciliationReadCompletion.portion,
+          ),
+        ],
+      ],
     );
 
     // Результат совпадает с новым чтением той же выдачи.
@@ -871,6 +894,13 @@ Future<IntentionCatalogConfirmedState> _awaitRevisionAfter(
   }
   fail('Согласованная выдача не опубликована.');
 }
+
+Matcher _reconciliationRead(
+  Matcher status, {
+  CatalogReconciliationReadCompletion? completion,
+}) => isA<CatalogReconciliationReadDiagnosticsEvent>()
+    .having((event) => event.completion, 'завершение', completion)
+    .having((event) => event.status, 'статус', status);
 
 int _catalogPageReads(InMemoryDiagnosticsSink diagnostics) => diagnostics.events
     .whereType<CatalogPageReadDiagnosticsEvent>()
