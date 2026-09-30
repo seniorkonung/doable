@@ -971,6 +971,148 @@ void main() {
         }
       }
     });
+
+    test('порция и продолжение с обязательными тегами идут по индексу порядка охвата', () async {
+      // 50 000 намерений: чётные активны, нечётные в архиве. Обязательный
+      // тег назначен всем, исключённый — каждому десятому.
+      const requiredTag = 1001;
+      const excludedTag = 1002;
+      const pageSize = 100;
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?), (?, ?)', [
+        _uuid(requiredTag),
+        'Обязательный',
+        _uuid(excludedTag),
+        'Исключённый',
+      ]);
+      raw.execute('''
+        WITH RECURSIVE ids(n) AS (
+          VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 50000
+        )
+        INSERT INTO intentions
+          (id, title, is_action_ready, is_archived, created_at, updated_at)
+        SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
+               'Запись ' || n, 0, n % 2, n, n FROM ids
+      ''');
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) '
+        'SELECT ?, id FROM intentions',
+        [_uuid(requiredTag)],
+      );
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) '
+        'SELECT ?, id FROM intentions WHERE created_at % 10 = 0',
+        [_uuid(excludedTag)],
+      );
+
+      for (final (filterLabel, required, excluded) in [
+        ('обязательный', [requiredTag], <int>[]),
+        ('совместный', [requiredTag], [excludedTag]),
+        ('только исключённый', <int>[], [excludedTag]),
+      ]) {
+        for (final scope in IntentionScope.values) {
+          // Двухсимвольный фильтр отбирается без полнотекстового индекса.
+          for (final titleFilter in [null, 'за']) {
+            final label = '$filterLabel, $scope, название $titleFilter';
+            bool inScope(int number) => switch (scope) {
+              IntentionScope.active => number.isEven,
+              IntentionScope.archived => number.isOdd,
+              IntentionScope.all => true,
+            };
+            final expected = [
+              for (var number = 50000; number >= 1; number--)
+                if (inScope(number) && (excluded.isEmpty || number % 10 != 0))
+                  _id(_uuid(number)),
+            ];
+            final tagFilter = IntentionTagFilter(
+              requiredTagIds: [for (final tag in required) _tagId(tag)],
+              excludedTagIds: [for (final tag in excluded) _tagId(tag)],
+            );
+            IntentionCatalogQuery query({IntentionCatalogCursor? cursor}) =>
+                IntentionCatalogQuery(
+                  scope: scope,
+                  titleFilter: titleFilter,
+                  tagFilter: tagFilter,
+                  order: IntentionCatalogOrder.createdAtDescending,
+                  pageSize: pageSize,
+                  cursor: cursor,
+                );
+
+            trace.measured.clear();
+            final firstWatch = Stopwatch()..start();
+            final first = _firstPage(await repository.getCatalogPage(query()));
+            firstWatch.stop();
+            final firstRead = trace.measured.singleWhere(
+              (select) => select.sql.contains('LIMIT'),
+            );
+            trace.measured.clear();
+            final nextWatch = Stopwatch()..start();
+            final next = _continuationPage(
+              await repository.getCatalogPage(query(cursor: first.nextCursor)),
+            );
+            nextWatch.stop();
+            final nextRead = trace.measured.singleWhere(
+              (select) => select.sql.contains('LIMIT'),
+            );
+
+            expect(first.totalCount, expected.length, reason: label);
+            expect(
+              first.items.map((item) => item.id),
+              expected.take(pageSize),
+              reason: label,
+            );
+            expect(
+              next.items.map((item) => item.id),
+              expected.skip(pageSize).take(pageSize),
+              reason: label,
+            );
+            String planOf(_MeasuredSelect read) => raw
+                .select('EXPLAIN QUERY PLAN ${read.sql}', read.arguments)
+                .map((row) => row['detail'] as String)
+                .join('\n');
+            final firstPlan = planOf(firstRead);
+            final nextPlan = planOf(nextRead);
+            // Измерение характеризует фикстуру и не служит порогом.
+            // ignore: avoid_print
+            print(
+              'Порядок каталога ($label): 50000 намерений, '
+              '${expected.length} совпадений, порция $pageSize; '
+              'первая=${firstWatch.elapsedMicroseconds} мкс '
+              '(SELECT=${firstRead.elapsed.inMicroseconds} мкс), '
+              'продолжение=${nextWatch.elapsedMicroseconds} мкс '
+              '(SELECT=${nextRead.elapsed.inMicroseconds} мкс); '
+              'план первой=${firstPlan.replaceAll('\n', ' | ')}; '
+              'план продолжения=${nextPlan.replaceAll('\n', ' | ')}',
+            );
+            for (final (read, plan) in [
+              (firstRead, firstPlan),
+              (nextRead, nextPlan),
+            ]) {
+              expect(
+                plan,
+                contains('intentions_${scope.name}_created_at_desc_id_asc'),
+                reason: '$label:\n$plan',
+              );
+              expect(
+                plan,
+                isNot(contains('USE TEMP B-TREE FOR ORDER BY')),
+                reason: '$label:\n$plan',
+              );
+              expect(
+                plan,
+                isNot(
+                  contains(
+                    'SEARCH intentions USING INDEX '
+                    'sqlite_autoindex_intentions_1 (id=?)',
+                  ),
+                ),
+                reason: '$label:\n$plan',
+              );
+              expect(read.rows, pageSize + 1, reason: label);
+            }
+          }
+        }
+      }
+    });
   });
 
   group('Порция каталога — собственные теги', () {

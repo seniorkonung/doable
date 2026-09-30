@@ -1573,6 +1573,11 @@ final class _CatalogTagIdsParameter {
 /// кандидат проверяется адресным поиском в отобранном множестве. Уникальность
 /// `(tag_id, intention_id)` исключает повторный счёт одного назначения, а
 /// назначения связям без `intention_id` в отбор не попадают.
+///
+/// Унарный `+` запрещает SQLite вести выборку по отобранному множеству через
+/// первичный ключ: иначе порция и продолжение сортируют все совпадения во
+/// временном B-дереве. С ним выборку ведёт индекс порядка охвата, и она
+/// завершается после `pageSize + 1` подходящих строк.
 final class _RequiredCatalogTagsExpression extends Expression<bool> {
   _RequiredCatalogTagsExpression(Set<TagId> tagIds)
     : _tagIds = _CatalogTagIdsParameter(tagIds);
@@ -1582,7 +1587,7 @@ final class _RequiredCatalogTagsExpression extends Expression<bool> {
   @override
   void writeInto(GenerationContext context) {
     context.buffer.write(
-      'intentions.id IN (SELECT assignment.intention_id '
+      '+intentions.id IN (SELECT assignment.intention_id '
       'FROM tag_assignments AS assignment '
       'WHERE assignment.intention_id IS NOT NULL '
       'AND assignment.tag_id IN ('
