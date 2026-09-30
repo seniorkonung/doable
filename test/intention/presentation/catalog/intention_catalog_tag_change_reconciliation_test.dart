@@ -1694,7 +1694,7 @@ void main() {
     final ninth = testSummary(index: 9, tags: [health]);
     repository.completeReconciliation(
       0,
-      _firstPortion(
+      reconciliationFirstPortion(
         [twelfth, eleventh],
         totalCount: 6,
         nextCursor: const TestReconciliationCursor(),
@@ -1716,7 +1716,7 @@ void main() {
 
     repository.completeReconciliation(
       1,
-      _continuationPortion([ninth], revision: 2),
+      reconciliationContinuationPortion([ninth], revision: 2),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -1819,7 +1819,7 @@ void main() {
     final third = testSummary(index: 3, tags: [health]);
     repository.completeReconciliation(
       0,
-      _firstPortion(
+      reconciliationFirstPortion(
         [twelfth, ninth],
         totalCount: 5,
         nextCursor: const TestReconciliationCursor(),
@@ -1830,7 +1830,7 @@ void main() {
     expect(confirmedStates, isEmpty);
     repository.completeReconciliation(
       1,
-      _continuationPortion([third], revision: 2),
+      reconciliationContinuationPortion([third], revision: 2),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -1899,7 +1899,11 @@ void main() {
       expect(confirmedStates, isEmpty);
       repository.completeReconciliation(
         0,
-        _firstPortion(missing, totalCount: missing.length, revision: 2),
+        reconciliationFirstPortion(
+          missing,
+          totalCount: missing.length,
+          revision: 2,
+        ),
       );
       await Future<void>.delayed(Duration.zero);
 
@@ -2022,7 +2026,7 @@ void main() {
     final ninth = testSummary(index: 9, tags: [health]);
     repository.completeReconciliation(
       0,
-      _firstPortion([ninth], totalCount: 3, revision: 2),
+      reconciliationFirstPortion([ninth], totalCount: 3, revision: 2),
     );
     await waitForReconciliationQueries(repository, 2);
 
@@ -2035,7 +2039,7 @@ void main() {
     final seventh = testSummary(index: 7, tags: [health]);
     repository.completeReconciliation(
       1,
-      _firstPortion([seventh], totalCount: 3, revision: 4),
+      reconciliationFirstPortion([seventh], totalCount: 3, revision: 4),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -2089,7 +2093,7 @@ void main() {
     final renamed = Tag(id: health.id, name: TagName.fromInput('Самочувствие'));
     repository.completeReconciliation(
       0,
-      _firstPortion(
+      reconciliationFirstPortion(
         [
           testSummary(index: 9, tags: [renamed]),
         ],
@@ -2119,7 +2123,7 @@ void main() {
     final ninth = testSummary(index: 9, tags: [renamed]);
     repository.completeReconciliation(
       1,
-      _firstPortion([ninth], totalCount: 2, revision: 3),
+      reconciliationFirstPortion([ninth], totalCount: 2, revision: 3),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -2181,7 +2185,7 @@ void main() {
     final ninth = testSummary(index: 9, tags: [health]);
     repository.completeReconciliation(
       0,
-      _firstPortion([ninth], totalCount: 2, revision: 2),
+      reconciliationFirstPortion([ninth], totalCount: 2, revision: 2),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -2245,7 +2249,7 @@ void main() {
       confirmedStates.clear();
       repository.completeReconciliation(
         0,
-        _firstPortion([ninth], totalCount: 2, revision: 2),
+        reconciliationFirstPortion([ninth], totalCount: 2, revision: 2),
       );
       await Future<void>.delayed(Duration.zero);
 
@@ -2296,7 +2300,7 @@ void main() {
           'порция больше размера порции запроса',
           (repository) => repository.completeReconciliation(
             0,
-            _firstPortion(
+            reconciliationFirstPortion(
               [
                 testSummary(index: 13, tags: [health]),
                 testSummary(index: 12, tags: [health]),
@@ -2414,7 +2418,7 @@ void main() {
         final ninth = testSummary(index: 9, tags: [renamed]);
         repository.completeReconciliation(
           1,
-          _firstPortion([ninth], totalCount: 4, revision: 3),
+          reconciliationFirstPortion([ninth], totalCount: 4, revision: 3),
         );
         await retry;
 
@@ -2502,7 +2506,7 @@ void main() {
     );
     repository.completeReconciliation(
       1,
-      _firstPortion(const [], totalCount: 0, revision: 2),
+      reconciliationFirstPortion(const [], totalCount: 0, revision: 2),
     );
     await retry;
 
@@ -2663,7 +2667,7 @@ void main() {
     expect(first.cursor, isNull);
     repository.completeReconciliation(
       0,
-      _firstPortion(
+      reconciliationFirstPortion(
         [row(11), row(9)],
         totalCount: 11,
         nextCursor: cursors[0],
@@ -2680,7 +2684,11 @@ void main() {
     expect(second.cursor, same(cursors[0]));
     repository.completeReconciliation(
       1,
-      _continuationPortion([row(7)], nextCursor: cursors[1], revision: 2),
+      reconciliationContinuationPortion(
+        [row(7)],
+        nextCursor: cursors[1],
+        revision: 2,
+      ),
     );
 
     // Совпадение сразу после края прежнего окна читает следующее окно,
@@ -2692,7 +2700,7 @@ void main() {
     expect(third.cursor, same(cursors[1]));
     repository.completeReconciliation(
       2,
-      _continuationPortion(
+      reconciliationContinuationPortion(
         [row(5), row(3)],
         nextCursor: cursors[2],
         revision: 2,
@@ -2707,7 +2715,7 @@ void main() {
     expect(confirmedStates, isEmpty);
     repository.completeReconciliation(
       3,
-      _continuationPortion([row(1)], revision: 2),
+      reconciliationContinuationPortion([row(1)], revision: 2),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -2775,7 +2783,7 @@ void main() {
       );
       repository.completeReconciliation(
         0,
-        _firstPortion(
+        reconciliationFirstPortion(
           portion(row),
           totalCount: 5,
           nextCursor: const _WindowCursor(1),
@@ -2794,32 +2802,6 @@ void main() {
     });
   }
 }
-
-Result<IntentionCatalogReconciliationOutcome> _firstPortion(
-  List<IntentionSummary> items, {
-  required int totalCount,
-  IntentionCatalogReconciliationCursor? nextCursor,
-  required int revision,
-}) => ResultSuccess(
-  IntentionCatalogReconciliationFirstPortion(
-    items: items,
-    totalCount: totalCount,
-    nextCursor: nextCursor,
-    revision: TestCatalogRevision(revision),
-  ),
-);
-
-Result<IntentionCatalogReconciliationOutcome> _continuationPortion(
-  List<IntentionSummary> items, {
-  IntentionCatalogReconciliationCursor? nextCursor,
-  required int revision,
-}) => ResultSuccess(
-  IntentionCatalogReconciliationContinuationPortion(
-    items: items,
-    nextCursor: nextCursor,
-    revision: TestCatalogRevision(revision),
-  ),
-);
 
 /// Собирает состояния загрузки, которые сбросили бы позицию просмотра.
 List<AsyncValue<IntentionCatalogState>> _observeLoadingStates(
@@ -2958,12 +2940,7 @@ Future<void> _completeTagDelete(
     container,
     repository,
     DeleteTag(tagId),
-    TagCommandSucceeded(
-      ConfirmedGraphResult(
-        revision: revision,
-        value: TagDeleted(TagDeletedChange(revision: revision, tagId: tagId)),
-      ),
-    ),
+    tagDeletionSuccess(tagId: tagId, revision: revision),
   );
 }
 

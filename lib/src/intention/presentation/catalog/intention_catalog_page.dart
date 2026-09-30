@@ -127,6 +127,9 @@ final class _IntentionCatalogPageState
   }
 
   void _scrollToTop() {
+    // Новые параметры начинают выдачу с верхней позиции: отложенный якорь
+    // прежней выдачи больше не действует.
+    _pendingVisualAnchor = null;
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
@@ -149,7 +152,7 @@ final class _IntentionCatalogPageState
         previousState is IntentionCatalogLoaded &&
         identical(previousState.query, nextState.query) &&
         _catalogLayoutChanged(previousState.items, nextState.items)) {
-      _pendingVisualAnchor = _captureVisualAnchor(previousState.items);
+      _pendingVisualAnchor = _captureVisualAnchor(previousState);
     }
     _scheduleCatalogMaintenance();
   }
@@ -169,32 +172,27 @@ final class _IntentionCatalogPageState
     return false;
   }
 
-  _CatalogVisualAnchor? _captureVisualAnchor(List<IntentionSummary> items) {
+  _CatalogVisualAnchor? _captureVisualAnchor(IntentionCatalogLoaded state) {
     if (!_scrollController.hasClients) {
       return null;
     }
+    final items = state.items;
     final currentOffset = _scrollController.position.pixels;
     for (var index = 0; index < items.length; index++) {
-      final renderObject = _itemKeys[items[index].id]?.currentContext
-          ?.findRenderObject();
-      if (renderObject == null || !renderObject.attached) {
+      final extent = _builtItemExtent(items[index].id);
+      if (extent == null) {
         continue;
       }
-      final viewport = RenderAbstractViewport.maybeOf(renderObject);
-      if (viewport == null) {
-        continue;
-      }
-      final revealed = viewport.getOffsetToReveal(renderObject, 0);
-      final itemStart = revealed.offset;
-      final itemEnd = itemStart + revealed.rect.height;
-      if (itemStart <= currentOffset && itemEnd > currentOffset) {
+      if (extent.start <= currentOffset && extent.end > currentOffset) {
         return _CatalogVisualAnchor(
+          query: state.query,
           candidateIds: [
             items[index].id,
             if (index + 1 < items.length) items[index + 1].id,
             if (index > 0) items[index - 1].id,
           ],
-          offsetWithinItem: currentOffset - itemStart,
+          offsetWithinItem: currentOffset - extent.start,
+          remainingApproaches: _CatalogVisualAnchor.maxApproaches,
         );
       }
     }
@@ -219,28 +217,93 @@ final class _IntentionCatalogPageState
   void _restoreVisualAnchor() {
     final anchor = _pendingVisualAnchor;
     _pendingVisualAnchor = null;
-    if (anchor == null || !_scrollController.hasClients) {
+    final state = ref.read(intentionCatalogViewModelProvider(_purpose)).value;
+    if (anchor == null ||
+        !_scrollController.hasClients ||
+        state is! IntentionCatalogLoaded ||
+        !identical(state.query, anchor.query)) {
       return;
     }
 
-    for (final id in anchor.candidateIds) {
-      final renderObject = _itemKeys[id]?.currentContext?.findRenderObject();
-      if (renderObject == null || !renderObject.attached) {
-        continue;
-      }
-      final viewport = RenderAbstractViewport.maybeOf(renderObject);
-      if (viewport == null) {
-        continue;
-      }
-      final target =
-          viewport.getOffsetToReveal(renderObject, 0).offset +
-          anchor.offsetWithinItem;
-      final position = _scrollController.position;
-      position.jumpTo(
-        target.clamp(position.minScrollExtent, position.maxScrollExtent),
-      );
+    final targetIndex = _anchorTargetIndex(anchor, state.items);
+    if (targetIndex == null) {
       return;
     }
+    final position = _scrollController.position;
+    final exact = _builtItemExtent(state.items[targetIndex].id);
+    if (exact != null) {
+      _jumpWithinExtent(position, exact.start + anchor.offsetWithinItem);
+      return;
+    }
+
+    // Много строк, вставленных или удалённых перед якорем, уводят его за
+    // пределы построенной области списка. Сначала приближаемся к нему по
+    // размеру построенных строк, а точное положение восстанавливаем в
+    // следующем кадре, когда якорь уже построен.
+    final estimate = _estimateItemStart(state.items, targetIndex);
+    if (estimate == null || anchor.remainingApproaches == 0) {
+      return;
+    }
+    _jumpWithinExtent(position, estimate + anchor.offsetWithinItem);
+    _pendingVisualAnchor = anchor.afterApproach();
+    _scheduleCatalogMaintenance();
+  }
+
+  int? _anchorTargetIndex(
+    _CatalogVisualAnchor anchor,
+    List<IntentionSummary> items,
+  ) {
+    for (final id in anchor.candidateIds) {
+      final index = items.indexWhere((item) => item.id == id);
+      if (index >= 0) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  double? _estimateItemStart(List<IntentionSummary> items, int targetIndex) {
+    ({int index, _ItemExtent extent})? first;
+    ({int index, _ItemExtent extent})? last;
+    for (var index = 0; index < items.length; index++) {
+      final extent = _builtItemExtent(items[index].id);
+      if (extent == null) {
+        continue;
+      }
+      first ??= (index: index, extent: extent);
+      last = (index: index, extent: extent);
+    }
+    if (first == null || last == null) {
+      return null;
+    }
+    final averageExtent =
+        (last.extent.end - first.extent.start) / (last.index - first.index + 1);
+    if (targetIndex > last.index) {
+      return last.extent.end + (targetIndex - last.index - 1) * averageExtent;
+    }
+    return first.extent.start - (first.index - targetIndex) * averageExtent;
+  }
+
+  _ItemExtent? _builtItemExtent(IntentionId id) {
+    final renderObject = _itemKeys[id]?.currentContext?.findRenderObject();
+    if (renderObject == null || !renderObject.attached) {
+      return null;
+    }
+    final viewport = RenderAbstractViewport.maybeOf(renderObject);
+    if (viewport == null) {
+      return null;
+    }
+    final revealed = viewport.getOffsetToReveal(renderObject, 0);
+    return (
+      start: revealed.offset,
+      end: revealed.offset + revealed.rect.height,
+    );
+  }
+
+  void _jumpWithinExtent(ScrollPosition position, double target) {
+    position.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
   }
 
   void _pruneItemKeys() {
@@ -541,12 +604,30 @@ final class _IntentionSummaryTile extends StatelessWidget {
   }
 }
 
+/// Положение строки в прокручиваемой области списка.
+typedef _ItemExtent = ({double start, double end});
+
 final class _CatalogVisualAnchor {
   const _CatalogVisualAnchor({
+    required this.query,
     required this.candidateIds,
     required this.offsetWithinItem,
+    required this.remainingApproaches,
   });
 
+  /// Предел кадров приближения к якорю за пределами построенной области.
+  static const maxApproaches = 3;
+
+  /// Якорь действует только для выдачи того же запроса.
+  final IntentionCatalogQuery query;
   final List<IntentionId> candidateIds;
   final double offsetWithinItem;
+  final int remainingApproaches;
+
+  _CatalogVisualAnchor afterApproach() => _CatalogVisualAnchor(
+    query: query,
+    candidateIds: candidateIds,
+    offsetWithinItem: offsetWithinItem,
+    remainingApproaches: remainingApproaches - 1,
+  );
 }

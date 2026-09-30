@@ -129,13 +129,16 @@ LongTermRelationCommandResult relationCreationSuccess({
       LongTermRelationCommandFailure
     >(ConfirmedGraphResult(revision: revision, value: success));
 
-/// Проводит команду тега через coordinator до опубликованного завершения.
-Future<TagCommandCompletion> completeTagCommand(
+/// Принимает команду тега через coordinator и подтверждает её в репозитории.
+///
+/// Завершение команды публикуется асинхронно: вызывающий код сам ждёт его
+/// обычным ожиданием либо кадрами виджет-теста.
+TagCommandAccepted acceptTagCommand(
   ProviderContainer container,
   ControlledCatalogRepository repository,
   TagCommand command,
   TagCommandResult result,
-) async {
+) {
   final coordinator = container.read(graphCommandCoordinatorProvider.notifier);
   final commandIndex = repository.tagCommands.length;
   final start = switch (command) {
@@ -148,6 +151,17 @@ Future<TagCommandCompletion> completeTagCommand(
   expect(start, isA<TagCommandAccepted>());
   final accepted = start as TagCommandAccepted;
   repository.completeTagCommand(commandIndex, result);
+  return accepted;
+}
+
+/// Проводит команду тега через coordinator до опубликованного завершения.
+Future<TagCommandCompletion> completeTagCommand(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  TagCommand command,
+  TagCommandResult result,
+) async {
+  final accepted = acceptTagCommand(container, repository, command, result);
   final completion = await accepted.future;
   await Future<void>.delayed(Duration.zero);
   return completion;
@@ -166,11 +180,30 @@ Future<TagCommandCompletion> completeIntentionTagAssignment(
   required IntentionSummary after,
   required GraphRevision revision,
 }) {
+  final (command, result) = intentionTagAssignment(
+    state: state,
+    tagId: tagId,
+    before: before,
+    after: after,
+    revision: revision,
+  );
+  return completeTagCommand(container, repository, command, result);
+}
+
+/// Собирает команду назначения или снятия тега намерению и её подтверждение.
+///
+/// Подтверждение повторяет пакет реальной команды: компактный факт пары и
+/// каталожную мутацию с полными краткими снимками на одной ревизии.
+(TagCommand, TagCommandResult) intentionTagAssignment({
+  required TagAssignmentState state,
+  required TagId tagId,
+  required IntentionSummary before,
+  required IntentionSummary after,
+  required GraphRevision revision,
+}) {
   final target = IntentionTagTarget(after.id);
   final assignment = TagAssignment(tagId: tagId, target: target);
-  return completeTagCommand(
-    container,
-    repository,
+  return (
     switch (state) {
       TagAssignmentState.assigned => AssignTag(tagId: tagId, target: target),
       TagAssignmentState.absent => RemoveTagAssignment(
@@ -197,3 +230,42 @@ Future<TagCommandCompletion> completeIntentionTagAssignment(
     ),
   );
 }
+
+/// Собирает подтверждение физического удаления тега с компактным фактом.
+TagCommandResult tagDeletionSuccess({
+  required TagId tagId,
+  required GraphRevision revision,
+}) => TagCommandSucceeded(
+  ConfirmedGraphResult(
+    revision: revision,
+    value: TagDeleted(TagDeletedChange(revision: revision, tagId: tagId)),
+  ),
+);
+
+/// Первая успешная порция чтения согласования с абсолютным количеством.
+Result<IntentionCatalogReconciliationOutcome> reconciliationFirstPortion(
+  List<IntentionSummary> items, {
+  required int totalCount,
+  IntentionCatalogReconciliationCursor? nextCursor,
+  required int revision,
+}) => ResultSuccess(
+  IntentionCatalogReconciliationFirstPortion(
+    items: items,
+    totalCount: totalCount,
+    nextCursor: nextCursor,
+    revision: TestCatalogRevision(revision),
+  ),
+);
+
+/// Последующая успешная порция чтения согласования той же ревизии.
+Result<IntentionCatalogReconciliationOutcome> reconciliationContinuationPortion(
+  List<IntentionSummary> items, {
+  IntentionCatalogReconciliationCursor? nextCursor,
+  required int revision,
+}) => ResultSuccess(
+  IntentionCatalogReconciliationContinuationPortion(
+    items: items,
+    nextCursor: nextCursor,
+    revision: TestCatalogRevision(revision),
+  ),
+);
