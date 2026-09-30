@@ -2141,6 +2141,17 @@ void main() {
       };
       final target = IntentionTagTarget(harness.ownerId);
       const revision = TestGraphRevision(5);
+      final ownerBefore = catalog_support.testSummary(
+        index: 1,
+        title: 'Владелец',
+        activeRelationCount: 1,
+      );
+      final ownerAfter = catalog_support.testSummary(
+        index: 1,
+        title: 'Владелец',
+        activeRelationCount: 1,
+        tags: [tag_domain.Tag(id: tagId, name: TagName.fromInput('Здоровье'))],
+      );
       final accepted = harness.coordinator.acceptTagAssign(
         AssignTag(tagId: tagId, target: target),
       ) as TagCommandAccepted;
@@ -2155,15 +2166,20 @@ void main() {
                 assignment: TagAssignment(tagId: tagId, target: target),
                 state: TagAssignmentState.assigned,
               ),
+              catalogMutation: IntentionCatalogUpdated(
+                revision: revision,
+                before: catalog_support.TestCatalogEntrySnapshot(ownerBefore),
+                after: catalog_support.TestCatalogEntrySnapshot(ownerAfter),
+              ),
             ),
           ),
         ),
       );
       final completion = await accepted.future;
-      expect(
-        completion.confirmedChange!.changes.single,
+      expect(completion.confirmedChange!.changes, [
         isA<TagAssignmentChangedChange>(),
-      );
+        isA<IntentionCatalogUpdated>(),
+      ]);
       await pumpEventQueue();
       expect(repository.groupQueries, hasLength(3));
       expect(repository.groupQueries[2].cursor, isNull);
@@ -2206,6 +2222,13 @@ void main() {
       );
       expect(harness.catalog.revision, revision);
       expect(harness.catalogCounts, countsBefore);
+      expect(
+        harness.catalog.items
+            .singleWhere((item) => item.id == harness.ownerId)
+            .tags
+            .map((tag) => tag.id),
+        [tagId],
+      );
       expect(harness.detailsCounts, detailsBefore);
     },
   );

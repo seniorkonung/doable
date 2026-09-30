@@ -7,6 +7,12 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -109,3 +115,72 @@ LongTermRelationCommandResult relationCreationSuccess({
       LongTermRelationCommandSuccess,
       LongTermRelationCommandFailure
     >(ConfirmedGraphResult(revision: revision, value: success));
+
+/// Проводит команду тега через coordinator до опубликованного завершения.
+Future<TagCommandCompletion> completeTagCommand(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  TagCommand command,
+  TagCommandResult result,
+) async {
+  final coordinator = container.read(graphCommandCoordinatorProvider.notifier);
+  final commandIndex = repository.tagCommands.length;
+  final start = switch (command) {
+    AssignTag() => coordinator.acceptTagAssign(command),
+    RemoveTagAssignment() => coordinator.acceptTagRemoveAssignment(command),
+    CreateTag() => coordinator.acceptTagCreation(TagCreationFormKey(), command),
+    RenameTag() => coordinator.acceptTagRename(command),
+    DeleteTag() => coordinator.acceptTagDelete(command),
+  };
+  expect(start, isA<TagCommandAccepted>());
+  final accepted = start as TagCommandAccepted;
+  repository.completeTagCommand(commandIndex, result);
+  final completion = await accepted.future;
+  await Future<void>.delayed(Duration.zero);
+  return completion;
+}
+
+/// Проводит назначение или снятие тега намерению с пакетом реальной команды.
+///
+/// Пакет несёт компактный факт пары и каталожную мутацию с полными
+/// краткими снимками намерения до и после операции на одной ревизии.
+Future<TagCommandCompletion> completeIntentionTagAssignment(
+  ProviderContainer container,
+  ControlledCatalogRepository repository, {
+  required TagAssignmentState state,
+  required TagId tagId,
+  required IntentionSummary before,
+  required IntentionSummary after,
+  required GraphRevision revision,
+}) {
+  final target = IntentionTagTarget(after.id);
+  final assignment = TagAssignment(tagId: tagId, target: target);
+  return completeTagCommand(
+    container,
+    repository,
+    switch (state) {
+      TagAssignmentState.assigned => AssignTag(tagId: tagId, target: target),
+      TagAssignmentState.absent => RemoveTagAssignment(
+        tagId: tagId,
+        target: target,
+      ),
+    },
+    TagCommandSucceeded(
+      ConfirmedGraphResult(
+        revision: revision,
+        value: TagAssignmentChanged(
+          TagAssignmentChangedChange(
+            revision: revision,
+            assignment: assignment,
+            state: state,
+          ),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: revision,
+            before: TestCatalogEntrySnapshot(before),
+            after: TestCatalogEntrySnapshot(after),
+          ),
+        ),
+      ),
+    ),
+  );
+}

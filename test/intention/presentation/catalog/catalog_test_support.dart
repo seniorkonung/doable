@@ -25,6 +25,8 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
@@ -79,6 +81,8 @@ final class ControlledCatalogRepository
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
+  final tagCommands = <TagCommand>[];
+  final _tagCommandRequests = <Completer<TagCommandResult>>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -111,6 +115,10 @@ final class ControlledCatalogRepository
 
   void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) {
     _dailyChoiceCommandRequests[index].complete(result);
+  }
+
+  void completeTagCommand(int index, TagCommandResult result) {
+    _tagCommandRequests[index].complete(result);
   }
 
   @override
@@ -159,6 +167,7 @@ final class ControlledCatalogRepository
       final DailyChoiceCommand choiceCommand => await _executeDailyChoice(
         choiceCommand,
       ),
+      final TagCommand tagCommand => await _executeTag(tagCommand),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -179,6 +188,13 @@ final class ControlledCatalogRepository
     dailyChoiceCommands.add(command);
     final request = Completer<DailyChoiceCommandResult>();
     _dailyChoiceCommandRequests.add(request);
+    return request.future;
+  }
+
+  Future<TagCommandResult> _executeTag(TagCommand command) {
+    tagCommands.add(command);
+    final request = Completer<TagCommandResult>();
+    _tagCommandRequests.add(request);
     return request.future;
   }
 
