@@ -839,6 +839,120 @@ void main() {
     expect(repository.queries, hasLength(queriesBefore));
   });
 
+  test('переименование выбранных обязательного и исключённого тегов '
+      'сохраняет выбор по идентификаторам и меняет только названия '
+      'в загруженных сводках', () async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(repository);
+    addTearDown(container.dispose);
+    final focus = Tag(id: _tagId(3), name: TagName.fromInput('Фокус'));
+    final withHealthAndFocus = testSummary(
+      index: 2,
+      readiness: IntentionReadiness.ready,
+      tags: [health, focus],
+    );
+    final withHealth = testSummary(
+      index: 1,
+      readiness: IntentionReadiness.ready,
+      tags: [health],
+    );
+    final items = [withHealthAndFocus, withHealth];
+    final filter = IntentionTagFilter(
+      requiredTagIds: [health.id],
+      excludedTagIds: [rest.id],
+    );
+    final excluded = testSummary(index: 9).id;
+    final purposes = <IntentionCatalogPurpose>[
+      browse,
+      const SelectDailyChoiceAction(),
+      const SelectDailyChoiceSource(),
+      SelectRelationParticipant(
+        excludedIntentionId: excluded,
+        selectionContext: RelationParticipantSelectionContext.activeRelation,
+      ),
+      SelectRelationParticipant(
+        excludedIntentionId: excluded,
+        selectionContext: RelationParticipantSelectionContext.archivedRelation,
+      ),
+    ];
+    for (final purpose in purposes) {
+      final provider = intentionCatalogViewModelProvider(purpose);
+      final initial = repository.queries.length;
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForCatalogQueries(repository, initial + 1);
+      repository.complete(initial, _emptyPage(1));
+      await container.read(provider.future);
+      container.read(provider.notifier).changeTagFilter(filter);
+      await waitForCatalogQueries(repository, initial + 2);
+      expect(repository.queryAt(initial + 1).tagFilter, filter);
+      repository.complete(
+        initial + 1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: items,
+            totalCount: items.length,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(provider.future);
+    }
+    final before = {
+      for (final purpose in purposes) purpose: _loaded(container, purpose),
+    };
+    final loadingStates = {
+      for (final purpose in purposes)
+        purpose: _observeLoadingStates(container, purpose),
+    };
+    final queriesBefore = repository.queries.length;
+
+    await _completeTagRename(
+      container,
+      repository,
+      before: health,
+      after: Tag(id: health.id, name: TagName.fromInput('Самочувствие')),
+      revision: const TestCatalogRevision(2),
+    );
+    await _completeTagRename(
+      container,
+      repository,
+      before: rest,
+      after: Tag(id: rest.id, name: TagName.fromInput('Покой')),
+      revision: const TestCatalogRevision(3),
+    );
+
+    for (final purpose in purposes) {
+      final previous = before[purpose]!;
+      final current = _loaded(container, purpose);
+      expect(current.selection, same(previous.selection));
+      expect(current.selection.tagFilter, same(previous.selection.tagFilter));
+      expect(current.selection.tagFilter.requiredTagIds, {health.id});
+      expect(current.selection.tagFilter.excludedTagIds, {rest.id});
+      expect(current.query, same(previous.query));
+      expect(current.query.tagFilter, filter);
+      expect(
+        current.items.map((item) => item.id),
+        items.map((item) => item.id),
+      );
+      expect(current.items.map(_tagIds), items.map(_tagIds));
+      expect(current.items.map(_tagNames), [
+        ['Самочувствие', 'Фокус'],
+        ['Самочувствие'],
+      ]);
+      expect(current.totalCount, items.length);
+      expect(current.nextCursor, isNull);
+      expect(current.revision, const TestCatalogRevision(3));
+      expect(loadingStates[purpose], isEmpty);
+    }
+    expect(repository.queries, hasLength(queriesBefore));
+  });
+
   test('первая порция, прочитанная до переименования, публикуется с новым '
       'названием', () async {
     final repository = ControlledCatalogRepository();
