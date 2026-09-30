@@ -31,12 +31,22 @@ const _requiredTagBase = 100000;
 const _excludedTagBase = 110000;
 const _extraTagBase = 120000;
 const _backgroundTagBase = 130000;
+const _popularTag = 140000;
 
-/// Число обязательных и исключённых условий запроса; условия берутся
-/// первыми тегами соответствующего диапазона фикстуры.
-typedef _Conditions = ({int required, int excluded});
+/// Условия запроса: популярный обязательный тег и число редких обязательных
+/// и исключённых условий, которые берутся первыми тегами соответствующего
+/// диапазона фикстуры.
+typedef _Conditions = ({bool popular, int required, int excluded});
 
-const _allConditions = (required: _conditionCount, excluded: _conditionCount);
+const _allConditions = (
+  popular: false,
+  required: _conditionCount,
+  excluded: _conditionCount,
+);
+
+/// Число обязательных условий запроса вместе с популярным тегом.
+int _requiredConditionCount(_Conditions conditions) =>
+    conditions.required + (conditions.popular ? 1 : 0);
 
 void main() {
   test(
@@ -70,24 +80,7 @@ void main() {
   test(
     'материализует только порцию редких совместных совпадений и все её теги',
     () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      final trace = _SelectTrace();
-      late sqlite.Database raw;
-      final database = await harness.openReadyDatabase(
-        observer: trace,
-        setup: (connection) => raw = connection,
-      );
-      final repository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 3),
-        InMemoryDiagnosticsSink(),
-      );
-      await _populateFixture(database);
-      _populateJointTagFixture(raw);
-      trace.clear();
-      trace.parameterLimit = 400;
+      final (:repository, :raw, :trace) = await _openJointFixture();
 
       // Без фильтра названия совпадение отсекают только теги среди
       // 25 000 готовых активных кандидатов; «Другое название» проходит.
@@ -152,19 +145,31 @@ void main() {
       for (final (label, conditions, matchCount) in [
         (
           'только исключённые',
-          (required: 0, excluded: _smallConditionCount),
+          (popular: false, required: 0, excluded: _smallConditionCount),
           24995,
         ),
-        ('только исключённые', (required: 0, excluded: _conditionCount), 24994),
+        (
+          'только исключённые',
+          (popular: false, required: 0, excluded: _conditionCount),
+          24994,
+        ),
         (
           'только обязательные',
-          (required: _smallConditionCount, excluded: 0),
+          (popular: false, required: _smallConditionCount, excluded: 0),
           242,
         ),
-        ('только обязательные', (required: _conditionCount, excluded: 0), 239),
+        (
+          'только обязательные',
+          (popular: false, required: _conditionCount, excluded: 0),
+          239,
+        ),
         (
           'совместные',
-          (required: _smallConditionCount, excluded: _smallConditionCount),
+          (
+            popular: false,
+            required: _smallConditionCount,
+            excluded: _smallConditionCount,
+          ),
           tagOnlyMatchCount + 4,
         ),
         ('совместные', _allConditions, tagOnlyMatchCount),
@@ -201,6 +206,149 @@ void main() {
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
+
+  test('ведёт порцию и продолжение по индексу порядка при популярном обязательном теге', () async {
+    final (:repository, :raw, :trace) = await _openJointFixture();
+
+    // Популярный тег назначен 19 999 из 24 999 активных намерений. Среди
+    // них не готов кандидат 243 и исключён из выдачи кандидат 244, поэтому
+    // один популярный тег оставляет 19 997 совпадений. Первые девять
+    // исключённых тегов отсекают ещё двух кандидатов, все 1201 — трёх.
+    // С редкими обязательными тегами совпадения сужаются до совместных
+    // кандидатов, но популярный тег остаётся в наборе условий. Во всех
+    // сценариях порция и продолжение идут по индексу порядка охвата.
+    const popularBounds = [(6, 1728), (1756, 3478)];
+    for (final (label, conditions, matchCount, bounds) in [
+      (
+        'только обязательные',
+        (popular: true, required: 0, excluded: 0),
+        19997,
+        popularBounds,
+      ),
+      (
+        'только обязательные',
+        (popular: true, required: _smallConditionCount - 1, excluded: 0),
+        242,
+        null,
+      ),
+      (
+        'только обязательные',
+        (popular: true, required: _conditionCount, excluded: 0),
+        239,
+        null,
+      ),
+      (
+        'совместные',
+        (popular: true, required: 0, excluded: _smallConditionCount - 1),
+        19995,
+        popularBounds,
+      ),
+      (
+        'совместные',
+        (popular: true, required: 0, excluded: _conditionCount),
+        19994,
+        popularBounds,
+      ),
+      (
+        'совместные',
+        (popular: true, required: _conditionCount, excluded: _conditionCount),
+        236,
+        null,
+      ),
+    ]) {
+      final expected = _expectedTagOnlyMatches(conditions);
+      expect(expected, hasLength(matchCount), reason: label);
+      IntentionCatalogCursor? cursor;
+      for (var pageNumber = 0; pageNumber < 2; pageNumber++) {
+        trace.clear();
+        final page = _page(
+          await repository.getCatalogPage(
+            _jointQuery(
+              titleFilter: null,
+              conditions: conditions,
+              cursor: cursor,
+            ),
+          ),
+        );
+        final isFirst = pageNumber == 0;
+        if (isFirst) {
+          expect(
+            (page as IntentionCatalogFirstPage).totalCount,
+            matchCount,
+            reason: label,
+          );
+        }
+        final indexes = [
+          for (final item in page.items) _fixtureIndexOf(item.id),
+        ];
+        expect(
+          indexes,
+          expected.skip(pageNumber * _pageSize).take(_pageSize),
+          reason: '$label, порция $pageNumber',
+        );
+        if (bounds != null) {
+          expect(
+            (indexes.first, indexes.last),
+            bounds[pageNumber],
+            reason: '$label, порция $pageNumber',
+          );
+        }
+        expect(page.nextCursor, isA<IntentionCatalogCursor>(), reason: label);
+        _expectJointPlans(
+          raw,
+          trace,
+          titleFilter: null,
+          conditions: conditions,
+        );
+        _expectJointMaterialization(
+          page,
+          trace,
+          isFirst: isFirst,
+          conditions: conditions,
+        );
+        _printJointCost(
+          raw,
+          trace,
+          titleFilter: null,
+          page: pageNumber,
+          label: label,
+          conditions: conditions,
+        );
+        cursor = page.nextCursor;
+      }
+    }
+  }, timeout: const Timeout(Duration(minutes: 3)));
+}
+
+/// Файловая база с большой фикстурой, совместными кандидатами и популярным
+/// тегом; трассировка очищена и ограничивает число SQL-параметров.
+Future<
+  ({
+    DriftPersonalGraphRepository repository,
+    sqlite.Database raw,
+    _SelectTrace trace,
+  })
+>
+_openJointFixture() async {
+  final harness = await LocalDatabaseHarness.fileBacked();
+  addTearDown(harness.dispose);
+  final trace = _SelectTrace();
+  late sqlite.Database raw;
+  final database = await harness.openReadyDatabase(
+    observer: trace,
+    setup: (connection) => raw = connection,
+  );
+  final repository = DriftPersonalGraphRepository(
+    database,
+    UuidV7IntentionIdGenerator(),
+    () => DateTime.utc(2026, 9, 3),
+    InMemoryDiagnosticsSink(),
+  );
+  await _populateFixture(database);
+  _populateJointTagFixture(raw);
+  trace.clear();
+  trace.parameterLimit = 400;
+  return (repository: repository, raw: raw, trace: trace);
 }
 
 /// Полный обход совместного поиска: каждая порция, включая продолжения,
@@ -212,11 +360,7 @@ Future<void> _expectJointTraversal(
   required String? titleFilter,
   required List<int> matches,
 }) async {
-  final expected = [...matches]
-    ..sort((left, right) {
-      final timestampOrder = (right % 7).compareTo(left % 7);
-      return timestampOrder == 0 ? left.compareTo(right) : timestampOrder;
-    });
+  final expected = [...matches]..sort(_compareCatalogOrder);
   final actual = <String>[];
   IntentionCatalogCursor? cursor;
   var pageNumber = 0;
@@ -262,6 +406,7 @@ void _populateJointTagFixture(sqlite.Database database) {
       (_excludedTagBase, _conditionCount),
       (_extraTagBase, _extraTagCount),
       (_backgroundTagBase, _backgroundTagCount),
+      (_popularTag, 1),
     ]) {
       for (var index = 0; index < count; index++) {
         insertTag.execute([_fixtureId(base + index), 'Тег ${base + index}']);
@@ -295,12 +440,17 @@ void _populateJointTagFixture(sqlite.Database database) {
     }
     // У каждого намерения несколько собственных тегов вне условий: проверка
     // кандидата не может отсечь его по одному отсутствию назначений.
+    // Популярный обязательный тег назначен большинству намерений каждого
+    // охвата и всем совместным кандидатам.
     for (var index = 0; index < _fixtureSize; index++) {
       for (final tag in _backgroundTags(index)) {
         insertAssignment.execute([
           _fixtureId(_backgroundTagBase + tag),
           _fixtureId(index),
         ]);
+      }
+      if (_hasPopularTag(index)) {
+        insertAssignment.execute([_fixtureId(_popularTag), _fixtureId(index)]);
       }
     }
     database.execute('COMMIT');
@@ -328,6 +478,46 @@ int? _jointExcludedTag(int index) => switch (index) {
   _ => null,
 };
 
+/// Популярный тег есть у четырёх из пяти активных и архивных намерений, в
+/// том числе у всех совместных кандидатов: их номера кратны десяти.
+bool _hasPopularTag(int fixtureIndex) => fixtureIndex % 10 != 2;
+
+/// Номер совместного кандидата для намерения фикстуры, если оно им является.
+int? _jointIndexOf(int fixtureIndex) {
+  final offset = fixtureIndex - _jointIntentionIndex(0);
+  final joint = offset >= 0 && offset % 200 == 0 ? offset ~/ 200 : null;
+  return joint != null && joint < _jointCandidateCount ? joint : null;
+}
+
+/// Порядок каталога фикстуры: `created_at` по убыванию, затем `id`.
+int _compareCatalogOrder(int left, int right) {
+  final timestampOrder = (right % 7).compareTo(left % 7);
+  return timestampOrder == 0 ? left.compareTo(right) : timestampOrder;
+}
+
+/// Модель выдачи `_jointQuery` без фильтра названия: номера подходящих
+/// намерений фикстуры в порядке каталога.
+List<int> _expectedTagOnlyMatches(_Conditions conditions) => [
+  for (var index = 0; index < _fixtureSize; index++)
+    if (_matchesTagOnlyQuery(index, conditions)) index,
+]..sort(_compareCatalogOrder);
+
+bool _matchesTagOnlyQuery(int fixtureIndex, _Conditions conditions) {
+  final joint = _jointIndexOf(fixtureIndex);
+  // Активны чётные намерения, кроме переведённого в архив кандидата 242;
+  // кандидат 243 не готов, кандидат 244 исключён из выдачи запросом.
+  if (fixtureIndex.isOdd || joint == 242 || joint == 243 || joint == 244) {
+    return false;
+  }
+  if (conditions.popular && !_hasPopularTag(fixtureIndex)) return false;
+  if (conditions.required > 0 &&
+      (joint == null || _jointRequiredTagCount(joint) < conditions.required)) {
+    return false;
+  }
+  final excludedTag = joint == null ? null : _jointExcludedTag(joint);
+  return excludedTag == null || excludedTag >= conditions.excluded;
+}
+
 /// Фоновые теги намерения фикстуры в порядке их создания.
 List<int> _backgroundTags(int fixtureIndex) => [
   for (final offset in _backgroundTagOffsets)
@@ -335,13 +525,9 @@ List<int> _backgroundTags(int fixtureIndex) => [
 ]..sort();
 
 /// Полный состав собственных тегов намерения фикстуры в порядке создания
-/// тегов: обязательные, исключённый, дополнительные, фоновые.
+/// тегов: обязательные, исключённый, дополнительные, фоновые, популярный.
 List<TagId> _fixtureTagIds(int fixtureIndex) {
-  final offset = fixtureIndex - _jointIntentionIndex(0);
-  final joint = offset >= 0 && offset % 200 == 0 ? offset ~/ 200 : null;
-  final jointIndex = joint != null && joint < _jointCandidateCount
-      ? joint
-      : null;
+  final jointIndex = _jointIndexOf(fixtureIndex);
   return [
     if (jointIndex != null) ...[
       for (var tag = 0; tag < _jointRequiredTagCount(jointIndex); tag++)
@@ -354,6 +540,7 @@ List<TagId> _fixtureTagIds(int fixtureIndex) {
         _tagId(_extraTagBase + tag),
     for (final tag in _backgroundTags(fixtureIndex))
       _tagId(_backgroundTagBase + tag),
+    if (_hasPopularTag(fixtureIndex)) _tagId(_popularTag),
   ];
 }
 
@@ -376,6 +563,7 @@ IntentionCatalogQuery _jointQuery({
   titleFilter: titleFilter,
   tagFilter: IntentionTagFilter(
     requiredTagIds: [
+      if (conditions.popular) _tagId(_popularTag),
       for (var index = 0; index < conditions.required; index++)
         _tagId(_requiredTagBase + index),
     ],
@@ -451,8 +639,9 @@ void _expectJointMaterialization(
         .map((argument) => (jsonDecode(argument) as List).toSet())
         .toList();
     expect(conditionSets, [
-      if (conditions.required > 0)
+      if (_requiredConditionCount(conditions) > 0)
         {
+          if (conditions.popular) _fixtureId(_popularTag),
           for (var index = 0; index < conditions.required; index++)
             _fixtureId(_requiredTagBase + index),
         },
@@ -510,8 +699,9 @@ void _expectConditionSetsReadOnce(
   ];
   final correlated = startsWith('CORRELATED');
   final details = plan.map((node) => node.detail).join('\n');
+  final hasRequired = _requiredConditionCount(conditions) > 0;
   for (final alias in [
-    if (conditions.required > 0) 'required_tag',
+    if (hasRequired) 'required_tag',
     if (conditions.excluded > 0) 'excluded_tag',
   ]) {
     final setReads = plan
@@ -539,9 +729,7 @@ void _expectConditionSetsReadOnce(
       .toList();
   expect(
     assignmentReads,
-    hasLength(
-      (conditions.required > 0 ? 1 : 0) + (conditions.excluded > 0 ? 1 : 0),
-    ),
+    hasLength((hasRequired ? 1 : 0) + (conditions.excluded > 0 ? 1 : 0)),
     reason: details,
   );
   for (final read in assignmentReads) {
@@ -569,6 +757,12 @@ void _expectJointPlans(
       plan.any((node) => node.detail.contains('intention_titles_fts')),
       usesFts,
     );
+    // Без полнотекстового индекса порцию ведёт индекс порядка охвата, и
+    // выборка завершается после `pageSize + 1` строк. Точное количество может
+    // использовать любой план.
+    if (!usesFts && select.statement.contains('LIMIT')) {
+      _expectOrderIndexDrivesPage(plan);
+    }
   }
   final tagPlan = _observedPlan(
     database,
@@ -578,6 +772,27 @@ void _expectJointPlans(
   ).join('\n');
   expect(tagPlan, contains('tag_assignments_intention_order'));
   expect(tagPlan, isNot(contains('SCAN a')));
+}
+
+void _expectOrderIndexDrivesPage(List<_PlanNode> plan) {
+  final details = plan.map((node) => node.detail).join('\n');
+  expect(
+    details,
+    contains('intentions_active_created_at_desc_id_asc'),
+    reason: 'Порцию ведёт индекс порядка охвата:\n$details',
+  );
+  expect(
+    details,
+    isNot(contains('USE TEMP B-TREE FOR ORDER BY')),
+    reason: 'Порция не сортирует все совпадения:\n$details',
+  );
+  expect(
+    details,
+    isNot(
+      contains('SEARCH intentions USING INDEX sqlite_autoindex_intentions_1'),
+    ),
+    reason: 'Выборку не ведёт отобранное по тегам множество:\n$details',
+  );
 }
 
 void _printJointCost(
@@ -607,7 +822,8 @@ void _printJointCost(
   print(
     'Поиск по тегам ($label), название ${titleFilter ?? 'без фильтра'}, '
     'порция $page: $_fixtureSize намерений, '
-    '${conditions.required} обязательных и '
+    '${_requiredConditionCount(conditions)} обязательных'
+    '${conditions.popular ? ' (с популярным)' : ''} и '
     '${conditions.excluded} исключённых условий; '
     '${trace.selects.length} чтения; '
     '${[if (count != null) cost('COUNT', count), cost('порция', read), cost('назначения', tags)].join('; ')}',
