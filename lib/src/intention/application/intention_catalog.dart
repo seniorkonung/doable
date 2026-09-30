@@ -324,6 +324,30 @@ final class IntentionSummary {
     );
   }
 
+  /// Убирает назначение физически удалённого тега.
+  ///
+  /// Порядок остальных тегов и временные метки сохраняются. Если тег не
+  /// назначен намерению, возвращается та же сводка.
+  IntentionSummary withoutTag(TagId deletedTagId) {
+    if (!tags.any((tag) => tag.id == deletedTagId)) {
+      return this;
+    }
+    return IntentionSummary(
+      id: id,
+      title: title,
+      hasDescription: hasDescription,
+      readiness: readiness,
+      archiveState: archiveState,
+      activeRelationCount: activeRelationCount,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      tags: [
+        for (final tag in tags)
+          if (tag.id != deletedTagId) tag,
+      ],
+    );
+  }
+
   static int _requireNonNegativeCount(int value) {
     if (value < 0) {
       throw ArgumentError.value(

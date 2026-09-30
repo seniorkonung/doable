@@ -10,6 +10,7 @@ import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../tag/application/tag_change.dart';
 import '../../../tag/domain/tag.dart';
+import '../../../tag/domain/tag_id.dart';
 import '../../../tag/domain/tag_target.dart';
 import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
@@ -763,6 +764,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     for (final renamed in package.renamedTags) {
       reconciled = _applyRenamedTagContent(reconciled, renamed);
     }
+    for (final deletedTagId in package.deletedTagIds) {
+      final next = _applyDeletedTagContent(reconciled, deletedTagId);
+      if (next == null) {
+        return null;
+      }
+      reconciled = next;
+    }
 
     return _withRevision(reconciled, package.revision);
   }
@@ -810,6 +818,54 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
     final items = [
       for (final item in confirmed.items) item.withRenamedTag(renamed),
+    ];
+    if (items.indexed.every(
+      (entry) => identical(entry.$2, confirmed.items[entry.$1]),
+    )) {
+      return confirmed;
+    }
+    return IntentionCatalogLoaded(
+      selection: confirmed.selection,
+      query: confirmed.query,
+      items: items,
+      totalCount: confirmed.totalCount,
+      nextCursor: confirmed.nextCursor,
+      revision: confirmed.revision,
+      continuation: confirmed.continuation,
+    );
+  }
+
+  /// Согласует физическое удаление тега с сохранёнными условиями поиска.
+  ///
+  /// Условие по удалённому идентификатору не снимается. Обязательный тег
+  /// больше не назначен ни одному намерению, поэтому выдача становится
+  /// успешно пустой без продолжения. Тег вне условий только исчезает из
+  /// загруженных строк. Удаление исключённого тега может открыть совпадения
+  /// вне загруженных строк; локально их не восстановить, поэтому пакет
+  /// несогласуем и выдача читается заново с теми же условиями.
+  IntentionCatalogConfirmedState? _applyDeletedTagContent(
+    IntentionCatalogConfirmedState confirmed,
+    TagId deletedTagId,
+  ) {
+    final tagFilter = confirmed.query.tagFilter;
+    if (tagFilter.requiredTagIds.contains(deletedTagId)) {
+      return switch (confirmed) {
+        IntentionCatalogEmpty() => confirmed,
+        IntentionCatalogLoaded() => IntentionCatalogEmpty(
+          selection: confirmed.selection,
+          query: confirmed.query,
+          revision: confirmed.revision,
+        ),
+      };
+    }
+    if (tagFilter.excludedTagIds.contains(deletedTagId)) {
+      return null;
+    }
+    if (confirmed is! IntentionCatalogLoaded) {
+      return confirmed;
+    }
+    final items = [
+      for (final item in confirmed.items) item.withoutTag(deletedTagId),
     ];
     if (items.indexed.every(
       (entry) => identical(entry.$2, confirmed.items[entry.$1]),
@@ -924,7 +980,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// назначения тега намерению сам принадлежность не меняет: её задаёт
 /// каталожная мутация того же намерения, поэтому количество изменяется
 /// один раз, а факт без такой мутации делает пакет несогласуемым.
-/// Переименование тега меняет только его название в загруженных строках.
+/// Переименование тега меняет только его название в загруженных строках,
+/// а физическое удаление тега согласуется по сохранённым условиям поиска.
 final class _CatalogChangePackage {
   _CatalogChangePackage(this.revision, Iterable<GraphChange> changes)
     : mutations = List.unmodifiable(
@@ -952,6 +1009,10 @@ final class _CatalogChangePackage {
   /// Новые названия тегов, переименованных пакетом.
   Iterable<Tag> get renamedTags =>
       tagChanges.whereType<TagRenamedChange>().map((change) => change.after);
+
+  /// Идентификаторы тегов, физически удалённых пакетом.
+  Iterable<TagId> get deletedTagIds =>
+      tagChanges.whereType<TagDeletedChange>().map((change) => change.tagId);
 
   bool get hasForeignRevision =>
       mutations.any(_isForeign) ||
