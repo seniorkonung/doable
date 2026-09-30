@@ -302,6 +302,28 @@ final class IntentionSummary {
         tags: tags,
       );
 
+  /// Заменяет название назначенного тега той же идентичности.
+  ///
+  /// Состав и порядок тегов переносятся без изменений, поэтому соответствие
+  /// фильтру, порядок выдачи и временные метки сохраняются. Если тег не
+  /// назначен намерению, возвращается та же сводка.
+  IntentionSummary withRenamedTag(Tag renamed) {
+    if (!tags.any((tag) => tag.id == renamed.id)) {
+      return this;
+    }
+    return IntentionSummary(
+      id: id,
+      title: title,
+      hasDescription: hasDescription,
+      readiness: readiness,
+      archiveState: archiveState,
+      activeRelationCount: activeRelationCount,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      tags: [for (final tag in tags) tag.id == renamed.id ? renamed : tag],
+    );
+  }
+
   static int _requireNonNegativeCount(int value) {
     if (value < 0) {
       throw ArgumentError.value(

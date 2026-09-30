@@ -9,6 +9,7 @@ import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../tag/application/tag_change.dart';
+import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_target.dart';
 import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
@@ -759,6 +760,9 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         entry.value.active,
       );
     }
+    for (final renamed in package.renamedTags) {
+      reconciled = _applyRenamedTagContent(reconciled, renamed);
+    }
 
     return _withRevision(reconciled, package.revision);
   }
@@ -782,6 +786,36 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
     final items = [...confirmed.items];
     items[index] = items[index].withActiveRelationCount(activeRelationCount);
+    return IntentionCatalogLoaded(
+      selection: confirmed.selection,
+      query: confirmed.query,
+      items: items,
+      totalCount: confirmed.totalCount,
+      nextCursor: confirmed.nextCursor,
+      revision: confirmed.revision,
+      continuation: confirmed.continuation,
+    );
+  }
+
+  /// Заменяет название переименованного тега в загруженных строках.
+  ///
+  /// Условия поиска хранят только идентификаторы тегов, поэтому состав
+  /// совпадений, порядок, число совпадений и курсор сохраняются.
+  IntentionCatalogConfirmedState _applyRenamedTagContent(
+    IntentionCatalogConfirmedState confirmed,
+    Tag renamed,
+  ) {
+    if (confirmed is! IntentionCatalogLoaded) {
+      return confirmed;
+    }
+    final items = [
+      for (final item in confirmed.items) item.withRenamedTag(renamed),
+    ];
+    if (items.indexed.every(
+      (entry) => identical(entry.$2, confirmed.items[entry.$1]),
+    )) {
+      return confirmed;
+    }
     return IntentionCatalogLoaded(
       selection: confirmed.selection,
       query: confirmed.query,
@@ -890,6 +924,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// назначения тега намерению сам принадлежность не меняет: её задаёт
 /// каталожная мутация того же намерения, поэтому количество изменяется
 /// один раз, а факт без такой мутации делает пакет несогласуемым.
+/// Переименование тега меняет только его название в загруженных строках.
 final class _CatalogChangePackage {
   _CatalogChangePackage(this.revision, Iterable<GraphChange> changes)
     : mutations = List.unmodifiable(
@@ -913,6 +948,10 @@ final class _CatalogChangePackage {
       .map((change) => change.assignment.target)
       .whereType<IntentionTagTarget>()
       .map((target) => target.intentionId);
+
+  /// Новые названия тегов, переименованных пакетом.
+  Iterable<Tag> get renamedTags =>
+      tagChanges.whereType<TagRenamedChange>().map((change) => change.after);
 
   bool get hasForeignRevision =>
       mutations.any(_isForeign) ||

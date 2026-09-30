@@ -292,7 +292,7 @@
   - **Ожидаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.g.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, новый `test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart` в существующем каталоге тестов.
   - **Размер:** M.
 
-- [ ] 2.3 Переименование и создание тега сохраняют идентичность условия и обновляют названия загруженных строк
+- [x] 2.3 Переименование и создание тега сохраняют идентичность условия и обновляют названия загруженных строк
   - **Критерии приёмки:**
     - Подтверждённый `TagRenamedChange` по `TagId` заменяет отображаемое название в подтверждённых тегах загруженных сводок и в сведениях о выбранных условиях. Состав совпадений, их порядок, точное количество, курсор и загруженная граница не меняются, а ревизия состояния продвигается на ревизию пакета.
     - `TagUnchangedChange`, `TagCreatedChange` без назначения и `TagAssignmentUnchangedChange` не меняют состав намерений и не применяют изменения количества. Новый тег с прежним названием не подменяет идентификатор условия и не считается назначением другого тега.

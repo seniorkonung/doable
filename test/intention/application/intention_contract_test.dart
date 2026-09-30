@@ -445,6 +445,73 @@ void main() {
       expect(() => copy.tags.clear(), throwsUnsupportedError);
     });
 
+    test('переименование тега заменяет только его название в сводке', () {
+      final firstId = _tagId('00000000-0000-4000-8000-000000000002');
+      final secondId = _tagId('00000000-0000-4000-8000-000000000001');
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: true,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+        activeRelationCount: 2,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        tags: [
+          Tag(id: firstId, name: TagName.fromStored('Первый тег')),
+          Tag(id: secondId, name: TagName.fromStored('Второй тег')),
+        ],
+      );
+
+      final copy = summary.withRenamedTag(
+        Tag(id: secondId, name: TagName.fromStored('Переименованный')),
+      );
+
+      expect(copy.tags.map((tag) => tag.id), [firstId, secondId]);
+      expect(copy.tags.map((tag) => tag.name.value), [
+        'Первый тег',
+        'Переименованный',
+      ]);
+      expect(summary.tags.last.name.value, 'Второй тег');
+      expect(copy.id, summary.id);
+      expect(copy.title, summary.title);
+      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.readiness, summary.readiness);
+      expect(copy.archiveState, summary.archiveState);
+      expect(copy.activeRelationCount, summary.activeRelationCount);
+      expect(copy.createdAt, summary.createdAt);
+      expect(copy.updatedAt, summary.updatedAt);
+      expect(() => copy.tags.clear(), throwsUnsupportedError);
+    });
+
+    test('переименование неназначенного тега возвращает ту же сводку', () {
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: false,
+        readiness: IntentionReadiness.notReady,
+        archiveState: IntentionArchiveState.active,
+        activeRelationCount: 0,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        tags: [
+          Tag(
+            id: _tagId('00000000-0000-4000-8000-000000000001'),
+            name: TagName.fromStored('Здоровье'),
+          ),
+        ],
+      );
+
+      final copy = summary.withRenamedTag(
+        Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000002'),
+          name: TagName.fromStored('Здоровье'),
+        ),
+      );
+
+      expect(copy, same(summary));
+    });
+
     test(
       'нормализует фильтр, ограничивает порцию и применяет scope с фильтром',
       () {
