@@ -7,9 +7,14 @@ import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -549,6 +554,150 @@ void main() {
       );
     }
     expect(await harness.databaseFile.readAsBytes(), corrupted);
+  });
+
+  test('чтение, назначение архивированному действию, навигация и снятие сохраняются после перезапусков', () async {
+    final harness = await LocalDatabaseHarness.fileBacked();
+    addTearDown(harness.dispose);
+    late sqlite.Database raw;
+    await harness.openReadyDatabase(setup: (db) => raw = db);
+    seedTagRecipientGraphFixture(raw);
+    // Архивированное действие участвует в выполненном дневном выборе.
+    raw.execute(
+      'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, 1)',
+      [tagFixtureId(203), tagFixtureId(1), tagFixtureId(2), '2026-09-24'],
+    );
+    raw.execute(
+      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+      [tagFixtureId(204), tagFixtureId(203), tagFixtureId(102)],
+    );
+    final graphBefore = retainedTagFixtureGraph(raw);
+    await harness.closePersistenceObjectGraph();
+
+    Future<DriftPersonalGraphRepository> restart() async {
+      await harness.closePersistenceObjectGraph();
+      final database = await harness.openReadyDatabase(setup: (db) => raw = db);
+      return DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        InMemoryDiagnosticsSink(),
+      );
+    }
+
+    final archivedAction =
+        (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
+    final activeAction =
+        (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
+
+    Future<void> expectState(
+      DriftPersonalGraphRepository repository,
+      TagId tagId, {
+      required List<IntentionId> active,
+      required List<IntentionId> archived,
+    }) async {
+      final catalog = (await repository.getTagCatalog(
+        const TagCatalogBrowseMode(),
+      ) as TagCatalogSuccess).value;
+      expect(catalog.items.map((tag) => (tag.id, tag.name.value)), [
+        (tagId, 'Дом'),
+      ]);
+      for (final intentionId in [activeAction, archivedAction]) {
+        final snapshot = (await repository.getTagAssignments(
+          intentionId,
+        ) as TagAssignmentsSuccess).value;
+        expect(snapshot.intentionId, intentionId);
+        expect(
+          snapshot.items.map((tag) => tag.id),
+          [...active, ...archived].contains(intentionId) ? [tagId] : isEmpty,
+        );
+      }
+      for (final (scope, expected) in [
+        (TaggedIntentionsScope.active, active),
+        (TaggedIntentionsScope.archived, archived),
+      ]) {
+        final page = (await repository.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(tagId: tagId, scope: scope),
+        ) as TaggedIntentionsPageSuccess).value;
+        expect(page.items.map((item) => item.id), expected);
+        expect(page.nextCursor, isNull);
+      }
+      expect(retainedTagFixtureGraph(raw), graphBefore);
+      expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
+      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+    }
+
+    var repository = await restart();
+    expect(
+      (await repository.getTagCatalog(
+        const TagCatalogBrowseMode(),
+      ) as TagCatalogSuccess).value.items,
+      isEmpty,
+    );
+    final created = await repository.execute(
+      CreateTag(TagName.fromInput('Дом')),
+    );
+    final tagId =
+        ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
+    await expectState(repository, tagId, active: [], archived: []);
+
+    for (final intentionId in [archivedAction, activeAction, archivedAction]) {
+      expect(
+        await repository.execute(
+          AssignTag(tagId: tagId, intentionId: intentionId),
+        ),
+        isA<TagCommandSucceeded>(),
+      );
+    }
+    final assignmentsBefore = _assignmentRows(raw);
+    expect(assignmentsBefore, hasLength(2));
+
+    repository = await restart();
+    expect(_assignmentRows(raw), assignmentsBefore);
+    await expectState(
+      repository,
+      tagId,
+      active: [activeAction],
+      archived: [archivedAction],
+    );
+
+    for (final intentionId in [activeAction, archivedAction]) {
+      expect(
+        (await repository.execute(
+          RemoveTagAssignment(tagId: tagId, intentionId: intentionId),
+        ) as TagCommandSucceeded).value.value,
+        isA<TagAssignmentChanged>(),
+      );
+    }
+
+    // Тег без назначений остаётся доступным для явного назначения.
+    repository = await restart();
+    expect(_assignmentRows(raw), isEmpty);
+    await expectState(repository, tagId, active: [], archived: []);
+    expect(
+      await repository.execute(
+        AssignTag(tagId: tagId, intentionId: archivedAction),
+      ),
+      isA<TagCommandSucceeded>(),
+    );
+
+    repository = await restart();
+    expect(
+      raw
+          .select('''
+          SELECT creation_sequence, tag_id, intention_id FROM tag_assignments
+        ''')
+          .map((row) => row.values.toList()),
+      [
+        [3, tagId.toCanonicalString(), tagFixtureId(2)],
+      ],
+    );
+    await expectState(
+      repository,
+      tagId,
+      active: [],
+      archived: [archivedAction],
+    );
   });
 }
 

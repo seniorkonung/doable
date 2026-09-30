@@ -274,7 +274,7 @@
   - **Вероятные файлы:** `test/support/tag_storage_fixture.dart`, `test/graph/data/drift_tag_assignment_read_cost_test.dart`, `test/graph/data/drift_tagged_entities_read_cost_test.dart`, `test/graph/data/tag_delete_cost.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/tag/presentation/assignments/tag_assignments_read_cost_widget_test.dart`, `test/tag/presentation/navigation/tag_navigation_read_cost_widget_test.dart`, `test/app/tag_navigation_graph_lifecycle_scenarios.dart`, `test/app/tag_navigation_app_lifecycle_test.dart`, `test/graph/data/file_backed_tag_durability_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.7 Приложение на текущей схеме сохраняет управление тегами намерений
+- [x] 2.7 Приложение на текущей схеме сохраняет управление тегами намерений
   - **Критерии приёмки:**
     - Команды, чтения и навигация реального адаптера исполняют контракты первой фазы: пары намерений сохраняются без дубликатов, полные снимки каталога и назначений упорядочены, страницы помеченных намерений ограничены, категории отказов различимы.
     - Тег без назначений остаётся в каталоге и доступен для явного назначения намерению; архивированное намерение и действие остаются допустимыми получателями.
