@@ -23,6 +23,9 @@ BEGIN
   SELECT RAISE(ABORT, 'tag identity is immutable');
 END;
 
+-- Тег — метка намерения: единственный получатель назначения — намерение,
+-- включая действие и архивированное намерение. Долговременные связи
+-- тегов не имеют.
 CREATE TABLE tag_assignments (
   creation_sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
     CHECK (creation_sequence > 0),
