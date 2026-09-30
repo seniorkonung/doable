@@ -30,6 +30,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   group('поисковый ключ названия намерения', () {
@@ -885,6 +886,95 @@ void main() {
     );
   });
 
+  group('контракт чтения согласования каталога', () {
+    test('запрос несёт фильтр, границу и неизменяемые сохранённые строки', () {
+      final query = _query(pageSize: 2);
+      final first = _intentionId('00000000-0000-4000-8000-000000000001');
+      final second = _intentionId('00000000-0000-4000-8000-000000000002');
+      final stored = [second, first, second];
+      const continuation = _TestCatalogCursor();
+      const cursor = _TestReconciliationCursor();
+
+      final reconciliation = IntentionCatalogReconciliationQuery(
+        catalogQuery: query,
+        boundary: const IntentionCatalogPartialPrefixBoundary(continuation),
+        storedIntentionIds: stored,
+        cursor: cursor,
+      );
+      stored.clear();
+
+      expect(reconciliation.catalogQuery, same(query));
+      expect(reconciliation.storedIntentionIds, {first, second});
+      expect(reconciliation.cursor, same(cursor));
+      expect(
+        () => reconciliation.storedIntentionIds.add(first),
+        throwsUnsupportedError,
+      );
+      expect(switch (reconciliation.boundary) {
+        IntentionCatalogPartialPrefixBoundary(:final continuation) =>
+          continuation,
+        IntentionCatalogCompletedBoundary() => null,
+      }, same(continuation));
+    });
+
+    test('ранее завершённая выдача, включая пустую, — отдельная граница', () {
+      final reconciliation = IntentionCatalogReconciliationQuery(
+        catalogQuery: _query(),
+        boundary: const IntentionCatalogCompletedBoundary(),
+        storedIntentionIds: const [],
+      );
+
+      expect(_boundaryDescription(reconciliation.boundary), 'completed');
+      expect(reconciliation.storedIntentionIds, isEmpty);
+      expect(reconciliation.cursor, isNull);
+    });
+
+    test('исходы различают первую порцию, продолжение и повтор', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
+      const cursor = _TestReconciliationCursor();
+      final summary = _summary(id: '00000000-0000-4000-8000-000000000003');
+      final outcomes = <IntentionCatalogReconciliationOutcome>[
+        IntentionCatalogReconciliationFirstPortion(
+          items: [summary],
+          totalCount: 7,
+          nextCursor: cursor,
+          revision: revision,
+        ),
+        IntentionCatalogReconciliationContinuationPortion(
+          items: const [],
+          nextCursor: null,
+          revision: revision,
+        ),
+        const IntentionCatalogReconciliationRetry(),
+      ];
+
+      expect(outcomes.map(_reconciliationDescription), [
+        'first:7',
+        'continuation',
+        'retry',
+      ]);
+      final first = outcomes.first as IntentionCatalogReconciliationPortion;
+      expect(first.items.single, same(summary));
+      expect(first.nextCursor, same(cursor));
+      expect(first.revision, same(revision));
+      expect(() => first.items.add(summary), throwsUnsupportedError);
+    });
+
+    test('первая порция отклоняет количество меньше своих строк', () {
+      final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
+
+      expect(
+        () => IntentionCatalogReconciliationFirstPortion(
+          items: [summary],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const _TestGraphRevision(epoch: 'первая', sequence: 0),
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+    });
+  });
+
   group('commands и результаты намерений', () {
     test(
       'закрытый набор commands несёт только необходимые предметные данные',
@@ -1020,6 +1110,16 @@ void main() {
       expect(
         await repository.getCatalogPage(_query()),
         isA<ResultFailure<IntentionCatalogPage>>(),
+      );
+      expect(
+        await repository.getCatalogReconciliationPortion(
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: _query(),
+            boundary: const IntentionCatalogCompletedBoundary(),
+            storedIntentionIds: [id],
+          ),
+        ),
+        isA<ResultFailure<IntentionCatalogReconciliationOutcome>>(),
       );
       expect(
         await repository.getRelationCounts(id),
@@ -1232,6 +1332,21 @@ String _pageDescription(IntentionCatalogPage page) => switch (page) {
   IntentionCatalogContinuationPage() => 'continuation',
 };
 
+String _boundaryDescription(IntentionCatalogReconciliationBoundary boundary) =>
+    switch (boundary) {
+      IntentionCatalogPartialPrefixBoundary() => 'partial',
+      IntentionCatalogCompletedBoundary() => 'completed',
+    };
+
+String _reconciliationDescription(
+  IntentionCatalogReconciliationOutcome outcome,
+) => switch (outcome) {
+  IntentionCatalogReconciliationFirstPortion(:final totalCount) =>
+    'first:$totalCount',
+  IntentionCatalogReconciliationContinuationPortion() => 'continuation',
+  IntentionCatalogReconciliationRetry() => 'retry',
+};
+
 String _successDescription(IntentionCommandSuccess success) =>
     switch (success) {
       IntentionSaved() => 'saved',
@@ -1317,7 +1432,7 @@ TagId _tagId(String value) => switch (TagId.decode(value)) {
 };
 
 final class _FailingPersonalGraphRepository
-    with TagReadContractTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
@@ -1413,6 +1528,11 @@ final class _EmptyGraphCommandOutcome implements GraphCommandOutcome {
 
 final class _TestCatalogCursor implements IntentionCatalogCursor {
   const _TestCatalogCursor();
+}
+
+final class _TestReconciliationCursor
+    implements IntentionCatalogReconciliationCursor {
+  const _TestReconciliationCursor();
 }
 
 final class _TestGraphRevision implements GraphRevision {

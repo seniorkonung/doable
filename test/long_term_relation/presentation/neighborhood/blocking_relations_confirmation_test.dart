@@ -33,6 +33,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'neighborhood_test_support.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   for (final locale in [const Locale('ru'), const Locale('en')]) {
@@ -1072,7 +1073,7 @@ DailyChoiceCatalogItem _dailyItem({
 }
 
 final class _CommandRepository
-    with TagReadContractTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(

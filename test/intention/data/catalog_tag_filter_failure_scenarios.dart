@@ -146,6 +146,100 @@ void _catalogTagFilterFailureScenarios(
   }
 }
 
+void _catalogReconciliationFailureScenarios(
+  Future<
+    ({
+      AppDatabase database,
+      DriftPersonalGraphRepository repository,
+      InMemoryDiagnosticsSink diagnostics,
+    })
+  >
+  Function(LocalDatabaseConnectionObserver, void Function(Database))
+  replace,
+) {
+  for (final (point, label) in [
+    (_CatalogFailurePoint.count, 'при подсчёте абсолютного количества'),
+    (_CatalogFailurePoint.rows, 'при чтении недостающих совпадений'),
+    (_CatalogFailurePoint.tags, 'при чтении тегов порции'),
+  ]) {
+    for (final (error, failure) in <(Object, Matcher)>[
+      (
+        StateError('CANARY-неизвестный отказ'),
+        isA<IntentionUnexpectedFailure>(),
+      ),
+      (
+        SqliteException(
+          extendedResultCode: SqlError.SQLITE_BUSY,
+          message: 'CANARY-недоступность',
+        ),
+        isA<IntentionUnavailableFailure>(),
+      ),
+      (
+        SqliteException(
+          extendedResultCode: SqlError.SQLITE_CORRUPT,
+          message: 'CANARY-повреждение',
+        ),
+        isA<IntentionCorruptionFailure>(),
+      ),
+    ]) {
+      test('отказ чтения согласования $label сохраняет категорию, граф и '
+          'соединение: $error', () async {
+        final observer = _CatalogFilterFailureObserver(point, error);
+        late Database raw;
+        final (:repository, diagnostics: _, database: _) = await replace(
+          observer,
+          (db) => raw = db,
+        );
+        seedTagStorageFixture(raw);
+        final query = IntentionCatalogReconciliationQuery(
+          catalogQuery: IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            tagFilter: IntentionTagFilter(
+              excludedTagIds: [_fixtureTag(lastTagNumber)],
+            ),
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+          ),
+          boundary: const IntentionCatalogCompletedBoundary(),
+          storedIntentionIds: const [],
+        );
+        final before = _storedFilterFailureGraph(raw);
+        final changesBefore = _connectionChanges(raw);
+        observer.arm();
+
+        expect(
+          await repository.getCatalogReconciliationPortion(query),
+          isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
+            (result) => result.failure,
+            'причина',
+            failure,
+          ),
+        );
+        expect(observer.hasFailed, isTrue);
+        expect(_storedFilterFailureGraph(raw), before);
+        expect(_connectionChanges(raw), changesBefore);
+
+        final recovered = await repository.getCatalogReconciliationPortion(
+          query,
+        );
+        final portion =
+            (recovered as ResultSuccess<IntentionCatalogReconciliationOutcome>)
+                    .value
+                as IntentionCatalogReconciliationFirstPortion;
+        expect(portion.totalCount, 2);
+        expect(portion.items.single.id, _id(tagFixtureId(1)));
+        expect(portion.items.single.tags.map((tag) => tag.id), [
+          _fixtureTag(firstTagNumber),
+        ]);
+        expect(portion.nextCursor, isNotNull);
+        expect(_storedFilterFailureGraph(raw), before);
+        expect(_connectionChanges(raw), changesBefore);
+      });
+    }
+  }
+}
+
 TagId _fixtureTag(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
 

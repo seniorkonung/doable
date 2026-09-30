@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -480,7 +481,7 @@ Future<void> _pumpPage(
 );
 
 final class _PathRepository
-    with TagReadContractTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   final queries = <ChoicePathContinuationQuery>[];
   final _requests = <Completer<ChoicePathContinuationResult>>[];

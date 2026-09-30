@@ -233,6 +233,54 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   }
 
   @override
+  Future<Result<IntentionCatalogReconciliationOutcome>>
+  getCatalogReconciliationPortion(
+    IntentionCatalogReconciliationQuery query,
+  ) async {
+    const invalidInput = ResultFailure<IntentionCatalogReconciliationOutcome>(
+      IntentionGenericValidationFailure(),
+    );
+    final catalogQuery = query.catalogQuery;
+    final _DriftIntentionCatalogCursor? area;
+    switch (query.boundary) {
+      case IntentionCatalogCompletedBoundary():
+        area = null;
+      case IntentionCatalogPartialPrefixBoundary(
+            continuation: final _DriftIntentionCatalogCursor continuation,
+          )
+          when continuation.isOwnedBy(_epoch) &&
+              continuation.matches(catalogQuery):
+        area = continuation;
+      case IntentionCatalogPartialPrefixBoundary():
+        return invalidInput;
+    }
+    final cursor = query.cursor;
+    if (catalogQuery.cursor != null ||
+        cursor != null &&
+            (cursor is! _DriftIntentionCatalogReconciliationCursor ||
+                !cursor.isOwnedBy(_epoch) ||
+                !cursor.matches(query, area))) {
+      return invalidInput;
+    }
+
+    try {
+      final outcome = await _sequencer.run(
+        () => _database.transaction(
+          () => switch (cursor) {
+            null => _readFirstReconciliationPortion(query, area),
+            _DriftIntentionCatalogReconciliationCursor() =>
+              _readReconciliationContinuation(query, area, cursor),
+            _ => throw StateError('Недопустимое продолжение согласования.'),
+          },
+        ),
+      );
+      return ResultSuccess(outcome);
+    } on Object catch (error) {
+      return ResultFailure(_classifyCatalogReadFailure(error));
+    }
+  }
+
+  @override
   Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
     IntentionId intentionId,
   ) async {
@@ -942,6 +990,107 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     );
   }
 
+  Future<IntentionCatalogReconciliationFirstPortion>
+  _readFirstReconciliationPortion(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? area,
+  ) async {
+    final intentions = _database.intentions;
+    final countExpression = countAll();
+    final countQuery = _database.selectOnly(intentions)
+      ..addColumns([countExpression])
+      ..where(_catalogCondition(query.catalogQuery));
+    final totalCount = (await countQuery.getSingle()).read(countExpression)!;
+    final portion = await _readMissingCatalogMatches(query, area, null);
+
+    return IntentionCatalogReconciliationFirstPortion(
+      items: portion.items,
+      totalCount: totalCount,
+      nextCursor: portion.nextCursor,
+      revision: _currentRevision,
+    );
+  }
+
+  Future<IntentionCatalogReconciliationOutcome> _readReconciliationContinuation(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? area,
+    _DriftIntentionCatalogReconciliationCursor cursor,
+  ) async {
+    if (cursor.revisionSequence != _mutationSequence) {
+      return const IntentionCatalogReconciliationRetry();
+    }
+    final portion = await _readMissingCatalogMatches(
+      query,
+      area,
+      cursor.position,
+    );
+    return IntentionCatalogReconciliationContinuationPortion(
+      items: portion.items,
+      nextCursor: portion.nextCursor,
+      revision: _currentRevision,
+    );
+  }
+
+  /// Недостающие совпадения области после [position] в действующем порядке:
+  /// строки после границы частичного префикса и сохранённые строки не
+  /// читаются, а материализация ограничена порцией и её назначениями.
+  Future<
+    ({
+      List<IntentionSummary> items,
+      IntentionCatalogReconciliationCursor? nextCursor,
+    })
+  >
+  _readMissingCatalogMatches(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? area,
+    _DriftIntentionCatalogCursor? position,
+  ) async {
+    final catalogQuery = query.catalogQuery;
+    final intentions = _database.intentions;
+    var condition = _catalogCondition(catalogQuery);
+    if (area != null) {
+      condition = condition & _notAfterKeysetCondition(catalogQuery, area);
+    }
+    if (position != null) {
+      condition = condition & _keysetCondition(catalogQuery, position);
+    }
+    if (query.storedIntentionIds.isNotEmpty) {
+      condition =
+          condition & _StoredCatalogRowsExpression(query.storedIntentionIds);
+    }
+    final rowsQuery = _database.selectOnly(intentions)
+      ..addColumns([
+        intentions.id,
+        intentions.title,
+        intentions.description,
+        intentions.isActionReady,
+        intentions.isArchived,
+        intentions.createdAt,
+        intentions.updatedAt,
+      ])
+      ..where(condition)
+      ..orderBy([
+        _primaryOrderingTerm(intentions, catalogQuery.order),
+        OrderingTerm.asc(intentions.id),
+      ])
+      ..limit(catalogQuery.pageSize + 1);
+    final rows = await rowsQuery.get();
+    final items = await _readCatalogItems(rows, catalogQuery.pageSize);
+    final hasNextPortion = rows.length > catalogQuery.pageSize;
+
+    return (
+      items: items,
+      nextCursor: hasNextPortion
+          ? _DriftIntentionCatalogReconciliationCursor(
+              position: _cursorAt(catalogQuery, items.last),
+              area: area,
+              storedIntentionIds: query.storedIntentionIds,
+              revisionSequence: _mutationSequence,
+            )
+          : null,
+    );
+  }
+
   Expression<bool> _catalogCondition(IntentionCatalogQuery query) {
     final intentions = _database.intentions;
     final scopeCondition = switch (query.scope) {
@@ -1015,6 +1164,37 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         (timestamp.equals(boundaryTimestamp) &
             intentions.id.isBiggerThanValue(
               cursor.boundaryId.toCanonicalString(),
+            ));
+  }
+
+  /// Строка не следует за границей в действующем порядке, включая саму
+  /// границу. Отдельное сравнение временной метки ограничивает диапазон
+  /// обхода индекса порядка.
+  Expression<bool> _notAfterKeysetCondition(
+    IntentionCatalogQuery query,
+    _DriftIntentionCatalogCursor boundary,
+  ) {
+    final intentions = _database.intentions;
+    final timestamp = _primaryOrderingColumn(intentions, query.order);
+    final boundaryTimestamp =
+        boundary.boundaryTimestamp.value.microsecondsSinceEpoch;
+    final (
+      notAfterTimestamp,
+      beforeTimestamp,
+    ) = switch (query.order.direction) {
+      IntentionCatalogSortDirection.ascending => (
+        timestamp.isSmallerOrEqualValue(boundaryTimestamp),
+        timestamp.isSmallerThanValue(boundaryTimestamp),
+      ),
+      IntentionCatalogSortDirection.descending => (
+        timestamp.isBiggerOrEqualValue(boundaryTimestamp),
+        timestamp.isBiggerThanValue(boundaryTimestamp),
+      ),
+    };
+    return notAfterTimestamp &
+        (beforeTimestamp |
+            intentions.id.isSmallerOrEqualValue(
+              boundary.boundaryId.toCanonicalString(),
             ));
   }
 
@@ -1093,7 +1273,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     tags: tags,
   );
 
-  IntentionCatalogCursor _cursorAt(
+  _DriftIntentionCatalogCursor _cursorAt(
     IntentionCatalogQuery query,
     IntentionSummary boundary,
   ) => _DriftIntentionCatalogCursor(
@@ -1550,12 +1730,15 @@ final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
   );
 }
 
-/// Набор условий передаётся одним параметром: JSON-массивом различных
-/// канонических строк для `json_each(?)`. Чтение ничего не пишет на
-/// соединение, а число условий не ограничено числом параметров SQL-выражения.
-final class _CatalogTagIdsParameter {
-  _CatalogTagIdsParameter(Set<TagId> tagIds)
-    : _canonicalIds = {for (final id in tagIds) id.toCanonicalString()};
+/// Набор идентификаторов передаётся одним параметром: JSON-массивом
+/// различных канонических строк для `json_each(?)`. Чтение ничего не пишет на
+/// соединение, а размер набора не ограничен числом параметров SQL-выражения.
+final class _CatalogIdsParameter {
+  _CatalogIdsParameter(Iterable<String> canonicalIds)
+    : _canonicalIds = {...canonicalIds};
+
+  _CatalogIdsParameter.tags(Set<TagId> tagIds)
+    : this(tagIds.map((id) => id.toCanonicalString()));
 
   final Set<String> _canonicalIds;
 
@@ -1580,9 +1763,9 @@ final class _CatalogTagIdsParameter {
 /// завершается после `pageSize + 1` подходящих строк.
 final class _RequiredCatalogTagsExpression extends Expression<bool> {
   _RequiredCatalogTagsExpression(Set<TagId> tagIds)
-    : _tagIds = _CatalogTagIdsParameter(tagIds);
+    : _tagIds = _CatalogIdsParameter.tags(tagIds);
 
-  final _CatalogTagIdsParameter _tagIds;
+  final _CatalogIdsParameter _tagIds;
 
   @override
   void writeInto(GenerationContext context) {
@@ -1612,9 +1795,9 @@ final class _RequiredCatalogTagsExpression extends Expression<bool> {
 /// `NULL` в множестве сделал бы `NOT IN` неопределённым для каждого кандидата.
 final class _ExcludedCatalogTagsExpression extends Expression<bool> {
   _ExcludedCatalogTagsExpression(Set<TagId> tagIds)
-    : _tagIds = _CatalogTagIdsParameter(tagIds);
+    : _tagIds = _CatalogIdsParameter.tags(tagIds);
 
-  final _CatalogTagIdsParameter _tagIds;
+  final _CatalogIdsParameter _tagIds;
 
   @override
   void writeInto(GenerationContext context) {
@@ -1627,6 +1810,67 @@ final class _ExcludedCatalogTagsExpression extends Expression<bool> {
     );
     _tagIds.writeInto(context);
     context.buffer.write(') AS excluded_tag))');
+  }
+}
+
+/// Сохранённые строки области не входят в порцию согласования. Набор
+/// передаётся одним параметром и читается из `json_each(?)` один раз на
+/// выполнение запроса; чтение ничего не пишет на соединение.
+final class _StoredCatalogRowsExpression extends Expression<bool> {
+  _StoredCatalogRowsExpression(Set<IntentionId> intentionIds)
+    : _intentionIds = _CatalogIdsParameter(
+        intentionIds.map((id) => id.toCanonicalString()),
+      );
+
+  final _CatalogIdsParameter _intentionIds;
+
+  @override
+  void writeInto(GenerationContext context) {
+    context.buffer.write(
+      'intentions.id NOT IN (SELECT stored_row.value FROM json_each(',
+    );
+    _intentionIds.writeInto(context);
+    context.buffer.write(') AS stored_row)');
+  }
+}
+
+/// Продолжение согласования связано с запросом и позицией порции,
+/// границей области, сохранёнными строками и ревизией первой порции.
+final class _DriftIntentionCatalogReconciliationCursor
+    implements IntentionCatalogReconciliationCursor {
+  const _DriftIntentionCatalogReconciliationCursor({
+    required this.position,
+    required this.area,
+    required this.storedIntentionIds,
+    required this.revisionSequence,
+  });
+
+  final _DriftIntentionCatalogCursor position;
+
+  /// Граница частичного префикса либо `null` для ранее завершённой выдачи.
+  final _DriftIntentionCatalogCursor? area;
+  final Set<IntentionId> storedIntentionIds;
+  final int revisionSequence;
+
+  bool isOwnedBy(_GraphEpoch candidate) => position.isOwnedBy(candidate);
+
+  bool matches(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? requestedArea,
+  ) =>
+      position.matches(query.catalogQuery) &&
+      _sameArea(requestedArea) &&
+      storedIntentionIds.length == query.storedIntentionIds.length &&
+      storedIntentionIds.containsAll(query.storedIntentionIds);
+
+  bool _sameArea(_DriftIntentionCatalogCursor? requestedArea) {
+    final area = this.area;
+    if (area == null || requestedArea == null) {
+      return area == null && requestedArea == null;
+    }
+    return area.boundaryTimestamp.value ==
+            requestedArea.boundaryTimestamp.value &&
+        area.boundaryId == requestedArea.boundaryId;
   }
 }
 

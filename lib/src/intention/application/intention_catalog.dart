@@ -513,3 +513,105 @@ final class IntentionCatalogContinuationPage extends IntentionCatalogPage {
     required super.revision,
   });
 }
+
+/// Граница области открытой выдачи, которую согласует чтение согласования.
+sealed class IntentionCatalogReconciliationBoundary {
+  const IntentionCatalogReconciliationBoundary();
+}
+
+/// Частично загруженный префикс заканчивается ключом сортировки обычного
+/// продолжения этой выдачи. Совпадения после ключа получает обычное
+/// продолжение, а не чтение согласования.
+final class IntentionCatalogPartialPrefixBoundary
+    extends IntentionCatalogReconciliationBoundary {
+  const IntentionCatalogPartialPrefixBoundary(this.continuation);
+
+  final IntentionCatalogCursor continuation;
+}
+
+/// Выдача ранее загружена до конца, в том числе пустая: область
+/// согласования продолжается до нового конца выдачи.
+final class IntentionCatalogCompletedBoundary
+    extends IntentionCatalogReconciliationBoundary {
+  const IntentionCatalogCompletedBoundary();
+}
+
+/// Непрозрачное продолжение одного согласования. Оно связано с запросом,
+/// границей области, сохранёнными идентификаторами и ревизией первой порции.
+abstract interface class IntentionCatalogReconciliationCursor {}
+
+/// Запрос недостающих совпадений внутри уже загруженной области.
+///
+/// [catalogQuery] задаёт текущий совместный фильтр и порядок открытой выдачи
+/// без курсора обычного продолжения. Сохранённые строки области исключаются
+/// из порций по идентичности; повторы и порядок идентификаторов не меняют
+/// смысл запроса.
+final class IntentionCatalogReconciliationQuery {
+  IntentionCatalogReconciliationQuery({
+    required this.catalogQuery,
+    required this.boundary,
+    required Iterable<IntentionId> storedIntentionIds,
+    this.cursor,
+  }) : storedIntentionIds = Set.unmodifiable(storedIntentionIds);
+
+  final IntentionCatalogQuery catalogQuery;
+  final IntentionCatalogReconciliationBoundary boundary;
+  final Set<IntentionId> storedIntentionIds;
+  final IntentionCatalogReconciliationCursor? cursor;
+}
+
+/// Исход чтения согласования, отличный от безопасно классифицированного
+/// отказа: порция недостающих совпадений либо требование повторить
+/// согласование для актуальной ревизии.
+sealed class IntentionCatalogReconciliationOutcome {
+  const IntentionCatalogReconciliationOutcome();
+}
+
+/// Порция недостающих совпадений области в действующем порядке с полным
+/// составом собственных тегов. Все порции одного согласования отражают одну
+/// ревизию.
+sealed class IntentionCatalogReconciliationPortion
+    extends IntentionCatalogReconciliationOutcome {
+  IntentionCatalogReconciliationPortion({
+    required List<IntentionSummary> items,
+    required this.nextCursor,
+    required this.revision,
+  }) : items = List.unmodifiable(items);
+
+  final List<IntentionSummary> items;
+  final IntentionCatalogReconciliationCursor? nextCursor;
+  final GraphRevision revision;
+}
+
+/// Первая порция согласования несёт абсолютное количество совпадений всего
+/// совместного фильтра, не ограниченное областью и сохранёнными строками.
+final class IntentionCatalogReconciliationFirstPortion
+    extends IntentionCatalogReconciliationPortion {
+  IntentionCatalogReconciliationFirstPortion({
+    required super.items,
+    required int totalCount,
+    required super.nextCursor,
+    required super.revision,
+  }) : totalCount = IntentionCatalogFirstPage._requireTotalCount(
+         totalCount,
+         items.length,
+       );
+
+  final int totalCount;
+}
+
+final class IntentionCatalogReconciliationContinuationPortion
+    extends IntentionCatalogReconciliationPortion {
+  IntentionCatalogReconciliationContinuationPortion({
+    required super.items,
+    required super.nextCursor,
+    required super.revision,
+  });
+}
+
+/// Граф изменился после первой порции: полученные порции нельзя
+/// публиковать, а согласование повторяется для актуальной ревизии.
+final class IntentionCatalogReconciliationRetry
+    extends IntentionCatalogReconciliationOutcome {
+  const IntentionCatalogReconciliationRetry();
+}

@@ -30,9 +30,10 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 final class ControlledCatalogRepository
-    with TagReadContractTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

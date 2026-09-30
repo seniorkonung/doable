@@ -55,6 +55,22 @@ void main() {
     );
   });
 
+  _catalogReconciliationFailureScenarios((observer, setup) async {
+    final replacement = await _replaceDatabase(
+      observer,
+      database,
+      diagnostics,
+      setup: setup,
+    );
+    database = replacement.database;
+    repository = replacement.repository;
+    return (
+      database: database,
+      repository: repository,
+      diagnostics: diagnostics,
+    );
+  });
+
   group('Порция каталога — отказы получения собственных тегов', () {
     test('повреждённая ссылка отклоняет всю порцию и её продолжение', () async {
       for (final id in [_id(_firstUuid), _id(_secondUuid)]) {
