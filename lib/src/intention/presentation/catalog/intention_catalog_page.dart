@@ -737,38 +737,38 @@ final class _CatalogScrollPosition extends ScrollPositionWithSingleContext {
   });
 
   double _leadingInset = 0;
-  ({double min, double max})? _contentDimensions;
+  double _appliedLeadingInset = 0;
 
   set leadingInset(double value) {
     if (value == _leadingInset) {
       return;
     }
-    final content = _contentDimensions;
-    final wasAtStart = content != null && pixels <= minScrollExtent;
     _leadingInset = value;
-    if (content == null) {
-      return;
-    }
-    final previousPixels = pixels;
-    super.applyContentDimensions(content.min - value, content.max);
-    // Список в начале выдачи остаётся в начале: строки уходят из-под
-    // появившегося отказа и возвращаются на место после его снятия.
-    if (wasAtStart || pixels < minScrollExtent) {
-      jumpTo(minScrollExtent);
-    }
-    // Поправка смещения новыми границами слушателей не уведомляет.
-    if (pixels != previousPixels) {
-      notifyListeners();
-    }
+    // Границы прокрутки меняются только при компоновке списка: появление
+    // места перед началом может сделать прокручиваемым список, который
+    // помещался на экране. Уведомление запрашивает эту компоновку.
+    notifyListeners();
   }
 
   @override
   bool applyContentDimensions(double minScrollExtent, double maxScrollExtent) {
-    _contentDimensions = (min: minScrollExtent, max: maxScrollExtent);
-    return super.applyContentDimensions(
+    final insetChanged = _leadingInset != _appliedLeadingInset;
+    final wasAtStart =
+        insetChanged && hasContentDimensions && pixels <= this.minScrollExtent;
+    _appliedLeadingInset = _leadingInset;
+    final accepted = super.applyContentDimensions(
       minScrollExtent - _leadingInset,
       maxScrollExtent,
     );
+    // Список в начале выдачи остаётся в начале: строки уходят из-под
+    // появившегося отказа и возвращаются на место после его снятия.
+    if (insetChanged &&
+        (wasAtStart || pixels < this.minScrollExtent) &&
+        pixels != this.minScrollExtent) {
+      correctPixels(this.minScrollExtent);
+      return false;
+    }
+    return accepted;
   }
 }
 

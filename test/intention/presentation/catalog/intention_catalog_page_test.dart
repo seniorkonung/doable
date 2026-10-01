@@ -1444,6 +1444,61 @@ void main() {
     );
   });
 
+  testWidgets('отказ обновления над списком, который помещается на экране, '
+      'отводит место без ошибок компоновки', (tester) async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(repository);
+    addTearDown(container.dispose);
+    final health = _tag(1, 'Здоровье');
+    final rest = _tag(2, 'Отдых');
+    final items = _taggedSummaries([health], first: 2, last: 2);
+    await _failCatalogRefresh(
+      tester,
+      container,
+      repository,
+      required: health,
+      deletedExcluded: rest,
+      items: items,
+      failure: const IntentionUnavailableFailure(),
+    );
+
+    // Появление отказа делает короткий список прокручиваемым: его первая
+    // строка уходит из-под отказа.
+    expect(tester.takeException(), isNull);
+    final message = find.text(
+      'The intention list isn’t up to date: changes couldn’t be loaded.',
+    );
+    expect(message, findsOneWidget);
+    final status = tester.getRect(_refreshStatus);
+    expect(
+      _catalogTileTop(tester, 'Намерение 2'),
+      moreOrLessEquals(status.bottom, epsilon: 0.01),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
+    await _pumpUntilReconciliationQueries(tester, repository, 2);
+    repository.completeReconciliation(
+      1,
+      reconciliationFirstPortion(
+        const [],
+        totalCount: items.length,
+        revision: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Снятие отказа возвращает строки на место.
+    expect(tester.takeException(), isNull);
+    expect(message, findsNothing);
+    final list = tester.getRect(
+      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
+    );
+    expect(
+      _catalogTileTop(tester, 'Намерение 2'),
+      moreOrLessEquals(list.top, epsilon: 0.01),
+    );
+  });
+
   for (final (name, failure, text) in <(String, IntentionFailure, String)>[
     (
       'повреждения',
