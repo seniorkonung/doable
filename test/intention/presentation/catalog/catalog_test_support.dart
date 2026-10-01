@@ -25,6 +25,10 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 
@@ -71,6 +75,9 @@ final class ControlledCatalogRepository
 
   final queries = <IntentionCatalogQuery>[];
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
+  final reconciliationQueries = <IntentionCatalogReconciliationQuery>[];
+  final _reconciliationRequests =
+      <Completer<Result<IntentionCatalogReconciliationOutcome>>>[];
   final commands = <IntentionCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
@@ -78,6 +85,24 @@ final class ControlledCatalogRepository
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
+  final tagCommands = <TagCommand>[];
+  final _tagCommandRequests = <Completer<TagCommandResult>>[];
+
+  /// Полный снимок каталога тегов для выбора тега условия поиска; без него
+  /// чтение каталога тегов отказывает.
+  List<Tag>? tagCatalogItems;
+
+  @override
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async =>
+      switch (tagCatalogItems) {
+        final items? => TagCatalogSuccess(
+          TagCatalogSnapshot(
+            items: items,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+        null => super.getTagCatalog(mode),
+      };
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -87,6 +112,20 @@ final class ControlledCatalogRepository
 
   void failPage(int index, Object error) {
     _requests[index].completeError(error);
+  }
+
+  IntentionCatalogReconciliationQuery reconciliationQueryAt(int index) =>
+      reconciliationQueries[index];
+
+  void completeReconciliation(
+    int index,
+    Result<IntentionCatalogReconciliationOutcome> result,
+  ) {
+    _reconciliationRequests[index].complete(result);
+  }
+
+  void failReconciliation(int index, Object error) {
+    _reconciliationRequests[index].completeError(error);
   }
 
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
@@ -112,6 +151,10 @@ final class ControlledCatalogRepository
     _dailyChoiceCommandRequests[index].complete(result);
   }
 
+  void completeTagCommand(int index, TagCommandResult result) {
+    _tagCommandRequests[index].complete(result);
+  }
+
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
@@ -119,6 +162,15 @@ final class ControlledCatalogRepository
     queries.add(query);
     final request = Completer<Result<IntentionCatalogPage>>();
     _requests.add(request);
+    return request.future;
+  }
+
+  @override
+  Future<Result<IntentionCatalogReconciliationOutcome>>
+  getCatalogReconciliationPortion(IntentionCatalogReconciliationQuery query) {
+    reconciliationQueries.add(query);
+    final request = Completer<Result<IntentionCatalogReconciliationOutcome>>();
+    _reconciliationRequests.add(request);
     return request.future;
   }
 
@@ -158,6 +210,7 @@ final class ControlledCatalogRepository
       final DailyChoiceCommand choiceCommand => await _executeDailyChoice(
         choiceCommand,
       ),
+      final TagCommand tagCommand => await _executeTag(tagCommand),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -181,6 +234,13 @@ final class ControlledCatalogRepository
     return request.future;
   }
 
+  Future<TagCommandResult> _executeTag(TagCommand command) {
+    tagCommands.add(command);
+    final request = Completer<TagCommandResult>();
+    _tagCommandRequests.add(request);
+    return request.future;
+  }
+
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
   _executeIntention(IntentionCommand command) {
     commands.add(command);
@@ -198,6 +258,11 @@ final class ControlledCatalogRepository
 
 final class TestCatalogCursor implements IntentionCatalogCursor {
   const TestCatalogCursor();
+}
+
+final class TestReconciliationCursor
+    implements IntentionCatalogReconciliationCursor {
+  const TestReconciliationCursor();
 }
 
 final class TestCatalogRevision implements GraphRevision {
@@ -240,6 +305,7 @@ IntentionSummary testSummary({
   int activeRelationCount = 0,
   int? createdDay,
   int? updatedDay,
+  List<Tag> tags = const [],
 }) {
   final encodedId =
       '018f0000-0000-7000-8000-${index.toString().padLeft(12, '0')}';
@@ -264,6 +330,7 @@ IntentionSummary testSummary({
     activeRelationCount: activeRelationCount,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    tags: tags,
   );
 }
 

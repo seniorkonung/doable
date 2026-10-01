@@ -40,6 +40,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_read_contract_test_fallback.dart';
+import '../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -1914,7 +1915,7 @@ String _textByKey(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
 final class _DelayedRelationRepository
-    with TagReadContractTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

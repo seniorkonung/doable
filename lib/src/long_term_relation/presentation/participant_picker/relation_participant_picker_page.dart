@@ -11,15 +11,18 @@ import '../../../intention/application/intention_catalog.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/catalog/intention_catalog_state.dart';
-import '../../../intention/presentation/catalog/intention_catalog_status_views.dart';
 import '../../../intention/presentation/catalog/intention_catalog_view_model.dart';
+import '../../../intention/presentation/catalog/intention_search_layout.dart';
+import '../../../intention/presentation/catalog/intention_search_results.dart';
+import '../../../intention/presentation/catalog/intention_tag_conditions_section.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_projection.dart';
 
 /// Выбор существующего намерения участником долговременной связи.
 ///
 /// Страница не заводит собственного источника списка: она читает тот же
-/// каталог намерений ограниченными порциями с буквальным фильтром названия.
+/// каталог намерений ограниченными порциями с буквальным фильтром названия
+/// и условиями по тегам. Строки показывают собственные теги намерений.
 /// Второе намерение пары исключается по идентификатору, а одноимённые
 /// намерения остаются отдельными строками с доступом к подробным данным.
 /// Выбор возвращает типизированную ссылку с идентификатором и снимком
@@ -46,12 +49,10 @@ final class RelationParticipantPickerPage extends ConsumerStatefulWidget {
 final class _RelationParticipantPickerPageState
     extends ConsumerState<RelationParticipantPickerPage> {
   final _filterController = TextEditingController();
-  final _scrollController = ScrollController();
 
   @override
   void dispose() {
     _filterController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -78,52 +79,87 @@ final class _RelationParticipantPickerPageState
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                key: const ValueKey('participant-picker-filter-field'),
-                controller: _filterController,
-                decoration: InputDecoration(
-                  labelText: localizations.catalogFilterLabel,
-                  errorText: _filterError(localizations, selection),
-                ),
-                onChanged: (value) {
-                  _scrollToTop();
-                  notifier.changeTitleFilter(value);
-                },
-              ),
-            ),
-            Expanded(
-              child: catalog.when(
-                skipLoadingOnReload: false,
-                skipLoadingOnRefresh: false,
-                data: (state) => _PickerContent(
-                  purpose: purpose,
-                  state: state,
-                  scrollController: _scrollController,
-                  onSelected: _select,
-                ),
-                error: (_, _) => IntentionCatalogStatusView(
-                  message: localizations.catalogUnexpectedFailure,
-                ),
-                loading: () => IntentionCatalogStatusView(
-                  message: localizations.catalogLoading,
-                  progressIndicator: true,
+        child: IntentionSearchLayout(
+          controls: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: TextField(
+                  key: const ValueKey('participant-picker-filter-field'),
+                  controller: _filterController,
+                  decoration: InputDecoration(
+                    labelText: localizations.catalogFilterLabel,
+                    errorText: _filterError(localizations, selection),
+                  ),
+                  onChanged: notifier.changeTitleFilter,
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: IntentionTagConditionsSection(purpose: purpose),
+                ),
+              ),
+            ],
+          ),
+          results: IntentionSearchResults(
+            purpose: purpose,
+            catalog: _withoutOccupiedResults(catalog),
+            listKey: const PageStorageKey<String>('participant-picker-list'),
+            messages: IntentionSearchResultsMessages(
+              loading: localizations.catalogLoading,
+              unavailable: localizations.catalogUnavailable,
+              corruption: localizations.catalogCorruption,
+              unexpected: localizations.catalogUnexpectedFailure,
             ),
-          ],
+            // Условия по тегам сужают охват: пустая выдача при них не
+            // означает, что других намерений для выбора нет.
+            emptyMessage: (empty) =>
+                empty.query.tagFilter != IntentionTagFilter.empty
+                ? localizations.catalogTagConditionsEmpty
+                : localizations.participantPickerEmpty,
+            // Второй участник пары остаётся строкой каталога без высоты:
+            // позиции остальных строк в загруженной части не смещаются, и
+            // продолжение каталога запрашивается по ним же.
+            itemBuilder: (context, results, summary) =>
+                summary.id == widget.excludedIntentionId
+                ? const SizedBox.shrink()
+                : _ParticipantOptionTile(
+                    summary: summary,
+                    revision: results.revision,
+                    onSelected: _select,
+                  ),
+          ),
         ),
       ),
     );
   }
 
-  void _scrollToTop() {
-    if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
+  /// Выдача, целиком занятая вторым участником пары, для выбора пуста.
+  ///
+  /// Пока у каталога есть продолжение, выдача остаётся загруженной: оно
+  /// остаётся единственным источником следующих доступных строк.
+  AsyncValue<IntentionCatalogState> _withoutOccupiedResults(
+    AsyncValue<IntentionCatalogState> catalog,
+  ) {
+    final state = catalog.value;
+    if (catalog is! AsyncData<IntentionCatalogState> ||
+        catalog.isLoading ||
+        state is! IntentionCatalogLoaded ||
+        state.nextCursor != null ||
+        state.continuation is! IntentionCatalogContinuationIdle ||
+        state.items.any((item) => item.id != widget.excludedIntentionId)) {
+      return catalog;
     }
+    return AsyncData(
+      IntentionCatalogEmpty(
+        selection: state.selection,
+        query: state.query,
+        revision: state.revision,
+        refresh: state.refresh,
+      ),
+    );
   }
 
   void _cancel() {
@@ -144,148 +180,6 @@ final class _RelationParticipantPickerPageState
       localizations.catalogFilterTooLong,
     null => null,
   };
-}
-
-final class _PickerContent extends ConsumerWidget {
-  const _PickerContent({
-    required this.purpose,
-    required this.state,
-    required this.scrollController,
-    required this.onSelected,
-  });
-
-  final SelectRelationParticipant purpose;
-  final IntentionCatalogState state;
-  final ScrollController scrollController;
-  final ValueChanged<GraphSnapshot<RelationParticipantSummary>> onSelected;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final localizations = AppLocalizations.of(context);
-    return switch (state) {
-      IntentionCatalogDebouncing() => IntentionCatalogStatusView(
-        message: localizations.catalogLoading,
-        progressIndicator: true,
-      ),
-      IntentionCatalogInvalidFilter() => const SizedBox.shrink(),
-      final IntentionCatalogLoaded loaded => _PickerOptions(
-        purpose: purpose,
-        state: loaded,
-        scrollController: scrollController,
-        onSelected: onSelected,
-      ),
-      IntentionCatalogEmpty() => IntentionCatalogStatusView(
-        message: localizations.participantPickerEmpty,
-      ),
-      IntentionCatalogUnavailable() => IntentionCatalogStatusView(
-        message: localizations.catalogUnavailable,
-        retryLabel: localizations.commonRetry,
-        onRetry: () {
-          unawaited(
-            ref
-                .read(intentionCatalogViewModelProvider(purpose).notifier)
-                .retry(),
-          );
-        },
-      ),
-      IntentionCatalogCorruption() => IntentionCatalogStatusView(
-        message: localizations.catalogCorruption,
-      ),
-      IntentionCatalogUnexpected() => IntentionCatalogStatusView(
-        message: localizations.catalogUnexpectedFailure,
-      ),
-    };
-  }
-}
-
-/// Доступные для выбора строки уже загруженной части каталога.
-///
-/// Исключение второго участника не меняет ни запрос, ни порядок порций:
-/// подгрузка продолжает тот же каталог по его собственным позициям.
-final class _PickerOptions extends ConsumerWidget {
-  const _PickerOptions({
-    required this.purpose,
-    required this.state,
-    required this.scrollController,
-    required this.onSelected,
-  });
-
-  final SelectRelationParticipant purpose;
-  final IntentionCatalogLoaded state;
-  final ScrollController scrollController;
-  final ValueChanged<GraphSnapshot<RelationParticipantSummary>> onSelected;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final localizations = AppLocalizations.of(context);
-    final options = <_ParticipantOption>[];
-    for (var index = 0; index < state.items.length; index++) {
-      final summary = state.items[index];
-      if (summary.id == purpose.excludedIntentionId) {
-        continue;
-      }
-      options.add(_ParticipantOption(catalogIndex: index, summary: summary));
-    }
-
-    final hasContinuationStatus =
-        state.continuation is! IntentionCatalogContinuationIdle;
-    if (options.isEmpty && !hasContinuationStatus) {
-      if (state.nextCursor == null) {
-        return IntentionCatalogStatusView(
-          message: localizations.participantPickerEmpty,
-        );
-      }
-      // Вся загруженная часть занята вторым участником: продолжение каталога
-      // остаётся единственным источником следующих доступных строк.
-      _requestNextPage(context, ref, state.items.length - 1);
-      return IntentionCatalogStatusView(
-        message: localizations.catalogLoadingMore,
-        progressIndicator: true,
-      );
-    }
-
-    return ListView.builder(
-      key: const PageStorageKey<String>('participant-picker-list'),
-      controller: scrollController,
-      itemCount: options.length + (hasContinuationStatus ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == options.length) {
-          return IntentionCatalogContinuationStatusView(
-            purpose: purpose,
-            continuation: state.continuation,
-          );
-        }
-        final option = options[index];
-        _requestNextPage(context, ref, option.catalogIndex);
-        return _ParticipantOptionTile(
-          summary: option.summary,
-          revision: state.revision,
-          onSelected: onSelected,
-        );
-      },
-    );
-  }
-
-  void _requestNextPage(BuildContext context, WidgetRef ref, int visibleIndex) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!context.mounted) {
-        return;
-      }
-      unawaited(
-        ref
-            .read(intentionCatalogViewModelProvider(purpose).notifier)
-            .loadNextPageIfNeeded(visibleIndex: visibleIndex),
-      );
-    });
-  }
-}
-
-final class _ParticipantOption {
-  const _ParticipantOption({required this.catalogIndex, required this.summary});
-
-  /// Позиция строки в загруженной части каталога, а не в списке выбора.
-  final int catalogIndex;
-  final IntentionSummary summary;
 }
 
 /// Одна доступная для выбора строка.
@@ -315,6 +209,7 @@ final class _ParticipantOptionTile extends StatelessWidget {
             title: summary.title,
             archiveState: summary.archiveState,
             showArchiveState: true,
+            confirmedTags: summary.tags,
             activeRelationCount: ConfirmedActiveRelationCount(
               summary.activeRelationCount,
             ),

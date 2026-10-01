@@ -4,6 +4,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -119,13 +120,17 @@ void main() {
       TagAssignmentUnchanged(:final state) => state,
       _ => throw StateError('Ожидался исход назначения.'),
     }, state);
-    expect(completion.confirmedChange!.changes, hasLength(1));
-    expect(
-      completion.confirmedChange!.changes.single.revision.compareTo(
-        completion.revision!,
-      ),
-      GraphRevisionOrder.same,
-    );
+    // Изменение пары намерения несёт и каталожный снимок той же ревизии.
+    expect(completion.confirmedChange!.changes, [
+      isA<TagChange>(),
+      if (changed) isA<IntentionCatalogUpdated>(),
+    ]);
+    for (final change in completion.confirmedChange!.changes) {
+      expect(
+        change.revision.compareTo(completion.revision!),
+        GraphRevisionOrder.same,
+      );
+    }
   }
 
   setUp(() async {

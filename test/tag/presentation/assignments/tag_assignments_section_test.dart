@@ -29,6 +29,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
+import '../../../support/tag_assignment_changed.dart';
 
 TagId _tagId(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
@@ -586,7 +587,7 @@ void main() {
             TagCommandSucceeded(
               ConfirmedGraphResult(
                 revision: const _Revision(1),
-                value: TagAssignmentChanged(
+                value: testTagAssignmentChanged(
                   TagAssignmentChangedChange(
                     revision: const _Revision(1),
                     assignment: TagAssignment(

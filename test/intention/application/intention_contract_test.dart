@@ -24,9 +24,13 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   group('поисковый ключ названия намерения', () {
@@ -103,7 +107,471 @@ void main() {
     );
   });
 
+  group('условия собственных тегов намерения', () {
+    final health = _tagId('00000000-0000-4000-8000-000000000001');
+    final rest = _tagId('00000000-0000-4000-8000-000000000002');
+    final sport = _tagId('00000000-0000-4000-8000-000000000003');
+    final work = _tagId('00000000-0000-4000-8000-000000000004');
+
+    test('пустые условия допускают намерения с тегами и без них', () {
+      final filter = IntentionTagFilter();
+
+      expect(filter.requiredTagIds, isEmpty);
+      expect(filter.excludedTagIds, isEmpty);
+      expect(filter.matches({}), isTrue);
+      expect(filter.matches({health, sport}), isTrue);
+      expect(filter, IntentionTagFilter.empty);
+      expect(filter.hashCode, IntentionTagFilter.empty.hashCode);
+    });
+
+    test('требует каждый обязательный тег и допускает дополнительные', () {
+      final filter = IntentionTagFilter(requiredTagIds: [health, rest]);
+
+      expect(filter.matches({health, rest}), isTrue);
+      expect(filter.matches({health, rest, sport}), isTrue);
+      expect(filter.matches({health}), isFalse);
+      expect(filter.matches({rest}), isFalse);
+      expect(filter.matches({}), isFalse);
+    });
+
+    test('исключает любой запрещённый тег и допускает отсутствие тегов', () {
+      final filter = IntentionTagFilter(excludedTagIds: [sport, work]);
+
+      expect(filter.matches({}), isTrue);
+      expect(filter.matches({health}), isTrue);
+      expect(filter.matches({sport}), isFalse);
+      expect(filter.matches({work}), isFalse);
+      expect(filter.matches({health, sport, work}), isFalse);
+    });
+
+    test('соединяет обязательные и исключённые условия через «И»', () {
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health, rest],
+        excludedTagIds: [sport, work],
+      );
+      final ownTagIds = {health, rest};
+
+      expect(filter.matches(ownTagIds), isTrue);
+      expect(filter.matches({health}), isFalse);
+      expect(filter.matches({health, rest, sport}), isFalse);
+      expect(filter.matches({health, rest, work}), isFalse);
+      expect(filter.matches({}), isFalse);
+      expect(ownTagIds, {health, rest});
+    });
+
+    test('сохраняет противоречивые условия и не допускает совпадений', () {
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health, rest],
+        excludedTagIds: [rest, sport],
+      );
+
+      expect(filter.requiredTagIds, {health, rest});
+      expect(filter.excludedTagIds, {rest, sport});
+      expect(filter.matches({}), isFalse);
+      expect(filter.matches({health}), isFalse);
+      expect(filter.matches({health, rest}), isFalse);
+      expect(filter.matches({health, rest, sport, work}), isFalse);
+    });
+
+    test('повторы и порядок не меняют равенство, хеш и смысл условий', () {
+      final first = IntentionTagFilter(
+        requiredTagIds: [health, rest, health],
+        excludedTagIds: [sport, work, sport],
+      );
+      final reordered = IntentionTagFilter(
+        requiredTagIds: [rest, _tagId(health.toCanonicalString())],
+        excludedTagIds: [work, sport],
+      );
+
+      expect(first.requiredTagIds, {health, rest});
+      expect(first.excludedTagIds, {sport, work});
+      expect(first == reordered, isTrue);
+      expect(reordered == first, isTrue);
+      expect(first.hashCode, reordered.hashCode);
+      expect({first, reordered}, hasLength(1));
+      for (final ownTagIds in <Set<TagId>>[
+        {},
+        {health},
+        {health, rest},
+        {health, rest, sport},
+      ]) {
+        expect(first.matches(ownTagIds), reordered.matches(ownTagIds));
+      }
+    });
+
+    test('состав и роль каждого набора различают условия', () {
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health],
+        excludedTagIds: [sport],
+      );
+
+      expect(
+        filter ==
+            IntentionTagFilter(requiredTagIds: [rest], excludedTagIds: [sport]),
+        isFalse,
+      );
+      expect(
+        filter ==
+            IntentionTagFilter(
+              requiredTagIds: [health],
+              excludedTagIds: [work],
+            ),
+        isFalse,
+      );
+      expect(
+        filter ==
+            IntentionTagFilter(
+              requiredTagIds: [sport],
+              excludedTagIds: [health],
+            ),
+        isFalse,
+      );
+      expect(filter == IntentionTagFilter(requiredTagIds: [health]), isFalse);
+      expect(filter == IntentionTagFilter(excludedTagIds: [sport]), isFalse);
+      expect(filter == Object(), isFalse);
+    });
+
+    test('копирует входные наборы и запрещает изменение своих условий', () {
+      final requiredTagIds = [health, rest];
+      final excludedTagIds = {sport, work};
+      final filter = IntentionTagFilter(
+        requiredTagIds: requiredTagIds,
+        excludedTagIds: excludedTagIds,
+      );
+      final originalHashCode = filter.hashCode;
+      requiredTagIds.clear();
+      excludedTagIds
+        ..clear()
+        ..add(health);
+
+      expect(filter.requiredTagIds, {health, rest});
+      expect(filter.excludedTagIds, {sport, work});
+      expect(() => filter.requiredTagIds.add(work), throwsUnsupportedError);
+      expect(
+        () => filter.requiredTagIds.remove(health),
+        throwsUnsupportedError,
+      );
+      expect(() => filter.excludedTagIds.add(health), throwsUnsupportedError);
+      expect(() => filter.excludedTagIds.clear(), throwsUnsupportedError);
+      expect(filter.matches({health, rest}), isTrue);
+      expect(filter.hashCode, originalHashCode);
+    });
+
+    test(
+      'переименование и одноимённый новый тег не подменяют идентичность',
+      () {
+        final original = Tag(id: health, name: TagName.fromInput('Здоровье'));
+        final renamed = Tag(
+          id: health,
+          name: TagName.fromInput('Самочувствие'),
+        );
+        final sameName = Tag(id: rest, name: TagName.fromInput('Здоровье'));
+        final required = IntentionTagFilter(requiredTagIds: [original.id]);
+        final excluded = IntentionTagFilter(excludedTagIds: [original.id]);
+
+        expect(original.name, sameName.name);
+        expect(required.matches({renamed.id}), isTrue);
+        expect(required.matches({sameName.id}), isFalse);
+        expect(excluded.matches({renamed.id}), isFalse);
+        expect(excluded.matches({sameName.id}), isTrue);
+      },
+    );
+
+    test('сохраняет идентификатор после удаления тега из назначений', () {
+      final required = IntentionTagFilter(requiredTagIds: [health]);
+      final excluded = IntentionTagFilter(excludedTagIds: [health]);
+      final ownTagIds = {health, rest};
+
+      expect(required.matches(ownTagIds), isTrue);
+      expect(excluded.matches(ownTagIds), isFalse);
+      ownTagIds.remove(health);
+
+      expect(required.matches(ownTagIds), isFalse);
+      expect(excluded.matches(ownTagIds), isTrue);
+      expect(required.requiredTagIds, {health});
+      expect(excluded.excludedTagIds, {health});
+    });
+  });
+
   group('контракт каталога намерений', () {
+    test('соединяет название, теги и ограничения допустимости через «И»', () {
+      final health = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000101'),
+        name: TagName.fromStored('Здоровье'),
+      );
+      final rest = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000102'),
+        name: TagName.fromStored('Отдых'),
+      );
+      final sport = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000103'),
+        name: TagName.fromStored('Спорт'),
+      );
+      const candidateId = '00000000-0000-4000-8000-000000000001';
+      final otherParticipant = _intentionId(
+        '00000000-0000-4000-8000-000000000002',
+      );
+      final filter = IntentionTagFilter(
+        requiredTagIds: [health.id, rest.id],
+        excludedTagIds: [sport.id],
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: 'ХОДИТЬ',
+        tagFilter: filter,
+        excludedIntentionId: otherParticipant,
+        order: IntentionCatalogOrder.createdAtAscending,
+        pageSize: 1,
+      );
+
+      expect(query.tagFilter, filter);
+      expect(query.excludedIntentionId, otherParticipant);
+      for (final (id, title, tags, readiness, archiveState, expected) in [
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, rest],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          true,
+        ),
+        (
+          candidateId,
+          'Читать',
+          [health, rest],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, rest, sport],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, rest],
+          IntentionReadiness.notReady,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, rest],
+          IntentionReadiness.ready,
+          IntentionArchiveState.archived,
+          false,
+        ),
+        (
+          otherParticipant.toCanonicalString(),
+          'Ходить в парк',
+          [health, rest],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+      ]) {
+        expect(
+          query.includes(
+            _summary(
+              id: id,
+              title: title,
+              tags: tags,
+              readiness: readiness,
+              archiveState: archiveState,
+            ),
+          ),
+          expected,
+        );
+      }
+      expect(_query().tagFilter, IntentionTagFilter.empty);
+      expect(_query().excludedIntentionId, isNull);
+    });
+
+    test('замена счётчика связей сохраняет теги и остальные данные сводки', () {
+      final suppliedTags = [
+        Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000002'),
+          name: TagName.fromStored('Первый тег'),
+        ),
+        Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000001'),
+          name: TagName.fromStored('Второй тег'),
+        ),
+      ];
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: true,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+        activeRelationCount: 2,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        tags: suppliedTags,
+      );
+
+      final copy = summary.withActiveRelationCount(7);
+
+      expect(copy.activeRelationCount, 7);
+      expect(summary.activeRelationCount, 2);
+      expect(copy.id, summary.id);
+      expect(copy.title, summary.title);
+      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.readiness, summary.readiness);
+      expect(copy.archiveState, summary.archiveState);
+      expect(copy.createdAt, summary.createdAt);
+      expect(copy.updatedAt, summary.updatedAt);
+      expect(copy.tags, suppliedTags);
+      suppliedTags.clear();
+      expect(copy.tags, summary.tags);
+      expect(copy.tags.map((tag) => tag.name.value), [
+        'Первый тег',
+        'Второй тег',
+      ]);
+      expect(() => copy.tags.clear(), throwsUnsupportedError);
+    });
+
+    test('переименование тега заменяет только его название в сводке', () {
+      final firstId = _tagId('00000000-0000-4000-8000-000000000002');
+      final secondId = _tagId('00000000-0000-4000-8000-000000000001');
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: true,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+        activeRelationCount: 2,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        tags: [
+          Tag(id: firstId, name: TagName.fromStored('Первый тег')),
+          Tag(id: secondId, name: TagName.fromStored('Второй тег')),
+        ],
+      );
+
+      final copy = summary.withRenamedTag(
+        Tag(id: secondId, name: TagName.fromStored('Переименованный')),
+      );
+
+      expect(copy.tags.map((tag) => tag.id), [firstId, secondId]);
+      expect(copy.tags.map((tag) => tag.name.value), [
+        'Первый тег',
+        'Переименованный',
+      ]);
+      expect(summary.tags.last.name.value, 'Второй тег');
+      expect(copy.id, summary.id);
+      expect(copy.title, summary.title);
+      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.readiness, summary.readiness);
+      expect(copy.archiveState, summary.archiveState);
+      expect(copy.activeRelationCount, summary.activeRelationCount);
+      expect(copy.createdAt, summary.createdAt);
+      expect(copy.updatedAt, summary.updatedAt);
+      expect(() => copy.tags.clear(), throwsUnsupportedError);
+    });
+
+    test('переименование неназначенного тега возвращает ту же сводку', () {
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: false,
+        readiness: IntentionReadiness.notReady,
+        archiveState: IntentionArchiveState.active,
+        activeRelationCount: 0,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        tags: [
+          Tag(
+            id: _tagId('00000000-0000-4000-8000-000000000001'),
+            name: TagName.fromStored('Здоровье'),
+          ),
+        ],
+      );
+
+      final copy = summary.withRenamedTag(
+        Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000002'),
+          name: TagName.fromStored('Здоровье'),
+        ),
+      );
+
+      expect(copy, same(summary));
+    });
+
+    test('удаление тега убирает только его назначение из сводки', () {
+      final firstId = _tagId('00000000-0000-4000-8000-000000000002');
+      final secondId = _tagId('00000000-0000-4000-8000-000000000001');
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: true,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+        activeRelationCount: 2,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        tags: [
+          Tag(id: firstId, name: TagName.fromStored('Первый тег')),
+          Tag(id: secondId, name: TagName.fromStored('Второй тег')),
+        ],
+      );
+
+      final copy = summary.withoutTag(firstId);
+
+      expect(copy.tags.map((tag) => tag.id), [secondId]);
+      expect(copy.tags.single.name.value, 'Второй тег');
+      expect(summary.tags.map((tag) => tag.id), [firstId, secondId]);
+      expect(copy.id, summary.id);
+      expect(copy.title, summary.title);
+      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.readiness, summary.readiness);
+      expect(copy.archiveState, summary.archiveState);
+      expect(copy.activeRelationCount, summary.activeRelationCount);
+      expect(copy.createdAt, summary.createdAt);
+      expect(copy.updatedAt, summary.updatedAt);
+      expect(() => copy.tags.clear(), throwsUnsupportedError);
+    });
+
+    test('удаление неназначенного тега возвращает ту же сводку', () {
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: false,
+        readiness: IntentionReadiness.notReady,
+        archiveState: IntentionArchiveState.active,
+        activeRelationCount: 0,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        tags: [
+          Tag(
+            id: _tagId('00000000-0000-4000-8000-000000000001'),
+            name: TagName.fromStored('Здоровье'),
+          ),
+        ],
+      );
+
+      final copy = summary.withoutTag(
+        _tagId('00000000-0000-4000-8000-000000000002'),
+      );
+
+      expect(copy, same(summary));
+    });
+
     test(
       'нормализует фильтр, ограничивает порцию и применяет scope с фильтром',
       () {
@@ -418,6 +886,104 @@ void main() {
     );
   });
 
+  group('контракт чтения согласования каталога', () {
+    test('запрос несёт фильтр, границу, курсор и окно сохранённых строк', () {
+      final query = _query(pageSize: 2);
+      final second = _summary(id: '00000000-0000-4000-8000-000000000002');
+      final first = _summary(id: '00000000-0000-4000-8000-000000000001');
+      final stored = [second, first];
+      const continuation = _TestCatalogCursor();
+      const cursor = _TestReconciliationCursor();
+
+      final reconciliation = IntentionCatalogReconciliationQuery(
+        catalogQuery: query,
+        boundary: const IntentionCatalogPartialPrefixBoundary(continuation),
+        window: IntentionCatalogInnerReconciliationWindow(stored),
+        cursor: cursor,
+      );
+      stored.clear();
+
+      expect(reconciliation.catalogQuery, same(query));
+      expect(reconciliation.cursor, same(cursor));
+      final window =
+          reconciliation.window as IntentionCatalogInnerReconciliationWindow;
+      expect(window.storedIntentionIds, [second.id, first.id]);
+      expect(window.upperEdgeRow, same(first));
+      expect(() => window.storedRows.add(first), throwsUnsupportedError);
+      expect(switch (reconciliation.boundary) {
+        IntentionCatalogPartialPrefixBoundary(:final continuation) =>
+          continuation,
+        IntentionCatalogCompletedBoundary() => null,
+      }, same(continuation));
+    });
+
+    test('внутреннее окно без сохранённых строк не создаётся', () {
+      expect(
+        () => IntentionCatalogInnerReconciliationWindow(const []),
+        throwsArgumentError,
+      );
+    });
+
+    test('ранее завершённая выдача, включая пустую, — отдельная граница, '
+        'а окно с последней строкой области может быть пустым', () {
+      final reconciliation = IntentionCatalogReconciliationQuery(
+        catalogQuery: _query(),
+        boundary: const IntentionCatalogCompletedBoundary(),
+        window: IntentionCatalogFinalReconciliationWindow(const []),
+      );
+
+      expect(_boundaryDescription(reconciliation.boundary), 'completed');
+      expect(_windowDescription(reconciliation.window), 'final');
+      expect(reconciliation.window.storedIntentionIds, isEmpty);
+      expect(reconciliation.cursor, isNull);
+    });
+
+    test('исходы различают первую порцию, продолжение и повтор', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 4);
+      const cursor = _TestReconciliationCursor();
+      final summary = _summary(id: '00000000-0000-4000-8000-000000000003');
+      final outcomes = <IntentionCatalogReconciliationOutcome>[
+        IntentionCatalogReconciliationFirstPortion(
+          items: [summary],
+          totalCount: 7,
+          nextCursor: cursor,
+          revision: revision,
+        ),
+        IntentionCatalogReconciliationContinuationPortion(
+          items: const [],
+          nextCursor: null,
+          revision: revision,
+        ),
+        const IntentionCatalogReconciliationRetry(),
+      ];
+
+      expect(outcomes.map(_reconciliationDescription), [
+        'first:7',
+        'continuation',
+        'retry',
+      ]);
+      final first = outcomes.first as IntentionCatalogReconciliationPortion;
+      expect(first.items.single, same(summary));
+      expect(first.nextCursor, same(cursor));
+      expect(first.revision, same(revision));
+      expect(() => first.items.add(summary), throwsUnsupportedError);
+    });
+
+    test('первая порция отклоняет количество меньше своих строк', () {
+      final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
+
+      expect(
+        () => IntentionCatalogReconciliationFirstPortion(
+          items: [summary],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const _TestGraphRevision(epoch: 'первая', sequence: 0),
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+    });
+  });
+
   group('commands и результаты намерений', () {
     test(
       'закрытый набор commands несёт только необходимые предметные данные',
@@ -553,6 +1119,18 @@ void main() {
       expect(
         await repository.getCatalogPage(_query()),
         isA<ResultFailure<IntentionCatalogPage>>(),
+      );
+      expect(
+        await repository.getCatalogReconciliationPortion(
+          IntentionCatalogReconciliationQuery(
+            catalogQuery: _query(),
+            boundary: const IntentionCatalogCompletedBoundary(),
+            window: IntentionCatalogFinalReconciliationWindow([
+              _summary(id: '00000000-0000-4000-8000-000000000001'),
+            ]),
+          ),
+        ),
+        isA<ResultFailure<IntentionCatalogReconciliationOutcome>>(),
       );
       expect(
         await repository.getRelationCounts(id),
@@ -729,6 +1307,7 @@ IntentionSummary _summary({
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   DateTime? createdAt,
   DateTime? updatedAt,
+  List<Tag> tags = const [],
 }) {
   final created = IntentionTimestamp(
     createdAt ?? DateTime.utc(2026, 8, 30, 12),
@@ -742,6 +1321,7 @@ IntentionSummary _summary({
     activeRelationCount: 0,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
+    tags: tags,
   );
 }
 
@@ -761,6 +1341,27 @@ Intention _intention() {
 String _pageDescription(IntentionCatalogPage page) => switch (page) {
   IntentionCatalogFirstPage(:final totalCount) => 'first:$totalCount',
   IntentionCatalogContinuationPage() => 'continuation',
+};
+
+String _boundaryDescription(IntentionCatalogReconciliationBoundary boundary) =>
+    switch (boundary) {
+      IntentionCatalogPartialPrefixBoundary() => 'partial',
+      IntentionCatalogCompletedBoundary() => 'completed',
+    };
+
+String _windowDescription(IntentionCatalogReconciliationWindow window) =>
+    switch (window) {
+      IntentionCatalogInnerReconciliationWindow() => 'inner',
+      IntentionCatalogFinalReconciliationWindow() => 'final',
+    };
+
+String _reconciliationDescription(
+  IntentionCatalogReconciliationOutcome outcome,
+) => switch (outcome) {
+  IntentionCatalogReconciliationFirstPortion(:final totalCount) =>
+    'first:$totalCount',
+  IntentionCatalogReconciliationContinuationPortion() => 'continuation',
+  IntentionCatalogReconciliationRetry() => 'retry',
 };
 
 String _successDescription(IntentionCommandSuccess success) =>
@@ -842,8 +1443,13 @@ IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
   InvalidIntentionIdDecoding() => throw StateError('Ожидался корректный UUID.'),
 };
 
+TagId _tagId(String value) => switch (TagId.decode(value)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw StateError('Ожидался корректный UUID тега.'),
+};
+
 final class _FailingPersonalGraphRepository
-    with TagReadContractTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
@@ -939,6 +1545,11 @@ final class _EmptyGraphCommandOutcome implements GraphCommandOutcome {
 
 final class _TestCatalogCursor implements IntentionCatalogCursor {
   const _TestCatalogCursor();
+}
+
+final class _TestReconciliationCursor
+    implements IntentionCatalogReconciliationCursor {
+  const _TestReconciliationCursor();
 }
 
 final class _TestGraphRevision implements GraphRevision {

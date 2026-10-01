@@ -11,11 +11,16 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_storage_fixture.dart';
 
 void main() {
   late AppDatabase database;
@@ -24,12 +29,13 @@ void main() {
   late _DeterministicClock clock;
   late DriftPersonalGraphRepository repository;
   late _WriteTrace writeTrace;
+  late Database raw;
 
   setUp(() async {
     writeTrace = _WriteTrace();
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(),
+        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
         writeTrace,
       ),
     );
@@ -48,6 +54,535 @@ void main() {
   tearDown(() => database.close());
 
   group('DriftPersonalGraphRepository.execute', () {
+    group('Собственные теги каталожных снимков команд', () {
+      late IntentionId id;
+      late List<String> expectedTagNames;
+
+      setUp(() {
+        seedTagStorageFixture(raw);
+        id = _id(tagFixtureId(1));
+        expectedTagNames = ['Дом'];
+        for (var index = 0; index < 105; index++) {
+          final name = 'Собственный тег $index';
+          expectedTagNames.add(name);
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            tagFixtureId(2000 - index),
+            name,
+          ]);
+        }
+        for (var index = 104; index >= 0; index--) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(2000 - index), id.toCanonicalString()],
+          );
+        }
+      });
+
+      test(
+        'снимки изменения полей сохраняют полные собственные теги',
+        () async {
+          writeTrace.overrideNextSelect(const {
+            'title_search_key': 'историческая проекция',
+          });
+          final saved = _commandSuccess(
+            await repository.execute(
+              UpdateIntention(
+                id: id,
+                title: 'Новое название',
+                description: null,
+              ),
+            ),
+          ) as IntentionSaved;
+          final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+
+          expect(mutation.before.summary.title, 'Намерение 1');
+          expect(mutation.after.summary.title, 'Новое название');
+          IntentionCatalogQuery query(String titleFilter) =>
+              IntentionCatalogQuery(
+                scope: IntentionScope.all,
+                titleFilter: titleFilter,
+                order: IntentionCatalogOrder.createdAtDescending,
+                pageSize: 1,
+              );
+          expect(mutation.before.matches(query('историческая')), isTrue);
+          expect(mutation.before.matches(query('Намерение 1')), isFalse);
+          expect(mutation.after.matches(query('историческая')), isFalse);
+          expect(mutation.after.matches(query('Новое название')), isTrue);
+          for (final entry in [mutation.before, mutation.after]) {
+            expect(entry.summary.id, id);
+            expect(
+              entry.summary.tags.map((tag) => tag.name.value),
+              expectedTagNames,
+            );
+            expect(
+              entry.summary.tags.first.id.toCanonicalString(),
+              tagFixtureId(firstTagNumber),
+            );
+            expect(entry.summary.activeRelationCount, 1);
+            expect(() => entry.summary.tags.clear(), throwsUnsupportedError);
+          }
+        },
+      );
+
+      for (final (name, command, isReady, isArchived)
+          in <(String, IntentionCommand Function(IntentionId), int, int)>[
+            ('включения готовности', EnableIntentionReadiness.new, 0, 0),
+            ('выключения готовности', DisableIntentionReadiness.new, 1, 0),
+            ('архивирования', ArchiveIntention.new, 1, 0),
+            ('восстановления из архива', RestoreIntention.new, 1, 1),
+          ]) {
+        test('снимки $name сохраняют полные собственные теги', () async {
+          if (isArchived == 1) {
+            raw.execute('UPDATE long_term_relations SET is_archived = 1');
+          }
+          raw.execute(
+            'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
+            [isReady, isArchived, id.toCanonicalString()],
+          );
+          final saved = _commandSuccess(
+            await repository.execute(command(id)),
+          ) as IntentionSaved;
+          final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+
+          for (final entry in [mutation.before, mutation.after]) {
+            expect(entry.summary.id, id);
+            expect(entry.summary.title, 'Намерение 1');
+            expect(entry.summary.hasDescription, isTrue);
+            expect(
+              entry.summary.tags.map((tag) => tag.name.value),
+              expectedTagNames,
+            );
+          }
+          expect(
+            mutation.before.summary.readiness,
+            isReady == 1
+                ? IntentionReadiness.ready
+                : IntentionReadiness.notReady,
+          );
+          expect(
+            mutation.before.summary.archiveState,
+            isArchived == 1
+                ? IntentionArchiveState.archived
+                : IntentionArchiveState.active,
+          );
+          expect(mutation.after.summary.readiness, saved.intention.readiness);
+          expect(
+            mutation.after.summary.archiveState,
+            saved.intention.archiveState,
+          );
+          expect(
+            mutation.before.summary.createdAt.value.microsecondsSinceEpoch,
+            101,
+          );
+          expect(
+            mutation.before.summary.updatedAt.value.microsecondsSinceEpoch,
+            201,
+          );
+          expect(
+            mutation.after.summary.createdAt,
+            mutation.before.summary.createdAt,
+          );
+          expect(mutation.after.summary.updatedAt, saved.intention.updatedAt);
+          expect(
+            mutation.before.summary.activeRelationCount,
+            isArchived == 1 ? 0 : 1,
+          );
+          expect(
+            mutation.after.summary.activeRelationCount,
+            command(id) is ArchiveIntention || isArchived == 1 ? 0 : 1,
+          );
+        });
+      }
+
+      for (final (name, command, isReady, isArchived)
+          in <(String, IntentionCommand Function(IntentionId), int, int)>[
+            (
+              'изменения полей',
+              (id) => UpdateIntention(
+                id: id,
+                title: 'Намерение 1',
+                description: 'Описание 1',
+              ),
+              1,
+              0,
+            ),
+            ('включения готовности', EnableIntentionReadiness.new, 1, 0),
+            ('выключения готовности', DisableIntentionReadiness.new, 0, 0),
+            ('архивирования', ArchiveIntention.new, 1, 1),
+            ('восстановления из архива', RestoreIntention.new, 1, 0),
+          ]) {
+        test('повтор $name сохраняет проверенные теги без записи', () async {
+          if (isArchived == 1) {
+            raw.execute('UPDATE long_term_relations SET is_archived = 1');
+          }
+          raw.execute(
+            'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
+            [isReady, isArchived, id.toCanonicalString()],
+          );
+          writeTrace.updateStatements.clear();
+
+          final saved = _commandSuccess(
+            await repository.execute(command(id)),
+          ) as IntentionSaved;
+          final mutation = saved.catalogMutation as IntentionCatalogUnchanged;
+
+          expect(mutation.before, same(mutation.after));
+          expect(
+            mutation.entry.summary.tags.map((tag) => tag.name.value),
+            expectedTagNames,
+          );
+          expect(clock.calls, 0);
+          expect(writeTrace.updateStatements, isEmpty);
+        });
+      }
+
+      test(
+        'каждая сторона снимка читает назначения на своём состоянии транзакции',
+        () async {
+          raw.execute('''CREATE TRIGGER change_own_tags_after_update
+          AFTER UPDATE ON intentions WHEN NEW.id = '${id.toCanonicalString()}'
+          BEGIN
+            DELETE FROM tag_assignments
+              WHERE intention_id = NEW.id AND tag_id = '${tagFixtureId(firstTagNumber)}';
+            INSERT INTO tag_assignments (tag_id, intention_id)
+              VALUES ('${tagFixtureId(lastTagNumber)}', NEW.id);
+          END''');
+
+          final saved = _commandSuccess(
+            await repository.execute(
+              UpdateIntention(
+                id: id,
+                title: 'Новое название',
+                description: null,
+              ),
+            ),
+          ) as IntentionSaved;
+          final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+
+          expect(
+            mutation.before.summary.tags.map((tag) => tag.name.value),
+            expectedTagNames,
+          );
+          expect(mutation.after.summary.tags.map((tag) => tag.name.value), [
+            'Работа',
+            ...expectedTagNames.skip(1),
+          ]);
+          expect(
+            mutation.before.summary.tags.first.id.toCanonicalString(),
+            tagFixtureId(firstTagNumber),
+          );
+          expect(
+            mutation.after.summary.tags.first.id.toCanonicalString(),
+            tagFixtureId(lastTagNumber),
+          );
+        },
+      );
+
+      test(
+        'снимок удаления сохраняет теги до каскадного удаления назначений',
+        () async {
+          raw.execute('DELETE FROM daily_choices');
+          raw.execute('DELETE FROM long_term_relations');
+
+          final deleted = _commandSuccess(
+            await repository.execute(DeleteIntention(id)),
+          ) as IntentionDeleted;
+          final mutation = deleted.catalogMutation as IntentionCatalogDeleted;
+
+          expect(mutation.before.summary.id, id);
+          expect(
+            mutation.before.summary.tags.map((tag) => tag.name.value),
+            expectedTagNames,
+          );
+          expect(mutation.after, isNull);
+          expect(
+            raw.select('SELECT * FROM tag_assignments WHERE intention_id = ?', [
+              id.toCanonicalString(),
+            ]),
+            isEmpty,
+          );
+          expect(raw.select('SELECT * FROM tags'), hasLength(107));
+          expect(
+            raw.select('SELECT * FROM tag_assignments WHERE intention_id = ?', [
+              tagFixtureId(3),
+            ]),
+            hasLength(1),
+          );
+        },
+      );
+
+      for (final (side, selectsToSkip, expectedClockCalls) in [
+        ('до изменения', 2, 0),
+        ('после изменения', 4, 1),
+      ]) {
+        test(
+          'повреждение тегов $side отклоняет команду и сохраняет ревизию',
+          () async {
+            final query = IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtDescending,
+              pageSize: 100,
+            );
+            final revisionBefore = _firstCatalogPage(
+              await repository.getCatalogPage(query),
+            ).revision;
+            writeTrace.overrideSelectAfter(
+              skippedNonEmptySelects: selectsToSkip,
+              overrides: const {'assigned_tag_id': 'повреждённая ссылка'},
+            );
+
+            final result = await repository.execute(
+              UpdateIntention(
+                id: id,
+                title: 'Новое название',
+                description: null,
+              ),
+            );
+
+            expect(result, _failure<IntentionCorruptionFailure>());
+            expect(clock.calls, expectedClockCalls);
+            final stored = raw.select(
+              'SELECT title, description, updated_at FROM intentions WHERE id = ?',
+              [id.toCanonicalString()],
+            ).single;
+            expect(stored['title'], 'Намерение 1');
+            expect(stored['description'], 'Описание 1');
+            expect(stored['updated_at'], 201);
+            final pageAfter = _firstCatalogPage(
+              await repository.getCatalogPage(query),
+            );
+            expect(
+              revisionBefore.compareTo(pageAfter.revision),
+              GraphRevisionOrder.same,
+            );
+            expect(
+              pageAfter.items
+                  .singleWhere((item) => item.id == id)
+                  .tags
+                  .map((tag) => tag.name.value),
+              expectedTagNames,
+            );
+          },
+        );
+      }
+
+      group('Команды назначения тега', () {
+        IntentionCatalogQuery requiring(int tagNumber) => IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: null,
+          tagFilter: IntentionTagFilter(
+            requiredTagIds: [_tagId(tagFixtureId(tagNumber))],
+          ),
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
+        );
+        final catalogQuery = IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
+        );
+
+        for (final (name, command, tagNumber, beforeNames, afterNames)
+            in <
+              (
+                String,
+                TagCommand Function(TagId, IntentionId),
+                int,
+                List<String> Function(List<String>),
+                List<String> Function(List<String>),
+              )
+            >[
+              (
+                'назначение',
+                (tagId, intentionId) =>
+                    AssignTag(tagId: tagId, intentionId: intentionId),
+                lastTagNumber,
+                (names) => names,
+                (names) => [names.first, 'Работа', ...names.skip(1)],
+              ),
+              (
+                'снятие',
+                (tagId, intentionId) =>
+                    RemoveTagAssignment(tagId: tagId, intentionId: intentionId),
+                firstTagNumber,
+                (names) => names,
+                (names) => names.skip(1).toList(),
+              ),
+            ]) {
+          test(
+            '$name добавляет полные снимки намерения в пакет той же ревизии',
+            () async {
+              final revisionBefore = _firstCatalogPage(
+                await repository.getCatalogPage(catalogQuery),
+              ).revision;
+              final tagId = _tagId(tagFixtureId(tagNumber));
+
+              final confirmed = _tagCommandSuccess(
+                await repository.execute(command(tagId, id)),
+              );
+              final changed = confirmed.value as TagAssignmentChanged;
+              final mutation = changed.catalogMutation;
+
+              expect(
+                confirmed.revision.compareTo(revisionBefore),
+                GraphRevisionOrder.newer,
+              );
+              expect(confirmed.changes, [same(changed.change), same(mutation)]);
+              expect(
+                confirmed.changes.whereType<IntentionCatalogMutation>(),
+                hasLength(1),
+              );
+              expect(
+                mutation.before.summary.tags.map((tag) => tag.name.value),
+                beforeNames(expectedTagNames),
+              );
+              expect(
+                mutation.after.summary.tags.map((tag) => tag.name.value),
+                afterNames(expectedTagNames),
+              );
+              final assigned = changed.state == TagAssignmentState.assigned;
+              expect(mutation.before.matches(requiring(tagNumber)), !assigned);
+              expect(mutation.after.matches(requiring(tagNumber)), assigned);
+              for (final entry in [mutation.before, mutation.after]) {
+                expect(entry.summary.id, id);
+                expect(entry.summary.title, 'Намерение 1');
+                expect(entry.summary.activeRelationCount, 1);
+                expect(
+                  entry.summary.createdAt.value.microsecondsSinceEpoch,
+                  101,
+                );
+                expect(
+                  entry.summary.updatedAt.value.microsecondsSinceEpoch,
+                  201,
+                );
+              }
+              expect(clock.calls, 0);
+              expect(
+                raw
+                    .select(
+                      'SELECT created_at, updated_at FROM intentions WHERE id = ?',
+                      [id.toCanonicalString()],
+                    )
+                    .single
+                    .values,
+                [101, 201],
+              );
+              final pageAfter = _firstCatalogPage(
+                await repository.getCatalogPage(catalogQuery),
+              );
+              expect(
+                pageAfter.revision.compareTo(confirmed.revision),
+                GraphRevisionOrder.same,
+              );
+              expect(
+                pageAfter.items
+                    .singleWhere((item) => item.id == id)
+                    .tags
+                    .map((tag) => tag.name.value),
+                afterNames(expectedTagNames),
+              );
+            },
+          );
+        }
+
+        for (final (name, command) in <(String, TagCommand)>[
+          (
+            'назначения',
+            AssignTag(
+              tagId: _tagId(tagFixtureId(firstTagNumber)),
+              intentionId: _id(tagFixtureId(1)),
+            ),
+          ),
+          (
+            'снятия',
+            RemoveTagAssignment(
+              tagId: _tagId(tagFixtureId(lastTagNumber)),
+              intentionId: _id(tagFixtureId(1)),
+            ),
+          ),
+        ]) {
+          test('повтор $name не даёт мутации и новой ревизии', () async {
+            final revisionBefore = _firstCatalogPage(
+              await repository.getCatalogPage(catalogQuery),
+            ).revision;
+
+            final confirmed = _tagCommandSuccess(
+              await repository.execute(command),
+            );
+
+            expect(confirmed.value, isA<TagAssignmentUnchanged>());
+            expect(confirmed.changes, [isA<TagAssignmentUnchangedChange>()]);
+            expect(
+              confirmed.revision.compareTo(revisionBefore),
+              GraphRevisionOrder.same,
+            );
+          });
+        }
+
+        for (final (side, skippedTagReads, stage) in [
+          ('до', 0, TagCommandDiagnosticsStage.validation),
+          ('после', 1, TagCommandDiagnosticsStage.resultRead),
+        ]) {
+          test(
+            'повреждение тегов снимка $side записи отклоняет команду без пакета',
+            () async {
+              final revisionBefore = _firstCatalogPage(
+                await repository.getCatalogPage(catalogQuery),
+              ).revision;
+              writeTrace.overrideSelectWithColumn(
+                'assigned_tag_id',
+                skippedMatchingSelects: skippedTagReads,
+                overrides: const {'assigned_tag_id': 'повреждённая ссылка'},
+              );
+
+              final result = await repository.execute(
+                AssignTag(
+                  tagId: _tagId(tagFixtureId(lastTagNumber)),
+                  intentionId: id,
+                ),
+              );
+
+              expect(
+                result,
+                isA<TagCommandFailed>().having(
+                  (result) => result.failure,
+                  'failure',
+                  isA<TagCorruptionFailure>(),
+                ),
+              );
+              expect(
+                diagnostics.events.whereType<TagCommandDiagnosticsEvent>().last,
+                isA<TagCommandDiagnosticsEvent>()
+                    .having((event) => event.stage, 'stage', stage)
+                    .having(
+                      (event) => event.status,
+                      'status',
+                      isA<DiagnosticsFailed>(),
+                    ),
+              );
+              expect(
+                raw.select(
+                  'SELECT 1 FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+                  [tagFixtureId(lastTagNumber), id.toCanonicalString()],
+                ),
+                isEmpty,
+              );
+              final pageAfter = _firstCatalogPage(
+                await repository.getCatalogPage(catalogQuery),
+              );
+              expect(
+                pageAfter.revision.compareTo(revisionBefore),
+                GraphRevisionOrder.same,
+              );
+              expect(clock.calls, 0);
+            },
+          );
+        }
+      });
+    });
+
     test('создаёт active not-ready намерение с нормализованными данными и единым UTC-временем', () async {
       final result = await repository.execute(
         const CreateIntention(
@@ -148,6 +683,7 @@ void main() {
       expect(createdMutation.before, isNull);
       expect(createdMutation.after, same(createdMutation.entry));
       expect(createdMutation.entry.summary.id, created.intention.id);
+      expect(createdMutation.entry.summary.tags, isEmpty);
       expect(createdMutation.entry.matches(milkQuery), isTrue);
       expect(createdMutation.entry.matches(doctorQuery), isFalse);
 
@@ -1358,6 +1894,18 @@ IntentionCommandSuccess _commandSuccess(
   return confirmed.value;
 }
 
+ConfirmedGraphResult<TagCommandSuccess> _tagCommandSuccess(
+  TagCommandResult result,
+) {
+  expect(result, isA<TagCommandSucceeded>());
+  return (result as TagCommandSucceeded).value;
+}
+
+TagId _tagId(String value) => switch (TagId.decode(value)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw ArgumentError.value(value, 'value'),
+};
+
 IntentionCatalogFirstPage _firstCatalogPage(
   Result<IntentionCatalogPage> result,
 ) {
@@ -1495,6 +2043,7 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
   final List<String> updateStatements = [];
   Map<String, Object?>? _nextSelectOverrides;
   var _nonEmptySelectsToSkip = 0;
+  String? _requiredColumn;
 
   void overrideNextSelect(Map<String, Object?> overrides) {
     overrideSelectAfter(skippedNonEmptySelects: 0, overrides: overrides);
@@ -1509,6 +2058,21 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
     }
     _nonEmptySelectsToSkip = skippedNonEmptySelects;
     _nextSelectOverrides = overrides;
+    _requiredColumn = null;
+  }
+
+  /// Подменяет строки непустого SELECT с указанным столбцом после пропуска
+  /// заданного числа таких же чтений.
+  void overrideSelectWithColumn(
+    String column, {
+    required int skippedMatchingSelects,
+    required Map<String, Object?> overrides,
+  }) {
+    overrideSelectAfter(
+      skippedNonEmptySelects: skippedMatchingSelects,
+      overrides: overrides,
+    );
+    _requiredColumn = column;
   }
 
   @override
@@ -1526,11 +2090,14 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
   ) {
     final overrides = _nextSelectOverrides;
     if (overrides == null || rows.isEmpty) return rows;
+    final column = _requiredColumn;
+    if (column != null && !rows.first.containsKey(column)) return rows;
     if (_nonEmptySelectsToSkip > 0) {
       _nonEmptySelectsToSkip--;
       return rows;
     }
     _nextSelectOverrides = null;
+    _requiredColumn = null;
     return [
       for (final row in rows) {...row, ...overrides},
     ];

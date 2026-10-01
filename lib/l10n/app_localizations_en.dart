@@ -107,6 +107,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogAllEmpty => 'No intentions yet.';
 
   @override
+  String get catalogTagConditionsEmpty =>
+      'No intentions match the tag conditions.';
+
+  @override
   String get catalogUnavailable => 'Intentions couldn’t be loaded. Try again.';
 
   @override
@@ -135,6 +139,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get catalogLoadMoreValidation =>
       'The saved catalog position is no longer valid.';
+
+  @override
+  String get catalogRefreshUnavailable =>
+      'The intention list isn’t up to date: changes couldn’t be loaded.';
+
+  @override
+  String get catalogRefreshCorruption =>
+      'The intention list isn’t up to date: stored data is damaged.';
+
+  @override
+  String get catalogRefreshUnexpected =>
+      'The intention list isn’t up to date because of an unexpected error.';
 
   @override
   String get catalogReload => 'Reload catalog';
@@ -170,6 +186,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get intentionActiveRelationCountUnknown =>
       'The active relation count is unknown.';
+
+  @override
+  String intentionSummaryTags(String tags) {
+    return 'Tags: $tags';
+  }
+
+  @override
+  String get intentionSummaryNoTags => 'No tags';
 
   @override
   String get relationNeighborhoodTitle => 'Relations';
@@ -868,6 +892,73 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tagNavigationLoadMoreUnexpected =>
       'Could not load more intentions because of an unexpected error.';
+
+  @override
+  String get tagConditionPickerTitle => 'Tag for search condition';
+
+  @override
+  String get tagConditionPickerPresent => 'With';
+
+  @override
+  String get tagConditionPickerAbsent => 'Without';
+
+  @override
+  String tagConditionPickerPresentNamed(String tagName) {
+    return 'With, $tagName';
+  }
+
+  @override
+  String tagConditionPickerAbsentNamed(String tagName) {
+    return 'Without, $tagName';
+  }
+
+  @override
+  String get tagConditionPickerSelectedPresent =>
+      'Already selected: must be present';
+
+  @override
+  String get tagConditionPickerSelectedAbsent =>
+      'Already selected: must be absent';
+
+  @override
+  String intentionTagConditionAbsent(String tagName) {
+    return 'not $tagName';
+  }
+
+  @override
+  String intentionTagConditionDeleted(String condition) {
+    return '$condition (tag deleted)';
+  }
+
+  @override
+  String intentionTagConditionPresentSemantics(String tagName) {
+    return '$tagName, must be present';
+  }
+
+  @override
+  String intentionTagConditionAbsentSemantics(String tagName) {
+    return '$tagName, must be absent';
+  }
+
+  @override
+  String intentionTagConditionDeletedSemantics(String condition) {
+    return '$condition, tag deleted';
+  }
+
+  @override
+  String get intentionTagConditionToggleHint =>
+      'Toggle requirement: must be present or must be absent';
+
+  @override
+  String intentionTagConditionRemove(String tagName) {
+    return 'Remove condition: $tagName';
+  }
+
+  @override
+  String get intentionTagConditionsAdd => 'Tag';
+
+  @override
+  String get intentionTagConditionsAddSemantics => 'Add tag condition';
 
   @override
   String get tagCatalogTitle => 'Tags';

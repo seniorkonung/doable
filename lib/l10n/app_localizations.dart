@@ -278,6 +278,12 @@ abstract class AppLocalizations {
   /// **'No intentions yet.'**
   String get catalogAllEmpty;
 
+  /// Успешная пустая выдача поиска намерений при действующих условиях по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions match the tag conditions.'**
+  String get catalogTagConditionsEmpty;
+
   /// Устранимая недоступность первой страницы каталога
   ///
   /// In en, this message translates to:
@@ -325,6 +331,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The saved catalog position is no longer valid.'**
   String get catalogLoadMoreValidation;
+
+  /// Устранимый отказ обновления над сохранённой выдачей каталога
+  ///
+  /// In en, this message translates to:
+  /// **'The intention list isn’t up to date: changes couldn’t be loaded.'**
+  String get catalogRefreshUnavailable;
+
+  /// Отказ обновления сохранённой выдачи из-за повреждения данных
+  ///
+  /// In en, this message translates to:
+  /// **'The intention list isn’t up to date: stored data is damaged.'**
+  String get catalogRefreshCorruption;
+
+  /// Отказ обновления сохранённой выдачи из-за непредвиденной ошибки
+  ///
+  /// In en, this message translates to:
+  /// **'The intention list isn’t up to date because of an unexpected error.'**
+  String get catalogRefreshUnexpected;
 
   /// Явное восстановление каталога с первой страницы
   ///
@@ -385,6 +409,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The active relation count is unknown.'**
   String get intentionActiveRelationCountUnknown;
+
+  /// Строка собственных тегов намерения в результате поиска; названия перечислены через запятую
+  ///
+  /// In en, this message translates to:
+  /// **'Tags: {tags}'**
+  String intentionSummaryTags(String tags);
+
+  /// Подтверждённое отсутствие тегов у намерения в результате поиска
+  ///
+  /// In en, this message translates to:
+  /// **'No tags'**
+  String get intentionSummaryNoTags;
 
   /// Заголовок соседства намерения
   ///
@@ -1543,6 +1579,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not load more intentions because of an unexpected error.'**
   String get tagNavigationLoadMoreUnexpected;
+
+  /// Заголовок экрана выбора тега для условия поиска намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Tag for search condition'**
+  String get tagConditionPickerTitle;
+
+  /// Действие «Есть»: выбрать тег с надобностью «должен быть»
+  ///
+  /// In en, this message translates to:
+  /// **'With'**
+  String get tagConditionPickerPresent;
+
+  /// Действие «Нет»: выбрать тег с надобностью «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Without'**
+  String get tagConditionPickerAbsent;
+
+  /// Семантика действия «Есть» вместе с названием тега
+  ///
+  /// In en, this message translates to:
+  /// **'With, {tagName}'**
+  String tagConditionPickerPresentNamed(String tagName);
+
+  /// Семантика действия «Нет» вместе с названием тега
+  ///
+  /// In en, this message translates to:
+  /// **'Without, {tagName}'**
+  String tagConditionPickerAbsentNamed(String tagName);
+
+  /// Отметка тега, уже входящего в условия поиска с надобностью «должен быть»
+  ///
+  /// In en, this message translates to:
+  /// **'Already selected: must be present'**
+  String get tagConditionPickerSelectedPresent;
+
+  /// Отметка тега, уже входящего в условия поиска с надобностью «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Already selected: must be absent'**
+  String get tagConditionPickerSelectedAbsent;
+
+  /// Текст чипа условия с надобностью «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'not {tagName}'**
+  String intentionTagConditionAbsent(String tagName);
+
+  /// Текст чипа условия по удалённому тегу с последним известным названием
+  ///
+  /// In en, this message translates to:
+  /// **'{condition} (tag deleted)'**
+  String intentionTagConditionDeleted(String condition);
+
+  /// Семантика условия с надобностью «должен быть»
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, must be present'**
+  String intentionTagConditionPresentSemantics(String tagName);
+
+  /// Семантика условия с надобностью «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, must be absent'**
+  String intentionTagConditionAbsentSemantics(String tagName);
+
+  /// Семантика условия по удалённому тегу
+  ///
+  /// In en, this message translates to:
+  /// **'{condition}, tag deleted'**
+  String intentionTagConditionDeletedSemantics(String condition);
+
+  /// Назначение нажатия на чип условия
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle requirement: must be present or must be absent'**
+  String get intentionTagConditionToggleHint;
+
+  /// Действие снятия условия по тегу
+  ///
+  /// In en, this message translates to:
+  /// **'Remove condition: {tagName}'**
+  String intentionTagConditionRemove(String tagName);
+
+  /// Подпись кнопки «+ Тег», открывающей выбор тега для условия поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Tag'**
+  String get intentionTagConditionsAdd;
+
+  /// Семантика кнопки добавления условия по тегу
+  ///
+  /// In en, this message translates to:
+  /// **'Add tag condition'**
+  String get intentionTagConditionsAddSemantics;
 
   /// Заголовок каталога тегов и переход к нему
   ///

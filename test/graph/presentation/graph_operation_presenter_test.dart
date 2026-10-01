@@ -30,6 +30,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../support/tag_assignment_changed.dart';
 
 void main() {
   setUp(() {
@@ -1769,7 +1770,7 @@ final class _PresenterHarness {
                       : TagAssignmentState.absent,
                 ),
               )
-            : TagAssignmentChanged(
+            : testTagAssignmentChanged(
                 TagAssignmentChangedChange(
                   revision: revision,
                   assignment: TagAssignment(

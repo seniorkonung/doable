@@ -6,6 +6,14 @@ import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
 import '../../../intention/domain/intention_id.dart';
 
+/// Отдельное открытие каталога тегов с собственным состоянием.
+///
+/// Идентичность задаёт сам экземпляр: состояние открытия не разделяется
+/// с каталогом тегов и другими открытиями того же режима.
+final class TagCatalogOpening {
+  TagCatalogOpening();
+}
+
 sealed class TagCatalogState {
   const TagCatalogState();
 }

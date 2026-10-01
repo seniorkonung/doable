@@ -1,4 +1,6 @@
 import '../../graph/application/graph_revision.dart';
+import '../../tag/domain/tag.dart';
+import '../../tag/domain/tag_id.dart';
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
@@ -7,6 +9,51 @@ import 'title_search_key.dart';
 enum IntentionScope { active, archived, all }
 
 enum IntentionReadinessFilter { all, readyOnly }
+
+/// Неизменяемые условия наличия и отсутствия собственных тегов намерения.
+///
+/// Повторы и порядок идентификаторов не меняют равенство условий.
+/// Пересечение наборов сохраняется и делает сочетание невыполнимым.
+/// Переименование и удаление тега сохраняют его идентификатор в условиях.
+final class IntentionTagFilter {
+  IntentionTagFilter({
+    Iterable<TagId> requiredTagIds = const [],
+    Iterable<TagId> excludedTagIds = const [],
+  }) : requiredTagIds = Set.unmodifiable(requiredTagIds),
+       excludedTagIds = Set.unmodifiable(excludedTagIds);
+
+  const IntentionTagFilter._({
+    required this.requiredTagIds,
+    required this.excludedTagIds,
+  });
+
+  static const empty = IntentionTagFilter._(
+    requiredTagIds: {},
+    excludedTagIds: {},
+  );
+
+  final Set<TagId> requiredTagIds;
+  final Set<TagId> excludedTagIds;
+
+  /// Проверяет полный набор собственных назначений искомому намерению.
+  bool matches(Set<TagId> ownTagIds) =>
+      ownTagIds.containsAll(requiredTagIds) &&
+      !excludedTagIds.any(ownTagIds.contains);
+
+  @override
+  bool operator ==(Object other) =>
+      other is IntentionTagFilter &&
+      requiredTagIds.length == other.requiredTagIds.length &&
+      excludedTagIds.length == other.excludedTagIds.length &&
+      requiredTagIds.containsAll(other.requiredTagIds) &&
+      excludedTagIds.containsAll(other.excludedTagIds);
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAllUnordered(requiredTagIds),
+    Object.hashAllUnordered(excludedTagIds),
+  );
+}
 
 enum IntentionCatalogSortField { createdAt, updatedAt }
 
@@ -64,11 +111,15 @@ final class IntentionCatalogQueryValidationException implements Exception {
   final IntentionTextValidationFailure? textFailure;
 }
 
+/// Соединяет охват, готовность, название, собственные теги и исключение
+/// участника через «И». Условия не требуют существования выбранных тегов.
 final class IntentionCatalogQuery {
   factory IntentionCatalogQuery({
     required IntentionScope scope,
     IntentionReadinessFilter readinessFilter = IntentionReadinessFilter.all,
     required String? titleFilter,
+    IntentionTagFilter tagFilter = IntentionTagFilter.empty,
+    IntentionId? excludedIntentionId,
     required IntentionCatalogOrder order,
     required int pageSize,
     IntentionCatalogCursor? cursor,
@@ -84,6 +135,8 @@ final class IntentionCatalogQuery {
       scope: scope,
       readinessFilter: readinessFilter,
       titleFilter: normalizedFilter,
+      tagFilter: tagFilter,
+      excludedIntentionId: excludedIntentionId,
       order: order,
       pageSize: pageSize,
       cursor: cursor,
@@ -94,6 +147,8 @@ final class IntentionCatalogQuery {
     required this.scope,
     required this.readinessFilter,
     required this.titleFilter,
+    required this.tagFilter,
+    required this.excludedIntentionId,
     required this.order,
     required this.pageSize,
     required this.cursor,
@@ -106,6 +161,10 @@ final class IntentionCatalogQuery {
   final IntentionScope scope;
   final IntentionReadinessFilter readinessFilter;
   final IntentionTitleFilter? titleFilter;
+  final IntentionTagFilter tagFilter;
+
+  /// Второй участник связи, исключаемый по идентичности до подсчёта и порции.
+  final IntentionId? excludedIntentionId;
   final IntentionCatalogOrder order;
   final int pageSize;
   final IntentionCatalogCursor? cursor;
@@ -123,7 +182,10 @@ final class IntentionCatalogQuery {
       IntentionReadinessFilter.readyOnly =>
         summary.readiness == IntentionReadiness.ready,
     };
-    if (!matchesScope || !matchesReadiness) {
+    if (!matchesScope ||
+        !matchesReadiness ||
+        summary.id == excludedIntentionId ||
+        !tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
       return false;
     }
     return titleFilter?.matchesTitle(summary.title) ?? true;
@@ -205,8 +267,10 @@ final class IntentionSummary {
     required int activeRelationCount,
     required this.createdAt,
     required this.updatedAt,
+    List<Tag> tags = const [],
   }) : title = IntentionText.normalizeTitle(title),
-       activeRelationCount = _requireNonNegativeCount(activeRelationCount);
+       activeRelationCount = _requireNonNegativeCount(activeRelationCount),
+       tags = List.unmodifiable(tags);
 
   final IntentionId id;
   final String title;
@@ -216,6 +280,10 @@ final class IntentionSummary {
   final int activeRelationCount;
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
+
+  /// Полный подтверждённый состав собственных тегов в порядке создания тегов.
+  /// Пустой список означает проверенное отсутствие назначений.
+  final List<Tag> tags;
 
   /// Заменяет только производный счётчик активных связей.
   ///
@@ -231,7 +299,54 @@ final class IntentionSummary {
         activeRelationCount: activeRelationCount,
         createdAt: createdAt,
         updatedAt: updatedAt,
+        tags: tags,
       );
+
+  /// Заменяет название назначенного тега той же идентичности.
+  ///
+  /// Состав и порядок тегов переносятся без изменений, поэтому соответствие
+  /// фильтру, порядок выдачи и временные метки сохраняются. Если тег не
+  /// назначен намерению, возвращается та же сводка.
+  IntentionSummary withRenamedTag(Tag renamed) {
+    if (!tags.any((tag) => tag.id == renamed.id)) {
+      return this;
+    }
+    return IntentionSummary(
+      id: id,
+      title: title,
+      hasDescription: hasDescription,
+      readiness: readiness,
+      archiveState: archiveState,
+      activeRelationCount: activeRelationCount,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      tags: [for (final tag in tags) tag.id == renamed.id ? renamed : tag],
+    );
+  }
+
+  /// Убирает назначение физически удалённого тега.
+  ///
+  /// Порядок остальных тегов и временные метки сохраняются. Если тег не
+  /// назначен намерению, возвращается та же сводка.
+  IntentionSummary withoutTag(TagId deletedTagId) {
+    if (!tags.any((tag) => tag.id == deletedTagId)) {
+      return this;
+    }
+    return IntentionSummary(
+      id: id,
+      title: title,
+      hasDescription: hasDescription,
+      readiness: readiness,
+      archiveState: archiveState,
+      activeRelationCount: activeRelationCount,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      tags: [
+        for (final tag in tags)
+          if (tag.id != deletedTagId) tag,
+      ],
+    );
+  }
 
   static int _requireNonNegativeCount(int value) {
     if (value < 0) {
@@ -397,4 +512,153 @@ final class IntentionCatalogContinuationPage extends IntentionCatalogPage {
     required super.nextCursor,
     required super.revision,
   });
+}
+
+/// Граница области открытой выдачи, которую согласует чтение согласования.
+sealed class IntentionCatalogReconciliationBoundary {
+  const IntentionCatalogReconciliationBoundary();
+}
+
+/// Частично загруженный префикс заканчивается ключом сортировки обычного
+/// продолжения этой выдачи. Совпадения после ключа получает обычное
+/// продолжение, а не чтение согласования.
+final class IntentionCatalogPartialPrefixBoundary
+    extends IntentionCatalogReconciliationBoundary {
+  const IntentionCatalogPartialPrefixBoundary(this.continuation);
+
+  final IntentionCatalogCursor continuation;
+}
+
+/// Выдача ранее загружена до конца, в том числе пустая: область
+/// согласования продолжается до нового конца выдачи.
+final class IntentionCatalogCompletedBoundary
+    extends IntentionCatalogReconciliationBoundary {
+  const IntentionCatalogCompletedBoundary();
+}
+
+/// Непрозрачное продолжение одного согласования. Оно связано с запросом,
+/// границей области, позицией в действующем порядке, строками своего окна,
+/// следующими за позицией, и ревизией первой порции.
+abstract interface class IntentionCatalogReconciliationCursor {}
+
+/// Окно сохранённых строк области, следующих за курсором согласования в
+/// действующем порядке. Строки окна исключаются из порции по идентичности, а
+/// недостающие совпадения читаются не дальше верхнего края окна. Окно больше
+/// размера порции запроса отклоняется как недопустимый ввод без чтения.
+sealed class IntentionCatalogReconciliationWindow {
+  IntentionCatalogReconciliationWindow._(Iterable<IntentionSummary> storedRows)
+    : storedRows = List.unmodifiable(storedRows);
+
+  /// Сохранённые строки окна в действующем порядке.
+  final List<IntentionSummary> storedRows;
+
+  List<IntentionId> get storedIntentionIds => [
+    for (final row in storedRows) row.id,
+  ];
+}
+
+/// За окном следуют другие сохранённые строки области: верхний край окна —
+/// ключ сортировки его последней строки.
+final class IntentionCatalogInnerReconciliationWindow
+    extends IntentionCatalogReconciliationWindow {
+  IntentionCatalogInnerReconciliationWindow(super.storedRows) : super._() {
+    if (storedRows.isEmpty) {
+      throw ArgumentError.value(
+        storedRows,
+        'storedRows',
+        'Внутреннее окно содержит хотя бы одну сохранённую строку.',
+      );
+    }
+  }
+
+  IntentionSummary get upperEdgeRow => storedRows.last;
+}
+
+/// Окно содержит последнюю сохранённую строку области либо пусто, потому что
+/// сохранённых строк после курсора нет: верхний край окна — граница области.
+final class IntentionCatalogFinalReconciliationWindow
+    extends IntentionCatalogReconciliationWindow {
+  IntentionCatalogFinalReconciliationWindow(super.storedRows) : super._();
+}
+
+/// Запрос недостающих совпадений внутри уже загруженной области.
+///
+/// [catalogQuery] задаёт текущий совместный фильтр и порядок открытой выдачи
+/// без курсора обычного продолжения. Область передаётся не целиком, а
+/// скользящим окном сохранённых строк после [cursor]; без курсора окно
+/// начинается с первой сохранённой строки области.
+final class IntentionCatalogReconciliationQuery {
+  const IntentionCatalogReconciliationQuery({
+    required this.catalogQuery,
+    required this.boundary,
+    required this.window,
+    this.cursor,
+  });
+
+  final IntentionCatalogQuery catalogQuery;
+  final IntentionCatalogReconciliationBoundary boundary;
+  final IntentionCatalogReconciliationWindow window;
+  final IntentionCatalogReconciliationCursor? cursor;
+}
+
+/// Исход чтения согласования, отличный от безопасно классифицированного
+/// отказа: порция недостающих совпадений либо требование повторить
+/// согласование для актуальной ревизии.
+sealed class IntentionCatalogReconciliationOutcome {
+  const IntentionCatalogReconciliationOutcome();
+}
+
+/// Порция недостающих совпадений области в действующем порядке с полным
+/// составом собственных тегов. Все порции одного согласования отражают одну
+/// ревизию.
+///
+/// Порция содержит совпадения после курсора и не дальше верхнего края окна.
+/// Продолжение заполненной порции начинается с ключа её последней строки,
+/// незаполненной порции внутреннего окна — с верхнего края окна. Отсутствие
+/// продолжения означает, что окно было последним и совпадений в нём больше
+/// нет.
+sealed class IntentionCatalogReconciliationPortion
+    extends IntentionCatalogReconciliationOutcome {
+  IntentionCatalogReconciliationPortion({
+    required List<IntentionSummary> items,
+    required this.nextCursor,
+    required this.revision,
+  }) : items = List.unmodifiable(items);
+
+  final List<IntentionSummary> items;
+  final IntentionCatalogReconciliationCursor? nextCursor;
+  final GraphRevision revision;
+}
+
+/// Первая порция согласования несёт абсолютное количество совпадений всего
+/// совместного фильтра, не ограниченное областью и сохранёнными строками.
+final class IntentionCatalogReconciliationFirstPortion
+    extends IntentionCatalogReconciliationPortion {
+  IntentionCatalogReconciliationFirstPortion({
+    required super.items,
+    required int totalCount,
+    required super.nextCursor,
+    required super.revision,
+  }) : totalCount = IntentionCatalogFirstPage._requireTotalCount(
+         totalCount,
+         items.length,
+       );
+
+  final int totalCount;
+}
+
+final class IntentionCatalogReconciliationContinuationPortion
+    extends IntentionCatalogReconciliationPortion {
+  IntentionCatalogReconciliationContinuationPortion({
+    required super.items,
+    required super.nextCursor,
+    required super.revision,
+  });
+}
+
+/// Граф изменился после первой порции: полученные порции нельзя
+/// публиковать, а согласование повторяется для актуальной ревизии.
+final class IntentionCatalogReconciliationRetry
+    extends IntentionCatalogReconciliationOutcome {
+  const IntentionCatalogReconciliationRetry();
 }

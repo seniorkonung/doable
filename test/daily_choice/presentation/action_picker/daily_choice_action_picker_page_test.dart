@@ -10,6 +10,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/material.dart';
@@ -20,8 +21,24 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show testSummary;
 import '../../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart';
+import '../daily_choice_picker_tag_search_test_support.dart';
 
 void main() {
+  defineDailyChoicePickerTagSearchTests(
+    DailyChoicePickerTagSearchCase(
+      route: const DailyChoiceActionPickerRoute(),
+      purpose: const SelectDailyChoiceAction(),
+      keyPrefix: 'daily-choice-action',
+      readinessFilter: IntentionReadinessFilter.readyOnly,
+      rowReadiness: const [IntentionReadiness.ready],
+      totalCountLabel: (count) => 'Total actions: $count',
+      emptyScopeMessages: const {
+        'en': 'No active actions are available.',
+        'ru': 'Доступных активных действий нет.',
+      },
+    ),
+  );
+
   testWidgets(
     'выбирает одноимённое действие по идентификатору и открывает подробности',
     (tester) async {

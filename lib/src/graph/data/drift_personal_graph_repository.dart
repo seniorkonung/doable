@@ -198,15 +198,16 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
     try {
       final page = await _sequencer.run(
-        () async => switch (cursor) {
-          null => await _database.transaction(
-            () => _readFirstCatalogPage(query),
-          ),
-          _DriftIntentionCatalogCursor() => await _database.transaction(
-            () => _readCatalogContinuationPage(query, cursor),
-          ),
-          _ => throw StateError('Недопустимый cursor каталога.'),
-        },
+        () => _database.transaction(
+          () => switch (cursor) {
+            null => _readFirstCatalogPage(query),
+            _DriftIntentionCatalogCursor() => _readCatalogContinuationPage(
+              query,
+              cursor,
+            ),
+            _ => throw StateError('Недопустимый cursor каталога.'),
+          },
+        ),
       );
       _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
@@ -228,6 +229,89 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       );
       return ResultFailure(failure);
     }
+  }
+
+  @override
+  Future<Result<IntentionCatalogReconciliationOutcome>>
+  getCatalogReconciliationPortion(
+    IntentionCatalogReconciliationQuery query,
+  ) async {
+    final catalogQuery = query.catalogQuery;
+    final pageSize = catalogQuery.pageSize;
+    final stopwatch = Stopwatch()..start();
+    _recordDiagnostics(
+      CatalogReconciliationReadDiagnosticsEvent.started(pageSize: pageSize),
+    );
+    Result<IntentionCatalogReconciliationOutcome> fail(
+      IntentionFailure failure,
+    ) {
+      _recordDiagnostics(
+        CatalogReconciliationReadDiagnosticsEvent.failed(
+          pageSize: pageSize,
+          duration: stopwatch.elapsed,
+          code: _diagnosticsFailureCode(failure),
+        ),
+      );
+      return ResultFailure(failure);
+    }
+
+    const invalidInput = IntentionGenericValidationFailure();
+    final _DriftIntentionCatalogCursor? area;
+    switch (query.boundary) {
+      case IntentionCatalogCompletedBoundary():
+        area = null;
+      case IntentionCatalogPartialPrefixBoundary(
+            continuation: final _DriftIntentionCatalogCursor continuation,
+          )
+          when continuation.isOwnedBy(_epoch) &&
+              continuation.matches(catalogQuery):
+        area = continuation;
+      case IntentionCatalogPartialPrefixBoundary():
+        return fail(invalidInput);
+    }
+    final cursor = query.cursor;
+    if (catalogQuery.cursor != null ||
+        cursor != null &&
+            (cursor is! _DriftIntentionCatalogReconciliationCursor ||
+                !cursor.isOwnedBy(_epoch) ||
+                !cursor.matches(query, area)) ||
+        !_isValidReconciliationWindow(
+          query,
+          area,
+          cursor is _DriftIntentionCatalogReconciliationCursor ? cursor : null,
+        )) {
+      return fail(invalidInput);
+    }
+
+    final IntentionCatalogReconciliationOutcome outcome;
+    try {
+      outcome = await _sequencer.run(
+        () => _database.transaction(
+          () => switch (cursor) {
+            null => _readFirstReconciliationPortion(query, area),
+            _DriftIntentionCatalogReconciliationCursor() =>
+              _readReconciliationContinuation(query, area, cursor),
+            _ => throw StateError('Недопустимое продолжение согласования.'),
+          },
+        ),
+      );
+    } on Object catch (error) {
+      return fail(_classifyCatalogReadFailure(error));
+    }
+    // Повтор из-за новой ревизии — штатное завершение чтения, а не отказ.
+    _recordDiagnostics(
+      CatalogReconciliationReadDiagnosticsEvent.completed(
+        pageSize: pageSize,
+        duration: stopwatch.elapsed,
+        completion: switch (outcome) {
+          IntentionCatalogReconciliationPortion() =>
+            CatalogReconciliationReadCompletion.portion,
+          IntentionCatalogReconciliationRetry() =>
+            CatalogReconciliationReadCompletion.retry,
+        },
+      ),
+    );
+    return ResultSuccess(outcome);
   }
 
   @override
@@ -603,7 +687,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final counts = await _readVerifiedRelationCounts(intention.id);
     return _CommittedIntentionCreated(
       intention: _rehydrateStored(stored.detail),
-      after: _catalogEntrySnapshot(stored, counts),
+      after: await _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -620,7 +704,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
     final existing = _rehydrateStored(storedBefore.detail);
     final counts = await _readVerifiedRelationCounts(command.id);
-    final before = _catalogEntrySnapshot(storedBefore, counts);
+    final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.title == title && existing.description == description) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -648,7 +732,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored, counts),
+      after: await _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -661,7 +745,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
     final existing = _rehydrateStored(storedBefore.detail);
     final counts = await _readVerifiedRelationCounts(id);
-    final before = _catalogEntrySnapshot(storedBefore, counts);
+    final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.readiness == readiness) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -688,7 +772,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored, counts),
+      after: await _catalogEntrySnapshot(stored, counts),
     );
   }
 
@@ -701,7 +785,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
     final existing = _rehydrateStored(storedBefore.detail);
     final counts = await _readVerifiedRelationCounts(id);
-    final before = _catalogEntrySnapshot(storedBefore, counts);
+    final before = await _catalogEntrySnapshot(storedBefore, counts);
     if (existing.archiveState == archiveState) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
@@ -741,7 +825,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     return _CommittedIntentionUpdated(
       intention: _rehydrateStored(stored.detail),
       before: before,
-      after: _catalogEntrySnapshot(stored, affectedCounts[id] ?? counts),
+      after: await _catalogEntrySnapshot(stored, affectedCounts[id] ?? counts),
       affectedCounts: affectedCounts,
     );
   }
@@ -808,7 +892,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       throw _IntentionHasBlockingRelations(id);
     }
     final counts = await _readVerifiedRelationCounts(id);
-    final before = _catalogEntrySnapshot(storedBefore, counts);
+    final before = await _catalogEntrySnapshot(storedBefore, counts);
     final deletedRows = await (_database.delete(
       _database.intentions,
     )..where((row) => row.id.equals(id.toCanonicalString()))).go();
@@ -940,6 +1024,186 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     );
   }
 
+  /// Окно не больше порции запроса, без повторов, строго по возрастанию в
+  /// действующем порядке, после позиции продолжения и не за границей
+  /// частичного префикса.
+  bool _isValidReconciliationWindow(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? area,
+    _DriftIntentionCatalogReconciliationCursor? cursor,
+  ) {
+    final catalogQuery = query.catalogQuery;
+    final rows = query.window.storedRows;
+    if (rows.length > catalogQuery.pageSize) {
+      return false;
+    }
+    for (var index = 1; index < rows.length; index++) {
+      if (catalogQuery.compare(rows[index - 1], rows[index]) >= 0) {
+        return false;
+      }
+    }
+    if (rows.isEmpty) {
+      return true;
+    }
+    final order = catalogQuery.order;
+    if (cursor != null &&
+        _compareToCatalogKey(order, rows.first, cursor.position) <= 0) {
+      return false;
+    }
+    return area == null || _compareToCatalogKey(order, rows.last, area) <= 0;
+  }
+
+  /// Сравнивает строку с ключом сортировки в действующем порядке.
+  int _compareToCatalogKey(
+    IntentionCatalogOrder order,
+    IntentionSummary row,
+    _DriftIntentionCatalogCursor key,
+  ) {
+    final timestamp = switch (order.field) {
+      IntentionCatalogSortField.createdAt => row.createdAt,
+      IntentionCatalogSortField.updatedAt => row.updatedAt,
+    };
+    final timestampComparison = timestamp.value.compareTo(
+      key.boundaryTimestamp.value,
+    );
+    final directionAdjusted = switch (order.direction) {
+      IntentionCatalogSortDirection.ascending => timestampComparison,
+      IntentionCatalogSortDirection.descending => -timestampComparison,
+    };
+    return directionAdjusted != 0
+        ? directionAdjusted
+        : row.id.compareTo(key.boundaryId);
+  }
+
+  Future<IntentionCatalogReconciliationFirstPortion>
+  _readFirstReconciliationPortion(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? area,
+  ) async {
+    final intentions = _database.intentions;
+    final countExpression = countAll();
+    final countQuery = _database.selectOnly(intentions)
+      ..addColumns([countExpression])
+      ..where(_catalogCondition(query.catalogQuery));
+    final totalCount = (await countQuery.getSingle()).read(countExpression)!;
+    final portion = await _readMissingCatalogMatches(query, area, null);
+
+    return IntentionCatalogReconciliationFirstPortion(
+      items: portion.items,
+      totalCount: totalCount,
+      nextCursor: portion.nextCursor,
+      revision: _currentRevision,
+    );
+  }
+
+  Future<IntentionCatalogReconciliationOutcome> _readReconciliationContinuation(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? area,
+    _DriftIntentionCatalogReconciliationCursor cursor,
+  ) async {
+    if (cursor.revisionSequence != _mutationSequence) {
+      return const IntentionCatalogReconciliationRetry();
+    }
+    final portion = await _readMissingCatalogMatches(
+      query,
+      area,
+      cursor.position,
+    );
+    return IntentionCatalogReconciliationContinuationPortion(
+      items: portion.items,
+      nextCursor: portion.nextCursor,
+      revision: _currentRevision,
+    );
+  }
+
+  /// Недостающие совпадения окна после [position] в действующем порядке:
+  /// строки за верхним краем окна и строки окна не читаются, а
+  /// материализация ограничена порцией и её назначениями.
+  Future<
+    ({
+      List<IntentionSummary> items,
+      IntentionCatalogReconciliationCursor? nextCursor,
+    })
+  >
+  _readMissingCatalogMatches(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? area,
+    _DriftIntentionCatalogCursor? position,
+  ) async {
+    final catalogQuery = query.catalogQuery;
+    final window = query.window;
+    final intentions = _database.intentions;
+    final upperEdge = switch (window) {
+      IntentionCatalogInnerReconciliationWindow(:final upperEdgeRow) =>
+        _cursorAt(catalogQuery, upperEdgeRow),
+      IntentionCatalogFinalReconciliationWindow() => area,
+    };
+    var condition = _catalogCondition(catalogQuery);
+    if (upperEdge != null) {
+      condition = condition & _notAfterKeysetCondition(catalogQuery, upperEdge);
+    }
+    if (position != null) {
+      condition = condition & _keysetCondition(catalogQuery, position);
+    }
+    if (window.storedRows.isNotEmpty) {
+      condition =
+          condition & _StoredCatalogRowsExpression(window.storedIntentionIds);
+    }
+    final rowsQuery = _database.selectOnly(intentions)
+      ..addColumns([
+        intentions.id,
+        intentions.title,
+        intentions.description,
+        intentions.isActionReady,
+        intentions.isArchived,
+        intentions.createdAt,
+        intentions.updatedAt,
+      ])
+      ..where(condition)
+      ..orderBy([
+        _primaryOrderingTerm(intentions, catalogQuery.order),
+        OrderingTerm.asc(intentions.id),
+      ])
+      ..limit(catalogQuery.pageSize + 1);
+    final rows = await rowsQuery.get();
+    final items = await _readCatalogItems(rows, catalogQuery.pageSize);
+
+    final _DriftIntentionCatalogCursor? nextPosition;
+    final List<IntentionId> pendingWindowIds;
+    switch (window) {
+      case IntentionCatalogInnerReconciliationWindow(:final upperEdgeRow)
+          when items.length < catalogQuery.pageSize:
+        nextPosition = _cursorAt(catalogQuery, upperEdgeRow);
+        pendingWindowIds = const [];
+      case IntentionCatalogFinalReconciliationWindow()
+          when rows.length <= catalogQuery.pageSize:
+        nextPosition = null;
+        pendingWindowIds = const [];
+      case IntentionCatalogInnerReconciliationWindow() ||
+          IntentionCatalogFinalReconciliationWindow():
+        final last = items.last;
+        nextPosition = _cursorAt(catalogQuery, last);
+        pendingWindowIds = [
+          for (final row in window.storedRows)
+            if (catalogQuery.compare(row, last) > 0) row.id,
+        ];
+    }
+
+    return (
+      items: items,
+      nextCursor: nextPosition == null
+          ? null
+          : _DriftIntentionCatalogReconciliationCursor(
+              position: nextPosition,
+              area: area,
+              pendingWindowIds: pendingWindowIds,
+              pendingReachesAreaEnd:
+                  window is IntentionCatalogFinalReconciliationWindow,
+              revisionSequence: _mutationSequence,
+            ),
+    );
+  }
+
   Expression<bool> _catalogCondition(IntentionCatalogQuery query) {
     final intentions = _database.intentions;
     final scopeCondition = switch (query.scope) {
@@ -953,7 +1217,21 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         true,
       ),
     };
-    final condition = scopeCondition & readinessCondition;
+    var condition = scopeCondition & readinessCondition;
+    final excludedIntentionId = query.excludedIntentionId;
+    if (excludedIntentionId != null) {
+      condition =
+          condition &
+          intentions.id.equals(excludedIntentionId.toCanonicalString()).not();
+    }
+    final requiredTagIds = query.tagFilter.requiredTagIds;
+    if (requiredTagIds.isNotEmpty) {
+      condition = condition & _RequiredCatalogTagsExpression(requiredTagIds);
+    }
+    final excludedTagIds = query.tagFilter.excludedTagIds;
+    if (excludedTagIds.isNotEmpty) {
+      condition = condition & _ExcludedCatalogTagsExpression(excludedTagIds);
+    }
     final filter = query.titleFilter;
     if (filter == null) return condition;
     return condition &
@@ -979,6 +1257,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     IntentionCatalogSortField.updatedAt => intentions.updatedAt,
   };
 
+  /// Строка следует за курсором в действующем порядке. Отдельное сравнение
+  /// временной метки ограничивает диапазон обхода индекса порядка: вместе с
+  /// границей области согласования оно не даёт планировщику объединить
+  /// диапазоны `OR` и сортировать все строки области.
   Expression<bool> _keysetCondition(
     IntentionCatalogQuery query,
     _DriftIntentionCatalogCursor cursor,
@@ -987,18 +1269,54 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final timestamp = _primaryOrderingColumn(intentions, query.order);
     final boundaryTimestamp =
         cursor.boundaryTimestamp.value.microsecondsSinceEpoch;
-    final afterTimestamp = switch (query.order.direction) {
-      IntentionCatalogSortDirection.ascending => timestamp.isBiggerThanValue(
-        boundaryTimestamp,
+    final (
+      notBeforeTimestamp,
+      afterTimestamp,
+    ) = switch (query.order.direction) {
+      IntentionCatalogSortDirection.ascending => (
+        timestamp.isBiggerOrEqualValue(boundaryTimestamp),
+        timestamp.isBiggerThanValue(boundaryTimestamp),
       ),
-      IntentionCatalogSortDirection.descending => timestamp.isSmallerThanValue(
-        boundaryTimestamp,
+      IntentionCatalogSortDirection.descending => (
+        timestamp.isSmallerOrEqualValue(boundaryTimestamp),
+        timestamp.isSmallerThanValue(boundaryTimestamp),
       ),
     };
-    return afterTimestamp |
-        (timestamp.equals(boundaryTimestamp) &
+    return notBeforeTimestamp &
+        (afterTimestamp |
             intentions.id.isBiggerThanValue(
               cursor.boundaryId.toCanonicalString(),
+            ));
+  }
+
+  /// Строка не следует за границей в действующем порядке, включая саму
+  /// границу. Отдельное сравнение временной метки ограничивает диапазон
+  /// обхода индекса порядка.
+  Expression<bool> _notAfterKeysetCondition(
+    IntentionCatalogQuery query,
+    _DriftIntentionCatalogCursor boundary,
+  ) {
+    final intentions = _database.intentions;
+    final timestamp = _primaryOrderingColumn(intentions, query.order);
+    final boundaryTimestamp =
+        boundary.boundaryTimestamp.value.microsecondsSinceEpoch;
+    final (
+      notAfterTimestamp,
+      beforeTimestamp,
+    ) = switch (query.order.direction) {
+      IntentionCatalogSortDirection.ascending => (
+        timestamp.isSmallerOrEqualValue(boundaryTimestamp),
+        timestamp.isSmallerThanValue(boundaryTimestamp),
+      ),
+      IntentionCatalogSortDirection.descending => (
+        timestamp.isBiggerOrEqualValue(boundaryTimestamp),
+        timestamp.isBiggerThanValue(boundaryTimestamp),
+      ),
+    };
+    return notAfterTimestamp &
+        (beforeTimestamp |
+            intentions.id.isSmallerOrEqualValue(
+              boundary.boundaryId.toCanonicalString(),
             ));
   }
 
@@ -1010,11 +1328,14 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final itemRows = validatedRows.take(pageSize).toList(growable: false);
     final intentionIds = [for (final row in itemRows) row.intentionId];
     final aggregates = await _relationCountAggregates.read(intentionIds);
+    final tags = await _readIntentionTags(intentionIds);
     return [
       for (var index = 0; index < itemRows.length; index++)
         _rehydrateSummary(
           itemRows[index],
           _requireValidAggregate(aggregates[intentionIds[index]]),
+          tags[intentionIds[index]] ??
+              (throw const _StoredIntentionCorruption()),
         ),
     ];
   }
@@ -1061,6 +1382,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   IntentionSummary _rehydrateSummary(
     ({IntentionId intentionId, _StoredIntentionDetail stored}) row,
     RelationCounts relationCounts,
+    List<tag_domain.Tag> tags,
   ) => IntentionSummary(
     id: row.intentionId,
     title: row.stored.title,
@@ -1070,9 +1392,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     activeRelationCount: relationCounts.active,
     createdAt: row.stored.createdAt,
     updatedAt: row.stored.updatedAt,
+    tags: tags,
   );
 
-  IntentionCatalogCursor _cursorAt(
+  _DriftIntentionCatalogCursor _cursorAt(
     IntentionCatalogQuery query,
     IntentionSummary boundary,
   ) => _DriftIntentionCatalogCursor(
@@ -1080,6 +1403,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     scope: query.scope,
     readinessFilter: query.readinessFilter,
     normalizedTitleFilter: query.titleFilter?.map((value) => value),
+    tagFilter: query.tagFilter,
+    excludedIntentionId: query.excludedIntentionId,
     order: query.order,
     boundaryTimestamp: switch (query.order.field) {
       IntentionCatalogSortField.createdAt => boundary.createdAt,
@@ -1099,11 +1424,12 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         updatedAt: stored.updatedAt,
       );
 
-  IntentionCatalogEntrySnapshot _catalogEntrySnapshot(
+  Future<IntentionCatalogEntrySnapshot> _catalogEntrySnapshot(
     _StoredIntentionCommandSnapshot stored,
     RelationCounts relationCounts,
-  ) {
+  ) async {
     final intention = _rehydrateStored(stored.detail);
+    final tags = await _readIntentionTags([intention.id]);
     return _DriftIntentionCatalogEntrySnapshot(
       summary: IntentionSummary(
         id: intention.id,
@@ -1114,6 +1440,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         activeRelationCount: relationCounts.active,
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
+        tags: tags[intention.id] ?? (throw const _StoredIntentionCorruption()),
       ),
       storedTitleSearchKey: stored.titleSearchKey,
     );
@@ -1398,7 +1725,12 @@ final class _DriftIntentionCatalogEntrySnapshot
       IntentionReadinessFilter.readyOnly =>
         summary.readiness == domain.IntentionReadiness.ready,
     };
-    if (!matchesScope || !matchesReadiness) return false;
+    if (!matchesScope ||
+        !matchesReadiness ||
+        summary.id == query.excludedIntentionId ||
+        !query.tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
+      return false;
+    }
 
     final filter = query.titleFilter;
     return filter == null ||
@@ -1520,12 +1852,181 @@ final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
   );
 }
 
+/// Набор идентификаторов передаётся одним параметром: JSON-массивом
+/// различных канонических строк для `json_each(?)`. Чтение ничего не пишет на
+/// соединение, а размер набора не ограничен числом параметров SQL-выражения.
+final class _CatalogIdsParameter {
+  _CatalogIdsParameter(Iterable<String> canonicalIds)
+    : _canonicalIds = {...canonicalIds};
+
+  _CatalogIdsParameter.tags(Set<TagId> tagIds)
+    : this(tagIds.map((id) => id.toCanonicalString()));
+
+  final Set<String> _canonicalIds;
+
+  int get distinctCount => _canonicalIds.length;
+
+  void writeInto(GenerationContext context) =>
+      Variable<String>(jsonEncode([..._canonicalIds])).writeInto(context);
+}
+
+/// Намерение имеет собственные назначения всех обязательных тегов.
+///
+/// Набор читается из параметра один раз на выполнение запроса: некоррелированный
+/// подзапрос отбирает намерения, у которых число собственных назначений
+/// обязательных тегов равно числу различных обязательных идентификаторов, а
+/// кандидат проверяется адресным поиском в отобранном множестве. Уникальность
+/// `(tag_id, intention_id)` исключает повторный счёт одного назначения.
+///
+/// Унарный `+` запрещает SQLite вести выборку по отобранному множеству через
+/// первичный ключ: иначе порция и продолжение сортируют все совпадения во
+/// временном B-дереве. С ним выборку ведёт индекс порядка охвата, и она
+/// завершается после `pageSize + 1` подходящих строк.
+final class _RequiredCatalogTagsExpression extends Expression<bool> {
+  _RequiredCatalogTagsExpression(Set<TagId> tagIds)
+    : _tagIds = _CatalogIdsParameter.tags(tagIds);
+
+  final _CatalogIdsParameter _tagIds;
+
+  @override
+  void writeInto(GenerationContext context) {
+    context.buffer.write(
+      '+intentions.id IN (SELECT assignment.intention_id '
+      'FROM tag_assignments AS assignment '
+      'WHERE assignment.tag_id IN ('
+      'SELECT required_tag.value FROM json_each(',
+    );
+    _tagIds.writeInto(context);
+    context.buffer.write(
+      ') AS required_tag) '
+      'GROUP BY assignment.intention_id HAVING COUNT(*) = ',
+    );
+    Variable<int>(_tagIds.distinctCount).writeInto(context);
+    context.buffer.write(')');
+  }
+}
+
+/// Намерение не имеет собственных назначений ни одного исключённого тега.
+///
+/// Набор читается из параметра один раз на выполнение запроса:
+/// некоррелированный подзапрос отбирает намерения с назначением хотя бы одного
+/// исключённого тега, а кандидат проверяется адресным поиском в этом
+/// множестве. Столбец `intention_id` обязателен, поэтому `NULL` в множество не
+/// попадает и `NOT IN` определён для каждого кандидата.
+final class _ExcludedCatalogTagsExpression extends Expression<bool> {
+  _ExcludedCatalogTagsExpression(Set<TagId> tagIds)
+    : _tagIds = _CatalogIdsParameter.tags(tagIds);
+
+  final _CatalogIdsParameter _tagIds;
+
+  @override
+  void writeInto(GenerationContext context) {
+    context.buffer.write(
+      'intentions.id NOT IN (SELECT assignment.intention_id '
+      'FROM tag_assignments AS assignment '
+      'WHERE assignment.tag_id IN ('
+      'SELECT excluded_tag.value FROM json_each(',
+    );
+    _tagIds.writeInto(context);
+    context.buffer.write(') AS excluded_tag))');
+  }
+}
+
+/// Сохранённые строки области не входят в порцию согласования. Набор
+/// передаётся одним параметром и читается из `json_each(?)` один раз на
+/// выполнение запроса; чтение ничего не пишет на соединение.
+final class _StoredCatalogRowsExpression extends Expression<bool> {
+  _StoredCatalogRowsExpression(Iterable<IntentionId> intentionIds)
+    : _intentionIds = _CatalogIdsParameter(
+        intentionIds.map((id) => id.toCanonicalString()),
+      );
+
+  final _CatalogIdsParameter _intentionIds;
+
+  @override
+  void writeInto(GenerationContext context) {
+    context.buffer.write(
+      'intentions.id NOT IN (SELECT stored_row.value FROM json_each(',
+    );
+    _intentionIds.writeInto(context);
+    context.buffer.write(') AS stored_row)');
+  }
+}
+
+/// Продолжение согласования связано с запросом и позицией порции,
+/// границей области, строками своего окна после позиции и ревизией первой
+/// порции.
+final class _DriftIntentionCatalogReconciliationCursor
+    implements IntentionCatalogReconciliationCursor {
+  const _DriftIntentionCatalogReconciliationCursor({
+    required this.position,
+    required this.area,
+    required this.pendingWindowIds,
+    required this.pendingReachesAreaEnd,
+    required this.revisionSequence,
+  });
+
+  final _DriftIntentionCatalogCursor position;
+
+  /// Граница частичного префикса либо `null` для ранее завершённой выдачи.
+  final _DriftIntentionCatalogCursor? area;
+
+  /// Строки окна, выдавшего продолжение, после [position]: следующее окно
+  /// начинается с них в том же порядке.
+  final List<IntentionId> pendingWindowIds;
+
+  /// Окно, выдавшее продолжение, содержало последнюю сохранённую строку
+  /// области: следующее окно состоит ровно из [pendingWindowIds].
+  final bool pendingReachesAreaEnd;
+  final int revisionSequence;
+
+  bool isOwnedBy(_GraphEpoch candidate) => position.isOwnedBy(candidate);
+
+  bool matches(
+    IntentionCatalogReconciliationQuery query,
+    _DriftIntentionCatalogCursor? requestedArea,
+  ) =>
+      position.matches(query.catalogQuery) &&
+      _sameArea(requestedArea) &&
+      _continuesWindow(query.window);
+
+  bool _continuesWindow(IntentionCatalogReconciliationWindow window) {
+    final rows = window.storedRows;
+    if (pendingReachesAreaEnd &&
+        (window is! IntentionCatalogFinalReconciliationWindow ||
+            rows.length != pendingWindowIds.length)) {
+      return false;
+    }
+    if (rows.length < pendingWindowIds.length) {
+      return false;
+    }
+    for (var index = 0; index < pendingWindowIds.length; index++) {
+      if (rows[index].id != pendingWindowIds[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _sameArea(_DriftIntentionCatalogCursor? requestedArea) {
+    final area = this.area;
+    if (area == null || requestedArea == null) {
+      return area == null && requestedArea == null;
+    }
+    return area.boundaryTimestamp.value ==
+            requestedArea.boundaryTimestamp.value &&
+        area.boundaryId == requestedArea.boundaryId;
+  }
+}
+
 final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   const _DriftIntentionCatalogCursor({
     required this.epoch,
     required this.scope,
     required this.readinessFilter,
     required this.normalizedTitleFilter,
+    required this.tagFilter,
+    required this.excludedIntentionId,
     required this.order,
     required this.boundaryTimestamp,
     required this.boundaryId,
@@ -1535,6 +2036,8 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   final IntentionScope scope;
   final IntentionReadinessFilter readinessFilter;
   final String? normalizedTitleFilter;
+  final IntentionTagFilter tagFilter;
+  final IntentionId? excludedIntentionId;
   final IntentionCatalogOrder order;
   final domain.IntentionTimestamp boundaryTimestamp;
   final IntentionId boundaryId;
@@ -1545,6 +2048,8 @@ final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
       scope == query.scope &&
       readinessFilter == query.readinessFilter &&
       normalizedTitleFilter == query.titleFilter?.map((value) => value) &&
+      tagFilter == query.tagFilter &&
+      excludedIntentionId == query.excludedIntentionId &&
       order == query.order;
 }
 

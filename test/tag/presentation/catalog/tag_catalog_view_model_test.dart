@@ -21,6 +21,8 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_assignment_changed.dart';
+
 void main() {
   test('отсутствие намерения не отменяется поздним полным снимком', () async {
     final h = _Harness();
@@ -84,7 +86,7 @@ void main() {
         isA<TagCatalogAssignmentSubmitting>(),
       );
       h.repository.completeCommand(
-        TagAssignmentChanged(
+        testTagAssignmentChanged(
           TagAssignmentChangedChange(
             revision: const _Revision(2),
             assignment: TagAssignment(
@@ -292,7 +294,7 @@ void main() {
     await pumpEventQueue();
     expect(h.model.assignSelected(), isA<TagCommandAccepted>());
     h.repository.completeCommand(
-      TagAssignmentChanged(
+      testTagAssignmentChanged(
         TagAssignmentChangedChange(
           revision: const _Revision(3),
           assignment: TagAssignment(
@@ -321,7 +323,7 @@ void main() {
       AssignTag(tagId: _id(1), intentionId: _intentionId(1)),
     ) as TagCommandAccepted;
     h.repository.completeCommand(
-      TagAssignmentChanged(
+      testTagAssignmentChanged(
         TagAssignmentChangedChange(
           revision: const _Revision(2),
           assignment: TagAssignment(
@@ -959,7 +961,7 @@ void main() {
         AssignTag(tagId: _id(1), intentionId: _intentionId(1)),
       ) as TagCommandAccepted;
       h.repository.completeCommand(
-        TagAssignmentChanged(
+        testTagAssignmentChanged(
           TagAssignmentChangedChange(
             revision: const _Revision(2),
             assignment: TagAssignment(

@@ -154,3 +154,66 @@ final class IntentionCatalogContinuationStatusView extends ConsumerWidget {
     };
   }
 }
+
+/// Место отказа обновления над списком сохранённой выдачи.
+///
+/// Отказ занимает не больше двух третей высоты [availableHeight], общей для
+/// него и списка. Более высокое сообщение — при увеличенном тексте —
+/// прокручивается внутри этого места, поэтому под отказом всегда остаются
+/// строки выдачи.
+final class IntentionCatalogRefreshStatusArea extends StatelessWidget {
+  const IntentionCatalogRefreshStatusArea({
+    required this.availableHeight,
+    required this.child,
+    super.key,
+  });
+
+  final double availableHeight;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(maxHeight: availableHeight * 2 / 3),
+    child: SingleChildScrollView(primary: false, child: child),
+  );
+}
+
+/// Локализованный отказ обновления над сохранённой выдачей каталога.
+///
+/// Сообщение говорит, что показанная выдача не обновлена, поэтому исходно
+/// пустую выдачу нельзя принять за успешное отсутствие совпадений. Повтор
+/// доступен только при недоступности хранилища; без отказа представление
+/// ничего не выводит и не занимает места.
+final class IntentionCatalogRefreshStatusView extends ConsumerWidget {
+  const IntentionCatalogRefreshStatusView({
+    required this.purpose,
+    required this.refresh,
+    super.key,
+  });
+
+  final IntentionCatalogPurpose purpose;
+  final IntentionCatalogRefreshState refresh;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localizations = AppLocalizations.of(context);
+    return switch (refresh) {
+      IntentionCatalogRefreshIdle() => const SizedBox.shrink(),
+      IntentionCatalogRefreshUnavailable() => IntentionCatalogInlineStatus(
+        message: localizations.catalogRefreshUnavailable,
+        actionLabel: localizations.commonRetry,
+        onAction: () {
+          ref
+              .read(intentionCatalogViewModelProvider(purpose).notifier)
+              .retryRefresh();
+        },
+      ),
+      IntentionCatalogRefreshCorruption() => IntentionCatalogInlineStatus(
+        message: localizations.catalogRefreshCorruption,
+      ),
+      IntentionCatalogRefreshUnexpected() => IntentionCatalogInlineStatus(
+        message: localizations.catalogRefreshUnexpected,
+      ),
+    };
+  }
+}

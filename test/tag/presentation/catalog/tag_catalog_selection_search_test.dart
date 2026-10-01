@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_catalog_test_repository.dart';
+import '../../../support/tag_assignment_changed.dart';
 
 void main() {
   testWidgets(
@@ -43,7 +44,7 @@ void main() {
         TagCommandSucceeded(
           ConfirmedGraphResult(
             revision: const TagCatalogTestRevision(2),
-            value: TagAssignmentChanged(
+            value: testTagAssignmentChanged(
               TagAssignmentChangedChange(
                 revision: const TagCatalogTestRevision(2),
                 assignment: command.assignment,

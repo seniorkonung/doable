@@ -1,8 +1,8 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -125,7 +125,10 @@ void main() {
           (assignmentResult.value as TagAssignmentChanged).state,
           TagAssignmentState.assigned,
         );
-        expect(assignmentResult.changes, hasLength(1));
+        expect(assignmentResult.changes, [
+          isA<TagAssignmentChangedChange>(),
+          isA<IntentionCatalogUpdated>(),
+        ]);
         expect(
           (assignmentResult.value as TagAssignmentChanged)
               .assignment

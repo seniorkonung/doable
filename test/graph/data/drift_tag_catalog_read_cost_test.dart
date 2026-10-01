@@ -63,9 +63,7 @@ void main() {
   );
 }
 
-Future<void> measureTagCatalogReadCost({
-  Future<void> Function(DriftPersonalGraphRepository)? onCatalogReady,
-}) async {
+Future<void> measureTagCatalogReadCost() async {
   final directory = await Directory.systemTemp.createTemp('doable_tag_cost_');
   final file = File('${directory.path}/catalog.sqlite');
   final trace = _CatalogTrace();
@@ -229,7 +227,6 @@ Future<void> measureTagCatalogReadCost({
             : 'debug',
       }),
     );
-    if (onCatalogReady case final callback?) await callback(repository);
   } finally {
     await database.close();
     await directory.delete(recursive: true);

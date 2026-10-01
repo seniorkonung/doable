@@ -107,6 +107,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogAllEmpty => 'Намерений пока нет.';
 
   @override
+  String get catalogTagConditionsEmpty =>
+      'По условиям по тегам совпадений нет.';
+
+  @override
   String get catalogUnavailable =>
       'Не удалось загрузить намерения. Повторите попытку.';
 
@@ -136,6 +140,18 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get catalogLoadMoreValidation =>
       'Сохранённая позиция каталога больше недействительна.';
+
+  @override
+  String get catalogRefreshUnavailable =>
+      'Список намерений не обновлён: не удалось получить изменения.';
+
+  @override
+  String get catalogRefreshCorruption =>
+      'Список намерений не обновлён: сохранённые данные повреждены.';
+
+  @override
+  String get catalogRefreshUnexpected =>
+      'Список намерений не обновлён из-за непредвиденной ошибки.';
 
   @override
   String get catalogReload => 'Перезагрузить каталог';
@@ -171,6 +187,14 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get intentionActiveRelationCountUnknown =>
       'Количество активных связей неизвестно.';
+
+  @override
+  String intentionSummaryTags(String tags) {
+    return 'Теги: $tags';
+  }
+
+  @override
+  String get intentionSummaryNoTags => 'Без тегов';
 
   @override
   String get relationNeighborhoodTitle => 'Связи';
@@ -869,6 +893,72 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get tagNavigationLoadMoreUnexpected =>
       'Не удалось загрузить следующую порцию намерений из-за непредвиденной ошибки.';
+
+  @override
+  String get tagConditionPickerTitle => 'Тег для условия поиска';
+
+  @override
+  String get tagConditionPickerPresent => 'Есть';
+
+  @override
+  String get tagConditionPickerAbsent => 'Нет';
+
+  @override
+  String tagConditionPickerPresentNamed(String tagName) {
+    return 'Есть, $tagName';
+  }
+
+  @override
+  String tagConditionPickerAbsentNamed(String tagName) {
+    return 'Нет, $tagName';
+  }
+
+  @override
+  String get tagConditionPickerSelectedPresent => 'Уже выбран: должен быть';
+
+  @override
+  String get tagConditionPickerSelectedAbsent =>
+      'Уже выбран: должен отсутствовать';
+
+  @override
+  String intentionTagConditionAbsent(String tagName) {
+    return 'не $tagName';
+  }
+
+  @override
+  String intentionTagConditionDeleted(String condition) {
+    return '$condition (тег удалён)';
+  }
+
+  @override
+  String intentionTagConditionPresentSemantics(String tagName) {
+    return '$tagName, должен быть';
+  }
+
+  @override
+  String intentionTagConditionAbsentSemantics(String tagName) {
+    return '$tagName, должен отсутствовать';
+  }
+
+  @override
+  String intentionTagConditionDeletedSemantics(String condition) {
+    return '$condition, тег удалён';
+  }
+
+  @override
+  String get intentionTagConditionToggleHint =>
+      'Переключить надобность: должен быть или должен отсутствовать';
+
+  @override
+  String intentionTagConditionRemove(String tagName) {
+    return 'Снять условие: $tagName';
+  }
+
+  @override
+  String get intentionTagConditionsAdd => 'Тег';
+
+  @override
+  String get intentionTagConditionsAddSemantics => 'Добавить условие по тегу';
 
   @override
   String get tagCatalogTitle => 'Теги';

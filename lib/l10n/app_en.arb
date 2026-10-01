@@ -125,6 +125,10 @@
   "@catalogAllEmpty": {
     "description": "Пустой каталог всех намерений"
   },
+  "catalogTagConditionsEmpty": "No intentions match the tag conditions.",
+  "@catalogTagConditionsEmpty": {
+    "description": "Успешная пустая выдача поиска намерений при действующих условиях по тегам"
+  },
   "catalogUnavailable": "Intentions couldn’t be loaded. Try again.",
   "@catalogUnavailable": {
     "description": "Устранимая недоступность первой страницы каталога"
@@ -156,6 +160,18 @@
   "catalogLoadMoreValidation": "The saved catalog position is no longer valid.",
   "@catalogLoadMoreValidation": {
     "description": "Недопустимый cursor следующей порции"
+  },
+  "catalogRefreshUnavailable": "The intention list isn’t up to date: changes couldn’t be loaded.",
+  "@catalogRefreshUnavailable": {
+    "description": "Устранимый отказ обновления над сохранённой выдачей каталога"
+  },
+  "catalogRefreshCorruption": "The intention list isn’t up to date: stored data is damaged.",
+  "@catalogRefreshCorruption": {
+    "description": "Отказ обновления сохранённой выдачи из-за повреждения данных"
+  },
+  "catalogRefreshUnexpected": "The intention list isn’t up to date because of an unexpected error.",
+  "@catalogRefreshUnexpected": {
+    "description": "Отказ обновления сохранённой выдачи из-за непредвиденной ошибки"
   },
   "catalogReload": "Reload catalog",
   "@catalogReload": {
@@ -201,6 +217,19 @@
   "intentionActiveRelationCountUnknown": "The active relation count is unknown.",
   "@intentionActiveRelationCountUnknown": {
     "description": "Количество активных связей неизвестно из-за ошибки получения"
+  },
+  "intentionSummaryTags": "Tags: {tags}",
+  "@intentionSummaryTags": {
+    "description": "Строка собственных тегов намерения в результате поиска; названия перечислены через запятую",
+    "placeholders": {
+      "tags": {
+        "type": "String"
+      }
+    }
+  },
+  "intentionSummaryNoTags": "No tags",
+  "@intentionSummaryNoTags": {
+    "description": "Подтверждённое отсутствие тегов у намерения в результате поиска"
   },
   "relationNeighborhoodTitle": "Relations",
   "relationNeighborhoodSelectedCount": "Selected relations: {count}",
@@ -883,6 +912,38 @@
   "@tagNavigationLoadMoreCorruption": {"description":"Повреждение при подгрузке навигации"},
   "tagNavigationLoadMoreUnexpected": "Could not load more intentions because of an unexpected error.",
   "@tagNavigationLoadMoreUnexpected": {"description":"Неизвестный отказ подгрузки навигации"},
+  "tagConditionPickerTitle": "Tag for search condition",
+  "@tagConditionPickerTitle": {"description": "Заголовок экрана выбора тега для условия поиска намерений"},
+  "tagConditionPickerPresent": "With",
+  "@tagConditionPickerPresent": {"description": "Действие «Есть»: выбрать тег с надобностью «должен быть»"},
+  "tagConditionPickerAbsent": "Without",
+  "@tagConditionPickerAbsent": {"description": "Действие «Нет»: выбрать тег с надобностью «должен отсутствовать»"},
+  "tagConditionPickerPresentNamed": "With, {tagName}",
+  "@tagConditionPickerPresentNamed": {"description": "Семантика действия «Есть» вместе с названием тега", "placeholders": {"tagName": {"type": "String"}}},
+  "tagConditionPickerAbsentNamed": "Without, {tagName}",
+  "@tagConditionPickerAbsentNamed": {"description": "Семантика действия «Нет» вместе с названием тега", "placeholders": {"tagName": {"type": "String"}}},
+  "tagConditionPickerSelectedPresent": "Already selected: must be present",
+  "@tagConditionPickerSelectedPresent": {"description": "Отметка тега, уже входящего в условия поиска с надобностью «должен быть»"},
+  "tagConditionPickerSelectedAbsent": "Already selected: must be absent",
+  "@tagConditionPickerSelectedAbsent": {"description": "Отметка тега, уже входящего в условия поиска с надобностью «должен отсутствовать»"},
+  "intentionTagConditionAbsent": "not {tagName}",
+  "@intentionTagConditionAbsent": {"description": "Текст чипа условия с надобностью «должен отсутствовать»", "placeholders": {"tagName": {"type": "String"}}},
+  "intentionTagConditionDeleted": "{condition} (tag deleted)",
+  "@intentionTagConditionDeleted": {"description": "Текст чипа условия по удалённому тегу с последним известным названием", "placeholders": {"condition": {"type": "String"}}},
+  "intentionTagConditionPresentSemantics": "{tagName}, must be present",
+  "@intentionTagConditionPresentSemantics": {"description": "Семантика условия с надобностью «должен быть»", "placeholders": {"tagName": {"type": "String"}}},
+  "intentionTagConditionAbsentSemantics": "{tagName}, must be absent",
+  "@intentionTagConditionAbsentSemantics": {"description": "Семантика условия с надобностью «должен отсутствовать»", "placeholders": {"tagName": {"type": "String"}}},
+  "intentionTagConditionDeletedSemantics": "{condition}, tag deleted",
+  "@intentionTagConditionDeletedSemantics": {"description": "Семантика условия по удалённому тегу", "placeholders": {"condition": {"type": "String"}}},
+  "intentionTagConditionToggleHint": "Toggle requirement: must be present or must be absent",
+  "@intentionTagConditionToggleHint": {"description": "Назначение нажатия на чип условия"},
+  "intentionTagConditionRemove": "Remove condition: {tagName}",
+  "@intentionTagConditionRemove": {"description": "Действие снятия условия по тегу", "placeholders": {"tagName": {"type": "String"}}},
+  "intentionTagConditionsAdd": "Tag",
+  "@intentionTagConditionsAdd": {"description": "Подпись кнопки «+ Тег», открывающей выбор тега для условия поиска"},
+  "intentionTagConditionsAddSemantics": "Add tag condition",
+  "@intentionTagConditionsAddSemantics": {"description": "Семантика кнопки добавления условия по тегу"},
   "tagCatalogTitle": "Tags",
   "tagCatalogSelectionTitle": "Choose a tag",
   "@tagCatalogSelectionTitle": {"description": "Заголовок каталога выбора"},

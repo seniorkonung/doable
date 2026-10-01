@@ -16,6 +16,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   test(
@@ -127,7 +128,7 @@ final class _Revision implements GraphRevision {
 }
 
 final class _Repository
-    with TagReadContractTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   final controller = StreamController<DailyChoiceReadResult>(sync: true);
   DailyChoiceId? observedId;

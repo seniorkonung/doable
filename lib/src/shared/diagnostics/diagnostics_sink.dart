@@ -240,6 +240,42 @@ final class CatalogPageReadDiagnosticsEvent extends DiagnosticsEvent {
   final int pageSize;
 }
 
+/// Вид успешного завершения чтения согласования каталога.
+enum CatalogReconciliationReadCompletion {
+  /// Получена порция недостающих совпадений.
+  portion,
+
+  /// Граф изменился после начала согласования; его нужно повторить.
+  retry,
+}
+
+/// Чтение согласования каталога, отдельное от обычной порции каталога.
+///
+/// Конструкторы допускают только согласованные сочетания статуса и вида
+/// завершения: вид есть ровно у успешно завершённого чтения.
+final class CatalogReconciliationReadDiagnosticsEvent extends DiagnosticsEvent {
+  const CatalogReconciliationReadDiagnosticsEvent.started({
+    required this.pageSize,
+  }) : completion = null,
+       super(const DiagnosticsStarted());
+
+  CatalogReconciliationReadDiagnosticsEvent.completed({
+    required this.pageSize,
+    required Duration duration,
+    required CatalogReconciliationReadCompletion this.completion,
+  }) : super(DiagnosticsSucceeded(duration));
+
+  CatalogReconciliationReadDiagnosticsEvent.failed({
+    required this.pageSize,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : completion = null,
+       super(DiagnosticsFailed(duration: duration, code: code));
+
+  final int pageSize;
+  final CatalogReconciliationReadCompletion? completion;
+}
+
 final class IntentionDetailReadDiagnosticsEvent extends DiagnosticsEvent {
   const IntentionDetailReadDiagnosticsEvent({required DiagnosticsStatus status})
     : super(status);

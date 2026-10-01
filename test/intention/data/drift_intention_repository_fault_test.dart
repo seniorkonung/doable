@@ -14,11 +14,16 @@ import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_storage_fixture.dart';
+
+part 'catalog_tag_filter_failure_scenarios.dart';
 
 void main() {
   late AppDatabase database;
@@ -33,6 +38,188 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  _catalogTagFilterFailureScenarios((observer, setup) async {
+    final replacement = await _replaceDatabase(
+      observer,
+      database,
+      diagnostics,
+      setup: setup,
+    );
+    database = replacement.database;
+    repository = replacement.repository;
+    return (
+      database: database,
+      repository: repository,
+      diagnostics: diagnostics,
+    );
+  });
+
+  _catalogReconciliationFailureScenarios((observer, setup) async {
+    final replacement = await _replaceDatabase(
+      observer,
+      database,
+      diagnostics,
+      setup: setup,
+    );
+    database = replacement.database;
+    repository = replacement.repository;
+    return (
+      database: database,
+      repository: repository,
+      diagnostics: diagnostics,
+    );
+  });
+
+  group('Порция каталога — отказы получения собственных тегов', () {
+    test('повреждённая ссылка отклоняет всю порцию и её продолжение', () async {
+      for (final id in [_id(_firstUuid), _id(_secondUuid)]) {
+        await _insertIntention(
+          database,
+          id: id,
+          title: 'Одноимённое намерение',
+          createdAt: DateTime.utc(2026, 9, 2, 10),
+        );
+      }
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.all,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtAscending,
+        pageSize: 1,
+      );
+      final first = (await repository.getCatalogPage(
+        query,
+      ) as ResultSuccess<IntentionCatalogPage>).value;
+      await database.customStatement('PRAGMA foreign_keys = OFF');
+      await database.customStatement(
+        'INSERT INTO tags (id, name) VALUES (?, ?)',
+        [_relationUuid, 'CANARY-тег'],
+      );
+      await database.customStatement(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_relationUuid, _secondUuid],
+      );
+      await database.customStatement('DELETE FROM tags WHERE id = ?', [
+        _relationUuid,
+      ]);
+
+      for (final request in [
+        IntentionCatalogQuery(
+          scope: query.scope,
+          titleFilter: null,
+          order: query.order,
+          pageSize: 2,
+        ),
+        IntentionCatalogQuery(
+          scope: query.scope,
+          titleFilter: null,
+          order: query.order,
+          pageSize: 1,
+          cursor: first.nextCursor,
+        ),
+      ]) {
+        expect(
+          await repository.getCatalogPage(request),
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionCorruptionFailure>(),
+          ),
+        );
+      }
+    });
+
+    test(
+      'ошибка после получения назначений не публикует частичный успех',
+      () async {
+        for (final (error, expected, code)
+            in <(Object, Matcher, DiagnosticsFailureCode)>[
+              (
+                SqliteException(
+                  extendedResultCode: SqlError.SQLITE_BUSY,
+                  message: 'CANARY-недоступность',
+                ),
+                isA<IntentionUnavailableFailure>(),
+                DiagnosticsFailureCode.unavailable,
+              ),
+              (
+                SqliteException(
+                  extendedResultCode: SqlError.SQLITE_CORRUPT,
+                  message: 'CANARY-повреждение',
+                ),
+                isA<IntentionCorruptionFailure>(),
+                DiagnosticsFailureCode.corruption,
+              ),
+              (
+                StateError('CANARY-неизвестный-отказ'),
+                isA<IntentionUnexpectedFailure>(),
+                DiagnosticsFailureCode.unexpected,
+              ),
+              (
+                SqliteException(
+                  extendedResultCode: SqlError.SQLITE_READONLY,
+                  message: 'CANARY-неизвестный-SQLite-отказ',
+                ),
+                isA<IntentionUnexpectedFailure>(),
+                DiagnosticsFailureCode.unexpected,
+              ),
+            ]) {
+          final interceptor = _TagAssignmentReadInterceptor(failure: error);
+          final replacement = await _replaceDatabase(
+            interceptor,
+            database,
+            diagnostics,
+          );
+          database = replacement.database;
+          repository = replacement.repository;
+          await _insertIntention(
+            database,
+            id: _id(_firstUuid),
+            title: 'CANARY-намерение',
+            createdAt: DateTime.utc(2026, 9, 2, 10),
+          );
+          await database.customStatement(
+            'INSERT INTO tags (id, name) VALUES (?, ?)',
+            [_relationUuid, 'CANARY-тег'],
+          );
+          await database.customStatement(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_relationUuid, _firstUuid],
+          );
+          final result = await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtAscending,
+              pageSize: 1,
+            ),
+          );
+
+          expect(
+            result,
+            isA<ResultFailure<IntentionCatalogPage>>().having(
+              (result) => result.failure,
+              'причина',
+              expected,
+            ),
+          );
+          expect(
+            diagnostics.events.last,
+            isA<CatalogPageReadDiagnosticsEvent>().having(
+              (event) => event.status,
+              'исход',
+              isA<DiagnosticsFailed>().having(
+                (status) => status.code,
+                'категория',
+                code,
+              ),
+            ),
+          );
+          expect(diagnostics.events.toString(), isNot(contains('CANARY')));
+        }
+      },
+    );
+  });
 
   group('DriftPersonalGraphRepository.execute — физическое удаление', () {
     test(
@@ -566,12 +753,13 @@ Future<({AppDatabase database, DriftPersonalGraphRepository repository})>
 _replaceDatabase(
   LocalDatabaseConnectionObserver observer,
   AppDatabase previousDatabase,
-  InMemoryDiagnosticsSink diagnostics,
-) async {
+  InMemoryDiagnosticsSink diagnostics, {
+  void Function(Database)? setup,
+}) async {
   await previousDatabase.close();
   final database = AppDatabase(
     observeConfiguredLocalDatabaseConnection(
-      openInMemoryLocalDatabase(),
+      openInMemoryLocalDatabase(setup: setup),
       observer,
     ),
   );
@@ -731,6 +919,24 @@ final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
   void record(DiagnosticsEvent event) {
     attemptedEvents.add(event);
     throw StateError('CANARY-diagnostics-sink-failure');
+  }
+}
+
+final class _TagAssignmentReadInterceptor
+    extends LocalDatabaseConnectionObserver {
+  _TagAssignmentReadInterceptor({required this.failure});
+
+  final Object failure;
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    if (statement.statements.single.contains('FROM tag_assignments')) {
+      throw failure;
+    }
+    return rows;
   }
 }
 

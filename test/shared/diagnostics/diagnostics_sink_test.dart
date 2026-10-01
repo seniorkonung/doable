@@ -207,6 +207,89 @@ void main() {
       ]);
     });
 
+    test('чтение согласования кодируется отдельной операцией, а повтор из-за '
+        'новой ревизии — завершением, а не отказом', () {
+      final events = [
+        const CatalogReconciliationReadDiagnosticsEvent.started(pageSize: 50),
+        CatalogReconciliationReadDiagnosticsEvent.completed(
+          pageSize: 50,
+          duration: const Duration(milliseconds: 2),
+          completion: CatalogReconciliationReadCompletion.portion,
+        ),
+        CatalogReconciliationReadDiagnosticsEvent.completed(
+          pageSize: 50,
+          duration: const Duration(milliseconds: 3),
+          completion: CatalogReconciliationReadCompletion.retry,
+        ),
+        CatalogReconciliationReadDiagnosticsEvent.failed(
+          pageSize: 50,
+          duration: const Duration(milliseconds: 4),
+          code: DiagnosticsFailureCode.validation,
+        ),
+        CatalogReconciliationReadDiagnosticsEvent.failed(
+          pageSize: 50,
+          duration: const Duration(milliseconds: 5),
+          code: DiagnosticsFailureCode.unavailable,
+        ),
+      ];
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      for (final event in events) {
+        sink.record(event);
+      }
+
+      expect(events.map((event) => event.status.runtimeType), [
+        DiagnosticsStarted,
+        DiagnosticsSucceeded,
+        DiagnosticsSucceeded,
+        DiagnosticsFailed,
+        DiagnosticsFailed,
+      ]);
+      expect(events.map((event) => event.completion), [
+        null,
+        CatalogReconciliationReadCompletion.portion,
+        CatalogReconciliationReadCompletion.retry,
+        null,
+        null,
+      ]);
+      expect(messages.map(jsonDecode), [
+        {
+          'operation': 'catalogReconciliationRead',
+          'outcome': 'started',
+          'pageSize': 50,
+        },
+        {
+          'operation': 'catalogReconciliationRead',
+          'outcome': 'succeeded',
+          'durationMicros': 2000,
+          'pageSize': 50,
+          'completion': 'portion',
+        },
+        {
+          'operation': 'catalogReconciliationRead',
+          'outcome': 'succeeded',
+          'durationMicros': 3000,
+          'pageSize': 50,
+          'completion': 'retry',
+        },
+        {
+          'operation': 'catalogReconciliationRead',
+          'outcome': 'failed',
+          'durationMicros': 4000,
+          'failureCode': 'validation',
+          'pageSize': 50,
+        },
+        {
+          'operation': 'catalogReconciliationRead',
+          'outcome': 'failed',
+          'durationMicros': 5000,
+          'failureCode': 'unavailable',
+          'pageSize': 50,
+        },
+      ]);
+    });
+
     test(
       'дневные события различают чтение, проверку, запись и чтение результата',
       () {

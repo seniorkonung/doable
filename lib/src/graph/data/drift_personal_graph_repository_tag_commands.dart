@@ -171,6 +171,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
       );
     }
 
+    final before = await _tagIntentionCatalogEntryBefore(command.intentionId);
     onStage(TagCommandDiagnosticsStage.write);
     final tagId = command.tagId.toCanonicalString();
     await _database
@@ -184,6 +185,10 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     return _CommittedTagAssignmentChanged(
       assignment,
       TagAssignmentState.assigned,
+      catalogEntries: await _tagIntentionCatalogEntries(
+        before,
+        onStage: onStage,
+      ),
     );
   }
 
@@ -200,6 +205,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
       );
     }
 
+    final before = await _tagIntentionCatalogEntryBefore(command.intentionId);
     onStage(TagCommandDiagnosticsStage.write);
     final tagId = command.tagId.toCanonicalString();
     final rows =
@@ -215,6 +221,40 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     return _CommittedTagAssignmentChanged(
       assignment,
       TagAssignmentState.absent,
+      catalogEntries: await _tagIntentionCatalogEntries(
+        before,
+        onStage: onStage,
+      ),
+    );
+  }
+
+  /// Снимок «до» читается до записи пары, поэтому содержит прежний
+  /// полный состав собственных тегов намерения.
+  Future<_TagIntentionCatalogEntryBefore> _tagIntentionCatalogEntryBefore(
+    IntentionId intentionId,
+  ) async {
+    final stored = await _readCommandSnapshot(intentionId);
+    if (stored == null) throw const _StoredIntentionCorruption();
+    final counts = await _readVerifiedRelationCounts(intentionId);
+    return (
+      id: intentionId,
+      counts: counts,
+      entry: await _catalogEntrySnapshot(stored, counts),
+    );
+  }
+
+  /// Команда тега не меняет строку намерения и его связи: снимок «после»
+  /// отличается от снимка «до» только составом собственных тегов.
+  Future<_TagIntentionCatalogEntries> _tagIntentionCatalogEntries(
+    _TagIntentionCatalogEntryBefore before, {
+    required void Function(TagCommandDiagnosticsStage) onStage,
+  }) async {
+    onStage(TagCommandDiagnosticsStage.resultRead);
+    final stored = await _readCommandSnapshot(before.id);
+    if (stored == null) throw const _StoredIntentionCorruption();
+    return (
+      before: before.entry,
+      after: await _catalogEntrySnapshot(stored, before.counts),
     );
   }
 
@@ -330,11 +370,28 @@ final class _CommittedTagDeleted extends _CommittedTagCommand {
       TagDeleted(TagDeletedChange(revision: revision, tagId: id));
 }
 
+typedef _TagIntentionCatalogEntryBefore = ({
+  IntentionId id,
+  RelationCounts counts,
+  IntentionCatalogEntrySnapshot entry,
+});
+
+typedef _TagIntentionCatalogEntries = ({
+  IntentionCatalogEntrySnapshot before,
+  IntentionCatalogEntrySnapshot after,
+});
+
 final class _CommittedTagAssignmentChanged extends _CommittedTagCommand {
-  const _CommittedTagAssignmentChanged(this.assignment, this.state);
+  const _CommittedTagAssignmentChanged(
+    this.assignment,
+    this.state, {
+    required this.catalogEntries,
+  });
 
   final TagAssignment assignment;
   final TagAssignmentState state;
+
+  final _TagIntentionCatalogEntries catalogEntries;
 
   @override
   bool get didMutate => true;
@@ -345,6 +402,11 @@ final class _CommittedTagAssignmentChanged extends _CommittedTagCommand {
       revision: revision,
       assignment: assignment,
       state: state,
+    ),
+    catalogMutation: IntentionCatalogUpdated(
+      revision: revision,
+      before: catalogEntries.before,
+      after: catalogEntries.after,
     ),
   );
 }

@@ -16,7 +16,7 @@ final class TagCatalogViewModelProvider
     extends $NotifierProvider<TagCatalogViewModel, TagCatalogState> {
   TagCatalogViewModelProvider._({
     required TagCatalogViewModelFamily super.from,
-    required TagCatalogMode super.argument,
+    required ({TagCatalogMode mode, TagCatalogOpening? opening}) super.argument,
   }) : super(
          retry: null,
          name: r'tagCatalogViewModelProvider',
@@ -32,7 +32,7 @@ final class TagCatalogViewModelProvider
   String toString() {
     return r'tagCatalogViewModelProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
@@ -59,7 +59,7 @@ final class TagCatalogViewModelProvider
 }
 
 String _$tagCatalogViewModelHash() =>
-    r'fe562201bd48dcc99d679475cdb0421b9865d862';
+    r'7b3b124463aee1114657db1707c41ab8354d333c';
 
 final class TagCatalogViewModelFamily extends $Family
     with
@@ -68,7 +68,7 @@ final class TagCatalogViewModelFamily extends $Family
           TagCatalogState,
           TagCatalogState,
           TagCatalogState,
-          TagCatalogMode
+          ({TagCatalogMode mode, TagCatalogOpening? opening})
         > {
   TagCatalogViewModelFamily._()
     : super(
@@ -81,17 +81,26 @@ final class TagCatalogViewModelFamily extends $Family
 
   TagCatalogViewModelProvider call({
     TagCatalogMode mode = const TagCatalogBrowseMode(),
-  }) => TagCatalogViewModelProvider._(argument: mode, from: this);
+    TagCatalogOpening? opening,
+  }) => TagCatalogViewModelProvider._(
+    argument: (mode: mode, opening: opening),
+    from: this,
+  );
 
   @override
   String toString() => r'tagCatalogViewModelProvider';
 }
 
 abstract class _$TagCatalogViewModel extends $Notifier<TagCatalogState> {
-  late final _$args = ref.$arg as TagCatalogMode;
-  TagCatalogMode get mode => _$args;
+  late final _$args =
+      ref.$arg as ({TagCatalogMode mode, TagCatalogOpening? opening});
+  TagCatalogMode get mode => _$args.mode;
+  TagCatalogOpening? get opening => _$args.opening;
 
-  TagCatalogState build({TagCatalogMode mode = const TagCatalogBrowseMode()});
+  TagCatalogState build({
+    TagCatalogMode mode = const TagCatalogBrowseMode(),
+    TagCatalogOpening? opening,
+  });
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
@@ -104,6 +113,9 @@ abstract class _$TagCatalogViewModel extends $Notifier<TagCatalogState> {
               Object?,
               Object?
             >;
-    return element.handleCreate(ref, () => build(mode: _$args));
+    return element.handleCreate(
+      ref,
+      () => build(mode: _$args.mode, opening: _$args.opening),
+    );
   }
 }

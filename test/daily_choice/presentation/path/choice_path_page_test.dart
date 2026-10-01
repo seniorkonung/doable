@@ -13,6 +13,7 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -22,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -139,6 +141,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Намерение 1'), findsWidgets);
     expect(find.textContaining('Намерение 2'), findsWidgets);
+    // Дневной путь — представление без поиска: тегов и условий в нём нет.
+    expect(find.textContaining('Теги:'), findsNothing);
+    expect(find.text('Без тегов'), findsNothing);
+    expect(find.byType(IntentionTagConditionsSection), findsNothing);
     final semantics = tester.ensureSemantics();
     expect(find.bySemanticsLabel(RegExp('Шаг 1:.*нужно.*P1')), findsOneWidget);
     expect(
@@ -480,7 +486,7 @@ Future<void> _pumpPage(
 );
 
 final class _PathRepository
-    with TagReadContractTestFallback
+    with TagReadContractTestFallback, CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   final queries = <ChoicePathContinuationQuery>[];
   final _requests = <Completer<ChoicePathContinuationResult>>[];
