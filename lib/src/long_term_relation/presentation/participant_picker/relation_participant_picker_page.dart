@@ -184,8 +184,26 @@ final class _PickerContent extends ConsumerWidget {
         scrollController: scrollController,
         onSelected: onSelected,
       ),
-      final IntentionCatalogEmpty empty => IntentionCatalogStatusView(
-        message: _emptyMessage(localizations, empty.query),
+      // Отказ обновления стоит над сообщением о пустоте, поэтому не
+      // обновлённую выдачу нельзя принять за успешное отсутствие совпадений.
+      final IntentionCatalogEmpty empty => LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            IntentionCatalogRefreshStatusArea(
+              availableHeight: constraints.maxHeight,
+              child: IntentionCatalogRefreshStatusView(
+                purpose: purpose,
+                refresh: empty.refresh,
+              ),
+            ),
+            Expanded(
+              child: IntentionCatalogStatusView(
+                message: _emptyMessage(localizations, empty.query),
+              ),
+            ),
+          ],
+        ),
       ),
       IntentionCatalogUnavailable() => IntentionCatalogStatusView(
         message: localizations.catalogUnavailable,

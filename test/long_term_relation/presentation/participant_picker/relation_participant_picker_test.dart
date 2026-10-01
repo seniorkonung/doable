@@ -1077,7 +1077,147 @@ void _defineTagSearchTests() {
       expect(repository.reconciliationQueries, hasLength(1));
     });
   }
+
+  testWidgets('успешная пустая выдача показывает только сообщение о пустоте, '
+      'без представления отказа обновления', (tester) async {
+    final repository = ControlledCatalogRepository();
+    final opened = await _openTagSearchPicker(
+      tester,
+      repository,
+      _activeRelation,
+    );
+    await _applyConditions(
+      tester,
+      opened.container,
+      repository,
+      _activeRelation,
+      [(_tag(1, 'Здоровье'), IntentionTagRequirement.mustBePresent)],
+      _tagSearchPage(const []),
+    );
+
+    expect(find.text(_emptyByConditions), findsOneWidget);
+    expect(tester.getSize(_refreshStatus).height, 0);
+    expect(
+      find.descendant(of: _refreshStatus, matching: find.byType(Text)),
+      findsNothing,
+    );
+    expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
+  });
+
+  testWidgets('отказ обновления из-за недоступности показан над исходно '
+      'пустой выдачей, а повтор согласует её с прежними охватом и '
+      'исключением', (tester) async {
+    final repository = ControlledCatalogRepository();
+    final health = _tag(1, 'Здоровье');
+    final rest = _tag(2, 'Отдых');
+    final filter = IntentionTagFilter(
+      requiredTagIds: [health.id],
+      excludedTagIds: [rest.id],
+    );
+    final opened = await _openTagSearchPicker(
+      tester,
+      repository,
+      _archivedRelation,
+    );
+    await _failRefresh(
+      tester,
+      opened.container,
+      repository,
+      _archivedRelation,
+      required: health,
+      deletedExcluded: rest,
+      items: const [],
+      failure: const IntentionUnavailableFailure(),
+    );
+
+    // Сообщение о пустоте остаётся, но выдача явно названа не обновлённой.
+    final message = find.text(
+      'The intention list isn’t up to date: changes couldn’t be loaded.',
+    );
+    expect(message, findsOneWidget);
+    expect(find.text(_emptyByConditions), findsOneWidget);
+    expect(
+      tester.getRect(_refreshStatus).bottom,
+      lessThanOrEqualTo(tester.getRect(find.text(_emptyByConditions)).top),
+    );
+    expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
+    _expectParticipantQuery(
+      repository.reconciliationQueryAt(0).catalogQuery,
+      _archivedRelation,
+      filter,
+    );
+
+    final retry = find.descendant(
+      of: _refreshStatus,
+      matching: find.widgetWithText(FilledButton, 'Try again'),
+    );
+    expect(retry, findsOneWidget);
+    await tester.tap(retry);
+    await _pumpUntilReconciliationQueries(tester, repository, 2);
+    // Повтор читает ту же область с прежними условиями, охватом и исключением.
+    expect(
+      repository.reconciliationQueryAt(1).catalogQuery,
+      same(repository.reconciliationQueryAt(0).catalogQuery),
+    );
+    repository.completeReconciliation(
+      1,
+      reconciliationFirstPortion(const [], totalCount: 0, revision: 2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(message, findsNothing);
+    expect(retry, findsNothing);
+    expect(find.text(_emptyByConditions), findsOneWidget);
+    expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
+    _expectNoCommands(repository, tagCommands: 1);
+  });
+
+  for (final (name, failure, text) in <(String, IntentionFailure, String)>[
+    (
+      'повреждения',
+      const IntentionCorruptionFailure(),
+      'The intention list isn’t up to date: stored data is damaged.',
+    ),
+    (
+      'неожиданной ошибки',
+      const IntentionUnexpectedFailure(),
+      'The intention list isn’t up to date because of an unexpected error.',
+    ),
+  ]) {
+    testWidgets('отказ обновления из-за $name показан над исходно пустой '
+        'выдачей без повтора', (tester) async {
+      final repository = ControlledCatalogRepository();
+      final health = _tag(1, 'Здоровье');
+      final opened = await _openTagSearchPicker(
+        tester,
+        repository,
+        _activeRelation,
+      );
+      await _failRefresh(
+        tester,
+        opened.container,
+        repository,
+        _activeRelation,
+        required: health,
+        deletedExcluded: _tag(2, 'Отдых'),
+        items: const [],
+        failure: failure,
+      );
+
+      expect(find.text(text), findsOneWidget);
+      expect(find.text(_emptyByConditions), findsOneWidget);
+      expect(
+        tester.getRect(_refreshStatus).bottom,
+        lessThanOrEqualTo(tester.getRect(find.text(_emptyByConditions)).top),
+      );
+      expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
+      expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
+      expect(repository.reconciliationQueries, hasLength(1));
+    });
+  }
 }
+
+const _emptyByConditions = 'No intentions match the tag conditions.';
 
 /// Индекс намерения, уже занятого вторым участником связи.
 const _excludedIndex = 9;

@@ -496,8 +496,26 @@ final class _CatalogContent extends ConsumerWidget {
         itemKeyFor: itemKeyFor,
         onRefreshStatusExtentChanged: onRefreshStatusExtentChanged,
       ),
-      IntentionCatalogEmpty empty => IntentionCatalogStatusView(
-        message: _emptyMessage(localizations, empty.query),
+      // Отказ обновления стоит над сообщением о пустоте, поэтому не
+      // обновлённую выдачу нельзя принять за успешное отсутствие совпадений.
+      IntentionCatalogEmpty empty => LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            IntentionCatalogRefreshStatusArea(
+              availableHeight: constraints.maxHeight,
+              child: IntentionCatalogRefreshStatusView(
+                purpose: _purpose,
+                refresh: empty.refresh,
+              ),
+            ),
+            Expanded(
+              child: IntentionCatalogStatusView(
+                message: _emptyMessage(localizations, empty.query),
+              ),
+            ),
+          ],
+        ),
       ),
       IntentionCatalogUnavailable() => IntentionCatalogStatusView(
         message: localizations.catalogUnavailable,

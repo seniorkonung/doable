@@ -112,7 +112,8 @@ final class _DailyChoiceSourcePickerPageState
                 state: loaded,
                 scrollController: _scrollController,
               ),
-              final IntentionCatalogEmpty empty => IntentionCatalogStatusView(
+              final IntentionCatalogEmpty empty => _EmptySources(
+                refresh: empty.refresh,
                 // Условия по тегам сужают охват: пустая выдача не
                 // означает, что в нём нет намерений.
                 message: empty.query.tagFilter != IntentionTagFilter.empty
@@ -145,6 +146,34 @@ final class _DailyChoiceSourcePickerPageState
       ),
     );
   }
+}
+
+/// Пустая выдача поиска исходного намерения с состоянием её обновления.
+///
+/// Отказ обновления стоит над сообщением о пустоте, поэтому не обновлённую
+/// выдачу нельзя принять за успешное отсутствие совпадений.
+final class _EmptySources extends StatelessWidget {
+  const _EmptySources({required this.refresh, required this.message});
+
+  final IntentionCatalogRefreshState refresh;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        IntentionCatalogRefreshStatusArea(
+          availableHeight: constraints.maxHeight,
+          child: IntentionCatalogRefreshStatusView(
+            purpose: _purpose,
+            refresh: refresh,
+          ),
+        ),
+        Expanded(child: IntentionCatalogStatusView(message: message)),
+      ],
+    ),
+  );
 }
 
 final class _SourceOptions extends ConsumerWidget {

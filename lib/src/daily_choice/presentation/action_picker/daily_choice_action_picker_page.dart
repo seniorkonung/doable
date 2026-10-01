@@ -111,7 +111,8 @@ final class _DailyChoiceActionPickerPageState
                 state: loaded,
                 scrollController: _scrollController,
               ),
-              final IntentionCatalogEmpty empty => IntentionCatalogStatusView(
+              final IntentionCatalogEmpty empty => _EmptyActions(
+                refresh: empty.refresh,
                 // Условия по тегам сужают охват: пустая выдача не
                 // означает, что в нём нет намерений.
                 message: empty.query.tagFilter != IntentionTagFilter.empty
@@ -144,6 +145,34 @@ final class _DailyChoiceActionPickerPageState
       ),
     );
   }
+}
+
+/// Пустая выдача поиска действия с состоянием её обновления.
+///
+/// Отказ обновления стоит над сообщением о пустоте, поэтому не обновлённую
+/// выдачу нельзя принять за успешное отсутствие совпадений.
+final class _EmptyActions extends StatelessWidget {
+  const _EmptyActions({required this.refresh, required this.message});
+
+  final IntentionCatalogRefreshState refresh;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        IntentionCatalogRefreshStatusArea(
+          availableHeight: constraints.maxHeight,
+          child: IntentionCatalogRefreshStatusView(
+            purpose: _purpose,
+            refresh: refresh,
+          ),
+        ),
+        Expanded(child: IntentionCatalogStatusView(message: message)),
+      ],
+    ),
+  );
 }
 
 final class _ActionOptions extends ConsumerWidget {
