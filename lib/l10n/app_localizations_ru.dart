@@ -173,6 +173,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Количество активных связей неизвестно.';
 
   @override
+  String intentionSummaryTags(String tags) {
+    return 'Теги: $tags';
+  }
+
+  @override
+  String get intentionSummaryNoTags => 'Без тегов';
+
+  @override
   String get relationNeighborhoodTitle => 'Связи';
 
   @override

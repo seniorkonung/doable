@@ -386,6 +386,18 @@ abstract class AppLocalizations {
   /// **'The active relation count is unknown.'**
   String get intentionActiveRelationCountUnknown;
 
+  /// Строка собственных тегов намерения в результате поиска; названия перечислены через запятую
+  ///
+  /// In en, this message translates to:
+  /// **'Tags: {tags}'**
+  String intentionSummaryTags(String tags);
+
+  /// Подтверждённое отсутствие тегов у намерения в результате поиска
+  ///
+  /// In en, this message translates to:
+  /// **'No tags'**
+  String get intentionSummaryNoTags;
+
   /// Заголовок соседства намерения
   ///
   /// In en, this message translates to:

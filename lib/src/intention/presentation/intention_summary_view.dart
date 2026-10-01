@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../tag/domain/tag.dart';
 import '../domain/intention.dart';
 
 /// Количество активных непосредственных связей намерения в его представлении.
@@ -56,6 +57,7 @@ final class IntentionSummaryView extends StatelessWidget {
     required this.activeRelationCount,
     required this.showArchiveState,
     this.traits = const <String>[],
+    this.confirmedTags,
     this.onTap,
     this.tapHint,
     super.key,
@@ -72,6 +74,13 @@ final class IntentionSummaryView extends StatelessWidget {
   /// Дополнительные локализованные подписи представления, например готовность
   /// к действию в строке каталога.
   final List<String> traits;
+
+  /// Подтверждённые собственные теги намерения в порядке сводки.
+  ///
+  /// Строка тегов выводится только при явной передаче: пустой список означает
+  /// проверенное отсутствие назначений, а `null` — представление, которое
+  /// теги не показывает.
+  final List<Tag>? confirmedTags;
 
   final VoidCallback? onTap;
 
@@ -94,6 +103,8 @@ final class IntentionSummaryView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (confirmedTags case final tags?)
+                Text(_tagsLabel(localizations, tags)),
               Wrap(
                 spacing: 12,
                 children: [
@@ -108,6 +119,13 @@ final class IntentionSummaryView extends StatelessWidget {
       ),
     );
   }
+
+  String _tagsLabel(AppLocalizations localizations, List<Tag> tags) =>
+      tags.isEmpty
+      ? localizations.intentionSummaryNoTags
+      : localizations.intentionSummaryTags(
+          tags.map((tag) => tag.name.value).join(', '),
+        );
 
   String _archiveStateLabel(AppLocalizations localizations) =>
       switch (archiveState) {

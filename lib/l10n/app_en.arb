@@ -202,6 +202,19 @@
   "@intentionActiveRelationCountUnknown": {
     "description": "Количество активных связей неизвестно из-за ошибки получения"
   },
+  "intentionSummaryTags": "Tags: {tags}",
+  "@intentionSummaryTags": {
+    "description": "Строка собственных тегов намерения в результате поиска; названия перечислены через запятую",
+    "placeholders": {
+      "tags": {
+        "type": "String"
+      }
+    }
+  },
+  "intentionSummaryNoTags": "No tags",
+  "@intentionSummaryNoTags": {
+    "description": "Подтверждённое отсутствие тегов у намерения в результате поиска"
+  },
   "relationNeighborhoodTitle": "Relations",
   "relationNeighborhoodSelectedCount": "Selected relations: {count}",
   "@relationNeighborhoodSelectedCount": {

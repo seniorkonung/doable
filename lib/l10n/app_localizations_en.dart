@@ -172,6 +172,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'The active relation count is unknown.';
 
   @override
+  String intentionSummaryTags(String tags) {
+    return 'Tags: $tags';
+  }
+
+  @override
+  String get intentionSummaryNoTags => 'No tags';
+
+  @override
   String get relationNeighborhoodTitle => 'Relations';
 
   @override
