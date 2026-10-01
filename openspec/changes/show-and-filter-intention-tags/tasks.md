@@ -711,7 +711,7 @@
   - **Ожидаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/app/intention_tag_search_app_flow_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.19 Подтвердить готовность изменения к завершению после проверки верхней позиции при смене параметров над снятым с экрана списком
+- [x] 3.19 Подтвердить готовность изменения к завершению после проверки верхней позиции при смене параметров над снятым с экрана списком
   - **Критерии приёмки:**
     - Задачи 3.17 и 3.18 подтверждены: во всех четырёх контекстах смена условий по тегам, названия, охвата или порядка начинает новую выдачу с первой порции и верхней позиции независимо от того, показан ли список в момент смены, а обновление без смены параметров позицию сохраняет. Результат третьей фазы, подтверждённый в 3.13, 3.15 и 3.17, остаётся выполненным.
     - Проверки ошибок, доступности, формата, анализа и регрессий проходят, generated-артефакты воспроизводимы. Исторические задачи и их отметки сохранены; архивация изменения остаётся отдельным шагом.
