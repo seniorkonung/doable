@@ -571,6 +571,14 @@ void main() {
         expect(find.text(l10n.catalogRefreshUnavailable), findsNothing);
         expect(_conditions(tester, page), ['Самочувствие', deletedSport]);
 
+        // Список прокручен ниже начала до того, как удаление обязательного
+        // тега снимет его с экрана.
+        tester.view.physicalSize = const Size(1200, 700);
+        await tester.pumpAndSettle();
+        await tester.drag(_catalogList, const Offset(0, -200));
+        await tester.pumpAndSettle();
+        expect(_catalogListPosition(tester).pixels, greaterThan(0));
+
         // Удалённый обязательный тег: успешная пустая выдача с количеством
         // ноль и сохранённым условием.
         await app.completeTag(
@@ -625,6 +633,14 @@ void main() {
         await _removeCondition(tester, _health);
         expect(_conditions(tester, page), [deletedSport]);
         final rest = l10n.intentionSummaryTags('Отдых');
+        // Возобновлённая выдача открывается с верхней позиции, а не с
+        // сохранённого смещения снятого с экрана списка.
+        await _until(tester, _catalogList);
+        await tester.pumpAndSettle();
+        expect(_catalogListPosition(tester).pixels, 0);
+        expect(_results(tester, page).first, ('Ходить в парк', rest));
+        tester.view.physicalSize = const Size(1200, 2400);
+        await tester.pumpAndSettle();
         await _expectResults(tester, page, [
           ('Ходить в парк', rest),
           ('Гулять без тегов', l10n.intentionSummaryNoTags),
@@ -843,6 +859,16 @@ Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
 
 Object? _connectionChanges(sqlite.Database raw) =>
     raw.select('SELECT total_changes() AS count').single['count'];
+
+final _catalogList = find.byKey(
+  const PageStorageKey<String>('intention-catalog-list'),
+);
+
+ScrollPosition _catalogListPosition(WidgetTester tester) => tester
+    .state<ScrollableState>(
+      find.descendant(of: _catalogList, matching: find.byType(Scrollable)),
+    )
+    .position;
 
 /// Видимые результаты поиска страницы в порядке выдачи.
 List<_Row> _results(WidgetTester tester, Type page) => [

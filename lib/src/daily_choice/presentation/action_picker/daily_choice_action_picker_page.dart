@@ -37,6 +37,9 @@ final class _DailyChoiceActionPickerPageState
   final _filterController = TextEditingController();
   final _scrollController = ScrollController();
 
+  /// Сохранённое смещение списка выдачи между его показами.
+  var _listStorage = PageStorageBucket();
+
   @override
   void dispose() {
     _filterController.dispose();
@@ -107,47 +110,50 @@ final class _DailyChoiceActionPickerPageState
               ),
             ],
           ),
-          results: catalog.when(
-            skipLoadingOnReload: false,
-            skipLoadingOnRefresh: false,
-            data: (state) => switch (state) {
-              IntentionCatalogDebouncing() => IntentionCatalogStatusView(
+          results: PageStorage(
+            bucket: _listStorage,
+            child: catalog.when(
+              skipLoadingOnReload: false,
+              skipLoadingOnRefresh: false,
+              data: (state) => switch (state) {
+                IntentionCatalogDebouncing() => IntentionCatalogStatusView(
+                  message: l10n.actionPickerLoading,
+                  progressIndicator: true,
+                ),
+                IntentionCatalogInvalidFilter() => const SizedBox.shrink(),
+                final IntentionCatalogLoaded loaded => _ActionOptions(
+                  state: loaded,
+                  scrollController: _scrollController,
+                ),
+                final IntentionCatalogEmpty empty => _EmptyActions(
+                  refresh: empty.refresh,
+                  // Условия по тегам сужают охват: пустая выдача не
+                  // означает, что в нём нет намерений.
+                  message: empty.query.tagFilter != IntentionTagFilter.empty
+                      ? l10n.catalogTagConditionsEmpty
+                      : selection.titleFilterText.trim().isEmpty
+                      ? l10n.actionPickerEmpty
+                      : l10n.actionPickerNoMatches,
+                ),
+                IntentionCatalogUnavailable() => IntentionCatalogStatusView(
+                  message: l10n.actionPickerUnavailable,
+                  retryLabel: l10n.commonRetry,
+                  onRetry: () => unawaited(notifier.retry()),
+                ),
+                IntentionCatalogCorruption() => IntentionCatalogStatusView(
+                  message: l10n.actionPickerCorruption,
+                ),
+                IntentionCatalogUnexpected() => IntentionCatalogStatusView(
+                  message: l10n.actionPickerUnexpected,
+                ),
+              },
+              error: (_, _) => IntentionCatalogStatusView(
+                message: l10n.actionPickerUnexpected,
+              ),
+              loading: () => IntentionCatalogStatusView(
                 message: l10n.actionPickerLoading,
                 progressIndicator: true,
               ),
-              IntentionCatalogInvalidFilter() => const SizedBox.shrink(),
-              final IntentionCatalogLoaded loaded => _ActionOptions(
-                state: loaded,
-                scrollController: _scrollController,
-              ),
-              final IntentionCatalogEmpty empty => _EmptyActions(
-                refresh: empty.refresh,
-                // Условия по тегам сужают охват: пустая выдача не
-                // означает, что в нём нет намерений.
-                message: empty.query.tagFilter != IntentionTagFilter.empty
-                    ? l10n.catalogTagConditionsEmpty
-                    : selection.titleFilterText.trim().isEmpty
-                    ? l10n.actionPickerEmpty
-                    : l10n.actionPickerNoMatches,
-              ),
-              IntentionCatalogUnavailable() => IntentionCatalogStatusView(
-                message: l10n.actionPickerUnavailable,
-                retryLabel: l10n.commonRetry,
-                onRetry: () => unawaited(notifier.retry()),
-              ),
-              IntentionCatalogCorruption() => IntentionCatalogStatusView(
-                message: l10n.actionPickerCorruption,
-              ),
-              IntentionCatalogUnexpected() => IntentionCatalogStatusView(
-                message: l10n.actionPickerUnexpected,
-              ),
-            },
-            error: (_, _) => IntentionCatalogStatusView(
-              message: l10n.actionPickerUnexpected,
-            ),
-            loading: () => IntentionCatalogStatusView(
-              message: l10n.actionPickerLoading,
-              progressIndicator: true,
             ),
           ),
         ),
@@ -156,6 +162,10 @@ final class _DailyChoiceActionPickerPageState
   }
 
   void _scrollToTop() {
+    // Список может быть снят с экрана пустой выдачей: сохранённое смещение
+    // прежней выдачи тогда вернулось бы вместе с ним. Новое хранилище не
+    // переносит его в выдачу новых параметров.
+    setState(() => _listStorage = PageStorageBucket());
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }

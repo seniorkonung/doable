@@ -288,6 +288,82 @@ void defineDailyChoicePickerTagSearchTests(
     expect(_listPosition(tester, page).pixels, positionBefore);
   });
 
+  for (final (name, change) in <(String, Future<void> Function(WidgetTester))>[
+    (
+      'снятие условия',
+      (tester) => tester.tap(_conditionRemove(_tag(1, 'Здоровье'))),
+    ),
+    (
+      'новый текст названия',
+      (tester) => tester.enterText(_filterField(page), 'Намерение'),
+    ),
+  ]) {
+    testWidgets('$name начинает выдачу с верхней позиции, когда прокрученный '
+        'список снят с экрана успешной пустой выдачей', (tester) async {
+      final repository = ControlledCatalogRepository();
+      final health = _tag(1, 'Здоровье');
+      final opened = await _openPicker(tester, repository, page);
+      await _applyConditions(tester, opened.container, repository, page, [
+        (health, IntentionTagRequirement.mustBePresent),
+      ], _firstPage(_summaries(page, [health], count: 60), revision: 1));
+      await _scrollListDown(tester, page);
+
+      // Удаление обязательного тега снимает список с экрана без смены
+      // параметров поиска.
+      await _deleteTag(tester, opened.container, repository, health, 2);
+      expect(_list(page), findsNothing);
+      expect(find.text(_emptyByConditions), findsOneWidget);
+
+      final answered = repository.queries.length;
+      await change(tester);
+      await _pumpUntilQueries(tester, repository, answered + 1);
+      // Состав новой выдачи задаёт управляемое хранилище: странице важна
+      // только смена параметров над снятым с экрана списком.
+      repository.complete(
+        answered,
+        _firstPage(_summaries(page, const [], count: 60), revision: 2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_listPosition(tester, page).pixels, 0);
+      expect(find.text('Намерение 60'), findsOneWidget);
+    });
+  }
+
+  testWidgets('выдача, вернувшаяся после временной пустоты без смены '
+      'параметров, сохраняет экранную позицию', (tester) async {
+    final repository = ControlledCatalogRepository();
+    final health = _tag(1, 'Здоровье');
+    final rest = _tag(2, 'Отдых');
+    final opened = await _openPicker(tester, repository, page);
+    await _applyConditions(tester, opened.container, repository, page, [
+      (health, IntentionTagRequirement.mustBePresent),
+      (rest, IntentionTagRequirement.mustBeAbsent),
+    ], _firstPage(_summaries(page, [health], count: 60), revision: 1));
+    await _scrollListDown(tester, page);
+    final positionBefore = _listPosition(tester, page).pixels;
+
+    await _deleteTag(tester, opened.container, repository, health, 2);
+    expect(_list(page), findsNothing);
+
+    // Согласование после удаления исключённого тега возвращает совпадения
+    // без смены параметров; их состав задаёт управляемое хранилище.
+    await _deleteTag(tester, opened.container, repository, rest, 3);
+    await _pumpUntilReconciliationQueries(tester, repository, 1);
+    repository.completeReconciliation(
+      0,
+      reconciliationFirstPortion(
+        _summaries(page, const [], count: 60),
+        totalCount: 60,
+        revision: 3,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Намерение 60'), findsNothing);
+    expect(_listPosition(tester, page).pixels, positionBefore);
+  });
+
   testWidgets('условия по тегам действуют вместе с ограничениями страницы, '
       'а выбор строки возвращает идентификатор намерения', (tester) async {
     final repository = ControlledCatalogRepository();
@@ -699,6 +775,25 @@ Future<void> _failRefresh(
   await _pumpUntilReconciliationQueries(tester, repository, 1);
   repository.completeReconciliation(0, ResultFailure(failure));
   await tester.pump();
+  await tester.pump();
+  await tester.pump();
+}
+
+/// Подтверждает физическое удаление тега без действий на странице выбора.
+Future<void> _deleteTag(
+  WidgetTester tester,
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  Tag tag,
+  int revision,
+) async {
+  final accepted = acceptTagCommand(
+    container,
+    repository,
+    DeleteTag(tag.id),
+    tagDeletionSuccess(tagId: tag.id, revision: TestCatalogRevision(revision)),
+  );
+  await accepted.future;
   await tester.pump();
   await tester.pump();
 }

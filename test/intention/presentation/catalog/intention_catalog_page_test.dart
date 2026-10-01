@@ -1303,6 +1303,136 @@ void main() {
     expect(repository.tagCommands, isEmpty);
   });
 
+  for (final (name, change) in <(String, Future<void> Function(WidgetTester))>[
+    (
+      'снятие условия',
+      (tester) => tester.tap(_conditionRemove(_tag(1, 'Здоровье'))),
+    ),
+    (
+      'новый текст названия',
+      (tester) => tester.enterText(
+        find.byKey(const ValueKey('catalog-filter-field')),
+        'Намерение',
+      ),
+    ),
+    (
+      'новый охват',
+      (tester) async {
+        await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Archived').last);
+      },
+    ),
+    (
+      'новый порядок',
+      (tester) async {
+        await tester.tap(find.byKey(const ValueKey('catalog-order-control')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Created: oldest first').last);
+      },
+    ),
+  ]) {
+    testWidgets('$name начинает выдачу с верхней позиции, когда прокрученный '
+        'список снят с экрана успешной пустой выдачей', (tester) async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      addTearDown(container.dispose);
+      final health = _tag(1, 'Здоровье');
+      await _openCatalogWithConditions(tester, container, repository, [
+        (health, IntentionTagRequirement.mustBePresent),
+      ], _firstPage(_taggedSummaries([health], last: 1), revision: 1));
+      await _scrollCatalogDown(tester);
+
+      // Удаление обязательного тега снимает список с экрана без смены
+      // параметров поиска.
+      await _completeCatalogWidgetTagCommand(
+        tester,
+        container,
+        repository,
+        DeleteTag(health.id),
+        tagDeletionSuccess(
+          tagId: health.id,
+          revision: const TestCatalogRevision(2),
+        ),
+      );
+      expect(
+        find.byKey(const PageStorageKey<String>('intention-catalog-list')),
+        findsNothing,
+      );
+      expect(find.text(_emptyByConditions), findsOneWidget);
+
+      final answered = repository.queries.length;
+      await change(tester);
+      await _pumpUntilQueries(tester, repository, answered + 1);
+      // Состав новой выдачи задаёт управляемое хранилище: странице важна
+      // только смена параметров над снятым с экрана списком.
+      repository.complete(
+        answered,
+        _firstPage(_taggedSummaries(const [], last: 1), revision: 2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_catalogScrollPosition(tester).pixels, 0);
+      expect(find.text('Намерение 60'), findsOneWidget);
+    });
+  }
+
+  testWidgets('выдача, вернувшаяся после временной пустоты без смены '
+      'параметров, сохраняет экранную позицию', (tester) async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(repository);
+    addTearDown(container.dispose);
+    final health = _tag(1, 'Здоровье');
+    final rest = _tag(2, 'Отдых');
+    await _openCatalogWithConditions(tester, container, repository, [
+      (health, IntentionTagRequirement.mustBePresent),
+      (rest, IntentionTagRequirement.mustBeAbsent),
+    ], _firstPage(_taggedSummaries([health], last: 1), revision: 1));
+    await _scrollCatalogDown(tester);
+    final positionBefore = _catalogScrollPosition(tester).pixels;
+
+    await _completeCatalogWidgetTagCommand(
+      tester,
+      container,
+      repository,
+      DeleteTag(health.id),
+      tagDeletionSuccess(
+        tagId: health.id,
+        revision: const TestCatalogRevision(2),
+      ),
+    );
+    expect(
+      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
+      findsNothing,
+    );
+
+    // Согласование после удаления исключённого тега возвращает совпадения
+    // без смены параметров; их состав задаёт управляемое хранилище.
+    await _completeCatalogWidgetTagCommand(
+      tester,
+      container,
+      repository,
+      DeleteTag(rest.id),
+      tagDeletionSuccess(
+        tagId: rest.id,
+        revision: const TestCatalogRevision(3),
+      ),
+    );
+    await _pumpUntilReconciliationQueries(tester, repository, 1);
+    repository.completeReconciliation(
+      0,
+      reconciliationFirstPortion(
+        _taggedSummaries(const [], last: 1),
+        totalCount: 60,
+        revision: 3,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Намерение 60'), findsNothing);
+    expect(_catalogScrollPosition(tester).pixels, positionBefore);
+  });
+
   testWidgets('смена охвата и порядка сохраняет условия по тегам', (
     tester,
   ) async {

@@ -52,6 +52,9 @@ final class _RelationParticipantPickerPageState
   final _filterController = TextEditingController();
   final _scrollController = ScrollController();
 
+  /// Сохранённое смещение списка выдачи между его показами.
+  var _listStorage = PageStorageBucket();
+
   @override
   void dispose() {
     _filterController.dispose();
@@ -119,21 +122,24 @@ final class _RelationParticipantPickerPageState
               ),
             ],
           ),
-          results: catalog.when(
-            skipLoadingOnReload: false,
-            skipLoadingOnRefresh: false,
-            data: (state) => _PickerContent(
-              purpose: purpose,
-              state: state,
-              scrollController: _scrollController,
-              onSelected: _select,
-            ),
-            error: (_, _) => IntentionCatalogStatusView(
-              message: localizations.catalogUnexpectedFailure,
-            ),
-            loading: () => IntentionCatalogStatusView(
-              message: localizations.catalogLoading,
-              progressIndicator: true,
+          results: PageStorage(
+            bucket: _listStorage,
+            child: catalog.when(
+              skipLoadingOnReload: false,
+              skipLoadingOnRefresh: false,
+              data: (state) => _PickerContent(
+                purpose: purpose,
+                state: state,
+                scrollController: _scrollController,
+                onSelected: _select,
+              ),
+              error: (_, _) => IntentionCatalogStatusView(
+                message: localizations.catalogUnexpectedFailure,
+              ),
+              loading: () => IntentionCatalogStatusView(
+                message: localizations.catalogLoading,
+                progressIndicator: true,
+              ),
             ),
           ),
         ),
@@ -142,6 +148,10 @@ final class _RelationParticipantPickerPageState
   }
 
   void _scrollToTop() {
+    // Список может быть снят с экрана пустой выдачей: сохранённое смещение
+    // прежней выдачи тогда вернулось бы вместе с ним. Новое хранилище не
+    // переносит его в выдачу новых параметров.
+    setState(() => _listStorage = PageStorageBucket());
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }

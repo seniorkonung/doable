@@ -42,6 +42,9 @@ final class _IntentionCatalogPageState
   final _filterController = TextEditingController();
   final _scrollController = _CatalogScrollController();
   final _itemKeys = <IntentionId, GlobalKey>{};
+
+  /// Сохранённое смещение списка выдачи между его показами.
+  var _listStorage = PageStorageBucket();
   _CatalogVisualAnchor? _pendingVisualAnchor;
   bool _catalogMaintenanceScheduled = false;
 
@@ -118,21 +121,24 @@ final class _IntentionCatalogPageState
             notifier.changeOrder(order);
           },
         ),
-        results: catalog.when(
-          skipLoadingOnReload: false,
-          skipLoadingOnRefresh: false,
-          data: (state) => _CatalogContent(
-            state: state,
-            scrollController: _scrollController,
-            itemKeyFor: _itemKeyFor,
-            onRefreshStatusExtentChanged: _reserveRefreshStatusExtent,
-          ),
-          error: (_, _) => IntentionCatalogStatusView(
-            message: localizations.catalogUnexpectedFailure,
-          ),
-          loading: () => IntentionCatalogStatusView(
-            message: localizations.catalogLoading,
-            progressIndicator: true,
+        results: PageStorage(
+          bucket: _listStorage,
+          child: catalog.when(
+            skipLoadingOnReload: false,
+            skipLoadingOnRefresh: false,
+            data: (state) => _CatalogContent(
+              state: state,
+              scrollController: _scrollController,
+              itemKeyFor: _itemKeyFor,
+              onRefreshStatusExtentChanged: _reserveRefreshStatusExtent,
+            ),
+            error: (_, _) => IntentionCatalogStatusView(
+              message: localizations.catalogUnexpectedFailure,
+            ),
+            loading: () => IntentionCatalogStatusView(
+              message: localizations.catalogLoading,
+              progressIndicator: true,
+            ),
           ),
         ),
       ),
@@ -143,6 +149,10 @@ final class _IntentionCatalogPageState
     // Новые параметры начинают выдачу с верхней позиции: отложенный якорь
     // прежней выдачи больше не действует.
     _pendingVisualAnchor = null;
+    // Список может быть снят с экрана пустой выдачей: сохранённое смещение
+    // прежней выдачи тогда вернулось бы вместе с ним. Новое хранилище не
+    // переносит его в выдачу новых параметров.
+    setState(() => _listStorage = PageStorageBucket());
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
