@@ -1,6 +1,6 @@
 import 'package:widgetbook/widgetbook.dart';
 
-import 'sandbox/intention_screen.dart';
+import 'intention/intention_summary_view_use_cases.dart';
 
 /// Строит дерево каталога.
 ///
@@ -13,16 +13,11 @@ import 'sandbox/intention_screen.dart';
 /// дерево, а не общее изменяемое состояние.
 List<WidgetbookNode> buildCatalog() => [
   WidgetbookFolder(
-    name: 'Песочница',
+    name: 'Намерения',
     children: [
       WidgetbookComponent(
-        name: 'Экран намерения',
-        useCases: [
-          WidgetbookUseCase(
-            name: 'По умолчанию',
-            builder: (context) => const IntentionScreen(),
-          ),
-        ],
+        name: 'Строка намерения',
+        useCases: intentionSummaryViewUseCases(),
       ),
     ],
   ),

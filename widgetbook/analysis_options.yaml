@@ -9,3 +9,9 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+
+linter:
+  rules:
+    # У приложения нет публичной библиотеки: его виджеты лежат в `lib/src`,
+    # и каталог импортирует их оттуда.
+    implementation_imports: false
