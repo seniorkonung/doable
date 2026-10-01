@@ -956,6 +956,8 @@ void _defineTagSearchTests() {
     );
     await _scrollListDown(tester);
     final positionBefore = _listPosition(tester).pixels;
+    final visibleRow = _rowAtListCenter(tester);
+    final rowTopBefore = tester.getRect(visibleRow).top;
 
     final accepted = acceptTagCommand(
       opened.container,
@@ -981,6 +983,12 @@ void _defineTagSearchTests() {
     );
     expect(message, findsOneWidget);
     expect(_listPosition(tester).pixels, positionBefore);
+    // Отказ лежит поверх верхнего края списка и не сдвигает его строки.
+    expect(tester.getRect(visibleRow).top, rowTopBefore);
+    expect(
+      tester.getRect(_refreshStatus).top,
+      moreOrLessEquals(tester.getRect(_list).top, epsilon: 0.01),
+    );
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await _pumpUntilReconciliationQueries(tester, repository, 2);
@@ -992,6 +1000,7 @@ void _defineTagSearchTests() {
 
     expect(message, findsNothing);
     expect(_listPosition(tester).pixels, positionBefore);
+    expect(tester.getRect(visibleRow).top, rowTopBefore);
   });
 
   for (final (name, change) in <(String, Future<void> Function(WidgetTester))>[
@@ -1226,9 +1235,13 @@ void _defineTagSearchTests() {
     expect(message, findsOneWidget);
     expect(find.byType(IntentionSummaryView), findsNWidgets(3));
     expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
+    // Место под отказ отведено перед началом выдачи: первая строка стоит
+    // под ним и остаётся достижимой.
     expect(
       tester.getRect(_refreshStatus).bottom,
-      lessThanOrEqualTo(tester.getRect(_list).top),
+      lessThanOrEqualTo(
+        tester.getRect(find.byType(IntentionSummaryView).first).top,
+      ),
     );
     _expectParticipantQuery(
       repository.reconciliationQueryAt(0).catalogQuery,
@@ -1625,6 +1638,22 @@ ScrollPosition _listPosition(WidgetTester tester) => tester
       find.descendant(of: _list, matching: find.byType(Scrollable)),
     )
     .position;
+
+/// Строка выдачи, занимающая середину области списка.
+Finder _rowAtListCenter(WidgetTester tester) {
+  final center = tester.getRect(_list).center.dy;
+  final rows = find.byType(IntentionSummaryView);
+  for (final row in tester.widgetList<IntentionSummaryView>(rows)) {
+    final rect = tester.getRect(find.byWidget(row));
+    if (rect.top <= center && rect.bottom > center) {
+      final title = row.title;
+      return find.byWidgetPredicate(
+        (widget) => widget is IntentionSummaryView && widget.title == title,
+      );
+    }
+  }
+  fail('В середине списка нет строки выдачи.');
+}
 
 /// Прокручивает список выдачи ниже начала.
 Future<void> _scrollListDown(WidgetTester tester) async {
