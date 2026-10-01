@@ -791,3 +791,34 @@
   - **Зависимости:** 3.19, 3.20, 3.21, 3.22, 3.23, 3.24.
   - **Ожидаемые файлы:** нет, итоговая контрольная проверка.
   - **Размер:** XS.
+
+- [ ] 3.26 Сквозные утверждения о явном выборе намерения различают верный и неверный результат у вызывающей стороны
+  - **Критерии приёмки:**
+    - В `test/app/intention_tag_search_app_flow_test.dart` каждое утверждение о явном выборе намерения через настоящие маршруты и `DriftPersonalGraphRepository` наблюдает идентичность выбранного намерения у вызывающего сценария и ложно, когда выбор ничего не вернул или вернул другое намерение, включая одноимённое.
+    - Выбор участника архивированной связи: из двух одноимённых намерений «Ходить в парк» выбирается то, которое не является прежним участником. После закрытия поиска редактор связи показывает именно его: проверяется идентификатор участника, полученный редактором, и архивное состояние участника по ключу `relation-editor-participant-archive-state-related`, отличное от состояния прежнего участника. Одного совпадения названия для утверждения недостаточно.
+    - Выбор действия при создании дневного выбора: открытый `ChoicePathPage` получил идентификатор выбранного действия, и он равен идентификатору нажатой строки. Одного открытия страницы пути для утверждения недостаточно.
+    - Сохранённый граф после выбора по-прежнему не меняется, остальные утверждения файла не ослабляются. Задача меняет только тест: поведение приложения, спецификации, [design](design.md) и [план](plan.md) остаются прежними, файлы в `lib/` не меняются. Тест выполняется на хосте и не требует устройства.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --no-pub test/app/intention_tag_search_app_flow_test.dart` — проходит на русском и английском.
+    - Различающая способность подтверждена: при временной подмене результата выбора на прежнего участника и на другое действие новые утверждения падают; подмена в коммит не входит.
+    - `mise run --skip-tools check`, включая медленные тесты.
+    - `mise exec --no-deps -- openspec validate show-and-filter-intention-tags --type change --strict --no-interactive --json`.
+  - **Зависимости:** 3.12.
+  - **Ожидаемые файлы:** `test/app/intention_tag_search_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [ ] 3.27 Тесты, требующие Android-устройства, удалены из репозитория вместе с их запускающей обвязкой
+  - **Критерии приёмки:**
+    - По решению пользователя тесты, которые запускаются только на подключённом устройстве, не поддерживаются: удалены `integration_test/tag_catalog_read_cost_test.dart`, `integration_test/tag_selection_stability_test.dart`, сам каталог `integration_test/` и драйвер `test_driver/integration_test.dart` с каталогом `test_driver/`.
+    - Зависимость `integration_test` удалена из `dev_dependencies` в `pubspec.yaml`, `pubspec.lock` приведён в соответствие без обновления версий остальных пакетов.
+    - Хостовые тесты сохраняются и проходят без изменения ожиданий, включая `test/graph/data/drift_tag_catalog_read_cost_test.dart` и `test/tag/presentation/catalog/tag_catalog_selection_stability_test.dart`. Параметр `onCatalogReady` функции `measureTagCatalogReadCost`, которым пользовался только тест на устройстве, удалён, если других вызовов с ним не остаётся.
+    - Свидетельства архивированных изменений в `openspec/changes/archive/` и `docs/verification/` — исторические записи и не переписываются. Поведение приложения не меняется: файлы в `lib/`, спецификации, [design](design.md) и [план](plan.md) остаются прежними.
+  - **Проверка:**
+    - Каталогов `integration_test/` и `test_driver/` нет; поиск `package:integration_test` и `IntegrationTestWidgetsFlutterBinding` по `lib`, `test` и корню репозитория ничего не находит; `integration_test` отсутствует в `pubspec.yaml` и `pubspec.lock`.
+    - `mise exec --no-deps -- flutter pub get` завершается успешно, и `git diff` по `pubspec.lock` содержит только удаление записей, ставших ненужными без `integration_test`.
+    - `mise run --skip-tools check`, включая медленные тесты.
+    - На чистой закоммиченной рабочей копии: `mise run --skip-tools codegen-check` и `mise run --skip-tools codegen-check-test`; подтвердить отсутствие изменений после генерации.
+    - `mise exec --no-deps -- openspec validate show-and-filter-intention-tags --type change --strict --no-interactive --json`.
+  - **Зависимости:** нет.
+  - **Ожидаемые файлы:** удаляемые `integration_test/tag_catalog_read_cost_test.dart`, `integration_test/tag_selection_stability_test.dart`, `test_driver/integration_test.dart`; `pubspec.yaml`, `pubspec.lock`, `test/graph/data/drift_tag_catalog_read_cost_test.dart`.
+  - **Размер:** S.
