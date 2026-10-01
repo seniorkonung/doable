@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задачи 3.18–3.27 реализованы, и полная проверка на head проходит: общий элемент выдачи один владеет верхней позицией при смене параметров и размещением отказа обновления на четырёх страницах, комментарий `_CatalogChangePackage` верен коду, сквозные утверждения о выборе различают намерения по идентификатору, тесты для устройства удалены без потери хостовых проверок. Неразрешённых находок нет: единственное замечание ревью — общий элемент запоминает исходные параметры поиска при первом уведомлении модели, а не при создании — по решению пользователя передано в планирование и принадлежит незавершённым задачам 3.28 и 3.29 в `tasks.md`; в коде оно не исправлено. Принятых остаточных рисков нет.
+**Summary:** Задачи 3.28 и 3.29 реализованы, и полная проверка на head проходит: общий элемент выдачи фиксирует исходные параметры поиска при создании состояния, поэтому первая смена охвата, порядка, названия или условий по тегам после монтирования на уже загруженную выдачу открывает новую выдачу с верхней позиции. Четыре новых сценария падают на реализации до исправления и проходят после него; остальное поведение элемента и четыре страницы поиска не изменены. Неразрешённых находок нет, исправлений кода и артефактов на этом этапе не потребовалось. Принятых остаточных рисков нет.
 
 ## Review target
 
-- **Baseline ref:** 7ba58867052b8ce53eb5a962f41ab985794b6b95
-- **Base commit:** 7ba58867052b8ce53eb5a962f41ab985794b6b95
-- **Reviewed head:** 1e5f4447e8417d6d648dbca6f7a84f5c62609359
-- **Target commits:** ["6c068ab291bfd00f4157263816147708f64ab37b","73ec1863de559b247631eda6efdd0b6ee00a3dd8","34a8ae558e31f6f5ccb81fdb97a41c4a7151361f","73e93de892a639bd81e78fd294b54a63bc131485","83fe0a65ab6bfe1b5a015655fd5276025fd5a3c4","525b71fc2f9072e2f902da4afd2685f4a0a4c7b6","88eb7efc4a8afa5ce6f4c21b6175418b40ddd400","f1dfa7eb2aa7610cf0a9f737a2ce5fd65be3ac6f","6de8bb8de705d531d2ce5a663ac545ca163abf36","1e5f4447e8417d6d648dbca6f7a84f5c62609359"]
-- **Reviewable paths:** ["integration_test/tag_catalog_read_cost_test.dart","integration_test/tag_selection_stability_test.dart","lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart","lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart","lib/src/intention/presentation/catalog/intention_catalog_page.dart","lib/src/intention/presentation/catalog/intention_catalog_view_model.dart","lib/src/intention/presentation/catalog/intention_search_results.dart","lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart","openspec/changes/show-and-filter-intention-tags/tasks.md","pubspec.lock","pubspec.yaml","test/app/intention_tag_search_app_flow_test.dart","test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart","test/graph/data/drift_tag_catalog_read_cost_test.dart","test/intention/presentation/catalog/intention_catalog_page_test.dart","test/intention/presentation/catalog/intention_search_results_test.dart","test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart","test_driver/integration_test.dart"]
+- **Baseline ref:** 8dae7de6b5cbf831511f6a3685dfaf0e8fc86e9e
+- **Base commit:** 8dae7de6b5cbf831511f6a3685dfaf0e8fc86e9e
+- **Reviewed head:** 2ce656762d068cfa5e0231677be8295d854c3f16
+- **Target commits:** ["5c1b768f50603dd7ed945d7f02ad214200d369e0","2ce656762d068cfa5e0231677be8295d854c3f16"]
+- **Reviewable paths:** ["lib/src/intention/presentation/catalog/intention_search_results.dart","openspec/changes/show-and-filter-intention-tags/tasks.md","test/intention/presentation/catalog/intention_search_results_test.dart"]
 - **OpenSpec change:** show-and-filter-intention-tags
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,45 +22,21 @@
 
 ## Reviewed increment
 
-### U1 · Общий элемент выдачи владеет верхней позицией при смене параметров и размещением отказа обновления на четырёх страницах поиска
+### U1 · Первая смена параметров после монтирования общего элемента на уже загруженную выдачу открывает выдачу с верхней позиции
 
-- **Work items:** ["3.18","3.19","3.21","3.22","3.23","3.24","3.25"]
-- **Requirements and scenarios:** ["intention-management: Согласованность параметров совместного поиска","intention-management: Сохранение условия после физического удаления тега — сценарий «Явное удаление сохранённого условия возобновляет поиск»","design: решение 6 — размещение отказа обновления поверх списка без сдвига строк","design: решение 7 — общий элемент выдачи поиска"]
+- **Work items:** ["3.28","3.29"]
+- **Requirements and scenarios:** ["intention-management: Согласованность параметров совместного поиска","design: решение 6 — переход к верхней позиции при смене параметров","design: решение 7 — общий элемент выдачи поиска"]
 - **Affected boundary:** Пользователь каталога намерений, поиска действия, поиска исходного намерения и поиска участника долговременной связи; слой представления поиска намерений.
-- **Implementation target:** ["lib/src/intention/presentation/catalog/intention_search_results.dart","lib/src/intention/presentation/catalog/intention_catalog_page.dart","lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart","lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart","lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart","test/intention/presentation/catalog/intention_search_results_test.dart","test/intention/presentation/catalog/intention_catalog_page_test.dart","test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart","test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart","test/app/intention_tag_search_app_flow_test.dart"]
-- **Applicable constraints and non-goals:** Смена параметров начинает выдачу с верхней позиции независимо от того, показан ли список; обновление без смены параметров позицию сохраняет. Отказ обновления не меняет ни смещение, ни экранное положение строк и отличим от успешной пустоты. Каталог сохраняет якорь видимого намерения и место под кнопку создания. Ограничения назначений поиска, выбор по идентификатору и запрет самосвязи сохраняются; элемент не читает граф, не выполняет команд и не меняет условия. Правила отбора, чтения репозитория и согласование модели вне объёма.
-
-### U2 · Комментарий каталожной части подтверждённого пакета называет действительного гаранта каталожной мутации
-
-- **Work items:** ["3.20"]
-- **Requirements and scenarios:** ["tasks: 3.20 — документация без изменения поведения"]
-- **Affected boundary:** Сопровождающие модели каталога намерений.
-- **Implementation target:** ["lib/src/intention/presentation/catalog/intention_catalog_view_model.dart"]
-- **Applicable constraints and non-goals:** Меняются только строки комментария; исполняемый код модели, контракт `TagAssignmentChanged` и тесты остаются прежними, проверка на стороне модели не возвращается.
-
-### U3 · Сквозные утверждения о явном выборе намерения различают верный и неверный результат
-
-- **Work items:** ["3.26"]
-- **Requirements and scenarios:** ["daily-choice-management: явный выбор действия по идентификатору","long-term-relation-management: идентичность выбора участника связи среди одноимённых намерений"]
-- **Affected boundary:** Набор тестов как свидетельство для вызывающих сценариев страниц поиска.
-- **Implementation target:** ["test/app/intention_tag_search_app_flow_test.dart"]
-- **Applicable constraints and non-goals:** Меняется только тест; сохранённый граф после выбора не меняется, остальные утверждения не ослабляются, тест выполняется на хосте на обоих языках.
-
-### U4 · Тесты, требующие Android-устройства, и их обвязка удалены
-
-- **Work items:** ["3.27"]
-- **Requirements and scenarios:** ["tasks: 3.27 — решение пользователя не поддерживать тесты только для устройства"]
-- **Affected boundary:** Разработчики и CI, выполняющие проверки репозитория.
-- **Implementation target:** ["integration_test/tag_catalog_read_cost_test.dart","integration_test/tag_selection_stability_test.dart","test_driver/integration_test.dart","pubspec.yaml","pubspec.lock","test/graph/data/drift_tag_catalog_read_cost_test.dart"]
-- **Applicable constraints and non-goals:** Хостовые тесты сохраняются с прежними ожиданиями; `pubspec.lock` содержит только удаление записей без смены версий; исторические свидетельства в `openspec/changes/archive/` и `docs/verification/` не переписываются; поведение приложения не меняется.
+- **Implementation target:** ["lib/src/intention/presentation/catalog/intention_search_results.dart","test/intention/presentation/catalog/intention_search_results_test.dart"]
+- **Applicable constraints and non-goals:** Смена параметров начинает выдачу с верхней позиции во всех четырёх контекстах независимо от момента монтирования элемента и порядка уведомлений модели. Обновление без смены параметров сохраняет позицию; смена назначения не наследует ни позицию, ни якорь. Страницы поиска, модель каталога, спецификации, design и план не меняются. Задача 3.29 — итоговая контрольная проверка без собственных файлов: её свидетельство — отметка в `tasks.md` из коммита 2ce656762d068cfa5e0231677be8295d854c3f16 и проверки, воспроизведённые на head в этом ревью.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Три свежих изолированных ревьюера получили только нейтральные брифы и точный диапазон. Группа U1+U3 с общим путём `test/app/intention_tag_search_app_flow_test.dart` проверена одним ревьюером на десяти путях; по его запросу группа расширена единственным путём U2 `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, после чего он подтвердил полное покрытие одиннадцати путей. U2 отдельно проверен вторым ревьюером на том же пути, U4 — третьим на шести путях. Ревьюеры U2 и U4 находок не вернули; ревьюер U1+U3 вернул две находки низкой значимости: первая подтверждена и передана в планирование задачам 3.28 и 3.29, вторая опровергнута фактами репозитория (см. Review coverage). |
-| OpenSpec conformance | Complete | На чистой рабочей копии с `HEAD` = 1e5f4447e8417d6d648dbca6f7a84f5c62609359: `mise run --skip-tools check` — формат без изменений, `flutter analyze` без замечаний, 2989 тестов прошли, включая медленные; `mise run --skip-tools codegen-check` и `codegen-check-test` — код выхода 0, рабочая копия осталась чистой; `mise exec --no-deps -- openspec validate show-and-filter-intention-tags --type change --strict --no-interactive --json` — valid, без замечаний. Проверки поиска из задач 3.22, 3.25 и 3.27 воспроизведены: `_scrollToTop`, `_CatalogScrollController`, `_ExtentObserver` и `IntentionCatalogRefreshStatusArea(` на четырёх страницах отсутствуют; каталогов `integration_test/` и `test_driver/` нет; diff `pubspec.lock` содержит только удаления. Отметки задач 3.18–3.27 в `tasks.md` соответствуют диапазону. |
-| Code quality | Complete | Корректность, читаемость, архитектура, безопасность и производительность проверены по всем путям поставки и тестов на head: жизненный цикл контроллера и отложенных обратных вызовов, смена хранилища позиции, якорь каталога, место под отказ перед началом выдачи, подключение четырёх страниц, различающая способность новых утверждений, состав удалённых записей `pubspec.lock`. Дефект исходных параметров общего элемента, принадлежащий задаче 3.28, воспроизведён временным тестом на head, который в коммит не вошёл. |
+| Independent decision review | Complete | Один свежий изолированный ревьюер получил только нейтральный бриф и точный диапазон `8dae7de6b5cbf831511f6a3685dfaf0e8fc86e9e..2ce656762d068cfa5e0231677be8295d854c3f16` с двумя путями U1: `lib/src/intention/presentation/catalog/intention_search_results.dart` и `test/intention/presentation/catalog/intention_search_results_test.dart`. Он подтвердил полное покрытие обоих путей, расширения цели не запрашивал и находок не вернул. Его проверка статическая; прогон тестов выполнен координатором (см. ниже). |
+| OpenSpec conformance | Complete | На чистой рабочей копии с `HEAD` = 2ce656762d068cfa5e0231677be8295d854c3f16: `mise run --skip-tools check` — формат без изменений (435 файлов), `flutter analyze` без замечаний, 2993 теста прошли, включая медленные и файлы из проверки 3.28 и 3.29; `mise run --skip-tools codegen-check` и `mise run --skip-tools codegen-check-test` — код выхода 0, рабочая копия осталась чистой; `mise exec --no-deps -- openspec validate show-and-filter-intention-tags --type change --strict --no-interactive --json` — valid, без замечаний. Условие 3.28 «сценарий падает на реализации до исправления» воспроизведено во временной копии head с файлом элемента из базы: четыре новых сценария падают (`Expected: <0> Actual: <300.0>`), остальные 23 проходят; копия удалена. Отметки задач 3.28 и 3.29 соответствуют диапазону, прежние задачи и их отметки не изменены. |
+| Code quality | Complete | Корректность, читаемость, архитектура, безопасность и производительность проверены по обоим путям поставки на head: момент инициализации базы сравнения, допустимость чтения модели в `initState`, сохранность ветки смены назначения, отсутствие изменений в местах использования элемента, различающая способность и устройство новых сценариев и опоры `_open`. |
 
 ## Findings
 
@@ -68,16 +44,10 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Проверены все 18 путей диапазона `7ba58867052b8ce53eb5a962f41ab985794b6b95..1e5f4447e8417d6d648dbca6f7a84f5c62609359`; `tasks.md` использован как свидетельство планирования, прежний отчёт находок и принятых рисков не содержал, переносить нечего.
+Проверены все 3 пути диапазона `8dae7de6b5cbf831511f6a3685dfaf0e8fc86e9e..2ce656762d068cfa5e0231677be8295d854c3f16`; `tasks.md` использован как свидетельство планирования: его diff содержит только отметки выполнения 3.28 и 3.29. Прежний отчёт находок и принятых рисков не содержал, переносить нечего; его единственное замечание, переданное в планирование задачам 3.28 и 3.29, в этом диапазоне исправлено в коде.
 
-U1: Общий элемент: контроллер освобождается, отложенные обратные вызовы защищены `mounted`/`attached`; смена параметров заменяет хранилище позиции и переводит показанный список к нулю; обновление без смены параметров, включая возврат выдачи после временной пустоты, позицию сохраняет; место под отказ отводится перед началом выдачи через `minScrollExtent`, список в начале остаётся в начале. Модель публикует состояние при каждой смене охвата, порядка, названия и условий по тегам (`changeScope`, `changeOrder`, `changeTitleFilter`, `changeTagFilter` → `ref.invalidateSelf()`), а `selection` обновляется до публикации. Каталог подключает якорь видимого намерения и место под кнопку создания явными параметрами; три страницы выбора собственных слушателя, перехода к началу и компоновки отказа не содержат.
+U1: В базе `_parameters` был `late` с ленивым инициализатором и при монтировании на готовую выдачу вычислялся внутри обработчика первой смены параметров, совпадая с новыми значениями. На head база задаётся в `initState` (`lib/src/intention/presentation/catalog/intention_search_results.dart:126-133`) и сравнивается в `_handleCatalogStateChanged` (`:318-328`), поэтому первая смена вызывает `_startFromTop`. Чтение `ref.read(...notifier)` в `initState` у `ConsumerState` допустимо; модель к этому моменту удерживается страницей, которая наблюдает провайдер и передаёт `catalog`. Ветка смены назначения в `didUpdateWidget` (`:135-144`) не менялась. Обновление без смены параметров `selection` не меняет, позиция сохраняется: сценарий возврата выдачи после временной пустоты проходит с прежним ожиданием. Четыре места использования элемента в `lib/` (каталог и три страницы выбора) диапазоном не затронуты, их тесты проходят с прежними ожиданиями.
 
-Опровергнутая находка ревьюера: Предположение, что скрытая строка второго участника в поиске участника связи (`relation_participant_picker_page.dart:125-127`) завышает число элементов списка для вспомогательных технологий, не подтверждено: исключённое намерение не попадает в выдачу — его отсекают запрос репозитория (`drift_personal_graph_repository.dart:1221-1225`) и предикат принадлежности каталога (`intention_catalog.dart:187`); ветка страницы остаётся защитной и в достижимых состояниях не срабатывает.
+Тесты: Новый сценарий выполняется для охвата, порядка, названия и условий по тегам (`test/intention/presentation/catalog/intention_search_results_test.dart:237-250`). Опора `_open` с `loadedBeforeMount` (`:557-570`) загружает выдачу при другом слушателе модели и лишь затем монтирует элемент, так что элемент не видит уведомлений загрузки — это ровно условие дефекта. Существующие сценарии файла не ослаблены: изменения в них сводятся к выносу общей обёртки приложения в локальную функцию `pump`.
 
-U2: Diff содержит только четыре строки комментария; каждое утверждение комментария сверено с `TagAssignmentChanged` (`lib/src/tag/application/tag_result.dart`) и `_applyPackage` модели.
-
-U3: Выбор действия сверяет `ChoicePathPage.sourceIntentionId` с идентификатором нажатой строки; выбор участника сверяет архивное состояние в редакторе связи и идентификатор открытых подробностей (намерение 7, не 5); сохранённый граф по-прежнему сравнивается.
-
-U4: Удалённые записи `pubspec.lock` (`integration_test`, `flutter_driver`, `fuchsia_remote_debug_protocol`, `process`, `sync_http`, `webdriver`) больше ничем не требуются, версии остальных пакетов не менялись; ссылок на удалённую обвязку в `mise.toml`, CI и скриптах нет. Хостовые тесты сохраняют утверждения удалённых тестов о стабильности выбора и стоимости чтения; исчезает только неутверждаемая запись времени кадров при прокрутке 10 000 строк на устройстве — следствие решения пользователя, зафиксированного в задаче 3.27.
-
-Не проверялось кодом или тестами диапазона: Порядок обхода экранным диктором отказа, лежащего поверх списка; свидетельство доступности подтверждено только прохождением `test/intention/presentation/intention_tag_search_accessibility_test.dart` в составе полной проверки.
+Не проверялось кодом или тестами диапазона: Монтирование на готовую выдачу на каждой из четырёх страниц отдельными сценариями страниц не воспроизводится; поведение обеспечивает общий элемент, которым все четыре страницы пользуются без собственного слушателя параметров, а сценарий проверен на уровне элемента.
