@@ -822,3 +822,28 @@
   - **Зависимости:** нет.
   - **Ожидаемые файлы:** удаляемые `integration_test/tag_catalog_read_cost_test.dart`, `integration_test/tag_selection_stability_test.dart`, `test_driver/integration_test.dart`; `pubspec.yaml`, `pubspec.lock`, `test/graph/data/drift_tag_catalog_read_cost_test.dart`.
   - **Размер:** S.
+
+- [ ] 3.28 Общий элемент выдачи начинает выдачу с верхней позиции при первой смене параметров после монтирования на уже загруженную выдачу
+  - **Критерии приёмки:**
+    - По требованию «Согласованность параметров совместного поиска» и решению 7 [design](design.md) базой сравнения в общем элементе выдачи из 3.21 служат параметры поиска, действующие в момент создания состояния элемента или смены назначения поиска. База не зависит от того, пришло ли уже уведомление модели каталога: она не вычисляется лениво при первом уведомлении.
+    - Элемент смонтирован на модель, чья выдача уже загружена, список прокручен; первое уведомление модели после монтирования вызвано сменой охвата, порядка, названия или условия по тегам. Новая выдача открывается со смещением ноль, сохранённое смещение прежней выдачи в неё не переносится.
+    - Остальное поведение элемента не меняется: обновление без смены параметров сохраняет позицию, смена назначения не наследует ни позицию, ни якорь, ожидания задач 3.18 и 3.21–3.24 проходят без ослабления утверждений. Спецификации, [design](design.md) и [план](plan.md) остаются прежними, страницы поиска не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --no-pub test/intention/presentation/catalog/intention_search_results_test.dart` — добавлен сценарий: модель загружена до монтирования элемента, список прокручен, первая смена параметров открывает выдачу со смещением ноль. Сценарий падает на реализации до исправления и проходит после него.
+    - `mise exec --no-deps -- flutter test --no-pub test/intention/presentation/catalog/intention_catalog_page_test.dart test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart` — сценарии четырёх страниц проходят с прежними ожиданиями.
+  - **Зависимости:** 3.21.
+  - **Ожидаемые файлы:** `lib/src/intention/presentation/catalog/intention_search_results.dart`, `test/intention/presentation/catalog/intention_search_results_test.dart`.
+  - **Размер:** S.
+
+- [ ] 3.29 Подтвердить готовность изменения к завершению после закрепления исходных параметров общего элемента выдачи
+  - **Критерии приёмки:**
+    - Задача 3.28 подтверждена: переход к верхней позиции при смене параметров не зависит от порядка уведомлений модели и момента монтирования общего элемента на каждой из четырёх страниц поиска. Результат третьей фазы, подтверждённый в 3.13, 3.15, 3.17, 3.19 и 3.25, остаётся выполненным.
+    - Проверки ошибок, доступности, формата, анализа и регрессий проходят, generated-артефакты воспроизводимы. Исторические задачи и их отметки сохранены; архивация изменения остаётся отдельным шагом.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --no-pub test/intention/presentation/intention_tag_search_accessibility_test.dart test/app/intention_tag_search_app_flow_test.dart`.
+    - `mise run --skip-tools check`, включая медленные тесты.
+    - На чистой закоммиченной рабочей копии: `mise run --skip-tools codegen-check` и `mise run --skip-tools codegen-check-test`; подтвердить отсутствие изменений после генерации. Выполнить ревью соответствия и качества инкремента.
+    - `mise exec --no-deps -- openspec validate show-and-filter-intention-tags --type change --strict --no-interactive --json`.
+  - **Зависимости:** 3.28.
+  - **Ожидаемые файлы:** нет, итоговая контрольная проверка.
+  - **Размер:** XS.
