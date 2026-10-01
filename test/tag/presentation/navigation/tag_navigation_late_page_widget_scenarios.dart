@@ -43,7 +43,7 @@ void _registerLatePageWidgetScenarios() {
                 } else {
                   reads.fail(
                     pendingIndex,
-                    const TaggedEntitiesUnavailableFailure(),
+                    const TaggedIntentionsUnavailableFailure(),
                   );
                 }
                 await tester.runAsync(() => pumpEventQueue());
@@ -72,7 +72,7 @@ void _registerLatePageWidgetScenarios() {
                   findsNothing,
                 );
                 expect(find.text(l10n.tagNavigationEmptyActive), findsNothing);
-                expect(model.canActOn(item.target), isFalse);
+                expect(model.canActOn(item.id), isFalse);
                 if (loaded) {
                   final stale = container.read(provider) as TagNavigationLoaded;
                   expect(stale.items, [item]);
@@ -119,17 +119,20 @@ void _registerLatePageWidgetScenarios() {
                   );
                   await tester.pumpAndSettle();
                   expect(find.text(message), findsOneWidget);
-                  expect(model.canActOn(item.target), isFalse);
+                  expect(model.canActOn(item.id), isFalse);
                   expect(reads.queries, hasLength(count));
                   await tester.tap(retry);
                   await tester.pump();
                   expect(reads.queries, hasLength(count + 1));
                   expect(reads.queries.last.tagId, _tag.id);
-                  expect(reads.queries.last.scope, TaggedEntitiesScope.active);
+                  expect(
+                    reads.queries.last.scope,
+                    TaggedIntentionsScope.active,
+                  );
                   expect(reads.queries.last.cursor, isNull);
                   reads.page(count, [item]);
                   await tester.pump();
-                  expect(model.canActOn(item.target), isFalse);
+                  expect(model.canActOn(item.id), isFalse);
                   reads.watch.add(
                     TagReadSuccess(
                       GraphSnapshot(value: _tag, revision: const _Revision(1)),
@@ -139,7 +142,7 @@ void _registerLatePageWidgetScenarios() {
                   final restored =
                       container.read(provider) as TagNavigationLoaded;
                   expect(restored.items, [item]);
-                  expect(model.canActOn(item.target), isTrue);
+                  expect(model.canActOn(item.id), isTrue);
                   expect(_row(lateItem), findsNothing);
                   expect(find.text(message), findsNothing);
                   expect(find.text(l10n.commonRetry), findsNothing);

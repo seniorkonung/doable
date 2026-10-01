@@ -488,7 +488,7 @@ dependencies:
   content_hash: sha256:7973e746e8e2ea5004d520da970c15a106824b8d6be1bcff48908aec021f3677
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-29T21:33:52+00:00'
+  resolved_at: '2026-09-29T21:34:11+00:00'
 - repo_url: addyosmani/agent-skills
   name: debugging-and-error-recovery
   host: github.com
@@ -511,7 +511,7 @@ dependencies:
   content_hash: sha256:1a119d27e8f1d27ed6317adf3115826336491346780dcb7d7a7a7f79fe3ffe10
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-29T21:33:52+00:00'
+  resolved_at: '2026-09-29T21:34:11+00:00'
 - repo_url: addyosmani/agent-skills
   name: source-driven-development
   host: github.com
@@ -534,7 +534,7 @@ dependencies:
   content_hash: sha256:c48d3c3abb2cb8a5c4a8584ab95db64f8a0261f3acfe2cdb7b8ff88ec3d90211
   constraint: 0.6.9
   resolved_tag: 0.6.9
-  resolved_at: '2026-09-29T21:33:52+00:00'
+  resolved_at: '2026-09-29T21:34:11+00:00'
 - repo_url: mattpocock/skills
   name: grill-with-docs
   host: github.com

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -9,11 +10,12 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -64,12 +66,15 @@ final class _ReadProbe extends LocalDatabaseConnectionObserver {
   }
 }
 
+final class _ForeignCursor implements TaggedIntentionsCursor {}
+
 void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late DriftPersonalGraphRepository graph;
   late _ReadProbe probe;
   Directory? fileDirectory;
+  late InMemoryDiagnosticsSink diagnostics;
 
   setUp(() async {
     probe = _ReadProbe();
@@ -81,11 +86,28 @@ void main() {
     );
     await database.open();
     seedTagStorageFixture(raw);
+    raw.execute(
+      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
+      [tagFixtureId(4), 'Намерение 4'],
+    );
+    // Назначения другого тега тем же намерениям чередуются с назначениями
+    // выбранного тега.
+    for (final (tagNumber, intentionNumber) in [
+      (lastTagNumber, 1),
+      (lastTagNumber, 4),
+      (firstTagNumber, 4),
+    ]) {
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(tagNumber), tagFixtureId(intentionNumber)],
+      );
+    }
+    diagnostics = InMemoryDiagnosticsSink();
     graph = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
       () => DateTime.utc(2026, 9, 28),
-      InMemoryDiagnosticsSink(),
+      diagnostics,
     );
     probe.statements.clear();
   });
@@ -107,6 +129,11 @@ void main() {
     );
     await database.open();
     seedTagStorageFixture(raw);
+    // Продолжению навигации активного охвата нужен второй получатель тега.
+    raw.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(firstTagNumber), tagFixtureId(3)],
+    );
     graph = _storageScenarioRepository(database);
     return (
       database: database,
@@ -117,20 +144,20 @@ void main() {
     );
   });
 
-  TaggedEntitiesPage page(TaggedEntitiesPageResult result) =>
-      (result as TaggedEntitiesPageSuccess).value;
+  TaggedIntentionsPage page(TaggedIntentionsPageResult result) =>
+      (result as TaggedIntentionsPageSuccess).value;
 
-  Future<List<TaggedEntity>> collect(
+  Future<List<TaggedIntention>> collect(
     TagId tagId,
-    TaggedEntitiesScope scope,
+    TaggedIntentionsScope scope,
     int size,
   ) async {
-    final all = <TaggedEntity>[];
-    TaggedEntitiesCursor? cursor;
+    final all = <TaggedIntention>[];
+    TaggedIntentionsCursor? cursor;
     do {
       final next = page(
-        await graph.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: tagId,
             scope: scope,
             pageSize: size,
@@ -145,19 +172,19 @@ void main() {
     return all;
   }
 
-  Future<void> expectCorruption(TaggedEntitiesScope scope) async {
+  Future<void> expectCorruption(TaggedIntentionsScope scope) async {
     expect(
-      await graph.getTaggedEntitiesPage(
-        TaggedEntitiesQuery(
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
           tagId: _tag(firstTagNumber),
           scope: scope,
           pageSize: 1,
         ),
       ),
-      isA<TaggedEntitiesPageError>().having(
+      isA<TaggedIntentionsPageError>().having(
         (error) => error.failure,
         'причина',
-        isA<TaggedEntitiesCorruptionFailure>(),
+        isA<TaggedIntentionsCorruptionFailure>(),
       ),
     );
   }
@@ -170,24 +197,49 @@ void main() {
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
         [tagFixtureId(firstTagNumber), tagFixtureId(999)],
       );
-      await expectCorruption(TaggedEntitiesScope.active);
+      await expectCorruption(TaggedIntentionsScope.active);
     },
   );
 
-  test('отсутствующий участник связи отклоняет порцию', () async {
-    raw.execute('PRAGMA foreign_keys = OFF');
-    raw.execute('DELETE FROM intentions WHERE id = ?', [tagFixtureId(3)]);
-    await expectCorruption(TaggedEntitiesScope.active);
-  });
+  test(
+    'непомеченный сосед и назначения другого тега не участвуют в чтении',
+    () async {
+      raw.execute('PRAGMA foreign_keys = OFF');
+      raw.execute('DELETE FROM intentions WHERE id = ?', [tagFixtureId(3)]);
+      final active = await collect(
+        _tag(firstTagNumber),
+        TaggedIntentionsScope.active,
+        1,
+      );
+      expect(active.map((item) => item.id), [_intention(1), _intention(4)]);
+    },
+  );
 
-  test('отсутствующая архивная связь не исчезает за фильтром', () async {
-    raw.execute('PRAGMA foreign_keys = OFF');
-    raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
-      tagFixtureId(102),
-    ]);
-    await expectCorruption(TaggedEntitiesScope.active);
-    await expectCorruption(TaggedEntitiesScope.archived);
-  });
+  test(
+    'отсутствующая связь помеченных намерений не влияет на результаты',
+    () async {
+      raw.execute('PRAGMA foreign_keys = OFF');
+      raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
+        tagFixtureId(102),
+      ]);
+      expect(
+        (await collect(
+          _tag(firstTagNumber),
+          TaggedIntentionsScope.active,
+          1,
+        )).map((item) => item.id),
+        [_intention(1), _intention(4)],
+      );
+      expect(
+        (await collect(
+          _tag(firstTagNumber),
+          TaggedIntentionsScope.archived,
+          1,
+        )).map((item) => item.id),
+        [_intention(2)],
+      );
+    },
+  );
 
   test(
     'оставшиеся назначения отсутствующего тега означают повреждение',
@@ -196,35 +248,86 @@ void main() {
       raw.execute('DELETE FROM tags WHERE id = ?', [
         tagFixtureId(firstTagNumber),
       ]);
-      await expectCorruption(TaggedEntitiesScope.active);
+      await expectCorruption(TaggedIntentionsScope.active);
     },
   );
 
-  test('отсутствующий участник вне порции и охвата отклоняет чтение', () async {
+  test('отсутствующее помеченное намерение не исчезает за охватом', () async {
     raw.execute('PRAGMA foreign_keys = OFF');
-    raw.execute('DELETE FROM tag_assignments WHERE intention_id = ?', [
-      tagFixtureId(2),
-    ]);
     raw.execute('DELETE FROM intentions WHERE id = ?', [tagFixtureId(2)]);
-    await expectCorruption(TaggedEntitiesScope.active);
+    await expectCorruption(TaggedIntentionsScope.active);
+    await expectCorruption(TaggedIntentionsScope.archived);
   });
 
-  test('назначение без получателя не превращается в пустой успех', () async {
+  test('назначение без намерения или со вторым получателем непредставимо', () async {
+    // Аудит не проверяет эти состояния: их исключает сама схема, даже при
+    // отключённых проверках ограничений и внешних ключей.
+    raw.execute('PRAGMA foreign_keys = OFF');
     raw.execute('PRAGMA ignore_check_constraints = ON');
-    raw.execute('INSERT INTO tag_assignments (tag_id) VALUES (?)', [
-      tagFixtureId(firstTagNumber),
-    ]);
-    await expectCorruption(TaggedEntitiesScope.active);
+    for (final (sql, values) in [
+      (
+        'INSERT INTO tag_assignments (tag_id) VALUES (?)',
+        [tagFixtureId(firstTagNumber)],
+      ),
+      (
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, NULL)',
+        [tagFixtureId(firstTagNumber)],
+      ),
+    ]) {
+      expect(
+        () => raw.execute(sql, values),
+        throwsA(isA<sqlite.SqliteException>()),
+        reason: sql,
+      );
+    }
+    // Второму получателю негде храниться: у назначения один столбец цели.
+    expect(
+      raw
+          .select('SELECT name FROM pragma_table_info(?) ORDER BY cid', [
+            'tag_assignments',
+          ])
+          .map((row) => row['name']),
+      ['creation_sequence', 'tag_id', 'tag_creation_sequence', 'intention_id'],
+    );
+    expect(
+      () => raw.execute(
+        'UPDATE tag_assignments SET intention_id = NULL WHERE intention_id = ?',
+        [tagFixtureId(1)],
+      ),
+      throwsA(isA<sqlite.SqliteException>()),
+    );
+    expect(
+      (await collect(
+        _tag(firstTagNumber),
+        TaggedIntentionsScope.active,
+        1,
+      )).map((item) => item.id),
+      [_intention(1), _intention(4)],
+    );
   });
 
-  test('повреждение дополнительной строки отклоняет всю порцию', () async {
-    raw.execute('DELETE FROM daily_choice_path_steps');
-    raw.execute('PRAGMA ignore_check_constraints = ON');
-    raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
-      'CANARY-вид',
-      tagFixtureId(101),
+  test('повреждение дополнительного намерения отклоняет всю порцию', () async {
+    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+      ' CANARY-название ',
+      tagFixtureId(4),
     ]);
-    await expectCorruption(TaggedEntitiesScope.active);
+    await expectCorruption(TaggedIntentionsScope.active);
+    final events = diagnostics.events
+        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+        .toList();
+    expect(events, hasLength(2));
+    expect(events.first.stage, TagReadDiagnosticsStage.validation);
+    expect(events.first.status, isA<DiagnosticsStarted>());
+    expect(events.last.stage, TagReadDiagnosticsStage.read);
+    expect(
+      events.last.status,
+      isA<DiagnosticsFailed>().having(
+        (status) => status.code,
+        'категория',
+        DiagnosticsFailureCode.corruption,
+      ),
+    );
+    expect(events.join(' '), isNot(contains('CANARY')));
   });
 
   test('нестрогое название получателя отклоняет всю порцию', () async {
@@ -232,7 +335,7 @@ void main() {
       ' CANARY-название ',
       tagFixtureId(1),
     ]);
-    await expectCorruption(TaggedEntitiesScope.active);
+    await expectCorruption(TaggedIntentionsScope.active);
   });
 
   test('начальный BOM сохранённого названия не удаляется при чтении', () async {
@@ -240,7 +343,7 @@ void main() {
       '\uFEFFНамерение',
       tagFixtureId(1),
     ]);
-    await expectCorruption(TaggedEntitiesScope.active);
+    await expectCorruption(TaggedIntentionsScope.active);
   });
 
   test('начальный BOM названия тега не удаляется при чтении', () async {
@@ -249,7 +352,7 @@ void main() {
       '\uFEFFДом',
       tagFixtureId(firstTagNumber),
     ]);
-    await expectCorruption(TaggedEntitiesScope.active);
+    await expectCorruption(TaggedIntentionsScope.active);
   });
 
   test('недопустимый UTF-8 идентичности даёт повреждение', () async {
@@ -263,50 +366,38 @@ void main() {
       VALUES (?, CAST(x'FF' AS TEXT))''',
       [tagFixtureId(firstTagNumber)],
     );
-    await expectCorruption(TaggedEntitiesScope.active);
+    await expectCorruption(TaggedIntentionsScope.active);
   });
 
   test(
-    'неверная идентичность участника отклоняет дополнительную строку',
+    'неверная идентичность намерения отклоняет дополнительную строку',
     () async {
+      raw.execute('DELETE FROM tag_assignments WHERE intention_id = ?', [
+        tagFixtureId(4),
+      ]);
       raw.execute(
         'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
-        ['CANARY-неверный-id', 'Участник'],
+        ['CANARY-неверный-id', 'Намерение'],
       );
       raw.execute(
-        '''INSERT INTO long_term_relations
-      (id, source_intention_id, related_intention_id, type, priority)
-      VALUES (?, ?, ?, 'need', 1)''',
-        [tagFixtureId(103), tagFixtureId(3), 'CANARY-неверный-id'],
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(firstTagNumber), 'CANARY-неверный-id'],
       );
-      raw.execute(
-        'DELETE FROM tag_assignments WHERE tag_id = ? AND long_term_relation_id = ?',
-        [tagFixtureId(firstTagNumber), tagFixtureId(101)],
-      );
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), tagFixtureId(103)],
-      );
-      await expectCorruption(TaggedEntitiesScope.active);
+      await expectCorruption(TaggedIntentionsScope.active);
     },
   );
 
-  for (final (table, number) in [
-    ('intentions', 2),
-    ('long_term_relations', 102),
-  ]) {
-    test(
-      'недопустимое архивное состояние $table не скрывается охватом',
-      () async {
-        raw.execute('PRAGMA ignore_check_constraints = ON');
-        raw.execute('UPDATE $table SET is_archived = 2 WHERE id = ?', [
-          tagFixtureId(number),
-        ]);
-        await expectCorruption(TaggedEntitiesScope.active);
-        await expectCorruption(TaggedEntitiesScope.archived);
-      },
-    );
-  }
+  test(
+    'недопустимое архивное состояние намерения не скрывается охватом',
+    () async {
+      raw.execute('PRAGMA ignore_check_constraints = ON');
+      raw.execute('UPDATE intentions SET is_archived = 2 WHERE id = ?', [
+        tagFixtureId(2),
+      ]);
+      await expectCorruption(TaggedIntentionsScope.active);
+      await expectCorruption(TaggedIntentionsScope.archived);
+    },
+  );
 
   test(
     'повреждение назначений другого тега не затрагивает выбранный',
@@ -316,13 +407,13 @@ void main() {
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
         [tagFixtureId(lastTagNumber), tagFixtureId(999)],
       );
-      final result = await graph.getTaggedEntitiesPage(
-        TaggedEntitiesQuery(
+      final result = await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
           tagId: _tag(firstTagNumber),
-          scope: TaggedEntitiesScope.active,
+          scope: TaggedIntentionsScope.active,
         ),
       );
-      expect(result, isA<TaggedEntitiesPageSuccess>());
+      expect(result, isA<TaggedIntentionsPageSuccess>());
     },
   );
 
@@ -330,7 +421,7 @@ void main() {
     'проверка ссылок выбранного тега выполняется один раз за обход',
     () async {
       probe.statements.clear();
-      await collect(_tag(firstTagNumber), TaggedEntitiesScope.active, 1);
+      await collect(_tag(firstTagNumber), TaggedIntentionsScope.active, 1);
       expect(
         probe.statements.where(
           (sql) =>
@@ -344,8 +435,8 @@ void main() {
   );
 
   for (final (scope, scopeLabel) in [
-    (TaggedEntitiesScope.active, 'активный охват'),
-    (TaggedEntitiesScope.archived, 'архивный охват'),
+    (TaggedIntentionsScope.active, 'активный охват'),
+    (TaggedIntentionsScope.archived, 'архивный охват'),
   ]) {
     for (final (label, filter) in [
       ('без условий', IntentionTagFilter.empty),
@@ -386,7 +477,7 @@ void main() {
               [
                 tagFixtureId(number),
                 'Намерение $number',
-                scope == TaggedEntitiesScope.archived ? 1 : 0,
+                scope == TaggedIntentionsScope.archived ? 1 : 0,
                 number,
                 number,
               ],
@@ -416,8 +507,8 @@ void main() {
               .map((row) => row.values.toList())
               .toList();
           final first = page(
-            await graph.getTaggedEntitiesPage(
-              TaggedEntitiesQuery(
+            await graph.getTaggedIntentionsPage(
+              TaggedIntentionsQuery(
                 tagId: _tag(firstTagNumber),
                 scope: scope,
                 pageSize: 1,
@@ -428,7 +519,7 @@ void main() {
           IntentionCatalogQuery catalogQuery({
             IntentionCatalogCursor? cursor,
           }) => IntentionCatalogQuery(
-            scope: scope == TaggedEntitiesScope.active
+            scope: scope == TaggedIntentionsScope.active
                 ? IntentionScope.active
                 : IntentionScope.archived,
             titleFilter: null,
@@ -437,7 +528,7 @@ void main() {
             pageSize: 1,
             cursor: cursor,
           );
-          final targets = [...first.items.map((item) => item.target)];
+          final ids = [...first.items.map((item) => item.id)];
           var cursor = first.nextCursor;
           probe.statements.clear();
           while (cursor != null) {
@@ -477,8 +568,8 @@ void main() {
                 isNot(catalogPage.items.single.id),
               );
             }
-            final result = await graph.getTaggedEntitiesPage(
-              TaggedEntitiesQuery(
+            final result = await graph.getTaggedIntentionsPage(
+              TaggedIntentionsQuery(
                 tagId: _tag(firstTagNumber),
                 scope: scope,
                 pageSize: 1,
@@ -487,8 +578,8 @@ void main() {
             );
             expect(
               result,
-              isA<TaggedEntitiesPageSuccess>(),
-              reason: result is TaggedEntitiesPageError
+              isA<TaggedIntentionsPageSuccess>(),
+              reason: result is TaggedIntentionsPageError
                   ? '${result.failure.runtimeType}'
                   : null,
             );
@@ -498,23 +589,18 @@ void main() {
               GraphRevisionOrder.same,
             );
             expect(next.tag.name, first.tag.name);
-            targets.addAll(next.items.map((item) => item.target));
+            ids.addAll(next.items.map((item) => item.id));
             cursor = next.nextCursor;
           }
-          expect(targets, [
-            IntentionTagTarget(
-              scope == TaggedEntitiesScope.active
-                  ? _intention(1)
-                  : _intention(2),
-            ),
-            LongTermRelationTagTarget(
-              scope == TaggedEntitiesScope.active
-                  ? _relation(101)
-                  : _relation(102),
-            ),
-            ...additionalIds.map(IntentionTagTarget.new),
+          expect(ids, [
+            if (scope == TaggedIntentionsScope.active) ...[
+              _intention(1),
+              _intention(4),
+            ] else
+              _intention(2),
+            ...additionalIds,
           ]);
-          expect(targets.toSet(), hasLength(targets.length));
+          expect(ids.toSet(), hasLength(ids.length));
           expect(storedGraph(), before);
           expect(
             raw
@@ -638,10 +724,10 @@ void main() {
     'смена хранилища лишает продолжение свидетельства целостности',
     () async {
       final first = page(
-        await graph.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: _tag(firstTagNumber),
-            scope: TaggedEntitiesScope.active,
+            scope: TaggedIntentionsScope.active,
             pageSize: 1,
           ),
         ),
@@ -652,85 +738,86 @@ void main() {
         [tagFixtureId(firstTagNumber), tagFixtureId(999)],
       );
       expect(
-        await graph.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: _tag(firstTagNumber),
-            scope: TaggedEntitiesScope.active,
+            scope: TaggedIntentionsScope.active,
             pageSize: 1,
             cursor: first.nextCursor,
           ),
         ),
-        isA<TaggedEntitiesPageError>().having(
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesSnapshotExpired>(),
+          isA<TaggedIntentionsSnapshotExpired>(),
         ),
       );
-      await expectCorruption(TaggedEntitiesScope.active);
+      await expectCorruption(TaggedIntentionsScope.active);
     },
   );
 
-  test('оба охвата смешивают виды в порядке назначения без соседей', () async {
-    raw.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 2, 1],
-    );
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(103)],
-    );
-    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-      'Намерение 1',
-      tagFixtureId(2),
+  test(
+    'оба охвата содержат только прямые назначения намерениям в их порядке',
+    () async {
+      raw.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 2, 1],
+      );
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(lastTagNumber), tagFixtureId(2)],
+      );
+      for (final size in [1, 50, 100]) {
+        final active = await collect(
+          _tag(firstTagNumber),
+          TaggedIntentionsScope.active,
+          size,
+        );
+        expect(active.map((item) => item.id), [_intention(1), _intention(4)]);
+        expect(active.map((item) => item.title), [
+          'Намерение 1',
+          'Намерение 4',
+        ]);
+        expect(
+          active.every(
+            (item) => item.archiveState == IntentionArchiveState.active,
+          ),
+          isTrue,
+        );
+        final archived = await collect(
+          _tag(firstTagNumber),
+          TaggedIntentionsScope.archived,
+          size,
+        );
+        expect(archived.map((item) => item.id), [_intention(2)]);
+        expect(archived.single.archiveState, IntentionArchiveState.archived);
+      }
+    },
+  );
+
+  test('тег без назначений пуст в обоих охватах при помеченных связанных намерениях', () async {
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      tagFixtureId(305),
+      'Без назначений',
     ]);
-
-    for (final size in [1, 50, 100]) {
-      final active = await collect(
-        _tag(firstTagNumber),
-        TaggedEntitiesScope.active,
-        size,
+    for (final scope in TaggedIntentionsScope.values) {
+      final empty = page(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(tagId: _tag(305), scope: scope, pageSize: 1),
+        ),
       );
-      expect(active.map((item) => item.target).toSet(), hasLength(2));
-      expect(active[0], isA<TaggedIntention>());
-      expect((active[0] as TaggedIntention).id, _intention(1));
-      expect((active[0] as TaggedIntention).title, 'Намерение 1');
-      expect(active[1], isA<TaggedLongTermRelation>());
-      final relation = active[1] as TaggedLongTermRelation;
-      expect(relation.id, _relation(101));
-      expect(relation.type, LongTermRelationType.need);
-      expect(relation.sourceTitle, 'Намерение 1');
-      expect(relation.relatedTitle, 'Намерение 3');
-      expect(relation.scope, RelationScope.active);
-
-      final archived = await collect(
-        _tag(firstTagNumber),
-        TaggedEntitiesScope.archived,
-        size,
-      );
-      expect(archived, hasLength(3));
-      expect(archived[0], isA<TaggedIntention>());
-      expect((archived[0] as TaggedIntention).id, _intention(2));
-      expect(
-        (archived[0] as TaggedIntention).archiveState,
-        IntentionArchiveState.archived,
-      );
-      expect((archived[0] as TaggedIntention).title, 'Намерение 1');
-      expect(archived[1], isA<TaggedLongTermRelation>());
-      expect(archived[2], isA<TaggedLongTermRelation>());
-      final archivedRelation = archived[2] as TaggedLongTermRelation;
-      expect(archivedRelation.id, _relation(103));
-      expect(archivedRelation.scope, RelationScope.archived);
-      expect(archivedRelation.sourceTitle, 'Намерение 3');
-      expect(archivedRelation.relatedTitle, 'Намерение 1');
+      expect(empty.tag.id, _tag(305));
+      expect(empty.items, isEmpty);
+      expect(empty.nextCursor, isNull);
     }
   });
 
   test('пустой охват отличается от отсутствия тега', () async {
     final empty = page(
-      await graph.getTaggedEntitiesPage(
-        TaggedEntitiesQuery(
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
           tagId: _tag(lastTagNumber),
-          scope: TaggedEntitiesScope.archived,
+          scope: TaggedIntentionsScope.archived,
         ),
       ),
     );
@@ -747,10 +834,10 @@ void main() {
     );
     expect(
       page(
-        await graph.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: _tag(303),
-            scope: TaggedEntitiesScope.active,
+            scope: TaggedIntentionsScope.active,
           ),
         ),
       ).items,
@@ -758,26 +845,26 @@ void main() {
     );
     expect(
       page(
-        await graph.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: _tag(303),
-            scope: TaggedEntitiesScope.archived,
+            scope: TaggedIntentionsScope.archived,
           ),
         ),
       ).items,
       hasLength(1),
     );
     expect(
-      await graph.getTaggedEntitiesPage(
-        TaggedEntitiesQuery(
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(
           tagId: _tag(999),
-          scope: TaggedEntitiesScope.active,
+          scope: TaggedIntentionsScope.active,
         ),
       ),
-      isA<TaggedEntitiesPageError>().having(
+      isA<TaggedIntentionsPageError>().having(
         (error) => error.failure,
         'причина',
-        isA<TaggedEntitiesTagNotFound>(),
+        isA<TaggedIntentionsTagNotFound>(),
       ),
     );
   });
@@ -785,33 +872,25 @@ void main() {
   test('одноимённые намерения одного охвата остаются разными', () async {
     raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
       'Намерение 1',
-      tagFixtureId(3),
+      tagFixtureId(4),
     ]);
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), tagFixtureId(3)],
-    );
     final active = await collect(
       _tag(firstTagNumber),
-      TaggedEntitiesScope.active,
+      TaggedIntentionsScope.active,
       1,
     );
-    final intentions = active.whereType<TaggedIntention>().toList();
-    expect(intentions.map((item) => item.title), [
-      'Намерение 1',
-      'Намерение 1',
-    ]);
-    expect(intentions.map((item) => item.id), [_intention(1), _intention(3)]);
+    expect(active.map((item) => item.title), ['Намерение 1', 'Намерение 1']);
+    expect(active.map((item) => item.id), [_intention(1), _intention(4)]);
   });
 
   test(
     'курсор привязан к тегу, охвату, размеру, экземпляру и снимку',
     () async {
       final first = page(
-        await graph.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: _tag(firstTagNumber),
-            scope: TaggedEntitiesScope.active,
+            scope: TaggedIntentionsScope.active,
             pageSize: 1,
           ),
         ),
@@ -819,31 +898,31 @@ void main() {
       final cursor = first.nextCursor;
       expect(cursor, isNotNull);
       for (final query in [
-        TaggedEntitiesQuery(
+        TaggedIntentionsQuery(
           tagId: _tag(lastTagNumber),
-          scope: TaggedEntitiesScope.active,
+          scope: TaggedIntentionsScope.active,
           pageSize: 1,
           cursor: cursor,
         ),
-        TaggedEntitiesQuery(
+        TaggedIntentionsQuery(
           tagId: _tag(firstTagNumber),
-          scope: TaggedEntitiesScope.archived,
+          scope: TaggedIntentionsScope.archived,
           pageSize: 1,
           cursor: cursor,
         ),
-        TaggedEntitiesQuery(
+        TaggedIntentionsQuery(
           tagId: _tag(firstTagNumber),
-          scope: TaggedEntitiesScope.active,
+          scope: TaggedIntentionsScope.active,
           pageSize: 2,
           cursor: cursor,
         ),
       ]) {
         expect(
-          await graph.getTaggedEntitiesPage(query),
-          isA<TaggedEntitiesPageError>().having(
+          await graph.getTaggedIntentionsPage(query),
+          isA<TaggedIntentionsPageError>().having(
             (error) => error.failure,
             'причина',
-            isA<TaggedEntitiesInvalidCursor>(),
+            isA<TaggedIntentionsInvalidCursor>(),
           ),
         );
       }
@@ -854,18 +933,18 @@ void main() {
         InMemoryDiagnosticsSink(),
       );
       expect(
-        await other.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        await other.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: _tag(firstTagNumber),
-            scope: TaggedEntitiesScope.active,
+            scope: TaggedIntentionsScope.active,
             pageSize: 1,
             cursor: cursor,
           ),
         ),
-        isA<TaggedEntitiesPageError>().having(
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesInvalidCursor>(),
+          isA<TaggedIntentionsInvalidCursor>(),
         ),
       );
 
@@ -874,18 +953,18 @@ void main() {
         tagFixtureId(firstTagNumber),
       ]);
       expect(
-        await graph.getTaggedEntitiesPage(
-          TaggedEntitiesQuery(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
             tagId: _tag(firstTagNumber),
-            scope: TaggedEntitiesScope.active,
+            scope: TaggedIntentionsScope.active,
             pageSize: 1,
             cursor: cursor,
           ),
         ),
-        isA<TaggedEntitiesPageError>().having(
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesSnapshotExpired>(),
+          isA<TaggedIntentionsSnapshotExpired>(),
         ),
       );
     },
@@ -903,10 +982,10 @@ void main() {
     probe.statements.clear();
     final active = await collect(
       _tag(firstTagNumber),
-      TaggedEntitiesScope.active,
+      TaggedIntentionsScope.active,
       1,
     );
-    expect(active, [isA<TaggedLongTermRelation>(), isA<TaggedIntention>()]);
+    expect(active.map((item) => item.id), [_intention(4), _intention(1)]);
     final pageQueries = probe.statements
         .where(
           (sql) =>
@@ -928,7 +1007,6 @@ void main() {
         .select('EXPLAIN QUERY PLAN ${pageQueries.first}', [
           tagFixtureId(firstTagNumber),
           0,
-          0,
           2,
         ])
         .map((row) => row['detail'].toString())
@@ -936,75 +1014,203 @@ void main() {
     expect(plan, contains('tag_assignments_tag_order'));
   });
 
-  test('порции 1, 50 и 100 полностью обходят смешанную выдачу', () async {
-    final expected = <Object>[];
-    for (var number = 4; number <= 106; number++) {
-      final relationNumber = number + 1000;
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), 'Новое намерение $number', 0, 0, number, number],
-      );
-      raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          tagFixtureId(relationNumber),
-          tagFixtureId(1),
-          tagFixtureId(number),
-          'need',
-          2,
-          0,
-        ],
-      );
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), tagFixtureId(number)],
-      );
-      expected.add(_intention(number));
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), tagFixtureId(relationNumber)],
-      );
-      expected.add(_relation(relationNumber));
-    }
-    final initial = [_intention(1), _relation(101), ...expected];
-    for (final size in [1, 50, 100]) {
-      final rows = await collect(
-        _tag(firstTagNumber),
-        TaggedEntitiesScope.active,
-        size,
-      );
-      expect(
-        rows.map(
-          (row) => switch (row) {
-            TaggedIntention(:final id) => id,
-            TaggedLongTermRelation(:final id) => id,
-          },
-        ),
-        initial,
-      );
-    }
-    raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-      'Изменённое название',
-      tagFixtureId(4),
-    ]);
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-      'Изменённый тег',
-      tagFixtureId(firstTagNumber),
-    ]);
-    final after = await collect(
-      _tag(firstTagNumber),
-      TaggedEntitiesScope.active,
-      100,
+  test('чужой вид продолжения отклоняется до чтения хранилища', () async {
+    final result = await graph.getTaggedIntentionsPage(
+      TaggedIntentionsQuery(
+        tagId: _tag(firstTagNumber),
+        scope: TaggedIntentionsScope.active,
+        cursor: _ForeignCursor(),
+      ),
     );
     expect(
-      after.map(
-        (row) => switch (row) {
-          TaggedIntention(:final id) => id,
-          TaggedLongTermRelation(:final id) => id,
-        },
+      result,
+      isA<TaggedIntentionsPageError>().having(
+        (error) => error.failure,
+        'причина',
+        isA<TaggedIntentionsInvalidCursor>(),
       ),
-      initial,
     );
-    expect((after[2] as TaggedIntention).title, 'Изменённое название');
+    expect(probe.statements, isEmpty);
+    final event = diagnostics.events
+        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
+        .last;
+    expect(event.stage, TagReadDiagnosticsStage.validation);
+    expect(
+      event.status,
+      isA<DiagnosticsFailed>().having(
+        (status) => status.code,
+        'категория',
+        DiagnosticsFailureCode.validation,
+      ),
+    );
   });
+
+  test(
+    'повтор назначения сохраняет ревизию и допустимость продолжения',
+    () async {
+      final first = page(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
+            tagId: _tag(firstTagNumber),
+            scope: TaggedIntentionsScope.active,
+            pageSize: 1,
+          ),
+        ),
+      );
+      expect(first.nextCursor, isNotNull);
+      expect(
+        await graph.execute(
+          AssignTag(tagId: _tag(firstTagNumber), intentionId: _intention(1)),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      final next = page(
+        await graph.getTaggedIntentionsPage(
+          TaggedIntentionsQuery(
+            tagId: _tag(firstTagNumber),
+            scope: TaggedIntentionsScope.active,
+            pageSize: 1,
+            cursor: first.nextCursor,
+          ),
+        ),
+      );
+      expect(next.items.single.id, _intention(4));
+      expect(next.nextCursor, isNull);
+      expect(next.revision.compareTo(first.revision), GraphRevisionOrder.same);
+    },
+  );
+
+  for (final changeRelation in [false, true]) {
+    test(
+      changeRelation
+          ? 'изменение связи делает продолжение общей ревизии устаревшим'
+          : 'снятие назначения требует начать навигацию с новой основы',
+      () async {
+        final first = page(
+          await graph.getTaggedIntentionsPage(
+            TaggedIntentionsQuery(
+              tagId: _tag(firstTagNumber),
+              scope: TaggedIntentionsScope.active,
+              pageSize: 1,
+            ),
+          ),
+        );
+        expect(first.nextCursor, isNotNull);
+        if (changeRelation) {
+          expect(
+            await graph.execute(ArchiveLongTermRelation(_relation(101))),
+            isA<GraphCommandSucceeded>(),
+          );
+        } else {
+          expect(
+            await graph.execute(
+              RemoveTagAssignment(
+                tagId: _tag(firstTagNumber),
+                intentionId: _intention(1),
+              ),
+            ),
+            isA<GraphCommandSucceeded>(),
+          );
+        }
+        expect(
+          await graph.getTaggedIntentionsPage(
+            TaggedIntentionsQuery(
+              tagId: _tag(firstTagNumber),
+              scope: TaggedIntentionsScope.active,
+              pageSize: 1,
+              cursor: first.nextCursor,
+            ),
+          ),
+          isA<TaggedIntentionsPageError>().having(
+            (error) => error.failure,
+            'причина',
+            isA<TaggedIntentionsSnapshotExpired>(),
+          ),
+        );
+        final updated = await collect(
+          _tag(firstTagNumber),
+          TaggedIntentionsScope.active,
+          1,
+        );
+        expect(updated.map((item) => item.id), [
+          if (changeRelation) _intention(1),
+          _intention(4),
+        ]);
+      },
+    );
+  }
+
+  test(
+    'порции 1, 50 и 100 обходят намерения обоих охватов среди чужих назначений',
+    () async {
+      final expected = <TaggedIntentionsScope, List<IntentionId>>{
+        TaggedIntentionsScope.active: [_intention(1), _intention(4)],
+        TaggedIntentionsScope.archived: [_intention(2)],
+      };
+      for (var number = 5; number <= 209; number++) {
+        final archived = number.isOdd;
+        final relationNumber = number + 1000;
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            tagFixtureId(number),
+            'Новое намерение $number',
+            number % 3 == 0 ? 1 : 0,
+            archived ? 1 : 0,
+            number,
+            number,
+          ],
+        );
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            tagFixtureId(relationNumber),
+            tagFixtureId(1),
+            tagFixtureId(number),
+            'need',
+            2,
+            archived ? 1 : 0,
+          ],
+        );
+        for (final tagNumber in [lastTagNumber, firstTagNumber]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(tagNumber), tagFixtureId(number)],
+          );
+        }
+        expected[archived
+                ? TaggedIntentionsScope.archived
+                : TaggedIntentionsScope.active]!
+            .add(_intention(number));
+      }
+      for (final size in [1, 50, 100]) {
+        for (final scope in TaggedIntentionsScope.values) {
+          final rows = await collect(_tag(firstTagNumber), scope, size);
+          expect(rows.map((row) => row.id), expected[scope]);
+          expect(
+            rows.map((row) => row.id).toSet(),
+            hasLength(expected[scope]!.length),
+          );
+        }
+      }
+      raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+        'Изменённое название',
+        tagFixtureId(6),
+      ]);
+      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+        'Изменённый тег',
+        tagFixtureId(firstTagNumber),
+      ]);
+      final after = await collect(
+        _tag(firstTagNumber),
+        TaggedIntentionsScope.active,
+        100,
+      );
+      expect(
+        after.map((row) => row.id),
+        expected[TaggedIntentionsScope.active],
+      );
+      expect(after[2].title, 'Изменённое название');
+    },
+  );
 }

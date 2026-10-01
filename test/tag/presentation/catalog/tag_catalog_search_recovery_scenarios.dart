@@ -1,7 +1,7 @@
 part of 'tag_catalog_search_page_test.dart';
 
 void _registerSearchRecoveryScenarios() {
-  for (final (description, target) in _modes) {
+  for (final (description, intentionId) in _modes) {
     for (final language in ['ru', 'en']) {
       testWidgets(
         '$description, $language: совместные ошибки и повтор доступны с клавиатурой и текстом 2.5',
@@ -11,7 +11,7 @@ void _registerSearchRecoveryScenarios() {
           addTearDown(tester.view.reset);
           final repository = await _pumpCatalog(
             tester,
-            target: target,
+            intentionId: intentionId,
             language: language,
             scale: 2.5,
           );
@@ -21,7 +21,7 @@ void _registerSearchRecoveryScenarios() {
           final forHome = _tag(3, 'Для дома');
           repository.complete([work, home, forHome], assignedIds: {home.id});
           await tester.pumpAndSettle();
-          if (target != null) {
+          if (intentionId != null) {
             await tester.tap(_row(work));
             await tester.pump();
           }
@@ -42,7 +42,10 @@ void _registerSearchRecoveryScenarios() {
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
           expect(tester.getRect(_list).height, greaterThan(0));
-          expect(_loaded(tester, target).freshness, TagCatalogFreshness.stale);
+          expect(
+            _loaded(tester, intentionId).freshness,
+            TagCatalogFreshness.stale,
+          );
           expect(input.value, editingValue);
           expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
           for (final message in [
@@ -59,8 +62,8 @@ void _registerSearchRecoveryScenarios() {
             expect(tile.onTap, isNull);
             expect(tile.trailing, isNull);
           }
-          if (target != null) {
-            expect(_loaded(tester, target).selection.id, work.id);
+          if (intentionId != null) {
+            expect(_loaded(tester, intentionId).selection.id, work.id);
             expect(
               find.descendant(of: _selected, matching: find.text('Рабочее')),
               findsOneWidget,
@@ -89,7 +92,7 @@ void _registerSearchRecoveryScenarios() {
           );
           await tester.pumpAndSettle();
           expect(
-            _loaded(tester, target).freshness,
+            _loaded(tester, intentionId).freshness,
             TagCatalogFreshness.current,
           );
           expect(input.value, editingValue);
@@ -105,8 +108,8 @@ void _registerSearchRecoveryScenarios() {
               findsOneWidget,
             );
           }
-          if (target != null) {
-            expect(_loaded(tester, target).selection.id, work.id);
+          if (intentionId != null) {
+            expect(_loaded(tester, intentionId).selection.id, work.id);
             expect(_assignment(tester, updatedHome), l10n.tagCatalogAvailable);
             expect(_assignment(tester, forHome), l10n.tagCatalogAssigned);
             expect(tester.widget<FilledButton>(_assign).onPressed, isNotNull);

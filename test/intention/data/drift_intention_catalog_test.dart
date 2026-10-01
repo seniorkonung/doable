@@ -19,7 +19,6 @@ import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -446,10 +445,24 @@ void main() {
           ),
         ),
       );
-      expect(page.totalCount, 1);
+      // Все теги фикстуры назначены второму и четвёртому намерениям.
+      expect(page.totalCount, 2);
       expect(page.items.single.id, _id(_uuid(2)));
       expect(page.items.single.tags, hasLength(1203));
-      expect(page.nextCursor, isNull);
+      final continuation = _continuationPage(
+        await repository.getCatalogPage(
+          _tagQuery(
+            tagFilter: IntentionTagFilter(
+              requiredTagIds: required,
+              excludedTagIds: excluded,
+            ),
+            cursor: page.nextCursor,
+          ),
+        ),
+      );
+      expect(continuation.items.single.id, _id(_uuid(4)));
+      expect(continuation.items.single.tags, hasLength(1203));
+      expect(continuation.nextCursor, isNull);
 
       final missingLastRequired = _firstPage(
         await repository.getCatalogPage(
@@ -772,10 +785,6 @@ void main() {
         'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
         [_uuid(500), _uuid(1), _uuid(5), 'need', 2],
       );
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-        [_uuid(102), _uuid(500)],
-      );
       final filter = IntentionTagFilter(
         requiredTagIds: [_tagId(101), _tagId(102)],
         excludedTagIds: [_tagId(103), _tagId(104)],
@@ -849,7 +858,7 @@ void main() {
       );
     });
 
-    test('отбирает по собственным назначениям без влияния назначений связям', () async {
+    test('отбирает по собственным назначениям без влияния тегов связанных намерений', () async {
       // Номер намерения → (название, в архиве, собственные теги).
       const intentions = <int, (String, bool, Set<int>)>{
         1: ('Ходить в парк', false, {101, 102}),
@@ -890,23 +899,16 @@ void main() {
           );
         }
       }
-      // Связи несут те же теги, но их назначения не являются собственными
-      // назначениями намерений и не содержат `intention_id`.
-      for (final (relation, source, related, archived, tags) in [
-        (500, 4, 1, 0, [101, 102, 103]),
-        (501, 2, 3, 0, [102, 103]),
-        (502, 8, 7, 1, [101, 102, 103]),
+      // Связи с помеченными соседями не дают намерению собственных назначений.
+      for (final (relation, source, related, archived) in [
+        (500, 4, 1, 0),
+        (501, 2, 3, 0),
+        (502, 8, 7, 1),
       ]) {
         raw.execute(
           'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
           [_uuid(relation), _uuid(source), _uuid(related), 'need', 2, archived],
         );
-        for (final tag in tags) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-            [_uuid(tag), _uuid(relation)],
-          );
-        }
       }
       // Тег 900 никогда не существовал либо физически удалён вместе с
       // назначениями: хранилище не содержит ни его, ни ссылок на него.
@@ -1149,10 +1151,6 @@ void main() {
           [_uuid(500), _uuid(1), _uuid(3), 'need', 2],
         );
         raw.execute(
-          'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-          [_uuid(108), _uuid(500)],
-        );
-        raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
           [_uuid(109), _uuid(4)],
         );
@@ -1217,7 +1215,7 @@ void main() {
         expect(assignmentRead.rows, 3);
         expect(assignmentRead.arguments, [_uuid(1), _uuid(2), _uuid(3)]);
         final assignments = (await repository.getTagAssignments(
-          IntentionTagTarget(page.items.first.id),
+          page.items.first.id,
         ) as TagAssignmentsSuccess).value;
         expect(
           page.items.first.tags.map((tag) => tag.id),
@@ -1269,20 +1267,36 @@ void main() {
         expect(read.rows, 1203);
         expect(read.arguments, [_uuid(2)]);
         cursor = dense.nextCursor;
-        final empty = _continuationPage(
-          await repository.getCatalogPage(
-            IntentionCatalogQuery(
-              scope: IntentionScope.all,
-              titleFilter: null,
-              order: IntentionCatalogOrder.createdAtAscending,
-              pageSize: 1,
-              cursor: cursor,
+        // Третье намерение получает каждый третий тег, четвёртое — все.
+        for (final (number, indexes) in [
+          (3, [for (var index = 0; index < 1203; index += 3) index]),
+          (4, [for (var index = 0; index < 1203; index++) index]),
+        ]) {
+          trace.measured.clear();
+          final next = _continuationPage(
+            await repository.getCatalogPage(
+              IntentionCatalogQuery(
+                scope: IntentionScope.all,
+                titleFilter: null,
+                order: IntentionCatalogOrder.createdAtAscending,
+                pageSize: 1,
+                cursor: cursor,
+              ),
             ),
-          ),
-        );
-        expect(empty.items.single.id, _id(_uuid(3)));
-        expect(empty.items.single.tags, isEmpty);
-        expect(empty.nextCursor, isNull);
+          );
+          expect(next.items.single.id, _id(_uuid(number)));
+          expect(
+            next.items.single.tags.map((tag) => tag.id.toCanonicalString()),
+            [for (final index in indexes) _uuid(10000 + index)],
+          );
+          final nextRead = trace.measured
+              .where((read) => read.sql.contains('FROM tag_assignments'))
+              .single;
+          expect(nextRead.rows, indexes.length);
+          expect(nextRead.arguments, [_uuid(number)]);
+          cursor = next.nextCursor;
+        }
+        expect(cursor, isNull);
       },
     );
 
@@ -1424,7 +1438,7 @@ void main() {
           ),
         );
         expect(
-          await repository.getTagAssignments(IntentionTagTarget(_id(_uuid(1)))),
+          await repository.getTagAssignments(_id(_uuid(1))),
           isA<TagAssignmentsError>().having(
             (result) => result.failure,
             'причина',
@@ -3468,10 +3482,7 @@ void main() {
         expect(firstPortion.nextCursor, isNotNull);
         expect(
           await repository.execute(
-            AssignTag(
-              tagId: keptTag,
-              target: IntentionTagTarget(_id(_uuid(9))),
-            ),
+            AssignTag(tagId: keptTag, intentionId: _id(_uuid(9))),
           ),
           isA<GraphCommandSucceeded>(),
         );
@@ -3935,10 +3946,7 @@ void main() {
 
         expect(
           await repository.execute(
-            AssignTag(
-              tagId: keptTag,
-              target: IntentionTagTarget(_id(_uuid(9))),
-            ),
+            AssignTag(tagId: keptTag, intentionId: _id(_uuid(9))),
           ),
           isA<GraphCommandSucceeded>(),
         );

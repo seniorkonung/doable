@@ -1,11 +1,11 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../../intention/application/intention_catalog.dart';
+import '../../intention/domain/intention_id.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
 import '../domain/tag_name.dart';
 import '../domain/tag_assignment.dart';
-import '../domain/tag_target.dart';
 import 'tag_change.dart';
 
 sealed class TagCommandFailure implements GraphCommandFailure {
@@ -39,10 +39,10 @@ final class TagNotFoundFailure extends TagCommandFailure {
   GraphFailureCategory get category => GraphFailureCategory.notFound;
 }
 
-final class TagTargetNotFoundFailure extends TagCommandFailure {
-  const TagTargetNotFoundFailure(this.target);
+final class TagIntentionNotFoundFailure extends TagCommandFailure {
+  const TagIntentionNotFoundFailure(this.intentionId);
 
-  final TagTarget target;
+  final IntentionId intentionId;
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.notFound;
@@ -123,21 +123,14 @@ final class TagCommandSuccessValidationException implements Exception {
 
 /// Возвращается после commit при изменении ровно одной пары.
 ///
-/// Для намерения пакет дополнительно несёт каталожную мутацию с полными
-/// краткими снимками до и после операции: принадлежность каталогу задаёт
-/// только она, а компактный факт пары не перечисляет других получателей.
-/// Назначение долговременной связи каталожной мутации не имеет.
+/// Пакет дополнительно несёт каталожную мутацию с полными краткими снимками
+/// намерения до и после операции: принадлежность каталогу задаёт только она,
+/// а компактный факт пары не перечисляет других получателей тега.
 final class TagAssignmentChanged extends TagCommandSuccess {
-  TagAssignmentChanged(this.change, {this.catalogMutation}) {
-    final mutation = catalogMutation;
-    if (mutation == null) return;
-    final matchesTarget = switch (change.assignment.target) {
-      IntentionTagTarget(:final intentionId) =>
-        mutation.before.summary.id == intentionId &&
-            mutation.after.summary.id == intentionId,
-      LongTermRelationTagTarget() => false,
-    };
-    if (!matchesTarget) {
+  TagAssignmentChanged(this.change, {required this.catalogMutation}) {
+    final intentionId = change.assignment.intentionId;
+    if (catalogMutation.before.summary.id != intentionId ||
+        catalogMutation.after.summary.id != intentionId) {
       throw const TagCommandSuccessValidationException(
         TagCommandSuccessValidationFailure.catalogMutationTargetMismatch,
       );
@@ -146,12 +139,12 @@ final class TagAssignmentChanged extends TagCommandSuccess {
 
   @override
   final TagAssignmentChangedChange change;
-  final IntentionCatalogUpdated? catalogMutation;
+  final IntentionCatalogUpdated catalogMutation;
   TagAssignment get assignment => change.assignment;
   TagAssignmentState get state => change.state;
 
   @override
-  Iterable<GraphChange> get changes => [change, ?catalogMutation];
+  Iterable<GraphChange> get changes => [change, catalogMutation];
 }
 
 /// Возвращается после проверки существования обеих сторон без новой записи.

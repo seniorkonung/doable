@@ -15,7 +15,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -940,9 +939,7 @@ Future<void> _assignTag(
 ) async {
   final start = container
       .read(graphCommandCoordinatorProvider.notifier)
-      .acceptTagAssign(
-        AssignTag(tagId: tagId, target: IntentionTagTarget(intentionId)),
-      );
+      .acceptTagAssign(AssignTag(tagId: tagId, intentionId: intentionId));
   final completion = await (start as TagCommandAccepted).future;
   expect(completion.isFailure, isFalse);
 }

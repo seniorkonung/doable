@@ -13,7 +13,7 @@ void _testTerminalWatchRecovery() {
         }
         await _finishWatch(h, failure: const TagReadUnavailableFailure());
         if (!loaded) {
-          h.reads.fail(0, const TaggedEntitiesUnavailableFailure());
+          h.reads.fail(0, const TaggedIntentionsUnavailableFailure());
           await pumpEventQueue();
         }
         final retry = loaded
@@ -26,15 +26,15 @@ void _testTerminalWatchRecovery() {
         h.reads.observe(_tag('Дом'), index: 1);
         await pumpEventQueue();
 
-        expect(h.model.canActOn(_intention(2).target), isFalse);
+        expect(h.model.canActOn(_intention(2).id), isFalse);
         expect(h.reads.queries, hasLength(3));
         h.reads.page(2, [_intention(3)], revision: 2);
         await pumpEventQueue();
         expect(
-          (h.state as TagNavigationLoaded).items.single.target,
-          _intention(3).target,
+          (h.state as TagNavigationLoaded).items.single.id,
+          _intention(3).id,
         );
-        expect(h.model.canActOn(_intention(3).target), isTrue);
+        expect(h.model.canActOn(_intention(3).id), isTrue);
         expect(h.reads.watchedIds, hasLength(2));
       },
     );
@@ -104,7 +104,7 @@ void _testTerminalWatchRecovery() {
         () async {
           final h = _Harness(reader: _Reads(terminalWatches: true));
           addTearDown(h.dispose);
-          h.model.setScope(TaggedEntitiesScope.archived);
+          h.model.setScope(TaggedIntentionsScope.archived);
           h.reads.page(0, []);
           await pumpEventQueue();
           if (loaded) {
@@ -118,7 +118,7 @@ void _testTerminalWatchRecovery() {
             loaded: loaded,
           );
           if (!loaded) {
-            h.reads.fail(1, const TaggedEntitiesUnavailableFailure());
+            h.reads.fail(1, const TaggedIntentionsUnavailableFailure());
             await pumpEventQueue();
           }
 
@@ -132,7 +132,7 @@ void _testTerminalWatchRecovery() {
           expect(h.reads.watchedIds, [_tagId(1), _tagId(1)]);
           expect(h.reads.queries, hasLength(3));
           expect(h.reads.queries.last.tagId, _tagId(1));
-          expect(h.reads.queries.last.scope, TaggedEntitiesScope.archived);
+          expect(h.reads.queries.last.scope, TaggedIntentionsScope.archived);
           expect(h.reads.queries.last.cursor, isNull);
 
           if (pageFirst) {
@@ -140,11 +140,11 @@ void _testTerminalWatchRecovery() {
               _intention(2, archived: true),
             ], revision: pageRevision);
             await retry;
-            expect(h.model.canActOn(_intention(2).target), isFalse);
+            expect(h.model.canActOn(_intention(2).id), isFalse);
             h.reads.observe(_tag('Дом'), index: 1);
           } else {
             h.reads.observe(_tag('Дом'), index: 1);
-            expect(h.model.canActOn(_intention(1).target), isFalse);
+            expect(h.model.canActOn(_intention(1).id), isFalse);
             h.reads.page(2, [
               _intention(2, archived: true),
             ], revision: pageRevision);
@@ -153,13 +153,11 @@ void _testTerminalWatchRecovery() {
           await pumpEventQueue();
 
           final restored = h.state as TagNavigationLoaded;
-          expect(restored.scope, TaggedEntitiesScope.archived);
+          expect(restored.scope, TaggedIntentionsScope.archived);
           expect(restored.refreshFailure, isNull);
           expect(restored.canUseCurrentItems, isTrue);
-          expect(restored.items.map((item) => item.target), [
-            _intention(2).target,
-          ]);
-          expect(h.model.canActOn(_intention(2).target), isTrue);
+          expect(restored.items.map((item) => item.id), [_intention(2).id]);
+          expect(h.model.canActOn(_intention(2).id), isTrue);
           expect(h.reads.queries, hasLength(3));
           h.reads.observe(_tag('Быт'), index: 1, revision: pageRevision);
           expect((h.state as TagNavigationLoaded).tag.name.value, 'Быт');
@@ -184,7 +182,7 @@ void _testTerminalWatchRecovery() {
           }
           await _finishWatch(h, failure: const TagReadUnavailableFailure());
           if (!loaded) {
-            h.reads.fail(0, const TaggedEntitiesUnavailableFailure());
+            h.reads.fail(0, const TaggedIntentionsUnavailableFailure());
             await pumpEventQueue();
           }
           final retry = loaded
@@ -196,11 +194,11 @@ void _testTerminalWatchRecovery() {
           _expectWatchFailure(h, failure.category, loaded: loaded);
           h.reads.fail(1, switch (failure) {
             TagReadUnavailableFailure() =>
-              const TaggedEntitiesUnavailableFailure(),
+              const TaggedIntentionsUnavailableFailure(),
             TagReadCorruptionFailure() =>
-              const TaggedEntitiesCorruptionFailure(),
+              const TaggedIntentionsCorruptionFailure(),
             TagReadUnexpectedFailure() =>
-              const TaggedEntitiesUnexpectedFailure(),
+              const TaggedIntentionsUnexpectedFailure(),
           });
           await retry;
           await pumpEventQueue();
@@ -301,7 +299,7 @@ void _expectWatchFailure(
     final failed = h.state as TagNavigationLoaded;
     expect(failed.refreshFailure?.category, category);
     expect(failed.freshness, TagNavigationFreshness.stale);
-    expect(failed.items.single.target, _intention(1).target);
+    expect(failed.items.single.id, _intention(1).id);
     expect(failed.nextCursor, isNull);
     expect(failed.pageStatus, isA<TagNavigationPageIdle>());
   } else {
@@ -309,5 +307,5 @@ void _expectWatchFailure(
     expect(failed.failure.category, category);
     expect(failed.canRetry, category == GraphFailureCategory.unavailable);
   }
-  expect(h.model.canActOn(_intention(1).target), isFalse);
+  expect(h.model.canActOn(_intention(1).id), isFalse);
 }

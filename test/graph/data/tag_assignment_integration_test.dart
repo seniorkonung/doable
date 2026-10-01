@@ -1,5 +1,6 @@
 import 'package:doable/src/data/local/app_database.dart' hide TagAssignment;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -7,8 +8,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -16,7 +15,6 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
@@ -32,18 +30,12 @@ import '../../support/tag_storage_fixture.dart';
 TagId _tag(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
 
-IntentionTagTarget _intention(int number) => IntentionTagTarget(
-  (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id,
-);
-
-LongTermRelationTagTarget _relation(int number) => LongTermRelationTagTarget(
-  (LongTermRelationId.decode(
-    tagFixtureId(number),
-  ) as LongTermRelationIdDecodingSuccess).id,
-);
+IntentionId _intention(int number) =>
+    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
 final class _AssignmentFailureProbe extends LocalDatabaseConnectionObserver {
   bool failAfterInsert = false;
+  String? failAfterDeleteFrom;
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
@@ -52,6 +44,13 @@ final class _AssignmentFailureProbe extends LocalDatabaseConnectionObserver {
         statement.statements.any((sql) => sql.contains('tag_assignments'))) {
       failAfterInsert = false;
       throw StateError('Управляемый отказ после записи назначения.');
+    }
+    final table = failAfterDeleteFrom;
+    if (table != null &&
+        statement.operation == LocalDatabaseSqlOperation.delete &&
+        statement.statements.any((sql) => sql.contains(table))) {
+      failAfterDeleteFrom = null;
+      throw StateError('Управляемый отказ после удаления.');
     }
   }
 }
@@ -82,17 +81,11 @@ void main() {
           .toList(),
   };
 
-  List<sqlite.Row> assignment(TagId tagId, TagTarget target) =>
-      switch (target) {
-        IntentionTagTarget(:final intentionId) => reader.select(
-          'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
-          [tagId.toCanonicalString(), intentionId.toCanonicalString()],
-        ),
-        LongTermRelationTagTarget(:final relationId) => reader.select(
-          'SELECT * FROM tag_assignments WHERE tag_id = ? AND long_term_relation_id = ?',
-          [tagId.toCanonicalString(), relationId.toCanonicalString()],
-        ),
-      };
+  List<sqlite.Row> assignment(TagId tagId, IntentionId intentionId) =>
+      reader.select(
+        'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+        [tagId.toCanonicalString(), intentionId.toCanonicalString()],
+      );
 
   Future<GraphRevision> revision() async => (await repository.getTagCatalog(
     const TagCatalogBrowseMode(),
@@ -127,16 +120,10 @@ void main() {
       TagAssignmentUnchanged(:final state) => state,
       _ => throw StateError('Ожидался исход назначения.'),
     }, state);
-    final target = switch (outcome) {
-      TagAssignmentChanged(:final assignment) ||
-      TagAssignmentUnchanged(:final assignment) => assignment.target,
-      _ => throw StateError('Ожидался исход назначения.'),
-    };
     // Изменение пары намерения несёт и каталожный снимок той же ревизии.
     expect(completion.confirmedChange!.changes, [
       isA<TagChange>(),
-      if (changed && target is IntentionTagTarget)
-        isA<IntentionCatalogUpdated>(),
+      if (changed) isA<IntentionCatalogUpdated>(),
     ]);
     for (final change in completion.confirmedChange!.changes) {
       expect(
@@ -188,7 +175,7 @@ void main() {
 
   for (final (label, target) in [
     ('архивному намерению', _intention(2)),
-    ('связи из дневного пути', _relation(101)),
+    ('активному действию из дневного пути', _intention(1)),
   ]) {
     test(
       'назначение $label, повторы и снятие подтверждаются после фиксации',
@@ -197,7 +184,9 @@ void main() {
         final before = graph();
         final initialRevision = await revision();
 
-        final assigned = await send(AssignTag(tagId: tagId, target: target));
+        final assigned = await send(
+          AssignTag(tagId: tagId, intentionId: target),
+        );
         expectAssignmentChange(
           assigned,
           TagAssignmentState.assigned,
@@ -205,7 +194,7 @@ void main() {
         );
         expect(
           (success(assigned) as TagAssignmentChanged).assignment,
-          TagAssignment(tagId: tagId, target: target),
+          TagAssignment(tagId: tagId, intentionId: target),
         );
         expect(
           assigned.revision!.compareTo(initialRevision),
@@ -216,7 +205,9 @@ void main() {
           target,
         ).single['creation_sequence'];
 
-        final repeated = await send(AssignTag(tagId: tagId, target: target));
+        final repeated = await send(
+          AssignTag(tagId: tagId, intentionId: target),
+        );
         expectAssignmentChange(
           repeated,
           TagAssignmentState.assigned,
@@ -232,7 +223,7 @@ void main() {
         );
 
         final removed = await send(
-          RemoveTagAssignment(tagId: tagId, target: target),
+          RemoveTagAssignment(tagId: tagId, intentionId: target),
         );
         expectAssignmentChange(
           removed,
@@ -241,7 +232,7 @@ void main() {
         );
         expect(
           (success(removed) as TagAssignmentChanged).assignment,
-          TagAssignment(tagId: tagId, target: target),
+          TagAssignment(tagId: tagId, intentionId: target),
         );
         expect(
           removed.revision!.compareTo(repeated.revision!),
@@ -250,7 +241,7 @@ void main() {
         expect(assignment(tagId, target), isEmpty);
 
         final repeatedRemoval = await send(
-          RemoveTagAssignment(tagId: tagId, target: target),
+          RemoveTagAssignment(tagId: tagId, intentionId: target),
         );
         expectAssignmentChange(
           repeatedRemoval,
@@ -268,12 +259,23 @@ void main() {
 
     test('две отправки назначения $label дают одну пару', () async {
       final tagId = _tag(lastTagNumber);
-      final command = AssignTag(tagId: tagId, target: target);
+      final command = AssignTag(tagId: tagId, intentionId: target);
       final initialRevision = await revision();
       final first = coordinator.acceptTagAssign(command) as TagCommandAccepted;
       expect(
         coordinator.acceptTagAssign(command),
         isA<TagCommandAlreadyRunning>(),
+      );
+      expect(
+        coordinator.acceptTagDelete(DeleteTag(tagId)),
+        isA<TagCommandAlreadyRunning>(),
+      );
+      expect(
+        coordinator.acceptExisting(
+          DeleteIntention(target),
+          presentationTitle: 'Намерение',
+        ),
+        isA<IntentionCommandAlreadyRunning>(),
       );
       expect(assignment(tagId, target), isEmpty);
       final committed = await first.future;
@@ -288,6 +290,8 @@ void main() {
       );
       expect(assignment(tagId, target), hasLength(1));
       expect(completions, [same(committed)]);
+      expect(coordinator.isTagRunning(tagId), isFalse);
+      expect(coordinator.isRunning(target), isFalse);
 
       final repeated = await send(command);
       expectAssignmentChange(
@@ -310,7 +314,7 @@ void main() {
           final before = graph();
           if (assignFirst) {
             final assigned = await send(
-              AssignTag(tagId: tagId, target: target),
+              AssignTag(tagId: tagId, intentionId: target),
             );
             expectAssignmentChange(
               assigned,
@@ -323,7 +327,9 @@ void main() {
           expect(success(deleted), isA<TagDeleted>());
           expect(assignment(tagId, target), isEmpty);
           final afterDelete = graph();
-          final failed = await send(AssignTag(tagId: tagId, target: target));
+          final failed = await send(
+            AssignTag(tagId: tagId, intentionId: target),
+          );
           expect(
             (failed.confirmedResult as TagCommandFailed).failure,
             isA<TagNotFoundFailure>(),
@@ -344,10 +350,7 @@ void main() {
     }
   }
 
-  for (final (label, target) in [
-    ('намерения', _intention(4)),
-    ('связи', _relation(102)),
-  ]) {
+  for (final (label, target) in [('намерения', _intention(4))]) {
     for (final assignFirst in [true, false]) {
       test(
         '${assignFirst ? 'назначение' : 'удаление'} $label первым не оставляет висячую пару',
@@ -356,7 +359,7 @@ void main() {
           final before = graph();
           if (assignFirst) {
             final assigned = await send(
-              AssignTag(tagId: tagId, target: target),
+              AssignTag(tagId: tagId, intentionId: target),
             );
             expectAssignmentChange(
               assigned,
@@ -364,26 +367,21 @@ void main() {
               changed: true,
             );
           }
-          final deleted = switch (target) {
-            IntentionTagTarget(:final intentionId) =>
-              await (coordinator.acceptExisting(
-                DeleteIntention(intentionId),
-                presentationTitle: 'Свободное намерение',
-              ) as IntentionCommandAccepted).future,
-            LongTermRelationTagTarget(:final relationId) =>
-              await (coordinator.acceptRelationDelete(
-                DeleteLongTermRelation(relationId),
-              ) as LongTermRelationCommandAccepted).future,
-          };
+          final deleted = await (coordinator.acceptExisting(
+            DeleteIntention(target),
+            presentationTitle: 'Свободное намерение',
+          ) as IntentionCommandAccepted).future;
           expect(deleted.isFailure, isFalse);
           expect(deleted.revision, isNotNull);
           expect(published[deleted], graph());
           expect(assignment(tagId, target), isEmpty);
           final afterDelete = graph();
-          final failed = await send(AssignTag(tagId: tagId, target: target));
+          final failed = await send(
+            AssignTag(tagId: tagId, intentionId: target),
+          );
           expect(
             (failed.confirmedResult as TagCommandFailed).failure,
-            isA<TagTargetNotFoundFailure>(),
+            isA<TagIntentionNotFoundFailure>(),
           );
           expect(failed.confirmedChange, isNull);
           expect(published[failed], afterDelete);
@@ -405,6 +403,86 @@ void main() {
     }
   }
 
+  test(
+    'конкурирующие команды адаптера сохраняют одну пару и одну ревизию',
+    () async {
+      final tagId = _tag(lastTagNumber);
+      final intentionId = _intention(2);
+      final command = AssignTag(tagId: tagId, intentionId: intentionId);
+      final results = await Future.wait([
+        repository.execute(command),
+        repository.execute(command),
+      ]);
+      final first = (results.first as TagCommandSucceeded).value;
+      final repeated = (results.last as TagCommandSucceeded).value;
+      expect(first.value, isA<TagAssignmentChanged>());
+      expect(repeated.value, isA<TagAssignmentUnchanged>());
+      expect(
+        repeated.revision.compareTo(first.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(assignment(tagId, intentionId), hasLength(1));
+      expect(reader.select('PRAGMA foreign_key_check'), isEmpty);
+    },
+  );
+
+  for (final deleteTag in [true, false]) {
+    for (final assignFirst in [true, false]) {
+      test(
+        'конкуренция с удалением ${deleteTag ? 'тега' : 'намерения'}: ${assignFirst ? 'назначение' : 'удаление'} принято первым',
+        () async {
+          final tagId = _tag(lastTagNumber);
+          final intentionId = _intention(4);
+          final before = graph();
+          final assign = AssignTag(tagId: tagId, intentionId: intentionId);
+          final GraphCommand<GraphCommandOutcome, GraphCommandFailure> delete =
+              deleteTag ? DeleteTag(tagId) : DeleteIntention(intentionId);
+          // Обе команды отправлены до ожидания результата любой из них.
+          final first = repository.execute(assignFirst ? assign : delete);
+          final second = repository.execute(assignFirst ? delete : assign);
+          final results = await Future.wait([first, second]);
+          final assigned = results[assignFirst ? 0 : 1];
+          final deleted = results[assignFirst ? 1 : 0];
+          expect(deleted, isA<GraphCommandSucceeded>());
+          if (assignFirst) {
+            expect(
+              (assigned as TagCommandSucceeded).value.value,
+              isA<TagAssignmentChanged>(),
+            );
+          } else {
+            expect(
+              (assigned as TagCommandFailed).failure,
+              deleteTag
+                  ? isA<TagNotFoundFailure>()
+                  : isA<TagIntentionNotFoundFailure>(),
+            );
+          }
+          final removedId = deleteTag
+              ? tagId.toCanonicalString()
+              : intentionId.toCanonicalString();
+          final removedTable = deleteTag ? 'tags' : 'intentions';
+          expect(graph(), {
+            ...before,
+            removedTable: before[removedTable]!
+                .where((row) => !row.contains(removedId))
+                .toList(),
+            'tag_assignments': before['tag_assignments']!
+                .where((row) => !row.contains(removedId))
+                .toList(),
+          });
+          expect(assignment(tagId, intentionId), isEmpty);
+          expect(
+            (await revision()).compareTo(
+              (deleted as GraphCommandSucceeded).value.revision,
+            ),
+            GraphRevisionOrder.same,
+          );
+          expect(reader.select('PRAGMA foreign_key_check'), isEmpty);
+        },
+      );
+    }
+  }
+
   test('переименование сохраняет выбор, новое одноимённое имя не подменяет удалённый тег', () async {
     final tagId = _tag(lastTagNumber);
     final target = _intention(2);
@@ -412,7 +490,7 @@ void main() {
       RenameTag(tagId: tagId, name: TagName.fromInput('Быт')),
     );
     expect(success(renamed), isA<TagRenamed>());
-    final assigned = await send(AssignTag(tagId: tagId, target: target));
+    final assigned = await send(AssignTag(tagId: tagId, intentionId: target));
     expectAssignmentChange(
       assigned,
       TagAssignmentState.assigned,
@@ -432,7 +510,7 @@ void main() {
     final replacement = (success(created) as TagCreated).tag.id;
     expect(replacement, isNot(tagId));
     final afterCreate = graph();
-    final stale = await send(AssignTag(tagId: tagId, target: target));
+    final stale = await send(AssignTag(tagId: tagId, intentionId: target));
     expect(
       (stale.confirmedResult as TagCommandFailed).failure,
       isA<TagNotFoundFailure>(),
@@ -454,7 +532,7 @@ void main() {
       final before = graph();
       final initialRevision = await revision();
       probe.failAfterInsert = true;
-      final failed = await send(AssignTag(tagId: tagId, target: target));
+      final failed = await send(AssignTag(tagId: tagId, intentionId: target));
       expect(
         (failed.confirmedResult as TagCommandFailed).failure,
         isA<TagUnexpectedFailure>(),
@@ -467,18 +545,71 @@ void main() {
         GraphRevisionOrder.same,
       );
       expect(coordinator.isTagRunning(tagId), isFalse);
-      expect(coordinator.isRunning(target.intentionId), isFalse);
+      expect(coordinator.isRunning(target), isFalse);
 
-      final retry = await send(AssignTag(tagId: tagId, target: target));
+      final retry = await send(AssignTag(tagId: tagId, intentionId: target));
       expectAssignmentChange(retry, TagAssignmentState.assigned, changed: true);
       expect(assignment(tagId, target), hasLength(1));
       expect(reader.select('PRAGMA foreign_key_check'), isEmpty);
     },
   );
 
+  for (final (label, table, command) in [
+    (
+      'снятия назначения',
+      'tag_assignments',
+      RemoveTagAssignment(
+        tagId: _tag(firstTagNumber),
+        intentionId: _intention(4),
+      ),
+    ),
+    ('удаления тега', 'tags', DeleteTag(_tag(firstTagNumber))),
+    ('удаления намерения', 'intentions', DeleteIntention(_intention(4))),
+  ]) {
+    test('отказ после $label откатывает граф и освобождает ключи', () async {
+      final tagId = _tag(firstTagNumber);
+      final intentionId = _intention(4);
+      await send(AssignTag(tagId: tagId, intentionId: intentionId));
+      final before = graph();
+      final initialRevision = await revision();
+      Future<GraphCommandCompletion> execute() => switch (command) {
+        TagCommand tagCommand => send(tagCommand),
+        DeleteIntention intentionCommand => (coordinator.acceptExisting(
+          intentionCommand,
+          presentationTitle: 'Свободное намерение',
+        ) as IntentionCommandAccepted).future,
+        _ => throw StateError('Неожиданная проверяемая команда.'),
+      };
+      probe.failAfterDeleteFrom = table;
+      final failed = await execute();
+      expect(probe.failAfterDeleteFrom, isNull);
+      expect(failed.isFailure, isTrue);
+      expect(failed.confirmedChange, isNull);
+      expect(published[failed], before);
+      expect(graph(), before);
+      expect(
+        (await revision()).compareTo(initialRevision),
+        GraphRevisionOrder.same,
+      );
+      expect(coordinator.isTagRunning(tagId), isFalse);
+      expect(coordinator.isRunning(intentionId), isFalse);
+      final retry = await execute();
+      expect(retry.isFailure, isFalse);
+      expect(published[retry], graph());
+      expect(assignment(tagId, intentionId), isEmpty);
+      expect(
+        (await revision()).compareTo(initialRevision),
+        GraphRevisionOrder.newer,
+      );
+      expect(coordinator.isTagRunning(tagId), isFalse);
+      expect(coordinator.isRunning(intentionId), isFalse);
+      expect(reader.select('PRAGMA foreign_key_check'), isEmpty);
+    });
+  }
+
   for (final (label, target) in [
     ('намерения', _intention(1)),
-    ('долговременной связи', _relation(101)),
+    ('архивного намерения', _intention(2)),
   ]) {
     test(
       'два потребителя $label согласуют полные снимки и изменения графа',
@@ -488,18 +619,10 @@ void main() {
             tagFixtureId(number),
             'Тег $number',
           ]);
-          switch (target) {
-            case IntentionTagTarget(:final intentionId):
-              raw.execute(
-                'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-                [tagFixtureId(number), intentionId.toCanonicalString()],
-              );
-            case LongTermRelationTagTarget(:final relationId):
-              raw.execute(
-                'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
-                [tagFixtureId(number), relationId.toCanonicalString()],
-              );
-          }
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(number), target.toCanonicalString()],
+          );
         }
 
         final assignmentsSubscription = container.listen(
@@ -561,7 +684,7 @@ void main() {
         expect(assigned.items.map((tag) => tag.id).toSet(), hasLength(138));
 
         final completion = await send(
-          AssignTag(tagId: _tag(lastTagNumber), target: target),
+          AssignTag(tagId: _tag(lastTagNumber), intentionId: target),
         );
         expectAssignmentChange(
           completion,
@@ -581,7 +704,7 @@ void main() {
         );
 
         final removed = await send(
-          RemoveTagAssignment(tagId: _tag(firstTagNumber), target: target),
+          RemoveTagAssignment(tagId: _tag(firstTagNumber), intentionId: target),
         );
         expectAssignmentChange(
           removed,

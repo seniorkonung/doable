@@ -40,7 +40,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -453,7 +452,7 @@ void main() {
             (TagId.decode(_relationSourceUuid) as TagIdDecodingSuccess).id;
         final intentionId = _intentionId(_relationRelatedUuid);
         final accepted = coordinator.acceptTagAssign(
-          AssignTag(tagId: tagId, target: IntentionTagTarget(intentionId)),
+          AssignTag(tagId: tagId, intentionId: intentionId),
         ) as TagCommandAccepted;
         coordinator.releaseInitiatorPresentation(accepted.token);
 
@@ -463,7 +462,7 @@ void main() {
         expect(closeObserver.closeCalls, 0);
         expect(
           coordinator.acceptTagAssign(
-            AssignTag(tagId: tagId, target: IntentionTagTarget(intentionId)),
+            AssignTag(tagId: tagId, intentionId: intentionId),
           ),
           isA<GraphCommandCoordinatorDraining>(),
         );

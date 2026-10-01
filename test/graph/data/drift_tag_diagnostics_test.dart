@@ -4,18 +4,17 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
+import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -44,18 +43,20 @@ final class _ThrowingSink implements DiagnosticsSink {
 
 final class _ReadFault extends LocalDatabaseConnectionObserver {
   Object? failure;
+  bool failAssignmentReads = false;
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation == LocalDatabaseSqlOperation.select &&
-        statement.statements.single.contains('FROM tags WHERE id = ?')) {
+        (failAssignmentReads ||
+            statement.statements.single.contains('FROM tags WHERE id = ?'))) {
       final error = failure;
       if (error != null) throw error;
     }
   }
 }
 
-final class _ForeignTaggedCursor implements TaggedEntitiesCursor {}
+final class _ForeignTaggedCursor implements TaggedIntentionsCursor {}
 
 void main() {
   late AppDatabase database;
@@ -91,23 +92,23 @@ void main() {
       final id = (TagId.decode(
         tagFixtureId(firstTagNumber),
       ) as TagIdDecodingSuccess).id;
-      TaggedEntitiesQuery query({TaggedEntitiesCursor? cursor}) =>
-          TaggedEntitiesQuery(
+      TaggedIntentionsQuery query({TaggedIntentionsCursor? cursor}) =>
+          TaggedIntentionsQuery(
             tagId: id,
-            scope: TaggedEntitiesScope.active,
+            scope: TaggedIntentionsScope.active,
             pageSize: 1,
             cursor: cursor,
           );
 
       expect(
-        await graph.getTaggedEntitiesPage(query()),
-        isA<TaggedEntitiesPageSuccess>(),
+        await graph.getTaggedIntentionsPage(query()),
+        isA<TaggedIntentionsPageSuccess>(),
       );
       expect(
-        await graph.getTaggedEntitiesPage(
+        await graph.getTaggedIntentionsPage(
           query(cursor: _ForeignTaggedCursor()),
         ),
-        isA<TaggedEntitiesPageError>(),
+        isA<TaggedIntentionsPageError>(),
       );
       final validation = sink.events
           .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
@@ -125,11 +126,11 @@ void main() {
         parametersToStatement: [tagFixtureId(firstTagNumber)],
       );
       expect(
-        await graph.getTaggedEntitiesPage(query()),
-        isA<TaggedEntitiesPageError>().having(
+        await graph.getTaggedIntentionsPage(query()),
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesUnavailableFailure>(),
+          isA<TaggedIntentionsUnavailableFailure>(),
         ),
       );
       final unavailable = sink.events
@@ -143,11 +144,11 @@ void main() {
 
       readFault.failure = StateError('CANARY-неизвестная-причина');
       expect(
-        await graph.getTaggedEntitiesPage(query()),
-        isA<TaggedEntitiesPageError>().having(
+        await graph.getTaggedIntentionsPage(query()),
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesUnexpectedFailure>(),
+          isA<TaggedIntentionsUnexpectedFailure>(),
         ),
       );
       final unknown = sink.events
@@ -165,11 +166,11 @@ void main() {
         [tagFixtureId(firstTagNumber), tagFixtureId(999)],
       );
       expect(
-        await graph.getTaggedEntitiesPage(query()),
-        isA<TaggedEntitiesPageError>().having(
+        await graph.getTaggedIntentionsPage(query()),
+        isA<TaggedIntentionsPageError>().having(
           (error) => error.failure,
           'причина',
-          isA<TaggedEntitiesCorruptionFailure>(),
+          isA<TaggedIntentionsCorruptionFailure>(),
         ),
       );
       final corruption = sink.events
@@ -222,10 +223,10 @@ void main() {
     final id =
         (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
     expect(
-      await graph.getTaggedEntitiesPage(
-        TaggedEntitiesQuery(tagId: id, scope: TaggedEntitiesScope.active),
+      await graph.getTaggedIntentionsPage(
+        TaggedIntentionsQuery(tagId: id, scope: TaggedIntentionsScope.active),
       ),
-      isA<TaggedEntitiesPageSuccess>(),
+      isA<TaggedIntentionsPageSuccess>(),
     );
     expect(sink.attempts, 2);
   });
@@ -392,13 +393,12 @@ void main() {
         (TagId.decode(tagFixtureId(lastTagNumber)) as TagIdDecodingSuccess).id;
     final missingTag =
         (TagId.decode(tagFixtureId(999)) as TagIdDecodingSuccess).id;
-    final target = IntentionTagTarget(
-      (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id,
-    );
+    final target =
+        (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
     const privateError = 'CANARY-SQL-параметр-назначения';
 
     final missing = await graph.execute(
-      RemoveTagAssignment(tagId: missingTag, target: target),
+      RemoveTagAssignment(tagId: missingTag, intentionId: target),
     );
     expect((missing as TagCommandFailed).failure, isA<TagNotFoundFailure>());
     final missingEvent = sink.events
@@ -418,7 +418,9 @@ void main() {
       CREATE TEMP TRIGGER fail_assignment BEFORE INSERT ON tag_assignments
       BEGIN SELECT RAISE(ABORT, '$privateError'); END
     ''');
-    final failed = await graph.execute(AssignTag(tagId: tag, target: target));
+    final failed = await graph.execute(
+      AssignTag(tagId: tag, intentionId: target),
+    );
     expect((failed as TagCommandFailed).failure, isA<TagUnexpectedFailure>());
     final writeEvent = sink.events.whereType<TagCommandDiagnosticsEvent>().last;
     expect(writeEvent.commandType, TagCommandDiagnosticsType.assign);
@@ -436,7 +438,9 @@ void main() {
     );
     raw.execute('DROP TRIGGER fail_assignment');
 
-    final assigned = await graph.execute(AssignTag(tagId: tag, target: target));
+    final assigned = await graph.execute(
+      AssignTag(tagId: tag, intentionId: target),
+    );
     expect(assigned, isA<TagCommandSucceeded>());
     final assignedEvent = sink.events
         .whereType<TagCommandDiagnosticsEvent>()
@@ -445,7 +449,9 @@ void main() {
     // После записи команда читает каталожный снимок намерения.
     expect(assignedEvent.stage, TagCommandDiagnosticsStage.resultRead);
     expect(assignedEvent.status, isA<DiagnosticsSucceeded>());
-    final repeated = await graph.execute(AssignTag(tagId: tag, target: target));
+    final repeated = await graph.execute(
+      AssignTag(tagId: tag, intentionId: target),
+    );
     expect(
       (repeated as TagCommandSucceeded).value.value,
       isA<TagAssignmentUnchanged>(),
@@ -457,7 +463,7 @@ void main() {
     expect(repeatEvent.status, isA<DiagnosticsSucceeded>());
 
     final removed = await graph.execute(
-      RemoveTagAssignment(tagId: tag, target: target),
+      RemoveTagAssignment(tagId: tag, intentionId: target),
     );
     expect(removed, isA<TagCommandSucceeded>());
     final removedEvent = sink.events
@@ -488,12 +494,11 @@ void main() {
     final graph = repository(sink);
     final tag =
         (TagId.decode(tagFixtureId(lastTagNumber)) as TagIdDecodingSuccess).id;
-    final target = IntentionTagTarget(
-      (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id,
-    );
+    final target =
+        (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
 
     expect(
-      await graph.execute(AssignTag(tagId: tag, target: target)),
+      await graph.execute(AssignTag(tagId: tag, intentionId: target)),
       isA<TagCommandSucceeded>(),
     );
     expect(
@@ -504,7 +509,7 @@ void main() {
       hasLength(1),
     );
     expect(
-      await graph.execute(RemoveTagAssignment(tagId: tag, target: target)),
+      await graph.execute(RemoveTagAssignment(tagId: tag, intentionId: target)),
       isA<TagCommandSucceeded>(),
     );
     expect(
@@ -523,14 +528,12 @@ void main() {
       seedTagStorageFixture(raw);
       final sink = _RecordingSink();
       final graph = repository(sink);
-      final target = IntentionTagTarget(
-        (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id,
-      );
-      final missing = IntentionTagTarget(
-        (IntentionId.decode(
-          tagFixtureId(999),
-        ) as IntentionIdDecodingSuccess).id,
-      );
+      final target = (IntentionId.decode(
+        tagFixtureId(1),
+      ) as IntentionIdDecodingSuccess).id;
+      final missing = (IntentionId.decode(
+        tagFixtureId(999),
+      ) as IntentionIdDecodingSuccess).id;
 
       expect(
         await graph.getTagAssignments(target),
@@ -575,16 +578,133 @@ void main() {
     seedTagStorageFixture(raw);
     final sink = _ThrowingSink();
     final graph = repository(sink);
-    final target = LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        tagFixtureId(101),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    );
+    final target =
+        (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
     expect(await graph.getTagAssignments(target), isA<TagAssignmentsSuccess>());
     expect(
       await graph.getTagCatalog(TagCatalogSelectionMode(target)),
       isA<TagCatalogSuccess>(),
     );
-    expect(sink.attempts, 4);
+    final tagId =
+        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
+    expect(
+      await graph.getTagAssignmentStatus(tagId, target),
+      isA<TagAssignmentStatusSuccess>(),
+    );
+    expect(sink.attempts, 6);
+  });
+
+  test('отказы трёх чтений различаются и не раскрывают данные пары', () async {
+    seedTagStorageFixture(raw);
+    final sink = _RecordingSink();
+    final graph = repository(sink);
+    final intentionId =
+        (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
+    final tagId =
+        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
+    readFault.failAssignmentReads = true;
+    for (final (error, category, code) in [
+      (
+        sqlite.SqliteException(
+          extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+          message: 'CANARY-ошибка-чтения',
+          causingStatement: 'CANARY-запрос-чтения',
+          parametersToStatement: [tagFixtureId(2)],
+        ),
+        GraphFailureCategory.unavailable,
+        DiagnosticsFailureCode.unavailable,
+      ),
+      (
+        sqlite.SqliteException(
+          extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
+          message: 'CANARY-повреждение',
+        ),
+        GraphFailureCategory.corruption,
+        DiagnosticsFailureCode.corruption,
+      ),
+      (
+        StateError('CANARY-неизвестная-причина'),
+        GraphFailureCategory.unexpected,
+        DiagnosticsFailureCode.unexpected,
+      ),
+    ]) {
+      readFault.failure = error;
+      expect(
+        await graph.getTagAssignments(intentionId),
+        isA<TagAssignmentsError>().having(
+          (result) => result.failure.category,
+          'категория',
+          category,
+        ),
+      );
+      expect(
+        await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
+        isA<TagCatalogError>().having(
+          (result) => result.failure.category,
+          'категория',
+          category,
+        ),
+      );
+      expect(
+        await graph.getTagAssignmentStatus(tagId, intentionId),
+        isA<TagAssignmentStatusError>().having(
+          (result) => result.failure.category,
+          'категория',
+          category,
+        ),
+      );
+      for (final event in sink.events.reversed.take(6)) {
+        if (event.status case DiagnosticsFailed(
+          :final duration,
+          code: final failureCode,
+        )) {
+          expect(duration.isNegative, isFalse);
+          expect(failureCode, code);
+        }
+      }
+      expect(
+        (sink.events.whereType<TagAssignmentsReadDiagnosticsEvent>().last.status
+                as DiagnosticsFailed)
+            .code,
+        code,
+      );
+      expect(
+        (sink.events.whereType<TagCatalogReadDiagnosticsEvent>().last.status
+                as DiagnosticsFailed)
+            .code,
+        code,
+      );
+      final statusEvent = sink.events
+          .whereType<TagAssignmentStatusReadDiagnosticsEvent>()
+          .last;
+      expect(statusEvent.stage, TagReadDiagnosticsStage.read);
+      expect((statusEvent.status as DiagnosticsFailed).code, code);
+    }
+    readFault.failure = null;
+    expect(
+      await graph.getTagAssignments(intentionId),
+      isA<TagAssignmentsSuccess>(),
+    );
+    expect(
+      await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
+      isA<TagCatalogSuccess>(),
+    );
+    expect(
+      await graph.getTagAssignmentStatus(tagId, intentionId),
+      isA<TagAssignmentStatusSuccess>(),
+    );
+    final recorded = [
+      ...sink.events.map((event) => event.toString()),
+      ...sink.messages,
+    ].join('\n');
+    for (final value in [
+      'CANARY',
+      tagFixtureId(2),
+      tagFixtureId(firstTagNumber),
+      'Дом',
+      'Намерение 2',
+    ]) {
+      expect(recorded, isNot(contains(value)));
+    }
   });
 }

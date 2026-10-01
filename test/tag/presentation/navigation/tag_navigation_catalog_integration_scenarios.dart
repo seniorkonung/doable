@@ -1,7 +1,7 @@
 part of 'tag_navigation_view_model_test.dart';
 
 void _realTagNavigationCatalogScenarios() {
-  for (final scope in TaggedEntitiesScope.values) {
+  for (final scope in TaggedIntentionsScope.values) {
     for (final searchFails in [false, true]) {
       test(
         '${searchFails ? 'отказавший' : 'успешный'} совместный поиск '
@@ -10,14 +10,14 @@ void _realTagNavigationCatalogScenarios() {
           final h = await _RealNavigationHarness.open();
           addTearDown(h.dispose);
           final expected =
-              (await h.graph.getTaggedEntitiesPage(
-                    TaggedEntitiesQuery(
+              (await h.graph.getTaggedIntentionsPage(
+                    TaggedIntentionsQuery(
                       tagId: h.tagId,
                       scope: scope,
                       pageSize: 100,
                     ),
-                  ) as TaggedEntitiesPageSuccess).value.items
-                  .map((item) => item.target)
+                  ) as TaggedIntentionsPageSuccess).value.items
+                  .map((item) => item.id)
                   .toList();
           h.model.setScope(scope);
           final first = await h.loaded((state) => state.scope == scope);
@@ -29,7 +29,7 @@ void _realTagNavigationCatalogScenarios() {
 
           final search = await h.graph.getCatalogPage(
             IntentionCatalogQuery(
-              scope: scope == TaggedEntitiesScope.active
+              scope: scope == TaggedIntentionsScope.active
                   ? IntentionScope.active
                   : IntentionScope.archived,
               titleFilter: null,
@@ -59,10 +59,10 @@ void _realTagNavigationCatalogScenarios() {
           expect(unchanged.freshness, TagNavigationFreshness.current);
           await h.model.loadMore();
           final loaded = h.subscription.read() as TagNavigationLoaded;
-          expect(loaded.items.map((item) => item.target), expected);
+          expect(loaded.items.map((item) => item.id), expected);
           expect(loaded.items.take(first.items.length), first.items);
           expect(
-            loaded.items.map((item) => item.target).toSet(),
+            loaded.items.map((item) => item.id).toSet(),
             hasLength(expected.length),
           );
           expect(loaded.hasReachedEnd, isTrue);
@@ -104,14 +104,12 @@ void _realTagNavigationCatalogScenarios() {
 
     await h.model.loadMore();
     final fresh = await h.loaded(
-      (state) =>
-          (state.items.first as TaggedIntention).title ==
-          'Новое название получателя',
+      (state) => state.items.first.title == 'Новое название получателя',
     );
     expect(fresh.items, hasLength(50));
     expect(
-      fresh.items.map((item) => item.target),
-      first.items.map((item) => item.target),
+      fresh.items.map((item) => item.id),
+      first.items.map((item) => item.id),
     );
     expect(fresh.nextCursor, isNotNull);
     expect(fresh.revision.compareTo(first.revision), GraphRevisionOrder.same);
@@ -162,7 +160,7 @@ final class _RealNavigationHarness {
       ),
     );
     await database.open();
-    seedTagNavigationFixture(raw, extraPairsPerScope: 26);
+    seedTagNavigationFixture(raw, extraPairsPerScope: 51);
     final graph = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),

@@ -8,7 +8,6 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -16,7 +15,6 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -520,103 +518,6 @@ void main() {
     expect(restart.tagFilter, filter);
   });
 
-  test('факт назначения намерению без каталожного снимка не продвигает '
-      'выдачу молча, а перечитывает её', () async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(repository);
-    _observeConfirmedStates(container, browse);
-    final only = testSummary(index: 1, tags: [health]);
-    final filter = IntentionTagFilter(requiredTagIds: [health.id]);
-    await _loadFiltered(
-      container,
-      repository,
-      browse,
-      filter,
-      IntentionCatalogFirstPage(
-        items: [only],
-        totalCount: 1,
-        nextCursor: null,
-        revision: const TestCatalogRevision(1),
-      ),
-    );
-
-    const revision = TestCatalogRevision(2);
-    final target = IntentionTagTarget(only.id);
-    await completeTagCommand(
-      container,
-      repository,
-      RemoveTagAssignment(tagId: health.id, target: target),
-      TagCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: revision,
-          value: TagAssignmentChanged(
-            TagAssignmentChangedChange(
-              revision: revision,
-              assignment: TagAssignment(tagId: health.id, target: target),
-              state: TagAssignmentState.absent,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    await waitForCatalogQueries(repository, 3);
-    final restart = repository.queryAt(2);
-    expect(restart.cursor, isNull);
-    expect(restart.tagFilter, filter);
-  });
-
-  test('назначение долговременной связи не меняет выдачу намерений', () async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(repository);
-    final confirmedStates = _observeConfirmedStates(container, browse);
-    final only = testSummary(index: 1, tags: [health]);
-    final filter = IntentionTagFilter(requiredTagIds: [health.id]);
-    await _loadFiltered(
-      container,
-      repository,
-      browse,
-      filter,
-      IntentionCatalogFirstPage(
-        items: [only],
-        totalCount: 1,
-        nextCursor: null,
-        revision: const TestCatalogRevision(1),
-      ),
-    );
-    final before = _loaded(container, browse);
-    confirmedStates.clear();
-
-    const revision = TestCatalogRevision(2);
-    final target = LongTermRelationTagTarget(_relationId(1));
-    await completeTagCommand(
-      container,
-      repository,
-      AssignTag(tagId: health.id, target: target),
-      TagCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: revision,
-          value: TagAssignmentChanged(
-            TagAssignmentChangedChange(
-              revision: revision,
-              assignment: TagAssignment(tagId: health.id, target: target),
-              state: TagAssignmentState.assigned,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final current = _loaded(container, browse);
-    expect(current.items.map((item) => item.id), [only.id]);
-    expect(current.items.single.tags.map((tag) => tag.id), [health.id]);
-    expect(confirmedStates, [same(current)]);
-    expect(current.totalCount, 1);
-    expect(current.query, same(before.query));
-    expect(current.revision, revision);
-    expect(repository.queries, hasLength(2));
-  });
-
   test('переименование обновляет названия загруженных строк и сохраняет '
       'условие, состав, количество и продолжение', () async {
     final repository = ControlledCatalogRepository();
@@ -1101,18 +1002,17 @@ void main() {
         ),
       ),
     );
-    final target = IntentionTagTarget(only.id);
     await completeTagCommand(
       container,
       repository,
-      AssignTag(tagId: health.id, target: target),
+      AssignTag(tagId: health.id, intentionId: only.id),
       TagCommandSucceeded(
         ConfirmedGraphResult(
           revision: revision,
           value: TagAssignmentUnchanged(
             TagAssignmentUnchangedChange(
               revision: revision,
-              assignment: TagAssignment(tagId: health.id, target: target),
+              assignment: TagAssignment(tagId: health.id, intentionId: only.id),
               state: TagAssignmentState.assigned,
             ),
           ),
@@ -3320,15 +3220,6 @@ TagId _tagId(int index) => switch (TagId.decode(
   TagIdDecodingSuccess(:final id) => id,
   InvalidTagIdDecoding() => throw StateError(
     'Некорректный идентификатор тега в тесте.',
-  ),
-};
-
-LongTermRelationId _relationId(int index) => switch (LongTermRelationId.decode(
-  '018f0001-0000-7000-8000-${index.toString().padLeft(12, '0')}',
-)) {
-  LongTermRelationIdDecodingSuccess(:final id) => id,
-  InvalidLongTermRelationIdDecoding() => throw StateError(
-    'Некорректный идентификатор связи в тесте.',
   ),
 };
 

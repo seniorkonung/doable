@@ -14,12 +14,9 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
@@ -191,20 +188,18 @@ void main() {
 }
 
 void _registerAssignmentScenarios() {
-  for (final (locale, isIntention, number) in [
-    (const Locale('ru'), true, 1),
-    (const Locale('en'), true, 2),
-    (const Locale('ru'), false, 101),
-    (const Locale('en'), false, 102),
+  for (final (locale, number) in [
+    (const Locale('ru'), 1),
+    (const Locale('en'), 2),
   ]) {
     testWidgets(
-      'полный сценарий назначений доступен: ${locale.languageCode}, ${isIntention ? 'намерение' : 'связь'} $number',
+      'полный сценарий назначений доступен: ${locale.languageCode}, намерение $number',
       (tester) async {
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.resumed,
         );
         tester.binding.platformDispatcher.localesTestValue = [locale];
-        tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+        tester.binding.platformDispatcher.textScaleFactorTestValue = 2.5;
         addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
         addTearDown(
           tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
@@ -233,7 +228,7 @@ void _registerAssignmentScenarios() {
             'Дополнение ${index.toString().padLeft(3, '0')}',
           ]);
           raw.execute(
-            'INSERT INTO tag_assignments (tag_id, ${isIntention ? 'intention_id' : 'long_term_relation_id'}) VALUES (?, ?)',
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [id, tagFixtureId(number)],
           );
         }
@@ -241,35 +236,22 @@ void _registerAssignmentScenarios() {
         final router = ready.container.read(appRouterProvider);
         await tester.pumpWidget(MainApp(runtime: runtime));
         await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
-        if (isIntention) {
-          final id = (IntentionId.decode(
-            tagFixtureId(number),
-          ) as IntentionIdDecodingSuccess).id;
-          unawaited(router.push(IntentionDetailsRoute(intentionId: id)));
-        } else {
-          final id = (LongTermRelationId.decode(
-            tagFixtureId(number),
-          ) as LongTermRelationIdDecodingSuccess).id;
-          unawaited(router.push(RelationDetailsRoute(relationId: id)));
-        }
-        final archived = number == 2 || number == 102;
-        final kind = isIntention
-            ? l10n.tagAssignmentsIntention
-            : l10n.tagAssignmentsRelation;
+        final id = (IntentionId.decode(
+          tagFixtureId(number),
+        ) as IntentionIdDecodingSuccess).id;
+        unawaited(router.push(IntentionDetailsRoute(intentionId: id)));
+        final archived = number == 2;
+        final kind = l10n.tagAssignmentsIntention;
         final archiveState = archived
             ? l10n.tagAssignmentsArchived
             : l10n.tagAssignmentsActive;
         final detailsMarker = find.byKey(
-          ValueKey(
-            isIntention ? 'intention-details-title' : 'relation-details-phrase',
-          ),
+          const ValueKey('intention-details-title'),
         );
         await _until(tester, detailsMarker);
         final detailsScroll = find
             .descendant(
-              of: isIntention
-                  ? find.byType(IntentionDetailsPage)
-                  : find.byType(RelationDetailsPage),
+              of: find.byType(IntentionDetailsPage),
               matching: find.byType(Scrollable),
             )
             .first;
@@ -394,12 +376,7 @@ void _registerAssignmentScenarios() {
           hasLength(1),
         );
         router.pop();
-        await _until(
-          tester,
-          isIntention
-              ? find.byType(IntentionDetailsPage)
-              : find.byType(RelationDetailsPage),
-        );
+        await _until(tester, find.byType(IntentionDetailsPage));
         await tester.pumpAndSettle();
         expect(
           find.byKey(const ValueKey('tag-assignments-load-more')),
@@ -429,59 +406,37 @@ void _registerAssignmentScenarios() {
           hasLength(1),
         );
 
-        if (isIntention || number == 102) {
-          final recipientDelete = find.byKey(
-            ValueKey(
-              isIntention
-                  ? 'intention-details-delete'
-                  : 'relation-details-delete-relation',
-            ),
-          );
-          await tester.scrollUntilVisible(
-            recipientDelete,
-            -300,
-            scrollable: detailsScroll,
-          );
-          await _tap(tester, recipientDelete);
-          await tester.pumpAndSettle();
-          final message = isIntention
-              ? l10n.detailsDeleteConfirmationMessage
-              : l10n
-                    .relationDetailsDeleteConfirmationMessage('', '', '', '')
-                    .split('\n\n')
-                    .last;
-          expect(
-            tester.getSemantics(find.textContaining(message)).label,
-            contains(message),
-          );
-          final cancelRecipient = find.text(l10n.detailsCancelEditAction).last;
-          final confirmRecipient = find.byKey(
-            ValueKey(
-              isIntention
-                  ? 'intention-details-confirm-delete'
-                  : 'relation-details-confirm-delete',
-            ),
-          );
-          _expectAction(tester.getSemantics(cancelRecipient));
-          _expectAction(tester.getSemantics(confirmRecipient));
-          expect(
-            _traversalIndex(tester, l10n.detailsCancelEditAction),
-            lessThan(
-              _traversalIndex(
-                tester,
-                isIntention
-                    ? l10n.detailsConfirmDeleteAction
-                    : l10n.relationDetailsConfirmDeleteAction,
-              ),
-            ),
-          );
-          await tester.tap(cancelRecipient);
-          await tester.pumpAndSettle();
-          expect(
-            raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
-            hasLength(1),
-          );
-        }
+        final recipientDelete = find.byKey(
+          const ValueKey('intention-details-delete'),
+        );
+        await tester.scrollUntilVisible(
+          recipientDelete,
+          -300,
+          scrollable: detailsScroll,
+        );
+        await _tap(tester, recipientDelete);
+        await tester.pumpAndSettle();
+        final message = l10n.detailsDeleteConfirmationMessage;
+        expect(
+          tester.getSemantics(find.textContaining(message)).label,
+          contains(message),
+        );
+        final cancelRecipient = find.text(l10n.detailsCancelEditAction).last;
+        final confirmRecipient = find.byKey(
+          const ValueKey('intention-details-confirm-delete'),
+        );
+        _expectAction(tester.getSemantics(cancelRecipient));
+        _expectAction(tester.getSemantics(confirmRecipient));
+        expect(
+          _traversalIndex(tester, l10n.detailsCancelEditAction),
+          lessThan(_traversalIndex(tester, l10n.detailsConfirmDeleteAction)),
+        );
+        await tester.tap(cancelRecipient);
+        await tester.pumpAndSettle();
+        expect(
+          raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
+          hasLength(1),
+        );
 
         expect(tester.takeException(), isNull);
 

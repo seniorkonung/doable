@@ -12,8 +12,7 @@ extension _TagReading on DriftPersonalGraphRepository {
     };
     final rows = await _database
         .customSelect(
-          '''SELECT a.intention_id, a.long_term_relation_id,
-         a.tag_id AS assigned_tag_id,
+          '''SELECT a.intention_id, a.tag_id AS assigned_tag_id,
          a.tag_creation_sequence AS creation_sequence,
          t.creation_sequence AS actual_tag_creation_sequence, t.id, t.name,
          CASE WHEN substr(t.id, 1, 1) = char(65279)
@@ -43,7 +42,7 @@ extension _TagReading on DriftPersonalGraphRepository {
 
   Future<TagAssignmentStatusResult> _readTagAssignmentStatus(
     TagId tagId,
-    TagTarget target,
+    IntentionId intentionId,
   ) async {
     final stopwatch = Stopwatch()..start();
     var stage = TagReadDiagnosticsStage.validation;
@@ -55,48 +54,40 @@ extension _TagReading on DriftPersonalGraphRepository {
     try {
       final snapshot = await _sequencer.run(
         () => _database.transaction(() async {
-          final targetSql = switch (target) {
-            IntentionTagTarget(:final intentionId) => _TagReadTargetSql(
-              table: 'intentions',
-              assignmentColumn: 'intention_id',
-              id: intentionId.toCanonicalString(),
-            ),
-            LongTermRelationTagTarget(:final relationId) => _TagReadTargetSql(
-              table: 'long_term_relations',
-              assignmentColumn: 'long_term_relation_id',
-              id: relationId.toCanonicalString(),
-            ),
-          };
           stage = TagReadDiagnosticsStage.read;
           final row = await _database
               .customSelect(
                 '''SELECT EXISTS(SELECT 1 FROM tags WHERE id = ?) AS tag_exists,
-                 EXISTS(SELECT 1 FROM ${targetSql.table} WHERE id = ?) AS target_exists,
+                 EXISTS(SELECT 1 FROM intentions WHERE id = ?) AS intention_exists,
                  EXISTS(SELECT 1 FROM tag_assignments
-                   WHERE tag_id = ? AND ${targetSql.assignmentColumn} = ?) AS is_assigned''',
+                   WHERE tag_id = ? AND intention_id = ?) AS is_assigned''',
                 variables: [
                   Variable<String>(tagId.toCanonicalString()),
-                  Variable<String>(targetSql.id),
+                  Variable<String>(intentionId.toCanonicalString()),
                   Variable<String>(tagId.toCanonicalString()),
-                  Variable<String>(targetSql.id),
+                  Variable<String>(intentionId.toCanonicalString()),
                 ],
-                readsFrom: {_database.tags, _database.tagAssignments},
+                readsFrom: {
+                  _database.tags,
+                  _database.intentions,
+                  _database.tagAssignments,
+                },
               )
               .getSingle();
           final tagExists = _requiredStoredInteger(row.data, 'tag_exists');
-          final targetExists = _requiredStoredInteger(
+          final intentionExists = _requiredStoredInteger(
             row.data,
-            'target_exists',
+            'intention_exists',
           );
           final assigned = _requiredStoredInteger(row.data, 'is_assigned');
           if ((tagExists != 0 && tagExists != 1) ||
-              (targetExists != 0 && targetExists != 1) ||
+              (intentionExists != 0 && intentionExists != 1) ||
               (assigned != 0 && assigned != 1) ||
-              (assigned == 1 && (tagExists == 0 || targetExists == 0))) {
+              (assigned == 1 && (tagExists == 0 || intentionExists == 0))) {
             throw const _StoredIntentionCorruption();
           }
           if (tagExists == 0) throw const _TagStatusTagMissing();
-          if (targetExists == 0) throw const _TagReadTargetMissing();
+          if (intentionExists == 0) throw const _TagReadIntentionMissing();
           return GraphSnapshot(
             value: assigned == 1,
             revision: _currentRevision,
@@ -129,31 +120,29 @@ extension _TagReading on DriftPersonalGraphRepository {
       final snapshot = await _sequencer.run(
         () => _database.transaction(() async {
           stage = TagReadDiagnosticsStage.read;
-          final selectionTarget = switch (mode) {
+          final intentionId = switch (mode) {
             TagCatalogBrowseMode() => null,
-            TagCatalogSelectionMode(:final target) => target,
+            TagCatalogSelectionMode(:final intentionId) => intentionId,
           };
-          final targetSql = selectionTarget == null
-              ? null
-              : await _validatedTagReadTarget(
-                  selectionTarget,
-                  checkAssignmentReferences: true,
-                );
+          if (intentionId != null) {
+            await _validateTagReadIntention(intentionId);
+          }
           final rows = await _database
               .customSelect(
-                targetSql == null
+                intentionId == null
                     ? '''SELECT creation_sequence, id, name FROM tags
                    ORDER BY creation_sequence ASC'''
                     : '''SELECT t.creation_sequence, t.id, t.name,
-                   EXISTS(SELECT 1 FROM tag_assignments a WHERE a.tag_id = t.id AND a.${targetSql.assignmentColumn} = ?) AS is_assigned
+                   EXISTS(SELECT 1 FROM tag_assignments a WHERE a.tag_id = t.id AND a.intention_id = ?) AS is_assigned
                    FROM tags t
                    ORDER BY t.creation_sequence ASC''',
                 variables: [
-                  if (targetSql != null) Variable<String>(targetSql.id),
+                  if (intentionId != null)
+                    Variable<String>(intentionId.toCanonicalString()),
                 ],
                 readsFrom: {
                   _database.tags,
-                  if (targetSql != null) _database.tagAssignments,
+                  if (intentionId != null) _database.tagAssignments,
                 },
               )
               .get();
@@ -171,7 +160,7 @@ extension _TagReading on DriftPersonalGraphRepository {
             previousSequence = sequence;
             final tag = _decodeStoredTag(row.data);
             decoded.add(tag);
-            if (targetSql != null) {
+            if (intentionId != null) {
               final assigned = _requiredStoredInteger(row.data, 'is_assigned');
               if (assigned != 0 && assigned != 1) {
                 throw const _StoredIntentionCorruption();
@@ -182,10 +171,10 @@ extension _TagReading on DriftPersonalGraphRepository {
             }
           }
           final revision = _currentRevision;
-          return selectionTarget == null
+          return intentionId == null
               ? TagCatalogSnapshot(items: decoded, revision: revision)
               : TagCatalogSnapshot.selection(
-                  target: selectionTarget,
+                  intentionId: intentionId,
                   rows: selectionRows,
                   revision: revision,
                 );
@@ -205,7 +194,9 @@ extension _TagReading on DriftPersonalGraphRepository {
     }
   }
 
-  Future<TagAssignmentsResult> _readTagAssignments(TagTarget recipient) async {
+  Future<TagAssignmentsResult> _readTagAssignments(
+    IntentionId intentionId,
+  ) async {
     final stopwatch = Stopwatch()..start();
     var stage = TagReadDiagnosticsStage.validation;
     void record(DiagnosticsStatus status) => _recordDiagnostics(
@@ -217,23 +208,19 @@ extension _TagReading on DriftPersonalGraphRepository {
       final snapshot = await _sequencer.run(
         () => _database.transaction(() async {
           stage = TagReadDiagnosticsStage.read;
-          final target = await _validatedTagReadTarget(
-            recipient,
-            checkAssignmentReferences: true,
-          );
+          await _validateTagReadIntention(intentionId);
           final rows = await _database
               .customSelect(
-                '''SELECT a.intention_id, a.long_term_relation_id,
-                 a.tag_id AS assigned_tag_id,
+                '''SELECT a.tag_id AS assigned_tag_id,
                  a.tag_creation_sequence AS creation_sequence,
                  t.creation_sequence AS actual_tag_creation_sequence, t.id, t.name,
                  CASE WHEN substr(t.id, 1, 1) = char(65279)
                    OR substr(t.name, 1, 1) = char(65279)
                    THEN 1 ELSE 0 END AS has_leading_bom
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
-               WHERE a.${target.assignmentColumn} = ?
+               WHERE a.intention_id = ?
                ORDER BY a.tag_creation_sequence ASC''',
-                variables: [Variable<String>(target.id)],
+                variables: [Variable<String>(intentionId.toCanonicalString())],
                 readsFrom: {_database.tags, _database.tagAssignments},
               )
               .get();
@@ -249,7 +236,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           }
           final revision = _currentRevision;
           return TagAssignmentsSnapshot(
-            target: recipient,
+            intentionId: intentionId,
             items: tags,
             revision: revision,
           );
@@ -269,51 +256,35 @@ extension _TagReading on DriftPersonalGraphRepository {
     }
   }
 
-  Future<_TagReadTargetSql> _validatedTagReadTarget(
-    TagTarget target, {
-    required bool checkAssignmentReferences,
-  }) async {
-    final sql = switch (target) {
-      IntentionTagTarget(:final intentionId) => _TagReadTargetSql(
-        table: 'intentions',
-        assignmentColumn: 'intention_id',
-        id: intentionId.toCanonicalString(),
-      ),
-      LongTermRelationTagTarget(:final relationId) => _TagReadTargetSql(
-        table: 'long_term_relations',
-        assignmentColumn: 'long_term_relation_id',
-        id: relationId.toCanonicalString(),
-      ),
-    };
+  Future<void> _validateTagReadIntention(IntentionId intentionId) async {
+    final id = intentionId.toCanonicalString();
     final exists = await _database
         .customSelect(
-          'SELECT 1 FROM ${sql.table} WHERE id = ?',
-          variables: [Variable<String>(sql.id)],
+          'SELECT 1 FROM intentions WHERE id = ?',
+          variables: [Variable<String>(id)],
+          readsFrom: {_database.intentions},
         )
         .getSingleOrNull();
     if (exists == null) {
       final dangling = await _database
           .customSelect(
-            'SELECT 1 FROM tag_assignments WHERE ${sql.assignmentColumn} = ? LIMIT 1',
-            variables: [Variable<String>(sql.id)],
+            'SELECT 1 FROM tag_assignments WHERE intention_id = ? LIMIT 1',
+            variables: [Variable<String>(id)],
             readsFrom: {_database.tagAssignments},
           )
           .getSingleOrNull();
       if (dangling != null) throw const _StoredIntentionCorruption();
-      throw const _TagReadTargetMissing();
+      throw const _TagReadIntentionMissing();
     }
-    if (checkAssignmentReferences) {
-      final orphan = await _database
-          .customSelect(
-            '''SELECT 1 FROM tag_assignments a LEFT JOIN tags t ON t.id = a.tag_id
-         WHERE a.${sql.assignmentColumn} = ? AND t.id IS NULL LIMIT 1''',
-            variables: [Variable<String>(sql.id)],
-            readsFrom: {_database.tags, _database.tagAssignments},
-          )
-          .getSingleOrNull();
-      if (orphan != null) throw const _StoredIntentionCorruption();
-    }
-    return sql;
+    final orphan = await _database
+        .customSelect(
+          '''SELECT 1 FROM tag_assignments a LEFT JOIN tags t ON t.id = a.tag_id
+         WHERE a.intention_id = ? AND t.id IS NULL LIMIT 1''',
+          variables: [Variable<String>(id)],
+          readsFrom: {_database.tags, _database.tagAssignments},
+        )
+        .getSingleOrNull();
+    if (orphan != null) throw const _StoredIntentionCorruption();
   }
 
   Future<_TagReadStorageVersion> _tagReadStorageVersion() async {
@@ -406,9 +377,7 @@ extension _TagReading on DriftPersonalGraphRepository {
   if (_requiredStoredInteger(data, 'has_leading_bom') != 0 ||
       sequence <= previousSequence ||
       sequence !=
-          _requiredStoredInteger(data, 'actual_tag_creation_sequence') ||
-      (data['intention_id'] == null) ==
-          (data['long_term_relation_id'] == null)) {
+          _requiredStoredInteger(data, 'actual_tag_creation_sequence')) {
     throw const _StoredIntentionCorruption();
   }
   final tag = _decodeStoredTag(data);
@@ -434,26 +403,14 @@ tag_domain.Tag _decodeStoredTag(Map<String, Object?> data) {
   }
 }
 
-final class _TagReadTargetSql {
-  const _TagReadTargetSql({
-    required this.table,
-    required this.assignmentColumn,
-    required this.id,
-  });
-
-  final String table;
-  final String assignmentColumn;
-  final String id;
-}
-
 typedef _TagReadStorageVersion = ({
   String connectionId,
   int connectionChanges,
   int dataVersion,
 });
 
-final class _TagReadTargetMissing implements Exception {
-  const _TagReadTargetMissing();
+final class _TagReadIntentionMissing implements Exception {
+  const _TagReadIntentionMissing();
 }
 
 final class _TagStatusTagMissing implements Exception {
@@ -464,8 +421,8 @@ TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
   if (error is _TagStatusTagMissing) {
     return const TagAssignmentStatusTagNotFound();
   }
-  if (error is _TagReadTargetMissing) {
-    return const TagAssignmentStatusTargetNotFound();
+  if (error is _TagReadIntentionMissing) {
+    return const TagAssignmentStatusIntentionNotFound();
   }
   if (error is _StoredIntentionCorruption) {
     return const TagAssignmentStatusCorruption();
@@ -479,8 +436,8 @@ TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
 }
 
 TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {
-  if (error is _TagReadTargetMissing) {
-    return const TagCatalogTargetNotFound();
+  if (error is _TagReadIntentionMissing) {
+    return const TagCatalogIntentionNotFound();
   }
   if (error is _StoredIntentionCorruption) {
     return const TagCatalogCorruptionFailure();
@@ -494,8 +451,8 @@ TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {
 }
 
 TagAssignmentsReadFailure _classifyTagAssignmentsReadFailure(Object error) {
-  if (error is _TagReadTargetMissing) {
-    return const TagAssignmentsTargetNotFound();
+  if (error is _TagReadIntentionMissing) {
+    return const TagAssignmentsIntentionNotFound();
   }
   if (error is _StoredIntentionCorruption) {
     return const TagAssignmentsCorruptionFailure();

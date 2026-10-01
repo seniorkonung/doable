@@ -75,10 +75,10 @@ final class TagDeletedChange extends TagChange {
   final TagId tagId;
 }
 
-/// Подтверждённое состояние одной пары после команды назначения или снятия.
+/// Подтверждённое состояние пары тега и намерения после назначения или снятия.
 enum TagAssignmentState { assigned, absent }
 
-/// Фактическое изменение одной пары; остальные назначения не перечисляются.
+/// Фактическое изменение пары тега и намерения; остальные не перечисляются.
 final class TagAssignmentChangedChange extends TagChange {
   const TagAssignmentChangedChange({
     required this.revision,

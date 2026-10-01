@@ -12,7 +12,6 @@ import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../tag/application/tag_change.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
-import '../../../tag/domain/tag_target.dart';
 import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention_id.dart';
@@ -1179,9 +1178,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       }
       reconciled = next;
     }
-    if (!package.assignedIntentionIds.every(mutatedIds.contains)) {
-      return null;
-    }
 
     final absoluteCounts = <IntentionId, RelationCounts>{};
     for (final change in package.countChanges) {
@@ -1445,13 +1441,6 @@ final class _CatalogChangePackage {
   final List<IntentionRelationCountsChanged> countChanges;
   final List<DailyChoiceChange> dailyChanges;
   final List<TagChange> tagChanges;
-
-  /// Намерения, у которых пакет фактически изменил назначение тега.
-  Iterable<IntentionId> get assignedIntentionIds => tagChanges
-      .whereType<TagAssignmentChangedChange>()
-      .map((change) => change.assignment.target)
-      .whereType<IntentionTagTarget>()
-      .map((target) => target.intentionId);
 
   /// Новые названия тегов, переименованных пакетом.
   Iterable<Tag> get renamedTags =>

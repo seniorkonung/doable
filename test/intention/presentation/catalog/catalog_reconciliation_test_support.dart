@@ -12,7 +12,6 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -201,14 +200,16 @@ Future<TagCommandCompletion> completeIntentionTagAssignment(
   required IntentionSummary after,
   required GraphRevision revision,
 }) {
-  final target = IntentionTagTarget(after.id);
-  final assignment = TagAssignment(tagId: tagId, target: target);
+  final assignment = TagAssignment(tagId: tagId, intentionId: after.id);
   return (
     switch (state) {
-      TagAssignmentState.assigned => AssignTag(tagId: tagId, target: target),
+      TagAssignmentState.assigned => AssignTag(
+        tagId: tagId,
+        intentionId: after.id,
+      ),
       TagAssignmentState.absent => RemoveTagAssignment(
         tagId: tagId,
-        target: target,
+        intentionId: after.id,
       ),
     },
     TagCommandSucceeded(

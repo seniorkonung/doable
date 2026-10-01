@@ -50,6 +50,15 @@ void _catalogTagFilterFailureScenarios(
             (db) => raw = db,
           );
           seedTagStorageFixture(raw);
+          // Продолжению навигации активного охвата нужен второй получатель тега.
+          raw.execute(
+            'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+            [tagFixtureId(4), 'Намерение 4', 104, 204],
+          );
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [tagFixtureId(firstTagNumber), tagFixtureId(4)],
+          );
           final required = _fixtureTag(firstTagNumber);
           final excluded = _fixtureTag(lastTagNumber);
           IntentionCatalogQuery query(TagId required, TagId excluded) =>
@@ -69,13 +78,13 @@ void _catalogTagFilterFailureScenarios(
               isA<ResultSuccess<IntentionCatalogPage>>(),
             );
           }
-          final first = (await repository.getTaggedEntitiesPage(
-            TaggedEntitiesQuery(
+          final first = (await repository.getTaggedIntentionsPage(
+            TaggedIntentionsQuery(
               tagId: required,
-              scope: TaggedEntitiesScope.active,
+              scope: TaggedIntentionsScope.active,
               pageSize: 1,
             ),
-          ) as TaggedEntitiesPageSuccess).value;
+          ) as TaggedIntentionsPageSuccess).value;
           expect(first.nextCursor, isNotNull);
           final before = _storedFilterFailureGraph(raw);
           final changesBefore = _connectionChanges(raw);
@@ -112,21 +121,21 @@ void _catalogTagFilterFailureScenarios(
             isNot(contains(tagFixtureId(firstTagNumber))),
           );
 
-          final continuation = await repository.getTaggedEntitiesPage(
-            TaggedEntitiesQuery(
+          final continuation = await repository.getTaggedIntentionsPage(
+            TaggedIntentionsQuery(
               tagId: required,
               scope: first.scope,
               pageSize: first.pageSize,
               cursor: first.nextCursor,
             ),
           );
-          expect(continuation, isA<TaggedEntitiesPageSuccess>());
-          final next = (continuation as TaggedEntitiesPageSuccess).value;
+          expect(continuation, isA<TaggedIntentionsPageSuccess>());
+          final next = (continuation as TaggedIntentionsPageSuccess).value;
           expect(
             next.revision.compareTo(first.revision),
             GraphRevisionOrder.same,
           );
-          expect(next.items.single.target, isNot(first.items.single.target));
+          expect(next.items.single.id, isNot(first.items.single.id));
           expect(next.nextCursor, isNull);
 
           final success = (await repository.getCatalogPage(

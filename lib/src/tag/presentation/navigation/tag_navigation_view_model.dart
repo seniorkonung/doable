@@ -7,12 +7,12 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../intention/domain/intention_id.dart';
 import '../../application/tag_change.dart';
 import '../../application/tag_read_result.dart';
-import '../../application/tagged_entities_page.dart';
+import '../../application/tagged_intentions_page.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
-import '../../domain/tag_target.dart';
 import 'tag_navigation_state.dart';
 
 part 'tag_navigation_view_model.g.dart';
@@ -37,7 +37,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
 
   late TagId _tagId;
   late TagReadContract _reads;
-  TaggedEntitiesScope _scope = TaggedEntitiesScope.active;
+  TaggedIntentionsScope _scope = TaggedIntentionsScope.active;
   Future<void>? _activeRequest;
   bool _firstPagePending = false;
   int _generation = 0;
@@ -63,7 +63,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     unawaited(_changes?.cancel());
     unawaited(_tagReads?.cancel());
     _tagId = tagId;
-    _scope = TaggedEntitiesScope.active;
+    _scope = TaggedIntentionsScope.active;
     _reads = ref.watch(tagNavigationReaderProvider);
     _requiredRevision = null;
     _retiredRevision = null;
@@ -99,7 +99,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     _changeSelection();
   }
 
-  void setScope(TaggedEntitiesScope scope) {
+  void setScope(TaggedIntentionsScope scope) {
     if (!ref.mounted || _scope == scope) return;
     _scope = scope;
     _changeSelection();
@@ -142,14 +142,14 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     return _startFirst();
   }
 
-  bool canActOn(TagTarget target) {
+  bool canActOn(IntentionId intentionId) {
     if (!ref.mounted) return false;
     final current = state;
     return current is TagNavigationLoaded &&
         current.tagId == _tagId &&
         current.scope == _scope &&
         current.canUseCurrentItems &&
-        current.contains(target);
+        current.contains(intentionId);
   }
 
   Future<void> retryRefresh() {
@@ -158,7 +158,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     final current = state;
     if (current is! TagNavigationLoaded ||
         current.freshness != TagNavigationFreshness.stale ||
-        current.refreshFailure is! TaggedEntitiesUnavailableFailure) {
+        current.refreshFailure is! TaggedIntentionsUnavailableFailure) {
       return Future.value();
     }
     _staleReadAttempts = 0;
@@ -217,11 +217,11 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
 
   Future<void> _loadFirst(
     TagId tagId,
-    TaggedEntitiesScope scope,
+    TaggedIntentionsScope scope,
     int generation,
   ) async {
     final requiredAtStart = _requiredRevision;
-    final query = TaggedEntitiesQuery(tagId: tagId, scope: scope);
+    final query = TaggedIntentionsQuery(tagId: tagId, scope: scope);
     final result = await _readPage(query);
     if (!_canPublish(generation)) return;
     if (result is GraphResultFailure && _firstPagePending) return;
@@ -229,7 +229,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
       case GraphResultSuccess(:final value):
         if (!_matches(value, query) || !_unique(value.items)) {
           _firstPagePending = false;
-          _firstFailure(const TaggedEntitiesUnexpectedFailure());
+          _firstFailure(const TaggedIntentionsUnexpectedFailure());
           return;
         }
         final required = _requiredRevision;
@@ -253,7 +253,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
         if (_tagRevision?.compareTo(value.revision) ==
                 GraphRevisionOrder.same &&
             _knownTag?.name != value.tag.name) {
-          _firstFailure(const TaggedEntitiesUnexpectedFailure());
+          _firstFailure(const TaggedIntentionsUnexpectedFailure());
           return;
         }
         final loaded = TagNavigationLoaded(
@@ -272,9 +272,9 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
           _tagRevision = value.revision;
           state = loaded;
         }
-      case GraphResultFailure(failure: TaggedEntitiesTagNotFound()):
+      case GraphResultFailure(failure: TaggedIntentionsTagNotFound()):
         _tagMissing();
-      case GraphResultFailure(failure: TaggedEntitiesSnapshotExpired()):
+      case GraphResultFailure(failure: TaggedIntentionsSnapshotExpired()):
         _repeatStaleRead();
       case GraphResultFailure(:final failure):
         _firstPagePending = false;
@@ -284,7 +284,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
 
   Future<void> _loadMore(TagNavigationLoaded base, int generation) async {
     state = base.withPageStatus(const TagNavigationPageLoading());
-    final query = TaggedEntitiesQuery(
+    final query = TaggedIntentionsQuery(
       tagId: base.tagId,
       scope: base.scope,
       cursor: base.nextCursor,
@@ -298,7 +298,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     switch (result) {
       case GraphResultSuccess(:final value):
         if (!_matches(value, query)) {
-          _pageFailure(base, const TaggedEntitiesUnexpectedFailure());
+          _pageFailure(base, const TaggedIntentionsUnexpectedFailure());
           return;
         }
         if (value.revision.compareTo(base.revision) !=
@@ -311,7 +311,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
         if (value.tag.name != base.tag.name ||
             identical(value.nextCursor, base.nextCursor) ||
             !_unique([...base.items, ...value.items])) {
-          _pageFailure(base, const TaggedEntitiesUnexpectedFailure());
+          _pageFailure(base, const TaggedIntentionsUnexpectedFailure());
           return;
         }
         state = TagNavigationLoaded(
@@ -321,9 +321,9 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
           nextCursor: value.nextCursor,
           revision: base.revision,
         );
-      case GraphResultFailure(failure: TaggedEntitiesTagNotFound()):
+      case GraphResultFailure(failure: TaggedIntentionsTagNotFound()):
         _tagMissing();
-      case GraphResultFailure(failure: TaggedEntitiesSnapshotExpired()):
+      case GraphResultFailure(failure: TaggedIntentionsSnapshotExpired()):
         _beginRefresh(base);
         _firstPagePending = true;
       case GraphResultFailure(:final failure):
@@ -333,14 +333,14 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
 
   bool _canPublish(int generation) => ref.mounted && generation == _generation;
 
-  bool _matches(TaggedEntitiesPage page, TaggedEntitiesQuery query) =>
+  bool _matches(TaggedIntentionsPage page, TaggedIntentionsQuery query) =>
       page.tag.id == query.tagId &&
       page.scope == query.scope &&
       page.pageSize == query.pageSize;
 
-  bool _unique(List<TaggedEntity> items) {
-    final targets = <TagTarget>{};
-    return items.every((item) => targets.add(item.target));
+  bool _unique(List<TaggedIntention> items) {
+    final intentionIds = <IntentionId>{};
+    return items.every((item) => intentionIds.add(item.id));
   }
 
   TagNavigationInitialLoading _loading() =>
@@ -357,7 +357,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     state = TagNavigationTagMissing(tagId: _tagId, scope: _scope);
   }
 
-  void _firstFailure(TaggedEntitiesReadFailure failure) {
+  void _firstFailure(TaggedIntentionsReadFailure failure) {
     final current = state;
     if (current is TagNavigationLoaded) {
       state = current.withStatus(
@@ -495,11 +495,12 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
     _firstFailure(_navigationWatchFailure(failure));
   }
 
-  TaggedEntitiesReadFailure _navigationWatchFailure(TagReadFailure failure) =>
+  TaggedIntentionsReadFailure _navigationWatchFailure(TagReadFailure failure) =>
       switch (failure) {
-        TagReadUnavailableFailure() => const TaggedEntitiesUnavailableFailure(),
-        TagReadCorruptionFailure() => const TaggedEntitiesCorruptionFailure(),
-        TagReadUnexpectedFailure() => const TaggedEntitiesUnexpectedFailure(),
+        TagReadUnavailableFailure() =>
+          const TaggedIntentionsUnavailableFailure(),
+        TagReadCorruptionFailure() => const TaggedIntentionsCorruptionFailure(),
+        TagReadUnexpectedFailure() => const TaggedIntentionsUnexpectedFailure(),
       };
 
   /// Повтор подтверждают новая подписка и согласованная новая первая порция.
@@ -519,7 +520,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
       case GraphRevisionOrder.same:
         if (firstPage.value.tag.name != observation.value.name) {
           _watchRecovery?.firstPage = null;
-          _firstFailure(const TaggedEntitiesUnexpectedFailure());
+          _firstFailure(const TaggedIntentionsUnexpectedFailure());
           return;
         }
       case GraphRevisionOrder.newer:
@@ -548,7 +549,7 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
   void _repeatStaleRead() {
     if (++_staleReadAttempts >= _maxStaleReads) {
       _firstPagePending = false;
-      _firstFailure(const TaggedEntitiesUnavailableFailure());
+      _firstFailure(const TaggedIntentionsUnavailableFailure());
     } else {
       _firstPagePending = true;
     }
@@ -585,19 +586,23 @@ final class TagNavigationViewModel extends _$TagNavigationViewModel {
 
   void _pageFailure(
     TagNavigationLoaded base,
-    TaggedEntitiesReadFailure failure,
+    TaggedIntentionsReadFailure failure,
   ) {
     state = base.withPageStatus(
       TagNavigationPageFailure(failure),
-      clearCursor: failure is! TaggedEntitiesUnavailableFailure,
+      clearCursor: failure is! TaggedIntentionsUnavailableFailure,
     );
   }
 
-  Future<TaggedEntitiesPageResult> _readPage(TaggedEntitiesQuery query) async {
+  Future<TaggedIntentionsPageResult> _readPage(
+    TaggedIntentionsQuery query,
+  ) async {
     try {
-      return await _reads.getTaggedEntitiesPage(query);
+      return await _reads.getTaggedIntentionsPage(query);
     } on Object {
-      return const TaggedEntitiesPageError(TaggedEntitiesUnexpectedFailure());
+      return const TaggedIntentionsPageError(
+        TaggedIntentionsUnexpectedFailure(),
+      );
     }
   }
 }

@@ -9,8 +9,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -58,13 +58,27 @@ void main() {
 
   List<List<Object?>> assignments() => rows('tag_assignments');
 
-  List<Object?> assignedTags(String targetColumn, int id) => raw
+  List<Object?> assignedTags(int id) => raw
       .select(
-        'SELECT tag_id FROM tag_assignments WHERE $targetColumn = ? ORDER BY creation_sequence',
+        'SELECT tag_id FROM tag_assignments WHERE intention_id = ? ORDER BY creation_sequence',
         [tagFixtureId(id)],
       )
       .map((entry) => entry['tag_id'])
       .toList();
+
+  Future<void> expectNavigation(
+    int tag,
+    TaggedIntentionsScope scope,
+    List<int> intentions,
+  ) async {
+    final result = await repository.getTaggedIntentionsPage(
+      TaggedIntentionsQuery(tagId: _tag(tag), scope: scope),
+    );
+    expect(result, isA<TaggedIntentionsPageSuccess>());
+    final page = (result as TaggedIntentionsPageSuccess).value;
+    expect(page.items.map((item) => item.id), intentions.map(_intention));
+    expect(page.nextCursor, isNull);
+  }
 
   Map<String, List<List<Object?>>> graph() => {
     for (final table in [
@@ -88,37 +102,20 @@ void main() {
       final intentionBeforeAssignments = row('intentions', 1);
       expect(
         await repository.execute(
-          AssignTag(
-            tagId: _tag(lastTagNumber),
-            target: IntentionTagTarget(_intention(1)),
-          ),
-        ),
-        isA<TagCommandSucceeded>(),
-      );
-      expect(
-        await repository.execute(
-          AssignTag(
-            tagId: _tag(lastTagNumber),
-            target: LongTermRelationTagTarget(_relation(103)),
-          ),
+          AssignTag(tagId: _tag(lastTagNumber), intentionId: _intention(1)),
         ),
         isA<TagCommandSucceeded>(),
       );
       expect(row('intentions', 1), intentionBeforeAssignments);
 
       final originalAssignments = assignments();
-      expect(originalAssignments, hasLength(7));
-      expect(assignedTags('intention_id', 1), [
+      expect(originalAssignments, hasLength(4));
+      expect(assignedTags(1), [
         tagFixtureId(firstTagNumber),
         tagFixtureId(lastTagNumber),
       ]);
-      expect(assignedTags('long_term_relation_id', 101), [
-        tagFixtureId(firstTagNumber),
-      ]);
-      expect(assignedTags('long_term_relation_id', 103), [
-        tagFixtureId(lastTagNumber),
-      ]);
-      expect(assignedTags('intention_id', 3), [tagFixtureId(lastTagNumber)]);
+      expect(assignedTags(2), [tagFixtureId(firstTagNumber)]);
+      expect(assignedTags(3), [tagFixtureId(lastTagNumber)]);
       final otherIntentions = [row('intentions', 2), row('intentions', 3)];
       final alreadyArchivedRelation = row('long_term_relations', 102);
       final dailyChoices = rows('daily_choices');
@@ -162,6 +159,26 @@ void main() {
         expect(rows('tags'), tags);
         expect(rows('daily_choices'), dailyChoices);
         expect(rows('daily_choice_path_steps'), pathSteps);
+        await expectNavigation(
+          firstTagNumber,
+          TaggedIntentionsScope.active,
+          archived == 0 ? [1] : [],
+        );
+        await expectNavigation(
+          firstTagNumber,
+          TaggedIntentionsScope.archived,
+          archived == 0 ? [2] : [1, 2],
+        );
+        await expectNavigation(
+          lastTagNumber,
+          TaggedIntentionsScope.active,
+          archived == 0 ? [3, 1] : [3],
+        );
+        await expectNavigation(
+          lastTagNumber,
+          TaggedIntentionsScope.archived,
+          archived == 0 ? [] : [1],
+        );
         expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
       }
 
@@ -243,7 +260,7 @@ void main() {
   );
 
   test(
-    'допустимые правки и собственный архив связи сохраняют оба назначения',
+    'правки участников, типа и архива связи сохраняют назначения намерениям',
     () async {
       for (final number in [4, 5]) {
         raw.execute(
@@ -262,20 +279,22 @@ void main() {
           'Прежнее',
         ],
       );
-      for (final tag in [firstTagNumber, lastTagNumber]) {
+      for (final (tag, intention) in [
+        (firstTagNumber, 3),
+        (firstTagNumber, 4),
+        (lastTagNumber, 4),
+        (lastTagNumber, 5),
+      ]) {
         expect(
           await repository.execute(
-            AssignTag(
-              tagId: _tag(tag),
-              target: LongTermRelationTagTarget(_relation(103)),
-            ),
+            AssignTag(tagId: _tag(tag), intentionId: _intention(intention)),
           ),
           isA<TagCommandSucceeded>(),
         );
       }
 
       final originalAssignments = assignments();
-      expect(assignedTags('long_term_relation_id', 103), [
+      expect(assignedTags(4), [
         tagFixtureId(firstTagNumber),
         tagFixtureId(lastTagNumber),
       ]);
@@ -364,7 +383,7 @@ void main() {
   );
 
   test(
-    'теги используемой дневным путём связи меняются без обхода защиты смысла',
+    'теги участников дневного пути меняются без обхода защиты смысла связи',
     () async {
       raw.execute(
         'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
@@ -377,10 +396,7 @@ void main() {
 
       expect(
         await repository.execute(
-          AssignTag(
-            tagId: _tag(lastTagNumber),
-            target: LongTermRelationTagTarget(_relation(101)),
-          ),
+          AssignTag(tagId: _tag(lastTagNumber), intentionId: _intention(1)),
         ),
         isA<TagCommandSucceeded>(),
       );
@@ -388,7 +404,7 @@ void main() {
         await repository.execute(
           RemoveTagAssignment(
             tagId: _tag(firstTagNumber),
-            target: LongTermRelationTagTarget(_relation(101)),
+            intentionId: _intention(1),
           ),
         ),
         isA<TagCommandSucceeded>(),
@@ -397,9 +413,7 @@ void main() {
       expect(rows('intentions'), intentionsBefore);
       expect(rows('daily_choices'), choicesBefore);
       expect(rows('daily_choice_path_steps'), pathBefore);
-      expect(assignedTags('long_term_relation_id', 101), [
-        tagFixtureId(lastTagNumber),
-      ]);
+      expect(assignedTags(1), [tagFixtureId(lastTagNumber)]);
 
       final beforeRejectedEdits = graph();
       for (final patch in [

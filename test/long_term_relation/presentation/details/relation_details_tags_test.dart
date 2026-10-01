@@ -8,9 +8,9 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,15 +24,19 @@ LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
 ) as LongTermRelationIdDecodingSuccess).id;
 
 void main() {
-  for (final (number, locale, usedByDailyPath) in [
-    (101, const Locale('ru'), true),
-    (102, const Locale('en'), true),
-    (102, const Locale('ru'), false),
-    (102, const Locale('en'), false),
+  for (final (number, locale, usedByDailyPath, type) in [
+    for (final type in ['need', 'can'])
+      for (final number in [101, 102])
+        for (final locale in [const Locale('ru'), const Locale('en')])
+          for (final usedByDailyPath in [false, true])
+            (number, locale, usedByDailyPath, type),
   ]) {
     testWidgets(
-      'подробности связи $number ${usedByDailyPath ? 'в дневном пути' : 'без пути'} независимо управляют назначениями на ${locale.languageCode}',
+      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}, ${usedByDailyPath ? 'в дневном пути' : 'без пути'}: собственных тегов нет на ${locale.languageCode}',
       (tester) async {
+        tester.view.physicalSize = const Size(1200, 6000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
         late sqlite.Database raw;
         final database = AppDatabase(
           openInMemoryLocalDatabase(setup: (db) => raw = db),
@@ -40,37 +44,37 @@ void main() {
         await database.open();
         addTearDown(database.close);
         seedTagStorageFixture(raw);
-        raw.execute(
-          'UPDATE long_term_relations SET description = ? WHERE id = ?',
-          ['Описание связи $number', tagFixtureId(number)],
-        );
-        if (number == 102) {
-          raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
-            'can',
-            tagFixtureId(102),
+        if (number == 101) {
+          raw.execute('DELETE FROM daily_choices WHERE id = ?', [
+            tagFixtureId(201),
           ]);
-          if (usedByDailyPath) {
-            raw.execute(
-              'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-              [
-                tagFixtureId(203),
-                tagFixtureId(1),
-                tagFixtureId(2),
-                '2026-09-26',
-                1,
-              ],
-            );
-            raw.execute(
-              'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-              [tagFixtureId(204), tagFixtureId(203), tagFixtureId(102)],
-            );
-          }
         }
-        final graphBefore = retainedTagFixtureGraph(raw);
-        final assignmentsBefore = raw
-            .select('SELECT * FROM tag_assignments ORDER BY creation_sequence')
-            .map((row) => row.values.toList())
-            .toList();
+        raw.execute(
+          'UPDATE long_term_relations SET type = ?, description = ? WHERE id = ?',
+          [type, 'Описание связи $number', tagFixtureId(number)],
+        );
+        if (usedByDailyPath) {
+          final choiceNumber = number == 101 ? 201 : 203;
+          raw.execute(
+            'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
+            [
+              tagFixtureId(choiceNumber),
+              tagFixtureId(1),
+              tagFixtureId(number == 101 ? 3 : 2),
+              '2026-09-26',
+              1,
+            ],
+          );
+          raw.execute(
+            'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+            [
+              tagFixtureId(choiceNumber + 1),
+              tagFixtureId(choiceNumber),
+              tagFixtureId(number),
+            ],
+          );
+        }
+        final graphBefore = _storedGraph(raw);
         final repository = DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
@@ -99,7 +103,7 @@ void main() {
         unawaited(router.push(TagNavigationRoute(tagId: tagId)));
         await tester.pumpAndSettle();
         await tester.tap(
-          find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+          find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
         );
         await tester.pumpAndSettle();
         unawaited(
@@ -107,168 +111,121 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final choose = find.byKey(const ValueKey('tag-assignments-choose'));
-        await tester.scrollUntilVisible(
-          choose,
-          200,
-          scrollable: find.byType(Scrollable).last,
+        final l10n = AppLocalizations.of(
+          tester.element(find.byKey(const ValueKey('relation-details-phrase'))),
         );
-        await tester.pumpAndSettle();
-        expect(choose, findsOneWidget);
-        expect(find.text('Дом'), findsOneWidget);
-        final open = find.byKey(
-          ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
-        );
-        expect(open, findsOneWidget);
-        await Scrollable.ensureVisible(tester.element(open), alignment: 0.3);
-        await tester.pumpAndSettle();
-        await tester.tap(open);
-        await tester.pumpAndSettle();
-        expect(router.current.name, TagNavigationRoute.name);
+        expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(
-          router.current
-              .argsAs<TagNavigationRouteArgs>()
-              .tagId
-              .toCanonicalString(),
-          tagFixtureId(firstTagNumber),
+          find.byKey(const ValueKey('tag-assignments-choose')),
+          findsNothing,
+        );
+        for (final tagNumber in [firstTagNumber, lastTagNumber]) {
+          for (final action in ['open', 'remove']) {
+            expect(
+              find.byKey(
+                ValueKey('tag-assignment-$action-${tagFixtureId(tagNumber)}'),
+              ),
+              findsNothing,
+            );
+          }
+        }
+        expect(find.text('Дом'), findsNothing);
+        expect(find.text('Работа'), findsNothing);
+        expect(
+          _textOf(tester, 'relation-details-type'),
+          type == 'need'
+              ? l10n.relationNeighborhoodTypeNeed
+              : l10n.relationNeighborhoodTypeCan,
+        );
+        expect(_textOf(tester, 'relation-details-priority'), 'P2');
+        expect(
+          _textOf(tester, 'relation-details-scope'),
+          number == 101
+              ? l10n.relationNeighborhoodRelationActive
+              : l10n.relationNeighborhoodRelationArchived,
+        );
+        expect(
+          _textOf(tester, 'relation-details-description'),
+          'Описание связи $number',
         );
         expect(
           tester
-              .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedEntitiesScope.active)),
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('relation-details-edit-relation')),
               )
-              .selected,
-          isTrue,
+              .onPressed,
+          isNotNull,
         );
-        expect(retainedTagFixtureGraph(raw), graphBefore);
         expect(
-          raw
-              .select(
-                'SELECT * FROM tag_assignments ORDER BY creation_sequence',
+          tester
+              .widget<FilledButton>(
+                find.byKey(
+                  ValueKey(
+                    number == 101
+                        ? 'relation-details-archive-relation'
+                        : 'relation-details-restore-relation',
+                  ),
+                ),
               )
-              .map((row) => row.values.toList())
-              .toList(),
-          assignmentsBefore,
+              .onPressed,
+          number == 101 ? isNotNull : isNull,
         );
-        router.pop();
-        await tester.pumpAndSettle();
-        expect(router.current.name, RelationDetailsRoute.name);
-        await Scrollable.ensureVisible(tester.element(choose), alignment: 0.3);
-        await tester.pumpAndSettle();
-        await tester.tap(choose);
-        await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
         expect(
-          router.current.argsAs<TagCatalogRouteArgs>().target,
-          LongTermRelationTagTarget(_relationId(number)),
+          tester
+              .widget<OutlinedButton>(
+                find.byKey(const ValueKey('relation-details-delete-relation')),
+              )
+              .onPressed,
+          usedByDailyPath ? isNull : isNotNull,
         );
 
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-        await tester.pumpAndSettle();
-        await tester.enterText(
-          find.byKey(const ValueKey('tag-editor-name')),
-          'Новый тег $number',
-        );
-        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-        await _waitUntil(
-          tester,
-          () =>
-              find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
-        );
-        final newTagId =
-            raw.select('SELECT id FROM tags WHERE name = ?', [
-                  'Новый тег $number',
-                ]).single['id']
-                as String;
-        expect(
-          raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-            newTagId,
-          ]),
-          isEmpty,
-        );
-
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
-        await _waitUntil(
-          tester,
-          () => raw.select(
-            'SELECT * FROM tag_assignments WHERE tag_id = ? AND long_term_relation_id = ?',
-            [newTagId, tagFixtureId(number)],
-          ).isNotEmpty,
-        );
-        router.pop();
-        await tester.pumpAndSettle();
-        final remove = find.byKey(ValueKey('tag-assignment-remove-$newTagId'));
-        await Scrollable.ensureVisible(tester.element(remove), alignment: 0.3);
-        await tester.pumpAndSettle();
-        await tester.tap(remove);
-        await _waitUntil(
-          tester,
-          () => raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-            newTagId,
-          ]).isEmpty,
-        );
-        expect(
-          raw.select('SELECT * FROM tags WHERE id = ?', [newTagId]),
-          hasLength(1),
-        );
-        expect(
-          raw.select(
-            'SELECT * FROM tag_assignments WHERE intention_id IS NOT NULL',
+        for (final (role, participantNumber, tagNumber) in [
+          ('source', 1, firstTagNumber),
+          (
+            'related',
+            number == 101 ? 3 : 2,
+            number == 101 ? lastTagNumber : firstTagNumber,
           ),
-          hasLength(3),
-        );
-        expect(
-          raw.select(
-            'SELECT * FROM tag_assignments WHERE long_term_relation_id = ?',
-            [tagFixtureId(number == 101 ? 102 : 101)],
-          ),
-          hasLength(1),
-        );
-        expect(
-          raw.select(
-            'SELECT * FROM tag_assignments WHERE long_term_relation_id = ?',
-            [tagFixtureId(number)],
-          ),
-          hasLength(1),
-        );
-        expect(retainedTagFixtureGraph(raw), graphBefore);
-
-        if (number == 102 && !usedByDailyPath) {
-          final delete = find.byKey(
-            const ValueKey('relation-details-delete-relation'),
-          );
-          await tester.scrollUntilVisible(
-            delete,
-            -200,
-            scrollable: find.byType(Scrollable).last,
+        ]) {
+          await tester.tap(
+            find.byKey(ValueKey('relation-details-$role-participant')),
           );
           await tester.pumpAndSettle();
-          await tester.tap(delete);
-          await tester.pumpAndSettle();
+          expect(router.current.name, IntentionDetailsRoute.name);
           expect(
-            find.textContaining(
-              locale.languageCode == 'ru'
-                  ? 'Все назначения тегов этой связи'
-                  : 'All tag assignments of this relation',
-            ),
+            router.current
+                .argsAs<IntentionDetailsRouteArgs>()
+                .intentionId
+                .toCanonicalString(),
+            tagFixtureId(participantNumber),
+          );
+          expect(find.byType(TagAssignmentsSection), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('tag-assignments-choose')),
             findsOneWidget,
           );
-          await tester.tap(
-            find.widgetWithText(
-              TextButton,
-              locale.languageCode == 'ru' ? 'Отмена' : 'Cancel',
-            ),
-          );
+          for (final action in ['open', 'remove']) {
+            expect(
+              find.byKey(
+                ValueKey('tag-assignment-$action-${tagFixtureId(tagNumber)}'),
+              ),
+              findsOneWidget,
+            );
+          }
+          router.pop();
           await tester.pumpAndSettle();
-          expect(retainedTagFixtureGraph(raw), graphBefore);
         }
+        expect(router.current.name, RelationDetailsRoute.name);
+        expect(find.byType(TagAssignmentsSection), findsNothing);
+        expect(_storedGraph(raw), graphBefore);
+        expect(tester.takeException(), isNull);
         router.pop();
         await tester.pumpAndSettle();
         expect(router.current.name, TagNavigationRoute.name);
         expect(
           tester
               .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+                find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
               )
               .selected,
           isTrue,
@@ -278,12 +235,14 @@ void main() {
   }
 }
 
-Future<void> _waitUntil(WidgetTester tester, bool Function() done) async {
-  for (var attempt = 0; attempt < 30 && !done(); attempt++) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 20)),
-    );
-    await tester.pumpAndSettle();
-  }
-  expect(done(), isTrue);
-}
+String _textOf(WidgetTester tester, String key) =>
+    tester.widget<Text>(find.byKey(ValueKey(key))).data!;
+
+Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
+  ...retainedTagFixtureGraph(raw),
+  for (final table in ['tags', 'tag_assignments'])
+    table: raw
+        .select('SELECT * FROM $table ORDER BY rowid')
+        .map((row) => row.values.toList())
+        .toList(),
+};

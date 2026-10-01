@@ -1,14 +1,14 @@
 import '../../../graph/application/graph_revision.dart';
-import '../../application/tagged_entities_page.dart';
+import '../../../intention/domain/intention_id.dart';
+import '../../application/tagged_intentions_page.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
-import '../../domain/tag_target.dart';
 
 sealed class TagNavigationState {
   const TagNavigationState({required this.tagId, required this.scope});
 
   final TagId tagId;
-  final TaggedEntitiesScope scope;
+  final TaggedIntentionsScope scope;
 }
 
 final class TagNavigationInitialLoading extends TagNavigationState {
@@ -29,8 +29,8 @@ final class TagNavigationInitialFailure extends TagNavigationState {
     required this.failure,
   });
 
-  final TaggedEntitiesReadFailure failure;
-  bool get canRetry => failure is TaggedEntitiesUnavailableFailure;
+  final TaggedIntentionsReadFailure failure;
+  bool get canRetry => failure is TaggedIntentionsUnavailableFailure;
 }
 
 sealed class TagNavigationPageStatus {
@@ -50,16 +50,16 @@ final class TagNavigationPageLoading extends TagNavigationPageStatus {
 final class TagNavigationPageFailure extends TagNavigationPageStatus {
   const TagNavigationPageFailure(this.failure);
 
-  final TaggedEntitiesReadFailure failure;
-  bool get canRetry => failure is TaggedEntitiesUnavailableFailure;
+  final TaggedIntentionsReadFailure failure;
+  bool get canRetry => failure is TaggedIntentionsUnavailableFailure;
 }
 
-/// Смешанные строки и продолжение принадлежат одному тегу, охвату и снимку.
+/// Помеченные намерения и продолжение принадлежат одному тегу, охвату и снимку.
 final class TagNavigationLoaded extends TagNavigationState {
   TagNavigationLoaded({
     required this.tag,
     required super.scope,
-    required List<TaggedEntity> items,
+    required List<TaggedIntention> items,
     required this.nextCursor,
     required this.revision,
     this.freshness = TagNavigationFreshness.current,
@@ -69,11 +69,11 @@ final class TagNavigationLoaded extends TagNavigationState {
        super(tagId: tag.id);
 
   final Tag tag;
-  final List<TaggedEntity> items;
-  final TaggedEntitiesCursor? nextCursor;
+  final List<TaggedIntention> items;
+  final TaggedIntentionsCursor? nextCursor;
   final GraphRevision revision;
   final TagNavigationFreshness freshness;
-  final TaggedEntitiesReadFailure? refreshFailure;
+  final TaggedIntentionsReadFailure? refreshFailure;
   final TagNavigationPageStatus pageStatus;
 
   bool get isEmpty => items.isEmpty;
@@ -83,13 +83,14 @@ final class TagNavigationLoaded extends TagNavigationState {
       nextCursor == null &&
       pageStatus is TagNavigationPageIdle;
 
-  bool contains(TagTarget target) => items.any((item) => item.target == target);
+  bool contains(IntentionId intentionId) =>
+      items.any((item) => item.id == intentionId);
 
   TagNavigationLoaded withStatus({
     Tag? tag,
     bool clearCursor = false,
     TagNavigationFreshness? freshness,
-    TaggedEntitiesReadFailure? refreshFailure,
+    TaggedIntentionsReadFailure? refreshFailure,
     TagNavigationPageStatus? pageStatus,
   }) => TagNavigationLoaded(
     tag: tag ?? this.tag,

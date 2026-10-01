@@ -23,8 +23,7 @@ check-fast = [
 codegen = [
     "flutter gen-l10n",
     "dart run build_runner build --delete-conflicting-outputs",
-    "dart run drift_dev schema dump lib/src/data/local/app_database.dart drift_schemas/",
-    "dart run drift_dev schema steps drift_schemas/ lib/src/data/local/migrations/generated_schema.dart"
+    "dart run drift_dev schema dump lib/src/data/local/app_database.dart drift_schemas/"
 ]
 codegen-check = "bash tool/check_generated.sh"
 codegen-check-test = "bash tool/check_generated_test.sh"

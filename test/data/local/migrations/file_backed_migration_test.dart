@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/fts_integrity.dart';
-import 'package:doable/src/data/local/migrations/migration_strategy.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -14,7 +13,6 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/doable_schema_verifier.dart';
 import '../../../support/local_database_harness.dart';
-import '../../../support/schema_v1_fixture.dart';
 import '../../../support/tag_storage_fixture.dart';
 
 const _activeIntentionId = '018f0b5d-6b2e-7c80-8000-000000000311';
@@ -32,516 +30,139 @@ const _workerStartedMarker = 'DOABLE_MIGRATION_WORKER_STARTED';
 const _workerReadyMarker = 'DOABLE_MIGRATION_WORKER_READY';
 
 void main() {
-  test('все поддерживаемые обновления дают контракт новой установки и сохраняют граф', () async {
-    final fresh = await LocalDatabaseHarness.fileBacked();
-    addTearDown(fresh.dispose);
-    final freshDatabase = await fresh.openReadyDatabase();
-    await verifyDoableDatabaseSchema(freshDatabase);
-    await fresh.closePersistenceObjectGraph();
-    final freshSchema = _schemaContract(fresh.databaseFile);
+  test(
+    'текущая схема на файловой базе совпадает с новой установкой и сохраняет '
+    'граф, назначения и счётчик после повторного открытия',
+    () async {
+      final fresh = await LocalDatabaseHarness.fileBacked();
+      addTearDown(fresh.dispose);
+      final freshDatabase = await fresh.openReadyDatabase();
+      await verifyDoableDatabaseSchema(freshDatabase);
+      await fresh.closePersistenceObjectGraph();
+      final freshSchema = _schemaContract(fresh.databaseFile);
 
-    for (final sourceVersion in [
-      publishedIntentionSchemaVersion,
-      publishedRelationSchemaVersion,
-      publishedDailyChoiceSchemaVersion,
-    ]) {
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
-      await _createPublishedGraphFixture(harness.databaseFile, sourceVersion);
-      final before = _graphRows(harness.databaseFile, sourceVersion);
+      late sqlite.Database raw;
+      await harness.openReadyDatabase(setup: (database) => raw = database);
+      _seedStoredGraph(raw);
+      seedTagStorageFixture(raw);
+      // Последнее назначение удалено: следующий номер должен продолжить счётчик
+      // последовательности, а не максимум сохранённых строк.
+      raw.execute('DELETE FROM tag_assignments WHERE creation_sequence = 3');
+      await harness.closePersistenceObjectGraph();
+      final beforeGraph = _graphRows(harness.databaseFile);
+      final beforeAssignments = _assignmentRows(harness.databaseFile);
+      expect(beforeAssignments.rows, hasLength(2));
+      expect(beforeAssignments.sequence, 3);
 
-      final migrated = await harness.openReadyDatabase();
-      await verifyDoableDatabaseSchema(migrated);
-      await verifyIntentionTitlesFtsIntegrity(migrated);
+      final reopened = await harness.openReadyDatabase();
+      await verifyDoableDatabaseSchema(reopened);
+      await verifyIntentionTitlesFtsIntegrity(reopened);
       expect(
-        (await migrated.customSelect('PRAGMA foreign_key_check').get()),
+        await reopened.customSelect('PRAGMA foreign_key_check').get(),
         isEmpty,
-        reason: 'Исходная версия $sourceVersion',
       );
       expect(
-        (await migrated.customSelect('PRAGMA foreign_keys').getSingle())
+        (await reopened.customSelect('PRAGMA foreign_keys').getSingle())
             .read<int>('foreign_keys'),
         1,
       );
       await harness.closePersistenceObjectGraph();
 
-      expect(
-        _schemaContract(harness.databaseFile),
-        freshSchema,
-        reason: 'Исходная версия $sourceVersion',
-      );
-      expect(
-        _graphRows(harness.databaseFile, sourceVersion),
-        before,
-        reason: 'Исходная версия $sourceVersion',
-      );
-      _expectEmptyTagTables(harness.databaseFile);
+      expect(_schemaContract(harness.databaseFile), freshSchema);
+      expect(_graphRows(harness.databaseFile), beforeGraph);
+      final afterAssignments = _assignmentRows(harness.databaseFile);
+      expect(afterAssignments.rows, beforeAssignments.rows);
+      expect(afterAssignments.sequence, beforeAssignments.sequence);
+      _expectStoredIntentionsSearchable(harness.databaseFile);
 
-      final reopened = await harness.openReadyDatabase();
-      await verifyDoableDatabaseSchema(reopened);
-      await harness.closePersistenceObjectGraph();
-      expect(_graphRows(harness.databaseFile, sourceVersion), before);
-    }
-  });
-
-  test('переход 4 → 5 сохраняет назначения и их последовательности', () async {
-    final fresh = await LocalDatabaseHarness.fileBacked();
-    addTearDown(fresh.dispose);
-    await fresh.openReadyDatabase();
-    await fresh.closePersistenceObjectGraph();
-    final freshSchema = _schemaContract(fresh.databaseFile);
-
-    final harness = await LocalDatabaseHarness.fileBacked();
-    addTearDown(harness.dispose);
-    await createSchemaV4Fixture(
-      harness.databaseFile,
-      seed: (raw) {
-        seedTagStorageFixture(raw);
-        raw.execute('DELETE FROM tag_assignments WHERE creation_sequence = 5');
-      },
-    );
-    final beforeGraph = _graphRows(
-      harness.databaseFile,
-      tagSchemaVersionBeforeOrder,
-    );
-    final beforeAssignments = _assignmentRows(harness.databaseFile);
-
-    final migrated = await harness.openReadyDatabase();
-    await verifyDoableDatabaseSchema(migrated);
-    await harness.closePersistenceObjectGraph();
-    expect(_schemaContract(harness.databaseFile), freshSchema);
-    expect(
-      _graphRows(harness.databaseFile, tagSchemaVersionBeforeOrder),
-      beforeGraph,
-    );
-    final afterAssignments = _assignmentRows(harness.databaseFile);
-    expect(afterAssignments.rows, beforeAssignments.rows);
-    expect(afterAssignments.sequence, beforeAssignments.sequence);
-    final raw = sqlite.sqlite3.open(harness.databaseFile.path);
-    try {
-      expect(raw.select('PRAGMA user_version').single['user_version'], 5);
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-      expect(
-        raw.select('''
+      final database = sqlite.sqlite3.open(harness.databaseFile.path);
+      try {
+        composeDoableSqliteConnectionSetup(null)(database);
+        expect(
+          database.select('PRAGMA user_version').single['user_version'],
+          AppDatabase.currentSchemaVersion,
+        );
+        expect(
+          database.select('''
           SELECT 1 FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
           WHERE a.tag_creation_sequence <> t.creation_sequence
         '''),
-        isEmpty,
-      );
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(lastTagNumber), tagFixtureId(3)],
-      );
-      expect(
-        raw
-            .select(
-              '''
+          isEmpty,
+        );
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(lastTagNumber), _activeIntentionId],
+        );
+        expect(
+          database
+              .select(
+                '''
           SELECT creation_sequence FROM tag_assignments
           WHERE tag_id = ? AND intention_id = ?
         ''',
-              [tagFixtureId(lastTagNumber), tagFixtureId(3)],
-            )
-            .single['creation_sequence'],
-        6,
-      );
-    } finally {
-      raw.close();
-    }
-  });
-
-  test(
-    'сбой перехода 4 → 5 откатывает схему и назначения до повторного открытия',
-    () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      await createSchemaV4Fixture(
-        harness.databaseFile,
-        seed: seedTagStorageFixture,
-      );
-      final beforeSchema = _schemaContract(harness.databaseFile);
-      final beforeAssignments = _assignmentRows(harness.databaseFile);
-      final interceptor = _Schema4To5FailureInterceptor();
-
-      final failed = await harness.open(observer: interceptor);
-      expect(failed, isA<LocalDataUnexpectedFailure>());
-      expect(interceptor.didInjectFailure, isTrue);
-      await harness.closePersistenceObjectGraph();
-      expect(_schemaContract(harness.databaseFile), beforeSchema);
-      final afterFailure = _assignmentRows(harness.databaseFile);
-      expect(afterFailure.rows, beforeAssignments.rows);
-      expect(afterFailure.sequence, beforeAssignments.sequence);
-
-      final recovered = await harness.openReadyDatabase();
-      await verifyDoableDatabaseSchema(recovered);
-      await harness.closePersistenceObjectGraph();
-      expect(
-        _assignmentRows(harness.databaseFile).rows,
-        beforeAssignments.rows,
-      );
-    },
-  );
-
-  test(
-    'сбой шага 3 → 4 до commit сохраняет дневной путь и позволяет повтор',
-    () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      await createSchemaV3Fixture(
-        harness.databaseFile,
-        seed: _seedPublishedDailyGraph,
-      );
-      final before = _graphRows(
-        harness.databaseFile,
-        publishedDailyChoiceSchemaVersion,
-      );
-      final interceptor = _Schema3To4FailureInterceptor();
-
-      final failed = await harness.open(observer: interceptor);
-      expect(failed, isA<LocalDataUnexpectedFailure>());
-      expect(interceptor.didInjectFailure, isTrue);
-      await harness.closePersistenceObjectGraph();
-      expect(
-        _graphRows(harness.databaseFile, publishedDailyChoiceSchemaVersion),
-        before,
-      );
-      _expectNoTagTables(
-        harness.databaseFile,
-        publishedDailyChoiceSchemaVersion,
-      );
-
-      final recovered = await harness.openReadyDatabase();
-      await verifyDoableDatabaseSchema(recovered);
-      await harness.closePersistenceObjectGraph();
-      expect(
-        _graphRows(harness.databaseFile, publishedDailyChoiceSchemaVersion),
-        before,
-      );
-      _expectEmptyTagTables(harness.databaseFile);
-    },
-  );
-
-  for (final stopPoint in _MigrationProcessStopPoint.values) {
-    test(
-      'останов процесса на переходе 3 → 4 ${stopPoint.testDescription} сохраняет дневной путь',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        await createSchemaV3Fixture(
-          harness.databaseFile,
-          seed: _seedPublishedDailyGraph,
-        );
-        final before = _graphRows(
-          harness.databaseFile,
-          publishedDailyChoiceSchemaVersion,
-        );
-
-        await _runMigrationWorkerUntilStopPoint(harness, stopPoint);
-        expect(
-          _graphRows(harness.databaseFile, publishedDailyChoiceSchemaVersion),
-          before,
-        );
-        if (stopPoint.isAfterCommit) {
-          _expectEmptyTagTables(harness.databaseFile);
-        } else {
-          _expectNoTagTables(
-            harness.databaseFile,
-            publishedDailyChoiceSchemaVersion,
-          );
-        }
-
-        final recovered = await harness.openReadyDatabase();
-        await verifyDoableDatabaseSchema(recovered);
-        await harness.closePersistenceObjectGraph();
-        expect(
-          _graphRows(harness.databaseFile, publishedDailyChoiceSchemaVersion),
-          before,
-        );
-        _expectEmptyTagTables(harness.databaseFile);
-      },
-    );
-  }
-
-  test(
-    'читатель схемы 3 отклоняет настоящий файл версии 5 без изменения',
-    () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      await createSchemaV3Fixture(
-        harness.databaseFile,
-        seed: _seedPublishedDailyGraph,
-      );
-      await harness.openReadyDatabase();
-      await harness.closePersistenceObjectGraph();
-      final before = await harness.databaseFile.readAsBytes();
-      final reader = _Schema3Reader(harness.databaseFile);
-      addTearDown(reader.close);
-
-      await expectLater(
-        reader.customSelect('SELECT id FROM intentions').get(),
-        throwsA(
-          isA<IncompatibleLocalDataSchemaException>()
-              .having(
-                (error) => error.expectedSchemaVersion,
-                'ожидаемая версия',
-                3,
+                [tagFixtureId(lastTagNumber), _activeIntentionId],
               )
-              .having(
-                (error) => error.detectedSchemaVersion,
-                'версия файла',
-                AppDatabase.currentSchemaVersion,
-              ),
-        ),
-      );
-      expect(await harness.databaseFile.readAsBytes(), before);
-      _expectEmptyTagTables(harness.databaseFile);
+              .single['creation_sequence'],
+          4,
+        );
+        expect(database.select('PRAGMA foreign_key_check'), isEmpty);
+      } finally {
+        database.close();
+      }
     },
   );
 
-  test('прерванное первичное создание не оставляет schema objects и допускает повтор', () async {
-    final harness = await LocalDatabaseHarness.fileBacked();
-    addTearDown(harness.dispose);
-    final failureInterceptor = _InitialSchemaCreationFailureInterceptor();
+  for (final failurePoint in _InitialCreationFailurePoint.values) {
+    test(
+      'отказ создания ${failurePoint.testDescription} не оставляет частичной '
+      'схемы, сохраняет файл и допускает повторное создание',
+      () async {
+        final harness = await LocalDatabaseHarness.fileBacked();
+        addTearDown(harness.dispose);
+        _markEmptyStorageFile(harness.databaseFile);
+        final failureInterceptor = _InitialSchemaCreationFailureInterceptor(
+          failurePoint,
+        );
 
-    final failedResult = await harness.open(observer: failureInterceptor);
+        final failedResult = await harness.open(observer: failureInterceptor);
 
-    expect(failedResult, isA<LocalDataUnexpectedFailure>());
-    expect(failureInterceptor.didInjectFailure, isTrue);
-    expect(failureInterceptor.didCloseExecutor, isTrue);
+        expect(failedResult, isA<LocalDataUnexpectedFailure>());
+        expect(failureInterceptor.didInjectFailure, isTrue);
+        expect(failureInterceptor.didCloseExecutor, isTrue);
 
-    await harness.closePersistenceObjectGraph();
-    await _expectStorageWithoutUserSchema(harness.databaseFile);
+        await harness.closePersistenceObjectGraph();
+        await _expectStorageWithoutUserSchema(harness.databaseFile);
+        _expectStorageFileKept(harness.databaseFile);
 
-    final reopenedDatabase = await harness.openReadyDatabase();
-    final version = await reopenedDatabase
-        .customSelect('PRAGMA user_version')
-        .getSingle();
-    final foreignKeys = await reopenedDatabase
-        .customSelect('PRAGMA foreign_keys')
-        .getSingle();
-
-    expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
-    expect(foreignKeys.read<int>('foreign_keys'), 1);
-    await expectLater(
-      verifyIntentionTitlesFtsIntegrity(reopenedDatabase),
-      completes,
+        await _expectRecreatedSchemaSurvivesReopen(harness);
+      },
     );
-  });
+  }
 
-  test('файловая миграция с внедрённым отказом оставляет целую схему после повторного открытия', () async {
-    final harness = await LocalDatabaseHarness.fileBacked();
-    addTearDown(harness.dispose);
-    await createSchemaV1Fixture(
-      harness.databaseFile,
-      seed: _seedPublishedIntentions,
-    );
-    final failureInterceptor = _Schema1To2FailureInterceptor();
-
-    final failedResult = await harness.open(observer: failureInterceptor);
-
-    expect(failedResult, isA<LocalDataUnexpectedFailure>());
-    expect(failureInterceptor.didInjectFailure, isTrue);
-
-    await harness.closePersistenceObjectGraph();
-    _expectPublishedIntentions(
-      harness.databaseFile,
-      expectedSchemaVersion: publishedIntentionSchemaVersion,
-      hasRelationSchema: false,
-    );
-
-    final reopenedDatabase = await harness.openReadyDatabase();
-    await expectLater(
-      verifyIntentionTitlesFtsIntegrity(reopenedDatabase),
-      completes,
-    );
-    await expectLater(verifyDoableDatabaseSchema(reopenedDatabase), completes);
-    await harness.closePersistenceObjectGraph();
-
-    _expectPublishedIntentions(
-      harness.databaseFile,
-      expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-      hasRelationSchema: true,
-    );
-  });
-
-  test(
-    'успешная миграция сохраняет намерения после повторного открытия',
-    () async {
+  for (final stopPoint in _MigrationProcessStopPoint.values) {
+    test('остановка процесса ${stopPoint.testDescription} создания схемы '
+        'оставляет либо целую схему, либо файл без схемы', () async {
       final harness = await LocalDatabaseHarness.fileBacked();
       addTearDown(harness.dispose);
-      await createSchemaV1Fixture(
-        harness.databaseFile,
-        seed: _seedPublishedIntentions,
-      );
+      _markEmptyStorageFile(harness.databaseFile);
 
-      final migratedDatabase = await harness.openReadyDatabase();
-      await expectLater(
-        verifyDoableDatabaseSchema(migratedDatabase),
-        completes,
-      );
-      await harness.closePersistenceObjectGraph();
-      _expectPublishedIntentions(
-        harness.databaseFile,
-        expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-        hasRelationSchema: true,
-      );
+      await _runMigrationWorkerUntilStopPoint(harness, stopPoint);
 
-      final reopenedDatabase = await harness.openReadyDatabase();
-      await expectLater(
-        verifyDoableDatabaseSchema(reopenedDatabase),
-        completes,
-      );
-      await harness.closePersistenceObjectGraph();
-      _expectPublishedIntentions(
-        harness.databaseFile,
-        expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-        hasRelationSchema: true,
-      );
-    },
-  );
+      if (stopPoint.isAfterCommit) {
+        _expectCurrentSchemaContract(harness.databaseFile);
+      } else {
+        await _expectStorageWithoutUserSchema(harness.databaseFile);
+      }
+      _expectStorageFileKept(harness.databaseFile);
 
-  test('переход 2 → 3 сохраняет граф и не создаёт дневные выборы', () async {
-    final harness = await LocalDatabaseHarness.fileBacked();
-    addTearDown(harness.dispose);
-    await createSchemaV2Fixture(
-      harness.databaseFile,
-      seed: _seedPublishedGraph,
-    );
-
-    final migratedDatabase = await harness.openReadyDatabase();
-    await expectLater(verifyDoableDatabaseSchema(migratedDatabase), completes);
-    await harness.closePersistenceObjectGraph();
-    _expectPublishedGraph(
-      harness.databaseFile,
-      expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-      hasChoiceSchema: true,
-    );
-
-    final reopenedDatabase = await harness.openReadyDatabase();
-    await expectLater(verifyDoableDatabaseSchema(reopenedDatabase), completes);
-    await harness.closePersistenceObjectGraph();
-    _expectPublishedGraph(
-      harness.databaseFile,
-      expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-      hasChoiceSchema: true,
-    );
-  });
-
-  test('сбой перехода 2 → 3 оставляет прежний граф и версию', () async {
-    final harness = await LocalDatabaseHarness.fileBacked();
-    addTearDown(harness.dispose);
-    await createSchemaV2Fixture(
-      harness.databaseFile,
-      seed: _seedPublishedGraph,
-    );
-    final interceptor = _Schema2To3FailureInterceptor();
-
-    final failedResult = await harness.open(observer: interceptor);
-    expect(failedResult, isA<LocalDataUnexpectedFailure>());
-    expect(interceptor.didInjectFailure, isTrue);
-    await harness.closePersistenceObjectGraph();
-    _expectPublishedGraph(
-      harness.databaseFile,
-      expectedSchemaVersion: publishedRelationSchemaVersion,
-      hasChoiceSchema: false,
-    );
-
-    final reopenedDatabase = await harness.openReadyDatabase();
-    await expectLater(verifyDoableDatabaseSchema(reopenedDatabase), completes);
-    await harness.closePersistenceObjectGraph();
-    _expectPublishedGraph(
-      harness.databaseFile,
-      expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-      hasChoiceSchema: true,
-    );
-  });
-
-  for (final stopPoint in _MigrationProcessStopPoint.values) {
-    test(
-      'прерывание перехода 2 → 3 ${stopPoint.testDescription} сохраняет целый граф',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        await createSchemaV2Fixture(
-          harness.databaseFile,
-          seed: _seedPublishedGraph,
-        );
-
-        await _runMigrationWorkerUntilStopPoint(harness, stopPoint);
-        _expectPublishedGraph(
-          harness.databaseFile,
-          expectedSchemaVersion: stopPoint.isAfterCommit
-              ? AppDatabase.currentSchemaVersion
-              : publishedRelationSchemaVersion,
-          hasChoiceSchema: stopPoint.isAfterCommit,
-        );
-
-        final reopenedDatabase = await harness.openReadyDatabase();
-        await expectLater(
-          verifyDoableDatabaseSchema(reopenedDatabase),
-          completes,
-        );
-        await harness.closePersistenceObjectGraph();
-        _expectPublishedGraph(
-          harness.databaseFile,
-          expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-          hasChoiceSchema: true,
-        );
-      },
-    );
-  }
-
-  for (final stopPoint in _MigrationProcessStopPoint.values) {
-    test(
-      'принудительное завершение ${stopPoint.testDescription} сохраняет целое хранилище',
-      () async {
-        final harness = await LocalDatabaseHarness.fileBacked();
-        addTearDown(harness.dispose);
-        await createSchemaV1Fixture(
-          harness.databaseFile,
-          seed: _seedPublishedIntentions,
-        );
-
-        await _runMigrationWorkerUntilStopPoint(harness, stopPoint);
-
-        _expectPublishedIntentions(
-          harness.databaseFile,
-          expectedSchemaVersion: stopPoint.expectedInterruptedVersion,
-          hasRelationSchema: stopPoint.isAfterCommit,
-        );
-
-        final recoveredDatabase = await harness.openReadyDatabase();
-        await expectLater(
-          verifyDoableDatabaseSchema(recoveredDatabase),
-          completes,
-        );
-        await harness.closePersistenceObjectGraph();
-        _expectPublishedIntentions(
-          harness.databaseFile,
-          expectedSchemaVersion: AppDatabase.currentSchemaVersion,
-          hasRelationSchema: true,
-        );
-      },
-    );
+      await _expectRecreatedSchemaSurvivesReopen(harness);
+    });
   }
 }
 
-final class _Schema3Reader extends GeneratedDatabase {
-  _Schema3Reader(File file)
-    : super(
-        NativeDatabase(file, setup: composeDoableSqliteConnectionSetup(null)),
-      );
-
-  @override
-  int get schemaVersion => publishedDailyChoiceSchemaVersion;
-
-  @override
-  Iterable<TableInfo> get allTables => const [];
-
-  @override
-  MigrationStrategy get migration => localDataMigrationStrategy(this);
-}
-
-void _seedPublishedIntentions(sqlite.Database database) {
+void _seedStoredIntentions(sqlite.Database database) {
   database.execute('''
     INSERT INTO intentions (
       id,
@@ -574,8 +195,8 @@ void _seedPublishedIntentions(sqlite.Database database) {
   ''');
 }
 
-void _seedPublishedGraph(sqlite.Database database) {
-  _seedPublishedIntentions(database);
+void _seedStoredGraph(sqlite.Database database) {
+  _seedStoredIntentions(database);
   database.execute('''
     INSERT INTO long_term_relations (
       creation_sequence,
@@ -597,10 +218,6 @@ void _seedPublishedGraph(sqlite.Database database) {
       1
     )
   ''');
-}
-
-void _seedPublishedDailyGraph(sqlite.Database database) {
-  _seedPublishedGraph(database);
   database.execute('''
     INSERT INTO intentions (
       id, title, description, is_action_ready, is_archived,
@@ -647,53 +264,30 @@ void _seedPublishedDailyGraph(sqlite.Database database) {
   ''');
 }
 
-Future<void> _createPublishedGraphFixture(File file, int version) =>
-    switch (version) {
-      publishedIntentionSchemaVersion => createSchemaV1Fixture(
-        file,
-        seed: _seedPublishedIntentions,
-      ),
-      publishedRelationSchemaVersion => createSchemaV2Fixture(
-        file,
-        seed: _seedPublishedGraph,
-      ),
-      publishedDailyChoiceSchemaVersion => createSchemaV3Fixture(
-        file,
-        seed: _seedPublishedDailyGraph,
-      ),
-      _ => throw ArgumentError.value(version, 'version'),
-    };
-
-Map<String, List<Map<String, Object?>>> _graphRows(File file, int version) {
+Map<String, List<Map<String, Object?>>> _graphRows(File file) {
   expect(file.existsSync(), isTrue);
   final database = sqlite.sqlite3.open(file.path);
   try {
-    final tables = [
+    const tables = [
       'intentions',
-      if (version >= publishedRelationSchemaVersion) 'long_term_relations',
-      if (version >= publishedDailyChoiceSchemaVersion) ...[
-        'daily_choices',
-        'daily_choice_path_steps',
-      ],
+      'long_term_relations',
+      'daily_choices',
+      'daily_choice_path_steps',
+      'tags',
     ];
-    final hasSequenceTable = database.select('''
-      SELECT name FROM sqlite_schema WHERE name = 'sqlite_sequence'
-    ''').isNotEmpty;
     return {
       for (final table in tables)
         table: database
             .select('SELECT rowid, * FROM $table ORDER BY rowid')
             .map((row) => Map<String, Object?>.from(row))
             .toList(),
-      'sqlite_sequence': !hasSequenceTable
-          ? <Map<String, Object?>>[]
-          : database
-                .select(
-                  "SELECT name, seq FROM sqlite_sequence WHERE name IN (${tables.map((_) => '?').join(', ')}) ORDER BY name",
-                  tables,
-                )
-                .map((row) => Map<String, Object?>.from(row))
-                .toList(),
+      'sqlite_sequence': database
+          .select(
+            "SELECT name, seq FROM sqlite_sequence WHERE name IN (${tables.map((_) => '?').join(', ')}) ORDER BY name",
+            tables,
+          )
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(),
     };
   } finally {
     database.close();
@@ -722,8 +316,7 @@ Map<String, String?> _schemaContract(File file) {
     return (
       rows: [
         for (final row in database.select('''
-          SELECT creation_sequence, tag_id, intention_id, long_term_relation_id
-          FROM tag_assignments ORDER BY creation_sequence
+          SELECT * FROM tag_assignments ORDER BY creation_sequence
         '''))
           Map<String, Object?>.from(row),
       ],
@@ -740,149 +333,15 @@ Map<String, String?> _schemaContract(File file) {
   }
 }
 
-void _expectNoTagTables(File file, int expectedVersion) {
-  expect(file.existsSync(), isTrue);
-  final database = sqlite.sqlite3.open(file.path);
-  try {
-    expect(
-      database.select('PRAGMA user_version').single['user_version'],
-      expectedVersion,
-    );
-    expect(
-      database.select('''
-      SELECT name FROM sqlite_schema
-      WHERE name IN ('tags', 'tag_assignments')
-    '''),
-      isEmpty,
-    );
-    expect(database.select('PRAGMA foreign_key_check'), isEmpty);
-    database.execute('''
-      INSERT INTO intention_titles_fts(intention_titles_fts, rank)
-      VALUES ('integrity-check', 1)
-    ''');
-  } finally {
-    database.close();
-  }
-}
-
-void _expectEmptyTagTables(File file) {
-  expect(file.existsSync(), isTrue);
-  final database = sqlite.sqlite3.open(file.path);
-  try {
-    expect(
-      database.select('PRAGMA user_version').single['user_version'],
-      AppDatabase.currentSchemaVersion,
-    );
-    expect(database.select('SELECT id FROM tags'), isEmpty);
-    expect(database.select('SELECT tag_id FROM tag_assignments'), isEmpty);
-    expect(database.select('PRAGMA foreign_key_check'), isEmpty);
-    database.execute('''
-      INSERT INTO intention_titles_fts(intention_titles_fts, rank)
-      VALUES ('integrity-check', 1)
-    ''');
-  } finally {
-    database.close();
-  }
-}
-
-void _expectPublishedGraph(
-  File databaseFile, {
-  required int expectedSchemaVersion,
-  required bool hasChoiceSchema,
-}) {
-  _expectPublishedIntentions(
-    databaseFile,
-    expectedSchemaVersion: expectedSchemaVersion,
-    hasRelationSchema: true,
-  );
+/// Сохранённые названия остаются доступными поиску после повторного открытия.
+void _expectStoredIntentionsSearchable(File databaseFile) {
   final database = sqlite.sqlite3.open(databaseFile.path);
   try {
     expect(
-      database.select('''
-        SELECT creation_sequence, id, source_intention_id,
-          related_intention_id, type, priority, description, is_archived
-        FROM long_term_relations
-      ''').single,
-      {
-        'creation_sequence': 47,
-        'id': '018f0b5d-6b2e-7c80-8000-000000000313',
-        'source_intention_id': _activeIntentionId,
-        'related_intention_id': _archivedIntentionId,
-        'type': 'need',
-        'priority': 2,
-        'description': '  Сохранённая связь  ',
-        'is_archived': 1,
-      },
-    );
-    final choiceTables = database.select('''
-      SELECT name FROM sqlite_schema
-      WHERE type = 'table'
-        AND name IN ('daily_choices', 'daily_choice_path_steps')
-      ORDER BY name
-    ''');
-    expect(choiceTables, hasChoiceSchema ? hasLength(2) : isEmpty);
-    if (hasChoiceSchema) {
-      expect(database.select('SELECT id FROM daily_choices'), isEmpty);
-      expect(
-        database.select('SELECT id FROM daily_choice_path_steps'),
-        isEmpty,
-      );
-    }
-  } finally {
-    database.close();
-  }
-}
-
-void _expectPublishedIntentions(
-  File databaseFile, {
-  required int expectedSchemaVersion,
-  required bool hasRelationSchema,
-}) {
-  final database = sqlite.sqlite3.open(databaseFile.path);
-  try {
-    expect(
-      database.select('PRAGMA user_version').single['user_version'],
-      expectedSchemaVersion,
-    );
-    expect(
-      database
-          .select('''
-            SELECT
-              id,
-              title,
-              title_search_key,
-              description,
-              is_action_ready,
-              is_archived,
-              created_at,
-              updated_at
-            FROM intentions
-            ORDER BY id
-          ''')
-          .map((row) => Map<String, Object?>.from(row))
-          .toList(),
-      [
-        {
-          'id': _activeIntentionId,
-          'title': 'Straße',
-          'title_search_key': 'strasse',
-          'description': '  Точный текст\nбез нормализации  ',
-          'is_action_ready': 1,
-          'is_archived': 0,
-          'created_at': 1704067200000000,
-          'updated_at': 1704153600000000,
-        },
-        {
-          'id': _archivedIntentionId,
-          'title': 'Архивное намерение',
-          'title_search_key': 'архивное намерение',
-          'description': null,
-          'is_action_ready': 0,
-          'is_archived': 1,
-          'created_at': 1704240000000000,
-          'updated_at': 1704326400000000,
-        },
-      ],
+      database.select('SELECT title_search_key FROM intentions WHERE id = ?', [
+        _activeIntentionId,
+      ]).single['title_search_key'],
+      'strasse',
     );
     expect(
       database.select('''
@@ -892,42 +351,6 @@ void _expectPublishedIntentions(
       '''),
       hasLength(1),
     );
-    expect(
-      database
-          .select('SELECT id FROM intentions WHERE is_archived = 0 ORDER BY id')
-          .single['id'],
-      _activeIntentionId,
-    );
-    expect(
-      database
-          .select('SELECT id FROM intentions WHERE is_archived = 1 ORDER BY id')
-          .single['id'],
-      _archivedIntentionId,
-    );
-
-    final relationSchema = database.select('''
-      SELECT name
-      FROM sqlite_schema
-      WHERE name = 'long_term_relations'
-    ''');
-    expect(relationSchema, hasRelationSchema ? hasLength(1) : isEmpty);
-
-    final choiceTables = database.select('''
-      SELECT name FROM sqlite_schema
-      WHERE type = 'table'
-        AND name IN ('daily_choices', 'daily_choice_path_steps')
-      ORDER BY name
-    ''');
-    if (expectedSchemaVersion == AppDatabase.currentSchemaVersion) {
-      expect(choiceTables, hasLength(2));
-      expect(database.select('SELECT id FROM daily_choices'), isEmpty);
-      expect(
-        database.select('SELECT id FROM daily_choice_path_steps'),
-        isEmpty,
-      );
-    } else {
-      expect(choiceTables, isEmpty);
-    }
   } finally {
     database.close();
   }
@@ -1041,24 +464,20 @@ String _findFlutterExecutable() {
 enum _MigrationProcessStopPoint {
   beforeCommit(
     environmentValue: 'before_commit',
-    testDescription: 'до подтверждения миграции',
-    expectedInterruptedVersion: publishedIntentionSchemaVersion,
+    testDescription: 'до подтверждения',
   ),
   afterCommit(
     environmentValue: 'after_commit',
-    testDescription: 'после подтверждения миграции',
-    expectedInterruptedVersion: AppDatabase.currentSchemaVersion,
+    testDescription: 'после подтверждения',
   );
 
   const _MigrationProcessStopPoint({
     required this.environmentValue,
     required this.testDescription,
-    required this.expectedInterruptedVersion,
   });
 
   final String environmentValue;
   final String testDescription;
-  final int expectedInterruptedVersion;
 
   bool get isAfterCommit => this == afterCommit;
 }
@@ -1082,116 +501,122 @@ Future<void> _expectStorageWithoutUserSchema(File databaseFile) async {
   expect(version.single['user_version'], 0);
 }
 
+/// Метка файла в заголовке SQLite: не является объектом схемы, но теряется,
+/// если файл хранилища удалён или создан заново.
+const _storageFileMarker = 0x444F4142;
+
+void _markEmptyStorageFile(File databaseFile) {
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    database.execute('PRAGMA application_id = $_storageFileMarker');
+  } finally {
+    database.close();
+  }
+}
+
+void _expectStorageFileKept(File databaseFile) {
+  expect(databaseFile.existsSync(), isTrue);
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    expect(
+      database.select('PRAGMA application_id').single['application_id'],
+      _storageFileMarker,
+      reason: 'Файл хранилища не должен удаляться или создаваться заново.',
+    );
+  } finally {
+    database.close();
+  }
+}
+
+void _expectCurrentSchemaContract(File databaseFile) {
+  final database = sqlite.sqlite3.open(databaseFile.path);
+  try {
+    expect(
+      database.select('PRAGMA user_version').single['user_version'],
+      AppDatabase.currentSchemaVersion,
+    );
+    expect(
+      database.select(
+        "SELECT name FROM sqlite_schema WHERE type = 'table' "
+        "AND name = 'tag_assignments'",
+      ),
+      hasLength(1),
+    );
+  } finally {
+    database.close();
+  }
+}
+
+/// Следующий запуск создаёт или открывает схему на том же файле, а повторное
+/// открытие после закрытия видит тот же подтверждённый контракт схемы.
+Future<void> _expectRecreatedSchemaSurvivesReopen(
+  LocalDatabaseHarness harness,
+) async {
+  final createdDatabase = await harness.openReadyDatabase();
+  await expectLater(verifyDoableDatabaseSchema(createdDatabase), completes);
+  await expectLater(
+    verifyIntentionTitlesFtsIntegrity(createdDatabase),
+    completes,
+  );
+  expect(
+    (await createdDatabase.customSelect('PRAGMA foreign_keys').getSingle())
+        .read<int>('foreign_keys'),
+    1,
+  );
+  await harness.closePersistenceObjectGraph();
+  final createdSchema = _schemaContract(harness.databaseFile);
+  _expectStorageFileKept(harness.databaseFile);
+
+  final reopenedDatabase = await harness.openReadyDatabase();
+  await expectLater(verifyDoableDatabaseSchema(reopenedDatabase), completes);
+  final version = await reopenedDatabase
+      .customSelect('PRAGMA user_version')
+      .getSingle();
+  expect(version.read<int>('user_version'), AppDatabase.currentSchemaVersion);
+  await harness.closePersistenceObjectGraph();
+  expect(_schemaContract(harness.databaseFile), createdSchema);
+  _expectStorageFileKept(harness.databaseFile);
+}
+
 final class _InjectedInitialCreationFailure implements Exception {
   const _InjectedInitialCreationFailure();
 }
 
-final class _InjectedSchema1To2Failure implements Exception {
-  const _InjectedSchema1To2Failure();
-}
+enum _InitialCreationFailurePoint {
+  firstSchemaObject(testDescription: 'на первом объекте схемы'),
+  versionMarker(testDescription: 'после всех объектов и проверок схемы');
 
-final class _InjectedSchema2To3Failure implements Exception {
-  const _InjectedSchema2To3Failure();
-}
+  const _InitialCreationFailurePoint({required this.testDescription});
 
-final class _InjectedSchema3To4Failure implements Exception {
-  const _InjectedSchema3To4Failure();
-}
-
-final class _InjectedSchema4To5Failure implements Exception {
-  const _InjectedSchema4To5Failure();
-}
-
-final class _Schema4To5FailureInterceptor
-    extends LocalDatabaseConnectionObserver {
-  var didInjectFailure = false;
-
-  @override
-  void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (didInjectFailure) return;
-    if (!statement.statements.any(
-      (sql) =>
-          sql.trimLeft().toUpperCase().startsWith('DROP TABLE TAG_ASSIGNMENTS'),
-    )) {
-      return;
-    }
-    didInjectFailure = true;
-    throw const _InjectedSchema4To5Failure();
-  }
-}
-
-final class _Schema3To4FailureInterceptor
-    extends LocalDatabaseConnectionObserver {
-  var didInjectFailure = false;
-
-  @override
-  void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (didInjectFailure) return;
-    final createsTagAssignmentTable = statement.statements.any(
-      (sql) => RegExp(
-        r'^CREATE TABLE(?: IF NOT EXISTS)? ["`]?tag_assignments["` ]?',
-        caseSensitive: false,
-      ).hasMatch(sql.trimLeft()),
-    );
-    if (!createsTagAssignmentTable) return;
-    didInjectFailure = true;
-    throw const _InjectedSchema3To4Failure();
-  }
-}
-
-final class _Schema2To3FailureInterceptor
-    extends LocalDatabaseConnectionObserver {
-  var didInjectFailure = false;
-
-  @override
-  void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (didInjectFailure) return;
-    final createsChoiceTable = statement.statements.any(
-      (sql) => RegExp(
-        r'^CREATE TABLE(?: IF NOT EXISTS)? ["`]?daily_choices["`]?',
-        caseSensitive: false,
-      ).hasMatch(sql.trimLeft()),
-    );
-    if (!createsChoiceTable) return;
-
-    didInjectFailure = true;
-    throw const _InjectedSchema2To3Failure();
-  }
-}
-
-final class _Schema1To2FailureInterceptor
-    extends LocalDatabaseConnectionObserver {
-  var didInjectFailure = false;
-
-  @override
-  void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (didInjectFailure) return;
-    final createsRelationTable = statement.statements.any(
-      (sql) => RegExp(
-        r'^CREATE TABLE(?: IF NOT EXISTS)? ["`]?long_term_relations["`]?',
-        caseSensitive: false,
-      ).hasMatch(sql.trimLeft()),
-    );
-    if (!createsRelationTable) return;
-
-    didInjectFailure = true;
-    throw const _InjectedSchema1To2Failure();
-  }
+  final String testDescription;
 }
 
 final class _InitialSchemaCreationFailureInterceptor
     extends LocalDatabaseConnectionObserver {
+  _InitialSchemaCreationFailureInterceptor(this.failurePoint);
+
+  final _InitialCreationFailurePoint failurePoint;
   var didInjectFailure = false;
   var didCloseExecutor = false;
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (!didInjectFailure &&
-        statement.operation == LocalDatabaseSqlOperation.custom &&
-        _isSchemaCreate(statement.statements.single)) {
-      didInjectFailure = true;
-      throw const _InjectedInitialCreationFailure();
+    if (didInjectFailure ||
+        statement.operation != LocalDatabaseSqlOperation.custom) {
+      return;
     }
+    final isFailurePoint = switch (failurePoint) {
+      _InitialCreationFailurePoint.firstSchemaObject => _isSchemaCreate(
+        statement.statements.single,
+      ),
+      _InitialCreationFailurePoint.versionMarker => _isVersionMarker(
+        statement.statements.single,
+      ),
+    };
+    if (!isFailurePoint) return;
+
+    didInjectFailure = true;
+    throw const _InjectedInitialCreationFailure();
   }
 
   @override
@@ -1204,6 +629,15 @@ final class _InitialSchemaCreationFailureInterceptor
       r'^CREATE (?:TABLE|VIRTUAL TABLE|INDEX|TRIGGER|VIEW)\b',
       caseSensitive: false,
     ).hasMatch(statement.trimLeft());
+  }
+
+  // Маркер версии — последняя запись создания: к этому моменту все объекты
+  // схемы созданы, а проверки внешних ключей и поискового индекса пройдены.
+  bool _isVersionMarker(String statement) {
+    return RegExp(
+      '^PRAGMA user_version\\s*=\\s*${AppDatabase.currentSchemaVersion};?\$',
+      caseSensitive: false,
+    ).hasMatch(statement.trim());
   }
 }
 

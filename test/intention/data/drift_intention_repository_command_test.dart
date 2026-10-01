@@ -9,14 +9,12 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -390,7 +388,7 @@ void main() {
             in <
               (
                 String,
-                TagCommand Function(TagId, TagTarget),
+                TagCommand Function(TagId, IntentionId),
                 int,
                 List<String> Function(List<String>),
                 List<String> Function(List<String>),
@@ -398,15 +396,16 @@ void main() {
             >[
               (
                 'назначение',
-                (tagId, target) => AssignTag(tagId: tagId, target: target),
+                (tagId, intentionId) =>
+                    AssignTag(tagId: tagId, intentionId: intentionId),
                 lastTagNumber,
                 (names) => names,
                 (names) => [names.first, 'Работа', ...names.skip(1)],
               ),
               (
                 'снятие',
-                (tagId, target) =>
-                    RemoveTagAssignment(tagId: tagId, target: target),
+                (tagId, intentionId) =>
+                    RemoveTagAssignment(tagId: tagId, intentionId: intentionId),
                 firstTagNumber,
                 (names) => names,
                 (names) => names.skip(1).toList(),
@@ -421,12 +420,10 @@ void main() {
               final tagId = _tagId(tagFixtureId(tagNumber));
 
               final confirmed = _tagCommandSuccess(
-                await repository.execute(
-                  command(tagId, IntentionTagTarget(id)),
-                ),
+                await repository.execute(command(tagId, id)),
               );
               final changed = confirmed.value as TagAssignmentChanged;
-              final mutation = changed.catalogMutation!;
+              final mutation = changed.catalogMutation;
 
               expect(
                 confirmed.revision.compareTo(revisionBefore),
@@ -488,44 +485,6 @@ void main() {
               );
             },
           );
-
-          test(
-            '$name у долговременной связи не даёт каталожной мутации',
-            () async {
-              final relationTarget = switch (LongTermRelationId.decode(
-                tagFixtureId(101),
-              )) {
-                LongTermRelationIdDecodingSuccess(:final id) =>
-                  LongTermRelationTagTarget(id),
-                InvalidLongTermRelationIdDecoding() => throw StateError(
-                  'Некорректный ID связи.',
-                ),
-              };
-              final tagId = _tagId(tagFixtureId(tagNumber));
-
-              final confirmed = _tagCommandSuccess(
-                await repository.execute(command(tagId, relationTarget)),
-              );
-              final changed = confirmed.value as TagAssignmentChanged;
-
-              expect(changed.catalogMutation, isNull);
-              expect(confirmed.changes, [same(changed.change)]);
-              expect(
-                diagnostics.events.whereType<TagCommandDiagnosticsEvent>().last,
-                isA<TagCommandDiagnosticsEvent>()
-                    .having(
-                      (event) => event.stage,
-                      'stage',
-                      TagCommandDiagnosticsStage.write,
-                    )
-                    .having(
-                      (event) => event.status,
-                      'status',
-                      isA<DiagnosticsSucceeded>(),
-                    ),
-              );
-            },
-          );
         }
 
         for (final (name, command) in <(String, TagCommand)>[
@@ -533,14 +492,14 @@ void main() {
             'назначения',
             AssignTag(
               tagId: _tagId(tagFixtureId(firstTagNumber)),
-              target: IntentionTagTarget(_id(tagFixtureId(1))),
+              intentionId: _id(tagFixtureId(1)),
             ),
           ),
           (
             'снятия',
             RemoveTagAssignment(
               tagId: _tagId(tagFixtureId(lastTagNumber)),
-              target: IntentionTagTarget(_id(tagFixtureId(1))),
+              intentionId: _id(tagFixtureId(1)),
             ),
           ),
         ]) {
@@ -581,7 +540,7 @@ void main() {
               final result = await repository.execute(
                 AssignTag(
                   tagId: _tagId(tagFixtureId(lastTagNumber)),
-                  target: IntentionTagTarget(id),
+                  intentionId: id,
                 ),
               );
 

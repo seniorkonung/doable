@@ -162,7 +162,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     AssignTag command, {
     required void Function(TagCommandDiagnosticsStage) onStage,
   }) async {
-    await _checkAssignmentIdentities(command.tagId, command.target);
+    await _checkAssignmentIdentities(command.tagId, command.intentionId);
     final assignment = command.assignment;
     if (await _assignmentExists(assignment)) {
       return _CommittedTagAssignmentUnchanged(
@@ -171,27 +171,24 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
       );
     }
 
-    final before = await _tagTargetCatalogEntryBefore(command.target);
+    final before = await _tagIntentionCatalogEntryBefore(command.intentionId);
     onStage(TagCommandDiagnosticsStage.write);
     final tagId = command.tagId.toCanonicalString();
-    await _database.into(_database.tagAssignments).insert(
-      switch (command.target) {
-        IntentionTagTarget(:final intentionId) =>
+    await _database
+        .into(_database.tagAssignments)
+        .insert(
           local.TagAssignmentsCompanion.insert(
             tagId: tagId,
-            intentionId: Value(intentionId.toCanonicalString()),
+            intentionId: command.intentionId.toCanonicalString(),
           ),
-        LongTermRelationTagTarget(:final relationId) =>
-          local.TagAssignmentsCompanion.insert(
-            tagId: tagId,
-            longTermRelationId: Value(relationId.toCanonicalString()),
-          ),
-      },
-    );
+        );
     return _CommittedTagAssignmentChanged(
       assignment,
       TagAssignmentState.assigned,
-      catalogEntries: await _tagTargetCatalogEntries(before, onStage: onStage),
+      catalogEntries: await _tagIntentionCatalogEntries(
+        before,
+        onStage: onStage,
+      ),
     );
   }
 
@@ -199,7 +196,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     RemoveTagAssignment command, {
     required void Function(TagCommandDiagnosticsStage) onStage,
   }) async {
-    await _checkAssignmentIdentities(command.tagId, command.target);
+    await _checkAssignmentIdentities(command.tagId, command.intentionId);
     final assignment = command.assignment;
     if (!await _assignmentExists(assignment)) {
       return _CommittedTagAssignmentUnchanged(
@@ -208,58 +205,50 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
       );
     }
 
-    final before = await _tagTargetCatalogEntryBefore(command.target);
+    final before = await _tagIntentionCatalogEntryBefore(command.intentionId);
     onStage(TagCommandDiagnosticsStage.write);
     final tagId = command.tagId.toCanonicalString();
     final rows =
         await (_database.delete(_database.tagAssignments)..where(
               (row) =>
                   row.tagId.equals(tagId) &
-                  switch (command.target) {
-                    IntentionTagTarget(:final intentionId) =>
-                      row.intentionId.equals(intentionId.toCanonicalString()),
-                    LongTermRelationTagTarget(:final relationId) =>
-                      row.longTermRelationId.equals(
-                        relationId.toCanonicalString(),
-                      ),
-                  },
+                  row.intentionId.equals(
+                    command.intentionId.toCanonicalString(),
+                  ),
             ))
             .go();
     if (rows != 1) throw const _StoredIntentionCorruption();
     return _CommittedTagAssignmentChanged(
       assignment,
       TagAssignmentState.absent,
-      catalogEntries: await _tagTargetCatalogEntries(before, onStage: onStage),
+      catalogEntries: await _tagIntentionCatalogEntries(
+        before,
+        onStage: onStage,
+      ),
     );
   }
 
   /// Снимок «до» читается до записи пары, поэтому содержит прежний
   /// полный состав собственных тегов намерения.
-  Future<_TagTargetCatalogEntryBefore?> _tagTargetCatalogEntryBefore(
-    TagTarget target,
+  Future<_TagIntentionCatalogEntryBefore> _tagIntentionCatalogEntryBefore(
+    IntentionId intentionId,
   ) async {
-    switch (target) {
-      case IntentionTagTarget(:final intentionId):
-        final stored = await _readCommandSnapshot(intentionId);
-        if (stored == null) throw const _StoredIntentionCorruption();
-        final counts = await _readVerifiedRelationCounts(intentionId);
-        return (
-          id: intentionId,
-          counts: counts,
-          entry: await _catalogEntrySnapshot(stored, counts),
-        );
-      case LongTermRelationTagTarget():
-        return null;
-    }
+    final stored = await _readCommandSnapshot(intentionId);
+    if (stored == null) throw const _StoredIntentionCorruption();
+    final counts = await _readVerifiedRelationCounts(intentionId);
+    return (
+      id: intentionId,
+      counts: counts,
+      entry: await _catalogEntrySnapshot(stored, counts),
+    );
   }
 
   /// Команда тега не меняет строку намерения и его связи: снимок «после»
   /// отличается от снимка «до» только составом собственных тегов.
-  Future<_TagTargetCatalogEntries?> _tagTargetCatalogEntries(
-    _TagTargetCatalogEntryBefore? before, {
+  Future<_TagIntentionCatalogEntries> _tagIntentionCatalogEntries(
+    _TagIntentionCatalogEntryBefore before, {
     required void Function(TagCommandDiagnosticsStage) onStage,
   }) async {
-    if (before == null) return null;
     onStage(TagCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(before.id);
     if (stored == null) throw const _StoredIntentionCorruption();
@@ -269,55 +258,33 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     );
   }
 
-  Future<void> _checkAssignmentIdentities(TagId tagId, TagTarget target) async {
+  Future<void> _checkAssignmentIdentities(
+    TagId tagId,
+    IntentionId intentionId,
+  ) async {
     if (await _findTagById(tagId) == null) throw _TagMissing(tagId);
-    final exists = switch (target) {
-      IntentionTagTarget(:final intentionId) =>
-        await _database
-            .customSelect(
-              'SELECT 1 FROM intentions WHERE id = ?',
-              variables: [Variable<String>(intentionId.toCanonicalString())],
-              readsFrom: {_database.intentions},
-            )
-            .getSingleOrNull(),
-      LongTermRelationTagTarget(:final relationId) =>
-        await _database
-            .customSelect(
-              'SELECT 1 FROM long_term_relations WHERE id = ?',
-              variables: [Variable<String>(relationId.toCanonicalString())],
-              readsFrom: {_database.longTermRelations},
-            )
-            .getSingleOrNull(),
-    };
-    if (exists == null) throw _TagTargetMissing(target);
+    final exists = await _database
+        .customSelect(
+          'SELECT 1 FROM intentions WHERE id = ?',
+          variables: [Variable<String>(intentionId.toCanonicalString())],
+          readsFrom: {_database.intentions},
+        )
+        .getSingleOrNull();
+    if (exists == null) throw _TagIntentionMissing(intentionId);
   }
 
   Future<bool> _assignmentExists(TagAssignment assignment) async {
     final tagId = Variable<String>(assignment.tagId.toCanonicalString());
-    final row = switch (assignment.target) {
-      IntentionTagTarget(:final intentionId) =>
-        await _database
-            .customSelect(
-              'SELECT 1 FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
-              variables: [
-                tagId,
-                Variable<String>(intentionId.toCanonicalString()),
-              ],
-              readsFrom: {_database.tagAssignments},
-            )
-            .getSingleOrNull(),
-      LongTermRelationTagTarget(:final relationId) =>
-        await _database
-            .customSelect(
-              'SELECT 1 FROM tag_assignments WHERE tag_id = ? AND long_term_relation_id = ?',
-              variables: [
-                tagId,
-                Variable<String>(relationId.toCanonicalString()),
-              ],
-              readsFrom: {_database.tagAssignments},
-            )
-            .getSingleOrNull(),
-    };
+    final row = await _database
+        .customSelect(
+          'SELECT 1 FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+          variables: [
+            tagId,
+            Variable<String>(assignment.intentionId.toCanonicalString()),
+          ],
+          readsFrom: {_database.tagAssignments},
+        )
+        .getSingleOrNull();
     return row != null;
   }
 
@@ -403,13 +370,13 @@ final class _CommittedTagDeleted extends _CommittedTagCommand {
       TagDeleted(TagDeletedChange(revision: revision, tagId: id));
 }
 
-typedef _TagTargetCatalogEntryBefore = ({
+typedef _TagIntentionCatalogEntryBefore = ({
   IntentionId id,
   RelationCounts counts,
   IntentionCatalogEntrySnapshot entry,
 });
 
-typedef _TagTargetCatalogEntries = ({
+typedef _TagIntentionCatalogEntries = ({
   IntentionCatalogEntrySnapshot before,
   IntentionCatalogEntrySnapshot after,
 });
@@ -424,8 +391,7 @@ final class _CommittedTagAssignmentChanged extends _CommittedTagCommand {
   final TagAssignment assignment;
   final TagAssignmentState state;
 
-  /// Есть только у назначения намерению.
-  final _TagTargetCatalogEntries? catalogEntries;
+  final _TagIntentionCatalogEntries catalogEntries;
 
   @override
   bool get didMutate => true;
@@ -437,14 +403,11 @@ final class _CommittedTagAssignmentChanged extends _CommittedTagCommand {
       assignment: assignment,
       state: state,
     ),
-    catalogMutation: switch (catalogEntries) {
-      (:final before, :final after) => IntentionCatalogUpdated(
-        revision: revision,
-        before: before,
-        after: after,
-      ),
-      null => null,
-    },
+    catalogMutation: IntentionCatalogUpdated(
+      revision: revision,
+      before: catalogEntries.before,
+      after: catalogEntries.after,
+    ),
   );
 }
 
@@ -472,9 +435,9 @@ final class _TagMissing implements Exception {
   final TagId id;
 }
 
-final class _TagTargetMissing implements Exception {
-  const _TagTargetMissing(this.target);
-  final TagTarget target;
+final class _TagIntentionMissing implements Exception {
+  const _TagIntentionMissing(this.intentionId);
+  final IntentionId intentionId;
 }
 
 final class _TagNameOccupied implements Exception {
@@ -484,8 +447,8 @@ final class _TagNameOccupied implements Exception {
 
 TagCommandFailure _classifyTagCommandFailure(Object error) {
   if (error is _TagMissing) return TagNotFoundFailure(error.id);
-  if (error is _TagTargetMissing) {
-    return TagTargetNotFoundFailure(error.target);
+  if (error is _TagIntentionMissing) {
+    return TagIntentionNotFoundFailure(error.intentionId);
   }
   if (error is _TagNameOccupied) return TagNameOccupiedFailure(error.id);
   if (error is _StoredIntentionCorruption) return const TagCorruptionFailure();

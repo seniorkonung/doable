@@ -425,14 +425,14 @@ abstract class AppLocalizations {
   /// Необратимость удаления связей и сохранность намерения
   ///
   /// In en, this message translates to:
-  /// **'Review every selected relation. This can’t be undone. The intention will remain; deleting it requires separate confirmation.'**
+  /// **'Review each selected relation. Only the selected relations will be deleted. Selected daily choices will be deleted with all their path steps. This cannot be undone. The intention will remain; deleting it requires a separate confirmation.'**
   String get blockingRelationsConfirmationWarning;
 
-  /// Снятие назначений выбранных долговременных связей с сохранением тегов и остальных назначений
+  /// Сохранение переиспользуемых тегов и всех назначений намерениям при удалении связей
   ///
   /// In en, this message translates to:
-  /// **'All tag assignments of the selected long-term relations, including those not shown here, will be removed. The reusable tags and their assignments to other entities will remain.'**
-  String get blockingRelationsConfirmationTagAssignments;
+  /// **'The reusable tags and all their assignments to intentions will remain.'**
+  String get blockingRelationsConfirmationPreservedTags;
 
   /// Число связей в подтверждённом наборе
   ///
@@ -1397,7 +1397,7 @@ abstract class AppLocalizations {
   /// Заголовок навигации по тегу
   ///
   /// In en, this message translates to:
-  /// **'Tagged entities'**
+  /// **'Tagged intentions'**
   String get tagNavigationTitle;
 
   /// Текущий тег навигации
@@ -1415,19 +1415,19 @@ abstract class AppLocalizations {
   /// Первое чтение выбранного охвата
   ///
   /// In en, this message translates to:
-  /// **'Loading tagged entities…'**
+  /// **'Loading tagged intentions…'**
   String get tagNavigationLoading;
 
   /// Пустой активный охват существующего тега
   ///
   /// In en, this message translates to:
-  /// **'No active intentions or long-term relations have this tag.'**
+  /// **'No active intentions have this tag.'**
   String get tagNavigationEmptyActive;
 
   /// Пустой архивный охват существующего тега
   ///
   /// In en, this message translates to:
-  /// **'No archived intentions or long-term relations have this tag.'**
+  /// **'No archived intentions have this tag.'**
   String get tagNavigationEmptyArchived;
 
   /// Вид и собственное активное состояние намерения
@@ -1442,19 +1442,7 @@ abstract class AppLocalizations {
   /// **'Intention, archived'**
   String get tagNavigationIntentionArchived;
 
-  /// Вид и собственное активное состояние связи
-  ///
-  /// In en, this message translates to:
-  /// **'Long-term relation, active'**
-  String get tagNavigationRelationActive;
-
-  /// Вид и собственное архивное состояние связи
-  ///
-  /// In en, this message translates to:
-  /// **'Long-term relation, archived'**
-  String get tagNavigationRelationArchived;
-
-  /// Доступная подсказка перехода к точной сущности
+  /// Доступная подсказка перехода к конкретному намерению
   ///
   /// In en, this message translates to:
   /// **'Open details'**
@@ -1487,43 +1475,43 @@ abstract class AppLocalizations {
   /// Наличие следующей порции
   ///
   /// In en, this message translates to:
-  /// **'More entities have this tag.'**
+  /// **'More intentions have this tag.'**
   String get tagNavigationMoreAvailable;
 
   /// Явная подгрузка навигации
   ///
   /// In en, this message translates to:
-  /// **'Show more entities'**
+  /// **'Show more intentions'**
   String get tagNavigationLoadMore;
 
   /// Выполняющаяся подгрузка навигации
   ///
   /// In en, this message translates to:
-  /// **'Loading more entities…'**
+  /// **'Loading more intentions…'**
   String get tagNavigationLoadingMore;
 
   /// Конец непустой выдачи навигации
   ///
   /// In en, this message translates to:
-  /// **'All entities are shown.'**
+  /// **'All intentions are shown.'**
   String get tagNavigationAllShown;
 
   /// Устранимый отказ первого чтения навигации
   ///
   /// In en, this message translates to:
-  /// **'Could not load tagged entities. Try again.'**
+  /// **'Could not load tagged intentions. Try again.'**
   String get tagNavigationUnavailable;
 
   /// Повреждение при первом чтении навигации
   ///
   /// In en, this message translates to:
-  /// **'Stored tagged entity data is damaged and cannot be shown.'**
+  /// **'Stored tagged intention data is damaged and cannot be shown.'**
   String get tagNavigationCorruption;
 
   /// Неизвестный отказ первого чтения навигации
   ///
   /// In en, this message translates to:
-  /// **'Could not load tagged entities because of an unexpected error.'**
+  /// **'Could not load tagged intentions because of an unexpected error.'**
   String get tagNavigationUnexpected;
 
   /// Недопустимое продолжение навигации
@@ -1541,19 +1529,19 @@ abstract class AppLocalizations {
   /// Устранимый отказ подгрузки навигации
   ///
   /// In en, this message translates to:
-  /// **'Could not load more entities.'**
+  /// **'Could not load more intentions.'**
   String get tagNavigationLoadMoreUnavailable;
 
   /// Повреждение при подгрузке навигации
   ///
   /// In en, this message translates to:
-  /// **'Stored data is damaged; more entities cannot be shown.'**
+  /// **'Stored data is damaged; more intentions cannot be shown.'**
   String get tagNavigationLoadMoreCorruption;
 
   /// Неизвестный отказ подгрузки навигации
   ///
   /// In en, this message translates to:
-  /// **'Could not load more entities because of an unexpected error.'**
+  /// **'Could not load more intentions because of an unexpected error.'**
   String get tagNavigationLoadMoreUnexpected;
 
   /// Заголовок каталога тегов и переход к нему
@@ -1685,7 +1673,7 @@ abstract class AppLocalizations {
   /// Полный охват удаления тега независимо от загруженной порции
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes the tag and all its assignments to active and archived intentions and long-term relations, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.'**
+  /// **'This permanently deletes the tag and all its assignments to active and archived intentions at the time of execution, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.'**
   String get tagDeleteConfirmationScope;
 
   /// Отменить удаление тега
@@ -1886,11 +1874,11 @@ abstract class AppLocalizations {
   /// **'A tag assignment change is already in progress. Wait for its result.'**
   String get tagAssignmentAlreadyRunning;
 
-  /// Отсутствие получателя назначения
+  /// Отсутствие намерения, которому назначают или с которого снимают тег
   ///
   /// In en, this message translates to:
-  /// **'This recipient no longer exists. Refresh its details.'**
-  String get tagAssignmentTargetNotFound;
+  /// **'This intention no longer exists. Refresh its details.'**
+  String get tagAssignmentIntentionNotFound;
 
   /// Временная недоступность назначения или снятия
   ///
@@ -1921,12 +1909,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'intention'**
   String get tagAssignmentsIntention;
-
-  /// Вид получателя: долговременная связь
-  ///
-  /// In en, this message translates to:
-  /// **'long-term relation'**
-  String get tagAssignmentsRelation;
 
   /// Активное состояние получателя
   ///
@@ -2589,7 +2571,7 @@ abstract class AppLocalizations {
   /// Контекст и объяснение необратимости удаления конкретной связи
   ///
   /// In en, this message translates to:
-  /// **'Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. All tag assignments of this relation, including those not shown here, will be removed. The tags, both intentions and all other relations will remain.'**
+  /// **'Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. The relation and its description will be permanently deleted. The tags, all their assignments to intentions, both intentions and all other relations will remain.'**
   String relationDetailsDeleteConfirmationMessage(
     String phrase,
     String sourceTitle,

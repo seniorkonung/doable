@@ -73,25 +73,25 @@ void _taggedEntitiesCatalogStorageScenarios(
               (otherGraph, otherFirst),
             ]) {
               expect(
-                await repository.getTaggedEntitiesPage(
+                await repository.getTaggedIntentionsPage(
                   _storageScenarioNavigation(cursor: previous.nextCursor),
                 ),
-                isA<TaggedEntitiesPageError>().having(
+                isA<TaggedIntentionsPageError>().having(
                   (result) => result.failure,
                   'старый снимок',
-                  isA<TaggedEntitiesSnapshotExpired>(),
+                  isA<TaggedIntentionsSnapshotExpired>(),
                 ),
               );
-              final fresh = await repository.getTaggedEntitiesPage(
+              final fresh = await repository.getTaggedIntentionsPage(
                 _storageScenarioNavigation(),
               );
               if (corrupt) {
                 expect(
                   fresh,
-                  isA<TaggedEntitiesPageError>().having(
+                  isA<TaggedIntentionsPageError>().having(
                     (result) => result.failure,
                     'повреждённая ссылка',
-                    isA<TaggedEntitiesCorruptionFailure>(),
+                    isA<TaggedIntentionsCorruptionFailure>(),
                   ),
                 );
                 // Ревизия проверяется независимым предметным чтением:
@@ -104,13 +104,13 @@ void _taggedEntitiesCatalogStorageScenarios(
                   GraphRevisionOrder.same,
                 );
               } else {
-                final page = (fresh as TaggedEntitiesPageSuccess).value;
+                final page = (fresh as TaggedIntentionsPageSuccess).value;
                 expect(
                   page.revision.compareTo(previous.revision),
                   GraphRevisionOrder.same,
                 );
                 expect(
-                  (page.items.single as TaggedIntention).title,
+                  page.items.single.title,
                   'Подтверждённое сырое изменение',
                 );
               }
@@ -140,17 +140,14 @@ void _taggedEntitiesCatalogStorageScenarios(
         (h.graph, first),
         (otherGraph, otherFirst),
       ]) {
-        final next = (await repository.getTaggedEntitiesPage(
+        final next = (await repository.getTaggedIntentionsPage(
           _storageScenarioNavigation(cursor: previous.nextCursor),
-        ) as TaggedEntitiesPageSuccess).value;
+        ) as TaggedIntentionsPageSuccess).value;
         expect(
           next.revision.compareTo(previous.revision),
           GraphRevisionOrder.same,
         );
-        expect(
-          next.items.single.target,
-          LongTermRelationTagTarget(_relation(101)),
-        );
+        expect(next.items.single.id, _intention(3));
       }
     }
     expect(
@@ -162,13 +159,13 @@ void _taggedEntitiesCatalogStorageScenarios(
       (otherGraph, otherFirst),
     ]) {
       expect(
-        await repository.getTaggedEntitiesPage(
+        await repository.getTaggedIntentionsPage(
           _storageScenarioNavigation(cursor: previous.nextCursor),
         ),
-        isA<TaggedEntitiesPageError>().having(
+        isA<TaggedIntentionsPageError>().having(
           (result) => result.failure,
           'старый снимок',
-          isA<TaggedEntitiesSnapshotExpired>(),
+          isA<TaggedIntentionsSnapshotExpired>(),
         ),
       );
       final fresh = await _storageScenarioPage(repository);
@@ -201,17 +198,17 @@ IntentionCatalogQuery _storageScenarioQuery() => IntentionCatalogQuery(
   pageSize: 1,
 );
 
-TaggedEntitiesQuery _storageScenarioNavigation({
-  TaggedEntitiesCursor? cursor,
-}) => TaggedEntitiesQuery(
+TaggedIntentionsQuery _storageScenarioNavigation({
+  TaggedIntentionsCursor? cursor,
+}) => TaggedIntentionsQuery(
   tagId: _tag(firstTagNumber),
-  scope: TaggedEntitiesScope.active,
+  scope: TaggedIntentionsScope.active,
   pageSize: 1,
   cursor: cursor,
 );
 
-Future<TaggedEntitiesPage> _storageScenarioPage(
+Future<TaggedIntentionsPage> _storageScenarioPage(
   DriftPersonalGraphRepository graph,
-) async => (await graph.getTaggedEntitiesPage(
+) async => (await graph.getTaggedIntentionsPage(
   _storageScenarioNavigation(),
-) as TaggedEntitiesPageSuccess).value;
+) as TaggedIntentionsPageSuccess).value;

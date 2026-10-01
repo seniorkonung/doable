@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/data/local/app_database.dart' hide Tag;
+import 'package:doable/src/data/local/app_database.dart'
+    hide Tag, TagAssignment;
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -9,15 +11,15 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter/material.dart';
@@ -27,30 +29,25 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
+import '../../../support/tag_assignment_changed.dart';
 
 TagId _tagId(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
 
-TagTarget _target(int number) => IntentionTagTarget(
-  (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id,
-);
-
-TagTarget _relationTarget(int number) => LongTermRelationTagTarget(
-  (LongTermRelationId.decode(
-    tagFixtureId(number),
-  ) as LongTermRelationIdDecodingSuccess).id,
-);
+IntentionId _intentionId(int number) =>
+    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
 Widget _host({
   required PersonalGraphRepository repository,
-  required TagTarget target,
+  required IntentionId intentionId,
   required Locale locale,
-  required ValueChanged<TagTarget> onChoose,
+  required ValueChanged<IntentionId> onChoose,
   ValueChanged<TagId>? onOpen,
   TagReadContract? reads,
   Stream<ConfirmedGraphChangePackage>? changes,
   bool largeText = false,
   bool isArchived = false,
+  bool showSection = true,
 }) => ProviderScope(
   overrides: [
     personalGraphRepositoryProvider.overrideWithValue(repository),
@@ -71,12 +68,14 @@ Widget _host({
         : null,
     home: Scaffold(
       body: SingleChildScrollView(
-        child: TagAssignmentsSection(
-          target: target,
-          isArchived: isArchived,
-          onChooseTag: onChoose,
-          onOpenTag: onOpen ?? (_) {},
-        ),
+        child: showSection
+            ? TagAssignmentsSection(
+                intentionId: intentionId,
+                isArchived: isArchived,
+                onChooseTag: onChoose,
+                onOpenTag: onOpen ?? (_) {},
+              )
+            : const SizedBox.shrink(),
       ),
     ),
   ),
@@ -104,11 +103,9 @@ void main() {
     (const Locale('ru'), 'Выбрать тег', 'Снять назначение'),
     (const Locale('en'), 'Choose a tag', 'Remove assignment'),
   ]) {
-    for (final (kind, target, isArchived) in [
-      ('намерения', _target(1), false),
-      ('намерения', _target(2), true),
-      ('долговременной связи', _relationTarget(101), false),
-      ('долговременной связи', _relationTarget(102), true),
+    for (final (kind, intentionId, isArchived) in [
+      ('намерения', _intentionId(1), false),
+      ('намерения', _intentionId(2), true),
     ]) {
       testWidgets(
         'назначение $kind ${isArchived ? 'в архиве' : 'в активном охвате'} открывает точный тег без изменений: ${locale.languageCode}',
@@ -125,7 +122,7 @@ void main() {
           await tester.pumpWidget(
             _host(
               repository: repository,
-              target: target,
+              intentionId: intentionId,
               isArchived: isArchived,
               locale: locale,
               onChoose: (_) {},
@@ -178,11 +175,11 @@ void main() {
       'снятие последнего назначения сохраняет тег и показывает пустой список: ${locale.languageCode}',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        final chosen = <TagTarget>[];
+        final chosen = <IntentionId>[];
         await tester.pumpWidget(
           _host(
             repository: repository,
-            target: _target(3),
+            intentionId: _intentionId(3),
             locale: locale,
             onChoose: chosen.add,
           ),
@@ -195,7 +192,7 @@ void main() {
         expect(find.text(chooseText), findsOneWidget);
         expect(find.byTooltip('$removeText: Работа'), findsOneWidget);
         await tester.tap(find.text(chooseText));
-        expect(chosen, [_target(3)]);
+        expect(chosen, [_intentionId(3)]);
         await tester.tap(find.byTooltip('$removeText: Работа'));
         await _pumpUntil(
           tester,
@@ -218,15 +215,15 @@ void main() {
     );
   }
 
-  testWidgets('архивная долговременная связь снимает только своё назначение', (
+  testWidgets('архивированное действие снимает только своё назначение', (
     tester,
   ) async {
-    final target = _relationTarget(102);
-    final chosen = <TagTarget>[];
+    final intentionId = _intentionId(2);
+    final chosen = <IntentionId>[];
     await tester.pumpWidget(
       _host(
         repository: repository,
-        target: target,
+        intentionId: intentionId,
         locale: const Locale('ru'),
         onChoose: chosen.add,
         isArchived: true,
@@ -234,27 +231,23 @@ void main() {
     );
     await _pumpUntil(tester, () => find.text('Дом').evaluate().isNotEmpty);
     expect(
-      find.byTooltip(
-        'Выбрать тег для получателя: долговременная связь, в архиве',
-      ),
+      find.byTooltip('Выбрать тег для получателя: намерение, в архиве'),
       findsOneWidget,
     );
     await tester.tap(find.text('Выбрать тег'));
-    expect(chosen, [target]);
+    expect(chosen, [intentionId]);
     await tester.tap(find.byTooltip('Снять назначение: Дом'));
     await _pumpUntil(
       tester,
-      () => raw.select(
-        'SELECT * FROM tag_assignments WHERE long_term_relation_id = ?',
-        [tagFixtureId(102)],
-      ).isEmpty,
+      () => raw.select('SELECT * FROM tag_assignments WHERE intention_id = ?', [
+        tagFixtureId(2),
+      ]).isEmpty,
     );
     expect(raw.select('SELECT * FROM tags'), hasLength(2));
     expect(
-      raw.select(
-        'SELECT * FROM tag_assignments WHERE long_term_relation_id = ?',
-        [tagFixtureId(101)],
-      ),
+      raw.select('SELECT * FROM tag_assignments WHERE intention_id = ?', [
+        tagFixtureId(1),
+      ]),
       hasLength(1),
     );
   });
@@ -264,6 +257,7 @@ void main() {
   ) async {
     final reads = _PendingReads();
     final opened = <TagId>[];
+    final chosen = <IntentionId>[];
     final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
       sync: true,
     );
@@ -271,9 +265,9 @@ void main() {
     await tester.pumpWidget(
       _host(
         repository: repository,
-        target: _target(1),
+        intentionId: _intentionId(1),
         locale: const Locale('ru'),
-        onChoose: (_) {},
+        onChoose: chosen.add,
         onOpen: opened.add,
         reads: reads,
         changes: changes.stream,
@@ -283,6 +277,11 @@ void main() {
     reads.page(0, [_tag(301, 'Дом')]);
     await tester.pumpAndSettle();
     expect(find.text('Дом'), findsOneWidget);
+    final previousChoose = tester
+        .widget<TextButton>(
+          find.byKey(const ValueKey('tag-assignments-choose')),
+        )
+        .onPressed!;
     await tester.tap(
       find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(301)}')),
     );
@@ -291,6 +290,8 @@ void main() {
         TagDeletedChange(revision: const _Revision(1), tagId: _tagId(302)),
       ]),
     );
+    previousChoose();
+    expect(chosen, isEmpty);
     await tester.pump();
     expect(find.text('Дом'), findsOneWidget);
     expect(
@@ -299,10 +300,12 @@ void main() {
     );
     reads.fail(1, const TagAssignmentsUnavailableFailure());
     await tester.pumpAndSettle();
+    previousChoose();
+    expect(chosen, isEmpty);
     expect(find.text('Дом'), findsOneWidget);
     await tester.tap(find.text('Повторить'));
     await tester.pump();
-    expect(reads.queries, [_target(1), _target(1), _target(1)]);
+    expect(reads.queries, [_intentionId(1), _intentionId(1), _intentionId(1)]);
     reads.page(2, [_tag(301, 'Дом'), _tag(302, 'Работа')], revision: 1);
     await tester.pumpAndSettle();
     expect(find.text('Работа'), findsOneWidget);
@@ -315,10 +318,7 @@ void main() {
     expect(opened, [_tagId(301), _tagId(302)]);
   });
 
-  for (final (kind, target) in [
-    ('намерения', _target(2)),
-    ('долговременной связи', _relationTarget(102)),
-  ]) {
+  for (final (kind, intentionId) in [('намерения', _intentionId(2))]) {
     testWidgets(
       'устаревшее или удалённое назначение $kind не открывается даже прежним действием',
       (tester) async {
@@ -331,7 +331,7 @@ void main() {
         await tester.pumpWidget(
           _host(
             repository: repository,
-            target: target,
+            intentionId: intentionId,
             isArchived: true,
             locale: const Locale('ru'),
             onChoose: (_) {},
@@ -397,20 +397,20 @@ void main() {
     );
   }
 
-  testWidgets('отсутствие получателя не предлагает повтор', (tester) async {
+  testWidgets('отсутствие намерения не предлагает повтор', (tester) async {
     final reads = _PendingReads();
     await tester.pumpWidget(
       _host(
         repository: repository,
-        target: _target(1),
+        intentionId: _intentionId(1),
         locale: const Locale('ru'),
         onChoose: (_) {},
         reads: reads,
       ),
     );
-    reads.fail(0, const TagAssignmentsTargetNotFound());
+    reads.fail(0, const TagAssignmentsIntentionNotFound());
     await tester.pumpAndSettle();
-    expect(find.textContaining('получателя больше нет'), findsOneWidget);
+    expect(find.textContaining('намерения больше нет'), findsOneWidget);
     expect(find.text('Повторить'), findsNothing);
   });
 
@@ -421,7 +421,7 @@ void main() {
       await tester.pumpWidget(
         _host(
           repository: repository,
-          target: _target(1),
+          intentionId: _intentionId(1),
           locale: const Locale('ru'),
           onChoose: (_) {},
           reads: reads,
@@ -446,7 +446,7 @@ void main() {
     await tester.pumpWidget(
       _host(
         repository: _FailingRepository(),
-        target: _target(1),
+        intentionId: _intentionId(1),
         locale: const Locale('ru'),
         onChoose: (_) {},
         reads: reads,
@@ -466,6 +466,175 @@ void main() {
     expect(find.text('Дом'), findsOneWidget);
   });
 
+  testWidgets('прежние действия не применяются к другому намерению', (
+    tester,
+  ) async {
+    final reads = _PendingReads();
+    final pending = _PendingRepository();
+    final chosen = <IntentionId>[];
+    final opened = <TagId>[];
+    Widget host(IntentionId intentionId) => _host(
+      repository: pending,
+      intentionId: intentionId,
+      locale: const Locale('ru'),
+      onChoose: chosen.add,
+      onOpen: opened.add,
+      reads: reads,
+    );
+    await tester.pumpWidget(host(_intentionId(1)));
+    reads.page(0, [_tag(301, 'Дом')]);
+    await tester.pumpAndSettle();
+    final previousChoose = tester
+        .widget<TextButton>(
+          find.byKey(const ValueKey('tag-assignments-choose')),
+        )
+        .onPressed!;
+    final previousRemove = tester
+        .widget<TextButton>(
+          find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
+        )
+        .onPressed!;
+    final previousOpen = tester
+        .widget<TextButton>(
+          find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(301)}')),
+        )
+        .onPressed!;
+
+    await tester.pumpWidget(host(_intentionId(2)));
+    reads.page(1, [_tag(301, 'Дом')]);
+    await tester.pumpAndSettle();
+    previousChoose();
+    previousOpen();
+    previousRemove();
+    expect(chosen, isEmpty);
+    expect(opened, isEmpty);
+    expect(pending.commands, isEmpty);
+    await tester.tap(find.byKey(const ValueKey('tag-assignments-choose')));
+    expect(chosen, [_intentionId(2)]);
+  });
+
+  testWidgets(
+    'позднее чтение другой страницы не заменяет назначения намерения',
+    (tester) async {
+      final reads = _PendingReads();
+      final chosen = <IntentionId>[];
+      Widget host(IntentionId intentionId) => _host(
+        repository: repository,
+        intentionId: intentionId,
+        locale: const Locale('ru'),
+        onChoose: chosen.add,
+        reads: reads,
+      );
+      await tester.pumpWidget(host(_intentionId(1)));
+      await tester.pumpWidget(host(_intentionId(2)));
+      expect(reads.queries, [_intentionId(1), _intentionId(2)]);
+      reads.page(1, [_tag(302, 'Работа')]);
+      await tester.pumpAndSettle();
+      reads.page(0, [_tag(301, 'Дом')]);
+      await tester.pumpAndSettle();
+      expect(find.text('Работа'), findsOneWidget);
+      expect(find.text('Дом'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('tag-assignments-choose')));
+      expect(chosen, [_intentionId(2)]);
+    },
+  );
+
+  for (final succeeds in [false, true]) {
+    testWidgets(
+      'снятие после ухода завершается и предъявляется один раз: ${succeeds ? 'успех' : 'отказ'}',
+      (tester) async {
+        final pending = _PendingRepository();
+        final reads = _PendingReads();
+        Widget host({bool showSection = true}) => _host(
+          repository: pending,
+          intentionId: _intentionId(1),
+          locale: const Locale('ru'),
+          onChoose: (_) {},
+          reads: reads,
+          showSection: showSection,
+        );
+        await tester.pumpWidget(host());
+        reads.page(0, [_tag(301, 'Дом')]);
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(TagAssignmentsSection)),
+        );
+        final coordinator = container.read(
+          graphCommandCoordinatorProvider.notifier,
+        );
+        final registration = coordinator.registerAppPresentation();
+        final claimFuture = registration.nextClaim();
+        await tester.tap(
+          find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
+        );
+        await tester.pump();
+        expect(pending.commands.single.intentionId, _intentionId(1));
+        expect(pending.commands.single.tagId, _tagId(301));
+        expect(coordinator.isRunning(_intentionId(1)), isTrue);
+        expect(
+          tester
+              .widget<TextButton>(
+                find.byKey(const ValueKey('tag-assignments-choose')),
+              )
+              .onPressed,
+          isNull,
+        );
+
+        await tester.pumpWidget(host(showSection: false));
+        expect(coordinator.isRunning(_intentionId(1)), isTrue);
+        if (succeeds) {
+          pending.result.complete(
+            TagCommandSucceeded(
+              ConfirmedGraphResult(
+                revision: const _Revision(1),
+                value: testTagAssignmentChanged(
+                  TagAssignmentChangedChange(
+                    revision: const _Revision(1),
+                    assignment: TagAssignment(
+                      tagId: _tagId(301),
+                      intentionId: _intentionId(1),
+                    ),
+                    state: TagAssignmentState.absent,
+                  ),
+                ),
+              ),
+            ),
+          );
+        } else {
+          pending.result.complete(
+            const TagCommandFailed(TagUnavailableFailure()),
+          );
+        }
+        await tester.pumpAndSettle();
+        final claim = await claimFuture;
+        expect(claim, isNotNull);
+        expect(claim!.completion.isFailure, !succeeds);
+        expect(coordinator.isRunning(_intentionId(1)), isFalse);
+        coordinator.confirmPresentation(claim);
+        var repeated = false;
+        final nextClaim = registration.nextClaim().then((value) {
+          repeated = value != null;
+        });
+
+        await tester.pumpWidget(host());
+        reads.page(
+          reads.pages.length - 1,
+          succeeds ? [] : [_tag(301, 'Дом')],
+          revision: 1,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('tag-assignments-remove-failure')),
+          findsNothing,
+        );
+        expect(pending.commands, hasLength(1));
+        expect(repeated, isFalse);
+        registration.release();
+        await nextClaim;
+      },
+    );
+  }
+
   testWidgets(
     'архивный контекст и длинное название доступны при большом тексте',
     (tester) async {
@@ -477,12 +646,12 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
       final reads = _PendingReads();
-      final target = _target(1);
+      final intentionId = _intentionId(1);
       final opened = <TagId>[];
       await tester.pumpWidget(
         _host(
           repository: repository,
-          target: target,
+          intentionId: intentionId,
           locale: const Locale('ru'),
           onChoose: (_) {},
           onOpen: opened.add,
@@ -504,7 +673,7 @@ void main() {
       );
       await tester.ensureVisible(open);
       await tester.pumpAndSettle();
-      expect(tester.getSemantics(open).label, contains('Сущности с тегом'));
+      expect(tester.getSemantics(open).label, contains('Намерения с тегом'));
       await tester.tap(open);
       expect(opened, [_tagId(301)]);
       await tester.ensureVisible(
@@ -521,12 +690,12 @@ void main() {
 }
 
 final class _PendingReads extends Fake implements TagReadContract {
-  final queries = <TagTarget>[];
+  final queries = <IntentionId>[];
   final pages = <Completer<TagAssignmentsResult>>[];
 
   @override
-  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) {
-    queries.add(target);
+  Future<TagAssignmentsResult> getTagAssignments(IntentionId intentionId) {
+    queries.add(intentionId);
     final page = Completer<TagAssignmentsResult>();
     pages.add(page);
     return page.future;
@@ -536,7 +705,7 @@ final class _PendingReads extends Fake implements TagReadContract {
     pages[index].complete(
       TagAssignmentsSuccess(
         TagAssignmentsSnapshot(
-          target: queries[index],
+          intentionId: queries[index],
           items: tags,
 
           revision: _Revision(revision),
@@ -580,6 +749,21 @@ final class _FailingRepository extends Fake implements PersonalGraphRepository {
   >(GraphCommand<TSuccess, TFailure> command) async =>
       const TagCommandFailed(TagUnavailableFailure())
           as GraphCommandResult<TSuccess, TFailure>;
+}
+
+final class _PendingRepository extends Fake implements PersonalGraphRepository {
+  final commands = <RemoveTagAssignment>[];
+  final result = Completer<TagCommandResult>();
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    expect(command, isA<RemoveTagAssignment>());
+    commands.add(command as RemoveTagAssignment);
+    return await result.future as GraphCommandResult<TSuccess, TFailure>;
+  }
 }
 
 Tag _tag(int number, String name) =>

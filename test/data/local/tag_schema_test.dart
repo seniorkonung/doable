@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/local_database_harness.dart';
-import '../../support/schema_v1_fixture.dart';
 
 const _firstIntention = '018f0b5d-6b2e-7c80-8000-000000000001';
 const _secondIntention = '018f0b5d-6b2e-7c80-8000-000000000002';
@@ -33,7 +32,8 @@ void main() {
 
   tearDown(() => harness.dispose());
 
-  test('создаёт версию 5 с индексами, ключом названия и внешними ключами', () {
+  test('создаёт версию 1 с индексами, ключом названия и внешними ключами', () {
+    expect(AppDatabase.currentSchemaVersion, 1);
     expect(
       raw.select('PRAGMA user_version').single['user_version'],
       AppDatabase.currentSchemaVersion,
@@ -50,8 +50,6 @@ void main() {
         'tag_assignments_tag_order',
         'tag_assignments_intention',
         'tag_assignments_intention_order',
-        'tag_assignments_long_term_relation',
-        'tag_assignments_long_term_relation_order',
         'tags_immutable_identity',
         'tag_assignments_immutable_identity',
         'tag_assignments_valid_tag_order_insert',
@@ -79,15 +77,54 @@ void main() {
       {
         ('tags', 'tag_id', 'id', 'RESTRICT', 'CASCADE'),
         ('intentions', 'intention_id', 'id', 'RESTRICT', 'CASCADE'),
-        (
-          'long_term_relations',
-          'long_term_relation_id',
-          'id',
-          'RESTRICT',
-          'CASCADE',
-        ),
       },
     );
+  });
+
+  test('хранит назначение только с обязательным намерением', () {
+    final columns = {
+      for (final row in raw.select('PRAGMA table_info(tag_assignments)'))
+        row['name']! as String: row['notnull']! as int,
+    };
+    expect(columns, {
+      'creation_sequence': 1,
+      'tag_id': 1,
+      'tag_creation_sequence': 1,
+      'intention_id': 1,
+    });
+
+    final uniqueIndexes = [
+      for (final index in raw.select('PRAGMA index_list(tag_assignments)'))
+        if (index['unique'] == 1)
+          [
+            for (final column in raw.select(
+              'SELECT name FROM pragma_index_info(?) ORDER BY seqno',
+              [index['name']],
+            ))
+              column['name']! as String,
+          ],
+    ];
+    expect(uniqueIndexes, [
+      ['tag_id', 'intention_id'],
+    ]);
+
+    final indexedColumns = {
+      for (final index in raw.select('PRAGMA index_list(tag_assignments)'))
+        for (final column in raw.select(
+          'SELECT name FROM pragma_index_info(?)',
+          [index['name']],
+        ))
+          column['name']! as String,
+    };
+    expect(indexedColumns, isNot(contains('long_term_relation_id')));
+
+    final relationObjects = raw.select('''
+      SELECT name
+      FROM sqlite_schema
+      WHERE tbl_name = 'tag_assignments'
+        AND (name LIKE '%long_term_relation%' OR sql LIKE '%long_term_relation%')
+    ''');
+    expect(relationObjects, isEmpty);
   });
 
   test('отклоняет неверные названия и дубликаты после Unicode folding', () {
@@ -154,39 +191,45 @@ void main() {
     );
   });
 
-  test('разрешает ровно одного существующего получателя и одну пару', () {
+  test('разрешает только существующее намерение и одну пару', () {
     _addTag(raw, _firstTag, 'Дом');
-    for (final target in [
-      (null, null),
-      (_firstIntention, _relation),
-      ('нет-намерения', null),
-      (null, 'нет-связи'),
-    ]) {
+    for (final intentionId in [null, 'нет-намерения', _relation]) {
       expect(
-        () => _addAssignment(raw, _firstTag, target.$1, target.$2),
+        () => _addAssignment(raw, _firstTag, intentionId),
         throwsA(isA<sqlite.SqliteException>()),
+        reason: 'Получателем может быть только существующее намерение.',
       );
     }
     expect(
-      () => _addAssignment(raw, 'нет-тега', _firstIntention, null),
+      () => raw.execute(
+        'INSERT INTO tag_assignments (tag_id, long_term_relation_id) VALUES (?, ?)',
+        [_firstTag, _relation],
+      ),
       throwsA(isA<sqlite.SqliteException>()),
     );
-    _addAssignment(raw, _firstTag, _firstIntention, null);
-    _addAssignment(raw, _firstTag, null, _relation);
-    for (final target in [(_firstIntention, null), (null, _relation)]) {
-      expect(
-        () => _addAssignment(raw, _firstTag, target.$1, target.$2),
-        throwsA(isA<sqlite.SqliteException>()),
-      );
-    }
-    expect(raw.select('SELECT * FROM tag_assignments'), hasLength(2));
+    expect(
+      () => _addAssignment(raw, 'нет-тега', _firstIntention),
+      throwsA(isA<sqlite.SqliteException>()),
+    );
+    _addAssignment(raw, _firstTag, _firstIntention);
+    _addAssignment(raw, _firstTag, _secondIntention);
+    expect(
+      () => _addAssignment(raw, _firstTag, _firstIntention),
+      throwsA(isA<sqlite.SqliteException>()),
+    );
+    expect(
+      raw
+          .select('SELECT intention_id FROM tag_assignments')
+          .map((row) => row['intention_id']),
+      [_firstIntention, _secondIntention],
+    );
   });
 
   test('запрещает подменять идентичность и сохраняет максимум sequence', () {
     _addTag(raw, _firstTag, 'Первый');
     _addTag(raw, _secondTag, 'Второй');
-    _addAssignment(raw, _firstTag, _firstIntention, null);
-    _addAssignment(raw, _firstTag, null, _relation);
+    _addAssignment(raw, _firstTag, _firstIntention);
+    _addAssignment(raw, _secondTag, _secondIntention);
     for (final table in ['tags', 'tag_assignments']) {
       for (final sequence in [0, -1]) {
         expect(
@@ -235,8 +278,8 @@ void main() {
       ),
       (
         'tag_assignments',
-        'long_term_relation_id',
-        _relation,
+        'intention_id',
+        null,
         'intention_id',
         _firstIntention,
       ),
@@ -256,10 +299,10 @@ void main() {
         throwsA(isA<sqlite.SqliteException>()),
       );
     }
-    raw.execute('DELETE FROM tag_assignments WHERE long_term_relation_id = ?', [
-      _relation,
+    raw.execute('DELETE FROM tag_assignments WHERE intention_id = ?', [
+      _secondIntention,
     ]);
-    _addAssignment(raw, _firstTag, _secondIntention, null);
+    _addAssignment(raw, _firstTag, _secondIntention);
     expect(
       raw.select(
         'SELECT creation_sequence FROM tag_assignments WHERE intention_id = ?',
@@ -277,97 +320,41 @@ void main() {
     );
   });
 
-  test('каскады удаляют только назначения удалённого тега или получателя', () {
+  test('каскады удаляют только назначения удалённого тега или намерения', () {
     _addTag(raw, _firstTag, 'Первый');
     _addTag(raw, _secondTag, 'Второй');
-    _addAssignment(raw, _firstTag, _firstIntention, null);
-    _addAssignment(raw, _firstTag, null, _relation);
-    _addAssignment(raw, _secondTag, _firstIntention, null);
+    _addAssignment(raw, _firstTag, _firstIntention);
+    _addAssignment(raw, _secondTag, _firstIntention);
+    _addAssignment(raw, _secondTag, _secondIntention);
     raw.execute('DELETE FROM tags WHERE id = ?', [_firstTag]);
     expect(raw.select('SELECT id FROM intentions'), hasLength(2));
     expect(raw.select('SELECT id FROM long_term_relations'), hasLength(1));
     expect(
-      raw.select('SELECT tag_id FROM tag_assignments').single['tag_id'],
-      _secondTag,
+      raw
+          .select('SELECT tag_id FROM tag_assignments')
+          .map((row) => row['tag_id']),
+      [_secondTag, _secondTag],
     );
     raw.execute('DELETE FROM long_term_relations WHERE id = ?', [_relation]);
+    expect(raw.select('SELECT * FROM tag_assignments'), hasLength(2));
     raw.execute('DELETE FROM intentions WHERE id = ?', [_firstIntention]);
-    expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+    expect(
+      raw
+          .select('SELECT intention_id FROM tag_assignments')
+          .single['intention_id'],
+      _secondIntention,
+    );
     expect(raw.select('SELECT id FROM tags').single['id'], _secondTag);
   });
-
-  test(
-    'переход 3 → 5 добавляет пустые таблицы без перестройки прежних',
-    () async {
-      final expectedSchema = _schemaObjects(raw);
-      await harness.dispose();
-      final fileHarness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(fileHarness.dispose);
-      late final Map<String, int> oldRootPages;
-      await createSchemaV3Fixture(
-        fileHarness.databaseFile,
-        seed: (db) {
-          db.execute(
-            'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
-            [_firstIntention, 'Сохранённое намерение'],
-          );
-          oldRootPages = {
-            for (final row in db.select(
-              "SELECT name, rootpage FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-            ))
-              row['name']! as String: row['rootpage']! as int,
-          };
-        },
-      );
-      sqlite.Database? upgraded;
-      final database = await fileHarness.openReadyDatabase(
-        setup: (db) => upgraded = db,
-      );
-      expect(database.schemaVersion, AppDatabase.currentSchemaVersion);
-      expect(
-        upgraded!.select('PRAGMA user_version').single['user_version'],
-        AppDatabase.currentSchemaVersion,
-      );
-      expect(
-        upgraded!.select('SELECT rowid, title FROM intentions').single['title'],
-        'Сохранённое намерение',
-      );
-      expect(upgraded!.select('SELECT * FROM tags'), isEmpty);
-      expect(upgraded!.select('SELECT * FROM tag_assignments'), isEmpty);
-      expect(upgraded!.select('PRAGMA foreign_key_check'), isEmpty);
-      expect(_schemaObjects(upgraded!), expectedSchema);
-      final newRootPages = {
-        for (final row in upgraded!.select(
-          "SELECT name, rootpage FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-        ))
-          row['name']! as String: row['rootpage']! as int,
-      };
-      for (final entry in oldRootPages.entries) {
-        expect(newRootPages[entry.key], entry.value);
-      }
-    },
-  );
 }
-
-Map<String, String> _schemaObjects(sqlite.Database db) => {
-  for (final row in db.select(
-    "SELECT name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL",
-  ))
-    row['name']! as String: row['sql']! as String,
-};
 
 void _addTag(sqlite.Database db, String id, String name) {
   db.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [id, name]);
 }
 
-void _addAssignment(
-  sqlite.Database db,
-  String tagId,
-  String? intentionId,
-  String? relationId,
-) {
+void _addAssignment(sqlite.Database db, String tagId, String? intentionId) {
   db.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id, long_term_relation_id) VALUES (?, ?, ?)',
-    [tagId, intentionId, relationId],
+    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+    [tagId, intentionId],
   );
 }

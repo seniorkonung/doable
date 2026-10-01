@@ -1,7 +1,7 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 
-/// Снимок одной пары тега и получателя без загрузки списка назначений.
+/// Снимок одной пары тега и намерения без загрузки списка назначений.
 typedef TagAssignmentStatusResult =
     GraphResult<GraphSnapshot<bool>, TagAssignmentStatusFailure>;
 typedef TagAssignmentStatusSuccess =
@@ -20,9 +20,9 @@ final class TagAssignmentStatusTagNotFound extends TagAssignmentStatusFailure {
   GraphFailureCategory get category => GraphFailureCategory.notFound;
 }
 
-final class TagAssignmentStatusTargetNotFound
+final class TagAssignmentStatusIntentionNotFound
     extends TagAssignmentStatusFailure {
-  const TagAssignmentStatusTargetNotFound();
+  const TagAssignmentStatusIntentionNotFound();
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.notFound;

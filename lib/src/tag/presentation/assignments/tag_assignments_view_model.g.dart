@@ -16,7 +16,7 @@ final class TagAssignmentsViewModelProvider
     extends $NotifierProvider<TagAssignmentsViewModel, TagAssignmentsState> {
   TagAssignmentsViewModelProvider._({
     required TagAssignmentsViewModelFamily super.from,
-    required TagTarget super.argument,
+    required IntentionId super.argument,
   }) : super(
          retry: null,
          name: r'tagAssignmentsViewModelProvider',
@@ -60,7 +60,7 @@ final class TagAssignmentsViewModelProvider
 }
 
 String _$tagAssignmentsViewModelHash() =>
-    r'a672f5b606a830d833311259d7248ac7bddbb726';
+    r'328adafcd523590cf5354cde38de3579d414365e';
 
 final class TagAssignmentsViewModelFamily extends $Family
     with
@@ -69,7 +69,7 @@ final class TagAssignmentsViewModelFamily extends $Family
           TagAssignmentsState,
           TagAssignmentsState,
           TagAssignmentsState,
-          TagTarget
+          IntentionId
         > {
   TagAssignmentsViewModelFamily._()
     : super(
@@ -80,8 +80,8 @@ final class TagAssignmentsViewModelFamily extends $Family
         isAutoDispose: true,
       );
 
-  TagAssignmentsViewModelProvider call(TagTarget target) =>
-      TagAssignmentsViewModelProvider._(argument: target, from: this);
+  TagAssignmentsViewModelProvider call(IntentionId intentionId) =>
+      TagAssignmentsViewModelProvider._(argument: intentionId, from: this);
 
   @override
   String toString() => r'tagAssignmentsViewModelProvider';
@@ -89,10 +89,10 @@ final class TagAssignmentsViewModelFamily extends $Family
 
 abstract class _$TagAssignmentsViewModel
     extends $Notifier<TagAssignmentsState> {
-  late final _$args = ref.$arg as TagTarget;
-  TagTarget get target => _$args;
+  late final _$args = ref.$arg as IntentionId;
+  IntentionId get intentionId => _$args;
 
-  TagAssignmentsState build(TagTarget target);
+  TagAssignmentsState build(IntentionId intentionId);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {

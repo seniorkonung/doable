@@ -16,12 +16,10 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
@@ -38,10 +36,10 @@ import '../../../support/tag_storage_fixture.dart';
 void main() {
   for (final (pairs, repetition) in [(5003, 1), (5003, 2), (15003, 1)]) {
     testWidgets(
-      'прокрутка обоих охватов при ${pairs * 2} назначениях, повтор $repetition',
+      'прокрутка обоих охватов при ${pairs * 2} назначениях выбранного тега и ${pairs * 2} назначениях другого тега, повтор $repetition',
       (tester) async {
         final app = await _App.pump(tester, pairs);
-        for (final scope in TaggedEntitiesScope.values) {
+        for (final scope in TaggedIntentionsScope.values) {
           await app.selectScope(tester, scope);
           await _traverse(tester, app, _expected(pairs, scope), {
             'recipientPairs': pairs,
@@ -50,16 +48,16 @@ void main() {
           });
         }
         // Переключатель доступен и после самого длинного обхода.
-        await app.selectScope(tester, TaggedEntitiesScope.active);
+        await app.selectScope(tester, TaggedIntentionsScope.active);
         expect((await app.loaded(tester)).items, hasLength(50));
       },
       timeout: const Timeout(Duration(minutes: 5)),
     );
   }
 
-  for (final scope in TaggedEntitiesScope.values) {
+  for (final scope in TaggedIntentionsScope.values) {
     testWidgets(
-      'изменение большого ${scope == TaggedEntitiesScope.active ? 'активного' : 'архивного'} охвата заменяет все порции',
+      'изменение большого ${scope == TaggedIntentionsScope.active ? 'активного' : 'архивного'} охвата заменяет все порции',
       (tester) async {
         const pairs = 5003;
         final app = await _App.pump(tester, pairs);
@@ -80,9 +78,9 @@ void main() {
             .container(tester)
             .read(graphCommandCoordinatorProvider.notifier);
         for (final command in [
-          RemoveTagAssignment(tagId: _tagId, target: expected.first),
-          RemoveTagAssignment(tagId: _tagId, target: expected.last),
-          AssignTag(tagId: _tagId, target: expected.first),
+          RemoveTagAssignment(tagId: _tagId, intentionId: expected.first),
+          RemoveTagAssignment(tagId: _tagId, intentionId: expected.last),
+          AssignTag(tagId: _tagId, intentionId: expected.first),
         ]) {
           final accepted = switch (command) {
             RemoveTagAssignment() => coordinator.acceptTagRemoveAssignment(
@@ -115,7 +113,7 @@ void main() {
         ];
         expect(current.tagId, _tagId);
         expect(current.scope, scope);
-        expect(current.items.map((item) => item.target), changed.take(50));
+        expect(current.items.map((item) => item.id), changed.take(50));
         expect(
           current.revision.compareTo(before.revision),
           GraphRevisionOrder.newer,
@@ -128,7 +126,7 @@ void main() {
           'scope': scope.name,
           'afterMutation': true,
           'discardedPageRows':
-              (await held.ready.future as TaggedEntitiesPageSuccess)
+              (await held.ready.future as TaggedIntentionsPageSuccess)
                   .value
                   .items
                   .length,
@@ -144,7 +142,7 @@ void main() {
 Future<void> _traverse(
   WidgetTester tester,
   _App app,
-  List<TagTarget> expected,
+  List<IntentionId> expected,
   Map<String, Object?> context,
 ) async {
   var loaded = await app.loaded(tester);
@@ -174,14 +172,14 @@ Future<void> _traverse(
     expect(loaded.items.length, greaterThan(before.items.length));
     expect(loaded.items.length - before.items.length, lessThanOrEqualTo(50));
     expect(
-      loaded.items.skip(before.items.length).map((item) => item.target),
+      loaded.items.skip(before.items.length).map((item) => item.id),
       expected.skip(before.items.length).take(50),
     );
     expect(tester.takeException(), isNull);
   }
-  expect(loaded.items.map((item) => item.target), expected);
+  expect(loaded.items.map((item) => item.id), expected);
   expect(
-    loaded.items.map((item) => item.target).toSet(),
+    loaded.items.map((item) => item.id).toSet(),
     hasLength(expected.length),
   );
   final samples = app.reads.samples.skip(sampleStart).toList();
@@ -201,7 +199,7 @@ Future<void> _traverse(
     'pageSize': 50,
     'pages': samples.length,
     'resultRows': expected.length,
-    'uniqueRows': loaded.items.map((item) => item.target).toSet().length,
+    'uniqueRows': loaded.items.map((item) => item.id).toSet().length,
     'maximumMountedRows': maximumMountedRows,
     'readElapsedMicroseconds': [
       for (final sample in samples) sample.microseconds,
@@ -215,52 +213,30 @@ Future<void> _traverse(
     1000,
   );
   expect(app.more, findsNothing);
-  for (final target in [
-    expected.whereType<IntentionTagTarget>().last,
-    expected.whereType<LongTermRelationTagTarget>().last,
-  ]) {
-    await _scrollTo(tester, find.byKey(ValueKey(target)), -300);
-    await tester.tap(find.byKey(ValueKey(target)));
-    await tester.pumpAndSettle();
-    switch (target) {
-      case IntentionTagTarget(:final intentionId):
-        expect(app.router.current.name, IntentionDetailsRoute.name);
-        expect(
-          app.router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-          intentionId,
-        );
-      case LongTermRelationTagTarget(:final relationId):
-        expect(app.router.current.name, RelationDetailsRoute.name);
-        expect(
-          app.router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-          relationId,
-        );
-    }
-    app.router.pop();
-    await tester.pumpAndSettle();
-    expect((await app.loaded(tester)).items, loaded.items);
-    expect(app.state(tester).scope, loaded.scope);
-  }
+  final intentionId = expected.last;
+  await _scrollTo(tester, find.byKey(ValueKey(intentionId)), -300);
+  await tester.tap(find.byKey(ValueKey(intentionId)));
+  await tester.pumpAndSettle();
+  expect(app.router.current.name, IntentionDetailsRoute.name);
+  expect(
+    app.router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+    intentionId,
+  );
+  app.router.pop();
+  await tester.pumpAndSettle();
+  expect((await app.loaded(tester)).items, loaded.items);
+  expect(app.state(tester).scope, loaded.scope);
 }
 
 void _emit(Map<String, Object?> record) =>
     debugPrintSynchronously(jsonEncode(record));
 
-List<TagTarget> _expected(int pairs, TaggedEntitiesScope scope) => [
-  for (var index = 0; index < pairs; index++) ...[
-    if ((index % 40 == 0) == (scope == TaggedEntitiesScope.archived))
-      IntentionTagTarget(
-        (IntentionId.decode(
-          tagFixtureId(100000 + index),
-        ) as IntentionIdDecodingSuccess).id,
-      ),
-    if ((index % 20 == 0) == (scope == TaggedEntitiesScope.archived))
-      LongTermRelationTagTarget(
-        (LongTermRelationId.decode(
-          tagFixtureId(200000 + index),
-        ) as LongTermRelationIdDecodingSuccess).id,
-      ),
-  ],
+List<IntentionId> _expected(int pairs, TaggedIntentionsScope scope) => [
+  for (final (id, _) in largeTaggedIntentions(
+    pairs,
+    archived: scope == TaggedIntentionsScope.archived,
+  ))
+    (IntentionId.decode(id) as IntentionIdDecodingSuccess).id,
 ];
 
 final _tagId = (TagId.decode(tagFixtureId(9000)) as TagIdDecodingSuccess).id;
@@ -295,7 +271,7 @@ final class _App {
   final _MeasuredReads reads;
 
   Finder get more =>
-      find.widgetWithText(OutlinedButton, 'Показать ещё сущности');
+      find.widgetWithText(OutlinedButton, 'Показать ещё намерения');
 
   AppLocalizations l10n(WidgetTester tester) =>
       AppLocalizations.of(tester.element(_navigation));
@@ -324,7 +300,7 @@ final class _App {
 
   Future<void> selectScope(
     WidgetTester tester,
-    TaggedEntitiesScope scope,
+    TaggedIntentionsScope scope,
   ) async {
     final chip = find.byKey(ValueKey(scope));
     await _scrollTo(tester, chip, -100000);
@@ -372,7 +348,7 @@ final class _App {
     _emit({
       'kind': 'tag_navigation_widget_fixture',
       'recipientPairs': pairs,
-      'intentions': pairs + 1,
+      'intentions': pairs * 2 + 1,
       'relations': pairs,
       'selectedTagAssignments': pairs * 2,
       'unrelatedTagAssignments': pairs * 2,
@@ -415,13 +391,13 @@ final class _App {
 
 final class _ReadSample {
   const _ReadSample(this.query, this.rows, this.microseconds);
-  final TaggedEntitiesQuery query;
+  final TaggedIntentionsQuery query;
   final int rows;
   final int microseconds;
 }
 
 final class _HeldPage {
-  final ready = Completer<TaggedEntitiesPageResult>();
+  final ready = Completer<TaggedIntentionsPageResult>();
   final release = Completer<void>();
 }
 
@@ -452,16 +428,16 @@ final class _MeasuredReads
   Stream<TagReadResult> watchTag(TagId id) => delegate.watchTag(id);
 
   @override
-  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
-    TaggedEntitiesQuery query,
+  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
+    TaggedIntentionsQuery query,
   ) async {
     final held = _next;
     _next = null;
     final timer = Stopwatch()..start();
-    final result = await delegate.getTaggedEntitiesPage(query);
+    final result = await delegate.getTaggedIntentionsPage(query);
     timer.stop();
-    expect(result, isA<TaggedEntitiesPageSuccess>());
-    final page = (result as TaggedEntitiesPageSuccess).value;
+    expect(result, isA<TaggedIntentionsPageSuccess>());
+    final page = (result as TaggedIntentionsPageSuccess).value;
     samples.add(
       _ReadSample(query, page.items.length, timer.elapsedMicroseconds),
     );

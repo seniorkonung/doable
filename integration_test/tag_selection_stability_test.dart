@@ -3,10 +3,8 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
@@ -23,12 +21,14 @@ import '../test/support/tag_storage_fixture.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  for (final relation in [false, true]) {
+  for (final archived in [false, true]) {
     for (final (locale, scale) in [
       (const Locale('ru'), 1.0),
       (const Locale('en'), 2.5),
     ]) {
-      final recipient = relation ? 'долговременная связь' : 'намерение';
+      final recipient = archived
+          ? 'архивированное действие'
+          : 'активное намерение';
       testWidgets(
         'стабильный выбор на устройстве: $recipient, ${locale.languageCode}, текст $scale',
         (tester) async {
@@ -51,19 +51,15 @@ void main() {
             () => DateTime.utc(2026, 9, 28),
             diagnostics,
           );
-          final target = relation
-              ? LongTermRelationTagTarget(
-                  (LongTermRelationId.decode(
-                    tagFixtureId(101),
-                  ) as LongTermRelationIdDecodingSuccess).id,
-                )
-              : IntentionTagTarget(
-                  (IntentionId.decode(
-                    tagFixtureId(1),
-                  ) as IntentionIdDecodingSuccess).id,
-                );
+          final intentionId = archived
+              ? (IntentionId.decode(
+                  tagFixtureId(2),
+                ) as IntentionIdDecodingSuccess).id
+              : (IntentionId.decode(
+                  tagFixtureId(1),
+                ) as IntentionIdDecodingSuccess).id;
           final provider = tagCatalogViewModelProvider(
-            mode: TagCatalogSelectionMode(target),
+            mode: TagCatalogSelectionMode(intentionId),
           );
           final container = ProviderContainer.test(
             overrides: [
@@ -84,7 +80,7 @@ void main() {
                         .copyWith(textScaler: TextScaler.linear(scale)),
                     child: child!,
                   ),
-                  home: TagCatalogPage(target: target),
+                  home: TagCatalogPage(intentionId: intentionId),
                 ),
               ),
             );

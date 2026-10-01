@@ -61,7 +61,7 @@ final class _DeleteCostProbe extends LocalDatabaseConnectionObserver {
 }
 
 Future<void> measureWidelyAssignedTagDeletion() async {
-  const recipientPairs = 1200;
+  const recipients = 2400;
   final durations = <int>[];
   List<String>? observedSql;
   List<int>? observedRows;
@@ -85,7 +85,7 @@ Future<void> measureWidelyAssignedTagDeletion() async {
     );
     try {
       await database.open();
-      seedWidelyAssignedTagFixture(raw, recipientPairs: recipientPairs);
+      seedWidelyAssignedTagFixture(raw, recipients: recipients);
       final repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
@@ -94,7 +94,7 @@ Future<void> measureWidelyAssignedTagDeletion() async {
       );
       expect(
         raw.select('SELECT COUNT(*) FROM tag_assignments').single.values.single,
-        recipientPairs * 2 + 1,
+        recipients * 2 + 1,
       );
       probe.statements.clear();
       probe.selectRows.clear();
@@ -106,15 +106,22 @@ Future<void> measureWidelyAssignedTagDeletion() async {
       expect(confirmed.value, isA<TagDeleted>());
       expect(confirmed.value.changes, hasLength(1));
       expect(confirmed.value.changes.single, isA<TagDeletedChange>());
-      expect(probe.assignmentsVisibleBeforeCommit, recipientPairs * 2);
+      expect(probe.assignmentsVisibleBeforeCommit, recipients);
+      // Назначения сохраняемого тега тем же получателям не затронуты.
       expect(
-        raw.select('SELECT COUNT(*) FROM tag_assignments').single.values.single,
-        1,
+        raw
+            .select(
+              'SELECT tag_id, COUNT(*) FROM tag_assignments GROUP BY tag_id',
+            )
+            .map((row) => row.values.toList()),
+        [
+          [tagFixtureId(9001), recipients + 1],
+        ],
       );
       expect(raw.select('SELECT COUNT(*) FROM tags').single.values.single, 1);
       expect(
         raw.select('SELECT COUNT(*) FROM intentions').single.values.single,
-        recipientPairs + 1,
+        recipients + 1,
       );
       expect(
         raw
@@ -122,7 +129,7 @@ Future<void> measureWidelyAssignedTagDeletion() async {
             .single
             .values
             .single,
-        recipientPairs,
+        recipients,
       );
       expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
       final sql = [
@@ -166,12 +173,11 @@ Future<void> measureWidelyAssignedTagDeletion() async {
   debugPrintSynchronously(
     jsonEncode({
       'kind': 'widely_assigned_tag_delete',
-      'recipientPairs': recipientPairs,
-      'activeIntentionRecipients': recipientPairs ~/ 2,
-      'archivedIntentionRecipients': recipientPairs ~/ 2,
-      'activeRelationRecipients': recipientPairs ~/ 2,
-      'archivedRelationRecipients': recipientPairs ~/ 2,
-      'assignments': recipientPairs * 2,
+      'recipients': recipients,
+      'activeIntentionRecipients': recipients ~/ 2,
+      'archivedIntentionRecipients': recipients ~/ 2,
+      'deletedAssignments': recipients,
+      'retainedAssignments': recipients + 1,
       'repetitions': durations.length,
       'elapsedMicroseconds': durations,
       'statements': observedSql,

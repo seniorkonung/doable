@@ -45,13 +45,12 @@ import '../../tag/application/tag_change.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_id_generator.dart';
 import '../../tag/application/tag_read_result.dart';
-import '../../tag/application/tagged_entities_page.dart';
+import '../../tag/application/tagged_intentions_page.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_id.dart';
 import '../../tag/domain/tag_name.dart';
-import '../../tag/domain/tag_target.dart';
 import '../application/blocking_relation_reference.dart';
 import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
@@ -76,7 +75,7 @@ part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_choice_path_suggestions.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
-part 'drift_personal_graph_repository_tagged_entities.dart';
+part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
@@ -124,19 +123,19 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       _readTagCatalog(mode);
 
   @override
-  Future<TagAssignmentsResult> getTagAssignments(TagTarget target) =>
-      _readTagAssignments(target);
+  Future<TagAssignmentsResult> getTagAssignments(IntentionId intentionId) =>
+      _readTagAssignments(intentionId);
 
   @override
-  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
-    TaggedEntitiesQuery query,
-  ) => _readTaggedEntitiesPage(query);
+  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
+    TaggedIntentionsQuery query,
+  ) => _readTaggedIntentionsPage(query);
 
   @override
   Future<TagAssignmentStatusResult> getTagAssignmentStatus(
     TagId tagId,
-    TagTarget target,
-  ) => _readTagAssignmentStatus(tagId, target);
+    IntentionId intentionId,
+  ) => _readTagAssignmentStatus(tagId, intentionId);
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);
@@ -1877,8 +1876,7 @@ final class _CatalogIdsParameter {
 /// подзапрос отбирает намерения, у которых число собственных назначений
 /// обязательных тегов равно числу различных обязательных идентификаторов, а
 /// кандидат проверяется адресным поиском в отобранном множестве. Уникальность
-/// `(tag_id, intention_id)` исключает повторный счёт одного назначения, а
-/// назначения связям без `intention_id` в отбор не попадают.
+/// `(tag_id, intention_id)` исключает повторный счёт одного назначения.
 ///
 /// Унарный `+` запрещает SQLite вести выборку по отобранному множеству через
 /// первичный ключ: иначе порция и продолжение сортируют все совпадения во
@@ -1895,8 +1893,7 @@ final class _RequiredCatalogTagsExpression extends Expression<bool> {
     context.buffer.write(
       '+intentions.id IN (SELECT assignment.intention_id '
       'FROM tag_assignments AS assignment '
-      'WHERE assignment.intention_id IS NOT NULL '
-      'AND assignment.tag_id IN ('
+      'WHERE assignment.tag_id IN ('
       'SELECT required_tag.value FROM json_each(',
     );
     _tagIds.writeInto(context);
@@ -1914,8 +1911,8 @@ final class _RequiredCatalogTagsExpression extends Expression<bool> {
 /// Набор читается из параметра один раз на выполнение запроса:
 /// некоррелированный подзапрос отбирает намерения с назначением хотя бы одного
 /// исключённого тега, а кандидат проверяется адресным поиском в этом
-/// множестве. Назначения связям без `intention_id` отбрасываются, иначе
-/// `NULL` в множестве сделал бы `NOT IN` неопределённым для каждого кандидата.
+/// множестве. Столбец `intention_id` обязателен, поэтому `NULL` в множество не
+/// попадает и `NOT IN` определён для каждого кандидата.
 final class _ExcludedCatalogTagsExpression extends Expression<bool> {
   _ExcludedCatalogTagsExpression(Set<TagId> tagIds)
     : _tagIds = _CatalogIdsParameter.tags(tagIds);
@@ -1927,8 +1924,7 @@ final class _ExcludedCatalogTagsExpression extends Expression<bool> {
     context.buffer.write(
       'intentions.id NOT IN (SELECT assignment.intention_id '
       'FROM tag_assignments AS assignment '
-      'WHERE assignment.intention_id IS NOT NULL '
-      'AND assignment.tag_id IN ('
+      'WHERE assignment.tag_id IN ('
       'SELECT excluded_tag.value FROM json_each(',
     );
     _tagIds.writeInto(context);

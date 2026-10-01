@@ -1,7 +1,7 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../intention/domain/intention_id.dart';
 import '../domain/tag.dart';
-import '../domain/tag_target.dart';
 
 sealed class TagCatalogMode {
   const TagCatalogMode();
@@ -17,20 +17,21 @@ final class TagCatalogBrowseMode extends TagCatalogMode {
   int get hashCode => 0;
 }
 
+/// Выбор тега для назначения конкретному намерению по его идентичности.
 final class TagCatalogSelectionMode extends TagCatalogMode {
-  const TagCatalogSelectionMode(this.target);
+  const TagCatalogSelectionMode(this.intentionId);
 
-  final TagTarget target;
+  final IntentionId intentionId;
 
   @override
   bool operator ==(Object other) =>
-      other is TagCatalogSelectionMode && other.target == target;
+      other is TagCatalogSelectionMode && other.intentionId == intentionId;
 
   @override
-  int get hashCode => Object.hash(TagCatalogSelectionMode, target);
+  int get hashCode => Object.hash(TagCatalogSelectionMode, intentionId);
 }
 
-/// Полный неизменяемый каталог на одной подтверждённой ревизии.
+/// Полный неизменяемый каталог в порядке создания тегов на одной ревизии.
 sealed class TagCatalogSnapshot {
   factory TagCatalogSnapshot({
     required List<Tag> items,
@@ -38,13 +39,13 @@ sealed class TagCatalogSnapshot {
   }) => TagBrowseSnapshot._(List.unmodifiable(items), revision);
 
   factory TagCatalogSnapshot.selection({
-    required TagTarget target,
+    required IntentionId intentionId,
     required List<TagSelectionRow> rows,
     required GraphRevision revision,
   }) {
     final immutableRows = List<TagSelectionRow>.unmodifiable(rows);
     return TagSelectionSnapshot._(
-      target,
+      intentionId,
       immutableRows,
       List<Tag>.unmodifiable(immutableRows.map((row) => row.tag)),
       revision,
@@ -60,6 +61,7 @@ final class TagBrowseSnapshot extends TagCatalogSnapshot {
   const TagBrowseSnapshot._(super.items, super.revision) : super._();
 }
 
+/// Признак назначения относится к намерению снимка выбора.
 final class TagSelectionRow {
   const TagSelectionRow({required this.tag, required this.isAssigned});
   final Tag tag;
@@ -68,12 +70,12 @@ final class TagSelectionRow {
 
 final class TagSelectionSnapshot extends TagCatalogSnapshot {
   const TagSelectionSnapshot._(
-    this.target,
+    this.intentionId,
     this.rows,
     super.items,
     super.revision,
   ) : super._();
-  final TagTarget target;
+  final IntentionId intentionId;
   final List<TagSelectionRow> rows;
 }
 
@@ -81,8 +83,8 @@ sealed class TagCatalogReadFailure implements GraphCommandFailure {
   const TagCatalogReadFailure();
 }
 
-final class TagCatalogTargetNotFound extends TagCatalogReadFailure {
-  const TagCatalogTargetNotFound();
+final class TagCatalogIntentionNotFound extends TagCatalogReadFailure {
+  const TagCatalogIntentionNotFound();
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.notFound;

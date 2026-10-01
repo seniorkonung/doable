@@ -34,6 +34,13 @@ void main() {
   late AppDatabase database;
   late sqlite.Database raw;
   late DriftPersonalGraphRepository repository;
+  late List<Map<String, Object?>> tagsBefore;
+  late List<Map<String, Object?>> assignmentsBefore;
+
+  List<Map<String, Object?>> storedRows(String table) => [
+    for (final row in raw.select('SELECT * FROM $table ORDER BY rowid'))
+      Map.of(row),
+  ];
 
   setUp(() async {
     database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
@@ -73,6 +80,18 @@ void main() {
          VALUES (?, ?, ?, 'need', 2, NULL, 0)''',
       [_uuid(103), _uuid(1), _uuid(4)],
     );
+    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      _uuid(301),
+      'Путь',
+    ]);
+    for (var number = 1; number <= 5; number++) {
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_uuid(301), _uuid(number)],
+      );
+    }
+    tagsBefore = storedRows('tags');
+    assignmentsBefore = storedRows('tag_assignments');
   });
 
   tearDown(() => database.close());
@@ -108,6 +127,17 @@ void main() {
     ]).single,
   );
 
+  void expectAssignments({int? deletedIntention}) {
+    expect(storedRows('tags'), tagsBefore);
+    expect(storedRows('tag_assignments'), [
+      for (final assignment in assignmentsBefore)
+        if (deletedIntention == null ||
+            assignment['intention_id'] != _uuid(deletedIntention))
+          assignment,
+    ]);
+    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+  }
+
   test(
     'удаление используемой связи возвращает конфликт и сохраняет путь',
     () async {
@@ -124,6 +154,7 @@ void main() {
       );
       expect(count('long_term_relations'), 3);
       expect(count('daily_choice_path_steps'), 2);
+      expectAssignments();
     },
   );
 
@@ -145,6 +176,7 @@ void main() {
     );
     expect(count('long_term_relations'), 3);
     expect(count('daily_choice_path_steps'), 2);
+    expectAssignments();
   });
 
   test('составная смена типа или участника отклоняет все поля', () async {
@@ -176,6 +208,7 @@ void main() {
         isA<LongTermRelationReferencedByDailyPathFailure>(),
       );
       expect(storedRelation(101), before);
+      expectAssignments();
     }
   });
 
@@ -199,6 +232,7 @@ void main() {
     expect(storedRelation(101)['priority'], 4);
     expect(storedRelation(101)['description'], 'Новое');
     expect(count('daily_choice_path_steps'), 2);
+    expectAssignments();
   });
 
   test(
@@ -221,6 +255,7 @@ void main() {
 
       expect(count('daily_choices'), 1);
       expect(count('daily_choice_path_steps'), 2);
+      expectAssignments();
       expect(storedRelation(101)['is_archived'], 1);
       expect(storedRelation(102)['is_archived'], 1);
       expect(
@@ -236,6 +271,7 @@ void main() {
         isA<GraphCommandSucceeded>(),
       );
       expect(count('daily_choice_path_steps'), 2);
+      expectAssignments();
     },
   );
 
@@ -251,6 +287,7 @@ void main() {
       (blocked as GraphCommandFailed).failure.category,
       GraphFailureCategory.conflict,
     );
+    expectAssignments();
     raw.execute('DELETE FROM daily_choices WHERE id = ?', [_uuid(202)]);
 
     expect(
@@ -258,6 +295,7 @@ void main() {
       isA<GraphCommandSucceeded>(),
     );
     expect(count('daily_choice_path_steps'), 0);
+    expectAssignments();
   });
 
   test('удаление намерения повторно учитывает прямую дневную ссылку', () async {
@@ -278,6 +316,7 @@ void main() {
     );
     expect(count('intentions'), 5);
     expect(count('daily_choices'), 1);
+    expectAssignments();
   });
 
   test('замена и удаление дубликата снимают только последние ссылки', () async {
@@ -317,6 +356,7 @@ void main() {
       _uuid(104),
     );
     expect(count('daily_choice_path_steps'), 3);
+    expectAssignments();
 
     for (final number in [101, 102, 104]) {
       final blocked = await repository.execute(
@@ -332,6 +372,7 @@ void main() {
       isA<GraphCommandSucceeded>(),
     );
     expect(count('daily_choice_path_steps'), 1);
+    expectAssignments();
     expect(
       await repository.execute(DeleteLongTermRelation(_relation(101))),
       isA<GraphCommandSucceeded>(),
@@ -356,5 +397,6 @@ void main() {
       ) as GraphCommandFailed).failure,
       isA<IntentionHasBlockingRelationsFailure>(),
     );
+    expectAssignments(deletedIntention: 2);
   });
 }

@@ -20,10 +20,9 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_entities_page.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
@@ -57,33 +56,33 @@ void main() {
           final more = app.repository.holdNextPage();
           unawaited(app.model(tester).loadMore());
           await _waitFor(tester, () => more.ready.isCompleted);
-          await _changeScope(tester, TaggedEntitiesScope.archived);
+          await _changeScope(tester, TaggedIntentionsScope.archived);
           expect(app.state(tester), isA<TagNavigationInitialLoading>());
           app.repository.releasePage(more);
         } else {
           await app.openNavigation(tester);
           await _waitFor(tester, () => held.ready.isCompleted);
-          await _changeScope(tester, TaggedEntitiesScope.archived);
+          await _changeScope(tester, TaggedIntentionsScope.archived);
           expect(app.state(tester), isA<TagNavigationInitialLoading>());
           app.repository.releasePage(held);
         }
         final current = await app.loaded(tester);
         expect(current.tagId, _tagId);
-        expect(current.scope, TaggedEntitiesScope.archived);
+        expect(current.scope, TaggedIntentionsScope.archived);
+        expect(current.items.map((item) => item.id), contains(_intention(2)));
         expect(
-          current.items.map((item) => item.target),
-          contains(_intention(2)),
-        );
-        expect(
-          current.items.map((item) => item.target),
+          current.items.map((item) => item.id),
           isNot(contains(_intention(1))),
         );
-        expect(app.repository.queries.last.scope, TaggedEntitiesScope.archived);
+        expect(
+          app.repository.queries.last.scope,
+          TaggedIntentionsScope.archived,
+        );
         expect(app.repository.queries.last.cursor, isNull);
         expect(
           tester
               .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedEntitiesScope.archived)),
+                find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
               )
               .selected,
           isTrue,
@@ -119,14 +118,14 @@ void main() {
       expect(newModel, isNot(same(oldModel)));
       final before = await app.loaded(tester);
       expect(before.tag.name.value, 'Новое название');
-      oldModel.setScope(TaggedEntitiesScope.archived);
+      oldModel.setScope(TaggedIntentionsScope.archived);
       oldModel.setTagId(_otherTagId);
       unawaited(oldModel.loadMore());
       unawaited(oldModel.retryFirstPage());
       app.repository.releasePage(held);
       await _waitFor(tester, () => app.repository.activePages == 0);
       expect(app.state(tester), same(before));
-      expect(app.state(tester).scope, TaggedEntitiesScope.active);
+      expect(app.state(tester).scope, TaggedIntentionsScope.active);
       expect(app.router.current.name, TagNavigationRoute.name);
       expect(tester.takeException(), isNull);
     },
@@ -138,7 +137,7 @@ void main() {
       final app = await _App.pump(tester);
       await app.openNavigation(tester);
       await app.loaded(tester);
-      await _changeScope(tester, TaggedEntitiesScope.archived);
+      await _changeScope(tester, TaggedIntentionsScope.archived);
       final before = await app.loaded(tester);
       final l10n = app.l10n(tester);
       app.repository.failPages = true;
@@ -159,8 +158,8 @@ void main() {
       expect(stale.scope, before.scope);
       expect(stale.tag.name.value, 'Быт');
       expect(
-        stale.items.map((item) => item.target),
-        before.items.map((item) => item.target),
+        stale.items.map((item) => item.id),
+        before.items.map((item) => item.id),
       );
       expect(stale.nextCursor, isNull);
       expect(app.model(tester).canActOn(_intention(2)), isFalse);
@@ -179,7 +178,7 @@ void main() {
       final count = app.repository.queries.length;
       await _tap(tester, find.widgetWithText(OutlinedButton, l10n.commonRetry));
       final current = await app.loaded(tester);
-      expect(current.scope, TaggedEntitiesScope.archived);
+      expect(current.scope, TaggedIntentionsScope.archived);
       expect(current.tag.name.value, 'Быт');
       expect(app.repository.queries, hasLength(count + 1));
       expect(app.repository.queries.last.cursor, isNull);
@@ -223,7 +222,7 @@ void main() {
       final current = await app.loaded(tester);
       expect(current.items, hasLength(53));
       expect(current.items.take(50), before.items);
-      expect(current.items.map((item) => item.target).toSet(), hasLength(53));
+      expect(current.items.map((item) => item.id).toSet(), hasLength(53));
       expect(current.hasReachedEnd, isTrue);
       expect(app.repository.queries, hasLength(count + 1));
       expect(app.repository.queries.last.cursor, same(before.nextCursor));
@@ -239,7 +238,7 @@ void main() {
         final app = await _App.pump(tester);
         await app.openNavigation(tester);
         await app.loaded(tester);
-        await _changeScope(tester, TaggedEntitiesScope.archived);
+        await _changeScope(tester, TaggedIntentionsScope.archived);
         final archived = await app.loaded(tester);
         final l10n = app.l10n(tester);
         final completions = <GraphCommandCompletion>[];
@@ -269,8 +268,8 @@ void main() {
         expect(input, findsNothing);
         await app.openNavigation(tester);
         await app.loaded(tester);
-        expect(app.state(tester).scope, TaggedEntitiesScope.active);
-        await _changeScope(tester, TaggedEntitiesScope.archived);
+        expect(app.state(tester).scope, TaggedIntentionsScope.active);
+        await _changeScope(tester, TaggedIntentionsScope.archived);
         await app.loaded(tester);
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.inactive,
@@ -286,7 +285,7 @@ void main() {
         );
         expect(app.router.current.name, TagNavigationRoute.name);
         expect(app.state(tester).tagId, _tagId);
-        expect(app.state(tester).scope, TaggedEntitiesScope.archived);
+        expect(app.state(tester).scope, TaggedIntentionsScope.archived);
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.inactive,
         );
@@ -303,7 +302,7 @@ void main() {
           current.tag.name.value,
           fails ? archived.tag.name.value : 'Новое название',
         );
-        expect(current.scope, TaggedEntitiesScope.archived);
+        expect(current.scope, TaggedIntentionsScope.archived);
         expect(find.textContaining(message), findsOneWidget);
         expect(
           tester
@@ -329,7 +328,7 @@ void main() {
         await tester.pumpAndSettle();
         final returned = await app.loaded(tester);
         expect(returned.tagId, archived.tagId);
-        expect(returned.scope, TaggedEntitiesScope.archived);
+        expect(returned.scope, TaggedIntentionsScope.archived);
         expect(returned.tag.name, current.tag.name);
         expect(completions, hasLength(1));
         expect(app.repository.commands.whereType<RenameTag>(), hasLength(1));
@@ -354,7 +353,8 @@ void main() {
                 app.repository.observations.isNotEmpty,
           );
           final before =
-              (await heldPage.ready.future as TaggedEntitiesPageSuccess).value;
+              (await heldPage.ready.future as TaggedIntentionsPageSuccess)
+                  .value;
           final heldCommand = app.repository.holdNextCommand(
             delay: _CommandDelay.afterWrite,
           );
@@ -411,7 +411,7 @@ void main() {
           } else {
             final current = await app.loaded(tester);
             expect(current.tagId, _tagId);
-            expect(current.scope, TaggedEntitiesScope.active);
+            expect(current.scope, TaggedIntentionsScope.active);
             expect(
               current.revision.compareTo(before.revision),
               GraphRevisionOrder.newer,
@@ -419,36 +419,26 @@ void main() {
             switch (mutation) {
               case _Mutation.removeAssignment:
                 expect(
-                  current.items.map((item) => item.target),
+                  current.items.map((item) => item.id),
                   isNot(contains(_intention(4))),
                 );
                 expect(app.model(tester).canActOn(_intention(4)), isFalse);
               case _Mutation.editParticipant:
-                final relation = current.items
-                    .whereType<TaggedLongTermRelation>()
-                    .first;
-                expect(relation.relatedTitle, 'Новое имя соседа');
                 expect(
-                  find.text(
-                    app
-                        .l10n(tester)
-                        .relationNeighborhoodNeedPhrase(
-                          relation.sourceTitle,
-                          'Непомеченный сосед',
-                        ),
-                  ),
-                  findsNothing,
+                  current.items.map((item) => item.id),
+                  before.items.map((item) => item.id),
                 );
                 expect(
-                  find.text(
-                    app
-                        .l10n(tester)
-                        .relationNeighborhoodNeedPhrase(
-                          relation.sourceTitle,
-                          relation.relatedTitle,
-                        ),
-                  ),
-                  findsOneWidget,
+                  current.items.map((item) => item.id),
+                  isNot(contains(_intention(3))),
+                );
+                expect(find.text('Новое имя соседа'), findsNothing);
+                expect(find.text('Непомеченный сосед'), findsNothing);
+                expect(
+                  app.raw.select('SELECT title FROM intentions WHERE id = ?', [
+                    tagFixtureId(3),
+                  ]).single['title'],
+                  'Новое имя соседа',
                 );
               case _Mutation.renameTag:
                 expect(current.tag.name.value, 'Быт');
@@ -533,11 +523,11 @@ Future<GraphCommandCompletion> _mutate(_App app, _Mutation mutation) {
   final coordinator = app.runtime.commandCoordinator;
   return switch (mutation) {
     _Mutation.removeAssignment => (coordinator.acceptTagRemoveAssignment(
-      RemoveTagAssignment(tagId: _tagId, target: _intention(4)),
+      RemoveTagAssignment(tagId: _tagId, intentionId: _intention(4)),
     ) as TagCommandAccepted).future,
     _Mutation.editParticipant => (coordinator.acceptExisting(
       UpdateIntention(
-        id: _intention(3).intentionId,
+        id: _intention(3),
         title: 'Новое имя соседа',
         description: 'Описание 3',
       ),
@@ -557,9 +547,8 @@ final _tagId =
 final _otherTagId =
     (TagId.decode(tagFixtureId(303)) as TagIdDecodingSuccess).id;
 
-IntentionTagTarget _intention(int number) => IntentionTagTarget(
-  (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id,
-);
+IntentionId _intention(int number) =>
+    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
 Future<void> _waitFor(WidgetTester tester, bool Function() done) async {
   for (var attempt = 0; attempt < 100 && !done(); attempt++) {
@@ -588,7 +577,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pump();
 }
 
-Future<void> _changeScope(WidgetTester tester, TaggedEntitiesScope scope) =>
+Future<void> _changeScope(WidgetTester tester, TaggedIntentionsScope scope) =>
     _tap(tester, find.byKey(ValueKey(scope)));
 
 Future<void> _scrollAndTap(WidgetTester tester, Finder finder) async {
@@ -660,7 +649,7 @@ final class _App {
       await runtime.shutdown();
     });
     final ready = await tester.runAsync(runtime.bootstrap) as AppRuntimeReady;
-    seedTagNavigationFixture(raw, extraPairsPerScope: 25);
+    seedTagNavigationFixture(raw, extraPairsPerScope: 51);
     final router = ready.container.read(appRouterProvider);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await _waitFor(
@@ -710,7 +699,7 @@ final class _App {
 
 /// Задерживает доставку уже прочитанного настоящего снимка.
 final class _HeldPage {
-  final ready = Completer<TaggedEntitiesPageResult>();
+  final ready = Completer<TaggedIntentionsPageResult>();
   final release = Completer<void>();
 }
 
@@ -728,7 +717,7 @@ final class _ControlledRepository extends Fake
     implements PersonalGraphRepository {
   _ControlledRepository(this.delegate);
   final PersonalGraphRepository delegate;
-  final queries = <TaggedEntitiesQuery>[];
+  final queries = <TaggedIntentionsQuery>[];
   final heldPages = <_HeldPage>[];
   final heldCommands = <_HeldCommand>[];
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
@@ -787,18 +776,20 @@ final class _ControlledRepository extends Fake
   }
 
   @override
-  Future<TaggedEntitiesPageResult> getTaggedEntitiesPage(
-    TaggedEntitiesQuery query,
+  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
+    TaggedIntentionsQuery query,
   ) async {
     queries.add(query);
     if (failPages || failNextPage) {
       failNextPage = false;
-      return const TaggedEntitiesPageError(TaggedEntitiesUnavailableFailure());
+      return const TaggedIntentionsPageError(
+        TaggedIntentionsUnavailableFailure(),
+      );
     }
     activePages++;
     final held = _nextPage;
     _nextPage = null;
-    final result = await delegate.getTaggedEntitiesPage(query);
+    final result = await delegate.getTaggedIntentionsPage(query);
     if (held != null) {
       held.ready.complete(result);
       await held.release.future;

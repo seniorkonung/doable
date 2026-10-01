@@ -37,7 +37,6 @@ import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/domain/tag_target.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -181,8 +180,8 @@ void main() {
 
     final packages = <List<Object>>[];
     for (final command in <TagCommand>[
-      AssignTag(tagId: tagId, target: IntentionTagTarget(observed)),
-      RemoveTagAssignment(tagId: tagId, target: IntentionTagTarget(observed)),
+      AssignTag(tagId: tagId, intentionId: observed),
+      RemoveTagAssignment(tagId: tagId, intentionId: observed),
     ]) {
       probes.reset();
       final firstEvent = diagnostics.events.length;
@@ -254,40 +253,24 @@ void main() {
   });
 
   test(
-    'пакет тега ненаблюдаемого намерения обрабатывается как пакет тега связи',
+    'пакет тега ненаблюдаемого намерения не затрагивает потребителей',
     () async {
       final contentBefore = probes.visibleContent();
       final formBefore = probes.intentionDetailsEdit(observed);
-      final reactions = <String, List<(String, int)>>{};
 
-      for (final (name, target) in <(String, TagTarget)>[
-        ('связь', LongTermRelationTagTarget(observedRelation)),
-        ('намерение', IntentionTagTarget(isolated)),
-      ]) {
-        probes.reset();
-        final firstEvent = diagnostics.events.length;
-        await run(AssignTag(tagId: tagId, target: target));
-        await _quiesce();
+      probes.reset();
+      final firstEvent = diagnostics.events.length;
+      await run(AssignTag(tagId: tagId, intentionId: isolated));
+      await _quiesce();
 
-        expect(
-          _readCounts(diagnostics, from: firstEvent),
-          isEmpty,
-          reason: name,
-        );
-        for (final probe in probes.all) {
-          expect(probe.updates, 0, reason: '$name: ${probe.name}');
-          expect(
-            probe.forbiddenStates,
-            isEmpty,
-            reason: '$name: ${probe.name}',
-          );
-        }
-        reactions[name] = probes.emissions;
-        expect(probes.visibleContent(), contentBefore, reason: name);
-        expect(probes.intentionDetailsEdit(observed), formBefore, reason: name);
+      expect(_readCounts(diagnostics, from: firstEvent), isEmpty);
+      for (final probe in probes.all) {
+        expect(probe.updates, 0, reason: probe.name);
+        expect(probe.forbiddenStates, isEmpty, reason: probe.name);
       }
-      expect(reactions['намерение'], reactions['связь']);
-      // Реакция на пакет без каталожной мутации: только отметка ревизии
+      expect(probes.visibleContent(), contentBefore);
+      expect(probes.intentionDetailsEdit(observed), formBefore);
+      // Реакция на пакет ненаблюдаемого намерения: только отметка ревизии
       // каталога дневных выборов, без чтений и смены содержимого.
       expect(
         [

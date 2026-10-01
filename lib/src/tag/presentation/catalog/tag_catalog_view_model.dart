@@ -15,7 +15,7 @@ import '../../application/tag_read_result.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
-import '../../domain/tag_target.dart';
+import '../../../intention/domain/intention_id.dart';
 import 'tag_catalog_state.dart';
 
 part 'tag_catalog_view_model.g.dart';
@@ -77,7 +77,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     return TagCatalogInitialLoading(mode: mode);
   }
 
-  /// Смена режима или получателя отменяет право прежних снимков и выбора
+  /// Смена режима или намерения отменяет право прежних снимков и выбора
   /// изменять новое состояние, не прерывая уже принятую команду.
   void setMode(TagCatalogMode mode) {
     if (_mode == mode) return;
@@ -114,6 +114,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   }
 
   void selectTag(TagId id) {
+    if (state is TagCatalogIntentionMissing) return;
     if (_selection is TagCatalogSelectionReady && _selection.id == id) return;
     _selectionGeneration++;
     _assignmentReadGeneration++;
@@ -227,23 +228,28 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         _selectedAssignment != TagCatalogSelectedAssignment.unknown) {
       return;
     }
-    final target = (current.mode as TagCatalogSelectionMode).target;
+    final intentionId = (current.mode as TagCatalogSelectionMode).intentionId;
     final selectionGeneration = _selectionGeneration;
     final readGeneration = ++_assignmentReadGeneration;
     unawaited(
-      _fetchSelectedAssignment(id, target, selectionGeneration, readGeneration),
+      _fetchSelectedAssignment(
+        id,
+        intentionId,
+        selectionGeneration,
+        readGeneration,
+      ),
     );
   }
 
   Future<void> _fetchSelectedAssignment(
     TagId id,
-    TagTarget target,
+    IntentionId intentionId,
     int selectionGeneration,
     int readGeneration,
   ) async {
     TagAssignmentStatusResult result;
     try {
-      result = await _repository.getTagAssignmentStatus(id, target);
+      result = await _repository.getTagAssignmentStatus(id, intentionId);
     } on Object {
       result = const TagAssignmentStatusError(TagAssignmentStatusUnexpected());
     }
@@ -251,7 +257,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         selectionGeneration != _selectionGeneration ||
         readGeneration != _assignmentReadGeneration ||
         _selection.id != id ||
-        _mode != TagCatalogSelectionMode(target)) {
+        _mode != TagCatalogSelectionMode(intentionId)) {
       return;
     }
     switch (result) {
@@ -288,9 +294,9 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       case TagAssignmentStatusError(failure: TagAssignmentStatusTagNotFound()):
         _commandTagMissing(id);
       case TagAssignmentStatusError(
-        failure: TagAssignmentStatusTargetNotFound(),
+        failure: TagAssignmentStatusIntentionNotFound(),
       ):
-        _targetMissing(target);
+        _intentionMissing(intentionId);
       case TagAssignmentStatusError(:final failure):
         _selectedAssignmentFailed(switch (failure) {
           TagAssignmentStatusUnavailable() =>
@@ -338,7 +344,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     }
     final mode = current.mode as TagCatalogSelectionMode;
     final start = _coordinator.acceptTagAssign(
-      AssignTag(tagId: selection.id, target: mode.target),
+      AssignTag(tagId: selection.id, intentionId: mode.intentionId),
     );
     switch (start) {
       case TagCommandAccepted(:final token):
@@ -536,10 +542,10 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
             _selectedAssignment == TagCatalogSelectedAssignment.unknown) {
           _readSelectedAssignment();
         }
-      case GraphResultFailure(failure: TagCatalogTargetNotFound())
+      case GraphResultFailure(failure: TagCatalogIntentionNotFound())
           when mode is TagCatalogSelectionMode:
         _refreshNeeded = false;
-        _targetMissing(mode.target);
+        _intentionMissing(mode.intentionId);
       case GraphResultFailure(:final failure):
         _refreshNeeded = false;
         _readFailure(failure);
@@ -585,15 +591,17 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   void _onCompletion(GraphCommandCompletion completion) {
     if (!ref.mounted) return;
     _finishAssignmentStatus(completion);
+    if (state is TagCatalogIntentionMissing) return;
     if (completion case TagCommandCompletion(
       kind: TagCommandKind.assign,
       confirmedResult: GraphResultFailure(
-        failure: TagTargetNotFoundFailure(:final target),
+        failure: TagIntentionNotFoundFailure(:final intentionId),
       ),
     )) {
-      if (_mode case TagCatalogSelectionMode(target: final selectedTarget)
-          when selectedTarget == target) {
-        _targetMissing(target);
+      if (_mode
+          case TagCatalogSelectionMode(intentionId: final selectedIntentionId)
+          when selectedIntentionId == intentionId) {
+        _intentionMissing(intentionId);
       }
       return;
     }
@@ -615,7 +623,7 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
         return;
       }
     }
-    if (_mode case TagCatalogSelectionMode(target: final target)) {
+    if (_mode case TagCatalogSelectionMode(intentionId: final intentionId)) {
       for (final change in package.changes) {
         switch (change) {
           case TagCreatedChange(:final after):
@@ -624,11 +632,11 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
           case TagAssignmentChangedChange(:final assignment, :final state) ||
               TagAssignmentUnchangedChange(:final assignment, :final state):
             if (_newlyCreatedTagId == assignment.tagId &&
-                assignment.target == target) {
+                assignment.intentionId == intentionId) {
               _newlyCreatedTagId = null;
               _newlyCreatedRevision = null;
             }
-            if (assignment.target == target &&
+            if (assignment.intentionId == intentionId &&
                 assignment.tagId == _selection.id) {
               _setSelectedAssignment(
                 state == TagAssignmentState.assigned
@@ -676,7 +684,8 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
           TagAssignmentChangedChange(:final assignment) ||
           TagAssignmentUnchangedChange(:final assignment) =>
             assignment.tagId == selectedId &&
-                assignment.target == (_mode as TagCatalogSelectionMode).target,
+                assignment.intentionId ==
+                    (_mode as TagCatalogSelectionMode).intentionId,
           _ => false,
         },
       );
@@ -765,8 +774,8 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
             when !snapshotAlreadyIncludes &&
                 current is TagCatalogLoaded &&
                 current.mode is TagCatalogSelectionMode &&
-                (current.mode as TagCatalogSelectionMode).target ==
-                    assignment.target:
+                (current.mode as TagCatalogSelectionMode).intentionId ==
+                    assignment.intentionId:
           rows = [
             for (final row in rows)
               if (row.tag.id == assignment.tagId)
@@ -831,7 +840,9 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
           when current is TagCatalogLoaded &&
               current.mode is TagCatalogSelectionMode &&
               !_coordinator.isTagRunning(tagId) &&
-              !_targetRunning((current.mode as TagCatalogSelectionMode).target):
+              !_intentionRunning(
+                (current.mode as TagCatalogSelectionMode).intentionId,
+              ):
         _assignmentStatus = const TagCatalogAssignmentIdle();
       case TagCatalogAssignmentStatus():
         return;
@@ -841,24 +852,21 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     }
   }
 
-  bool _targetRunning(TagTarget target) =>
-      _coordinator.isKeyRunning(switch (target) {
-        IntentionTagTarget(:final intentionId) => ExistingIntentionKey(
-          intentionId,
-        ),
-        LongTermRelationTagTarget(:final relationId) =>
-          ExistingLongTermRelationKey(relationId),
-      });
+  bool _intentionRunning(IntentionId intentionId) =>
+      _coordinator.isKeyRunning(ExistingIntentionKey(intentionId));
 
-  void _targetMissing(TagTarget target) {
+  void _intentionMissing(IntentionId intentionId) {
+    _generation++;
     _selectionGeneration++;
+    _assignmentReadGeneration++;
+    _refreshNeeded = false;
     unawaited(_selectedReads?.cancel());
     _selectedReads = null;
     _selection = const TagCatalogNoSelection();
     _selectedRevision = null;
     _clearSelectedAssignment();
     _assignmentStatus = const TagCatalogAssignmentIdle();
-    state = TagCatalogTargetMissing(target);
+    state = TagCatalogIntentionMissing(intentionId);
   }
 
   void _commandTagMissing(TagId id) {
@@ -923,10 +931,10 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
       switch ((snapshot, mode)) {
         (TagBrowseSnapshot(), TagCatalogBrowseMode()) => true,
         (
-          TagSelectionSnapshot(:final target),
-          TagCatalogSelectionMode(target: final modeTarget),
+          TagSelectionSnapshot(:final intentionId),
+          TagCatalogSelectionMode(intentionId: final modeIntentionId),
         ) =>
-          target == modeTarget,
+          intentionId == modeIntentionId,
         _ => false,
       };
 

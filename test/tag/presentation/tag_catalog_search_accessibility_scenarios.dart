@@ -1,33 +1,71 @@
 part of 'tag_accessibility_test.dart';
 
-final _searchModes = <(String, TagTarget?)>[
+final _searchModes = <(String, IntentionId?)>[
   ('каталог', null),
   (
     'выбор для намерения',
-    IntentionTagTarget(
-      (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id,
-    ),
+    (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id,
   ),
   (
-    'выбор для связи «нужно»',
-    LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        tagFixtureId(101),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    ),
-  ),
-  (
-    'выбор для связи «можно»',
-    LongTermRelationTagTarget(
-      (LongTermRelationId.decode(
-        tagFixtureId(102),
-      ) as LongTermRelationIdDecodingSuccess).id,
-    ),
+    'выбор для архивированного действия',
+    (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id,
   ),
 ];
 
 void _registerCatalogSearchScenarios() {
   for (final locale in [const Locale('ru'), const Locale('en')]) {
+    testWidgets(
+      'отсутствие намерения доступно диктору с клавиатурой при тексте 2.5: ${locale.languageCode}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final language = ValueNotifier(locale);
+        addTearDown(language.dispose);
+        try {
+          final l10n = await AppLocalizations.delegate.load(locale);
+          final message = find.text(l10n.tagAssignmentIntentionNotFound);
+          await _showAccessibleSearch(
+            tester,
+            (IntentionId.decode(
+              tagFixtureId(999),
+            ) as IntentionIdDecodingSuccess).id,
+            language,
+            readyMarker: message,
+          );
+          tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+          await tester.pumpAndSettle();
+          final text = tester.widget<Text>(message).data!;
+          expect(
+            text,
+            contains(locale.languageCode == 'ru' ? 'намерения' : 'intention'),
+          );
+          expect(
+            text,
+            isNot(
+              contains(
+                locale.languageCode == 'ru' ? 'получателя' : 'recipient',
+              ),
+            ),
+          );
+          await tester.ensureVisible(message);
+          expect(tester.getSemantics(message).label, contains(text));
+          expect(
+            tester.getSemantics(message).flagsCollection.isLiveRegion,
+            isTrue,
+          );
+          expect(
+            tester.renderObject<RenderParagraph>(message).didExceedMaxLines,
+            isFalse,
+          );
+          expect(
+            find.byKey(const ValueKey('tag-catalog-assign')),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
     for (final (description, target) in _searchModes) {
       testWidgets(
         'ошибка поиска полностью читается с клавиатурой при тексте 2.5: $description, ${locale.languageCode}',
@@ -117,6 +155,7 @@ void _registerCatalogSearchScenarios() {
               language,
               tagName: tagName,
             );
+            tester.view.viewInsets = const FakeViewPadding(bottom: 300);
             var l10n = await AppLocalizations.delegate.load(locale);
             final search = find.byKey(const ValueKey('tag-catalog-search'));
             final create = find.byKey(const ValueKey('tag-catalog-create'));
@@ -314,9 +353,10 @@ void _expectHiddenSelection(
 
 Future<void> _showAccessibleSearch(
   WidgetTester tester,
-  TagTarget? target,
+  IntentionId? intentionId,
   ValueNotifier<Locale> language, {
   String? tagName,
+  Finder? readyMarker,
 }) async {
   tester.view.physicalSize = const Size(420, 900);
   tester.view.devicePixelRatio = 1;
@@ -334,10 +374,6 @@ Future<void> _showAccessibleSearch(
       tagFixtureId(lastTagNumber),
     ]);
   }
-  raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
-    'can',
-    tagFixtureId(102),
-  ]);
   final repository = DriftPersonalGraphRepository(
     database,
     UuidV7IntentionIdGenerator(),
@@ -371,7 +407,7 @@ Future<void> _showAccessibleSearch(
   );
   addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
   await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
-  unawaited(router.push(TagCatalogRoute(target: target)));
-  await _until(tester, find.text(tagName ?? 'Работа'));
+  unawaited(router.push(TagCatalogRoute(intentionId: intentionId)));
+  await _until(tester, readyMarker ?? find.text(tagName ?? 'Работа'));
   await tester.pumpAndSettle();
 }
