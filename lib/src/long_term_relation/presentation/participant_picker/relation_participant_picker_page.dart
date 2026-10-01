@@ -13,6 +13,7 @@ import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/catalog/intention_catalog_state.dart';
 import '../../../intention/presentation/catalog/intention_catalog_status_views.dart';
 import '../../../intention/presentation/catalog/intention_catalog_view_model.dart';
+import '../../../intention/presentation/catalog/intention_search_layout.dart';
 import '../../../intention/presentation/catalog/intention_tag_conditions_section.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -80,50 +81,50 @@ final class _RelationParticipantPickerPageState
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                key: const ValueKey('participant-picker-filter-field'),
-                controller: _filterController,
-                decoration: InputDecoration(
-                  labelText: localizations.catalogFilterLabel,
-                  errorText: _filterError(localizations, selection),
-                ),
-                onChanged: (value) {
-                  _scrollToTop();
-                  notifier.changeTitleFilter(value);
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: IntentionTagConditionsSection(purpose: purpose),
-              ),
-            ),
-            Expanded(
-              child: catalog.when(
-                skipLoadingOnReload: false,
-                skipLoadingOnRefresh: false,
-                data: (state) => _PickerContent(
-                  purpose: purpose,
-                  state: state,
-                  scrollController: _scrollController,
-                  onSelected: _select,
-                ),
-                error: (_, _) => IntentionCatalogStatusView(
-                  message: localizations.catalogUnexpectedFailure,
-                ),
-                loading: () => IntentionCatalogStatusView(
-                  message: localizations.catalogLoading,
-                  progressIndicator: true,
+        child: IntentionSearchLayout(
+          controls: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: TextField(
+                  key: const ValueKey('participant-picker-filter-field'),
+                  controller: _filterController,
+                  decoration: InputDecoration(
+                    labelText: localizations.catalogFilterLabel,
+                    errorText: _filterError(localizations, selection),
+                  ),
+                  onChanged: (value) {
+                    _scrollToTop();
+                    notifier.changeTitleFilter(value);
+                  },
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: IntentionTagConditionsSection(purpose: purpose),
+                ),
+              ),
+            ],
+          ),
+          results: catalog.when(
+            skipLoadingOnReload: false,
+            skipLoadingOnRefresh: false,
+            data: (state) => _PickerContent(
+              purpose: purpose,
+              state: state,
+              scrollController: _scrollController,
+              onSelected: _select,
             ),
-          ],
+            error: (_, _) => IntentionCatalogStatusView(
+              message: localizations.catalogUnexpectedFailure,
+            ),
+            loading: () => IntentionCatalogStatusView(
+              message: localizations.catalogLoading,
+              progressIndicator: true,
+            ),
+          ),
         ),
       ),
     );
@@ -247,15 +248,21 @@ final class _PickerOptions extends ConsumerWidget {
       options.add(_ParticipantOption(catalogIndex: index, summary: summary));
     }
 
-    return Column(
-      children: [
-        // Отказ обновления стоит над списком и не заменяет сохранённую выдачу.
-        IntentionCatalogRefreshStatusView(
-          purpose: purpose,
-          refresh: state.refresh,
-        ),
-        Expanded(child: _buildOptions(context, ref, localizations, options)),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        children: [
+          // Отказ обновления стоит над списком и не заменяет сохранённую
+          // выдачу.
+          IntentionCatalogRefreshStatusArea(
+            availableHeight: constraints.maxHeight,
+            child: IntentionCatalogRefreshStatusView(
+              purpose: purpose,
+              refresh: state.refresh,
+            ),
+          ),
+          Expanded(child: _buildOptions(context, ref, localizations, options)),
+        ],
+      ),
     );
   }
 

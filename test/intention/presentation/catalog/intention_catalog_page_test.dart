@@ -1083,7 +1083,9 @@ void main() {
     await tester.tap(reloadButton);
     await _pumpUntilQueries(tester, repository, 3);
     expect(repository.queryAt(2).cursor, isNull);
-    expect(find.text('Прежнее первое'), findsOneWidget);
+    // Действие стоит выше кнопки создания намерения, поэтому первая строка
+    // сохранённой выдачи уходит за верхний край списка.
+    expect(find.text('Прежнее первое', skipOffstage: false), findsOneWidget);
     expect(find.text('Reloading catalog…'), findsOneWidget);
 
     repository.complete(

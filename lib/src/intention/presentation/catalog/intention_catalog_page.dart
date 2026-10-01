@@ -15,6 +15,7 @@ import 'intention_catalog_purpose.dart';
 import 'intention_catalog_state.dart';
 import 'intention_catalog_status_views.dart';
 import 'intention_catalog_view_model.dart';
+import 'intention_search_layout.dart';
 import 'intention_tag_conditions_section.dart';
 import 'intention_tag_conditions_view_model.dart';
 
@@ -23,6 +24,9 @@ import 'intention_tag_conditions_view_model.dart';
 /// Выбор участника связи ведёт отдельное состояние того же каталога: их
 /// охваты, фильтры и загруженные части не смешиваются.
 const _purpose = BrowseIntentionCatalog();
+
+/// Высота кнопки создания намерения вместе с отступами над нижним краем.
+const _createActionExtent = 56 + 2 * kFloatingActionButtonMargin;
 
 @RoutePage()
 final class IntentionCatalogPage extends ConsumerStatefulWidget {
@@ -97,44 +101,40 @@ final class _IntentionCatalogPageState
         icon: const Icon(Icons.add),
         label: Text(localizations.editorCreateAction),
       ),
-      body: Column(
-        children: [
-          _CatalogControls(
-            selection: selection,
-            filterController: _filterController,
-            onScopeChanged: (scope) {
-              _scrollToTop();
-              notifier.changeScope(scope);
-            },
-            onFilterChanged: (value) {
-              _scrollToTop();
-              notifier.changeTitleFilter(value);
-            },
-            onOrderChanged: (order) {
-              _scrollToTop();
-              notifier.changeOrder(order);
-            },
+      body: IntentionSearchLayout(
+        controls: _CatalogControls(
+          selection: selection,
+          filterController: _filterController,
+          onScopeChanged: (scope) {
+            _scrollToTop();
+            notifier.changeScope(scope);
+          },
+          onFilterChanged: (value) {
+            _scrollToTop();
+            notifier.changeTitleFilter(value);
+          },
+          onOrderChanged: (order) {
+            _scrollToTop();
+            notifier.changeOrder(order);
+          },
+        ),
+        results: catalog.when(
+          skipLoadingOnReload: false,
+          skipLoadingOnRefresh: false,
+          data: (state) => _CatalogContent(
+            state: state,
+            scrollController: _scrollController,
+            itemKeyFor: _itemKeyFor,
+            onRefreshStatusExtentChanged: _reserveRefreshStatusExtent,
           ),
-          Expanded(
-            child: catalog.when(
-              skipLoadingOnReload: false,
-              skipLoadingOnRefresh: false,
-              data: (state) => _CatalogContent(
-                state: state,
-                scrollController: _scrollController,
-                itemKeyFor: _itemKeyFor,
-                onRefreshStatusExtentChanged: _reserveRefreshStatusExtent,
-              ),
-              error: (_, _) => IntentionCatalogStatusView(
-                message: localizations.catalogUnexpectedFailure,
-              ),
-              loading: () => IntentionCatalogStatusView(
-                message: localizations.catalogLoading,
-                progressIndicator: true,
-              ),
-            ),
+          error: (_, _) => IntentionCatalogStatusView(
+            message: localizations.catalogUnexpectedFailure,
           ),
-        ],
+          loading: () => IntentionCatalogStatusView(
+            message: localizations.catalogLoading,
+            progressIndicator: true,
+          ),
+        ),
       ),
     );
   }
@@ -563,53 +563,62 @@ final class _LoadedCatalog extends ConsumerWidget {
           ),
         ),
         Expanded(
-          child: Stack(
-            children: [
-              ListView.builder(
-                key: const PageStorageKey<String>('intention-catalog-list'),
-                controller: scrollController,
-                itemCount: state.items.length + (hasContinuationStatus ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == state.items.length) {
-                    return IntentionCatalogContinuationStatusView(
-                      purpose: _purpose,
-                      continuation: state.continuation,
-                    );
-                  }
-                  _requestNextPage(context, ref, index);
-                  final summary = state.items[index];
-                  return _IntentionSummaryTile(
-                    key: itemKeyFor(summary.id),
-                    summary: summary,
-                    showArchiveState: state.query.scope == IntentionScope.all,
-                    onTap: () {
-                      context.router.push(
-                        IntentionDetailsRoute(intentionId: summary.id),
+          child: LayoutBuilder(
+            builder: (context, constraints) => Stack(
+              children: [
+                ListView.builder(
+                  key: const PageStorageKey<String>('intention-catalog-list'),
+                  controller: scrollController,
+                  // Конец выдачи и состояние продолжения прокручиваются выше
+                  // кнопки создания намерения.
+                  padding: const EdgeInsets.only(bottom: _createActionExtent),
+                  itemCount:
+                      state.items.length + (hasContinuationStatus ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == state.items.length) {
+                      return IntentionCatalogContinuationStatusView(
+                        purpose: _purpose,
+                        continuation: state.continuation,
                       );
-                    },
-                  );
-                },
-              ),
-              // Отказ обновления ложится поверх верхнего края списка и не
-              // сдвигает строки; место под него список отводит перед своим
-              // началом, поэтому первые строки остаются достижимыми.
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: _ExtentObserver(
-                  onChanged: onRefreshStatusExtentChanged,
-                  child: Material(
-                    color: Theme.of(context).colorScheme.surface,
-                    elevation: 1,
-                    child: IntentionCatalogRefreshStatusView(
-                      purpose: _purpose,
-                      refresh: state.refresh,
+                    }
+                    _requestNextPage(context, ref, index);
+                    final summary = state.items[index];
+                    return _IntentionSummaryTile(
+                      key: itemKeyFor(summary.id),
+                      summary: summary,
+                      showArchiveState: state.query.scope == IntentionScope.all,
+                      onTap: () {
+                        context.router.push(
+                          IntentionDetailsRoute(intentionId: summary.id),
+                        );
+                      },
+                    );
+                  },
+                ),
+                // Отказ обновления ложится поверх верхнего края списка и не
+                // сдвигает строки; место под него список отводит перед своим
+                // началом, поэтому первые строки остаются достижимыми.
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _ExtentObserver(
+                    onChanged: onRefreshStatusExtentChanged,
+                    child: Material(
+                      color: Theme.of(context).colorScheme.surface,
+                      elevation: 1,
+                      child: IntentionCatalogRefreshStatusArea(
+                        availableHeight: constraints.maxHeight,
+                        child: IntentionCatalogRefreshStatusView(
+                          purpose: _purpose,
+                          refresh: state.refresh,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
