@@ -138,6 +138,18 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сохранённая позиция каталога больше недействительна.';
 
   @override
+  String get catalogRefreshUnavailable =>
+      'Список намерений не обновлён: не удалось получить изменения.';
+
+  @override
+  String get catalogRefreshCorruption =>
+      'Список намерений не обновлён: сохранённые данные повреждены.';
+
+  @override
+  String get catalogRefreshUnexpected =>
+      'Список намерений не обновлён из-за непредвиденной ошибки.';
+
+  @override
   String get catalogReload => 'Перезагрузить каталог';
 
   @override

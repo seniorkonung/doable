@@ -154,3 +154,43 @@ final class IntentionCatalogContinuationStatusView extends ConsumerWidget {
     };
   }
 }
+
+/// Локализованный отказ обновления над сохранённой выдачей каталога.
+///
+/// Сообщение говорит, что показанная выдача не обновлена, поэтому исходно
+/// пустую выдачу нельзя принять за успешное отсутствие совпадений. Повтор
+/// доступен только при недоступности хранилища; без отказа представление
+/// ничего не выводит и не занимает места.
+final class IntentionCatalogRefreshStatusView extends ConsumerWidget {
+  const IntentionCatalogRefreshStatusView({
+    required this.purpose,
+    required this.refresh,
+    super.key,
+  });
+
+  final IntentionCatalogPurpose purpose;
+  final IntentionCatalogRefreshState refresh;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localizations = AppLocalizations.of(context);
+    return switch (refresh) {
+      IntentionCatalogRefreshIdle() => const SizedBox.shrink(),
+      IntentionCatalogRefreshUnavailable() => IntentionCatalogInlineStatus(
+        message: localizations.catalogRefreshUnavailable,
+        actionLabel: localizations.commonRetry,
+        onAction: () {
+          ref
+              .read(intentionCatalogViewModelProvider(purpose).notifier)
+              .retryRefresh();
+        },
+      ),
+      IntentionCatalogRefreshCorruption() => IntentionCatalogInlineStatus(
+        message: localizations.catalogRefreshCorruption,
+      ),
+      IntentionCatalogRefreshUnexpected() => IntentionCatalogInlineStatus(
+        message: localizations.catalogRefreshUnexpected,
+      ),
+    };
+  }
+}

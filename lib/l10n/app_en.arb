@@ -157,6 +157,18 @@
   "@catalogLoadMoreValidation": {
     "description": "Недопустимый cursor следующей порции"
   },
+  "catalogRefreshUnavailable": "The intention list isn’t up to date: changes couldn’t be loaded.",
+  "@catalogRefreshUnavailable": {
+    "description": "Устранимый отказ обновления над сохранённой выдачей каталога"
+  },
+  "catalogRefreshCorruption": "The intention list isn’t up to date: stored data is damaged.",
+  "@catalogRefreshCorruption": {
+    "description": "Отказ обновления сохранённой выдачи из-за повреждения данных"
+  },
+  "catalogRefreshUnexpected": "The intention list isn’t up to date because of an unexpected error.",
+  "@catalogRefreshUnexpected": {
+    "description": "Отказ обновления сохранённой выдачи из-за непредвиденной ошибки"
+  },
   "catalogReload": "Reload catalog",
   "@catalogReload": {
     "description": "Явное восстановление каталога с первой страницы"

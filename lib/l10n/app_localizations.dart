@@ -326,6 +326,24 @@ abstract class AppLocalizations {
   /// **'The saved catalog position is no longer valid.'**
   String get catalogLoadMoreValidation;
 
+  /// Устранимый отказ обновления над сохранённой выдачей каталога
+  ///
+  /// In en, this message translates to:
+  /// **'The intention list isn’t up to date: changes couldn’t be loaded.'**
+  String get catalogRefreshUnavailable;
+
+  /// Отказ обновления сохранённой выдачи из-за повреждения данных
+  ///
+  /// In en, this message translates to:
+  /// **'The intention list isn’t up to date: stored data is damaged.'**
+  String get catalogRefreshCorruption;
+
+  /// Отказ обновления сохранённой выдачи из-за непредвиденной ошибки
+  ///
+  /// In en, this message translates to:
+  /// **'The intention list isn’t up to date because of an unexpected error.'**
+  String get catalogRefreshUnexpected;
+
   /// Явное восстановление каталога с первой страницы
   ///
   /// In en, this message translates to:

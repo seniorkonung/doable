@@ -137,6 +137,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'The saved catalog position is no longer valid.';
 
   @override
+  String get catalogRefreshUnavailable =>
+      'The intention list isn’t up to date: changes couldn’t be loaded.';
+
+  @override
+  String get catalogRefreshCorruption =>
+      'The intention list isn’t up to date: stored data is damaged.';
+
+  @override
+  String get catalogRefreshUnexpected =>
+      'The intention list isn’t up to date because of an unexpected error.';
+
+  @override
   String get catalogReload => 'Reload catalog';
 
   @override
