@@ -31,7 +31,9 @@ path_classification() {
     android/*|pubspec.yaml|pubspec.lock|mise.toml|.github/workflows/*|tool/check_ci_scope.sh|tool/check_android_privacy_manifest.dart)
       printf '%s\n' android
       ;;
-    lib/*|test/*|analysis_options.yaml|dart_test.yaml|l10n.yaml|build.yaml|drift_schemas/*)
+    # Widgetbook — отдельный пакет со своими раннерами: его android/ и
+    # pubspec.lock не входят в release APK приложения.
+    lib/*|test/*|analysis_options.yaml|dart_test.yaml|l10n.yaml|build.yaml|drift_schemas/*|widgetbook/*)
       printf '%s\n' project
       ;;
     *)
