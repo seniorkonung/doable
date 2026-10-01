@@ -278,6 +278,12 @@ abstract class AppLocalizations {
   /// **'No intentions yet.'**
   String get catalogAllEmpty;
 
+  /// Успешная пустая выдача поиска намерений при действующих условиях по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions match the tag conditions.'**
+  String get catalogTagConditionsEmpty;
+
   /// Устранимая недоступность первой страницы каталога
   ///
   /// In en, this message translates to:

@@ -107,6 +107,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogAllEmpty => 'No intentions yet.';
 
   @override
+  String get catalogTagConditionsEmpty =>
+      'No intentions match the tag conditions.';
+
+  @override
   String get catalogUnavailable => 'Intentions couldn’t be loaded. Try again.';
 
   @override

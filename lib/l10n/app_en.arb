@@ -125,6 +125,10 @@
   "@catalogAllEmpty": {
     "description": "Пустой каталог всех намерений"
   },
+  "catalogTagConditionsEmpty": "No intentions match the tag conditions.",
+  "@catalogTagConditionsEmpty": {
+    "description": "Успешная пустая выдача поиска намерений при действующих условиях по тегам"
+  },
   "catalogUnavailable": "Intentions couldn’t be loaded. Try again.",
   "@catalogUnavailable": {
     "description": "Устранимая недоступность первой страницы каталога"

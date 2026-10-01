@@ -15,6 +15,8 @@ import 'intention_catalog_purpose.dart';
 import 'intention_catalog_state.dart';
 import 'intention_catalog_status_views.dart';
 import 'intention_catalog_view_model.dart';
+import 'intention_tag_conditions_section.dart';
+import 'intention_tag_conditions_view_model.dart';
 
 /// Назначение общего просмотра каталога намерений.
 ///
@@ -34,7 +36,7 @@ final class IntentionCatalogPage extends ConsumerStatefulWidget {
 final class _IntentionCatalogPageState
     extends ConsumerState<IntentionCatalogPage> {
   final _filterController = TextEditingController();
-  final _scrollController = ScrollController();
+  final _scrollController = _CatalogScrollController();
   final _itemKeys = <IntentionId, GlobalKey>{};
   _CatalogVisualAnchor? _pendingVisualAnchor;
   bool _catalogMaintenanceScheduled = false;
@@ -54,6 +56,16 @@ final class _IntentionCatalogPageState
       intentionCatalogViewModelProvider(_purpose),
       _handleCatalogStateChanged,
     );
+    // Добавление, переключение и снятие условия начинают новую выдачу;
+    // переименование и удаление тега меняют только предъявление условия.
+    ref.listen(intentionTagConditionsViewModelProvider(_purpose), (
+      previous,
+      next,
+    ) {
+      if (previous?.tagFilter != next.tagFilter) {
+        _scrollToTop();
+      }
+    });
     final notifier = ref.read(
       intentionCatalogViewModelProvider(_purpose).notifier,
     );
@@ -111,6 +123,7 @@ final class _IntentionCatalogPageState
                 state: state,
                 scrollController: _scrollController,
                 itemKeyFor: _itemKeyFor,
+                onRefreshStatusExtentChanged: _reserveRefreshStatusExtent,
               ),
               error: (_, _) => IntentionCatalogStatusView(
                 message: localizations.catalogUnexpectedFailure,
@@ -137,6 +150,12 @@ final class _IntentionCatalogPageState
 
   GlobalKey _itemKeyFor(IntentionId id) =>
       _itemKeys.putIfAbsent(id, () => GlobalKey());
+
+  void _reserveRefreshStatusExtent(double extent) {
+    if (mounted) {
+      _scrollController.leadingInset = extent;
+    }
+  }
 
   void _handleCatalogStateChanged(
     AsyncValue<IntentionCatalogState>? previous,
@@ -369,6 +388,11 @@ final class _CatalogControls extends StatelessWidget {
             onChanged: onFilterChanged,
           ),
           const SizedBox(height: 12),
+          const Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: IntentionTagConditionsSection(purpose: _purpose),
+          ),
+          const SizedBox(height: 12),
           DropdownButtonFormField<IntentionCatalogOrder>(
             key: const ValueKey('catalog-order-control'),
             isExpanded: true,
@@ -449,11 +473,13 @@ final class _CatalogContent extends ConsumerWidget {
     required this.state,
     required this.scrollController,
     required this.itemKeyFor,
+    required this.onRefreshStatusExtentChanged,
   });
 
   final IntentionCatalogState state;
   final ScrollController scrollController;
   final Key Function(IntentionId) itemKeyFor;
+  final ValueChanged<double> onRefreshStatusExtentChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -468,9 +494,10 @@ final class _CatalogContent extends ConsumerWidget {
         state: loaded,
         scrollController: scrollController,
         itemKeyFor: itemKeyFor,
+        onRefreshStatusExtentChanged: onRefreshStatusExtentChanged,
       ),
       IntentionCatalogEmpty empty => IntentionCatalogStatusView(
-        message: _emptyMessage(localizations, empty.scope),
+        message: _emptyMessage(localizations, empty.query),
       ),
       IntentionCatalogUnavailable() => IntentionCatalogStatusView(
         message: localizations.catalogUnavailable,
@@ -490,12 +517,21 @@ final class _CatalogContent extends ConsumerWidget {
     };
   }
 
-  String _emptyMessage(AppLocalizations localizations, IntentionScope scope) =>
-      switch (scope) {
-        IntentionScope.active => localizations.catalogActiveEmpty,
-        IntentionScope.archived => localizations.catalogArchivedEmpty,
-        IntentionScope.all => localizations.catalogAllEmpty,
-      };
+  String _emptyMessage(
+    AppLocalizations localizations,
+    IntentionCatalogQuery query,
+  ) {
+    // Условия по тегам сужают охват: пустая выдача не означает, что в нём
+    // нет намерений.
+    if (query.tagFilter != IntentionTagFilter.empty) {
+      return localizations.catalogTagConditionsEmpty;
+    }
+    return switch (query.scope) {
+      IntentionScope.active => localizations.catalogActiveEmpty,
+      IntentionScope.archived => localizations.catalogArchivedEmpty,
+      IntentionScope.all => localizations.catalogAllEmpty,
+    };
+  }
 }
 
 final class _LoadedCatalog extends ConsumerWidget {
@@ -503,11 +539,13 @@ final class _LoadedCatalog extends ConsumerWidget {
     required this.state,
     required this.scrollController,
     required this.itemKeyFor,
+    required this.onRefreshStatusExtentChanged,
   });
 
   final IntentionCatalogLoaded state;
   final ScrollController scrollController;
   final Key Function(IntentionId) itemKeyFor;
+  final ValueChanged<double> onRefreshStatusExtentChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -525,30 +563,53 @@ final class _LoadedCatalog extends ConsumerWidget {
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            key: const PageStorageKey<String>('intention-catalog-list'),
-            controller: scrollController,
-            itemCount: state.items.length + (hasContinuationStatus ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index == state.items.length) {
-                return IntentionCatalogContinuationStatusView(
-                  purpose: _purpose,
-                  continuation: state.continuation,
-                );
-              }
-              _requestNextPage(context, ref, index);
-              final summary = state.items[index];
-              return _IntentionSummaryTile(
-                key: itemKeyFor(summary.id),
-                summary: summary,
-                showArchiveState: state.query.scope == IntentionScope.all,
-                onTap: () {
-                  context.router.push(
-                    IntentionDetailsRoute(intentionId: summary.id),
+          child: Stack(
+            children: [
+              ListView.builder(
+                key: const PageStorageKey<String>('intention-catalog-list'),
+                controller: scrollController,
+                itemCount: state.items.length + (hasContinuationStatus ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == state.items.length) {
+                    return IntentionCatalogContinuationStatusView(
+                      purpose: _purpose,
+                      continuation: state.continuation,
+                    );
+                  }
+                  _requestNextPage(context, ref, index);
+                  final summary = state.items[index];
+                  return _IntentionSummaryTile(
+                    key: itemKeyFor(summary.id),
+                    summary: summary,
+                    showArchiveState: state.query.scope == IntentionScope.all,
+                    onTap: () {
+                      context.router.push(
+                        IntentionDetailsRoute(intentionId: summary.id),
+                      );
+                    },
                   );
                 },
-              );
-            },
+              ),
+              // Отказ обновления ложится поверх верхнего края списка и не
+              // сдвигает строки; место под него список отводит перед своим
+              // началом, поэтому первые строки остаются достижимыми.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _ExtentObserver(
+                  onChanged: onRefreshStatusExtentChanged,
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    elevation: 1,
+                    child: IntentionCatalogRefreshStatusView(
+                      purpose: _purpose,
+                      refresh: state.refresh,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -596,6 +657,7 @@ final class _IntentionSummaryTile extends StatelessWidget {
       archiveState: summary.archiveState,
       showArchiveState: showArchiveState,
       traits: [readiness, description],
+      confirmedTags: summary.tags,
       activeRelationCount: ConfirmedActiveRelationCount(
         summary.activeRelationCount,
       ),
@@ -630,4 +692,115 @@ final class _CatalogVisualAnchor {
     offsetWithinItem: offsetWithinItem,
     remainingApproaches: remainingApproaches - 1,
   );
+}
+
+/// Контроллер списка каталога с местом перед началом выдачи.
+///
+/// Место отводится под отказ обновления над списком: оно расширяет область
+/// прокрутки назад и не меняет ни смещение, ни экранное положение строк.
+final class _CatalogScrollController extends ScrollController {
+  double _leadingInset = 0;
+
+  set leadingInset(double value) {
+    _leadingInset = value;
+    for (final position in positions) {
+      (position as _CatalogScrollPosition).leadingInset = value;
+    }
+  }
+
+  @override
+  ScrollPosition createScrollPosition(
+    ScrollPhysics physics,
+    ScrollContext context,
+    ScrollPosition? oldPosition,
+  ) => _CatalogScrollPosition(
+    physics: physics,
+    context: context,
+    oldPosition: oldPosition,
+  ).._leadingInset = _leadingInset;
+}
+
+final class _CatalogScrollPosition extends ScrollPositionWithSingleContext {
+  _CatalogScrollPosition({
+    required super.physics,
+    required super.context,
+    super.oldPosition,
+  });
+
+  double _leadingInset = 0;
+  ({double min, double max})? _contentDimensions;
+
+  set leadingInset(double value) {
+    if (value == _leadingInset) {
+      return;
+    }
+    final content = _contentDimensions;
+    final wasAtStart = content != null && pixels <= minScrollExtent;
+    _leadingInset = value;
+    if (content == null) {
+      return;
+    }
+    final previousPixels = pixels;
+    super.applyContentDimensions(content.min - value, content.max);
+    // Список в начале выдачи остаётся в начале: строки уходят из-под
+    // появившегося отказа и возвращаются на место после его снятия.
+    if (wasAtStart || pixels < minScrollExtent) {
+      jumpTo(minScrollExtent);
+    }
+    // Поправка смещения новыми границами слушателей не уведомляет.
+    if (pixels != previousPixels) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  bool applyContentDimensions(double minScrollExtent, double maxScrollExtent) {
+    _contentDimensions = (min: minScrollExtent, max: maxScrollExtent);
+    return super.applyContentDimensions(
+      minScrollExtent - _leadingInset,
+      maxScrollExtent,
+    );
+  }
+}
+
+/// Сообщает высоту потомка после кадра, в котором она изменилась.
+final class _ExtentObserver extends SingleChildRenderObjectWidget {
+  const _ExtentObserver({required this.onChanged, super.child});
+
+  final ValueChanged<double> onChanged;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderExtentObserver(onChanged);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderExtentObserver renderObject,
+  ) {
+    renderObject.onChanged = onChanged;
+  }
+}
+
+final class _RenderExtentObserver extends RenderProxyBox {
+  _RenderExtentObserver(this.onChanged);
+
+  ValueChanged<double> onChanged;
+  double? _reportedExtent;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final extent = size.height;
+    if (extent == _reportedExtent) {
+      return;
+    }
+    _reportedExtent = extent;
+    // Область прокрутки нельзя менять во время компоновки её соседа.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (attached && _reportedExtent == extent) {
+        onChanged(extent);
+      }
+    });
+  }
 }

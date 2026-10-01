@@ -25,6 +25,7 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -86,6 +87,22 @@ final class ControlledCatalogRepository
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
   final tagCommands = <TagCommand>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
+
+  /// Полный снимок каталога тегов для выбора тега условия поиска; без него
+  /// чтение каталога тегов отказывает.
+  List<Tag>? tagCatalogItems;
+
+  @override
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async =>
+      switch (tagCatalogItems) {
+        final items? => TagCatalogSuccess(
+          TagCatalogSnapshot(
+            items: items,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+        null => super.getTagCatalog(mode),
+      };
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 

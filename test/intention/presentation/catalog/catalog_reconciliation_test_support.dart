@@ -10,6 +10,7 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -240,6 +241,20 @@ TagCommandResult tagDeletionSuccess({
   ConfirmedGraphResult(
     revision: revision,
     value: TagDeleted(TagDeletedChange(revision: revision, tagId: tagId)),
+  ),
+);
+
+/// Собирает подтверждение переименования тега с прежней идентичностью.
+TagCommandResult tagRenameSuccess({
+  required Tag before,
+  required Tag after,
+  required GraphRevision revision,
+}) => TagCommandSucceeded(
+  ConfirmedGraphResult(
+    revision: revision,
+    value: TagRenamed(
+      TagRenamedChange(revision: revision, before: before, after: after),
+    ),
   ),
 );
 

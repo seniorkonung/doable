@@ -107,6 +107,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogAllEmpty => 'Намерений пока нет.';
 
   @override
+  String get catalogTagConditionsEmpty =>
+      'По условиям по тегам совпадений нет.';
+
+  @override
   String get catalogUnavailable =>
       'Не удалось загрузить намерения. Повторите попытку.';
 

@@ -30,6 +30,7 @@
   "catalogActiveEmpty": "Активных намерений пока нет.",
   "catalogArchivedEmpty": "Архивных намерений пока нет.",
   "catalogAllEmpty": "Намерений пока нет.",
+  "catalogTagConditionsEmpty": "По условиям по тегам совпадений нет.",
   "catalogUnavailable": "Не удалось загрузить намерения. Повторите попытку.",
   "catalogCorruption": "Сохранённые данные намерений повреждены и не могут быть показаны.",
   "catalogUnexpectedFailure": "Не удалось загрузить намерения из-за непредвиденной ошибки.",
