@@ -4,6 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -162,6 +163,10 @@ void main() {
     expect(find.text('Active relations: 5'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
     expect(find.text('Archived'), findsOneWidget);
+    // Участники в подробностях связи — представление без поиска: тегов и условий в нём нет.
+    expect(find.textContaining('Tags:'), findsNothing);
+    expect(find.text('No tags'), findsNothing);
+    expect(find.byType(IntentionTagConditionsSection), findsNothing);
   });
 
   testWidgets('отсутствие описания показывается отдельной подписью', (

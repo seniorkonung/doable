@@ -14,6 +14,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -908,6 +909,10 @@ void main() {
     expect(_isChipSelected(tester, 'relation-editor-type-can'), isTrue);
     expect(_isChipSelected(tester, 'relation-editor-priority-p2'), isTrue);
     expect(find.text('To Исходное, you can Связанное'), findsOneWidget);
+    // Участники в редакторе связи — представление без поиска: тегов и условий в нём нет.
+    expect(find.textContaining('Tags:'), findsNothing);
+    expect(find.text('No tags'), findsNothing);
+    expect(find.byType(IntentionTagConditionsSection), findsNothing);
 
     await _selectParticipant(
       tester,

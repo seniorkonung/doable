@@ -13,13 +13,15 @@ import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/catalog/intention_catalog_state.dart';
 import '../../../intention/presentation/catalog/intention_catalog_status_views.dart';
 import '../../../intention/presentation/catalog/intention_catalog_view_model.dart';
+import '../../../intention/presentation/catalog/intention_tag_conditions_section.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_projection.dart';
 
 /// Выбор существующего намерения участником долговременной связи.
 ///
 /// Страница не заводит собственного источника списка: она читает тот же
-/// каталог намерений ограниченными порциями с буквальным фильтром названия.
+/// каталог намерений ограниченными порциями с буквальным фильтром названия
+/// и условиями по тегам. Строки показывают собственные теги намерений.
 /// Второе намерение пары исключается по идентификатору, а одноимённые
 /// намерения остаются отдельными строками с доступом к подробным данным.
 /// Выбор возвращает типизированную ссылку с идентификатором и снимком
@@ -93,6 +95,13 @@ final class _RelationParticipantPickerPageState
                   _scrollToTop();
                   notifier.changeTitleFilter(value);
                 },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: IntentionTagConditionsSection(purpose: purpose),
               ),
             ),
             Expanded(
@@ -174,8 +183,8 @@ final class _PickerContent extends ConsumerWidget {
         scrollController: scrollController,
         onSelected: onSelected,
       ),
-      IntentionCatalogEmpty() => IntentionCatalogStatusView(
-        message: localizations.participantPickerEmpty,
+      final IntentionCatalogEmpty empty => IntentionCatalogStatusView(
+        message: _emptyMessage(localizations, empty.query),
       ),
       IntentionCatalogUnavailable() => IntentionCatalogStatusView(
         message: localizations.catalogUnavailable,
@@ -197,6 +206,17 @@ final class _PickerContent extends ConsumerWidget {
     };
   }
 }
+
+/// Сообщение успешной пустой выдачи выбора участника.
+///
+/// Условия по тегам сужают охват: пустая выдача при них не означает, что
+/// других намерений для выбора нет.
+String _emptyMessage(
+  AppLocalizations localizations,
+  IntentionCatalogQuery query,
+) => query.tagFilter != IntentionTagFilter.empty
+    ? localizations.catalogTagConditionsEmpty
+    : localizations.participantPickerEmpty;
 
 /// Доступные для выбора строки уже загруженной части каталога.
 ///
@@ -227,12 +247,30 @@ final class _PickerOptions extends ConsumerWidget {
       options.add(_ParticipantOption(catalogIndex: index, summary: summary));
     }
 
+    return Column(
+      children: [
+        // Отказ обновления стоит над списком и не заменяет сохранённую выдачу.
+        IntentionCatalogRefreshStatusView(
+          purpose: purpose,
+          refresh: state.refresh,
+        ),
+        Expanded(child: _buildOptions(context, ref, localizations, options)),
+      ],
+    );
+  }
+
+  Widget _buildOptions(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations localizations,
+    List<_ParticipantOption> options,
+  ) {
     final hasContinuationStatus =
         state.continuation is! IntentionCatalogContinuationIdle;
     if (options.isEmpty && !hasContinuationStatus) {
       if (state.nextCursor == null) {
         return IntentionCatalogStatusView(
-          message: localizations.participantPickerEmpty,
+          message: _emptyMessage(localizations, state.query),
         );
       }
       // Вся загруженная часть занята вторым участником: продолжение каталога
@@ -315,6 +353,7 @@ final class _ParticipantOptionTile extends StatelessWidget {
             title: summary.title,
             archiveState: summary.archiveState,
             showArchiveState: true,
+            confirmedTags: summary.tags,
             activeRelationCount: ConfirmedActiveRelationCount(
               summary.activeRelationCount,
             ),

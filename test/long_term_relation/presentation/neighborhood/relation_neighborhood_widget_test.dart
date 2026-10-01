@@ -12,6 +12,8 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
+import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -456,6 +458,11 @@ void main() {
     await tester.tap(second);
     await tester.pump();
     expect(container.read(provider).selected.keys, {testRelationId(2)});
+    // Окрестность связи — представление без поиска: тегов и условий в ней нет.
+    expect(find.byType(IntentionSummaryView), findsWidgets);
+    expect(find.textContaining('Tags:'), findsNothing);
+    expect(find.text('No tags'), findsNothing);
+    expect(find.byType(IntentionTagConditionsSection), findsNothing);
     await tester.drag(find.byType(Scrollable), const Offset(0, 3000));
     await tester.pump();
     expect(find.text('Selected relations: 1'), findsOneWidget);
