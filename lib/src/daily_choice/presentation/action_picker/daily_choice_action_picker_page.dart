@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../intention/application/intention_catalog.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/catalog/intention_catalog_state.dart';
 import '../../../intention/presentation/catalog/intention_catalog_status_views.dart';
 import '../../../intention/presentation/catalog/intention_catalog_view_model.dart';
+import '../../../intention/presentation/catalog/intention_tag_conditions_section.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 
 const _purpose = SelectDailyChoiceAction();
@@ -83,6 +85,13 @@ final class _DailyChoiceActionPickerPageState
                 },
               ),
             ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: IntentionTagConditionsSection(purpose: _purpose),
+              ),
+            ),
             Expanded(
               child: catalog.when(
                 skipLoadingOnReload: false,
@@ -97,11 +106,16 @@ final class _DailyChoiceActionPickerPageState
                     state: loaded,
                     scrollController: _scrollController,
                   ),
-                  IntentionCatalogEmpty() => IntentionCatalogStatusView(
-                    message: selection.titleFilterText.trim().isEmpty
-                        ? l10n.actionPickerEmpty
-                        : l10n.actionPickerNoMatches,
-                  ),
+                  final IntentionCatalogEmpty empty =>
+                    IntentionCatalogStatusView(
+                      // Условия по тегам сужают охват: пустая выдача не
+                      // означает, что в нём нет намерений.
+                      message: empty.query.tagFilter != IntentionTagFilter.empty
+                          ? l10n.catalogTagConditionsEmpty
+                          : selection.titleFilterText.trim().isEmpty
+                          ? l10n.actionPickerEmpty
+                          : l10n.actionPickerNoMatches,
+                    ),
                   IntentionCatalogUnavailable() => IntentionCatalogStatusView(
                     message: l10n.actionPickerUnavailable,
                     retryLabel: l10n.commonRetry,
@@ -151,6 +165,11 @@ final class _ActionOptions extends ConsumerWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
+        // Отказ обновления стоит над списком и не заменяет сохранённую выдачу.
+        IntentionCatalogRefreshStatusView(
+          purpose: _purpose,
+          refresh: state.refresh,
+        ),
         Expanded(
           child: ListView.builder(
             key: const PageStorageKey<String>('daily-choice-action-list'),
@@ -189,6 +208,7 @@ final class _ActionOptions extends ConsumerWidget {
                             ? l10n.catalogHasDescription
                             : l10n.catalogNoDescription,
                       ],
+                      confirmedTags: summary.tags,
                       activeRelationCount: ConfirmedActiveRelationCount(
                         summary.activeRelationCount,
                       ),
