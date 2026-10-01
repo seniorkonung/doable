@@ -807,7 +807,7 @@
   - **Ожидаемые файлы:** `test/app/intention_tag_search_app_flow_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.27 Тесты, требующие Android-устройства, удалены из репозитория вместе с их запускающей обвязкой
+- [x] 3.27 Тесты, требующие Android-устройства, удалены из репозитория вместе с их запускающей обвязкой
   - **Критерии приёмки:**
     - По решению пользователя тесты, которые запускаются только на подключённом устройстве, не поддерживаются: удалены `integration_test/tag_catalog_read_cost_test.dart`, `integration_test/tag_selection_stability_test.dart`, сам каталог `integration_test/` и драйвер `test_driver/integration_test.dart` с каталогом `test_driver/`.
     - Зависимость `integration_test` удалена из `dev_dependencies` в `pubspec.yaml`, `pubspec.lock` приведён в соответствие без обновления версий остальных пакетов.
