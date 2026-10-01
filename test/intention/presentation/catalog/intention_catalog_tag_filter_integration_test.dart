@@ -12,9 +12,13 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/domain/tag.dart' as tag_domain;
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -849,6 +853,355 @@ void main() {
     ];
     expect(contents(reread), contents(reconciled));
   });
+
+  group('модель выбранных условий по тегам', () {
+    const browse = BrowseIntentionCatalog();
+    final catalog = intentionCatalogViewModelProvider(browse);
+    final conditions = intentionTagConditionsViewModelProvider(browse);
+
+    void open(IntentionCatalogPurpose purpose) {
+      addTearDown(
+        container
+            .listen(intentionCatalogViewModelProvider(purpose), (_, _) {})
+            .close,
+      );
+      addTearDown(
+        container
+            .listen(intentionTagConditionsViewModelProvider(purpose), (_, _) {})
+            .close,
+      );
+    }
+
+    Future<IntentionCatalogConfirmedState> confirmed([
+      IntentionCatalogViewModelProvider? provider,
+    ]) async =>
+        await container.read((provider ?? catalog).future)
+            as IntentionCatalogConfirmedState;
+
+    test('добавление, переключение и снятие условий сразу применяют '
+        'настоящий поиск и не меняют теги', () async {
+      open(browse);
+      await confirmed();
+      final snapshot = await _tagSnapshot(repository);
+      final model = container.read(conditions.notifier);
+      final assignments = await _assignmentCount(database);
+
+      model.applySelection(snapshot.select(301, _present));
+      var state = await confirmed();
+      expect(state.query.tagFilter.requiredTagIds, {_tagId(301)});
+      expect(state.totalCount, 6);
+
+      model.applySelection(snapshot.select(302, _absent));
+      state = await confirmed();
+      expect(state.totalCount, 5);
+      expect(_shown(container, conditions), [
+        (_tagId(301), _present, 'Здоровье', false),
+        (_tagId(302), _absent, 'Спорт', false),
+      ]);
+
+      model.toggleRequirement(_tagId(302));
+      state = await confirmed();
+      expect(state.totalCount, 1);
+      expect(
+        (state as IntentionCatalogLoaded).items.single.id,
+        _intentionId(4),
+      );
+
+      // Повторный выбор меняет надобность существующего условия на месте.
+      model.applySelection(snapshot.select(301, _absent));
+      state = await confirmed();
+      expect(state, isA<IntentionCatalogEmpty>());
+      expect(_shown(container, conditions), [
+        (_tagId(301), _absent, 'Здоровье', false),
+        (_tagId(302), _present, 'Спорт', false),
+      ]);
+
+      model.remove(_tagId(301));
+      state = await confirmed();
+      expect(state.query.tagFilter, container.read(conditions).tagFilter);
+      expect(state.query.tagFilter.excludedTagIds, isEmpty);
+      expect(state.totalCount, 1);
+
+      final catalogModel = container.read(catalog.notifier);
+      catalogModel.changeScope(IntentionScope.archived);
+      catalogModel.changeOrder(IntentionCatalogOrder.createdAtAscending);
+      state = await confirmed();
+      expect(state.query.scope, IntentionScope.archived);
+      expect(state.query.tagFilter, container.read(conditions).tagFilter);
+      expect(_shown(container, conditions), [
+        (_tagId(302), _present, 'Спорт', false),
+      ]);
+
+      // Поиск только читает: теги и назначения остались прежними.
+      expect((await _tagSnapshot(repository)).names, snapshot.names);
+      expect(await _assignmentCount(database), assignments);
+    });
+
+    test('переименование и удаление выбранных тегов сохраняют условия, а '
+        'одноимённый новый тег их не подменяет', () async {
+      open(browse);
+      await confirmed();
+      final snapshot = await _tagSnapshot(repository);
+      final model = container.read(conditions.notifier);
+      model.applySelection(snapshot.select(301, _present));
+      model.applySelection(snapshot.select(302, _absent));
+      expect((await confirmed()).totalCount, 5);
+
+      await _completeTag(
+        container,
+        (coordinator) => coordinator.acceptTagRename(
+          RenameTag(
+            tagId: _tagId(301),
+            name: TagName.fromInput('Самочувствие'),
+          ),
+        ),
+      );
+      expect(_shown(container, conditions), [
+        (_tagId(301), _present, 'Самочувствие', false),
+        (_tagId(302), _absent, 'Спорт', false),
+      ]);
+      expect((await confirmed()).totalCount, 5);
+
+      await _deleteTag(container, _tagId(301));
+      expect(_shown(container, conditions), [
+        (_tagId(301), _present, 'Самочувствие', true),
+        (_tagId(302), _absent, 'Спорт', false),
+      ]);
+      // Удалённый обязательный тег даёт успешную пустую выдачу.
+      var state = await _awaitCatalog(
+        container,
+        catalog,
+        (state) => state.totalCount == 0,
+      );
+      expect(state.query.tagFilter.requiredTagIds, {_tagId(301)});
+
+      await _completeTag(
+        container,
+        (coordinator) => coordinator.acceptTagCreation(
+          TagCreationFormKey(),
+          CreateTag(TagName.fromInput('Самочувствие')),
+        ),
+      );
+      final recreated = (await _tagSnapshot(repository)).tags
+          .singleWhere((tag) => tag.name.value == 'Самочувствие');
+      expect(recreated.id, isNot(_tagId(301)));
+      await _assignTag(container, recreated.id, _intentionId(7));
+      await pumpEventQueue();
+      expect(_shown(container, conditions), [
+        (_tagId(301), _present, 'Самочувствие', true),
+        (_tagId(302), _absent, 'Спорт', false),
+      ]);
+      state = await confirmed();
+      expect(state.totalCount, 0);
+
+      // Явное снятие условия удалённого тега возобновляет поиск.
+      model.remove(_tagId(301));
+      state = await confirmed();
+      expect(state.totalCount, 7);
+      expect(_shown(container, conditions), [
+        (_tagId(302), _absent, 'Спорт', false),
+      ]);
+    });
+
+    test('выбор из устаревшего снимка предъявляется с актуальным названием '
+        'и признаком удаления', () async {
+      open(browse);
+      await confirmed();
+      final stale = await _tagSnapshot(repository);
+      await _completeTag(
+        container,
+        (coordinator) => coordinator.acceptTagRename(
+          RenameTag(tagId: _tagId(302), name: TagName.fromInput('Бег')),
+        ),
+      );
+      await _deleteTag(container, _tagId(304));
+      final model = container.read(conditions.notifier);
+
+      model.applySelection(stale.select(302, _absent));
+      model.applySelection(stale.select(304, _present));
+
+      // Поиск применён сразу, до уточнения предъявления.
+      expect(
+        container.read(catalog.notifier).selection.tagFilter,
+        IntentionTagFilter(
+          requiredTagIds: [_tagId(304)],
+          excludedTagIds: [_tagId(302)],
+        ),
+      );
+      await _awaitConditions(container, conditions, [
+        (_tagId(302), _absent, 'Бег', false),
+        (_tagId(304), _present, 'Работа', true),
+      ]);
+      expect(await confirmed(), isA<IntentionCatalogEmpty>());
+    });
+
+    test('отказ чтения тега не выглядит удалением, а следующее '
+        'подтверждённое изменение повторяет уточнение', () async {
+      open(browse);
+      await confirmed();
+      final stale = await _tagSnapshot(repository);
+      await _deleteTag(container, _tagId(304));
+      final model = container.read(conditions.notifier);
+
+      fault.failNextTagRead = true;
+      model.applySelection(stale.select(304, _present));
+      for (var attempt = 0; fault.failNextTagRead; attempt++) {
+        expect(attempt, lessThan(1000), reason: 'Чтение тега не выполнено.');
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      await pumpEventQueue();
+      expect(_shown(container, conditions), [
+        (_tagId(304), _present, 'Работа', false),
+      ]);
+
+      await _assignTag(container, _tagId(303), _intentionId(7));
+      await _awaitConditions(container, conditions, [
+        (_tagId(304), _present, 'Работа', true),
+      ]);
+    });
+
+    test('условия разных назначений независимы и не сохраняются после '
+        'закрытия поиска', () async {
+      const action = SelectDailyChoiceAction();
+      final actionCatalog = intentionCatalogViewModelProvider(action);
+      final actionConditions = intentionTagConditionsViewModelProvider(action);
+      final subscriptions = [
+        container.listen(catalog, (_, _) {}),
+        container.listen(conditions, (_, _) {}),
+      ];
+      open(action);
+      await confirmed();
+      await confirmed(actionCatalog);
+      final snapshot = await _tagSnapshot(repository);
+
+      container
+          .read(conditions.notifier)
+          .applySelection(snapshot.select(301, _present));
+      expect((await confirmed()).totalCount, 6);
+      expect(container.read(actionConditions).conditions, isEmpty);
+      var actionState = await confirmed(actionCatalog);
+      expect(actionState.query.tagFilter, IntentionTagFilter.empty);
+      expect(actionState.totalCount, 6);
+
+      container
+          .read(actionConditions.notifier)
+          .applySelection(snapshot.select(302, _absent));
+      actionState = await confirmed(actionCatalog);
+      expect(
+        actionState.query.readinessFilter,
+        IntentionReadinessFilter.readyOnly,
+      );
+      expect(actionState.totalCount, 5);
+      expect(_shown(container, conditions), [
+        (_tagId(301), _present, 'Здоровье', false),
+      ]);
+      expect((await confirmed()).query.tagFilter.excludedTagIds, isEmpty);
+
+      for (final subscription in subscriptions) {
+        subscription.close();
+      }
+      await container.pump();
+      open(browse);
+      expect(container.read(conditions).conditions, isEmpty);
+      final reopened = await confirmed();
+      expect(reopened.query.tagFilter, IntentionTagFilter.empty);
+      expect(reopened.totalCount, 8);
+      expect(_shown(container, actionConditions), [
+        (_tagId(302), _absent, 'Спорт', false),
+      ]);
+    });
+  });
+}
+
+const _present = IntentionTagRequirement.mustBePresent;
+const _absent = IntentionTagRequirement.mustBeAbsent;
+
+/// Полный снимок каталога тегов, из которого пользователь выбирает условие.
+final class _TagSnapshot {
+  const _TagSnapshot(this.tags, this.revision);
+
+  final List<tag_domain.Tag> tags;
+  final GraphRevision revision;
+
+  List<String> get names => [for (final tag in tags) tag.name.value];
+
+  IntentionTagConditionSelection select(
+    int number,
+    IntentionTagRequirement requirement,
+  ) => IntentionTagConditionSelection(
+    tag: tags.singleWhere((tag) => tag.id == _tagId(number)),
+    requirement: requirement,
+    snapshotRevision: revision,
+  );
+}
+
+Future<_TagSnapshot> _tagSnapshot(
+  DriftPersonalGraphRepository repository,
+) async {
+  final result = await repository.getTagCatalog(const TagCatalogBrowseMode());
+  final snapshot = (result as TagCatalogSuccess).value;
+  return _TagSnapshot(snapshot.items, snapshot.revision);
+}
+
+Future<int> _assignmentCount(AppDatabase database) async {
+  final row = await database
+      .customSelect('SELECT count(*) AS total FROM tag_assignments')
+      .getSingle();
+  return row.read<int>('total');
+}
+
+List<(TagId, IntentionTagRequirement, String, bool)> _shown(
+  ProviderContainer container,
+  IntentionTagConditionsViewModelProvider provider,
+) => [
+  for (final condition in container.read(provider).conditions)
+    (
+      condition.tagId,
+      condition.requirement,
+      condition.name.value,
+      condition.isDeleted,
+    ),
+];
+
+/// Ждёт уточнения предъявления условий чтением настоящего адаптера.
+Future<void> _awaitConditions(
+  ProviderContainer container,
+  IntentionTagConditionsViewModelProvider provider,
+  List<(TagId, IntentionTagRequirement, String, bool)> expected,
+) async {
+  for (var attempt = 0; attempt < 1000; attempt++) {
+    if (equals(expected).matches(_shown(container, provider), {})) return;
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  expect(_shown(container, provider), expected);
+}
+
+/// Ждёт подтверждённой выдачи, согласованной с изменением тегов.
+Future<IntentionCatalogConfirmedState> _awaitCatalog(
+  ProviderContainer container,
+  IntentionCatalogViewModelProvider provider,
+  bool Function(IntentionCatalogConfirmedState state) isReconciled,
+) async {
+  for (var attempt = 0; attempt < 1000; attempt++) {
+    final current = container.read(provider).value;
+    if (current is IntentionCatalogConfirmedState && isReconciled(current)) {
+      return current;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  fail('Согласованная выдача не опубликована.');
+}
+
+/// Проводит команду тега настоящим адаптером через coordinator.
+Future<void> _completeTag(
+  ProviderContainer container,
+  TagCommandStart Function(GraphCommandCoordinator coordinator) accept,
+) async {
+  final start = accept(
+    container.read(graphCommandCoordinatorProvider.notifier),
+  );
+  final completion = await (start as TagCommandAccepted).future;
+  expect(completion.isFailure, isFalse);
 }
 
 Future<void> _seedCatalog(AppDatabase database) =>
@@ -1014,6 +1367,9 @@ final class _ThrowingDiagnosticsSink implements DiagnosticsSink {
 final class _CatalogReadFault extends LocalDatabaseConnectionObserver {
   bool failNextSelect = false;
 
+  /// Отказывает следующему чтению одного тега по идентификатору.
+  bool failNextTagRead = false;
+
   /// Отказывает следующему чтению с условиями по тегам: команды тегов таких
   /// чтений не выполняют.
   bool failNextFilteredSelect = false;
@@ -1037,6 +1393,13 @@ final class _CatalogReadFault extends LocalDatabaseConnectionObserver {
                 ),
               ) as List).length
             : 0,
+      );
+    }
+    if (failNextTagRead && sql.contains('FROM tags WHERE id = ?')) {
+      failNextTagRead = false;
+      throw SqliteException(
+        extendedResultCode: SqlError.SQLITE_BUSY,
+        message: 'Контролируемая недоступность чтения тега.',
       );
     }
     if (failNextFilteredSelect &&
