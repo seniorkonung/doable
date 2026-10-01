@@ -10,6 +10,7 @@ final class AppRouter extends RootStackRouter {
     AutoRoute(page: TagCatalogRoute.page),
     AutoRoute(page: TagEditorRoute.page),
     AutoRoute(page: TagNavigationRoute.page),
+    AutoRoute(page: TagConditionPickerRoute.page),
     AutoRoute(page: DailyChoiceCatalogRoute.page),
     AutoRoute(page: DailyChoiceActionPickerRoute.page),
     AutoRoute(page: DailyChoiceSourcePickerRoute.page),

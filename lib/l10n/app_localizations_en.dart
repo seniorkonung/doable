@@ -878,6 +878,33 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load more intentions because of an unexpected error.';
 
   @override
+  String get tagConditionPickerTitle => 'Tag for search condition';
+
+  @override
+  String get tagConditionPickerPresent => 'With';
+
+  @override
+  String get tagConditionPickerAbsent => 'Without';
+
+  @override
+  String tagConditionPickerPresentNamed(String tagName) {
+    return 'With, $tagName';
+  }
+
+  @override
+  String tagConditionPickerAbsentNamed(String tagName) {
+    return 'Without, $tagName';
+  }
+
+  @override
+  String get tagConditionPickerSelectedPresent =>
+      'Already selected: must be present';
+
+  @override
+  String get tagConditionPickerSelectedAbsent =>
+      'Already selected: must be absent';
+
+  @override
   String get tagCatalogTitle => 'Tags';
 
   @override

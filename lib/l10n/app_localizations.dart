@@ -1556,6 +1556,48 @@ abstract class AppLocalizations {
   /// **'Could not load more intentions because of an unexpected error.'**
   String get tagNavigationLoadMoreUnexpected;
 
+  /// Заголовок экрана выбора тега для условия поиска намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Tag for search condition'**
+  String get tagConditionPickerTitle;
+
+  /// Действие «Есть»: выбрать тег с надобностью «должен быть»
+  ///
+  /// In en, this message translates to:
+  /// **'With'**
+  String get tagConditionPickerPresent;
+
+  /// Действие «Нет»: выбрать тег с надобностью «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Without'**
+  String get tagConditionPickerAbsent;
+
+  /// Семантика действия «Есть» вместе с названием тега
+  ///
+  /// In en, this message translates to:
+  /// **'With, {tagName}'**
+  String tagConditionPickerPresentNamed(String tagName);
+
+  /// Семантика действия «Нет» вместе с названием тега
+  ///
+  /// In en, this message translates to:
+  /// **'Without, {tagName}'**
+  String tagConditionPickerAbsentNamed(String tagName);
+
+  /// Отметка тега, уже входящего в условия поиска с надобностью «должен быть»
+  ///
+  /// In en, this message translates to:
+  /// **'Already selected: must be present'**
+  String get tagConditionPickerSelectedPresent;
+
+  /// Отметка тега, уже входящего в условия поиска с надобностью «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Already selected: must be absent'**
+  String get tagConditionPickerSelectedAbsent;
+
   /// Заголовок каталога тегов и переход к нему
   ///
   /// In en, this message translates to:

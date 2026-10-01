@@ -47,8 +47,12 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
   int _generation = 0;
   int _staleReadAttempts = 0;
 
+  /// [opening] отделяет состояние одного открытия от общего состояния режима.
   @override
-  TagCatalogState build({TagCatalogMode mode = const TagCatalogBrowseMode()}) {
+  TagCatalogState build({
+    TagCatalogMode mode = const TagCatalogBrowseMode(),
+    TagCatalogOpening? opening,
+  }) {
     unawaited(_completions?.cancel());
     unawaited(_selectedReads?.cancel());
     _repository = ref.watch(personalGraphRepositoryProvider);
