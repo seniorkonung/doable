@@ -653,3 +653,25 @@
   - **Зависимости:** 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12.
   - **Ожидаемые файлы:** нет, итоговая контрольная проверка.
   - **Размер:** XS.
+
+- [ ] 3.14 Каждая из четырёх страниц поиска показывает отказ обновления над исходно пустой выдачей отличимо от успешного отсутствия совпадений
+  - **Критерии приёмки:**
+    - По решению 6 [design](design.md) и требованию «Актуальность тегов и результатов совместного поиска» страницы каталога намерений, поиска действия, поиска исходного намерения и поиска участника долговременной связи при состоянии `IntentionCatalogEmpty` с отказом обновления показывают представление отказа из 3.6 вместе с сообщением о пустой выдаче. Такую выдачу нельзя принять за успешное отсутствие совпадений: сообщение явно говорит, что выдача не обновлена.
+    - При недоступности хранилища на каждой из четырёх страниц доступно действие «Повторить», вызывающее `retryRefresh` модели своего назначения. При повреждении и неожиданной ошибке показывается их безопасное сообщение без действия. Пустая выдача без отказа обновления по-прежнему показывает только сообщение о пустоте, без представления отказа.
+    - Условия по тегам, название, охват и ограничения назначения поиска при отказе не меняются. Ожидания задач 3.8–3.10 для отказа над загруженным списком сохраняются.
+  - **Проверка:** `mise exec --no-deps -- flutter test --no-pub test/intention/presentation/catalog/intention_catalog_page_test.dart test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart` — на каждой странице: исходно пустая выдача с отказом каждой из трёх категорий, действие «Повторить» только при недоступности хранилища и вызов `retryRefresh`, отсутствие представления отказа при успешной пустой выдаче.
+  - **Зависимости:** 3.6, 3.8, 3.9, 3.10.
+  - **Ожидаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.15 Подтвердить готовность изменения к завершению после проверки отказа обновления над исходно пустой выдачей на четырёх страницах
+  - **Критерии приёмки:**
+    - Задачи 3.13 и 3.14 подтверждены: во всех четырёх контекстах отказ обновления отличим от успешного отсутствия совпадений как над загруженным списком, так и над исходно пустой выдачей, а повтор доступен только при недоступности хранилища. Результат третьей фазы, подтверждённый в 3.13, остаётся выполненным.
+    - Проверки ошибок, доступности, формата, анализа и регрессий проходят, generated-артефакты воспроизводимы. Исторические задачи и их отметки сохранены; архивация изменения остаётся отдельным шагом.
+  - **Проверка:**
+    - `mise run --skip-tools check`, включая медленные тесты.
+    - На чистой закоммиченной рабочей копии: `mise run --skip-tools codegen-check` и `mise run --skip-tools codegen-check-test`; подтвердить отсутствие изменений после генерации. Выполнить ревью соответствия и качества инкремента.
+    - `mise exec --no-deps -- openspec validate show-and-filter-intention-tags --type change --strict --no-interactive --json`.
+  - **Зависимости:** 3.13, 3.14.
+  - **Ожидаемые файлы:** нет, итоговая контрольная проверка.
+  - **Размер:** XS.
