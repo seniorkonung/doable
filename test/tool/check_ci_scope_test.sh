@@ -191,10 +191,27 @@ do
 done
 
 for path in \
+  widgetbook/pubspec.yaml \
+  widgetbook/pubspec.lock \
+  widgetbook/lib/main.dart \
+  widgetbook/test/widgetbook_app_test.dart \
+  widgetbook/assets/fonts/roboto/Roboto-Regular.ttf \
+  widgetbook/linux/CMakeLists.txt \
+  widgetbook/android/app/build.gradle.kts
+do
+  check_value \
+    "путь Widgetbook $path" \
+    project \
+    path_classification \
+    "$path"
+done
+
+for path in \
   README.md \
   AGENTS.md \
   docs/architecture.md \
-  notes/nested/review.md
+  notes/nested/review.md \
+  widgetbook/README.md
 do
   check_value \
     "документационный путь $path" \
@@ -226,6 +243,12 @@ check_boolean \
   paths_require_android \
   lib/src/example.dart \
   test/example_test.dart
+check_boolean \
+  "Android-раннер Widgetbook не требует artifact приложения" \
+  false \
+  paths_require_android \
+  widgetbook/android/app/build.gradle.kts \
+  widgetbook/pubspec.lock
 check_boolean \
   "Android-изменение требует artifact" \
   true \
@@ -265,6 +288,11 @@ check_boolean \
   paths_require_project \
   lib/src/example.dart
 check_boolean \
+  "изменение Widgetbook требует проектные проверки" \
+  true \
+  paths_require_project \
+  widgetbook/lib/main.dart
+check_boolean \
   "Android-изменение требует проектные проверки" \
   true \
   paths_require_project \
@@ -296,6 +324,11 @@ check_boolean \
   false \
   paths_require_openspec \
   lib/src/example.dart
+check_boolean \
+  "изменение Widgetbook не требует OpenSpec-валидацию" \
+  false \
+  paths_require_openspec \
+  widgetbook/lib/main.dart
 check_boolean \
   "неизвестный путь требует OpenSpec-валидацию fail-closed" \
   true \
