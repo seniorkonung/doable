@@ -686,7 +686,7 @@
   - **Ожидаемые файлы:** `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.17 Подтвердить готовность изменения к завершению после проверки верхней позиции при изменении условий на трёх страницах выбора
+- [x] 3.17 Подтвердить готовность изменения к завершению после проверки верхней позиции при изменении условий на трёх страницах выбора
   - **Критерии приёмки:**
     - Задачи 3.15 и 3.16 подтверждены: во всех четырёх контекстах изменение условий по тегам начинает новую выдачу с первой порции и верхней позиции. Результат третьей фазы, подтверждённый в 3.13 и 3.15, остаётся выполненным.
     - Проверки ошибок, доступности, формата, анализа и регрессий проходят, generated-артефакты воспроизводимы. Исторические задачи и их отметки сохранены; архивация изменения остаётся отдельным шагом.
