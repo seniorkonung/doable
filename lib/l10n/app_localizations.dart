@@ -1598,6 +1598,60 @@ abstract class AppLocalizations {
   /// **'Already selected: must be absent'**
   String get tagConditionPickerSelectedAbsent;
 
+  /// Текст чипа условия с надобностью «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'not {tagName}'**
+  String intentionTagConditionAbsent(String tagName);
+
+  /// Текст чипа условия по удалённому тегу с последним известным названием
+  ///
+  /// In en, this message translates to:
+  /// **'{condition} (tag deleted)'**
+  String intentionTagConditionDeleted(String condition);
+
+  /// Семантика условия с надобностью «должен быть»
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, must be present'**
+  String intentionTagConditionPresentSemantics(String tagName);
+
+  /// Семантика условия с надобностью «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, must be absent'**
+  String intentionTagConditionAbsentSemantics(String tagName);
+
+  /// Семантика условия по удалённому тегу
+  ///
+  /// In en, this message translates to:
+  /// **'{condition}, tag deleted'**
+  String intentionTagConditionDeletedSemantics(String condition);
+
+  /// Назначение нажатия на чип условия
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle requirement: must be present or must be absent'**
+  String get intentionTagConditionToggleHint;
+
+  /// Действие снятия условия по тегу
+  ///
+  /// In en, this message translates to:
+  /// **'Remove condition: {tagName}'**
+  String intentionTagConditionRemove(String tagName);
+
+  /// Подпись кнопки «+ Тег», открывающей выбор тега для условия поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Tag'**
+  String get intentionTagConditionsAdd;
+
+  /// Семантика кнопки добавления условия по тегу
+  ///
+  /// In en, this message translates to:
+  /// **'Add tag condition'**
+  String get intentionTagConditionsAddSemantics;
+
   /// Заголовок каталога тегов и переход к нему
   ///
   /// In en, this message translates to:

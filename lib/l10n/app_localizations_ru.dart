@@ -905,6 +905,46 @@ class AppLocalizationsRu extends AppLocalizations {
       'Уже выбран: должен отсутствовать';
 
   @override
+  String intentionTagConditionAbsent(String tagName) {
+    return 'не $tagName';
+  }
+
+  @override
+  String intentionTagConditionDeleted(String condition) {
+    return '$condition (тег удалён)';
+  }
+
+  @override
+  String intentionTagConditionPresentSemantics(String tagName) {
+    return '$tagName, должен быть';
+  }
+
+  @override
+  String intentionTagConditionAbsentSemantics(String tagName) {
+    return '$tagName, должен отсутствовать';
+  }
+
+  @override
+  String intentionTagConditionDeletedSemantics(String condition) {
+    return '$condition, тег удалён';
+  }
+
+  @override
+  String get intentionTagConditionToggleHint =>
+      'Переключить надобность: должен быть или должен отсутствовать';
+
+  @override
+  String intentionTagConditionRemove(String tagName) {
+    return 'Снять условие: $tagName';
+  }
+
+  @override
+  String get intentionTagConditionsAdd => 'Тег';
+
+  @override
+  String get intentionTagConditionsAddSemantics => 'Добавить условие по тегу';
+
+  @override
   String get tagCatalogTitle => 'Теги';
 
   @override

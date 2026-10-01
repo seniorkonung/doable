@@ -905,6 +905,46 @@ class AppLocalizationsEn extends AppLocalizations {
       'Already selected: must be absent';
 
   @override
+  String intentionTagConditionAbsent(String tagName) {
+    return 'not $tagName';
+  }
+
+  @override
+  String intentionTagConditionDeleted(String condition) {
+    return '$condition (tag deleted)';
+  }
+
+  @override
+  String intentionTagConditionPresentSemantics(String tagName) {
+    return '$tagName, must be present';
+  }
+
+  @override
+  String intentionTagConditionAbsentSemantics(String tagName) {
+    return '$tagName, must be absent';
+  }
+
+  @override
+  String intentionTagConditionDeletedSemantics(String condition) {
+    return '$condition, tag deleted';
+  }
+
+  @override
+  String get intentionTagConditionToggleHint =>
+      'Toggle requirement: must be present or must be absent';
+
+  @override
+  String intentionTagConditionRemove(String tagName) {
+    return 'Remove condition: $tagName';
+  }
+
+  @override
+  String get intentionTagConditionsAdd => 'Tag';
+
+  @override
+  String get intentionTagConditionsAddSemantics => 'Add tag condition';
+
+  @override
   String get tagCatalogTitle => 'Tags';
 
   @override
