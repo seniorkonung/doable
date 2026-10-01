@@ -7,6 +7,10 @@ environment:
   sdk: ^3.13.1
 
 dependencies:
+  # Каталог показывает виджеты самого приложения. Зависимость направлена от
+  # каталога к приложению, поэтому в его release APK ничего не добавляет.
+  doable:
+    path: ../
   flutter:
     sdk: flutter
   flutter_localizations:

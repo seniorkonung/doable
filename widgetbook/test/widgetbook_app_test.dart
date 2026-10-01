@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('каталог показывает песочницу в панели навигации', (
+  testWidgets('каталог показывает раздел намерений в панели навигации', (
     tester,
   ) async {
     // Панель навигации видна только в настольной компоновке Widgetbook,
@@ -15,6 +15,6 @@ void main() {
     await tester.pumpWidget(const WidgetbookApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Песочница'), findsOneWidget);
+    expect(find.text('Намерения'), findsOneWidget);
   });
 }
