@@ -113,12 +113,24 @@ final class _IntentionSearchResultsState
 
   /// Сохранённое смещение списка выдачи между его показами.
   var _listStorage = PageStorageBucket();
-  late _SearchParameters _parameters = _currentParameters();
+
+  /// Параметры, с которыми сравнивается каждое уведомление модели: действуют
+  /// в момент создания состояния или смены назначения поиска.
+  late _SearchParameters _parameters;
   _VisualAnchor? _pendingVisualAnchor;
   bool _maintenanceScheduled = false;
 
   IntentionCatalogViewModel get _notifier =>
       ref.read(intentionCatalogViewModelProvider(widget.purpose).notifier);
+
+  @override
+  void initState() {
+    super.initState();
+    // База не ждёт первого уведомления модели: иначе первая смена параметров
+    // на уже загруженной выдаче сама стала бы базой и не начала бы выдачу с
+    // верхней позиции.
+    _parameters = _currentParameters();
+  }
 
   @override
   void didUpdateWidget(IntentionSearchResults oldWidget) {

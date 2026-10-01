@@ -233,6 +233,21 @@ void main() {
           moreOrLessEquals(tester.getRect(_list).top),
         );
       });
+
+      testWidgets('первая после монтирования на уже загруженную выдачу смена '
+          '$name открывает выдачу со смещением ноль', (tester) async {
+        final h = await _open(tester, loadedBeforeMount: _summaries(first: 40));
+        h.position.jumpTo(300);
+        await _settle(tester);
+
+        await h.changeParameters(change, _summaries(first: 40));
+
+        expect(h.position.pixels, 0);
+        expect(
+          _rowTop(tester, 'Намерение 40'),
+          moreOrLessEquals(tester.getRect(_list).top),
+        );
+      });
     }
 
     testWidgets('выдача, вернувшаяся после временной пустоты без смены '
@@ -522,24 +537,38 @@ Future<_Harness> _open(
   IntentionSearchResultsViewAnchor viewAnchor =
       IntentionSearchResultsViewAnchor.scrollOffset,
   double trailingInset = 0,
+  List<IntentionSummary>? loadedBeforeMount,
 }) async {
   final repository = ControlledCatalogRepository();
   final container = reconciliationCatalogContainer(repository);
   addTearDown(container.dispose);
-  await tester.pumpWidget(
+  final harness = _Harness(tester, container, repository);
+  Future<void> pump(Widget body) => tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: _Host(viewAnchor: viewAnchor, trailingInset: trailingInset),
-        ),
+        home: Scaffold(body: body),
       ),
     ),
   );
-  return _Harness(tester, container, repository);
+  if (loadedBeforeMount != null) {
+    // Модель удерживает другой слушатель: элемент выдачи монтируется на
+    // готовую выдачу и не видит уведомлений её загрузки.
+    await pump(
+      Consumer(
+        builder: (context, ref, _) {
+          ref.watch(intentionCatalogViewModelProvider(_purpose));
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+    await harness.load(loadedBeforeMount);
+  }
+  await pump(_Host(viewAnchor: viewAnchor, trailingInset: trailingInset));
+  return harness;
 }
 
 /// Завершённое чтение публикует состояние в микрозадаче, а перестроение
