@@ -6,6 +6,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
@@ -22,6 +23,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
@@ -45,6 +47,11 @@ const _pathRelation = 101;
 const _archivedRelation = 102;
 const _activeRelation = 103;
 const _dailyChoice = 201;
+
+/// Архивное состояние связанного участника в редакторе связи.
+const _relatedArchiveState = ValueKey(
+  'relation-editor-participant-archive-state-related',
+);
 
 /// Строка результата: название и строка тегов так, как они показаны.
 typedef _Row = (String title, String tags);
@@ -262,16 +269,37 @@ void main() {
           ('Ходить в парк', healthRest),
         ]);
 
-        // Явный выбор действия по идентификатору открывает путь выбора.
+        // Явный выбор действия по идентификатору открывает путь выбора:
+        // страница пути получает идентификатор нажатой строки, а не другого
+        // действия выдачи.
+        final chosenAction = _intention(1);
         await _tap(
           tester,
           find.descendant(
-            of: find.byKey(ValueKey('daily-choice-action-${tagFixtureId(1)}')),
+            of: find.byKey(
+              ValueKey(
+                'daily-choice-action-${chosenAction.toCanonicalString()}',
+              ),
+            ),
             matching: find.byType(IntentionSummaryView),
           ),
         );
         await _until(tester, find.byType(ChoicePathPage));
         await _waitFor(tester, () => find.byType(action).evaluate().isEmpty);
+        expect(
+          tester.widget<ChoicePathPage>(find.byType(ChoicePathPage)),
+          isA<ChoicePathPage>()
+              .having(
+                (path) => path.sourceIntentionId.toCanonicalString(),
+                'выбранное действие',
+                chosenAction.toCanonicalString(),
+              )
+              .having(
+                (path) => path.direction,
+                'направление',
+                ChoicePathDraftDirection.bottomUp,
+              ),
+        );
         await _closeTop(tester, ChoicePathPage);
 
         // Дневной путь тегами и условиями не дополняется.
@@ -406,7 +434,11 @@ void main() {
 
         // Архивированная связь: активное и архивированное одноимённые
         // намерения доступны отдельно с различимым архивным состоянием.
-        await app.openParticipantPicker(tester, _archivedRelation);
+        final previousArchiveState = await app.openParticipantPicker(
+          tester,
+          _archivedRelation,
+        );
+        expect(previousArchiveState, l10n.detailsArchived);
         expect(_conditions(tester, picker), isEmpty);
         await _addCondition(tester, _health, present: true);
         await _addCondition(tester, _sport, present: false);
@@ -434,7 +466,9 @@ void main() {
           findsOneWidget,
         );
 
-        // Явный выбор закрывает поиск и не меняет сохранённую связь.
+        // Явный выбор закрывает поиск и не меняет сохранённую связь. Из
+        // двух одноимённых намерений выбрано активное, а не прежний
+        // архивированный участник.
         await _tap(tester, options.first);
         await _waitFor(tester, () => find.byType(picker).evaluate().isEmpty);
         await tester.pumpAndSettle();
@@ -448,6 +482,26 @@ void main() {
               .data,
           'Ходить в парк',
         );
+        final archiveState = tester
+            .widget<Text>(find.byKey(_relatedArchiveState))
+            .data;
+        expect(archiveState, l10n.detailsActive);
+        expect(archiveState, isNot(previousArchiveState));
+
+        // Редактор получил идентификатор выбранного намерения: его
+        // действие подробностей участника открывает именно это намерение.
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('relation-editor-open-related-details')),
+        );
+        await _until(tester, find.byType(IntentionDetailsPage));
+        final received = tester
+            .widget<IntentionDetailsPage>(find.byType(IntentionDetailsPage))
+            .intentionId
+            .toCanonicalString();
+        expect(received, tagFixtureId(7));
+        expect(received, isNot(tagFixtureId(5)));
+        await _closeTop(tester, IntentionDetailsPage);
         expect(_storedGraph(app.raw), before);
         expect(tester.takeException(), isNull);
       },
@@ -718,7 +772,13 @@ final class _App {
   }
 
   /// Открывает поиск связанного участника из редактора сохранённой связи.
-  Future<void> openParticipantPicker(WidgetTester tester, int relation) async {
+  ///
+  /// Возвращает архивное состояние прежнего участника так, как его показал
+  /// редактор до открытия поиска.
+  Future<String> openParticipantPicker(
+    WidgetTester tester,
+    int relation,
+  ) async {
     unawaited(
       router.push(
         RelationDetailsRoute(
@@ -732,12 +792,17 @@ final class _App {
       tester,
       find.byKey(const ValueKey('relation-details-edit-relation')),
     );
+    await _until(tester, find.byKey(_relatedArchiveState));
+    final archiveState = tester
+        .widget<Text>(find.byKey(_relatedArchiveState))
+        .data!;
     await _tap(
       tester,
       find.byKey(const ValueKey('relation-editor-change-related')),
     );
     await _until(tester, find.byType(RelationParticipantPickerPage));
     await tester.pumpAndSettle();
+    return archiveState;
   }
 }
 
