@@ -13,6 +13,7 @@ import '../../../intention/presentation/catalog/intention_catalog_status_views.d
 import '../../../intention/presentation/catalog/intention_catalog_view_model.dart';
 import '../../../intention/presentation/catalog/intention_search_layout.dart';
 import '../../../intention/presentation/catalog/intention_tag_conditions_section.dart';
+import '../../../intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 
 const _purpose = SelectDailyChoiceAction();
@@ -47,6 +48,16 @@ final class _DailyChoiceActionPickerPageState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final catalog = ref.watch(intentionCatalogViewModelProvider(_purpose));
+    // Добавление, переключение и снятие условия начинают новую выдачу;
+    // переименование и удаление тега меняют только предъявление условия.
+    ref.listen(intentionTagConditionsViewModelProvider(_purpose), (
+      previous,
+      next,
+    ) {
+      if (previous?.tagFilter != next.tagFilter) {
+        _scrollToTop();
+      }
+    });
     final notifier = ref.read(
       intentionCatalogViewModelProvider(_purpose).notifier,
     );
@@ -82,9 +93,7 @@ final class _DailyChoiceActionPickerPageState
                     },
                   ),
                   onChanged: (value) {
-                    if (_scrollController.hasClients) {
-                      _scrollController.jumpTo(0);
-                    }
+                    _scrollToTop();
                     notifier.changeTitleFilter(value);
                   },
                 ),
@@ -144,6 +153,12 @@ final class _DailyChoiceActionPickerPageState
         ),
       ),
     );
+  }
+
+  void _scrollToTop() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
   }
 }
 

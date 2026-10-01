@@ -15,6 +15,7 @@ import '../../../intention/presentation/catalog/intention_catalog_status_views.d
 import '../../../intention/presentation/catalog/intention_catalog_view_model.dart';
 import '../../../intention/presentation/catalog/intention_search_layout.dart';
 import '../../../intention/presentation/catalog/intention_tag_conditions_section.dart';
+import '../../../intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_projection.dart';
 
@@ -66,6 +67,16 @@ final class _RelationParticipantPickerPageState
       selectionContext: widget.selectionContext,
     );
     final catalog = ref.watch(intentionCatalogViewModelProvider(purpose));
+    // Добавление, переключение и снятие условия начинают новую выдачу;
+    // переименование и удаление тега меняют только предъявление условия.
+    ref.listen(intentionTagConditionsViewModelProvider(purpose), (
+      previous,
+      next,
+    ) {
+      if (previous?.tagFilter != next.tagFilter) {
+        _scrollToTop();
+      }
+    });
     final notifier = ref.read(
       intentionCatalogViewModelProvider(purpose).notifier,
     );
