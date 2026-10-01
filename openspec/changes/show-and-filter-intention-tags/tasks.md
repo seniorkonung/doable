@@ -664,7 +664,7 @@
   - **Ожидаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.15 Подтвердить готовность изменения к завершению после проверки отказа обновления над исходно пустой выдачей на четырёх страницах
+- [x] 3.15 Подтвердить готовность изменения к завершению после проверки отказа обновления над исходно пустой выдачей на четырёх страницах
   - **Критерии приёмки:**
     - Задачи 3.13 и 3.14 подтверждены: во всех четырёх контекстах отказ обновления отличим от успешного отсутствия совпадений как над загруженным списком, так и над исходно пустой выдачей, а повтор доступен только при недоступности хранилища. Результат третьей фазы, подтверждённый в 3.13, остаётся выполненным.
     - Проверки ошибок, доступности, формата, анализа и регрессий проходят, generated-артефакты воспроизводимы. Исторические задачи и их отметки сохранены; архивация изменения остаётся отдельным шагом.
