@@ -18,7 +18,7 @@
   - **Вероятные файлы:** `lib/src/data/local/schema/favorite_schema.drift` (новый), `lib/src/data/local/app_database.dart`, `drift_schemas/drift_schema_v1.json`, `test/data/local/favorite_schema_test.dart` (новый); `lib/src/data/local/app_database.g.dart` обновляется генерацией.
   - **Размер:** M.
 
-- [ ] 1.2 Подробные и краткие данные намерения несут подтверждённую отметку избранного
+- [x] 1.2 Подробные и краткие данные намерения несут подтверждённую отметку избранного
   - **Критерии приёмки:**
     - `FavoriteMark` — перечисление из двух значений по образцу `IntentionReadiness` (решение 6 design); сущность `Intention` и её редактируемые поля не меняются. `IntentionDetails` и `IntentionSummary` несут отметку как подтверждённое состояние именно этого `IntentionId`: значение «без отметки» означает проверенное отсутствие, а не неизвестность.
     - Копии сводки `withActiveRelationCount`, `withRenamedTag` и `withoutTag` сохраняют отметку. Отметка не участвует в принадлежности запросу `IntentionCatalogQuery.includes`, в сравнении порядка и в условиях поиска.

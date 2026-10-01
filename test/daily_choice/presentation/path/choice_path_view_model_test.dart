@@ -583,6 +583,7 @@ final class _Repository
               archivedCanIncoming: 0,
               archivedCanOutgoing: 0,
             ),
+            favoriteMark: FavoriteMark.notFavorite,
           ),
           revision: _Revision(revision),
         ),

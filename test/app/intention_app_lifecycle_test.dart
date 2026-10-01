@@ -927,6 +927,7 @@ final class _DelayedPersonalGraphRepository
               value: IntentionDetails(
                 intention: intention,
                 relationCounts: _countsFor(intention.id),
+                favoriteMark: FavoriteMark.notFavorite,
               ),
               revision: _Revision(index),
             ),
@@ -1004,6 +1005,7 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   activeRelationCount: 0,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
+  favoriteMark: FavoriteMark.notFavorite,
 );
 
 final _relationId = switch (LongTermRelationId.decode(

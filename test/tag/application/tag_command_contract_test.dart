@@ -389,6 +389,7 @@ IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(
     createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
     updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
     tags: tags,
+    favoriteMark: FavoriteMark.notFavorite,
   ),
 );
 

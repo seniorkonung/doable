@@ -9,6 +9,7 @@ import 'package:doable/src/graph/presentation/operation_failure_presentation.dar
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:flutter/material.dart';
@@ -642,6 +643,7 @@ Result<IntentionCommandSuccess> _savedResult({required String title}) {
             activeRelationCount: 0,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,
+            favoriteMark: FavoriteMark.notFavorite,
           ),
         ),
       ),

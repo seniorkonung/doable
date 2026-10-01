@@ -163,7 +163,11 @@ final class ControlledNeighborhoodRepository
     _intentionController.add(
       ResultSuccess(
         GraphSnapshot(
-          value: IntentionDetails(intention: intention, relationCounts: counts),
+          value: IntentionDetails(
+            intention: intention,
+            relationCounts: counts,
+            favoriteMark: FavoriteMark.notFavorite,
+          ),
           revision: revision,
         ),
       ),
@@ -513,6 +517,7 @@ final class _NeighborhoodCatalogEntrySnapshot
         activeRelationCount: 0,
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
+        favoriteMark: FavoriteMark.notFavorite,
       );
 
   @override

@@ -766,6 +766,7 @@ IntentionSummary _summary(int id, String title) => IntentionSummary(
   activeRelationCount: 0,
   createdAt: IntentionTimestamp(DateTime.utc(2026)),
   updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+  favoriteMark: FavoriteMark.notFavorite,
 );
 
 final class _Revision implements GraphRevision {

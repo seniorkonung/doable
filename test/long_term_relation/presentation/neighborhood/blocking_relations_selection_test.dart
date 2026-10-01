@@ -984,6 +984,7 @@ final class _Repository
             ? IntentionDetails(
                 intention: testNeighborhoodIntention(id: id),
                 relationCounts: testRelationCounts(),
+                favoriteMark: FavoriteMark.notFavorite,
               )
             : null,
         revision: const TestGraphRevision(1),

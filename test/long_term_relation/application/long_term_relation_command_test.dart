@@ -492,6 +492,7 @@ _TestCatalogEntry _catalogEntry(
     activeRelationCount: activeRelationCount,
     createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 19)),
     updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 19)),
+    favoriteMark: FavoriteMark.notFavorite,
   ),
 );
 

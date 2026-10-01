@@ -5,6 +5,11 @@ enum IntentionReadiness { notReady, ready }
 
 enum IntentionArchiveState { active, archived }
 
+/// Отметка избранного намерения: явное решение человека держать намерение
+/// на Главной. Отметка не выражает приоритет и не является редактируемым
+/// полем намерения, поэтому в [Intention] не входит.
+enum FavoriteMark { notFavorite, favorite }
+
 final class IntentionTimestamp {
   IntentionTimestamp(DateTime value) : value = value.toUtc();
 

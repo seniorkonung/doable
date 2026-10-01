@@ -48,6 +48,7 @@ void main() {
       final details = IntentionDetails(
         intention: _intention(),
         relationCounts: counts,
+        favoriteMark: FavoriteMark.notFavorite,
       );
 
       expect(details.intention.title, 'Быть здоровым');

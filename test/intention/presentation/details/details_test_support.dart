@@ -55,6 +55,7 @@ final class ControlledDetailRequest {
     Result<Intention?> result, {
     GraphRevision revision = const TestDetailsRevision(0),
     RelationCounts? relationCounts,
+    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
   }) {
     final snapshotResult = switch (result) {
       ResultSuccess(:final value) =>
@@ -65,6 +66,7 @@ final class ControlledDetailRequest {
                 : IntentionDetails(
                     intention: value,
                     relationCounts: relationCounts ?? testRelationCounts(),
+                    favoriteMark: favoriteMark,
                   ),
             revision: revision,
           ),
@@ -384,6 +386,7 @@ IntentionId testDetailsIntentionId(int index) {
 IntentionSummary testDetailsSummary(
   Intention intention, {
   int activeRelationCount = 0,
+  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
 }) => IntentionSummary(
   id: intention.id,
   title: intention.title,
@@ -393,6 +396,7 @@ IntentionSummary testDetailsSummary(
   activeRelationCount: activeRelationCount,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
+  favoriteMark: favoriteMark,
 );
 
 RelationCounts testRelationCounts({

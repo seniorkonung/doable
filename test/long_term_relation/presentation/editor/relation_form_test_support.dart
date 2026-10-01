@@ -101,7 +101,11 @@ final class ControlledRelationFormRepository
   }) => _intentionStreams[intention.id]!.add(
     ResultSuccess(
       GraphSnapshot(
-        value: IntentionDetails(intention: intention, relationCounts: counts),
+        value: IntentionDetails(
+          intention: intention,
+          relationCounts: counts,
+          favoriteMark: FavoriteMark.notFavorite,
+        ),
         revision: revision,
       ),
     ),
