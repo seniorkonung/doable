@@ -20,22 +20,32 @@ final class AppShellPage extends StatelessWidget {
     // Вкладки — дочерние маршруты оболочки в порядке [AppDestination.values]:
     // индекс вкладки и индекс пункта совпадают по построению маршрутизатора.
     return AutoTabsRouter.builder(
+      // Дошедшее до приложения «назад» с каталога выбирает Главную, а с
+      // Главной передаётся родителю — приложение покидается.
+      homeIndex: AppDestination.home.index,
       builder: (context, children, tabsRouter) {
         final selected = AppDestination.values[tabsRouter.activeIndex];
-        return Column(
-          children: [
-            Expanded(
-              child: AppShellTabInsets(
-                barHeight: AppNavigationBar.height,
-                child: _AppShellTabs(selected: selected, children: children),
+        // Объявление платформе: пока выбран каталог, маршрут оболочки
+        // запрещает закрытие, и framework сообщает о готовности обработать
+        // «назад» — иначе платформа выполнит выход сама. Переход на Главную
+        // выполняет только `homeIndex`, поэтому обратного вызова здесь нет.
+        return PopScope<Object?>(
+          canPop: selected == AppDestination.home,
+          child: Column(
+            children: [
+              Expanded(
+                child: AppShellTabInsets(
+                  barHeight: AppNavigationBar.height,
+                  child: _AppShellTabs(selected: selected, children: children),
+                ),
               ),
-            ),
-            AppNavigationBar(
-              selected: selected,
-              onSelected: (destination) =>
-                  tabsRouter.setActiveIndex(destination.index),
-            ),
-          ],
+              AppNavigationBar(
+                selected: selected,
+                onSelected: (destination) =>
+                    tabsRouter.setActiveIndex(destination.index),
+              ),
+            ],
+          ),
         );
       },
     );
