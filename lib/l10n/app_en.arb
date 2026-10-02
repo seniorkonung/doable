@@ -231,6 +231,10 @@
   "@intentionSummaryNoTags": {
     "description": "Подтверждённое отсутствие тегов у намерения в результате поиска"
   },
+  "intentionSummaryFavoriteMark": "Favorite intention",
+  "@intentionSummaryFavoriteMark": {
+    "description": "Доступное название звезды избранного намерения в результате поиска"
+  },
   "relationNeighborhoodTitle": "Relations",
   "relationNeighborhoodSelectedCount": "Selected relations: {count}",
   "@relationNeighborhoodSelectedCount": {

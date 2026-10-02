@@ -58,6 +58,7 @@ final class IntentionSummaryView extends StatelessWidget {
     required this.showArchiveState,
     this.traits = const <String>[],
     this.confirmedTags,
+    this.confirmedFavoriteMark,
     this.onTap,
     this.tapHint,
     super.key,
@@ -81,6 +82,13 @@ final class IntentionSummaryView extends StatelessWidget {
   /// проверенное отсутствие назначений, а `null` — представление, которое
   /// теги не показывает.
   final List<Tag>? confirmedTags;
+
+  /// Подтверждённая отметка избранного намерения.
+  ///
+  /// Звезда выводится только при явной передаче отметки избранного намерения:
+  /// неизбранное намерение звезды не получает, а `null` — представление,
+  /// которое отметку не показывает.
+  final FavoriteMark? confirmedFavoriteMark;
 
   final VoidCallback? onTap;
 
@@ -115,6 +123,16 @@ final class IntentionSummaryView extends StatelessWidget {
               ..._activeRelationCountLines(localizations, theme),
             ],
           ),
+          trailing: switch (confirmedFavoriteMark) {
+            // Звезда — подпись строки, а не управление: отметка различима
+            // наличием значка и ставится только на странице намерения.
+            FavoriteMark.favorite => Icon(
+              Icons.star,
+              applyTextScaling: true,
+              semanticLabel: localizations.intentionSummaryFavoriteMark,
+            ),
+            FavoriteMark.notFavorite || null => null,
+          },
         ),
       ),
     );

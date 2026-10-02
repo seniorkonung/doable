@@ -196,6 +196,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionSummaryNoTags => 'No tags';
 
   @override
+  String get intentionSummaryFavoriteMark => 'Favorite intention';
+
+  @override
   String get relationNeighborhoodTitle => 'Relations';
 
   @override

@@ -197,6 +197,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionSummaryNoTags => 'Без тегов';
 
   @override
+  String get intentionSummaryFavoriteMark => 'Избранное намерение';
+
+  @override
   String get relationNeighborhoodTitle => 'Связи';
 
   @override

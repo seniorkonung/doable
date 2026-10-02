@@ -422,6 +422,12 @@ abstract class AppLocalizations {
   /// **'No tags'**
   String get intentionSummaryNoTags;
 
+  /// Доступное название звезды избранного намерения в результате поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intention'**
+  String get intentionSummaryFavoriteMark;
+
   /// Заголовок соседства намерения
   ///
   /// In en, this message translates to:

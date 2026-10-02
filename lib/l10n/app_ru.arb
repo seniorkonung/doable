@@ -54,6 +54,7 @@
   "intentionActiveRelationCountUnknown": "Количество активных связей неизвестно.",
   "intentionSummaryTags": "Теги: {tags}",
   "intentionSummaryNoTags": "Без тегов",
+  "intentionSummaryFavoriteMark": "Избранное намерение",
   "relationNeighborhoodTitle": "Связи",
   "relationNeighborhoodSelectedCount": "Выбрано связей: {count}",
   "@relationNeighborhoodSelectedCount": {
