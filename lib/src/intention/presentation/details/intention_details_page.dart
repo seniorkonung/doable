@@ -163,7 +163,11 @@ final class _FavoriteMarkControl extends StatelessWidget {
         onMark,
       ),
     };
-    final enabled = !state.isOperationRunning && state.edit == null;
+    // До снимка подтверждённой отметки действие вычислено по прежней.
+    final enabled =
+        !state.isOperationRunning &&
+        state.edit == null &&
+        !state.isAwaitingFavoriteMarkSnapshot;
     return MergeSemantics(
       child: Semantics(
         label: localizations.detailsFavoriteMarkLabel,

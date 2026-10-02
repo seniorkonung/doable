@@ -2007,6 +2007,522 @@ void main() {
     );
     coordinator.confirmPresentation(abandonedFailure);
   });
+
+  test(
+    'после подтверждённой отметки и до снимка переходы отметки неприменимы',
+    () async {
+      final transitions =
+          <
+            (
+              FavoriteMark,
+              FavoriteMark,
+              void Function(IntentionDetailsViewModel),
+              void Function(IntentionDetailsViewModel),
+              Matcher,
+            )
+          >[
+            (
+              FavoriteMark.notFavorite,
+              FavoriteMark.favorite,
+              (details) => details.markFavorite(),
+              (details) => details.unmarkFavorite(),
+              isA<UnmarkIntentionFavorite>(),
+            ),
+            (
+              FavoriteMark.favorite,
+              FavoriteMark.notFavorite,
+              (details) => details.unmarkFavorite(),
+              (details) => details.markFavorite(),
+              isA<MarkIntentionFavorite>(),
+            ),
+          ];
+
+      for (final (before, after, start, reverse, reverseCommand)
+          in transitions) {
+        final repository = ControlledDetailsRepository();
+        final container = _detailsContainer(repository);
+        final intention = testDetailsIntention(index: 140);
+        final provider = intentionDetailsViewModelProvider(intention.id);
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests[0].add(
+          ResultSuccess(intention),
+          revision: const TestDetailsRevision(1),
+          favoriteMark: before,
+        );
+        await pumpEventQueue();
+        final details = container.read(provider.notifier);
+
+        start(details);
+        repository.completeCommand(
+          0,
+          testDetailsSavedResult(
+            intention,
+            before: intention,
+            revision: const TestDetailsRevision(2),
+            beforeFavoriteMark: before,
+            favoriteMark: after,
+          ),
+        );
+        await waitForDetailRequests(repository, 2);
+        await pumpEventQueue();
+
+        // Ключ намерения уже свободен, а состояние несёт прежнюю отметку.
+        expect(
+          container.read(provider),
+          isA<IntentionDetailsLoaded>()
+              .having(
+                (state) => state.details.favoriteMark,
+                'последняя подтверждённая отметка',
+                before,
+              )
+              .having(
+                (state) => state.isOperationRunning,
+                'освобождённый барьер',
+                isFalse,
+              )
+              .having(
+                (state) => state.isAwaitingFavoriteMarkSnapshot,
+                'ожидание снимка',
+                isTrue,
+              ),
+        );
+        start(details);
+        reverse(details);
+        expect(repository.commands, hasLength(1));
+
+        repository.detailRequests[1].add(
+          ResultSuccess(intention),
+          revision: const TestDetailsRevision(2),
+          favoriteMark: after,
+        );
+        await pumpEventQueue();
+        expect(
+          container.read(provider),
+          isA<IntentionDetailsLoaded>()
+              .having(
+                (state) => state.details.favoriteMark,
+                'новая подтверждённая отметка',
+                after,
+              )
+              .having(
+                (state) => state.isAwaitingFavoriteMarkSnapshot,
+                'ожидание снимка',
+                isFalse,
+              ),
+        );
+
+        // После снимка применим только обратный переход.
+        start(details);
+        expect(repository.commands, hasLength(1));
+        reverse(details);
+        expect(repository.commands, hasLength(2));
+        expect(repository.commands.last, reverseCommand);
+
+        repository.completeCommand(
+          1,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await pumpEventQueue();
+        subscription.close();
+        container.dispose();
+      }
+    },
+  );
+
+  test('снимок, опередивший завершение отметки, не оставляет ожидания', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final intention = testDetailsIntention(index: 141);
+    final provider = intentionDetailsViewModelProvider(intention.id);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(1),
+    );
+    await pumpEventQueue();
+    final details = container.read(provider.notifier)..markFavorite();
+
+    // Чтение, начатое пакетом, отвечает раньше, чем модель получает результат.
+    repository.onWatchIntention = (_) => repository.detailRequests.last.add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(2),
+      favoriteMark: FavoriteMark.favorite,
+    );
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(
+        intention,
+        before: intention,
+        revision: const TestDetailsRevision(2),
+        favoriteMark: FavoriteMark.favorite,
+      ),
+    );
+    await waitForDetailRequests(repository, 2);
+    await pumpEventQueue();
+
+    expect(
+      container.read(provider),
+      isA<IntentionDetailsLoaded>()
+          .having(
+            (state) => state.details.favoriteMark,
+            'новая подтверждённая отметка',
+            FavoriteMark.favorite,
+          )
+          .having(
+            (state) => state.isAwaitingFavoriteMarkSnapshot,
+            'ожидание снимка',
+            isFalse,
+          ),
+    );
+    details.unmarkFavorite();
+    expect(repository.commands.last, isA<UnmarkIntentionFavorite>());
+    repository.completeCommand(
+      1,
+      const ResultFailure(IntentionUnexpectedFailure()),
+    );
+    await pumpEventQueue();
+  });
+
+  test('завершение без изменения возвращает управление только с актуальной отметкой', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final intention = testDetailsIntention(index: 142);
+    final provider = intentionDetailsViewModelProvider(intention.id);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(2),
+    );
+    await pumpEventQueue();
+    final details = container.read(provider.notifier)..markFavorite();
+
+    // Ревизия не продвинулась: показанные данные уже соответствуют ей.
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(intention, revision: const TestDetailsRevision(2)),
+    );
+    await waitForDetailRequests(repository, 2);
+    await pumpEventQueue();
+    expect(
+      container.read(provider),
+      isA<IntentionDetailsLoaded>()
+          .having(
+            (state) => state.isAwaitingFavoriteMarkSnapshot,
+            'ожидание снимка',
+            isFalse,
+          )
+          .having((state) => state.stateChange, 'переход состояния', isNull),
+    );
+
+    // Отметку подтвердила другая операция: страница отстала от ревизии
+    // завершения без изменения и ждёт снимок.
+    details.markFavorite();
+    repository.completeCommand(
+      1,
+      testDetailsSavedResult(
+        intention,
+        revision: const TestDetailsRevision(3),
+        favoriteMark: FavoriteMark.favorite,
+      ),
+    );
+    await waitForDetailRequests(repository, 3);
+    await pumpEventQueue();
+    expect(
+      (container.read(
+        provider,
+      ) as IntentionDetailsLoaded).isAwaitingFavoriteMarkSnapshot,
+      isTrue,
+    );
+    details.markFavorite();
+    expect(repository.commands, hasLength(2));
+
+    repository.detailRequests[2].add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(3),
+      favoriteMark: FavoriteMark.favorite,
+    );
+    await pumpEventQueue();
+    expect(
+      (container.read(
+        provider,
+      ) as IntentionDetailsLoaded).isAwaitingFavoriteMarkSnapshot,
+      isFalse,
+    );
+    details.markFavorite();
+    expect(repository.commands, hasLength(2));
+    details.unmarkFavorite();
+    expect(repository.commands.last, isA<UnmarkIntentionFavorite>());
+    repository.completeCommand(
+      2,
+      const ResultFailure(IntentionUnexpectedFailure()),
+    );
+    await pumpEventQueue();
+  });
+
+  test('отказ чтения и удаление заканчивают ожидание снимка отметки', () async {
+    final repository = ControlledDetailsRepository();
+    final container = _detailsContainer(repository);
+    addTearDown(container.dispose);
+    final intention = testDetailsIntention(index: 143);
+    final provider = intentionDetailsViewModelProvider(intention.id);
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(1),
+    );
+    await pumpEventQueue();
+    final details = container.read(provider.notifier)..markFavorite();
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(
+        intention,
+        before: intention,
+        revision: const TestDetailsRevision(2),
+        favoriteMark: FavoriteMark.favorite,
+      ),
+    );
+    await waitForDetailRequests(repository, 2);
+    await pumpEventQueue();
+
+    repository.detailRequests[1].add(
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await pumpEventQueue();
+    expect(container.read(provider), isA<IntentionDetailsUnavailable>());
+    details
+      ..markFavorite()
+      ..unmarkFavorite();
+    expect(repository.commands, hasLength(1));
+
+    // Повтор чтения возвращает управление вместе с новой отметкой.
+    details.retry();
+    await waitForDetailRequests(repository, 3);
+    repository.detailRequests[2].add(
+      ResultSuccess(intention),
+      revision: const TestDetailsRevision(2),
+      favoriteMark: FavoriteMark.favorite,
+    );
+    await pumpEventQueue();
+    expect(
+      container.read(provider),
+      isA<IntentionDetailsLoaded>()
+          .having(
+            (state) => state.details.favoriteMark,
+            'новая подтверждённая отметка',
+            FavoriteMark.favorite,
+          )
+          .having(
+            (state) => state.isAwaitingFavoriteMarkSnapshot,
+            'ожидание снимка',
+            isFalse,
+          ),
+    );
+
+    details.unmarkFavorite();
+    repository.completeCommand(
+      1,
+      testDetailsSavedResult(
+        intention,
+        before: intention,
+        revision: const TestDetailsRevision(3),
+        beforeFavoriteMark: FavoriteMark.favorite,
+      ),
+    );
+    await waitForDetailRequests(repository, 4);
+    await pumpEventQueue();
+    expect(
+      (container.read(
+        provider,
+      ) as IntentionDetailsLoaded).isAwaitingFavoriteMarkSnapshot,
+      isTrue,
+    );
+
+    // Остальные переходы ожидание не блокирует; удаление завершает просмотр.
+    details.delete();
+    expect(repository.commands.last, isA<DeleteIntention>());
+    repository.completeCommand(
+      2,
+      testDetailsDeletedResult(
+        intention,
+        revision: const TestDetailsRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    expect(container.read(provider), isA<IntentionDetailsDeleted>());
+  });
+
+  test(
+    'отмена формы после отказа чтения заканчивает ожидание снимка отметки',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final intention = testDetailsIntention(index: 145);
+      final provider = intentionDetailsViewModelProvider(intention.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(1),
+      );
+      await pumpEventQueue();
+      final details = container.read(provider.notifier)..markFavorite();
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(
+          intention,
+          before: intention,
+          revision: const TestDetailsRevision(2),
+          favoriteMark: FavoriteMark.favorite,
+        ),
+      );
+      await waitForDetailRequests(repository, 2);
+      await pumpEventQueue();
+
+      // Открытая форма удерживает прежние данные при отказе чтения.
+      details.beginEditing();
+      repository.detailRequests[1].add(
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await pumpEventQueue();
+      expect(
+        container.read(provider),
+        isA<IntentionDetailsLoaded>()
+            .having((state) => state.edit, 'форма изменения', isNotNull)
+            .having(
+              (state) => state.isAwaitingFavoriteMarkSnapshot,
+              'ожидание снимка',
+              isTrue,
+            ),
+      );
+
+      details.cancelEditing();
+      await waitForDetailRequests(repository, 3);
+      details.markFavorite();
+      expect(repository.commands, hasLength(1));
+
+      repository.detailRequests[2].add(
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await pumpEventQueue();
+      expect(container.read(provider), isA<IntentionDetailsUnavailable>());
+    },
+  );
+
+  test(
+    'ожидание снимка отметки переживает другой подтверждённый переход',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final intention = testDetailsIntention(index: 144);
+      final provider = intentionDetailsViewModelProvider(intention.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(1),
+      );
+      await pumpEventQueue();
+      final details = container.read(provider.notifier)..markFavorite();
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(
+          intention,
+          before: intention,
+          revision: const TestDetailsRevision(2),
+          favoriteMark: FavoriteMark.favorite,
+        ),
+      );
+      await waitForDetailRequests(repository, 2);
+      await pumpEventQueue();
+
+      details.enableReadiness();
+      expect(repository.commands.last, isA<EnableIntentionReadiness>());
+      repository.completeCommand(
+        1,
+        testDetailsSavedResult(
+          intention,
+          before: intention,
+          revision: const TestDetailsRevision(3),
+          beforeFavoriteMark: FavoriteMark.favorite,
+          favoriteMark: FavoriteMark.favorite,
+        ),
+      );
+      await waitForDetailRequests(repository, 3);
+      await pumpEventQueue();
+
+      expect(
+        container.read(provider),
+        isA<IntentionDetailsLoaded>()
+            .having(
+              (state) => state.details.favoriteMark,
+              'последняя подтверждённая отметка',
+              FavoriteMark.notFavorite,
+            )
+            .having(
+              (state) => state.isOperationRunning,
+              'освобождённый барьер',
+              isFalse,
+            )
+            .having(
+              (state) => state.isAwaitingFavoriteMarkSnapshot,
+              'ожидание снимка',
+              isTrue,
+            ),
+      );
+      details.markFavorite();
+      expect(repository.commands, hasLength(2));
+
+      repository.detailRequests[2].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(3),
+        favoriteMark: FavoriteMark.favorite,
+      );
+      await pumpEventQueue();
+      expect(
+        (container.read(
+          provider,
+        ) as IntentionDetailsLoaded).isAwaitingFavoriteMarkSnapshot,
+        isFalse,
+      );
+    },
+  );
 }
 
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) {

@@ -111,6 +111,13 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       return;
     }
     state = current.copyWith(clearEdit: true);
+    if (current.isAwaitingFavoriteMarkSnapshot) {
+      // Открытая форма могла удержать прежние данные при отказе чтения:
+      // ожидание снимка заканчивает новое чтение, а не возврат управления.
+      _advanceGeneration();
+      _preserveAuthoritativeStateWhileLoading = true;
+      _startObservation();
+    }
   }
 
   void changeTitle(String value) {
@@ -363,7 +370,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     if (current is! IntentionDetailsLoaded ||
         current.edit != null ||
         _isOperationRunning ||
-        !_isStateChangeApplicable(current.details, kind)) {
+        !_isStateChangeApplicable(current, kind)) {
       return;
     }
 
@@ -410,7 +417,19 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
             when intention.id == _intentionId &&
                 kind != IntentionDetailsStateChangeKind.delete:
           if (current is IntentionDetailsLoaded) {
-            state = current.copyWith(clearStateChange: true);
+            state = current.copyWith(
+              clearStateChange: true,
+              isAwaitingFavoriteMarkSnapshot: switch (kind) {
+                IntentionDetailsStateChangeKind.markFavorite ||
+                IntentionDetailsStateChangeKind.unmarkFavorite =>
+                  _isOlderThanConfirmedChange(current.revision, completion),
+                IntentionDetailsStateChangeKind.enableReadiness ||
+                IntentionDetailsStateChangeKind.disableReadiness ||
+                IntentionDetailsStateChangeKind.archive ||
+                IntentionDetailsStateChangeKind.restore ||
+                IntentionDetailsStateChangeKind.delete => null,
+              },
+            );
           }
         case ResultSuccess(value: IntentionDeleted(:final id))
             when id == _intentionId &&
@@ -467,23 +486,46 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   };
 
   bool _isStateChangeApplicable(
-    application.IntentionDetails details,
+    IntentionDetailsLoaded loaded,
     IntentionDetailsStateChangeKind kind,
-  ) => switch (kind) {
-    IntentionDetailsStateChangeKind.enableReadiness =>
-      details.intention.readiness == IntentionReadiness.notReady,
-    IntentionDetailsStateChangeKind.disableReadiness =>
-      details.intention.readiness == IntentionReadiness.ready,
-    IntentionDetailsStateChangeKind.archive =>
-      details.intention.archiveState == IntentionArchiveState.active,
-    IntentionDetailsStateChangeKind.restore =>
-      details.intention.archiveState == IntentionArchiveState.archived,
-    IntentionDetailsStateChangeKind.delete => true,
-    IntentionDetailsStateChangeKind.markFavorite =>
-      details.favoriteMark == FavoriteMark.notFavorite,
-    IntentionDetailsStateChangeKind.unmarkFavorite =>
-      details.favoriteMark == FavoriteMark.favorite,
-  };
+  ) {
+    final details = loaded.details;
+    return switch (kind) {
+      IntentionDetailsStateChangeKind.enableReadiness =>
+        details.intention.readiness == IntentionReadiness.notReady,
+      IntentionDetailsStateChangeKind.disableReadiness =>
+        details.intention.readiness == IntentionReadiness.ready,
+      IntentionDetailsStateChangeKind.archive =>
+        details.intention.archiveState == IntentionArchiveState.active,
+      IntentionDetailsStateChangeKind.restore =>
+        details.intention.archiveState == IntentionArchiveState.archived,
+      IntentionDetailsStateChangeKind.delete => true,
+      // До снимка подтверждённой отметки действие по прежней неприменимо.
+      IntentionDetailsStateChangeKind.markFavorite =>
+        !loaded.isAwaitingFavoriteMarkSnapshot &&
+            details.favoriteMark == FavoriteMark.notFavorite,
+      IntentionDetailsStateChangeKind.unmarkFavorite =>
+        !loaded.isAwaitingFavoriteMarkSnapshot &&
+            details.favoriteMark == FavoriteMark.favorite,
+    };
+  }
+
+  /// Показанный снимок старше подтверждённого пакета, и отметку опубликует
+  /// только чтение, начатое этим пакетом. Завершение без изменения на ревизии
+  /// показанного снимка ожидания не образует.
+  bool _isOlderThanConfirmedChange(
+    GraphRevision shown,
+    IntentionCommandCompletion completion,
+  ) {
+    final confirmed = completion.confirmedChange?.revision;
+    if (confirmed == null) {
+      return false;
+    }
+    return switch (shown.compareTo(confirmed)) {
+      GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch => true,
+      GraphRevisionOrder.same || GraphRevisionOrder.newer => false,
+    };
+  }
 
   GraphInitiatorPresentationClaim? _claimFailure(
     IntentionOperationToken token,

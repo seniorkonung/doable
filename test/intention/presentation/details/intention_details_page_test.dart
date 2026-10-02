@@ -2125,6 +2125,106 @@ void main() {
   );
 
   testWidgets(
+    'управление отметкой недоступно от подтверждения до снимка и затем предлагает обратное действие',
+    (tester) async {
+      final scenarios =
+          <(FavoriteMark, FavoriteMark, IconData, String, String)>[
+            (
+              FavoriteMark.notFavorite,
+              FavoriteMark.favorite,
+              Icons.star_border,
+              'Not marked',
+              'Remove favorite mark',
+            ),
+            (
+              FavoriteMark.favorite,
+              FavoriteMark.notFavorite,
+              Icons.star,
+              'Marked',
+              'Mark as favorite',
+            ),
+          ];
+
+      for (var index = 0; index < scenarios.length; index += 1) {
+        final (before, after, confirmedIcon, confirmedValue, reverseAction) =
+            scenarios[index];
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledDetailsRepository();
+        final intention = testDetailsIntention(index: 130 + index);
+        await _pumpDetailsPage(tester, repository, intention.id);
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests[0].add(
+          ResultSuccess(intention),
+          revision: const TestDetailsRevision(1),
+          favoriteMark: before,
+        );
+        await tester.pumpAndSettle();
+        final control = find.byKey(_favoriteMarkKey);
+
+        await tester.tap(control);
+        await tester.pump();
+        repository.completeCommand(
+          0,
+          testDetailsSavedResult(
+            intention,
+            before: intention,
+            revision: const TestDetailsRevision(2),
+            beforeFavoriteMark: before,
+            favoriteMark: after,
+          ),
+        );
+        await tester.pump();
+        await waitForDetailRequests(repository, 2);
+        await tester.pump();
+
+        // Операция завершена, а подробные данные несут прежнюю отметку.
+        expect(find.text('Saving changes…'), findsNothing);
+        expect(tester.widget<IconButton>(control).onPressed, isNull);
+        expect(
+          find.descendant(of: control, matching: find.byIcon(confirmedIcon)),
+          findsOneWidget,
+        );
+        expect(
+          tester.getSemantics(control),
+          isSemantics(value: confirmedValue, isEnabled: false),
+        );
+        await tester.tap(control, warnIfMissed: false);
+        await tester.pump();
+        expect(repository.commands, hasLength(1));
+
+        repository.detailRequests[1].add(
+          ResultSuccess(intention),
+          revision: const TestDetailsRevision(2),
+          favoriteMark: after,
+        );
+        await tester.pump();
+        await tester.pump();
+        expect(tester.widget<IconButton>(control).onPressed, isNotNull);
+        expect(tester.widget<IconButton>(control).tooltip, reverseAction);
+
+        await tester.tap(control);
+        await tester.pump();
+        expect(repository.commands, hasLength(2));
+        expect(
+          repository.commands.last,
+          after == FavoriteMark.favorite
+              ? isA<UnmarkIntentionFavorite>()
+              : isA<MarkIntentionFavorite>(),
+        );
+
+        repository.completeCommand(
+          1,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await tester.pumpAndSettle();
+        semantics.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await _closeOperationMessage(tester);
+      }
+    },
+  );
+
+  testWidgets(
     'экранный диктор получает название, состояние и доступность управления отметкой на обоих языках',
     (tester) async {
       final semantics = tester.ensureSemantics();
