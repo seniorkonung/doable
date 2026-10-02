@@ -57,6 +57,11 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
+  FavoriteIntentionsReadDiagnosticsEvent(:final stage) => {
+    'operation': 'favoriteIntentionsRead',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
   DailyChoiceReadDiagnosticsEvent() => {
     'operation': 'dailyChoiceDetailRead',
     'stage': 'read',

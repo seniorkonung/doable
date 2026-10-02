@@ -158,6 +158,28 @@ final class TagDetailReadDiagnosticsEvent extends DiagnosticsEvent {
   final TagReadDiagnosticsStage stage;
 }
 
+/// Этап чтения списка избранных намерений.
+enum FavoriteIntentionsReadDiagnosticsStage {
+  /// Чтение строк избранного и счётчиков активных связей.
+  read,
+
+  /// Проверка сохранённых данных всего избранного до публикации списка.
+  validation,
+}
+
+/// Чтение полного списка избранных намерений.
+///
+/// Событие несёт только этап и исход: названий, идентификаторов, состава и
+/// порядка избранных намерений в нём нет.
+final class FavoriteIntentionsReadDiagnosticsEvent extends DiagnosticsEvent {
+  const FavoriteIntentionsReadDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final FavoriteIntentionsReadDiagnosticsStage stage;
+}
+
 final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
   const DailyChoiceReadDiagnosticsEvent({required DiagnosticsStatus status})
     : super(status);

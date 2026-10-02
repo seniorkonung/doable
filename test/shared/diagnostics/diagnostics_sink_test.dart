@@ -499,6 +499,102 @@ void main() {
       expect(attempts, 1);
     });
 
+    test('чтение списка избранных намерений кодируется отдельной операцией '
+        'с этапом, исходом и безопасной категорией', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      for (final stage in FavoriteIntentionsReadDiagnosticsStage.values) {
+        for (final status in const [
+          DiagnosticsStarted(),
+          DiagnosticsSucceeded(Duration(milliseconds: 2)),
+          DiagnosticsFailed(
+            duration: Duration(milliseconds: 3),
+            code: DiagnosticsFailureCode.unavailable,
+          ),
+          DiagnosticsFailed(
+            duration: Duration(milliseconds: 4),
+            code: DiagnosticsFailureCode.corruption,
+          ),
+          DiagnosticsFailed(
+            duration: Duration(milliseconds: 5),
+            code: DiagnosticsFailureCode.unexpected,
+          ),
+        ]) {
+          sink.record(
+            FavoriteIntentionsReadDiagnosticsEvent(
+              stage: stage,
+              status: status,
+            ),
+          );
+        }
+      }
+
+      expect(FavoriteIntentionsReadDiagnosticsStage.values.map((s) => s.name), [
+        'read',
+        'validation',
+      ]);
+      expect(messages.map(jsonDecode), [
+        for (final stage in ['read', 'validation']) ...[
+          {
+            'operation': 'favoriteIntentionsRead',
+            'stage': stage,
+            'outcome': 'started',
+          },
+          {
+            'operation': 'favoriteIntentionsRead',
+            'stage': stage,
+            'outcome': 'succeeded',
+            'durationMicros': 2000,
+          },
+          {
+            'operation': 'favoriteIntentionsRead',
+            'stage': stage,
+            'outcome': 'failed',
+            'durationMicros': 3000,
+            'failureCode': 'unavailable',
+          },
+          {
+            'operation': 'favoriteIntentionsRead',
+            'stage': stage,
+            'outcome': 'failed',
+            'durationMicros': 4000,
+            'failureCode': 'corruption',
+          },
+          {
+            'operation': 'favoriteIntentionsRead',
+            'stage': stage,
+            'outcome': 'failed',
+            'durationMicros': 5000,
+            'failureCode': 'unexpected',
+          },
+        ],
+      ]);
+    });
+
+    test('падающий писатель не повторяет диагностическое событие чтения '
+        'списка избранных намерений', () {
+      var attempts = 0;
+      final sink = DeveloperDiagnosticsSink((_) {
+        attempts++;
+        throw StateError('CANARY-diagnostics-writer-failure');
+      });
+
+      expect(
+        () => sink.record(
+          const FavoriteIntentionsReadDiagnosticsEvent(
+            stage: FavoriteIntentionsReadDiagnosticsStage.validation,
+            status: DiagnosticsFailed(
+              duration: Duration(milliseconds: 1),
+              code: DiagnosticsFailureCode.corruption,
+            ),
+          ),
+        ),
+        returnsNormally,
+      );
+      expect(attempts, 1);
+    });
+
     test('падающий получатель не влияет на исход дневной операции', () {
       final sink = _ThrowingDiagnosticsSink();
       const event = DailyChoiceCommandDiagnosticsEvent(

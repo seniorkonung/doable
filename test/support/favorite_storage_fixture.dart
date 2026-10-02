@@ -52,6 +52,25 @@ void storeFavoritePlaceWithoutIntention(
   }
 }
 
+/// Снимает защиту схемы с сохранённых данных избранного: таблица отметок
+/// заменяется копией без первичного ключа, уникальности места, проверки места
+/// и внешнего ключа с прежними строками. После этого [storeFavoriteMark]
+/// записывает неоднозначный порядок и вторую отметку одного намерения —
+/// повреждения, недостижимые через приложение.
+void removeFavoriteSchemaProtection(sqlite.Database database) {
+  database.execute(
+    'ALTER TABLE favorite_intentions RENAME TO protected_favorite_intentions',
+  );
+  database.execute(
+    'CREATE TABLE favorite_intentions (intention_id TEXT, position INTEGER)',
+  );
+  database.execute(
+    'INSERT INTO favorite_intentions (intention_id, position) '
+    'SELECT intention_id, position FROM protected_favorite_intentions',
+  );
+  database.execute('DROP TABLE protected_favorite_intentions');
+}
+
 /// Снимает отметку избранного намерения удалением её строки.
 void removeFavoriteMark(
   sqlite.Database database, {

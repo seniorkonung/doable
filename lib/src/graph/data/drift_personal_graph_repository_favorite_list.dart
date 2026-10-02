@@ -9,10 +9,21 @@ extension _FavoriteListReading on DriftPersonalGraphRepository {
   /// числом. Место без существующего намерения, неоднозначный порядок и
   /// недопустимые сохранённые значения дают повреждение без частичного
   /// списка, пропуска или исправления.
+  ///
+  /// Диагностика различает чтение строк и проверку сохранённых данных
+  /// избранного и не несёт данных личного графа.
   Future<FavoriteIntentionsResult> _readFavoriteIntentions() async {
+    final stopwatch = Stopwatch()..start();
+    var stage = FavoriteIntentionsReadDiagnosticsStage.read;
+    void record(DiagnosticsStatus status) => _recordDiagnostics(
+      FavoriteIntentionsReadDiagnosticsEvent(stage: stage, status: status),
+    );
+
+    record(const DiagnosticsStarted());
     try {
       final snapshot = await _sequencer.run(
         () => _database.transaction(() async {
+          stage = FavoriteIntentionsReadDiagnosticsStage.read;
           final rows = await _database
               .customSelect(
                 '''SELECT f.intention_id, f.position, i.id, i.title,
@@ -24,6 +35,7 @@ extension _FavoriteListReading on DriftPersonalGraphRepository {
                 readsFrom: {_database.favoriteIntentions, _database.intentions},
               )
               .get();
+          stage = FavoriteIntentionsReadDiagnosticsStage.validation;
           var previousPosition = 0;
           var archivedCount = 0;
           final seen = <IntentionId>{};
@@ -47,9 +59,19 @@ extension _FavoriteListReading on DriftPersonalGraphRepository {
                 archivedCount++;
             }
           }
-          final counts = await _readVerifiedRelationCountsFor(
-            active.map((intention) => intention.id),
-          );
+          stage = FavoriteIntentionsReadDiagnosticsStage.read;
+          final Map<IntentionId, RelationCounts> counts;
+          try {
+            counts = await _readVerifiedRelationCountsFor(
+              active.map((intention) => intention.id),
+            );
+          } on _StoredIntentionCorruption {
+            // Нарушение целостности счётчиков выявляет проверка агрегата, а
+            // не отказ его чтения.
+            stage = FavoriteIntentionsReadDiagnosticsStage.validation;
+            rethrow;
+          }
+          stage = FavoriteIntentionsReadDiagnosticsStage.validation;
           return FavoriteIntentionsSnapshot(
             items: [
               for (final intention in active)
@@ -68,11 +90,17 @@ extension _FavoriteListReading on DriftPersonalGraphRepository {
           );
         }),
       );
+      record(DiagnosticsSucceeded(stopwatch.elapsed));
       return FavoriteIntentionsSuccess(snapshot);
     } on Object catch (error) {
-      return FavoriteIntentionsError(
-        _classifyFavoriteIntentionsReadFailure(error),
+      final failure = _classifyFavoriteIntentionsReadFailure(error);
+      record(
+        DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: _graphCommandDiagnosticsFailureCode(failure),
+        ),
       );
+      return FavoriteIntentionsError(failure);
     }
   }
 }
