@@ -53,8 +53,18 @@ const _readTitle = 'Читать';
 
 const _favoriteControl = ValueKey('intention-details-favorite-mark');
 const _message = ValueKey('graph-operation-message');
-const _pageFailure = ValueKey('intention-details-state-change-failure');
-const _pageRetry = ValueKey('intention-details-state-change-retry');
+const _pageFailure = ValueKey('intention-details-favorite-mark-failure');
+const _pageRetry = ValueKey('intention-details-favorite-mark-retry');
+
+/// Сообщение области действий: отказ отметки в ней не повторяется.
+const _actionsFailure = ValueKey('intention-details-state-change-failure');
+
+/// Описание в пределах допустимой длины, при котором область действий лежит
+/// далеко за видимой частью.
+final _longDescription = List.filled(200, 'Строка описания.').join('\n');
+
+/// Положение прокрутки внутри длинного описания.
+const _scrolledOffset = 400.0;
 
 /// Остальные действия страницы намерения, изменяющие это намерение.
 const _otherActions = [
@@ -154,23 +164,52 @@ void main() {
       }
 
       testWidgets(
-        '$operation: отказ при открытой странице показывается на ней один раз без общей поверхности на $code',
+        '$operation: отказ при открытой прокрученной странице показывается под шапкой один раз без общей поверхности на $code',
         (tester) async {
-          final app = await _App.start(tester, locale, marked: markedBefore);
+          final app = await _App.start(
+            tester,
+            locale,
+            marked: markedBefore,
+            walkDescription: _longDescription,
+          );
           final l10n = app.l10n;
           final marksBefore = storedFavoriteMarks(app.raw);
 
           await _openDetails(tester, _walkTitle);
+          // Страница прокручена внутри длинного описания: область действий
+          // находится вне видимой части.
+          final scroll = tester.state<ScrollableState>(_detailsScrollable);
+          scroll.position.jumpTo(_scrolledOffset);
+          await tester.pumpAndSettle();
+          expect(find.byKey(_otherActions.first).hitTestable(), findsNothing);
+
           app.faults.failNextMarkWrite();
           await _tap(tester, find.byKey(_favoriteControl));
           await _until(tester, find.byKey(_pageFailure));
           await tester.pumpAndSettle();
 
+          // Отказ и повтор видны под шапкой без прокрутки, а её положение
+          // прежнее; область действий отказ не повторяет.
           expect(
             find.text(l10n.detailsFavoriteMarkUnavailable),
             findsOneWidget,
           );
-          expect(find.byKey(_pageRetry), findsOneWidget);
+          expect(
+            find.text(l10n.detailsFavoriteMarkUnavailable).hitTestable(),
+            findsOneWidget,
+          );
+          expect(find.byKey(_pageRetry).hitTestable(), findsOneWidget);
+          final contentTop = tester.getRect(_detailsScrollable).top;
+          expect(
+            tester.getRect(find.byKey(_pageFailure)).bottom,
+            lessThanOrEqualTo(contentTop),
+          );
+          expect(
+            tester.getRect(find.byKey(_pageRetry)).bottom,
+            lessThanOrEqualTo(contentTop),
+          );
+          expect(scroll.position.pixels, _scrolledOffset);
+          expect(find.byKey(_actionsFailure), findsNothing);
           await _expectNoLateMessage(tester);
 
           // Страница и хранилище показывают прежнее подтверждённое состояние.
@@ -214,6 +253,7 @@ final class _App {
     WidgetTester tester,
     Locale locale, {
     required bool marked,
+    String? walkDescription,
   }) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.binding.platformDispatcher.localesTestValue = [locale];
@@ -249,8 +289,14 @@ final class _App {
     await tester.runAsync(runtime.bootstrap);
     for (final (number, title) in [(_walk, _walkTitle), (_read, _readTitle)]) {
       raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
-        [tagFixtureId(number), title, number, number],
+        'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, 0, 0, ?, ?)',
+        [
+          tagFixtureId(number),
+          title,
+          number == _walk ? walkDescription : null,
+          number,
+          number,
+        ],
       );
     }
     if (marked) {
@@ -310,6 +356,14 @@ Future<void> _closeDetails(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Прокрутка содержимого страницы намерения.
+final _detailsScrollable = find
+    .descendant(
+      of: find.byType(CustomScrollView),
+      matching: find.byType(Scrollable),
+    )
+    .first;
+
 String? _controlTooltip(WidgetTester tester) =>
     tester.widget<IconButton>(find.byKey(_favoriteControl)).tooltip;
 
@@ -322,7 +376,10 @@ void _expectActionsEnabled(WidgetTester tester, bool enabled) {
   );
   for (final action in _otherActions) {
     expect(
-      tester.widget<ButtonStyleButton>(find.byKey(action)).enabled,
+      // Область действий может лежать вне видимой части страницы.
+      tester
+          .widget<ButtonStyleButton>(find.byKey(action, skipOffstage: false))
+          .enabled,
       enabled,
       reason: '$action',
     );

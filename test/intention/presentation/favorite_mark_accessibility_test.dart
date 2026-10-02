@@ -35,8 +35,8 @@ const _locales = [Locale('ru'), Locale('en')];
 const _longTitle = 'Долгая прогулка до дальнего парка вместе с соседями';
 
 const _favoriteMarkKey = ValueKey('intention-details-favorite-mark');
-const _failureKey = ValueKey('intention-details-state-change-failure');
-const _retryKey = ValueKey('intention-details-state-change-retry');
+const _failureKey = ValueKey('intention-details-favorite-mark-failure');
+const _retryKey = ValueKey('intention-details-favorite-mark-retry');
 const _operationMessageKey = ValueKey('graph-operation-message');
 
 /// Страница поиска намерений и то, чем она отличается от остальных трёх.
@@ -218,8 +218,8 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(repository.commands, hasLength(2));
       expect(repository.detailRequests, hasLength(2));
-      // Название ушло за область просмотра: человек возвращается к нему
-      // прокруткой.
+      // Название могло уйти за область просмотра: человек возвращается к
+      // нему прокруткой.
       final title = find.byKey(const ValueKey('intention-details-title'));
       await tester.scrollUntilVisible(
         title,
@@ -408,51 +408,66 @@ final _detailsScrollable = find
     )
     .first;
 
-/// Отказ отметки объявлен живой областью страницы, показан целиком и
-/// предлагает доступный повтор.
+/// Отказ отметки объявлен живой областью полосы под шапкой, показан целиком
+/// без прокрутки и предлагает доступный повтор, а содержимое страницы под
+/// полосой остаётся прокручиваемым и доступным.
 Future<void> _expectFavoriteMarkFailure(
   WidgetTester tester,
   AppLocalizations l10n,
 ) async {
   final message = l10n.detailsFavoriteMarkUnavailable;
   final failure = find.byKey(_failureKey);
-  // Область действий создаётся лениво: человек доходит до неё прокруткой.
+  final retry = find.byKey(_retryKey);
+
+  void expectBanner() {
+    final contentTop = tester.getRect(_detailsScrollable).top;
+    expect(
+      tester.getSemantics(failure),
+      isSemantics(isLiveRegion: true, label: message),
+    );
+    _expectNotTruncated(
+      tester,
+      find.descendant(of: failure, matching: find.text(message)),
+    );
+    _expectOnScreen(tester, failure);
+    expect(tester.getRect(failure).bottom, lessThanOrEqualTo(contentTop));
+
+    _expectTappable(tester, retry);
+    _expectOnScreen(tester, retry);
+    expect(tester.getRect(retry).bottom, lessThanOrEqualTo(contentTop));
+    expect(
+      tester.getSemantics(retry),
+      isSemantics(
+        label: l10n.commonRetry,
+        isButton: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
+    _expectNotTruncated(
+      tester,
+      find.descendant(of: retry, matching: find.text(l10n.commonRetry)),
+    );
+  }
+
+  expectBanner();
+
+  // Содержимое под полосой прокручивается до области действий и обратно,
+  // а полоса остаётся на месте.
+  final bannerRect = tester.getRect(failure);
+  final position = tester.state<ScrollableState>(_detailsScrollable).position;
+  final edit = find.byKey(const ValueKey('intention-details-edit'));
   await tester.scrollUntilVisible(
-    failure,
+    edit,
     150,
     scrollable: _detailsScrollable,
     maxScrolls: 200,
   );
-  await tester.ensureVisible(failure);
   await tester.pumpAndSettle();
-  expect(
-    tester.getSemantics(failure),
-    isSemantics(isLiveRegion: true, label: message),
-  );
-  _expectNotTruncated(
-    tester,
-    find.descendant(of: failure, matching: find.text(message)),
-  );
-  _expectOnScreen(tester, failure);
-
-  final retry = find.byKey(_retryKey);
-  await tester.ensureVisible(retry);
-  await tester.pumpAndSettle();
-  _expectTappable(tester, retry);
-  _expectOnScreen(tester, retry);
-  expect(
-    tester.getSemantics(retry),
-    isSemantics(
-      label: l10n.commonRetry,
-      isButton: true,
-      isEnabled: true,
-      hasTapAction: true,
-    ),
-  );
-  _expectNotTruncated(
-    tester,
-    find.descendant(of: retry, matching: find.text(l10n.commonRetry)),
-  );
+  expect(position.pixels, greaterThan(0));
+  _expectTappable(tester, edit);
+  expect(tester.getRect(failure), bannerRect);
+  expectBanner();
 }
 
 /// Каждая строка выдачи объявляет отметку вместе с названием одним узлом,

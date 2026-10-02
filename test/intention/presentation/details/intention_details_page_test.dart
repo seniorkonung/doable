@@ -1895,7 +1895,7 @@ void main() {
   );
 
   testWidgets(
-    'отказ отметки и её снятия показан в области действий с повтором только при недоступности',
+    'отказ отметки и её снятия показан под шапкой вне прокрутки с повтором только при недоступности',
     (tester) async {
       final scenarios = <(Locale, FavoriteMark, IntentionFailure, String, bool)>[
         (
@@ -1948,7 +1948,10 @@ void main() {
         final isFavorite = favoriteMark == FavoriteMark.favorite;
         final confirmedIcon = isFavorite ? Icons.star : Icons.star_border;
         final repository = ControlledDetailsRepository();
-        final intention = testDetailsIntention(index: 90 + index);
+        final intention = testDetailsIntention(
+          index: 90 + index,
+          description: _longDescription,
+        );
         await _pumpDetailsPage(
           tester,
           repository,
@@ -1963,34 +1966,52 @@ void main() {
         await tester.pumpAndSettle();
         final control = find.byKey(_favoriteMarkKey);
 
+        // Страница прокручена внутри длинного описания: область действий
+        // находится вне видимой части.
+        final position = tester.state<ScrollableState>(_detailsScrollable);
+        position.position.jumpTo(_scrolledOffset);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('intention-details-edit')).hitTestable(),
+          findsNothing,
+        );
+
         await tester.tap(control);
         await tester.pump();
         repository.completeCommand(0, ResultFailure(failure));
         await tester.pumpAndSettle();
 
-        // Ошибку предъявляет страница: общая поверхность её не повторяет.
+        // Ошибку предъявляет полоса под шапкой: область действий и общая
+        // поверхность её не повторяют, а прокрутка остаётся на месте.
+        final banner = find.byKey(_favoriteMarkFailureKey);
         expect(find.text(message), findsOneWidget);
         expect(
-          find.descendant(
-            of: find.byKey(
-              const ValueKey('intention-details-state-change-failure'),
-            ),
-            matching: find.text(message),
-          ),
+          find.descendant(of: banner, matching: find.text(message)),
           findsOneWidget,
         );
+        expect(find.text(message).hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(banner).bottom,
+          lessThanOrEqualTo(tester.getRect(_detailsScrollable).top),
+        );
+        expect(position.position.pixels, _scrolledOffset);
+        expect(find.byKey(_stateChangeFailureKey), findsNothing);
+        expect(find.byKey(_stateChangeRetryKey), findsNothing);
         expect(find.byType(SnackBar), findsNothing);
         expect(
           find.descendant(of: control, matching: find.byIcon(confirmedIcon)),
           findsOneWidget,
         );
         expect(tester.widget<IconButton>(control).onPressed, isNotNull);
-        final retry = find.byKey(
-          const ValueKey('intention-details-state-change-retry'),
-        );
+        final retry = find.byKey(_favoriteMarkRetryKey);
         expect(retry, canRetry ? findsOneWidget : findsNothing);
         if (canRetry) {
-          await tester.ensureVisible(retry);
+          // Повтор виден без прокрутки и отправляет новую команду.
+          expect(retry.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(retry).bottom,
+            lessThanOrEqualTo(tester.getRect(_detailsScrollable).top),
+          );
           await tester.tap(retry);
           await tester.pump();
           expect(repository.commands, hasLength(2));
@@ -2000,17 +2021,106 @@ void main() {
                 ? isA<UnmarkIntentionFavorite>()
                 : isA<MarkIntentionFavorite>(),
           );
+          expect(banner, findsNothing);
           repository.completeCommand(
             1,
             const ResultFailure(IntentionUnexpectedFailure()),
           );
           await tester.pumpAndSettle();
+          expect(banner, findsOneWidget);
           expect(retry, findsNothing);
+          expect(position.position.pixels, _scrolledOffset);
         }
 
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       }
+    },
+  );
+
+  testWidgets(
+    'полосы отказа отметки нет после отказа другой операции намерения и после успеха отметки',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 100);
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      final control = find.byKey(_favoriteMarkKey);
+      final banner = find.byKey(_favoriteMarkFailureKey);
+
+      await tester.tap(control);
+      await tester.pump();
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(banner, findsOneWidget);
+      expect(find.byKey(_favoriteMarkRetryKey), findsOneWidget);
+
+      // Отказ архивирования остаётся в области действий и убирает полосу.
+      final archive = find.byKey(const ValueKey('intention-details-archive'));
+      await tester.ensureVisible(archive);
+      await tester.tap(archive);
+      await tester.pump();
+      expect(repository.commands.last, isA<ArchiveIntention>());
+      repository.completeCommand(
+        1,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(banner, findsNothing);
+      expect(find.byKey(_favoriteMarkRetryKey), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(_stateChangeFailureKey),
+          matching: find.text(
+            'The intention state couldn’t be changed. Try again.',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(_stateChangeRetryKey), findsOneWidget);
+
+      await tester.tap(control);
+      await tester.pump();
+      repository.completeCommand(
+        2,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(banner, findsOneWidget);
+      expect(find.byKey(_stateChangeFailureKey), findsNothing);
+      expect(find.byKey(_stateChangeRetryKey), findsNothing);
+
+      // Успешный повтор убирает полосу.
+      await tester.tap(find.byKey(_favoriteMarkRetryKey));
+      await tester.pump();
+      repository.completeCommand(
+        3,
+        testDetailsSavedResult(
+          intention,
+          before: intention,
+          revision: const TestDetailsRevision(1),
+          favoriteMark: FavoriteMark.favorite,
+        ),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(1),
+        favoriteMark: FavoriteMark.favorite,
+      );
+      await tester.pumpAndSettle();
+      expect(banner, findsNothing);
+      expect(find.byKey(_favoriteMarkRetryKey), findsNothing);
+      expect(
+        find.descendant(of: control, matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
     },
   );
 
@@ -2114,6 +2224,31 @@ void main() {
 }
 
 const _favoriteMarkKey = ValueKey('intention-details-favorite-mark');
+const _favoriteMarkFailureKey = ValueKey(
+  'intention-details-favorite-mark-failure',
+);
+const _favoriteMarkRetryKey = ValueKey('intention-details-favorite-mark-retry');
+const _stateChangeFailureKey = ValueKey(
+  'intention-details-state-change-failure',
+);
+const _stateChangeRetryKey = ValueKey('intention-details-state-change-retry');
+
+/// Описание, при котором область действий лежит далеко за видимой частью.
+final _longDescription = List.filled(
+  120,
+  'Длинное описание намерения.',
+).join('\n');
+
+/// Положение прокрутки внутри длинного описания.
+const _scrolledOffset = 240.0;
+
+/// Прокрутка содержимого страницы намерения.
+final _detailsScrollable = find
+    .descendant(
+      of: find.byType(CustomScrollView),
+      matching: find.byType(Scrollable),
+    )
+    .first;
 
 Future<void> _pumpDetailsPage(
   WidgetTester tester,
