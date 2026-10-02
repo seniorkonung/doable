@@ -77,10 +77,7 @@ part 'drift_personal_graph_repository_choice_path_suggestions.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
-
-/// Адаптер ещё не читает `favorite_intentions`: проекции намерений получают
-/// это значение без сверки с сохранёнными строками отметок.
-const _unreadFavoriteMark = domain.FavoriteMark.notFavorite;
+part 'drift_personal_graph_repository_favorite_marks.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -474,7 +471,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         value: IntentionDetails(
           intention: _rehydrateDetailRow(row),
           relationCounts: await _readVerifiedRelationCounts(id),
-          favoriteMark: _unreadFavoriteMark,
+          favoriteMark: await _readFavoriteMark(id),
         ),
         revision: _currentRevision,
       );
@@ -1334,12 +1331,15 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     final intentionIds = [for (final row in itemRows) row.intentionId];
     final aggregates = await _relationCountAggregates.read(intentionIds);
     final tags = await _readIntentionTags(intentionIds);
+    final favoriteMarks = await _readFavoriteMarks(intentionIds);
     return [
       for (var index = 0; index < itemRows.length; index++)
         _rehydrateSummary(
           itemRows[index],
           _requireValidAggregate(aggregates[intentionIds[index]]),
           tags[intentionIds[index]] ??
+              (throw const _StoredIntentionCorruption()),
+          favoriteMarks[intentionIds[index]] ??
               (throw const _StoredIntentionCorruption()),
         ),
     ];
@@ -1388,6 +1388,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     ({IntentionId intentionId, _StoredIntentionDetail stored}) row,
     RelationCounts relationCounts,
     List<tag_domain.Tag> tags,
+    domain.FavoriteMark favoriteMark,
   ) => IntentionSummary(
     id: row.intentionId,
     title: row.stored.title,
@@ -1398,7 +1399,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     createdAt: row.stored.createdAt,
     updatedAt: row.stored.updatedAt,
     tags: tags,
-    favoriteMark: _unreadFavoriteMark,
+    favoriteMark: favoriteMark,
   );
 
   _DriftIntentionCatalogCursor _cursorAt(
@@ -1447,7 +1448,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
         tags: tags[intention.id] ?? (throw const _StoredIntentionCorruption()),
-        favoriteMark: _unreadFavoriteMark,
+        favoriteMark: await _readFavoriteMark(intention.id),
       ),
       storedTitleSearchKey: stored.titleSearchKey,
     );
