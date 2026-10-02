@@ -1,8 +1,10 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -728,4 +730,279 @@ void main() {
     );
     expect(repository.queries, hasLength(1));
   });
+
+  group('отметка избранного', () {
+    test('отметка и её снятие обновляют загруженную строку на месте во всех '
+        'четырёх порядках', () async {
+      for (final order in [
+        IntentionCatalogOrder.createdAtDescending,
+        IntentionCatalogOrder.createdAtAscending,
+        IntentionCatalogOrder.updatedAtDescending,
+        IntentionCatalogOrder.updatedAtAscending,
+      ]) {
+        final reason = '${order.field}/${order.direction}';
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(
+          repository,
+          pageSize: 2,
+          prefetchRemaining: 1,
+        );
+        final provider = intentionCatalogViewModelProvider(
+          const BrowseIntentionCatalog(),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        final notifier = container.read(provider.notifier);
+        if (order != IntentionCatalogOrder.createdAtDescending) {
+          notifier.changeOrder(order);
+          await waitForCatalogQueries(repository, 2);
+        }
+        IntentionCatalogLoaded loaded() =>
+            container.read(provider).requireValue as IntentionCatalogLoaded;
+
+        // Пять совпадений в действующем порядке: две загруженные порции и
+        // одно намерение за границей загруженной части.
+        final ordered = [
+          for (final index in [5, 4, 3, 2, 1]) testSummary(index: index),
+        ]..sort(_compareBy(order));
+        final [first, second, third, fourth, outside] = ordered;
+        const firstCursor = TestCatalogCursor();
+        const secondCursor = TestCatalogCursor();
+        repository.complete(
+          repository.queries.length - 1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [first, second],
+              totalCount: 5,
+              nextCursor: firstCursor,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        final continuationIndex = repository.queries.length;
+        final load = notifier.loadNextPageIfNeeded(visibleIndex: 1);
+        await waitForCatalogQueries(repository, continuationIndex + 1);
+        repository.complete(
+          continuationIndex,
+          ResultSuccess(
+            IntentionCatalogContinuationPage(
+              items: [third, fourth],
+              nextCursor: secondCursor,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await load;
+        final readsBefore = repository.queries.length;
+        final before = loaded();
+        expect(before.items, [first, second, third, fourth], reason: reason);
+
+        var revision = 1;
+        Future<void> confirm(IntentionSummary target, FavoriteMark mark) =>
+            completeCatalogCommand(
+              container,
+              repository,
+              switch (mark) {
+                FavoriteMark.favorite => MarkIntentionFavorite(target.id),
+                FavoriteMark.notFavorite => UnmarkIntentionFavorite(target.id),
+              },
+              IntentionSaved(
+                _intentionOf(target),
+                catalogMutation: IntentionCatalogUpdated(
+                  revision: TestCatalogRevision(++revision),
+                  before: TestCatalogEntrySnapshot(
+                    _withMark(target, switch (mark) {
+                      FavoriteMark.favorite => FavoriteMark.notFavorite,
+                      FavoriteMark.notFavorite => FavoriteMark.favorite,
+                    }),
+                  ),
+                  after: TestCatalogEntrySnapshot(_withMark(target, mark)),
+                ),
+              ),
+            );
+
+        void expectInPlace(Map<IntentionId, FavoriteMark> marks) {
+          final current = loaded();
+          expect(
+            current.items.map((item) => item.id),
+            before.items.map((item) => item.id),
+            reason: reason,
+          );
+          for (final (index, item) in current.items.indexed) {
+            final unmarked = before.items[index];
+            expect(
+              item.favoriteMark,
+              marks[item.id] ?? FavoriteMark.notFavorite,
+              reason: '$reason: ${item.id}',
+            );
+            expect(item.createdAt, unmarked.createdAt, reason: reason);
+            expect(item.updatedAt, unmarked.updatedAt, reason: reason);
+            expect(item.title, unmarked.title, reason: reason);
+            expect(item.readiness, unmarked.readiness, reason: reason);
+            expect(item.archiveState, unmarked.archiveState, reason: reason);
+          }
+          expect(current.totalCount, 5, reason: reason);
+          expect(current.nextCursor, same(secondCursor), reason: reason);
+          expect(current.query, same(before.query), reason: reason);
+          expect(
+            current.continuation,
+            isA<IntentionCatalogContinuationIdle>(),
+            reason: reason,
+          );
+          expect(current.refresh, isA<IntentionCatalogRefreshIdle>());
+          expect(
+            current.revision.compareTo(TestCatalogRevision(revision)),
+            GraphRevisionOrder.same,
+            reason: reason,
+          );
+          expect(repository.queries, hasLength(readsBefore), reason: reason);
+          expect(repository.reconciliationQueries, isEmpty, reason: reason);
+        }
+
+        // Строка первой порции, строка на границе продолжения и строка
+        // второй порции обновляются на своих местах.
+        await confirm(first, FavoriteMark.favorite);
+        expectInPlace({first.id: FavoriteMark.favorite});
+        await confirm(fourth, FavoriteMark.favorite);
+        expectInPlace({
+          first.id: FavoriteMark.favorite,
+          fourth.id: FavoriteMark.favorite,
+        });
+        await confirm(third, FavoriteMark.favorite);
+        expectInPlace({
+          first.id: FavoriteMark.favorite,
+          third.id: FavoriteMark.favorite,
+          fourth.id: FavoriteMark.favorite,
+        });
+
+        // Намерение вне загруженной части строк не добавляет.
+        await confirm(outside, FavoriteMark.favorite);
+        expectInPlace({
+          first.id: FavoriteMark.favorite,
+          third.id: FavoriteMark.favorite,
+          fourth.id: FavoriteMark.favorite,
+        });
+        await confirm(outside, FavoriteMark.notFavorite);
+
+        await confirm(first, FavoriteMark.notFavorite);
+        await confirm(fourth, FavoriteMark.notFavorite);
+        expectInPlace({third.id: FavoriteMark.favorite});
+
+        subscription.close();
+        container.dispose();
+      }
+    });
+
+    test('повтор отметки и снятия без изменения не меняет выдачу', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(
+        repository,
+        pageSize: 2,
+        prefetchRemaining: 1,
+      );
+      final provider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final published = <IntentionCatalogState>[];
+      final subscription = container.listen(provider, (_, next) {
+        if (next.value case final state?) {
+          published.add(state);
+        }
+      }, fireImmediately: true);
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+
+      const cursor = TestCatalogCursor();
+      final favorite = testSummary(
+        index: 4,
+        favoriteMark: FavoriteMark.favorite,
+      );
+      final plain = testSummary(index: 3);
+      final outside = testSummary(index: 1);
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [favorite, plain],
+            totalCount: 4,
+            nextCursor: cursor,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      final before = await container.read(provider.future);
+      published.clear();
+
+      // Повтор не продвигает ревизию: снимок до и после один и тот же.
+      for (final (command, entry)
+          in <(ExistingIntentionCommand, IntentionSummary)>[
+            (MarkIntentionFavorite(favorite.id), favorite),
+            (UnmarkIntentionFavorite(plain.id), plain),
+            (UnmarkIntentionFavorite(outside.id), outside),
+          ]) {
+        await completeCatalogCommand(
+          container,
+          repository,
+          command,
+          IntentionSaved(
+            _intentionOf(entry),
+            catalogMutation: IntentionCatalogUnchanged(
+              revision: const TestCatalogRevision(1),
+              entry: TestCatalogEntrySnapshot(entry),
+            ),
+          ),
+        );
+      }
+
+      expect(container.read(provider).requireValue, same(before));
+      expect(published, isEmpty);
+      expect(repository.queries, hasLength(1));
+      expect(repository.reconciliationQueries, isEmpty);
+    });
+  });
 }
+
+/// Порядок выдачи фикстур: [testSummary] выводит обе временные метки из
+/// номера, поэтому положение намерения задаёт направление порядка.
+int Function(IntentionSummary, IntentionSummary) _compareBy(
+  IntentionCatalogOrder order,
+) => switch (order.direction) {
+  IntentionCatalogSortDirection.ascending => (
+    left,
+    right,
+  ) => left.createdAt.value.compareTo(right.createdAt.value),
+  IntentionCatalogSortDirection.descending => (
+    left,
+    right,
+  ) => right.createdAt.value.compareTo(left.createdAt.value),
+};
+
+/// Краткие данные того же намерения, отличающиеся только отметкой.
+IntentionSummary _withMark(IntentionSummary summary, FavoriteMark mark) =>
+    IntentionSummary(
+      id: summary.id,
+      title: summary.title,
+      hasDescription: summary.hasDescription,
+      readiness: summary.readiness,
+      archiveState: summary.archiveState,
+      activeRelationCount: summary.activeRelationCount,
+      createdAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      tags: summary.tags,
+      favoriteMark: mark,
+    );
+
+/// Намерение подтверждённой команды отметки: его поля отметка не меняет.
+Intention _intentionOf(IntentionSummary summary) => Intention(
+  id: summary.id,
+  title: summary.title,
+  description: null,
+  readiness: summary.readiness,
+  archiveState: summary.archiveState,
+  createdAt: summary.createdAt,
+  updatedAt: summary.updatedAt,
+);

@@ -1,4 +1,7 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
@@ -41,6 +44,10 @@ final _refreshRetry = find.descendant(
   of: _refreshStatus,
   matching: find.byType(FilledButton),
 );
+
+final _star = find.byIcon(Icons.star);
+
+Finder _row(int index) => find.byKey(ValueKey(testSummary(index: index).id));
 
 final _health = _tag(1, 'Здоровье');
 final _sport = _tag(2, 'Спорт');
@@ -335,6 +342,73 @@ void main() {
     });
   });
 
+  group('отметка избранного', () {
+    for (final viewAnchor in IntentionSearchResultsViewAnchor.values) {
+      testWidgets('подтверждённые отметка и её снятие меняют только звезду '
+          'видимой строки прокрученного списка (${viewAnchor.name})', (
+        tester,
+      ) async {
+        final h = await _open(tester, viewAnchor: viewAnchor);
+        await h.load(_summaries(first: 40));
+        h.position.jumpTo(300);
+        await _settle(tester);
+        final rowTops = {
+          for (final index in [34, 33, 32])
+            index: _rowTop(tester, 'Намерение $index'),
+        };
+        final before = h.confirmed as IntentionCatalogLoaded;
+        expect(_star, findsNothing);
+
+        for (final mark in [FavoriteMark.favorite, FavoriteMark.notFavorite]) {
+          await h.confirmMark(33, mark);
+
+          expect(
+            find.descendant(of: _row(33), matching: _star),
+            mark == FavoriteMark.favorite ? findsOneWidget : findsNothing,
+          );
+          expect(
+            _star.evaluate().length,
+            mark == FavoriteMark.favorite ? 1 : 0,
+          );
+          expect(h.position.pixels, 300);
+          for (final MapEntry(key: index, value: top) in rowTops.entries) {
+            expect(_rowTop(tester, 'Намерение $index'), top);
+          }
+          final current = h.confirmed as IntentionCatalogLoaded;
+          expect(
+            current.items.map((item) => item.id),
+            before.items.map((item) => item.id),
+          );
+          expect(current.totalCount, 40);
+          expect(find.text('Всего намерений: 40'), findsOneWidget);
+          expect(tester.getSize(_refreshStatus).height, 0);
+        }
+        expect(h.repository.queries, hasLength(2));
+        expect(h.repository.reconciliationQueries, isEmpty);
+      });
+    }
+
+    testWidgets('отметка намерения вне загруженной части не меняет строки и '
+        'позицию', (tester) async {
+      final h = await _open(tester);
+      await h.load(_summaries(first: 40));
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final rowTop = _rowTop(tester, 'Намерение 33');
+      final before = h.confirmed as IntentionCatalogLoaded;
+
+      // Намерение без обязательного тега в выдачу не входит.
+      await h.confirmMark(77, FavoriteMark.favorite, tags: const []);
+
+      final current = h.confirmed as IntentionCatalogLoaded;
+      expect(current.items, before.items);
+      expect(current.totalCount, 40);
+      expect(_star, findsNothing);
+      expect(h.position.pixels, 300);
+      expect(_rowTop(tester, 'Намерение 33'), rowTop);
+    });
+  });
+
   group('состояния без выдачи', () {
     testWidgets('загрузка и устранимая недоступность показаны сообщениями '
         'страницы, а повтор читает первую порцию заново', (tester) async {
@@ -408,8 +482,18 @@ final class _Host extends ConsumerWidget {
       ),
       totalCountLabel: localizations.catalogTotalCount,
       emptyMessage: (empty) => localizations.catalogActiveEmpty,
-      itemBuilder: (context, results, summary) =>
-          SizedBox(height: _rowExtent, child: Text(summary.title)),
+      itemBuilder: (context, results, summary) => SizedBox(
+        key: ValueKey(summary.id),
+        height: _rowExtent,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: Text(summary.title)),
+            if (summary.favoriteMark == FavoriteMark.favorite)
+              const Icon(Icons.star),
+          ],
+        ),
+      ),
       viewAnchor: viewAnchor,
       trailingInset: trailingInset,
     );
@@ -457,6 +541,51 @@ final class _Harness {
 
   Future<void> complete(TagCommand command, TagCommandResult result) async {
     final accepted = acceptTagCommand(_container, repository, command, result);
+    await accepted.future;
+    await _settle(_tester);
+  }
+
+  /// Подтверждает отметку либо её снятие: краткие снимки до и после
+  /// различаются только отметкой.
+  Future<void> confirmMark(
+    int index,
+    FavoriteMark mark, {
+    List<Tag>? tags,
+  }) async {
+    IntentionSummary summary(FavoriteMark mark) => testSummary(
+      index: index,
+      title: 'Намерение $index',
+      tags: tags ?? [_health],
+      favoriteMark: mark,
+    );
+    final after = summary(mark);
+    final commandIndex = repository.commands.length;
+    final accepted =
+        _container
+                .read(graphCommandCoordinatorProvider.notifier)
+                .acceptExisting(switch (mark) {
+                  FavoriteMark.favorite => MarkIntentionFavorite(after.id),
+                  FavoriteMark.notFavorite => UnmarkIntentionFavorite(after.id),
+                }, presentationTitle: after.title)
+            as IntentionCommandAccepted;
+    repository.completeCommand(
+      commandIndex,
+      ResultSuccess(
+        IntentionSaved(
+          testIntention(index: index, title: after.title),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: TestCatalogRevision(++revision),
+            before: TestCatalogEntrySnapshot(
+              summary(switch (mark) {
+                FavoriteMark.favorite => FavoriteMark.notFavorite,
+                FavoriteMark.notFavorite => FavoriteMark.favorite,
+              }),
+            ),
+            after: TestCatalogEntrySnapshot(after),
+          ),
+        ),
+      ),
+    );
     await accepted.future;
     await _settle(_tester);
   }
