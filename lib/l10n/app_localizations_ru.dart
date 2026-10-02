@@ -632,6 +632,21 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось изменить отметку избранного из-за непредвиденной ошибки.';
 
   @override
+  String get detailsFavoriteMarkLabel => 'Избранное намерение';
+
+  @override
+  String get detailsFavoriteMarkStateMarked => 'Отмечено';
+
+  @override
+  String get detailsFavoriteMarkStateNotMarked => 'Не отмечено';
+
+  @override
+  String get detailsMarkFavoriteAction => 'Отметить избранным';
+
+  @override
+  String get detailsUnmarkFavoriteAction => 'Снять отметку избранного';
+
+  @override
   String get detailsDeleteInvalid => 'Не удалось удалить намерение.';
 
   @override

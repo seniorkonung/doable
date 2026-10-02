@@ -659,6 +659,26 @@
   "@detailsFavoriteMarkUnexpected": {
     "description": "Терминальная непредвиденная ошибка изменения отметки избранного"
   },
+  "detailsFavoriteMarkLabel": "Favorite intention",
+  "@detailsFavoriteMarkLabel": {
+    "description": "Название управления отметкой избранного в шапке страницы намерения для экранного диктора"
+  },
+  "detailsFavoriteMarkStateMarked": "Marked",
+  "@detailsFavoriteMarkStateMarked": {
+    "description": "Состояние управления отметкой: намерение избранное"
+  },
+  "detailsFavoriteMarkStateNotMarked": "Not marked",
+  "@detailsFavoriteMarkStateNotMarked": {
+    "description": "Состояние управления отметкой: намерение не избранное"
+  },
+  "detailsMarkFavoriteAction": "Mark as favorite",
+  "@detailsMarkFavoriteAction": {
+    "description": "Подсказка действия отметки намерения избранным"
+  },
+  "detailsUnmarkFavoriteAction": "Remove favorite mark",
+  "@detailsUnmarkFavoriteAction": {
+    "description": "Подсказка действия снятия отметки избранного"
+  },
   "detailsDeleteInvalid": "The intention couldn’t be deleted.",
   "@detailsDeleteInvalid": {
     "description": "Безопасная ошибка недопустимого физического удаления"

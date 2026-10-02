@@ -78,7 +78,19 @@ final class _IntentionDetailsPageState
       }
     });
     return Scaffold(
-      appBar: AppBar(title: Text(localizations.detailsTitle)),
+      appBar: AppBar(
+        title: Text(localizations.detailsTitle),
+        actions: [
+          // Отметка входит в подробные данные: без них управления нет, и
+          // отметка не изображается отсутствующей.
+          if (details is IntentionDetailsLoaded)
+            _FavoriteMarkControl(
+              state: details,
+              onMark: ref.read(provider.notifier).markFavorite,
+              onUnmark: ref.read(provider.notifier).unmarkFavorite,
+            ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -93,6 +105,59 @@ final class _IntentionDetailsPageState
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Управление отметкой избранного в шапке страницы намерения.
+///
+/// Показывает только подтверждённую отметку: значок меняет форму после
+/// подтверждённого снимка, а не после нажатия.
+final class _FavoriteMarkControl extends StatelessWidget {
+  const _FavoriteMarkControl({
+    required this.state,
+    required this.onMark,
+    required this.onUnmark,
+  });
+
+  final IntentionDetailsLoaded state;
+  final VoidCallback onMark;
+  final VoidCallback onUnmark;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final (
+      icon,
+      value,
+      action,
+      onPressed,
+    ) = switch (state.details.favoriteMark) {
+      FavoriteMark.favorite => (
+        Icons.star,
+        localizations.detailsFavoriteMarkStateMarked,
+        localizations.detailsUnmarkFavoriteAction,
+        onUnmark,
+      ),
+      FavoriteMark.notFavorite => (
+        Icons.star_border,
+        localizations.detailsFavoriteMarkStateNotMarked,
+        localizations.detailsMarkFavoriteAction,
+        onMark,
+      ),
+    };
+    final enabled = !state.isOperationRunning && state.edit == null;
+    return MergeSemantics(
+      child: Semantics(
+        label: localizations.detailsFavoriteMarkLabel,
+        value: value,
+        child: IconButton(
+          key: const ValueKey('intention-details-favorite-mark'),
+          tooltip: action,
+          onPressed: enabled ? onPressed : null,
+          icon: Icon(icon),
         ),
       ),
     );
@@ -620,10 +685,22 @@ final class _DetailsActions extends StatelessWidget {
     final stateChange = state.stateChange;
     final operation = stateChange?.operation;
     return switch (operation) {
-      OperationFailed<Intention>(:final failure) =>
-        stateChange!.kind == IntentionDetailsStateChangeKind.delete
-            ? _deleteFailureMessage(localizations, failure)
-            : _stateChangeFailureMessage(localizations, failure),
+      OperationFailed<Intention>(:final failure) => switch (stateChange!.kind) {
+        IntentionDetailsStateChangeKind.delete => _deleteFailureMessage(
+          localizations,
+          failure,
+        ),
+        IntentionDetailsStateChangeKind.markFavorite ||
+        IntentionDetailsStateChangeKind.unmarkFavorite =>
+          _favoriteMarkFailureMessage(localizations, failure),
+        IntentionDetailsStateChangeKind.enableReadiness ||
+        IntentionDetailsStateChangeKind.disableReadiness ||
+        IntentionDetailsStateChangeKind.archive ||
+        IntentionDetailsStateChangeKind.restore => _stateChangeFailureMessage(
+          localizations,
+          failure,
+        ),
+      },
       null ||
       OperationIdle<Intention>() ||
       OperationRunning<Intention>() ||
@@ -644,6 +721,23 @@ final class _DetailsActions extends StatelessWidget {
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
+  };
+
+  String _favoriteMarkFailureMessage(
+    AppLocalizations localizations,
+    IntentionFailure failure,
+  ) => switch (failure) {
+    IntentionGenericValidationFailure() ||
+    IntentionTextInputValidationFailure() =>
+      localizations.detailsFavoriteMarkInvalid,
+    IntentionNotFoundFailure() => localizations.detailsFavoriteMarkNotFound,
+    IntentionConflictFailure() => localizations.detailsFavoriteMarkConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsFavoriteMarkUnexpected,
+    IntentionUnavailableFailure() =>
+      localizations.detailsFavoriteMarkUnavailable,
+    IntentionCorruptionFailure() => localizations.detailsFavoriteMarkCorruption,
+    IntentionUnexpectedFailure() => localizations.detailsFavoriteMarkUnexpected,
   };
 
   String _stateChangeFailureMessage(

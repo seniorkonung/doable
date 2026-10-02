@@ -631,6 +631,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'The favorite mark couldn’t be changed because of an unexpected error.';
 
   @override
+  String get detailsFavoriteMarkLabel => 'Favorite intention';
+
+  @override
+  String get detailsFavoriteMarkStateMarked => 'Marked';
+
+  @override
+  String get detailsFavoriteMarkStateNotMarked => 'Not marked';
+
+  @override
+  String get detailsMarkFavoriteAction => 'Mark as favorite';
+
+  @override
+  String get detailsUnmarkFavoriteAction => 'Remove favorite mark';
+
+  @override
   String get detailsDeleteInvalid => 'The intention couldn’t be deleted.';
 
   @override

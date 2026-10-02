@@ -1136,6 +1136,36 @@ abstract class AppLocalizations {
   /// **'The favorite mark couldn’t be changed because of an unexpected error.'**
   String get detailsFavoriteMarkUnexpected;
 
+  /// Название управления отметкой избранного в шапке страницы намерения для экранного диктора
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intention'**
+  String get detailsFavoriteMarkLabel;
+
+  /// Состояние управления отметкой: намерение избранное
+  ///
+  /// In en, this message translates to:
+  /// **'Marked'**
+  String get detailsFavoriteMarkStateMarked;
+
+  /// Состояние управления отметкой: намерение не избранное
+  ///
+  /// In en, this message translates to:
+  /// **'Not marked'**
+  String get detailsFavoriteMarkStateNotMarked;
+
+  /// Подсказка действия отметки намерения избранным
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as favorite'**
+  String get detailsMarkFavoriteAction;
+
+  /// Подсказка действия снятия отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'Remove favorite mark'**
+  String get detailsUnmarkFavoriteAction;
+
   /// Безопасная ошибка недопустимого физического удаления
   ///
   /// In en, this message translates to:
