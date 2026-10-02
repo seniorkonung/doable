@@ -843,6 +843,199 @@ void main() {
     });
   });
 
+  group('неактуальное состояние восстанавливается любым следующим пакетом', () {
+    const failures = <(String, FavoriteIntentionsReadFailure)>[
+      ('недоступности', FavoriteIntentionsUnavailableFailure()),
+      ('повреждения', FavoriteIntentionsCorruptionFailure()),
+      ('неизвестного отказа', FavoriteIntentionsUnexpectedFailure()),
+    ];
+
+    /// Список А, Б ревизии 1, обновление которого после отметки В на ревизии
+    /// 2 завершилось отказом [failure].
+    Future<HomeHarness> staleHome(FavoriteIntentionsReadFailure failure) async {
+      final h = await loadedHome();
+      await confirmMarkC(h, revision: 2);
+      h.repository.failRead(1, failure);
+      await pumpEventQueue();
+      expect((h.state as HomeList).freshness, isA<HomeFreshnessStale>());
+      expect(h.repository.readCount, 2);
+      return h;
+    }
+
+    final abc = [homeTestRow(1, 'А'), homeTestRow(2, 'Б'), homeTestRow(3, 'В')];
+
+    for (final (name, failure) in failures) {
+      test('пакет, не затрагивающий избранное, после $name вызывает чтение и '
+          'возвращает текущую актуальность', () async {
+        final h = await staleHome(failure);
+
+        await confirmRenameX(h, revision: 3);
+
+        expectRefreshingAB(h);
+        expect(h.repository.readCount, 3);
+
+        h.repository.completeRead(2, items: abc, revision: 3);
+        await pumpEventQueue();
+
+        expect(ids(h), [a, b, c]);
+        final list = h.state as HomeList;
+        expect(list.freshness, isA<HomeFreshnessCurrent>());
+        expect((list.revision as HomeTestRevision).number, 3);
+        expect(h.repository.readCount, 3);
+      });
+    }
+
+    test('пакет, не затрагивающий избранное, при неактуальном пустом '
+        'состоянии вызывает чтение', () async {
+      final h = HomeHarness();
+      addTearDown(h.dispose);
+      h.repository.completeRead(0, archivedCount: 2);
+      await pumpEventQueue();
+      await confirmMarkC(h, revision: 2);
+      h.repository.failRead(1, const FavoriteIntentionsCorruptionFailure());
+      await pumpEventQueue();
+      expect((h.state as HomeEmpty).freshness, isA<HomeFreshnessStale>());
+
+      await confirmRenameX(h, revision: 3);
+
+      final refreshing = h.state as HomeEmpty;
+      expect(refreshing.reason, HomeEmptyReason.allArchived);
+      expect(refreshing.freshness, isA<HomeFreshnessRefreshing>());
+      expect(h.repository.readCount, 3);
+
+      h.repository.completeRead(
+        2,
+        items: [homeTestRow(3, 'В')],
+        archivedCount: 2,
+        revision: 3,
+      );
+      await pumpEventQueue();
+
+      expect(ids(h), [c]);
+      expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
+    });
+
+    test('снимок старше ревизии вызвавшего чтение пакета не '
+        'публикуется', () async {
+      final h = await staleHome(const FavoriteIntentionsCorruptionFailure());
+
+      await confirmRenameX(h, revision: 3);
+      h.repository.completeRead(2, items: abc, revision: 2);
+      await pumpEventQueue();
+
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 4);
+
+      h.repository.completeRead(3, items: abc, revision: 3);
+      await pumpEventQueue();
+
+      expect(ids(h), [a, b, c]);
+      expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
+      expect(h.repository.readCount, 4);
+    });
+
+    test('повторный отказ сохраняет прежний список с причиной последнего '
+        'отказа, а следующий пакет снова повторяет обновление', () async {
+      final h = await staleHome(const FavoriteIntentionsUnavailableFailure());
+
+      await confirmRenameX(h, revision: 3);
+      h.repository.failRead(2, const FavoriteIntentionsCorruptionFailure());
+      await pumpEventQueue();
+
+      final list = h.state as HomeList;
+      expect(list.items.map((row) => row.id), [a, b]);
+      expect((list.revision as HomeTestRevision).number, 1);
+      final stale = list.freshness as HomeFreshnessStale;
+      expect(stale.failure, isA<FavoriteIntentionsCorruptionFailure>());
+      expect(stale.canRetry, isFalse);
+      // Без нового пакета и явного повтора чтение не повторяется.
+      expect(h.repository.readCount, 3);
+
+      await confirmRenameX(h, revision: 4);
+
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 4);
+
+      h.repository.completeRead(3, items: abc, revision: 4);
+      await pumpEventQueue();
+
+      expect(ids(h), [a, b, c]);
+      expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
+    });
+
+    test('пакет во время повторного чтения не запускает параллельного и '
+        'после его неуспеха даёт ещё одно', () async {
+      final h = await staleHome(const FavoriteIntentionsUnexpectedFailure());
+
+      await confirmRenameX(h, revision: 3);
+      expect(h.repository.readCount, 3);
+      await confirmRenameX(h, revision: 4);
+
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 3);
+
+      h.repository.failRead(2, const FavoriteIntentionsUnavailableFailure());
+      await pumpEventQueue();
+
+      // Отказ чтения, начатого до пакета ревизии 4, не публикуется.
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 4);
+
+      h.repository.completeRead(3, items: abc, revision: 4);
+      await pumpEventQueue();
+
+      expect(ids(h), [a, b, c]);
+      expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
+      expect(h.repository.readCount, 4);
+    });
+
+    test('пакет во время явного повтора неактуального списка после его '
+        'неуспеха даёт ещё одно чтение', () async {
+      final h = await staleHome(const FavoriteIntentionsUnavailableFailure());
+
+      h.model.retry();
+      expect(h.repository.readCount, 3);
+      await confirmRenameX(h, revision: 3);
+      expect(h.repository.readCount, 3);
+
+      h.repository.failRead(2, const FavoriteIntentionsUnavailableFailure());
+      await pumpEventQueue();
+
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 4);
+    });
+
+    test('после восстановления актуальности пакет, не затрагивающий '
+        'избранное, чтения не вызывает', () async {
+      final h = await staleHome(const FavoriteIntentionsCorruptionFailure());
+      await confirmRenameX(h, revision: 3);
+      h.repository.completeRead(2, items: abc, revision: 3);
+      await pumpEventQueue();
+      final restored = h.state;
+      expect((restored as HomeList).freshness, isA<HomeFreshnessCurrent>());
+
+      await confirmRenameX(h, revision: 4);
+
+      expect(h.state, same(restored));
+      expect(h.repository.readCount, 3);
+    });
+
+    test('после восстановления явным повтором пакет, не затрагивающий '
+        'избранное, чтения не вызывает', () async {
+      final h = await staleHome(const FavoriteIntentionsUnavailableFailure());
+      h.model.retry();
+      h.repository.completeRead(2, items: abc, revision: 2);
+      await pumpEventQueue();
+      final restored = h.state;
+      expect((restored as HomeList).freshness, isA<HomeFreshnessCurrent>());
+
+      await confirmRenameX(h, revision: 3);
+
+      expect(h.state, same(restored));
+      expect(h.repository.readCount, 3);
+    });
+  });
+
   test('после закрытия Главной пакет чтения не запускает', () async {
     final h = HomeHarness();
     h.repository.completeRead(0, items: [homeTestRow(1, 'А')]);

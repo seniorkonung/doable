@@ -15,6 +15,17 @@ import 'home_state.dart';
 
 part 'home_view_model.g.dart';
 
+/// Вид подтверждённого пакета, который повторяет обновление Главной.
+enum _RefreshTrigger {
+  /// Только пакет, затрагивающий избранное: показанное актуально либо снимка
+  /// ещё нет.
+  favoriteChange,
+
+  /// Пакет любого состава: показанный снимок не обновлён, и неактуальность
+  /// длится до успешного получения.
+  anyPackage,
+}
+
 @riverpod
 final class HomeViewModel extends _$HomeViewModel {
   static const _maxStaleReads = 8;
@@ -22,8 +33,9 @@ final class HomeViewModel extends _$HomeViewModel {
   late FavoriteReadContract _favorites;
   StreamSubscription<GraphCommandCompletion>? _completions;
   int _generation = 0;
+  _RefreshTrigger _refreshTrigger = _RefreshTrigger.favoriteChange;
 
-  /// Ревизия последнего подтверждённого пакета, затронувшего избранное:
+  /// Ревизия последнего подтверждённого пакета, потребовавшего обновления:
   /// снимок старше неё не публикуется.
   GraphRevision? _requiredRevision;
   Future<void>? _activeRequest;
@@ -43,6 +55,7 @@ final class HomeViewModel extends _$HomeViewModel {
     _favorites = ref.watch(personalGraphRepositoryProvider);
     final coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     _generation++;
+    _refreshTrigger = _RefreshTrigger.favoriteChange;
     _requiredRevision = null;
     _activeRequest = null;
     _refreshNeeded = false;
@@ -75,13 +88,20 @@ final class HomeViewModel extends _$HomeViewModel {
   }
 
   /// Перечитывает полный снимок, когда подтверждённый пакет затрагивает
-  /// избранное; согласование не зависит от предъявления результата операции.
+  /// избранное, а пока показанный снимок не обновлён — при пакете любого
+  /// состава; согласование не зависит от предъявления результата операции.
   void _onCompletion(GraphCommandCompletion completion) {
     if (!ref.mounted) return;
     final package = completion.confirmedChange;
     if (package == null) return;
     final current = state;
-    if (!_affectsFavorites(package, current)) return;
+    final affectsFavorites = _affectsFavorites(package, current);
+    switch (_refreshTrigger) {
+      case _RefreshTrigger.favoriteChange:
+        if (!affectsFavorites) return;
+      case _RefreshTrigger.anyPackage:
+        break;
+    }
     final required = _requiredRevision;
     if (required == null ||
         switch (package.revision.compareTo(required)) {
@@ -187,6 +207,7 @@ final class HomeViewModel extends _$HomeViewModel {
         }
         _refreshNeeded = false;
         _staleReadAttempts = 0;
+        _refreshTrigger = _RefreshTrigger.favoriteChange;
         state = _loaded(value);
       case GraphResultFailure(:final failure):
         // Пакет, пришедший во время отказавшего чтения, даёт ещё одно.
@@ -215,14 +236,20 @@ final class HomeViewModel extends _$HomeViewModel {
   /// отказ без показанного снимка остаётся отказом получения.
   void _readFailure(FavoriteIntentionsReadFailure failure) {
     final current = state;
-    state = switch (current) {
-      HomeLoaded() => current.withFreshness(HomeFreshnessStale(failure)),
-      _ => switch (failure) {
-        FavoriteIntentionsUnavailableFailure() => const HomeUnavailable(),
-        FavoriteIntentionsCorruptionFailure() => const HomeCorruption(),
-        FavoriteIntentionsUnexpectedFailure() => const HomeUnexpected(),
-      },
-    };
+    switch (current) {
+      case HomeLoaded():
+        _refreshTrigger = _RefreshTrigger.anyPackage;
+        state = current.withFreshness(HomeFreshnessStale(failure));
+      case HomeLoading() ||
+          HomeUnavailable() ||
+          HomeCorruption() ||
+          HomeUnexpected():
+        state = switch (failure) {
+          FavoriteIntentionsUnavailableFailure() => const HomeUnavailable(),
+          FavoriteIntentionsCorruptionFailure() => const HomeCorruption(),
+          FavoriteIntentionsUnexpectedFailure() => const HomeUnexpected(),
+        };
+    }
   }
 
   bool _precedes(GraphRevision revision, GraphRevision other) =>
