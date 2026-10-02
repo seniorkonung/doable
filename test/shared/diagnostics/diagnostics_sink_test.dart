@@ -401,6 +401,104 @@ void main() {
       },
     );
 
+    test('отметка избранного и её снятие кодируются видом команды намерения '
+        'с этапом и безопасной категорией', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      for (final event in const [
+        IntentionCommandDiagnosticsEvent.markFavorite(
+          stage: FavoriteMarkCommandDiagnosticsStage.write,
+          status: DiagnosticsSucceeded(Duration(milliseconds: 2)),
+        ),
+        IntentionCommandDiagnosticsEvent.unmarkFavorite(
+          stage: FavoriteMarkCommandDiagnosticsStage.validation,
+          status: DiagnosticsFailed(
+            duration: Duration(milliseconds: 3),
+            code: DiagnosticsFailureCode.notFound,
+          ),
+        ),
+        IntentionCommandDiagnosticsEvent.markFavorite(
+          stage: FavoriteMarkCommandDiagnosticsStage.write,
+          status: DiagnosticsFailed(
+            duration: Duration(milliseconds: 4),
+            code: DiagnosticsFailureCode.unavailable,
+          ),
+        ),
+      ]) {
+        sink.record(event);
+      }
+
+      expect(messages.map(jsonDecode), [
+        {
+          'operation': 'intentionCommand',
+          'stage': 'write',
+          'outcome': 'succeeded',
+          'durationMicros': 2000,
+          'commandType': 'markFavorite',
+        },
+        {
+          'operation': 'intentionCommand',
+          'stage': 'validation',
+          'outcome': 'failed',
+          'durationMicros': 3000,
+          'failureCode': 'notFound',
+          'commandType': 'unmarkFavorite',
+        },
+        {
+          'operation': 'intentionCommand',
+          'stage': 'write',
+          'outcome': 'failed',
+          'durationMicros': 4000,
+          'failureCode': 'unavailable',
+          'commandType': 'markFavorite',
+        },
+      ]);
+    });
+
+    test('этап несут только отметка избранного и её снятие', () {
+      for (final commandType in IntentionCommandDiagnosticsType.values) {
+        IntentionCommandDiagnosticsEvent withoutStage() =>
+            IntentionCommandDiagnosticsEvent(
+              commandType: commandType,
+              status: const DiagnosticsStarted(),
+            );
+
+        switch (commandType) {
+          case IntentionCommandDiagnosticsType.markFavorite ||
+              IntentionCommandDiagnosticsType.unmarkFavorite:
+            expect(withoutStage, throwsAssertionError);
+          case IntentionCommandDiagnosticsType.create ||
+              IntentionCommandDiagnosticsType.update ||
+              IntentionCommandDiagnosticsType.enableReadiness ||
+              IntentionCommandDiagnosticsType.disableReadiness ||
+              IntentionCommandDiagnosticsType.archive ||
+              IntentionCommandDiagnosticsType.restore ||
+              IntentionCommandDiagnosticsType.delete:
+            expect(withoutStage().stage, isNull);
+        }
+      }
+    });
+
+    test('падающий писатель не повторяет диагностическое событие отметки', () {
+      var attempts = 0;
+      final sink = DeveloperDiagnosticsSink((_) {
+        attempts++;
+        throw StateError('CANARY-diagnostics-writer-failure');
+      });
+
+      expect(
+        () => sink.record(
+          const IntentionCommandDiagnosticsEvent.markFavorite(
+            stage: FavoriteMarkCommandDiagnosticsStage.write,
+            status: DiagnosticsSucceeded(Duration(milliseconds: 1)),
+          ),
+        ),
+        returnsNormally,
+      );
+      expect(attempts, 1);
+    });
+
     test('падающий получатель не влияет на исход дневной операции', () {
       final sink = _ThrowingDiagnosticsSink();
       const event = DailyChoiceCommandDiagnosticsEvent(

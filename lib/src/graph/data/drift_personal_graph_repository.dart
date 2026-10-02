@@ -549,7 +549,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   Future<GraphCommandResult<IntentionCommandSuccess, IntentionFailure>>
   _executeIntention(IntentionCommand command) async {
     final stopwatch = Stopwatch()..start();
-    final commandType = _commandDiagnosticsType(command);
+    var favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.validation;
+    void onFavoriteMarkWrite() =>
+        favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.write;
 
     try {
       _validateCommandText(command);
@@ -575,8 +577,14 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
               domain.IntentionArchiveState.active,
             ),
             DeleteIntention() => _deleteIntention(command.id),
-            MarkIntentionFavorite() => _markFavorite(command.id),
-            UnmarkIntentionFavorite() => _unmarkFavorite(command.id),
+            MarkIntentionFavorite() => _markFavorite(
+              command.id,
+              onWrite: onFavoriteMarkWrite,
+            ),
+            UnmarkIntentionFavorite() => _unmarkFavorite(
+              command.id,
+              onWrite: onFavoriteMarkWrite,
+            ),
           },
         );
         if (committed.didMutate) {
@@ -591,8 +599,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         return result;
       });
       _recordDiagnostics(
-        IntentionCommandDiagnosticsEvent(
-          commandType: commandType,
+        _commandDiagnosticsEvent(
+          command,
+          favoriteMarkStage: favoriteMarkStage,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
       );
@@ -600,8 +609,9 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     } on Object catch (error) {
       final failure = _classifyCommandFailure(error, command);
       _recordDiagnostics(
-        IntentionCommandDiagnosticsEvent(
-          commandType: commandType,
+        _commandDiagnosticsEvent(
+          command,
+          favoriteMarkStage: favoriteMarkStage,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
             code: _diagnosticsFailureCode(failure),
@@ -2134,20 +2144,43 @@ void _validateCommandText(IntentionCommand command) {
   }
 }
 
-IntentionCommandDiagnosticsType _commandDiagnosticsType(
-  IntentionCommand command,
-) => switch (command) {
-  CreateIntention() => IntentionCommandDiagnosticsType.create,
-  UpdateIntention() => IntentionCommandDiagnosticsType.update,
-  EnableIntentionReadiness() => IntentionCommandDiagnosticsType.enableReadiness,
-  DisableIntentionReadiness() =>
-    IntentionCommandDiagnosticsType.disableReadiness,
-  ArchiveIntention() => IntentionCommandDiagnosticsType.archive,
-  RestoreIntention() => IntentionCommandDiagnosticsType.restore,
-  DeleteIntention() => IntentionCommandDiagnosticsType.delete,
-  MarkIntentionFavorite() => IntentionCommandDiagnosticsType.markFavorite,
-  UnmarkIntentionFavorite() => IntentionCommandDiagnosticsType.unmarkFavorite,
-};
+/// Событие диагностики команды намерения. Этап [favoriteMarkStage] несут
+/// только отметка избранного и её снятие.
+IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
+  IntentionCommand command, {
+  required FavoriteMarkCommandDiagnosticsStage favoriteMarkStage,
+  required DiagnosticsStatus status,
+}) {
+  IntentionCommandDiagnosticsEvent event(
+    IntentionCommandDiagnosticsType commandType,
+  ) => IntentionCommandDiagnosticsEvent(
+    commandType: commandType,
+    status: status,
+  );
+
+  return switch (command) {
+    CreateIntention() => event(IntentionCommandDiagnosticsType.create),
+    UpdateIntention() => event(IntentionCommandDiagnosticsType.update),
+    EnableIntentionReadiness() => event(
+      IntentionCommandDiagnosticsType.enableReadiness,
+    ),
+    DisableIntentionReadiness() => event(
+      IntentionCommandDiagnosticsType.disableReadiness,
+    ),
+    ArchiveIntention() => event(IntentionCommandDiagnosticsType.archive),
+    RestoreIntention() => event(IntentionCommandDiagnosticsType.restore),
+    DeleteIntention() => event(IntentionCommandDiagnosticsType.delete),
+    MarkIntentionFavorite() => IntentionCommandDiagnosticsEvent.markFavorite(
+      stage: favoriteMarkStage,
+      status: status,
+    ),
+    UnmarkIntentionFavorite() =>
+      IntentionCommandDiagnosticsEvent.unmarkFavorite(
+        stage: favoriteMarkStage,
+        status: status,
+      ),
+  };
+}
 
 DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
     switch (failure) {

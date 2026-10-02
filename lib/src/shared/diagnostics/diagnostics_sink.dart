@@ -62,6 +62,15 @@ enum IntentionCommandDiagnosticsType {
   unmarkFavorite,
 }
 
+/// Этап команды отметки избранного или её снятия.
+enum FavoriteMarkCommandDiagnosticsStage {
+  /// Проверка существования намерения и его текущей отметки.
+  validation,
+
+  /// Запись отметки и подтверждение её результата.
+  write,
+}
+
 enum LongTermRelationCommandDiagnosticsType {
   create,
   update,
@@ -327,13 +336,37 @@ final class SelectedRelationsReadDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(status);
 }
 
+/// Команда намерения.
+///
+/// Конструкторы допускают только согласованные сочетания вида команды и
+/// этапа: этап есть ровно у отметки избранного и её снятия.
 final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
+  /// Команда намерения, кроме отметки избранного и её снятия.
   const IntentionCommandDiagnosticsEvent({
     required this.commandType,
     required DiagnosticsStatus status,
-  }) : super(status);
+  }) : assert(
+         commandType != IntentionCommandDiagnosticsType.markFavorite &&
+             commandType != IntentionCommandDiagnosticsType.unmarkFavorite,
+         'Отметка избранного и её снятие несут этап.',
+       ),
+       stage = null,
+       super(status);
+
+  const IntentionCommandDiagnosticsEvent.markFavorite({
+    required FavoriteMarkCommandDiagnosticsStage this.stage,
+    required DiagnosticsStatus status,
+  }) : commandType = IntentionCommandDiagnosticsType.markFavorite,
+       super(status);
+
+  const IntentionCommandDiagnosticsEvent.unmarkFavorite({
+    required FavoriteMarkCommandDiagnosticsStage this.stage,
+    required DiagnosticsStatus status,
+  }) : commandType = IntentionCommandDiagnosticsType.unmarkFavorite,
+       super(status);
 
   final IntentionCommandDiagnosticsType commandType;
+  final FavoriteMarkCommandDiagnosticsStage? stage;
 }
 
 final class LongTermRelationCommandDiagnosticsEvent extends DiagnosticsEvent {

@@ -171,8 +171,9 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'operation': 'selectedRelationsRead',
     ..._encodeStatus(event.status),
   },
-  IntentionCommandDiagnosticsEvent(:final commandType) => {
+  IntentionCommandDiagnosticsEvent(:final commandType, :final stage) => {
     'operation': 'intentionCommand',
+    'stage': ?stage?.name,
     ..._encodeStatus(event.status),
     'commandType': commandType.name,
   },
