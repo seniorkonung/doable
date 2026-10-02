@@ -1106,6 +1106,155 @@ void main() {
     expect(find.text('Total intentions: 1'), findsOneWidget);
   });
 
+  for (final (language, markLabel, totalCount) in [
+    ('en', 'Favorite intention', 'Total intentions: 2'),
+    ('ru', 'Избранное намерение', 'Всего намерений: 2'),
+  ]) {
+    testWidgets('$language: без условий поиска звезду показывает только '
+        'избранное из одноимённых намерений, без действия и фильтра отметки', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledCatalogRepository();
+      await tester.pumpWidget(_testApp(repository, locale: Locale(language)));
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [
+              testSummary(
+                index: 1,
+                title: 'Гулять',
+                favoriteMark: FavoriteMark.favorite,
+              ),
+              testSummary(index: 2, title: 'Гулять'),
+            ],
+            totalCount: 2,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Условия поиска пусты: отметка показана без фильтра названия и тегов.
+      expect(repository.queryAt(0).titleFilter, isNull);
+      expect(repository.queryAt(0).tagFilter, IntentionTagFilter.empty);
+      expect(repository.queries, hasLength(1));
+
+      final rows = find.byType(IntentionSummaryView);
+      expect(rows, findsNWidgets(2));
+      expect(find.text('Гулять'), findsNWidgets(2));
+      expect(find.text(totalCount), findsOneWidget);
+      expect(find.byIcon(Icons.star), findsOneWidget);
+      expect(
+        find.descendant(of: rows.at(0), matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: rows.at(1), matching: find.byIcon(Icons.star)),
+        findsNothing,
+      );
+      expect(tester.getSemantics(rows.at(0)).label, contains(markLabel));
+      expect(tester.getSemantics(rows.at(1)).label, isNot(contains(markLabel)));
+
+      // Отметка — подпись строки: её нельзя поставить, снять или выбрать
+      // условием поиска.
+      expect(
+        find.ancestor(
+          of: find.byIcon(Icons.star),
+          matching: find.bySubtype<ButtonStyleButton>(),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.ancestor(
+          of: find.byIcon(Icons.star),
+          matching: find.byType(IconButton),
+        ),
+        findsNothing,
+      );
+      expect(find.byIcon(Icons.star_border), findsNothing);
+      expect(find.text(markLabel), findsNothing);
+      expect(find.byTooltip(markLabel), findsNothing);
+
+      semantics.dispose();
+    });
+  }
+
+  for (final (scopeName, scope, showsArchiveState) in [
+    ('Archived', IntentionScope.archived, false),
+    ('All', IntentionScope.all, true),
+  ]) {
+    testWidgets('охват $scopeName показывает звезду архивированного '
+        'избранного намерения', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledCatalogRepository();
+      await tester.pumpWidget(_testApp(repository));
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            nextCursor: null,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(scopeName).last);
+      await tester.pump();
+      expect(repository.queryAt(1).scope, scope);
+      repository.complete(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [
+              testSummary(
+                index: 1,
+                title: 'Архивное избранное',
+                archiveState: IntentionArchiveState.archived,
+                favoriteMark: FavoriteMark.favorite,
+              ),
+              testSummary(
+                index: 2,
+                title: 'Архивное обычное',
+                archiveState: IntentionArchiveState.archived,
+              ),
+            ],
+            totalCount: 2,
+            nextCursor: null,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final favorite = find.ancestor(
+        of: find.text('Архивное избранное'),
+        matching: find.byType(IntentionSummaryView),
+      );
+      expect(find.byIcon(Icons.star), findsOneWidget);
+      expect(
+        find.descendant(of: favorite, matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
+      final label = tester.getSemantics(favorite).label;
+      expect(label, contains('Архивное избранное'));
+      expect(label, contains('Favorite intention'));
+      // Охват всех сообщает архивное состояние строкой, архивный — самим
+      // выбранным охватом.
+      expect(label.contains('Archived'), showsArchiveState);
+      expect(find.text('Total intentions: 2'), findsOneWidget);
+
+      semantics.dispose();
+    });
+  }
+
   testWidgets(
     'показывает количество активных связей в каждой строке каталога',
     (tester) async {

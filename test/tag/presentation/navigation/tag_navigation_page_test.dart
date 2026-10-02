@@ -283,6 +283,48 @@ void main() {
       },
     );
 
+    testWidgets('строки намерений тега не показывают отметку избранного на '
+        '$locale', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final reads = _Reads();
+        addTearDown(reads.dispose);
+        await _pumpPage(tester, reads, locale: locale);
+        final active = _intention(1);
+        reads.page(0, [active, _intention(101)]);
+        await tester.pumpAndSettle();
+
+        // Навигация по тегу — представление без поиска: строка намерения
+        // тега отметку не несёт и не выводит её для избранных намерений.
+        final markLabel = russian
+            ? 'Избранное намерение'
+            : 'Favorite intention';
+        expect(find.text('Намерение 1'), findsOneWidget);
+        expect(find.byIcon(Icons.star), findsNothing);
+        expect(find.byIcon(Icons.star_border), findsNothing);
+        expect(find.text(markLabel), findsNothing);
+        expect(
+          tester.getSemantics(_row(active)).label,
+          isNot(contains(markLabel)),
+        );
+        expect(find.bySemanticsLabel(RegExp(markLabel)), findsNothing);
+
+        await tester.tap(_scope(TaggedIntentionsScope.archived));
+        await tester.pump();
+        final archived = _intention(2, archived: true);
+        reads.page(1, [archived]);
+        await tester.pumpAndSettle();
+        expect(find.text('Намерение 2'), findsOneWidget);
+        expect(find.byIcon(Icons.star), findsNothing);
+        expect(
+          tester.getSemantics(_row(archived)).label,
+          isNot(contains(markLabel)),
+        );
+      } finally {
+        semantics.dispose();
+      }
+    });
+
     testWidgets('строки намерений, охват и семантика на $locale', (
       tester,
     ) async {

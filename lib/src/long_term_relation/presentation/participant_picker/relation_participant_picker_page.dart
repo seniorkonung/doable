@@ -210,6 +210,7 @@ final class _ParticipantOptionTile extends StatelessWidget {
             archiveState: summary.archiveState,
             showArchiveState: true,
             confirmedTags: summary.tags,
+            confirmedFavoriteMark: summary.favoriteMark,
             activeRelationCount: ConfirmedActiveRelationCount(
               summary.activeRelationCount,
             ),

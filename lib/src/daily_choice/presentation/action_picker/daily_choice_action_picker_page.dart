@@ -126,6 +126,7 @@ final class _DailyChoiceActionPickerPageState
                           : l10n.catalogNoDescription,
                     ],
                     confirmedTags: summary.tags,
+                    confirmedFavoriteMark: summary.favoriteMark,
                     activeRelationCount: ConfirmedActiveRelationCount(
                       summary.activeRelationCount,
                     ),

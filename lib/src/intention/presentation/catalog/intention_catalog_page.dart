@@ -292,6 +292,7 @@ final class _IntentionSummaryTile extends StatelessWidget {
       showArchiveState: showArchiveState,
       traits: [readiness, description],
       confirmedTags: summary.tags,
+      confirmedFavoriteMark: summary.favoriteMark,
       activeRelationCount: ConfirmedActiveRelationCount(
         summary.activeRelationCount,
       ),

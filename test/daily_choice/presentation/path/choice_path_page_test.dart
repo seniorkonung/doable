@@ -183,6 +183,42 @@ void main() {
     semantics.dispose();
   });
 
+  for (final (locale, markLabel) in [
+    (const Locale('ru'), 'Избранное намерение'),
+    (const Locale('en'), 'Favorite intention'),
+  ]) {
+    testWidgets('${locale.languageCode}: дневной путь избранного намерения не '
+        'показывает отметку', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = _PathRepository();
+      addTearDown(repository.dispose);
+      await _pumpPage(tester, repository, locale: locale);
+      repository.complete(0, [_edge(1, 2, 1)]);
+      await tester.pumpAndSettle();
+      // Исходное намерение пути подтверждено избранным.
+      repository.emitRevision(1, favoriteMark: FavoriteMark.favorite);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
+        ),
+      );
+      await tester.pump();
+      repository.complete(1, [_edge(2, 3, 2)], ready: true);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Намерение 1'), findsWidgets);
+      expect(find.textContaining('Намерение 2'), findsWidgets);
+      // Дневной путь — представление без поиска: отметки в нём нет.
+      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.byIcon(Icons.star_border), findsNothing);
+      expect(find.text(markLabel), findsNothing);
+      expect(find.bySemanticsLabel(RegExp(markLabel)), findsNothing);
+
+      semantics.dispose();
+    });
+  }
+
   testWidgets('различает отсутствие пути, конфликт и временную ошибку', (
     tester,
   ) async {
@@ -531,7 +567,10 @@ final class _PathRepository
   void fail(int index, ChoicePathContinuationFailure failure) =>
       _requests[index].complete(ChoicePathContinuationError(failure));
 
-  void emitRevision(int revision) => _observations.add(
+  void emitRevision(
+    int revision, {
+    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
+  }) => _observations.add(
     ResultSuccess(
       GraphSnapshot(
         value: IntentionDetails(
@@ -546,7 +585,7 @@ final class _PathRepository
             archivedCanIncoming: 0,
             archivedCanOutgoing: 0,
           ),
-          favoriteMark: FavoriteMark.notFavorite,
+          favoriteMark: favoriteMark,
         ),
         revision: _Revision(revision),
       ),

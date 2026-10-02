@@ -159,6 +159,7 @@ final class ControlledNeighborhoodRepository
     Intention intention, {
     required RelationCounts counts,
     required GraphRevision revision,
+    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
   }) {
     _intentionController.add(
       ResultSuccess(
@@ -166,7 +167,7 @@ final class ControlledNeighborhoodRepository
           value: IntentionDetails(
             intention: intention,
             relationCounts: counts,
-            favoriteMark: FavoriteMark.notFavorite,
+            favoriteMark: favoriteMark,
           ),
           revision: revision,
         ),
