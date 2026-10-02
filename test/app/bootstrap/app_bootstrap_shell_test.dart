@@ -8,7 +8,8 @@ import 'package:doable/src/data/local/app_database.dart'
         LocalDatabaseConnectionObserver,
         observeConfiguredLocalDatabaseConnection,
         openInMemoryLocalDatabase;
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,15 +42,15 @@ void main() {
       await openingStarted.future;
 
       expect(find.text('Preparing local data…'), findsOneWidget);
-      expect(find.byType(IntentionCatalogPage), findsNothing);
-      expect(find.byKey(const ValueKey('catalog-open-tags')), findsNothing);
+      expect(find.byType(HomePage), findsNothing);
+      expect(find.byType(AppNavigationBar), findsNothing);
 
       allowOpening.complete();
       await tester.pumpAndSettle();
 
       final ready = await runtime.bootstrap() as AppRuntimeReady;
-      final featureContext = tester.element(find.byType(IntentionCatalogPage));
-      expect(find.byKey(const ValueKey('catalog-open-tags')), findsOneWidget);
+      final featureContext = tester.element(find.byType(HomePage));
+      expect(find.byType(AppNavigationBar), findsOneWidget);
       expect(
         ProviderScope.containerOf(featureContext, listen: false),
         same(ready.container),
@@ -89,13 +90,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.widgetWithText(FilledButton, 'Try again'), findsOneWidget);
-    expect(find.byType(IntentionCatalogPage), findsNothing);
+    expect(find.byType(HomePage), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await tester.pumpAndSettle();
 
     expect(attempts, 2);
-    expect(find.byType(IntentionCatalogPage), findsOneWidget);
+    expect(find.byType(HomePage), findsOneWidget);
   });
 
   testWidgets('corruption имеет terminal-состояние без retry', (tester) async {

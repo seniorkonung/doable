@@ -10,6 +10,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -172,9 +173,19 @@ void main() {
         // Полное завершение и новый запуск на том же хранилище.
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.runAsync(app.runtime.shutdown);
-        app = await _App.start(tester, locale, harness, seed: false);
+        app = await _App.start(
+          tester,
+          locale,
+          harness,
+          seed: false,
+          // Приложение открывается на Главной без ранее открытых страниц.
+          onStartPage: () {
+            expect(find.byType(HomePage), findsOneWidget);
+            expect(find.byType(catalog), findsNothing);
+            expect(find.byType(IntentionDetailsPage), findsNothing);
+          },
+        );
 
-        // Приложение по-прежнему открывается на каталоге намерений.
         expect(find.byType(catalog), findsOneWidget);
         expect(find.byType(IntentionDetailsPage), findsNothing);
         expect(app.router.canPop(), isFalse);
@@ -302,6 +313,7 @@ final class _App {
     LocalDatabaseHarness harness, {
     required bool seed,
     LocalDatabaseConnectionObserver? observer,
+    VoidCallback? onStartPage,
   }) async {
     late sqlite.Database raw;
     final runtime = AppRuntime(
@@ -327,6 +339,11 @@ final class _App {
     final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
     if (seed) _seed(raw);
     await tester.pumpWidget(MainApp(runtime: runtime));
+    if (onStartPage != null) {
+      // Начальная страница проверяется до перехода к графу намерений.
+      await _until(tester, find.byType(HomePage));
+      onStartPage();
+    }
     await openIntentionGraph(tester, waitFor: _until);
     await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
     await _until(tester, find.byType(IntentionSummaryView));

@@ -51,7 +51,11 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 Future<void> _openPath(WidgetTester tester) async {
-  await _waitFor(tester, find.text('Основание'));
+  await openIntentionGraph(
+    tester,
+    waitFor: _waitFor,
+    content: find.text('Основание'),
+  );
   await _tap(tester, find.text('Основание').first);
   await _waitFor(
     tester,

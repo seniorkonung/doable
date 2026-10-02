@@ -324,7 +324,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await openIntentionGraph(tester);
+    await openIntentionGraph(tester, content: find.text(intention.title));
     await tester.tap(find.text(intention.title));
     await tester.pump();
     await waitForDetailRequests(repository, 1);
@@ -395,7 +395,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await openIntentionGraph(tester);
+      await openIntentionGraph(tester, content: find.text(intention.title));
       await tester.tap(find.text(intention.title));
       await tester.pump();
       await waitForDetailRequests(repository, 1);

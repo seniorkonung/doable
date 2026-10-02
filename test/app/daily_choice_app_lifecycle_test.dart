@@ -591,6 +591,7 @@ void main() {
         tester,
         waitFor: (tester, finder) =>
             _until(tester, () => finder.evaluate().isNotEmpty),
+        content: find.text('Намерение 1'),
       );
       await _tap(tester, find.text('Намерение 1').first);
       await _tap(

@@ -60,13 +60,6 @@ final class _IntentionCatalogPageState
             onPressed: () => context.router.push(TagCatalogRoute()),
             icon: const Icon(Icons.label_outline),
           ),
-          IconButton(
-            key: const ValueKey('catalog-open-daily-choices'),
-            tooltip: localizations.dailyChoiceCatalogTitle,
-            onPressed: () =>
-                context.router.push(const DailyChoiceCatalogRoute()),
-            icon: const Icon(Icons.today),
-          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(

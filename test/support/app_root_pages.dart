@@ -6,17 +6,18 @@
 /// «открыть дневные выборы», «вернулись на корневую страницу» — и не зависит
 /// от того, как приложение размещает корневые страницы.
 ///
-/// Сейчас каталог намерений — начальный маршрут: он уже открыт после запуска,
-/// дневные выборы открываются переходом из его шапки, а нижний маршрут — сам
-/// каталог.
+/// Корневые страницы — вкладки оболочки с нижней панелью: приложение
+/// открывается на Главной, каталоги открываются выбором пункта панели, а
+/// нижний маршрут под открытыми страницами — оболочка с выбранным пунктом.
 library;
 
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Способ сценария дождаться появления элемента.
@@ -32,9 +33,10 @@ typedef RootPageWait = Future<void> Function(
 /// Способ сценария нажать элемент, дождавшись его появления.
 typedef RootPageTap = Future<void> Function(WidgetTester tester, Finder finder);
 
-/// Переход к каталогу дневных выборов в шапке каталога намерений.
-final Finder _dailyChoicesEntry = find.byKey(
-  const ValueKey('catalog-open-daily-choices'),
+/// Пункт панели основной навигации.
+Finder _destination(AppDestination destination) => find.descendant(
+  of: find.byType(AppNavigationBar),
+  matching: find.byIcon(destination.icon),
 );
 
 /// Ожидание по умолчанию: кадры без реального времени.
@@ -59,12 +61,23 @@ Future<void> tapWhenFound(WidgetTester tester, Finder finder) async {
 
 /// Открывает граф намерений — каталог намерений как корневую страницу.
 ///
-/// Шаг завершается, когда каталог намерений показан. [waitFor] — ожидание
-/// сценария; по умолчанию [pumpUntilFound].
+/// Шаг выбирает пункт панели и завершается, когда каталог намерений показан.
+/// Каталог строится при первом выборе пункта и получает выдачу уже после
+/// входа, поэтому сценарий, которому сразу нужна строка выдачи, называет её
+/// в [content]: шаг дожидается и её. [waitFor] — ожидание сценария; по
+/// умолчанию [pumpUntilFound].
 Future<void> openIntentionGraph(
   WidgetTester tester, {
   RootPageWait waitFor = pumpUntilFound,
-}) => waitFor(tester, find.byType(IntentionCatalogPage));
+  Finder? content,
+}) async {
+  final entry = _destination(AppDestination.intentionGraph);
+  await waitFor(tester, entry);
+  await tester.tap(entry);
+  await tester.pump();
+  await waitFor(tester, find.byType(IntentionCatalogPage));
+  if (content != null) await waitFor(tester, content);
+}
 
 /// Открывает дневные выборы — каталог дневных выборов как корневую страницу.
 ///
@@ -73,7 +86,7 @@ Future<void> openIntentionGraph(
 Future<void> openDailyChoices(
   WidgetTester tester, {
   RootPageTap tap = tapWhenFound,
-}) => tap(tester, _dailyChoicesEntry);
+}) => tap(tester, _destination(AppDestination.dailyChoices));
 
 /// Открывает дневные выборы переходом маршрутизатора, без нажатия.
 ///
@@ -81,15 +94,23 @@ Future<void> openDailyChoices(
 /// первого кадра и поэтому не могут нажать вход: переход начинается сразу, а
 /// кадры продвигает сам сценарий.
 void openDailyChoicesOn(StackRouter router) {
-  unawaited(router.push(const DailyChoiceCatalogRoute()));
+  unawaited(
+    router.navigate(const AppShellRoute(children: [DailyChoiceCatalogRoute()])),
+  );
 }
 
 /// Проверяет, что все страницы поверх закрыты и открыт граф намерений.
 void expectIntentionGraphRootPage(StackRouter router) {
-  expect(router.current.name, IntentionCatalogRoute.name);
+  _expectRootPage(router, IntentionCatalogRoute.name);
 }
 
 /// Проверяет, что все страницы поверх закрыты и открыты дневные выборы.
 void expectDailyChoicesRootPage(StackRouter router) {
-  expect(router.current.name, DailyChoiceCatalogRoute.name);
+  _expectRootPage(router, DailyChoiceCatalogRoute.name);
+}
+
+/// Нижний маршрут — оболочка, а её выбранный пункт показывает [rootPage].
+void _expectRootPage(StackRouter router, String rootPage) {
+  expect(router.current.name, AppShellRoute.name);
+  expect(router.topRoute.name, rootPage);
 }
