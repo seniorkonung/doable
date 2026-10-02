@@ -26,12 +26,16 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
+import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 /// Управляемый граф: каждое чтение группы завершается тестом вручную.
 final class ControlledNeighborhoodRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        TagReadContractTestFallback,
+        FavoriteReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

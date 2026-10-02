@@ -19,6 +19,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/favorite_read_contract_test_fallback.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/catalog_reconciliation_test_fallback.dart';
 import '../../support/tag_assignment_changed.dart';
@@ -422,7 +423,10 @@ TagCommandSucceeded _created() => TagCommandSucceeded(
 );
 
 final class _ControlledRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        TagReadContractTestFallback,
+        FavoriteReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   final commands = <Object>[];
   final _results = <Completer<Object>>[];

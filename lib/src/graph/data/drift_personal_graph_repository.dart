@@ -18,6 +18,7 @@ import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
 import '../../daily_choice/domain/daily_choice_description.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
+import '../../favorite/application/favorite_intentions.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -78,6 +79,7 @@ part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_favorite_marks.dart';
+part 'drift_personal_graph_repository_favorite_list.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -118,6 +120,10 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
+
+  @override
+  Future<FavoriteIntentionsResult> getFavoriteIntentions() =>
+      _readFavoriteIntentions();
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>

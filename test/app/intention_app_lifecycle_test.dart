@@ -31,6 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/favorite_read_contract_test_fallback.dart';
 import '../support/tag_read_contract_test_fallback.dart';
 import '../support/catalog_reconciliation_test_fallback.dart';
 
@@ -712,7 +713,10 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 final class _DelayedPersonalGraphRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        TagReadContractTestFallback,
+        FavoriteReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

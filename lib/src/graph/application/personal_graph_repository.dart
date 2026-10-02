@@ -3,6 +3,7 @@ import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../daily_choice/application/choice_path_continuations.dart';
 import '../../daily_choice/application/choice_path_suggestions.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
+import '../../favorite/application/favorite_intentions.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_result.dart';
@@ -24,7 +25,7 @@ abstract interface class GraphCommandRepository {
 }
 
 abstract interface class PersonalGraphRepository
-    implements GraphCommandRepository, TagReadContract {
+    implements GraphCommandRepository, TagReadContract, FavoriteReadContract {
   /// Читает подсказки для исходного намерения либо выбранного действия на
   /// одной ревизии. Выборка ограничена последними 20 выборами участника по
   /// порядку создания до устранения повторов; возвращается до пяти разных
