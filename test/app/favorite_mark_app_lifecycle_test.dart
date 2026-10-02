@@ -38,6 +38,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
@@ -303,6 +304,7 @@ final class _App {
       storeFavoriteMark(raw, intentionId: tagFixtureId(_walk), position: 1);
     }
     await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(tester, waitFor: _until);
     await _until(tester, find.byType(IntentionSummaryView));
     await tester.pumpAndSettle();
     return _App(raw, repository, faults, lookupAppLocalizations(locale));

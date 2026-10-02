@@ -25,6 +25,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -128,6 +129,7 @@ void main() {
           ),
         );
         addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+        await openIntentionGraph(tester, waitFor: _until);
         await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
         final create = find.byKey(const ValueKey('tag-catalog-create'));
         await _until(tester, create);
@@ -235,6 +237,7 @@ void _registerAssignmentScenarios() {
         final l10n = await AppLocalizations.delegate.load(locale);
         final router = ready.container.read(appRouterProvider);
         await tester.pumpWidget(MainApp(runtime: runtime));
+        await openIntentionGraph(tester, waitFor: _until);
         await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
         final id = (IntentionId.decode(
           tagFixtureId(number),

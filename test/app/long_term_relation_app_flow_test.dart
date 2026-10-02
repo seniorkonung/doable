@@ -37,6 +37,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/favorite_read_contract_test_fallback.dart';
@@ -164,6 +165,7 @@ void main() {
           await database.dispose();
         });
         await tester.pumpWidget(MainApp(runtime: runtime));
+        await openIntentionGraph(tester, waitFor: _pumpUntilFound);
         await _pumpUntilFound(
           tester,
           find.byKey(const ValueKey('catalog-scope-control')),
@@ -363,6 +365,7 @@ void main() {
         await database.dispose();
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
       await _pumpUntilFound(tester, find.text(_blockingOwnerTitle));
       Map<String, List<List<Object?>>> tagState() => {
         for (final table in ['tags', 'tag_assignments'])
@@ -587,6 +590,7 @@ void main() {
         diagnostics: InMemoryDiagnosticsSink(),
       )..also(runtimes.add);
       await tester.pumpWidget(MainApp(runtime: reopened));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
       await _pumpUntilFound(tester, find.text(_blockingOwnerTitle));
       await _openIntention(tester, _blockingOwnerTitle);
       expect(find.text('Active relations: 50'), findsWidgets);
@@ -676,6 +680,7 @@ void main() {
       final firstRuntime = _fileRuntime(database, diagnostics: diagnostics)
         ..also(runtimes.add);
       await tester.pumpWidget(MainApp(runtime: firstRuntime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
       await _pumpUntilFound(
         tester,
         find.byKey(const ValueKey('catalog-create-intention')),
@@ -824,6 +829,7 @@ void main() {
       final reopenedRuntime = _fileRuntime(database, diagnostics: diagnostics)
         ..also(runtimes.add);
       await tester.pumpWidget(MainApp(runtime: reopenedRuntime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
       await _pumpUntilFound(tester, find.text('Укреплять здоровье'));
       expect(find.text('Много ходить'), findsOneWidget);
 
@@ -951,6 +957,7 @@ void main() {
       final lifecycleRuntime = _fileRuntime(database, diagnostics: diagnostics)
         ..also(runtimes.add);
       await tester.pumpWidget(MainApp(runtime: lifecycleRuntime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
       await _pumpUntilFound(tester, find.text(sameTitle));
       await _openArchivedCanRelation(
         tester,
@@ -1499,6 +1506,7 @@ Future<_DelayedApp> _pumpDelayedRelationApp(
   );
   addTearDown(runtime.shutdown);
   await tester.pumpWidget(MainApp(runtime: runtime));
+  await openIntentionGraph(tester, waitFor: _pumpUntilFound);
   await _pumpUntilFound(
     tester,
     find.byKey(const ValueKey('catalog-create-intention')),

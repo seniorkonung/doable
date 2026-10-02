@@ -28,6 +28,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
@@ -758,6 +759,7 @@ _pumpStoredPage(WidgetTester tester, {_Reads? reads}) async {
     ),
   );
   await tester.pumpAndSettle();
+  await openIntentionGraph(tester);
   unawaited(router.push(TagNavigationRoute(tagId: _tag.id)));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));

@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -326,6 +327,7 @@ final class _App {
     final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
     if (seed) _seed(raw);
     await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(tester, waitFor: _until);
     await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
     await _until(tester, find.byType(IntentionSummaryView));
     await tester.pumpAndSettle();

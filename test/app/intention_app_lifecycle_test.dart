@@ -30,6 +30,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/favorite_read_contract_test_fallback.dart';
 import '../support/tag_read_contract_test_fallback.dart';
@@ -387,6 +388,11 @@ void main() {
       });
 
       await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(
+        tester,
+        waitFor: (tester, finder) =>
+            _pumpUntil(tester, () => finder.evaluate().isNotEmpty),
+      );
       await _pumpUntil(tester, () => repository.pageQueries.isNotEmpty);
       repository.completePage(
         0,
@@ -675,6 +681,11 @@ Future<AppRuntime> _pumpCatalog(
   });
 
   await tester.pumpWidget(MainApp(runtime: runtime));
+  await openIntentionGraph(
+    tester,
+    waitFor: (tester, finder) =>
+        _pumpUntil(tester, () => finder.evaluate().isNotEmpty),
+  );
   await _pumpUntil(tester, () => repository.pageQueries.isNotEmpty);
   repository.completePage(
     0,

@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -246,10 +247,7 @@ void main() {
         );
 
         if (bottomUp) {
-          await _tap(
-            tester,
-            find.byKey(const ValueKey('catalog-open-daily-choices')),
-          );
+          await openDailyChoices(tester, tap: _tap);
           await tester.pumpAndSettle();
           await _tap(
             tester,
@@ -401,10 +399,7 @@ void main() {
         if (!bottomUp) {
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          await _tap(
-            tester,
-            find.byKey(const ValueKey('catalog-open-daily-choices')),
-          );
+          await openDailyChoices(tester, tap: _tap);
         }
         await _waitFor(
           tester,
@@ -470,10 +465,7 @@ void main() {
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final repository = ready.container.read(personalGraphRepositoryProvider);
 
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
       await _tap(
         tester,
@@ -734,10 +726,7 @@ void main() {
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final repository = ready.container.read(personalGraphRepositoryProvider);
 
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
       await _tap(
         tester,

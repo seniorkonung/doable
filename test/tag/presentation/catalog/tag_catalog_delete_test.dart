@@ -23,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 
 String _id(int number) =>
@@ -384,6 +385,7 @@ Future<void> _openRealCatalog(
   );
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   await tester.pumpAndSettle();
+  await openIntentionGraph(tester);
   await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
   await tester.pumpAndSettle();
 }

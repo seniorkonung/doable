@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
@@ -67,6 +68,7 @@ void main() {
           await runtime.shutdown();
         });
         await tester.pumpWidget(MainApp(runtime: runtime));
+        await openIntentionGraph(tester, waitFor: _until);
         await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
         await _until(tester, find.byKey(const ValueKey('tag-catalog-create')));
 

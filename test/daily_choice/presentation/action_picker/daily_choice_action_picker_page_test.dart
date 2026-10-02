@@ -21,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show testSummary;
 import '../../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart';
+import '../../../support/app_root_pages.dart';
 import '../daily_choice_picker_tag_search_test_support.dart';
 
 void main() {
@@ -421,6 +422,7 @@ Future<AppRouter> _pumpApp(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   _completeFirst(repository, 0, []);
   await tester.pumpAndSettle();
   return router;

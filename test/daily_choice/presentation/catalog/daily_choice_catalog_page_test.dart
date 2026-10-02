@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
@@ -46,7 +47,7 @@ void main() {
           find.byKey(const ValueKey('daily-choice-action-cancel')),
         );
         await tester.pump(const Duration(milliseconds: 400));
-        expect(router.current.name, DailyChoiceCatalogRoute.name);
+        expectDailyChoicesRootPage(router);
         repository.completeFirst([], total: 0);
         await tester.pump();
         expect(entry, findsOneWidget);
@@ -205,7 +206,7 @@ Future<AppRouter> _open(
       ),
     ),
   );
-  unawaited(router.push(const DailyChoiceCatalogRoute()));
+  openDailyChoicesOn(router);
   await tester.pump();
   return router;
 }

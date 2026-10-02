@@ -28,6 +28,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import 'details_test_support.dart';
 
 void main() {
@@ -105,6 +106,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -1266,6 +1268,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester);
       await tester.tap(find.text(intention.title));
       await tester.pump();
       await waitForDetailRequests(repository, 1);
@@ -1289,7 +1292,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
 
       repository.completeCommand(
         0,
@@ -1343,6 +1346,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
 
     await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
     await tester.pumpAndSettle();
@@ -1393,6 +1397,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -1415,12 +1420,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
     expect(find.byType(IntentionDetailsPage), findsNothing);
 
     repository.detailRequests[0].add(ResultSuccess(intention));
     await tester.pump();
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
     expect(find.text(intention.title), findsNothing);
   });
 
@@ -1520,6 +1525,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester);
       unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
@@ -1555,7 +1561,7 @@ void main() {
       repository.completeCommand(1, testDetailsDeletedResult(intention));
       await tester.pumpAndSettle();
 
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.textContaining('Intention deleted.'), findsNothing);
 
@@ -1603,6 +1609,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester);
       await tester.tap(find.text(intention.title));
       await tester.pump();
       await waitForDetailRequests(repository, 1);
@@ -1623,7 +1630,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.textContaining(inlineFailure), findsNothing);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);

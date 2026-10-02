@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -23,6 +22,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import 'details_test_support.dart';
 
 void main() {
@@ -324,6 +324,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     await tester.tap(find.text(intention.title));
     await tester.pump();
     await waitForDetailRequests(repository, 1);
@@ -342,7 +343,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
 
     repository.completeCommand(
       0,
@@ -394,6 +395,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester);
       await tester.tap(find.text(intention.title));
       await tester.pump();
       await waitForDetailRequests(repository, 1);
@@ -422,7 +424,7 @@ void main() {
       repository.completeCommand(0, testDetailsDeletedResult(intention));
       await tester.pumpAndSettle();
 
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(
         find.text(
           'Delete — “Удаляемое после ухода намерение”: Intention deleted.',

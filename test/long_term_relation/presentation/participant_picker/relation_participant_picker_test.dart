@@ -30,6 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../intention/presentation/catalog/catalog_reconciliation_test_support.dart';
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show ControlledCatalogRepository, TestCatalogRevision, testSummary;
+import '../../../support/app_root_pages.dart';
 import 'participant_picker_test_support.dart';
 
 void main() {
@@ -786,6 +787,7 @@ Future<AppRouter> _pumpAppWithCatalog(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   _completePage(repository, 0, [testSummary(index: 1, title: 'Ходить')]);
   await tester.pumpAndSettle();
   return router;
@@ -1623,6 +1625,7 @@ Future<_OpenedTagSearchPicker> _openTagSearchPicker(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   repository.complete(0, _tagSearchPage(const []));
   await tester.pumpAndSettle();
   final selection = router.push<GraphSnapshot<RelationParticipantSummary>>(

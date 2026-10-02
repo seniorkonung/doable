@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 
 Future<void> _until(WidgetTester tester, bool Function() done) async {
@@ -72,6 +73,11 @@ void main() {
       await runtime.shutdown();
     });
     await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(
+      tester,
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+    );
     await _until(
       tester,
       () =>
@@ -172,6 +178,11 @@ void main() {
       await runtime.shutdown();
     });
     await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(
+      tester,
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+    );
     await _tap(tester, 'catalog-open-tags');
     await _tap(tester, 'tag-catalog-create');
     await _until(
@@ -313,6 +324,11 @@ void main() {
         await runtime.shutdown();
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(
+        tester,
+        waitFor: (tester, finder) =>
+            _until(tester, () => finder.evaluate().isNotEmpty),
+      );
       await _tap(tester, 'catalog-open-tags');
       final search = find.byKey(const ValueKey('tag-catalog-search'));
       await _until(tester, () => search.evaluate().isNotEmpty);

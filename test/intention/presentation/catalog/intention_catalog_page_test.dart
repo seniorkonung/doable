@@ -28,6 +28,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
 
@@ -839,6 +840,7 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(_routerTestAppWithContainer(container, router));
     await tester.pump();
+    await openIntentionGraph(tester);
     repository.queryAt(0);
     await tester.enterText(
       find.byKey(const ValueKey('catalog-filter-field')),
@@ -916,7 +918,7 @@ void main() {
                 )
                 .requireValue
             as IntentionCatalogLoaded;
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
     expect(repository.queries, hasLength(3));
     expect(afterState.query, same(beforeState.query));
     expect(
@@ -1364,6 +1366,7 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(_routerTestAppWithContainer(container, router));
     await tester.pump();
+    await openIntentionGraph(tester);
     repository.complete(0, _firstPage(_taggedSummaries(const [], last: 1)));
     await tester.pumpAndSettle();
 
@@ -1403,7 +1406,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
     expect(_shownConditions(tester), ['Здоровье']);
     expect(_catalogScrollPosition(tester).pixels, 0);
     expect(find.text('Намерение 60'), findsOneWidget);

@@ -20,6 +20,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/app_root_pages.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 import 'details/details_test_support.dart';
@@ -291,6 +292,7 @@ void main() {
 
         await tester.pumpWidget(_searchApp(container, router, locale));
         await tester.pump();
+        await openIntentionGraph(tester);
         if (page.route case final route?) {
           repository.complete(0, _firstPage(const []));
           await _pumpFrames(tester);

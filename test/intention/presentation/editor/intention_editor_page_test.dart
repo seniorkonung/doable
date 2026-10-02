@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import '../catalog/catalog_test_support.dart';
 
 void main() {
@@ -104,7 +105,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
     expect(repository.commands, hasLength(1));
     repository.completeCommand(
       0,
@@ -309,7 +310,7 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.textContaining('Intention created.'), findsOneWidget);
     },
   );
@@ -529,7 +530,7 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.textContaining('Intention created.'), findsNothing);
 
@@ -566,7 +567,7 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.textContaining(failure), findsNothing);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -609,6 +610,7 @@ Future<AppRouter> _openEditor(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   repository.complete(
     0,
     ResultSuccess(

@@ -29,6 +29,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
@@ -381,6 +382,7 @@ final class _App {
       ),
     );
     await tester.pump();
+    await openIntentionGraph(tester);
     unawaited(router.push(TagNavigationRoute(tagId: _tagId)));
     await _waitFor(tester, () => _navigation.evaluate().isNotEmpty);
     final app = _App(router, measuredReads);
