@@ -15,6 +15,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -1457,6 +1458,145 @@ void main() {
       expect(harness.repository.relationCommands, hasLength(1));
     },
   );
+
+  for (final scenario
+      in <
+        ({
+          ExistingIntentionCommand Function(IntentionId) command,
+          String enOperation,
+          String ruOperation,
+          String enSuccess,
+          String ruSuccess,
+        })
+      >[
+        (
+          command: MarkIntentionFavorite.new,
+          enOperation: 'Mark as favorite',
+          ruOperation: 'Отметка избранного',
+          enSuccess: 'Intention marked as favorite.',
+          ruSuccess: 'Намерение отмечено избранным.',
+        ),
+        (
+          command: UnmarkIntentionFavorite.new,
+          enOperation: 'Remove favorite mark',
+          ruOperation: 'Снятие отметки избранного',
+          enSuccess: 'Favorite mark removed.',
+          ruSuccess: 'Отметка избранного снята.',
+        ),
+      ]) {
+    for (final locale in const [Locale('en'), Locale('ru')]) {
+      final isRussian = locale.languageCode == 'ru';
+      final operation = isRussian ? scenario.ruOperation : scenario.enOperation;
+      String message(String outcome) => isRussian
+          ? '$operation — «Гулять»: $outcome'
+          : '$operation — “Гулять”: $outcome';
+
+      testWidgets(
+        'успех отметки называет операцию, намерение и исход: $operation',
+        (tester) async {
+          final harness = await _pumpPresenterApp(tester, locale: locale);
+          final accepted = harness.startExisting(
+            scenario.command,
+            index: 1,
+            title: 'Гулять',
+          );
+          harness.completeSaved(accepted);
+          await tester.pumpAndSettle();
+
+          expect(
+            find.text(
+              message(isRussian ? scenario.ruSuccess : scenario.enSuccess),
+            ),
+            findsOneWidget,
+          );
+          await _closeMessage(tester);
+          expect(find.byType(SnackBar), findsNothing);
+        },
+      );
+
+      for (final failure
+          in <({IntentionFailure failure, String en, String ru})>[
+            (
+              failure: const IntentionGenericValidationFailure(),
+              en: 'The favorite mark couldn’t be changed.',
+              ru: 'Не удалось изменить отметку избранного.',
+            ),
+            (
+              failure: const IntentionNotFoundFailure(),
+              en:
+                  'The intention no longer exists. The favorite mark wasn’t '
+                  'changed.',
+              ru:
+                  'Намерение больше не существует. Отметка избранного не '
+                  'изменена.',
+            ),
+            (
+              failure: const IntentionConflictFailure(),
+              en:
+                  'The intention changed elsewhere. The favorite mark wasn’t '
+                  'changed.',
+              ru:
+                  'Намерение было изменено в другом месте. Отметка избранного '
+                  'не изменена.',
+            ),
+            (
+              failure: IntentionHasBlockingRelationsFailure(
+                testDetailsIntentionId(1),
+              ),
+              en:
+                  'The favorite mark couldn’t be changed because of an '
+                  'unexpected error.',
+              ru:
+                  'Не удалось изменить отметку избранного из-за '
+                  'непредвиденной ошибки.',
+            ),
+            (
+              failure: const IntentionUnavailableFailure(),
+              en: 'The favorite mark couldn’t be changed. Try again.',
+              ru: 'Не удалось изменить отметку избранного. Повторите попытку.',
+            ),
+            (
+              failure: const IntentionCorruptionFailure(),
+              en: 'Stored data is damaged. The favorite mark wasn’t changed.',
+              ru:
+                  'Сохранённые данные повреждены. Отметка избранного не '
+                  'изменена.',
+            ),
+            (
+              failure: const IntentionUnexpectedFailure(),
+              en:
+                  'The favorite mark couldn’t be changed because of an '
+                  'unexpected error.',
+              ru:
+                  'Не удалось изменить отметку избранного из-за '
+                  'непредвиденной ошибки.',
+            ),
+          ]) {
+        testWidgets('отказ отметки ${failure.failure.runtimeType} называет '
+            'операцию, намерение и безопасный исход: $operation', (
+          tester,
+        ) async {
+          final harness = await _pumpPresenterApp(tester, locale: locale);
+          final accepted = harness.startExisting(
+            scenario.command,
+            index: 1,
+            title: 'Гулять',
+          );
+          harness.completeFailure(accepted, failure.failure);
+          await tester.pumpAndSettle();
+
+          final text = message(isRussian ? failure.ru : failure.en);
+          expect(find.text(text), findsOneWidget);
+          expect(
+            text,
+            isNot(contains(testDetailsIntentionId(1).toCanonicalString())),
+          );
+          await _closeMessage(tester);
+          expect(find.byType(SnackBar), findsNothing);
+        });
+      }
+    }
+  }
 }
 
 const _withoutPresenter = -1;
@@ -2051,6 +2191,39 @@ final class _PresenterHarness {
     _titles[accepted] = (index, title);
     return accepted;
   }
+
+  IntentionCommandAccepted startExisting(
+    ExistingIntentionCommand Function(IntentionId) command, {
+    required int index,
+    required String title,
+  }) {
+    final intention = testDetailsIntention(index: index, title: title);
+    final commandIndex = repository.commands.length;
+    final accepted = _coordinator.acceptExisting(
+      command(intention.id),
+      presentationTitle: title,
+    ) as IntentionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _commandIndexes[accepted] = commandIndex;
+    _titles[accepted] = (index, title);
+    return accepted;
+  }
+
+  void completeSaved(IntentionCommandAccepted accepted) {
+    final (index, title) = _titles[accepted]!;
+    repository.completeCommand(
+      _commandIndexes[accepted]!,
+      testDetailsSavedResult(testDetailsIntention(index: index, title: title)),
+    );
+  }
+
+  void completeFailure(
+    IntentionCommandAccepted accepted,
+    IntentionFailure failure,
+  ) => repository.completeCommand(
+    _commandIndexes[accepted]!,
+    ResultFailure(failure),
+  );
 
   void completeDeleted(IntentionCommandAccepted accepted) {
     final (index, title) = _titles[accepted]!;

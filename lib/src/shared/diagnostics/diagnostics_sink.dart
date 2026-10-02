@@ -58,6 +58,8 @@ enum IntentionCommandDiagnosticsType {
   archive,
   restore,
   delete,
+  markFavorite,
+  unmarkFavorite,
 }
 
 enum LongTermRelationCommandDiagnosticsType {

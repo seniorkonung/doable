@@ -1165,6 +1165,8 @@ void main() {
           ArchiveIntention(id),
           RestoreIntention(id),
           DeleteIntention(id),
+          MarkIntentionFavorite(id),
+          UnmarkIntentionFavorite(id),
         ];
 
         expect(commands.map(_commandDescription), [
@@ -1175,7 +1177,16 @@ void main() {
           'archive',
           'restore',
           'delete',
+          'markFavorite',
+          'unmarkFavorite',
         ]);
+        expect(
+          commands.whereType<ExistingIntentionCommand>().map(
+            (command) => command.id,
+          ),
+          everyElement(id),
+        );
+        expect(commands.skip(7), everyElement(isA<ExistingIntentionCommand>()));
       },
     );
 
@@ -1552,6 +1563,8 @@ String _commandDescription(IntentionCommand command) => switch (command) {
   ArchiveIntention() => 'archive',
   RestoreIntention() => 'restore',
   DeleteIntention() => 'delete',
+  MarkIntentionFavorite() => 'markFavorite',
+  UnmarkIntentionFavorite() => 'unmarkFavorite',
 };
 
 String _failureDescription(IntentionFailure failure) => switch (failure) {

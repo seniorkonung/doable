@@ -51,3 +51,61 @@ extension _FavoriteMarkReading on DriftPersonalGraphRepository {
     return marks;
   }
 }
+
+extension _FavoriteMarkCommands on DriftPersonalGraphRepository {
+  /// Отмечает существующее намерение избранным на месте после текущего
+  /// максимума всего порядка, включая места архивированных намерений.
+  /// Вызывается внутри транзакции команды.
+  Future<_CommittedIntentionCommand> _markFavorite(IntentionId id) =>
+      _changeFavoriteMark(
+        id,
+        domain.FavoriteMark.favorite,
+        () => _database.customInsert(
+          '''INSERT INTO favorite_intentions (intention_id, position)
+       SELECT ?, COALESCE(MAX(position), 0) + 1 FROM favorite_intentions''',
+          variables: [Variable<String>(id.toCanonicalString())],
+          updates: {_database.favoriteIntentions},
+        ),
+      );
+
+  /// Снимает отметку избранного существующего намерения удалением её строки;
+  /// места остальных избранных намерений не меняются. Вызывается внутри
+  /// транзакции команды.
+  Future<_CommittedIntentionCommand> _unmarkFavorite(IntentionId id) =>
+      _changeFavoriteMark(
+        id,
+        domain.FavoriteMark.notFavorite,
+        () => _database.customUpdate(
+          'DELETE FROM favorite_intentions WHERE intention_id = ?',
+          variables: [Variable<String>(id.toCanonicalString())],
+          updates: {_database.favoriteIntentions},
+          updateKind: UpdateKind.delete,
+        ),
+      );
+
+  /// Проверяет существование намерения и текущую отметку и выполняет [write]
+  /// только при фактическом изменении. Строки намерений команда не пишет,
+  /// поэтому снимки до и после различаются только отметкой.
+  Future<_CommittedIntentionCommand> _changeFavoriteMark(
+    IntentionId id,
+    domain.FavoriteMark favoriteMark,
+    Future<void> Function() write,
+  ) async {
+    final stored = await _readCommandSnapshot(id);
+    if (stored == null) throw const _IntentionNotFound();
+
+    final existing = _rehydrateStored(stored.detail);
+    final counts = await _readVerifiedRelationCounts(id);
+    final before = await _catalogEntrySnapshot(stored, counts);
+    if (before.summary.favoriteMark == favoriteMark) {
+      return _CommittedIntentionUnchanged(intention: existing, entry: before);
+    }
+
+    await write();
+    return _CommittedIntentionUpdated(
+      intention: existing,
+      before: before,
+      after: await _catalogEntrySnapshot(stored, counts),
+    );
+  }
+}

@@ -202,6 +202,71 @@ void main() {
       },
     );
 
+    test('принимает отметку и её снятие под ключом намерения и различает '
+        'их вид', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final firstId = _id(_firstUuid);
+      final secondId = _id(_secondUuid);
+
+      final mark = _acceptExisting(coordinator, MarkIntentionFavorite(firstId));
+      final repeated = _acceptExisting(
+        coordinator,
+        UnmarkIntentionFavorite(firstId),
+      );
+      final blockedByMark = _acceptExisting(
+        coordinator,
+        ArchiveIntention(firstId),
+      );
+      final unmark = _acceptExisting(
+        coordinator,
+        UnmarkIntentionFavorite(secondId),
+      );
+
+      expect(mark, isA<IntentionCommandAccepted>());
+      expect(repeated, isA<IntentionCommandAlreadyRunning>());
+      expect(blockedByMark, isA<IntentionCommandAlreadyRunning>());
+      expect(unmark, isA<IntentionCommandAccepted>());
+      expect(coordinator.isKeyRunning(ExistingIntentionKey(firstId)), isTrue);
+      expect(repository.commands, [
+        isA<MarkIntentionFavorite>().having(
+          (command) => command.id,
+          'намерение',
+          firstId,
+        ),
+        isA<UnmarkIntentionFavorite>().having(
+          (command) => command.id,
+          'намерение',
+          secondId,
+        ),
+      ]);
+
+      repository.complete(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      repository.complete(1, const ResultFailure(IntentionNotFoundFailure()));
+      final markCompletion = await (mark as IntentionCommandAccepted).future;
+      final unmarkCompletion =
+          await (unmark as IntentionCommandAccepted).future;
+
+      expect(markCompletion.kind, IntentionCommandKind.markFavorite);
+      expect(unmarkCompletion.kind, IntentionCommandKind.unmarkFavorite);
+      expect(
+        markCompletion.target,
+        isA<ExistingIntentionOperationTarget>().having(
+          (target) => target.intentionId,
+          'намерение',
+          firstId,
+        ),
+      );
+      expect(coordinator.isKeyRunning(ExistingIntentionKey(firstId)), isFalse);
+
+      coordinator.releaseInitiatorPresentation(markCompletion.token);
+      coordinator.releaseInitiatorPresentation(unmarkCompletion.token);
+      await coordinator.shutdown();
+    });
+
     test('не сериализует независимые формы создания общим gate', () async {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);

@@ -627,6 +627,38 @@
   "@detailsStateChangeUnexpected": {
     "description": "Терминальная непредвиденная ошибка перехода состояния"
   },
+  "detailsFavoriteMarked": "Intention marked as favorite.",
+  "@detailsFavoriteMarked": {
+    "description": "Подтверждение отметки избранного намерения"
+  },
+  "detailsFavoriteUnmarked": "Favorite mark removed.",
+  "@detailsFavoriteUnmarked": {
+    "description": "Подтверждение снятия отметки избранного намерения"
+  },
+  "detailsFavoriteMarkInvalid": "The favorite mark couldn’t be changed.",
+  "@detailsFavoriteMarkInvalid": {
+    "description": "Безопасная ошибка недопустимого изменения отметки избранного"
+  },
+  "detailsFavoriteMarkNotFound": "The intention no longer exists. The favorite mark wasn’t changed.",
+  "@detailsFavoriteMarkNotFound": {
+    "description": "Безопасная ошибка изменения отметки избранного отсутствующего намерения"
+  },
+  "detailsFavoriteMarkConflict": "The intention changed elsewhere. The favorite mark wasn’t changed.",
+  "@detailsFavoriteMarkConflict": {
+    "description": "Безопасная ошибка конфликта изменения отметки избранного"
+  },
+  "detailsFavoriteMarkUnavailable": "The favorite mark couldn’t be changed. Try again.",
+  "@detailsFavoriteMarkUnavailable": {
+    "description": "Устранимая недоступность изменения отметки избранного"
+  },
+  "detailsFavoriteMarkCorruption": "Stored data is damaged. The favorite mark wasn’t changed.",
+  "@detailsFavoriteMarkCorruption": {
+    "description": "Терминальное повреждение при изменении отметки избранного"
+  },
+  "detailsFavoriteMarkUnexpected": "The favorite mark couldn’t be changed because of an unexpected error.",
+  "@detailsFavoriteMarkUnexpected": {
+    "description": "Терминальная непредвиденная ошибка изменения отметки избранного"
+  },
   "detailsDeleteInvalid": "The intention couldn’t be deleted.",
   "@detailsDeleteInvalid": {
     "description": "Безопасная ошибка недопустимого физического удаления"
@@ -791,6 +823,14 @@
   "graphOperationDelete": "Delete",
   "@graphOperationDelete": {
     "description": "Вид операции удаления намерения в сообщении оболочки"
+  },
+  "graphOperationMarkFavorite": "Mark as favorite",
+  "@graphOperationMarkFavorite": {
+    "description": "Вид операции отметки избранного намерения в сообщении оболочки"
+  },
+  "graphOperationUnmarkFavorite": "Remove favorite mark",
+  "@graphOperationUnmarkFavorite": {
+    "description": "Вид операции снятия отметки избранного намерения в сообщении оболочки"
   },
   "graphOperationDeleteBlockingRelations": "Delete selected relations",
   "@graphOperationDeleteBlockingRelations": {

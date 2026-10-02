@@ -1088,6 +1088,54 @@ abstract class AppLocalizations {
   /// **'The intention state couldn’t be changed because of an unexpected error.'**
   String get detailsStateChangeUnexpected;
 
+  /// Подтверждение отметки избранного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention marked as favorite.'**
+  String get detailsFavoriteMarked;
+
+  /// Подтверждение снятия отметки избранного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite mark removed.'**
+  String get detailsFavoriteUnmarked;
+
+  /// Безопасная ошибка недопустимого изменения отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite mark couldn’t be changed.'**
+  String get detailsFavoriteMarkInvalid;
+
+  /// Безопасная ошибка изменения отметки избранного отсутствующего намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention no longer exists. The favorite mark wasn’t changed.'**
+  String get detailsFavoriteMarkNotFound;
+
+  /// Безопасная ошибка конфликта изменения отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'The intention changed elsewhere. The favorite mark wasn’t changed.'**
+  String get detailsFavoriteMarkConflict;
+
+  /// Устранимая недоступность изменения отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite mark couldn’t be changed. Try again.'**
+  String get detailsFavoriteMarkUnavailable;
+
+  /// Терминальное повреждение при изменении отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The favorite mark wasn’t changed.'**
+  String get detailsFavoriteMarkCorruption;
+
+  /// Терминальная непредвиденная ошибка изменения отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite mark couldn’t be changed because of an unexpected error.'**
+  String get detailsFavoriteMarkUnexpected;
+
   /// Безопасная ошибка недопустимого физического удаления
   ///
   /// In en, this message translates to:
@@ -1327,6 +1375,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete'**
   String get graphOperationDelete;
+
+  /// Вид операции отметки избранного намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as favorite'**
+  String get graphOperationMarkFavorite;
+
+  /// Вид операции снятия отметки избранного намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Remove favorite mark'**
+  String get graphOperationUnmarkFavorite;
 
   /// Вид массовой операции в сообщении оболочки
   ///

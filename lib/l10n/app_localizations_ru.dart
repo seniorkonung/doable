@@ -602,6 +602,36 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось изменить состояние намерения из-за непредвиденной ошибки.';
 
   @override
+  String get detailsFavoriteMarked => 'Намерение отмечено избранным.';
+
+  @override
+  String get detailsFavoriteUnmarked => 'Отметка избранного снята.';
+
+  @override
+  String get detailsFavoriteMarkInvalid =>
+      'Не удалось изменить отметку избранного.';
+
+  @override
+  String get detailsFavoriteMarkNotFound =>
+      'Намерение больше не существует. Отметка избранного не изменена.';
+
+  @override
+  String get detailsFavoriteMarkConflict =>
+      'Намерение было изменено в другом месте. Отметка избранного не изменена.';
+
+  @override
+  String get detailsFavoriteMarkUnavailable =>
+      'Не удалось изменить отметку избранного. Повторите попытку.';
+
+  @override
+  String get detailsFavoriteMarkCorruption =>
+      'Сохранённые данные повреждены. Отметка избранного не изменена.';
+
+  @override
+  String get detailsFavoriteMarkUnexpected =>
+      'Не удалось изменить отметку избранного из-за непредвиденной ошибки.';
+
+  @override
   String get detailsDeleteInvalid => 'Не удалось удалить намерение.';
 
   @override
@@ -740,6 +770,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get graphOperationDelete => 'Удаление';
+
+  @override
+  String get graphOperationMarkFavorite => 'Отметка избранного';
+
+  @override
+  String get graphOperationUnmarkFavorite => 'Снятие отметки избранного';
 
   @override
   String get graphOperationDeleteBlockingRelations =>

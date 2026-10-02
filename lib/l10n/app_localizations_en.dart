@@ -601,6 +601,36 @@ class AppLocalizationsEn extends AppLocalizations {
       'The intention state couldn’t be changed because of an unexpected error.';
 
   @override
+  String get detailsFavoriteMarked => 'Intention marked as favorite.';
+
+  @override
+  String get detailsFavoriteUnmarked => 'Favorite mark removed.';
+
+  @override
+  String get detailsFavoriteMarkInvalid =>
+      'The favorite mark couldn’t be changed.';
+
+  @override
+  String get detailsFavoriteMarkNotFound =>
+      'The intention no longer exists. The favorite mark wasn’t changed.';
+
+  @override
+  String get detailsFavoriteMarkConflict =>
+      'The intention changed elsewhere. The favorite mark wasn’t changed.';
+
+  @override
+  String get detailsFavoriteMarkUnavailable =>
+      'The favorite mark couldn’t be changed. Try again.';
+
+  @override
+  String get detailsFavoriteMarkCorruption =>
+      'Stored data is damaged. The favorite mark wasn’t changed.';
+
+  @override
+  String get detailsFavoriteMarkUnexpected =>
+      'The favorite mark couldn’t be changed because of an unexpected error.';
+
+  @override
   String get detailsDeleteInvalid => 'The intention couldn’t be deleted.';
 
   @override
@@ -739,6 +769,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get graphOperationDelete => 'Delete';
+
+  @override
+  String get graphOperationMarkFavorite => 'Mark as favorite';
+
+  @override
+  String get graphOperationUnmarkFavorite => 'Remove favorite mark';
 
   @override
   String get graphOperationDeleteBlockingRelations =>

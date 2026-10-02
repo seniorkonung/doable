@@ -575,6 +575,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
               domain.IntentionArchiveState.active,
             ),
             DeleteIntention() => _deleteIntention(command.id),
+            MarkIntentionFavorite() => _markFavorite(command.id),
+            UnmarkIntentionFavorite() => _unmarkFavorite(command.id),
           },
         );
         if (committed.didMutate) {
@@ -2125,7 +2127,9 @@ void _validateCommandText(IntentionCommand command) {
         DisableIntentionReadiness() ||
         ArchiveIntention() ||
         RestoreIntention() ||
-        DeleteIntention():
+        DeleteIntention() ||
+        MarkIntentionFavorite() ||
+        UnmarkIntentionFavorite():
       return;
   }
 }
@@ -2141,6 +2145,8 @@ IntentionCommandDiagnosticsType _commandDiagnosticsType(
   ArchiveIntention() => IntentionCommandDiagnosticsType.archive,
   RestoreIntention() => IntentionCommandDiagnosticsType.restore,
   DeleteIntention() => IntentionCommandDiagnosticsType.delete,
+  MarkIntentionFavorite() => IntentionCommandDiagnosticsType.markFavorite,
+  UnmarkIntentionFavorite() => IntentionCommandDiagnosticsType.unmarkFavorite,
 };
 
 DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>

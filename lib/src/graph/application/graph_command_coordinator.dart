@@ -31,6 +31,8 @@ enum IntentionCommandKind {
   archive,
   restore,
   delete,
+  markFavorite,
+  unmarkFavorite,
 }
 
 sealed class GraphCommandKey {
@@ -1176,4 +1178,6 @@ IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   ArchiveIntention() => IntentionCommandKind.archive,
   RestoreIntention() => IntentionCommandKind.restore,
   DeleteIntention() => IntentionCommandKind.delete,
+  MarkIntentionFavorite() => IntentionCommandKind.markFavorite,
+  UnmarkIntentionFavorite() => IntentionCommandKind.unmarkFavorite,
 };
