@@ -39,7 +39,7 @@ final class _DailyChoiceCatalogPageState
     final state = ref.watch(dailyChoiceCatalogViewModelProvider);
     final model = ref.read(dailyChoiceCatalogViewModelProvider.notifier);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.dailyChoiceCatalogTitle)),
+      appBar: AppBar(title: Text(l10n.appDestinationDailyChoices)),
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('daily-choice-create-from-action'),
         onPressed: () => unawaited(_chooseAction()),

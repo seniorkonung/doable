@@ -260,12 +260,6 @@ abstract class AppLocalizations {
   /// **'Loading intentions…'**
   String get catalogLoading;
 
-  /// Заголовок единого каталога намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Intentions'**
-  String get catalogTitle;
-
   /// Подпись выбора охвата каталога
   ///
   /// In en, this message translates to:
@@ -3467,7 +3461,7 @@ abstract class AppLocalizations {
   /// **'Confirm daily choice'**
   String get dailyChoiceCreationTitle;
 
-  /// Заголовок каталога дневных выборов и вход из основной навигации
+  /// Заголовок раздела дневных выборов в соседстве намерения, пока их количество не получено
   ///
   /// In en, this message translates to:
   /// **'Daily choices'**

@@ -27,7 +27,6 @@
   "bootstrapIncompatibleSchema": "Чтобы продолжить, установите совместимое обновление Doable.",
   "bootstrapUnexpectedFailure": "Не удалось открыть локальные данные из-за непредвиденной ошибки.",
   "catalogLoading": "Загружаем намерения…",
-  "catalogTitle": "Намерения",
   "catalogScopeLabel": "Охват",
   "catalogScopeActive": "Активные",
   "catalogScopeArchived": "Архивные",

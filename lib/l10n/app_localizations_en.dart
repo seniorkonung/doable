@@ -103,9 +103,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogLoading => 'Loading intentions…';
 
   @override
-  String get catalogTitle => 'Intentions';
-
-  @override
   String get catalogScopeLabel => 'Scope';
 
   @override

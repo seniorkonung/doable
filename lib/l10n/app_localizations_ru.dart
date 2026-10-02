@@ -103,9 +103,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogLoading => 'Загружаем намерения…';
 
   @override
-  String get catalogTitle => 'Намерения';
-
-  @override
   String get catalogScopeLabel => 'Охват';
 
   @override

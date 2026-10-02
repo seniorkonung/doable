@@ -458,7 +458,7 @@
   - **Вероятные файлы:** `lib/src/app/routing/app_router.dart`, `lib/src/app/navigation/app_shell_page.dart` (новый), `lib/src/app/navigation/app_destination.dart`, `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `test/support/app_root_pages.dart`, `test/app/navigation/app_shell_test.dart` (новый), `test/app/routing/app_router_test.dart`, `test/app/bootstrap/app_bootstrap_shell_test.dart`, `test/app/favorite_mark_app_flow_test.dart`; производный маршрутизатор обновляется генерацией.
   - **Размер:** M.
 
-- [ ] 2.14 Заголовок каждой корневой страницы совпадает с названием её пункта
+- [x] 2.14 Заголовок каждой корневой страницы совпадает с названием её пункта
   - **Критерии приёмки:**
     - Заголовки Главной, каталога дневных выборов и каталога намерений берут те же строки локализации, что и пункты панели (решение 4 design): «Главная», «Дневные выборы» и «Граф намерений» в русском интерфейсе, «Home», «Daily choices» и «Intention graph» в английском и при любой нерусской системной локали. Прежняя строка заголовка каталога намерений удалена.
     - Название пункта доступно тремя способами: заголовком его корневой страницы, подсказкой по долгому нажатию и доступным названием для экранного диктора; видимых текстовых подписей в панели нет. Остальные заголовки и подписи каталогов не меняются.

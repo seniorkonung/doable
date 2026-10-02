@@ -52,7 +52,7 @@ final class _IntentionCatalogPageState
     final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
       appBar: AppBar(
-        title: Text(localizations.catalogTitle),
+        title: Text(localizations.appDestinationIntentionGraph),
         actions: [
           IconButton(
             key: const ValueKey('catalog-open-tags'),

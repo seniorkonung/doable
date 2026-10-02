@@ -108,10 +108,6 @@
   "@catalogLoading": {
     "description": "Начальная загрузка каталога намерений"
   },
-  "catalogTitle": "Intentions",
-  "@catalogTitle": {
-    "description": "Заголовок единого каталога намерений"
-  },
   "catalogScopeLabel": "Scope",
   "@catalogScopeLabel": {
     "description": "Подпись выбора охвата каталога"
@@ -1869,7 +1865,7 @@
   "dailyChoiceCatalogTitle": "Daily choices",
   "dailyChoiceCreateFromAction": "Create a choice from an action",
   "@dailyChoiceCreateFromAction": {"description": "Вход в создание дневного выбора от действия"},
-  "@dailyChoiceCatalogTitle": {"description": "Заголовок каталога дневных выборов и вход из основной навигации"},
+  "@dailyChoiceCatalogTitle": {"description": "Заголовок раздела дневных выборов в соседстве намерения, пока их количество не получено"},
   "dailyChoiceCatalogLoading": "Loading daily choices…",
   "@dailyChoiceCatalogLoading": {"description": "Начальная загрузка дневного каталога"},
   "dailyChoiceCatalogDateFilter": "Date",
