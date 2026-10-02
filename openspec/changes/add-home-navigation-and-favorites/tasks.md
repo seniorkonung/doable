@@ -42,7 +42,7 @@
   - **Вероятные файлы:** `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_favorite_marks.dart` (новый), `test/support/favorite_storage_fixture.dart` (новый), `test/intention/data/drift_intention_favorite_mark_read_test.dart` (новый), `test/intention/data/drift_intention_repository_fault_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.4 Подтвердить схему и чтения отметки перед появлением команд
+- [x] 1.4 Подтвердить схему и чтения отметки перед появлением команд
   - **Критерии приёмки:**
     - Схема, контракт проекций и чтения согласованы на реальном адаптере: строка отметки, записанная на уровне хранилища, видна в подробных данных, порциях всех охватов каталога и каталожных снимках существующих команд, а хранилище без отметок читается как прежде.
     - Существующие проверки намерений, каталога, тегов, связей и дневных выборов проходят без изменения утверждений о составе, порядке и количестве; изменения утверждений о стоимости чтений ограничены одним чтением отметок на порцию.
