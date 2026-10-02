@@ -11,6 +11,7 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -21,6 +22,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -209,6 +211,112 @@ void main() {
           conditions: conditions,
         );
       }
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'читает отметки только порции при любом числе избранных вне её',
+    () async {
+      final (:repository, :raw, :trace) = await _openJointFixture();
+
+      Future<({IntentionCatalogPage page, _TracedSelect marks})> read() async {
+        trace.clear();
+        final page = _page(await repository.getCatalogPage(_jointQuery()));
+        expect(page.items, hasLength(_pageSize));
+        _expectMarkMaterialization(page.items, trace);
+        return (
+          page: page,
+          marks: trace.selects.singleWhere(
+            (select) => select.statement.contains('FROM favorite_intentions'),
+          ),
+        );
+      }
+
+      final before = await read();
+      final pageIds = {
+        for (final item in before.page.items) item.id.toCanonicalString(),
+      };
+      final storedBefore = _favoriteRowCount(raw);
+
+      // Избранным становится каждое намерение вне порции, а за ними
+      // сохраняются места без существующих намерений.
+      final insertFavorite = raw.prepare(
+        'INSERT INTO favorite_intentions (intention_id, position) '
+        'VALUES (?, ?)',
+      );
+      var position = _fixtureSize;
+      raw.execute('BEGIN');
+      try {
+        for (var index = 0; index < _fixtureSize; index++) {
+          final id = _fixtureId(index);
+          if (_isFavorite(index) || pageIds.contains(id)) continue;
+          insertFavorite.execute([id, ++position]);
+        }
+        raw.execute('COMMIT');
+      } on Object {
+        raw.execute('ROLLBACK');
+        rethrow;
+      } finally {
+        insertFavorite.close();
+      }
+      for (var index = 0; index < _placesWithoutIntention; index++) {
+        storeFavoritePlaceWithoutIntention(
+          raw,
+          intentionId: _fixtureId(_fixtureSize + index),
+          position: ++position,
+        );
+      }
+      final storedAfter = _favoriteRowCount(raw);
+      expect(storedAfter, greaterThan(storedBefore * 2));
+      expect(
+        storedAfter,
+        _fixtureSize -
+            before.page.items
+                .where((item) => item.favoriteMark == FavoriteMark.notFavorite)
+                .length +
+            _placesWithoutIntention,
+      );
+
+      final after = await read();
+
+      expect(
+        [for (final item in after.page.items) (item.id, item.favoriteMark)],
+        [for (final item in before.page.items) (item.id, item.favoriteMark)],
+      );
+      expect(after.marks.arguments, before.marks.arguments);
+      expect(after.marks.rowCount, before.marks.rowCount);
+      expect(after.marks.intentionIds, before.marks.intentionIds);
+      expect(after.marks.rowCount, lessThanOrEqualTo(_pageSize));
+      expect(
+        _observedPlan(raw, after.marks).join('\n'),
+        allOf(
+          contains('sqlite_autoindex_favorite_intentions_1'),
+          isNot(contains('SCAN favorite_intentions')),
+        ),
+      );
+
+      // Подробные данные читают не больше одной строки отметки.
+      for (final item in after.page.items.take(3)) {
+        trace.clear();
+        final details = await repository.watchIntention(item.id).first;
+        expect(
+          (details as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+              .value
+              .value!
+              .favoriteMark,
+          item.favoriteMark,
+        );
+        final marks = trace.selects.singleWhere(
+          (select) => select.statement.contains('FROM favorite_intentions'),
+        );
+        expect(marks.arguments, [item.id.toCanonicalString()]);
+        expect(
+          marks.rowCount,
+          item.favoriteMark == FavoriteMark.favorite ? 1 : 0,
+        );
+      }
+      expect(trace.writes, isEmpty);
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
@@ -1021,6 +1129,15 @@ void _populateJointTagFixture(sqlite.Database database) {
 }
 
 const _jointCandidateCount = _jointMatchCount + 10;
+
+/// Число мест без существующих намерений, добавляемых вне порции.
+const _placesWithoutIntention = 500;
+
+int _favoriteRowCount(sqlite.Database raw) =>
+    raw
+            .select('SELECT count(*) AS count FROM favorite_intentions')
+            .single['count']
+        as int;
 
 /// Избранное — каждое третье намерение фикстуры: 16 667 отметок, среди них
 /// часть совместных кандидатов и большинство намерений вне любой порции.

@@ -33,6 +33,25 @@ void storeFavoriteMarkWithInvalidPosition(
   }
 }
 
+/// Сохраняет место без существующего намерения — повреждение сохранённых
+/// данных избранного, недостижимое через приложение. Проверка внешних ключей
+/// отключается только на время записи этой строки; вызывается вне транзакции.
+void storeFavoritePlaceWithoutIntention(
+  sqlite.Database database, {
+  required String intentionId,
+  required int position,
+}) {
+  database.execute('PRAGMA foreign_keys = OFF');
+  try {
+    database.execute(
+      'INSERT INTO favorite_intentions (intention_id, position) VALUES (?, ?)',
+      [intentionId, position],
+    );
+  } finally {
+    database.execute('PRAGMA foreign_keys = ON');
+  }
+}
+
 /// Снимает отметку избранного намерения удалением её строки.
 void removeFavoriteMark(
   sqlite.Database database, {

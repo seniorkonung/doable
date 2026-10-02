@@ -11,6 +11,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -475,7 +476,198 @@ void main() {
       });
     }
   });
+
+  group('Место без существующего намерения вне запрошенных', () {
+    // Целостные отметки — у первого и третьего намерений; между их местами и
+    // после них сохранены места без намерений.
+    late TagId tagId;
+
+    setUp(() async {
+      _insertIntention(raw, number: 1, title: 'CANARY-избранное');
+      _insertIntention(raw, number: 2, title: 'CANARY-неизбранное');
+      _insertIntention(raw, number: 3, title: 'CANARY-избранное');
+      storeFavoriteMark(raw, intentionId: _uuid(1), position: 2);
+      storeFavoriteMark(raw, intentionId: _uuid(3), position: 4);
+      for (final (number, position) in [(101, 1), (102, 3), (103, 9)]) {
+        storeFavoritePlaceWithoutIntention(
+          raw,
+          intentionId: _uuid(number),
+          position: position,
+        );
+      }
+      tagId = switch (await repository.execute(
+        CreateTag(TagName.fromInput('CANARY-тег')),
+      )) {
+        TagCommandSucceeded(
+          value: ConfirmedGraphResult(:final TagCreated value),
+        ) =>
+          value.change.after.id,
+        final other => fail('Тег не создан: $other'),
+      };
+      trace.clear();
+    });
+
+    test('подробные данные показывают подтверждённые отметки', () async {
+      for (final (number, mark) in _intactMarks) {
+        trace.clear();
+
+        expect(
+          (await _details(repository, number)).favoriteMark,
+          mark,
+          reason: 'намерение $number',
+        );
+
+        final markRead = trace.favoriteMarkReads.single;
+        expect(markRead.arguments, [_uuid(number)]);
+        expect(markRead.rowCount, mark == FavoriteMark.favorite ? 1 : 0);
+        expect(
+          diagnostics.events.last,
+          isA<IntentionDetailReadDiagnosticsEvent>().having(
+            (event) => event.status,
+            'исход',
+            isA<DiagnosticsSucceeded>(),
+          ),
+        );
+      }
+      expect(trace.writes, isEmpty);
+    });
+
+    test('порции каталога показывают подтверждённые отметки', () async {
+      for (final pageSize in [1, 2, 10]) {
+        final marks = <String, FavoriteMark>{};
+        IntentionCatalogCursor? cursor;
+        do {
+          trace.clear();
+          final page = await _page(
+            repository,
+            _query(pageSize: pageSize, cursor: cursor),
+          );
+          _expectSingleMarkRead(trace, page.items);
+          marks.addAll(_marks(page.items));
+          cursor = page.nextCursor;
+        } while (cursor != null);
+
+        expect(marks, _intactMarksById, reason: 'порция $pageSize');
+      }
+      expect(
+        diagnostics.events.whereType<CatalogPageReadDiagnosticsEvent>().map(
+          (event) => event.status,
+        ),
+        everyElement(isNot(isA<DiagnosticsFailed>())),
+      );
+    });
+
+    test('порция согласования показывает подтверждённые отметки', () async {
+      final result = await repository.getCatalogReconciliationPortion(
+        _reconciliationQuery(),
+      );
+
+      expect(
+        result,
+        isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>(),
+      );
+      final portion =
+          (result as ResultSuccess<IntentionCatalogReconciliationOutcome>).value
+              as IntentionCatalogReconciliationFirstPortion;
+      expect(portion.totalCount, 3);
+      expect(_marks(portion.items), _intactMarksById);
+      _expectSingleMarkRead(trace, portion.items);
+    });
+
+    test('каталожные снимки команд несут подтверждённые отметки', () async {
+      for (final (number, mark) in _intactMarks) {
+        final id = _id(number);
+        for (final command in <IntentionCommand>[
+          UpdateIntention(id: id, title: 'CANARY-новое', description: null),
+          EnableIntentionReadiness(id),
+          ArchiveIntention(id),
+          RestoreIntention(id),
+        ]) {
+          final mutation = (await _execute(
+            repository,
+            command,
+          )).catalogMutation;
+          final reason = '${command.runtimeType} намерения $number';
+          expect(mutation.before!.summary.favoriteMark, mark, reason: reason);
+          expect(mutation.after!.summary.favoriteMark, mark, reason: reason);
+        }
+        for (final command in <TagCommand>[
+          AssignTag(tagId: tagId, intentionId: id),
+          RemoveTagAssignment(tagId: tagId, intentionId: id),
+        ]) {
+          final result = await repository.execute(command);
+          final reason = '${command.runtimeType} намерения $number';
+          expect(result, isA<TagCommandSucceeded>(), reason: reason);
+          final changed =
+              (result as TagCommandSucceeded).value.value
+                  as TagAssignmentChanged;
+          for (final snapshot in [
+            changed.catalogMutation.before,
+            changed.catalogMutation.after,
+          ]) {
+            expect(snapshot.summary.favoriteMark, mark, reason: reason);
+          }
+        }
+      }
+
+      // Чтения и команды не исправляют и не удаляют места без намерений.
+      expect(storedFavoriteMarks(raw), [
+        (_uuid(101), 1),
+        (_uuid(1), 2),
+        (_uuid(102), 3),
+        (_uuid(3), 4),
+        (_uuid(103), 9),
+      ]);
+      expect(diagnostics.events.toString(), isNot(contains('CANARY')));
+    });
+
+    test(
+      'недопустимое место отметки запрошенного намерения остаётся повреждением',
+      () async {
+        storeFavoriteMarkWithInvalidPosition(
+          raw,
+          intentionId: _uuid(2),
+          position: 0,
+        );
+
+        expect(
+          await repository.watchIntention(_id(2)).first,
+          isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionCorruptionFailure>(),
+          ),
+        );
+        expect(
+          await repository.getCatalogPage(_query()),
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionCorruptionFailure>(),
+          ),
+        );
+        // Порция без повреждённого намерения от него не зависит.
+        final page = await _page(repository, _query(pageSize: 1));
+        expect(_marks(page.items), {_uuid(1): FavoriteMark.favorite});
+        expect(
+          (await _details(repository, 3)).favoriteMark,
+          FavoriteMark.favorite,
+        );
+      },
+    );
+  });
 }
+
+/// Подтверждённые отметки намерений, чьи сохранённые данные целостны.
+const _intactMarks = [
+  (1, FavoriteMark.favorite),
+  (2, FavoriteMark.notFavorite),
+  (3, FavoriteMark.favorite),
+];
+
+Map<String, FavoriteMark> get _intactMarksById => {
+  for (final (number, mark) in _intactMarks) _uuid(number): mark,
+};
 
 /// Чтения отметок и записи одного соединения в порядке выполнения.
 final class _StatementTrace extends LocalDatabaseConnectionObserver {
