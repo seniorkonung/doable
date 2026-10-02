@@ -267,6 +267,232 @@ void main() {
       await coordinator.shutdown();
     });
 
+    for (final running
+        in <(String, ExistingIntentionCommand Function(IntentionId))>[
+          ('изменение полей', _updateTitle),
+          ('включение готовности', EnableIntentionReadiness.new),
+          ('выключение готовности', DisableIntentionReadiness.new),
+          ('архивирование', ArchiveIntention.new),
+          ('восстановление', RestoreIntention.new),
+          ('удаление', DeleteIntention.new),
+          ('отметка', MarkIntentionFavorite.new),
+          ('снятие отметки', UnmarkIntentionFavorite.new),
+        ]) {
+      test('пока выполняется ${running.$1}, отметка и её снятие того же '
+          'намерения не принимаются, не запускаются и не ставятся в '
+          'очередь', () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final intentionId = _id(_firstUuid);
+
+        final accepted = _acceptExisting(
+          coordinator,
+          running.$2(intentionId),
+        ) as IntentionCommandAccepted;
+
+        expect(
+          _acceptExisting(coordinator, MarkIntentionFavorite(intentionId)),
+          isA<IntentionCommandAlreadyRunning>(),
+        );
+        expect(
+          _acceptExisting(coordinator, UnmarkIntentionFavorite(intentionId)),
+          isA<IntentionCommandAlreadyRunning>(),
+        );
+        expect(repository.commands, hasLength(1));
+
+        repository.complete(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final completion = await accepted.future;
+        await Future<void>.delayed(Duration.zero);
+
+        // Отклонённые команды не отложены: после завершения хранилище не
+        // получает их.
+        expect(repository.commands, hasLength(1));
+        expect(coordinator.isRunning(intentionId), isFalse);
+
+        coordinator.releaseInitiatorPresentation(completion.token);
+        await coordinator.shutdown();
+      });
+    }
+
+    for (final favorite
+        in <(String, ExistingIntentionCommand Function(IntentionId))>[
+          ('отметка', MarkIntentionFavorite.new),
+          ('снятие отметки', UnmarkIntentionFavorite.new),
+        ]) {
+      test('пока выполняется ${favorite.$1}, другие изменяющие операции '
+          'того же намерения не принимаются, не запускаются и не ставятся в '
+          'очередь', () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final intentionId = _id(_firstUuid);
+
+        final accepted = _acceptExisting(
+          coordinator,
+          favorite.$2(intentionId),
+        ) as IntentionCommandAccepted;
+
+        for (final blocked in <ExistingIntentionCommand>[
+          _updateTitle(intentionId),
+          EnableIntentionReadiness(intentionId),
+          DisableIntentionReadiness(intentionId),
+          ArchiveIntention(intentionId),
+          RestoreIntention(intentionId),
+          DeleteIntention(intentionId),
+        ]) {
+          expect(
+            _acceptExisting(coordinator, blocked),
+            isA<IntentionCommandAlreadyRunning>(),
+            reason: '${blocked.runtimeType}',
+          );
+        }
+        expect(repository.commands, hasLength(1));
+
+        repository.complete(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final completion = await accepted.future;
+        await Future<void>.delayed(Duration.zero);
+
+        expect(repository.commands, hasLength(1));
+        expect(coordinator.isRunning(intentionId), isFalse);
+
+        coordinator.releaseInitiatorPresentation(completion.token);
+        await coordinator.shutdown();
+      });
+    }
+
+    test('выполняющаяся отметка не блокирует операции других намерений, '
+        'включая их отметку', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final firstId = _id(_firstUuid);
+      final secondId = _id(_secondUuid);
+      final thirdId = _id(_thirdUuid);
+
+      final first = _acceptExisting(
+        coordinator,
+        MarkIntentionFavorite(firstId),
+      );
+      final second = _acceptExisting(
+        coordinator,
+        MarkIntentionFavorite(secondId),
+      );
+      final third = _acceptExisting(coordinator, DeleteIntention(thirdId));
+
+      expect(first, isA<IntentionCommandAccepted>());
+      expect(second, isA<IntentionCommandAccepted>());
+      expect(third, isA<IntentionCommandAccepted>());
+      expect(repository.commands, hasLength(3));
+
+      // Завершение одной отметки не освобождает ограничение другого
+      // намерения.
+      repository.complete(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      final firstCompletion = await (first as IntentionCommandAccepted).future;
+      expect(coordinator.isRunning(firstId), isFalse);
+      expect(coordinator.isRunning(secondId), isTrue);
+      expect(coordinator.isRunning(thirdId), isTrue);
+
+      repository.complete(
+        1,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      repository.complete(
+        2,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      final secondCompletion =
+          await (second as IntentionCommandAccepted).future;
+      final thirdCompletion = await (third as IntentionCommandAccepted).future;
+      for (final completion in [
+        firstCompletion,
+        secondCompletion,
+        thirdCompletion,
+      ]) {
+        coordinator.releaseInitiatorPresentation(completion.token);
+      }
+      await coordinator.shutdown();
+    });
+
+    test('ограничение отметки переживает уход инициатора, а принятая отметка '
+        'завершается независимо от экрана', () async {
+      final repository = _ControlledGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final registration = coordinator.registerAppPresentation();
+      final completions = <IntentionCommandCompletion>[];
+      final subscription = coordinator.intentionCompletions.listen(
+        completions.add,
+      );
+      final intentionId = _id(_firstUuid);
+      final otherId = _id(_secondUuid);
+
+      final accepted = _acceptExisting(
+        coordinator,
+        MarkIntentionFavorite(intentionId),
+      ) as IntentionCommandAccepted;
+      // Экран-инициатор закрыт до завершения отметки.
+      coordinator.releaseInitiatorPresentation(accepted.token);
+
+      expect(coordinator.isRunning(intentionId), isTrue);
+      expect(
+        _acceptExisting(coordinator, UnmarkIntentionFavorite(intentionId)),
+        isA<IntentionCommandAlreadyRunning>(),
+      );
+      expect(
+        _acceptExisting(coordinator, ArchiveIntention(intentionId)),
+        isA<IntentionCommandAlreadyRunning>(),
+      );
+      final other = _acceptExisting(
+        coordinator,
+        MarkIntentionFavorite(otherId),
+      );
+      expect(other, isA<IntentionCommandAccepted>());
+      expect(repository.commands, hasLength(2));
+
+      repository.complete(
+        0,
+        _markedResult(intentionId, const _TestCatalogRevision()),
+      );
+      final completion = await accepted.future;
+      final claim = await registration.nextClaim();
+
+      // Отметка завершена и доставлена потребителям данных и общей
+      // поверхности без участия закрытого экрана.
+      expect(completion.kind, IntentionCommandKind.markFavorite);
+      expect(completion.result, isA<ResultSuccess<IntentionCommandSuccess>>());
+      expect(completions, [same(completion)]);
+      expect(claim!.completion, same(completion));
+      expect(coordinator.isRunning(intentionId), isFalse);
+
+      final next = _acceptExisting(
+        coordinator,
+        UnmarkIntentionFavorite(intentionId),
+      );
+      expect(next, isA<IntentionCommandAccepted>());
+
+      coordinator.confirmPresentation(claim);
+      repository.complete(
+        1,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      repository.complete(
+        2,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      final otherCompletion = await (other as IntentionCommandAccepted).future;
+      final nextCompletion = await (next as IntentionCommandAccepted).future;
+      coordinator.releaseInitiatorPresentation(otherCompletion.token);
+      coordinator.releaseInitiatorPresentation(nextCompletion.token);
+      await subscription.cancel();
+      await coordinator.shutdown();
+    });
+
     test('не сериализует независимые формы создания общим gate', () async {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);
@@ -832,6 +1058,32 @@ Result<IntentionCommandSuccess> _deletedResult(IntentionId id) => ResultSuccess(
   ),
 );
 
+/// Подтверждённая отметка: снимки каталога различаются только отметкой.
+Result<IntentionCommandSuccess> _markedResult(
+  IntentionId id,
+  GraphRevision revision,
+) => ResultSuccess(
+  IntentionSaved(
+    Intention(
+      id: id,
+      title: 'Намерение',
+      description: null,
+      readiness: IntentionReadiness.notReady,
+      archiveState: IntentionArchiveState.active,
+      createdAt: IntentionTimestamp(DateTime.utc(2026)),
+      updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+    ),
+    catalogMutation: IntentionCatalogUpdated(
+      revision: revision,
+      before: _TestCatalogEntrySnapshot(id),
+      after: _TestCatalogEntrySnapshot(id, favoriteMark: FavoriteMark.favorite),
+    ),
+  ),
+);
+
+UpdateIntention _updateTitle(IntentionId id) =>
+    UpdateIntention(id: id, title: 'Новое название', description: null);
+
 Result<ConfirmedGraphResult<IntentionCommandSuccess>> _confirmedDeletedResult(
   IntentionId id,
   GraphRevision revision,
@@ -1114,18 +1366,20 @@ final class _TestCatalogRevision implements GraphRevision {
 }
 
 final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
-  _TestCatalogEntrySnapshot(IntentionId id)
-    : summary = IntentionSummary(
-        id: id,
-        title: 'Намерение',
-        hasDescription: false,
-        readiness: IntentionReadiness.notReady,
-        archiveState: IntentionArchiveState.active,
-        activeRelationCount: 0,
-        createdAt: IntentionTimestamp(DateTime.utc(2026)),
-        updatedAt: IntentionTimestamp(DateTime.utc(2026)),
-        favoriteMark: FavoriteMark.notFavorite,
-      );
+  _TestCatalogEntrySnapshot(
+    IntentionId id, {
+    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
+  }) : summary = IntentionSummary(
+         id: id,
+         title: 'Намерение',
+         hasDescription: false,
+         readiness: IntentionReadiness.notReady,
+         archiveState: IntentionArchiveState.active,
+         activeRelationCount: 0,
+         createdAt: IntentionTimestamp(DateTime.utc(2026)),
+         updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+         favoriteMark: favoriteMark,
+       );
 
   @override
   final IntentionSummary summary;
