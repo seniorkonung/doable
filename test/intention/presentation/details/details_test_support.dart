@@ -441,13 +441,21 @@ Result<IntentionCommandSuccess> testDetailsSavedResult(
   Intention? before,
   GraphRevision revision = const TestDetailsRevision(0),
   Iterable<GraphChange> additionalChanges = const [],
+  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
+  FavoriteMark beforeFavoriteMark = FavoriteMark.notFavorite,
 }) {
-  final afterSnapshot = _DetailsCatalogEntrySnapshot(intention);
+  final afterSnapshot = _DetailsCatalogEntrySnapshot(
+    intention,
+    favoriteMark: favoriteMark,
+  );
   final mutation = before == null
       ? IntentionCatalogUnchanged(revision: revision, entry: afterSnapshot)
       : IntentionCatalogUpdated(
           revision: revision,
-          before: _DetailsCatalogEntrySnapshot(before),
+          before: _DetailsCatalogEntrySnapshot(
+            before,
+            favoriteMark: beforeFavoriteMark,
+          ),
           after: afterSnapshot,
         );
   return ResultSuccess(
@@ -474,8 +482,10 @@ Result<IntentionCommandSuccess> testDetailsDeletedResult(
 
 final class _DetailsCatalogEntrySnapshot
     implements IntentionCatalogEntrySnapshot {
-  _DetailsCatalogEntrySnapshot(Intention intention)
-    : summary = testDetailsSummary(intention);
+  _DetailsCatalogEntrySnapshot(
+    Intention intention, {
+    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
+  }) : summary = testDetailsSummary(intention, favoriteMark: favoriteMark);
 
   @override
   final IntentionSummary summary;

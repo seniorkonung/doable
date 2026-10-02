@@ -187,6 +187,14 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   void delete() => _startStateChange(IntentionDetailsStateChangeKind.delete);
 
+  /// Отмечает намерение избранным. Новое значение публикует только
+  /// подтверждённый снимок: до него состояние несёт прежнюю отметку.
+  void markFavorite() =>
+      _startStateChange(IntentionDetailsStateChangeKind.markFavorite);
+
+  void unmarkFavorite() =>
+      _startStateChange(IntentionDetailsStateChangeKind.unmarkFavorite);
+
   void retryStateChange() {
     final current = state;
     final stateChange = current is IntentionDetailsLoaded
@@ -355,7 +363,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     if (current is! IntentionDetailsLoaded ||
         current.edit != null ||
         _isOperationRunning ||
-        !_isStateChangeApplicable(current.intention, kind)) {
+        !_isStateChangeApplicable(current.details, kind)) {
       return;
     }
 
@@ -450,21 +458,31 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     IntentionDetailsStateChangeKind.archive => ArchiveIntention(_intentionId),
     IntentionDetailsStateChangeKind.restore => RestoreIntention(_intentionId),
     IntentionDetailsStateChangeKind.delete => DeleteIntention(_intentionId),
+    IntentionDetailsStateChangeKind.markFavorite => MarkIntentionFavorite(
+      _intentionId,
+    ),
+    IntentionDetailsStateChangeKind.unmarkFavorite => UnmarkIntentionFavorite(
+      _intentionId,
+    ),
   };
 
   bool _isStateChangeApplicable(
-    Intention intention,
+    application.IntentionDetails details,
     IntentionDetailsStateChangeKind kind,
   ) => switch (kind) {
     IntentionDetailsStateChangeKind.enableReadiness =>
-      intention.readiness == IntentionReadiness.notReady,
+      details.intention.readiness == IntentionReadiness.notReady,
     IntentionDetailsStateChangeKind.disableReadiness =>
-      intention.readiness == IntentionReadiness.ready,
+      details.intention.readiness == IntentionReadiness.ready,
     IntentionDetailsStateChangeKind.archive =>
-      intention.archiveState == IntentionArchiveState.active,
+      details.intention.archiveState == IntentionArchiveState.active,
     IntentionDetailsStateChangeKind.restore =>
-      intention.archiveState == IntentionArchiveState.archived,
+      details.intention.archiveState == IntentionArchiveState.archived,
     IntentionDetailsStateChangeKind.delete => true,
+    IntentionDetailsStateChangeKind.markFavorite =>
+      details.favoriteMark == FavoriteMark.notFavorite,
+    IntentionDetailsStateChangeKind.unmarkFavorite =>
+      details.favoriteMark == FavoriteMark.favorite,
   };
 
   GraphInitiatorPresentationClaim? _claimFailure(

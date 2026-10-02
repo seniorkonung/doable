@@ -54,6 +54,12 @@ enum IntentionDetailsStateChangeKind {
   archive,
   restore,
   delete,
+
+  /// Отметка намерения избранным; применима, пока подтверждённой отметки нет.
+  markFavorite,
+
+  /// Снятие отметки; применимо только к подтверждённо избранному намерению.
+  unmarkFavorite,
 }
 
 final class IntentionDetailsStateChange {
