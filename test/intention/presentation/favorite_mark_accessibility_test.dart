@@ -567,7 +567,7 @@ Future<void> _reach(
       attempt < 100 && finder.evaluate().isEmpty;
       attempt++
     ) {
-      await tester.drag(scrollable, Offset(0, delta), warnIfMissed: false);
+      await tester.dragFrom(_dragStart(tester, scrollable), Offset(0, delta));
       await tester.pump();
     }
   }
@@ -575,6 +575,28 @@ Future<void> _reach(
   await _pumpFrames(tester);
   await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
   await _pumpFrames(tester);
+}
+
+/// Точка списка, с которой начинается жест прокрутки.
+///
+/// Основное действие страницы закрывает нижнюю часть списка, и жест от его
+/// центра может попасть в действие вместо списка. Точка ищется на вертикальной
+/// оси списка сверху вниз: первая, касание в которой достигает самого списка.
+Offset _dragStart(WidgetTester tester, Finder scrollable) {
+  final box = tester.renderObject<RenderBox>(scrollable);
+  final rect = box.localToGlobal(Offset.zero) & box.size;
+  for (var dy = rect.top + 4; dy < rect.bottom; dy += 8) {
+    final point = Offset(rect.center.dx, dy);
+    if (dy >= 0 &&
+        dy < _screen.height &&
+        tester
+            .hitTestOnBinding(point)
+            .path
+            .any((entry) => identical(entry.target, box))) {
+      return point;
+    }
+  }
+  fail('Жест прокрутки не достигает списка: $scrollable');
 }
 
 /// Элемент не выходит за горизонтальные границы экрана.
