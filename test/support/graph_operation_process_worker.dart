@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'large_blocking_relations_fixture.dart';
 import 'daily_choice_durability_fixture.dart';
+import 'tag_storage_fixture.dart';
 
 const _operationEnvironment = 'DOABLE_GRAPH_OPERATION';
 const _stopPointEnvironment = 'DOABLE_GRAPH_STOP_POINT';
@@ -32,6 +33,10 @@ const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
 const _secondNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000903';
 const _unrelatedIdValue = '018f0b5d-6b2e-7c80-8000-000000000904';
 const _workerRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000954';
+
+/// Намерение фикстуры тегов, которое отмечает и с которого снимает отметку
+/// процесс.
+const _favoriteIntentionNumber = 3;
 
 void main() {
   test(
@@ -141,6 +146,16 @@ void main() {
               relationIds: LargeBlockingRelationsFixture.selectedIds,
             ),
           ),
+          _GraphOperation.favoriteMark => await repository.execute(
+            MarkIntentionFavorite(
+              _intentionId(tagFixtureId(_favoriteIntentionNumber)),
+            ),
+          ),
+          _GraphOperation.favoriteUnmark => await repository.execute(
+            UnmarkIntentionFavorite(
+              _intentionId(tagFixtureId(_favoriteIntentionNumber)),
+            ),
+          ),
         };
         final succeeded = switch (operation) {
           _GraphOperation.create ||
@@ -155,7 +170,9 @@ void main() {
           _GraphOperation.dailyReplace ||
           _GraphOperation.dailyDelete ||
           _GraphOperation.dailyMixedDelete => result is GraphCommandSucceeded,
-          _GraphOperation.cascade => result is ResultSuccess,
+          _GraphOperation.cascade ||
+          _GraphOperation.favoriteMark ||
+          _GraphOperation.favoriteUnmark => result is ResultSuccess,
         };
         if (!succeeded) {
           throw StateError(
@@ -246,6 +263,12 @@ final class _GraphOperationStopObserver
               (sql) => sql.contains('long_term_relations'),
             ),
       _GraphOperation.bulkDelete => false,
+      _GraphOperation.favoriteMark => statement.statements.any(
+        (sql) => sql.contains('INSERT INTO favorite_intentions'),
+      ),
+      _GraphOperation.favoriteUnmark => statement.statements.any(
+        (sql) => sql.contains('DELETE FROM favorite_intentions'),
+      ),
     };
     if (matches) await _reportReadyAndWait();
   }
@@ -277,7 +300,9 @@ enum _GraphOperation {
   archive,
   restore,
   delete,
-  bulkDelete;
+  bulkDelete,
+  favoriteMark,
+  favoriteUnmark;
 
   static _GraphOperation parse(String? value) => switch (value) {
     'daily_create' => dailyCreate,
@@ -293,6 +318,8 @@ enum _GraphOperation {
     'restore' => restore,
     'delete' => delete,
     'bulk_delete' => bulkDelete,
+    'favorite_mark' => favoriteMark,
+    'favorite_unmark' => favoriteUnmark,
     _ => throw StateError('Неизвестная операция графа: $value.'),
   };
 }
