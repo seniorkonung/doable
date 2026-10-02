@@ -19,6 +19,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get navigationArchive => 'Архив';
 
   @override
+  String get appDestinationHome => 'Главная';
+
+  @override
+  String get appDestinationDailyChoices => 'Дневные выборы';
+
+  @override
+  String get appDestinationIntentionGraph => 'Граф намерений';
+
+  @override
   String get commonLoading => 'Загрузка…';
 
   @override

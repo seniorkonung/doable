@@ -19,6 +19,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navigationArchive => 'Archive';
 
   @override
+  String get appDestinationHome => 'Home';
+
+  @override
+  String get appDestinationDailyChoices => 'Daily choices';
+
+  @override
+  String get appDestinationIntentionGraph => 'Intention graph';
+
+  @override
   String get commonLoading => 'Loading…';
 
   @override

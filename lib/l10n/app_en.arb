@@ -12,6 +12,18 @@
   "@navigationArchive": {
     "description": "Пункт навигации к архиву намерений"
   },
+  "appDestinationHome": "Home",
+  "@appDestinationHome": {
+    "description": "Название пункта основной навигации и заголовок Главной"
+  },
+  "appDestinationDailyChoices": "Daily choices",
+  "@appDestinationDailyChoices": {
+    "description": "Название пункта основной навигации и заголовок каталога дневных выборов"
+  },
+  "appDestinationIntentionGraph": "Intention graph",
+  "@appDestinationIntentionGraph": {
+    "description": "Название пункта основной навигации и заголовок каталога намерений как корневой страницы"
+  },
   "commonLoading": "Loading…",
   "@commonLoading": {
     "description": "Общее состояние загрузки"

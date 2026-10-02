@@ -116,6 +116,24 @@ abstract class AppLocalizations {
   /// **'Archive'**
   String get navigationArchive;
 
+  /// Название пункта основной навигации и заголовок Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get appDestinationHome;
+
+  /// Название пункта основной навигации и заголовок каталога дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices'**
+  String get appDestinationDailyChoices;
+
+  /// Название пункта основной навигации и заголовок каталога намерений как корневой страницы
+  ///
+  /// In en, this message translates to:
+  /// **'Intention graph'**
+  String get appDestinationIntentionGraph;
+
   /// Общее состояние загрузки
   ///
   /// In en, this message translates to:

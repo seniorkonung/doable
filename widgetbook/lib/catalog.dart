@@ -1,6 +1,7 @@
 import 'package:widgetbook/widgetbook.dart';
 
 import 'intention/intention_summary_view_use_cases.dart';
+import 'navigation/app_navigation_bar_use_cases.dart';
 
 /// Строит дерево каталога.
 ///
@@ -12,6 +13,15 @@ import 'intention/intention_summary_view_use_cases.dart';
 /// Узлы хранят ссылку на родителя, поэтому каждое обращение возвращает новое
 /// дерево, а не общее изменяемое состояние.
 List<WidgetbookNode> buildCatalog() => [
+  WidgetbookFolder(
+    name: 'Навигация',
+    children: [
+      WidgetbookComponent(
+        name: 'Панель основной навигации',
+        useCases: appNavigationBarUseCases(),
+      ),
+    ],
+  ),
   WidgetbookFolder(
     name: 'Намерения',
     children: [
