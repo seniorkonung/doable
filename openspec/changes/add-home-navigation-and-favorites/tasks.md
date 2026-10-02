@@ -282,7 +282,7 @@
   - **Вероятные файлы:** `lib/src/intention/presentation/details/intention_details_state.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`, `test/app/favorite_mark_app_flow_test.dart`; производный провайдер обновляется генерацией.
   - **Размер:** S.
 
-- [ ] 1.25 Подтвердить готовность первой фазы без действия по прежней отметке после подтверждения
+- [x] 1.25 Подтвердить готовность первой фазы без действия по прежней отметке после подтверждения
   - **Критерии приёмки:**
     - Свидетельства 1.23 и 1.24 проходят вместе: после подтверждённой отметки или её снятия страница намерения не предлагает и не отправляет действие по прежней отметке, каждое сообщение об успехе соответствует выбранному человеком действию, а остальные результаты первой фазы и прежнее поведение страницы намерения не имеют регрессий.
     - Форматирование, анализ и проверки проекта проходят на чистой зафиксированной рабочей копии; строгая проверка изменения проходит. При запущенном приложении выполнены hot reload или restart с проверкой runtime errors по AGENTS.md.
