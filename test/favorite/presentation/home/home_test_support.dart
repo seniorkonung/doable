@@ -3,11 +3,18 @@ import 'dart:async';
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -31,6 +38,95 @@ final class HomeHarness {
 
   HomeViewModel get model => container.read(homeViewModelProvider.notifier);
   HomeState get state => container.read(homeViewModelProvider);
+
+  /// Проводит команду намерения через координатор до опубликованного
+  /// подтверждённого пакета ревизии [revision].
+  ///
+  /// Пакет несёт каталожную мутацию намерения команды со снимками [before] и
+  /// [after]: отсутствие [after] означает физическое удаление.
+  /// [activeRelationCounts] добавляет изменение счётчиков связей намерений
+  /// по их номерам.
+  Future<void> confirm(
+    ExistingIntentionCommand command, {
+    required int revision,
+    required IntentionSummary before,
+    required IntentionSummary? after,
+    Map<int, int> activeRelationCounts = const {},
+  }) async {
+    final graphRevision = HomeTestRevision(revision);
+    final mutation = after == null
+        ? IntentionCatalogDeleted(
+            revision: graphRevision,
+            entry: _HomeTestEntry(before),
+          )
+        : IntentionCatalogUpdated(
+            revision: graphRevision,
+            before: _HomeTestEntry(before),
+            after: _HomeTestEntry(after),
+          );
+    final counts = [
+      for (final MapEntry(key: number, value: count)
+          in activeRelationCounts.entries)
+        IntentionRelationCountsChanged(
+          revision: graphRevision,
+          intentionId: homeTestIntentionId(number),
+          counts: RelationCounts(
+            activeNeedIncoming: 0,
+            activeNeedOutgoing: count,
+            activeCanIncoming: 0,
+            activeCanOutgoing: 0,
+            archivedNeedIncoming: 0,
+            archivedNeedOutgoing: 0,
+            archivedCanIncoming: 0,
+            archivedCanOutgoing: 0,
+          ),
+        ),
+    ];
+    await _run(
+      command,
+      ResultSuccess(
+        ConfirmedGraphResult<IntentionCommandSuccess>(
+          revision: graphRevision,
+          value: after == null
+              ? IntentionDeleted(
+                  before.id,
+                  catalogMutation: mutation,
+                  additionalChanges: counts,
+                )
+              : IntentionSaved(
+                  Intention(
+                    id: after.id,
+                    title: after.title,
+                    description: null,
+                    readiness: after.readiness,
+                    archiveState: after.archiveState,
+                    createdAt: after.createdAt,
+                    updatedAt: after.updatedAt,
+                  ),
+                  catalogMutation: mutation,
+                  additionalChanges: counts,
+                ),
+        ),
+      ),
+    );
+  }
+
+  /// Проводит команду намерения до опубликованного отказа: подтверждённого
+  /// пакета у такого завершения нет.
+  Future<void> reject(ExistingIntentionCommand command) =>
+      _run(command, const ResultFailure(IntentionUnavailableFailure()));
+
+  Future<void> _run(
+    ExistingIntentionCommand command,
+    Result<ConfirmedGraphResult<IntentionCommandSuccess>> result,
+  ) async {
+    repository.nextCommandResult = result;
+    final start = container
+        .read(graphCommandCoordinatorProvider.notifier)
+        .acceptExisting(command, presentationTitle: 'Намерение');
+    await (start as IntentionCommandAccepted).future;
+    await pumpEventQueue();
+  }
 
   void dispose() {
     subscription.close();
@@ -78,6 +174,19 @@ final class HomeTestRepository extends Fake implements PersonalGraphRepository {
   void failRead(int index, FavoriteIntentionsReadFailure failure) =>
       reads[index].complete(FavoriteIntentionsError(failure));
 
+  /// Результат, которым граница завершает следующую команду.
+  Object? nextCommandResult;
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    final result = nextCommandResult;
+    nextCommandResult = null;
+    return result! as GraphCommandResult<TSuccess, TFailure>;
+  }
+
   void throwFromRead(int index, Object error) =>
       reads[index].completeError(error);
 }
@@ -116,3 +225,36 @@ FavoriteIntentionRow homeTestRow(
   readiness: readiness,
   activeRelationCount: activeRelationCount,
 );
+
+/// Краткий снимок намерения для каталожной мутации подтверждённого пакета.
+IntentionSummary homeTestSummary(
+  int number,
+  String title, {
+  FavoriteMark favoriteMark = FavoriteMark.favorite,
+  IntentionReadiness readiness = IntentionReadiness.notReady,
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
+  int activeRelationCount = 0,
+}) {
+  final timestamp = IntentionTimestamp(DateTime.utc(2026, 10, 2));
+  return IntentionSummary(
+    id: homeTestIntentionId(number),
+    title: title,
+    hasDescription: false,
+    readiness: readiness,
+    archiveState: archiveState,
+    activeRelationCount: activeRelationCount,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    favoriteMark: favoriteMark,
+  );
+}
+
+final class _HomeTestEntry implements IntentionCatalogEntrySnapshot {
+  const _HomeTestEntry(this.summary);
+
+  @override
+  final IntentionSummary summary;
+
+  @override
+  bool matches(IntentionCatalogQuery query) => query.includes(summary);
+}

@@ -37,6 +37,9 @@ sealed class HomeLoaded extends HomeState {
 
   final GraphRevision revision;
   final HomeFreshness freshness;
+
+  /// Тот же подтверждённый снимок с другой актуальностью.
+  HomeLoaded withFreshness(HomeFreshness freshness);
 }
 
 /// Все активные избранные намерения в едином ручном порядке; список не пуст.
@@ -48,6 +51,10 @@ final class HomeList extends HomeLoaded {
   }) : items = List.unmodifiable(items);
 
   final List<FavoriteIntentionRow> items;
+
+  @override
+  HomeList withFreshness(HomeFreshness freshness) =>
+      HomeList(items: items, revision: revision, freshness: freshness);
 }
 
 enum HomeEmptyReason {
@@ -66,6 +73,10 @@ final class HomeEmpty extends HomeLoaded {
   });
 
   final HomeEmptyReason reason;
+
+  @override
+  HomeEmpty withFreshness(HomeFreshness freshness) =>
+      HomeEmpty(reason: reason, revision: revision, freshness: freshness);
 }
 
 /// Доказанно устранимый отказ первоначального получения: доступен повтор.
