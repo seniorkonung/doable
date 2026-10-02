@@ -42,3 +42,12 @@ void removeFavoriteMark(
     intentionId,
   ]);
 }
+
+/// Сохранённые отметки избранного — идентификатор намерения и его место —
+/// в порядке мест.
+List<(String, int)> storedFavoriteMarks(sqlite.Database database) => [
+  for (final row in database.select(
+    'SELECT intention_id, position FROM favorite_intentions ORDER BY position',
+  ))
+    (row['intention_id'] as String, row['position'] as int),
+];
