@@ -1,5 +1,6 @@
 import 'package:widgetbook/widgetbook.dart';
 
+import 'favorite/home_row_use_cases.dart';
 import 'intention/intention_summary_view_use_cases.dart';
 import 'navigation/app_navigation_bar_use_cases.dart';
 
@@ -19,6 +20,15 @@ List<WidgetbookNode> buildCatalog() => [
       WidgetbookComponent(
         name: 'Панель основной навигации',
         useCases: appNavigationBarUseCases(),
+      ),
+    ],
+  ),
+  WidgetbookFolder(
+    name: 'Главная',
+    children: [
+      WidgetbookComponent(
+        name: 'Строка избранного намерения',
+        useCases: homeRowUseCases(),
       ),
     ],
   ),

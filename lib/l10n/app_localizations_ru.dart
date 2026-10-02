@@ -28,6 +28,47 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Граф намерений';
 
   @override
+  String get homeFavoritesHeading => 'Избранные намерения';
+
+  @override
+  String get homeLoading => 'Загружаем избранные намерения…';
+
+  @override
+  String get homeEmptyNoFavorites =>
+      'Избранных намерений пока нет. Чтобы добавить намерение сюда, отметьте его избранным на его странице.';
+
+  @override
+  String get homeEmptyAllArchived =>
+      'Все избранные намерения в архиве. Намерение, восстановленное из архива, вернётся сюда на своё место.';
+
+  @override
+  String get homeOpenIntentionGraph => 'Открыть граф намерений';
+
+  @override
+  String get homeUnavailable =>
+      'Не удалось загрузить избранные намерения. Повторите попытку.';
+
+  @override
+  String get homeCorruption =>
+      'Сохранённые данные избранных намерений повреждены и не могут быть показаны.';
+
+  @override
+  String get homeUnexpected =>
+      'Не удалось загрузить избранные намерения из-за непредвиденной ошибки.';
+
+  @override
+  String get homeRefreshUnavailable =>
+      'Список избранных намерений не обновлён: не удалось получить изменения.';
+
+  @override
+  String get homeRefreshCorruption =>
+      'Список избранных намерений не обновлён: сохранённые данные повреждены.';
+
+  @override
+  String get homeRefreshUnexpected =>
+      'Список избранных намерений не обновлён из-за непредвиденной ошибки.';
+
+  @override
   String get commonLoading => 'Загрузка…';
 
   @override

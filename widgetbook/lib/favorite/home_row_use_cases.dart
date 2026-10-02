@@ -1,0 +1,58 @@
+import 'package:doable/src/favorite/application/favorite_intentions.dart';
+import 'package:doable/src/favorite/presentation/home/home_page.dart';
+import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:widgetbook/widgetbook.dart';
+
+const _title = 'быть здоровым';
+const _longTitle =
+    'научиться хорошо плавать и перестать бояться глубины в открытой воде';
+
+/// Состояния строки избранного намерения на Главной — [HomeIntentionRow]
+/// приложения.
+List<WidgetbookUseCase> homeRowUseCases() => [
+  WidgetbookUseCase(
+    name: 'Готово к действию',
+    builder: (context) => HomeIntentionRow(
+      row: _row(
+        title: _title,
+        readiness: IntentionReadiness.ready,
+        activeRelationCount: 3,
+      ),
+      onTap: () {},
+    ),
+  ),
+  WidgetbookUseCase(
+    name: 'Не готово к действию',
+    builder: (context) => HomeIntentionRow(
+      row: _row(title: _title),
+      onTap: () {},
+    ),
+  ),
+  WidgetbookUseCase(
+    name: 'Длинное название',
+    builder: (context) => HomeIntentionRow(
+      row: _row(title: _longTitle, activeRelationCount: 12),
+      onTap: () {},
+    ),
+  ),
+];
+
+FavoriteIntentionRow _row({
+  required String title,
+  IntentionReadiness readiness = IntentionReadiness.notReady,
+  int activeRelationCount = 0,
+}) {
+  const serialized = '018f0000-0000-7000-8000-000000000001';
+  return switch (IntentionId.decode(serialized)) {
+    IntentionIdDecodingSuccess(:final id) => FavoriteIntentionRow(
+      id: id,
+      title: title,
+      readiness: readiness,
+      activeRelationCount: activeRelationCount,
+    ),
+    _ => throw StateError(
+      'Идентификатор образца намерения недействителен: $serialized',
+    ),
+  };
+}

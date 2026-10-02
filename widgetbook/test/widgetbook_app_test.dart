@@ -1,4 +1,6 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/favorite/presentation/home/home_page.dart';
+import 'package:doable_widgetbook/favorite/home_row_use_cases.dart';
 import 'package:doable_widgetbook/navigation/app_navigation_bar_use_cases.dart';
 import 'package:doable_widgetbook/widgetbook_app.dart';
 import 'package:flutter/material.dart';
@@ -52,6 +54,56 @@ void main() {
         }
       }
     }
+  });
+
+  testWidgets('строка Главной показана в обеих локалях без звезды', (
+    tester,
+  ) async {
+    final useCases = homeRowUseCases();
+    expect(useCases.map((useCase) => useCase.name), [
+      'Готово к действию',
+      'Не готово к действию',
+      'Длинное название',
+    ]);
+
+    final labels = {
+      const Locale('ru'): ['Готово к действию', 'Активных связей: 3'],
+      const Locale('en'): ['Ready for action', 'Active relations: 3'],
+    };
+    for (final MapEntry(key: locale, value: localeLabels) in labels.entries) {
+      for (final useCase in useCases) {
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: Builder(builder: useCase.builder)),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(HomeIntentionRow), findsOneWidget);
+        expect(find.byIcon(Icons.star), findsNothing);
+        expect(tester.takeException(), isNull);
+        if (useCase == useCases.first) {
+          expect(find.text('быть здоровым'), findsOneWidget);
+          for (final label in localeLabels) {
+            expect(find.text(label), findsOneWidget);
+          }
+        }
+      }
+    }
+  });
+
+  testWidgets('каталог показывает раздел Главной', (tester) async {
+    tester.view.physicalSize = const Size(1600, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const WidgetbookApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Главная'), findsOneWidget);
   });
 
   testWidgets('каталог показывает раздел навигации', (tester) async {

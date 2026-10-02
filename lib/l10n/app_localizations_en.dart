@@ -28,6 +28,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Intention graph';
 
   @override
+  String get homeFavoritesHeading => 'Favorite intentions';
+
+  @override
+  String get homeLoading => 'Loading favorite intentions…';
+
+  @override
+  String get homeEmptyNoFavorites =>
+      'There are no favorite intentions yet. To add an intention here, mark it as a favorite on its page.';
+
+  @override
+  String get homeEmptyAllArchived =>
+      'All favorite intentions are archived. An intention restored from the archive returns here to its place.';
+
+  @override
+  String get homeOpenIntentionGraph => 'Open intention graph';
+
+  @override
+  String get homeUnavailable =>
+      'Favorite intentions couldn’t be loaded. Try again.';
+
+  @override
+  String get homeCorruption =>
+      'Stored favorite intention data is damaged and can’t be shown.';
+
+  @override
+  String get homeUnexpected =>
+      'Favorite intentions couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get homeRefreshUnavailable =>
+      'The favorite intention list isn’t up to date: changes couldn’t be loaded.';
+
+  @override
+  String get homeRefreshCorruption =>
+      'The favorite intention list isn’t up to date: stored data is damaged.';
+
+  @override
+  String get homeRefreshUnexpected =>
+      'The favorite intention list isn’t up to date because of an unexpected error.';
+
+  @override
   String get commonLoading => 'Loading…';
 
   @override

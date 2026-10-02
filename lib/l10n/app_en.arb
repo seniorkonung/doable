@@ -24,6 +24,50 @@
   "@appDestinationIntentionGraph": {
     "description": "Название пункта основной навигации и заголовок каталога намерений как корневой страницы"
   },
+  "homeFavoritesHeading": "Favorite intentions",
+  "@homeFavoritesHeading": {
+    "description": "Название списка избранных намерений на Главной"
+  },
+  "homeLoading": "Loading favorite intentions…",
+  "@homeLoading": {
+    "description": "Первоначальное получение списка избранных намерений"
+  },
+  "homeEmptyNoFavorites": "There are no favorite intentions yet. To add an intention here, mark it as a favorite on its page.",
+  "@homeEmptyNoFavorites": {
+    "description": "Пустая Главная: в личном графе нет избранных намерений"
+  },
+  "homeEmptyAllArchived": "All favorite intentions are archived. An intention restored from the archive returns here to its place.",
+  "@homeEmptyAllArchived": {
+    "description": "Пустая Главная: избранные намерения есть, но все архивированы"
+  },
+  "homeOpenIntentionGraph": "Open intention graph",
+  "@homeOpenIntentionGraph": {
+    "description": "Переход с пустой Главной к каталогу намерений"
+  },
+  "homeUnavailable": "Favorite intentions couldn’t be loaded. Try again.",
+  "@homeUnavailable": {
+    "description": "Устранимый отказ первоначального получения списка избранных намерений"
+  },
+  "homeCorruption": "Stored favorite intention data is damaged and can’t be shown.",
+  "@homeCorruption": {
+    "description": "Повреждение сохранённых данных избранного при получении списка"
+  },
+  "homeUnexpected": "Favorite intentions couldn’t be loaded because of an unexpected error.",
+  "@homeUnexpected": {
+    "description": "Неизвестный отказ получения списка избранных намерений"
+  },
+  "homeRefreshUnavailable": "The favorite intention list isn’t up to date: changes couldn’t be loaded.",
+  "@homeRefreshUnavailable": {
+    "description": "Устранимый отказ обновления показанного списка избранных намерений"
+  },
+  "homeRefreshCorruption": "The favorite intention list isn’t up to date: stored data is damaged.",
+  "@homeRefreshCorruption": {
+    "description": "Повреждение при обновлении показанного списка избранных намерений"
+  },
+  "homeRefreshUnexpected": "The favorite intention list isn’t up to date because of an unexpected error.",
+  "@homeRefreshUnexpected": {
+    "description": "Неизвестный отказ обновления показанного списка избранных намерений"
+  },
   "commonLoading": "Loading…",
   "@commonLoading": {
     "description": "Общее состояние загрузки"

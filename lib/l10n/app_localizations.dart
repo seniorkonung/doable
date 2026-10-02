@@ -134,6 +134,72 @@ abstract class AppLocalizations {
   /// **'Intention graph'**
   String get appDestinationIntentionGraph;
 
+  /// Название списка избранных намерений на Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intentions'**
+  String get homeFavoritesHeading;
+
+  /// Первоначальное получение списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading favorite intentions…'**
+  String get homeLoading;
+
+  /// Пустая Главная: в личном графе нет избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'There are no favorite intentions yet. To add an intention here, mark it as a favorite on its page.'**
+  String get homeEmptyNoFavorites;
+
+  /// Пустая Главная: избранные намерения есть, но все архивированы
+  ///
+  /// In en, this message translates to:
+  /// **'All favorite intentions are archived. An intention restored from the archive returns here to its place.'**
+  String get homeEmptyAllArchived;
+
+  /// Переход с пустой Главной к каталогу намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Open intention graph'**
+  String get homeOpenIntentionGraph;
+
+  /// Устранимый отказ первоначального получения списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intentions couldn’t be loaded. Try again.'**
+  String get homeUnavailable;
+
+  /// Повреждение сохранённых данных избранного при получении списка
+  ///
+  /// In en, this message translates to:
+  /// **'Stored favorite intention data is damaged and can’t be shown.'**
+  String get homeCorruption;
+
+  /// Неизвестный отказ получения списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intentions couldn’t be loaded because of an unexpected error.'**
+  String get homeUnexpected;
+
+  /// Устранимый отказ обновления показанного списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite intention list isn’t up to date: changes couldn’t be loaded.'**
+  String get homeRefreshUnavailable;
+
+  /// Повреждение при обновлении показанного списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite intention list isn’t up to date: stored data is damaged.'**
+  String get homeRefreshCorruption;
+
+  /// Неизвестный отказ обновления показанного списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite intention list isn’t up to date because of an unexpected error.'**
+  String get homeRefreshUnexpected;
+
   /// Общее состояние загрузки
   ///
   /// In en, this message translates to:
