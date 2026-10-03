@@ -13,6 +13,9 @@ import '../path/choice_path_page.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
 
+/// Высота кнопки создания дневного выбора вместе с отступами над нижним краем.
+const _createActionExtent = 56 + 2 * kFloatingActionButtonMargin;
+
 @RoutePage()
 final class DailyChoiceCatalogPage extends ConsumerStatefulWidget {
   const DailyChoiceCatalogPage({super.key});
@@ -209,6 +212,9 @@ final class _DailyChoiceCatalogPageState
           child: state.items.isEmpty
               ? _Status(message: l10n.dailyChoiceCatalogEmpty)
               : ListView.builder(
+                  // Место под кнопку создания дневного выбора: прокрученные до
+                  // конца последняя строка и продолжение выдачи стоят над ней.
+                  padding: const EdgeInsets.only(bottom: _createActionExtent),
                   itemCount:
                       state.items.length + (state.nextCursor == null ? 0 : 1),
                   itemBuilder: (context, index) {
