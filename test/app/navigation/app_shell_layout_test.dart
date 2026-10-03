@@ -224,57 +224,73 @@ void main() {
       });
     }
 
-    testWidgets('каталог намерений: отказ продолжения выдачи и повтор видны '
-        'над панелью, а повтор догружает выдачу до конца', (tester) async {
-      const count = _intentionPageSize + 30;
-      final faults = _ReadFaults();
-      await _start(
+    for (final insets in [_safeArea, _keyboardOpen]) {
+      testWidgets('каталог намерений, ${insets.name}: отказ продолжения выдачи '
+          'и повтор видны над панелью, а повтор догружает выдачу до конца', (
         tester,
-        intentions: count,
-        insets: _safeArea,
-        observer: faults,
-      );
-      await _select(tester, AppDestination.intentionGraph);
-      await _until(tester, find.text('Total intentions: $count'));
-      final page = find.byType(IntentionCatalogPage);
-      final create = find.byKey(const ValueKey('catalog-create-intention'));
+      ) async {
+        const count = _intentionPageSize + 30;
+        final faults = _ReadFaults();
+        await _start(
+          tester,
+          intentions: count,
+          insets: insets,
+          observer: faults,
+        );
+        await _select(tester, AppDestination.intentionGraph);
+        await _until(tester, find.text('Total intentions: $count'));
+        final page = find.byType(IntentionCatalogPage);
+        final create = find.byKey(const ValueKey('catalog-create-intention'));
+        if (insets.keyboard > 0) {
+          // Клавиатуру открывает поле фильтра в фокусе, а выдача остаётся
+          // больше одной порции.
+          await _focusTitleFilter(tester, insets);
+          expect(find.text('Total intentions: $count'), findsOneWidget);
+        }
 
-      faults.isFailing = true;
-      await _scrollToEnd(tester, page);
+        faults.isFailing = true;
+        await _scrollToEnd(tester, page);
 
-      final continuation = find.byType(IntentionCatalogContinuationStatusView);
-      final failure = find.descendant(
-        of: continuation,
-        matching: find.text('More intentions couldn’t be loaded.'),
-      );
-      final retry = find.descendant(
-        of: continuation,
-        matching: find.byType(FilledButton),
-      );
-      // Отступы состояния нажатий не принимают: полную видимость проверяют
-      // его сообщение и повтор, а отсутствие пересечения с кнопкой — всё
-      // состояние.
-      _expectFullyVisible(tester, failure, _safeArea);
-      _expectFullyVisible(tester, retry, _safeArea);
-      _expectMainAction(tester, create, _safeArea);
-      expect(
-        tester.getRect(continuation).overlaps(tester.getRect(create)),
-        isFalse,
-      );
-      expect(retry.hitTestable(), findsOneWidget);
+        final continuation = find.byType(
+          IntentionCatalogContinuationStatusView,
+        );
+        final failure = find.descendant(
+          of: continuation,
+          matching: find.text('More intentions couldn’t be loaded.'),
+        );
+        final retry = find.descendant(
+          of: continuation,
+          matching: find.byType(FilledButton),
+        );
+        // Отступы состояния нажатий не принимают: полную видимость проверяют
+        // его сообщение и повтор, а отсутствие пересечения с кнопкой — всё
+        // состояние.
+        _expectFullyVisible(tester, failure, insets);
+        _expectFullyVisible(tester, retry, insets);
+        _expectMainAction(tester, create, insets);
+        expect(
+          tester.getRect(continuation).overlaps(tester.getRect(create)),
+          isFalse,
+        );
+        expect(retry.hitTestable(), findsOneWidget);
 
-      faults.isFailing = false;
-      await tester.tap(retry);
-      await _settle(tester);
-      await _scrollToEnd(tester, page);
+        faults.isFailing = false;
+        await tester.tap(retry);
+        await _settle(tester);
+        await _scrollToEnd(tester, page);
 
-      expect(continuation, findsNothing);
-      final lastRow = _catalogRow(_intentionTitle(1));
-      _expectFullyVisible(tester, lastRow, _safeArea);
-      _expectMainAction(tester, create, _safeArea);
-      expect(tester.getRect(lastRow).overlaps(tester.getRect(create)), isFalse);
-      expect(tester.takeException(), isNull);
-    });
+        expect(continuation, findsNothing);
+        final lastRow = _catalogRow(_intentionTitle(1));
+        _expectFullyVisible(tester, lastRow, insets);
+        _expectMainAction(tester, create, insets);
+        expect(
+          tester.getRect(lastRow).overlaps(tester.getRect(create)),
+          isFalse,
+        );
+        expect(lastRow.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
 
     for (final locale in _locales) {
       for (final insets in _insetVariants) {
@@ -883,6 +899,33 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
       reason: '$finder: нажатие на высоте $y',
     );
   }
+}
+
+/// Ставит фокус в поле фильтра названия каталога намерений, не меняя поиск:
+/// поле видно над клавиатурой и не закрыто созданием намерения.
+Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
+  final create = find.byKey(const ValueKey('catalog-create-intention'));
+  await tester.showKeyboard(_titleFilter);
+  await tester.pumpAndSettle();
+  expect(
+    tester
+        .widget<EditableText>(
+          find.descendant(
+            of: _titleFilter,
+            matching: find.byType(EditableText),
+          ),
+        )
+        .focusNode
+        .hasFocus,
+    isTrue,
+  );
+  expect(_titleFilter.hitTestable(), findsOneWidget);
+  _expectFullyVisible(tester, _titleFilter, insets);
+  _expectMainAction(tester, create, insets);
+  expect(
+    tester.getRect(_titleFilter).overlaps(tester.getRect(create)),
+    isFalse,
+  );
 }
 
 /// Ставит фокус в поле фильтра даты каталога дневных выборов: поле видно над
