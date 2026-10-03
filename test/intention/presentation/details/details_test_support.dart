@@ -10,6 +10,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/favorite/application/favorite_order_command.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -136,6 +137,7 @@ final class ControlledDetailsRepository
   final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
   final tagCommands = <TagCommand>[];
+  final favoriteOrderCommands = <MoveFavoriteIntention>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
@@ -143,6 +145,8 @@ final class ControlledDetailsRepository
       <Completer<DeleteBlockingRelationsResult>>[];
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
+  final _favoriteOrderCommandRequests =
+      <Completer<FavoriteOrderCommandResult>>[];
   var _watchCallCount = 0;
 
   Result<IntentionCatalogPage>? catalogResult;
@@ -258,6 +262,7 @@ final class ControlledDetailsRepository
         await _executeBlockingRelationsDelete(deletion),
       final DailyChoiceCommand choice => await _executeDailyChoice(choice),
       final TagCommand tag => await _executeTag(tag),
+      final MoveFavoriteIntention move => await _executeFavoriteOrder(move),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -296,6 +301,23 @@ final class ControlledDetailsRepository
 
   void failTagCommand(int index, Object error) =>
       _tagCommandRequests[index].completeError(error);
+
+  Future<FavoriteOrderCommandResult> _executeFavoriteOrder(
+    MoveFavoriteIntention command,
+  ) {
+    favoriteOrderCommands.add(command);
+    final request = Completer<FavoriteOrderCommandResult>();
+    _favoriteOrderCommandRequests.add(request);
+    return request.future;
+  }
+
+  void completeFavoriteOrderCommand(
+    int index,
+    FavoriteOrderCommandResult result,
+  ) => _favoriteOrderCommandRequests[index].complete(result);
+
+  void failFavoriteOrderCommand(int index, Object error) =>
+      _favoriteOrderCommandRequests[index].completeError(error);
 
   Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
     DeleteBlockingRelations command,

@@ -6,6 +6,8 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/favorite/application/favorite_order_command.dart';
+import 'package:doable/src/favorite/domain/favorite_order.dart';
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -293,6 +295,97 @@ void main() {
     await _closeMessage(tester);
     expect(find.byType(SnackBar), findsNothing);
   });
+
+  for (final scenario in const [
+    (
+      locale: Locale('en'),
+      message:
+          'The new order of favorite intentions wasn’t saved because the '
+          'list changed.',
+    ),
+    (
+      locale: Locale('ru'),
+      message:
+          'Новый порядок избранных намерений не сохранён, потому что список '
+          'изменился.',
+    ),
+  ]) {
+    testWidgets(
+      'отказ перестановки предъявляется общей поверхностью без участия инициатора, ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: scenario.locale,
+        );
+        final move = harness.startFavoriteOrderMove();
+        harness.completeFavoriteOrderFailure(
+          move,
+          const FavoriteOrderConflictFailure(),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.message), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('graph-operation-message')),
+          ),
+          matchesSemantics(
+            label: scenario.message,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(harness.repository.favoriteOrderCommands, hasLength(1));
+      },
+    );
+  }
+
+  testWidgets(
+    'исключение перестановки предъявляется неизвестным отказом без технических данных',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final move = harness.startFavoriteOrderMove();
+      harness.failFavoriteOrderWithException(
+        move,
+        StateError('UPDATE favorite_intentions: личные данные'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'The new order of favorite intentions couldn’t be saved because of '
+          'an unexpected error.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('favorite_intentions'), findsNothing);
+      expect(find.textContaining('личные данные'), findsNothing);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'успех перестановки не показывает сообщения и не задерживает следующий результат',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final move = harness.startFavoriteOrderMove();
+      harness.completeFavoriteOrderMoved(move);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+
+      final deletion = harness.startDelete(index: 1, title: 'Следующее');
+      harness.completeDeleted(deletion);
+      await tester.pumpAndSettle();
+
+      expect(find.text(_deleted('Следующее')), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 
   for (final locale in const [Locale('en'), Locale('ru')]) {
     testWidgets(
@@ -1840,9 +1933,55 @@ final class _PresenterHarness {
   final _blockingIndexes = <BlockingRelationsDeleteAccepted, int>{};
   final _dailyChoiceIndexes = <DailyChoiceCommandAccepted, int>{};
   final _tagIndexes = <TagCommandAccepted, int>{};
+  final _favoriteOrderIndexes = <FavoriteOrderCommandAccepted, int>{};
 
   GraphCommandCoordinator get _coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
+
+  /// Перестановка не освобождает право инициатора: её отказ сразу
+  /// принадлежит общей поверхности.
+  FavoriteOrderCommandAccepted startFavoriteOrderMove() {
+    final commandIndex = repository.favoriteOrderCommands.length;
+    final accepted = _coordinator.acceptFavoriteOrderMove(
+      MoveFavoriteIntention(
+        intentionId: testDetailsIntentionId(2),
+        placement: AfterFavoritePlacement(testDetailsIntentionId(1)),
+      ),
+    ) as FavoriteOrderCommandAccepted;
+    _favoriteOrderIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  void completeFavoriteOrderMoved(FavoriteOrderCommandAccepted accepted) {
+    const revision = TestDetailsRevision(9);
+    repository.completeFavoriteOrderCommand(
+      _favoriteOrderIndexes[accepted]!,
+      FavoriteOrderCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: FavoriteOrderMoved(
+            FavoriteOrderChangedChange(revision: revision),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeFavoriteOrderFailure(
+    FavoriteOrderCommandAccepted accepted,
+    FavoriteOrderCommandFailure failure,
+  ) => repository.completeFavoriteOrderCommand(
+    _favoriteOrderIndexes[accepted]!,
+    FavoriteOrderCommandFailed(failure),
+  );
+
+  void failFavoriteOrderWithException(
+    FavoriteOrderCommandAccepted accepted,
+    Object error,
+  ) => repository.failFavoriteOrderCommand(
+    _favoriteOrderIndexes[accepted]!,
+    error,
+  );
 
   TagCommandAccepted startTag(
     TagCommandKind kind, {
@@ -1942,7 +2081,7 @@ final class _PresenterHarness {
   void failTagWithException(TagCommandAccepted accepted, Object error) =>
       repository.failTagCommand(_tagIndexes[accepted]!, error);
 
-  void releaseInitiatorPresentation(GraphOperationToken token) =>
+  void releaseInitiatorPresentation(GraphInitiatorOperationToken token) =>
       _coordinator.releaseInitiatorPresentation(token);
 
   DailyChoiceCommandAccepted startDailyChoice(DailyChoiceCommandKind kind) =>
@@ -2322,7 +2461,7 @@ final class _PresenterHarness {
   }
 
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
-    GraphOperationToken token,
+    GraphInitiatorOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
 
   void releaseInitiatorClaim(GraphInitiatorPresentationClaim claim) =>
