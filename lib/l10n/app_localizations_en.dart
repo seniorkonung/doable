@@ -69,6 +69,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'The favorite intention list isn’t up to date because of an unexpected error.';
 
   @override
+  String get favoriteOrderConflict =>
+      'The new order of favorite intentions wasn’t saved because the list changed.';
+
+  @override
+  String get favoriteOrderInvalid =>
+      'The new order of favorite intentions wasn’t saved: the move isn’t valid.';
+
+  @override
+  String get favoriteOrderUnavailable =>
+      'The new order of favorite intentions couldn’t be saved. Try again.';
+
+  @override
+  String get favoriteOrderCorruption =>
+      'Stored favorite intention data is damaged. The new order wasn’t saved.';
+
+  @override
+  String get favoriteOrderUnexpected =>
+      'The new order of favorite intentions couldn’t be saved because of an unexpected error.';
+
+  @override
   String get commonLoading => 'Loading…';
 
   @override

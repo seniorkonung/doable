@@ -200,6 +200,36 @@ abstract class AppLocalizations {
   /// **'The favorite intention list isn’t up to date because of an unexpected error.'**
   String get homeRefreshUnexpected;
 
+  /// Конфликт актуального состояния: перестановка избранных намерений не сохранена, потому что список изменился
+  ///
+  /// In en, this message translates to:
+  /// **'The new order of favorite intentions wasn’t saved because the list changed.'**
+  String get favoriteOrderConflict;
+
+  /// Безопасная ошибка недопустимого перемещения избранного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The new order of favorite intentions wasn’t saved: the move isn’t valid.'**
+  String get favoriteOrderInvalid;
+
+  /// Устранимая недоступность сохранения перестановки избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The new order of favorite intentions couldn’t be saved. Try again.'**
+  String get favoriteOrderUnavailable;
+
+  /// Повреждение сохранённых данных при перестановке избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Stored favorite intention data is damaged. The new order wasn’t saved.'**
+  String get favoriteOrderCorruption;
+
+  /// Неизвестный отказ сохранения перестановки избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The new order of favorite intentions couldn’t be saved because of an unexpected error.'**
+  String get favoriteOrderUnexpected;
+
   /// Общее состояние загрузки
   ///
   /// In en, this message translates to:

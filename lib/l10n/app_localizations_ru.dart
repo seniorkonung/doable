@@ -69,6 +69,26 @@ class AppLocalizationsRu extends AppLocalizations {
       'Список избранных намерений не обновлён из-за непредвиденной ошибки.';
 
   @override
+  String get favoriteOrderConflict =>
+      'Новый порядок избранных намерений не сохранён, потому что список изменился.';
+
+  @override
+  String get favoriteOrderInvalid =>
+      'Новый порядок избранных намерений не сохранён: недопустимое перемещение.';
+
+  @override
+  String get favoriteOrderUnavailable =>
+      'Не удалось сохранить новый порядок избранных намерений. Повторите попытку.';
+
+  @override
+  String get favoriteOrderCorruption =>
+      'Сохранённые данные избранных намерений повреждены. Новый порядок не сохранён.';
+
+  @override
+  String get favoriteOrderUnexpected =>
+      'Не удалось сохранить новый порядок избранных намерений из-за непредвиденной ошибки.';
+
+  @override
   String get commonLoading => 'Загрузка…';
 
   @override
