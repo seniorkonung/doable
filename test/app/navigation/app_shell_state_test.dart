@@ -17,6 +17,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
+import 'package:doable/src/favorite/application/favorite_order_command.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
@@ -302,6 +303,80 @@ void main() {
         tagFixtureId(changed),
       );
       expect(_dailyChoiceParameters(tester, app), before);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('перестановка на Главной', () {
+    testWidgets('на экране телефона последняя строка и её ручка доступны над '
+        'панелью, а перестановка ручкой сохраняется без сообщения и не '
+        'сбрасывает позицию прокрутки ни результатом, ни переключением '
+        'пунктов', (tester) async {
+      final app = await _start(tester);
+      tester.view.physicalSize = const Size(360, 780);
+      await tester.pumpAndSettle();
+      final position = _homePosition(tester);
+      await _scrollToEnd(tester, position);
+      final offset = position.pixels;
+      expect(offset, greaterThan(0));
+
+      final panelTop = tester.getRect(find.byType(AppNavigationBar)).top;
+      final handle = _homeHandle(_favoriteCount);
+      expect(
+        tester.getRect(_homeRow(_favoriteCount)).bottom,
+        lessThanOrEqualTo(panelTop),
+      );
+      expect(tester.getRect(handle).bottom, lessThanOrEqualTo(panelTop));
+      final listener = tester.renderObject<RenderBox>(handle);
+      expect(
+        tester
+            .hitTestOnBinding(tester.getCenter(handle))
+            .path
+            .any((entry) => identical(entry.target, listener)),
+        isTrue,
+      );
+
+      // Последнее избранное намерение ставится сразу после 38-го.
+      await _dragHomeRowUp(tester, _favoriteCount);
+      await _waitFor(
+        tester,
+        () =>
+            app.home.reorder is HomeReorderIdle &&
+            app.home.items[_favoriteCount - 2].title ==
+                _favoriteTitle(_favoriteCount),
+      );
+      await tester.pumpAndSettle();
+
+      final reordered = [
+        for (var number = 1; number <= _favoriteCount - 2; number++) number,
+        _favoriteCount,
+        _favoriteCount - 1,
+      ];
+      expect(
+        [for (final (id, _) in storedFavoriteMarks(app.raw)) id],
+        [for (final number in reordered) tagFixtureId(number)],
+      );
+      expect(
+        [for (final row in app.home.items) row.title],
+        [for (final number in reordered) _favoriteTitle(number)],
+      );
+      expect(
+        app.repository.commands.whereType<MoveFavoriteIntention>(),
+        hasLength(1),
+      );
+      expect(_homePosition(tester).pixels, offset);
+      expect(_builtMessages, findsNothing);
+
+      await _select(tester, AppDestination.dailyChoices);
+      await _select(tester, AppDestination.intentionGraph);
+      await _select(tester, AppDestination.home);
+
+      expect(_homePosition(tester).pixels, offset);
+      expect(
+        [for (final row in app.home.items) row.title],
+        [for (final number in reordered) _favoriteTitle(number)],
+      );
+      expect(_builtMessages, findsNothing);
       expect(tester.takeException(), isNull);
     });
   });
@@ -857,6 +932,36 @@ ScrollPosition _homePosition(WidgetTester tester) => _positionOf(
   tester,
   find.byKey(const PageStorageKey<String>('home-favorite-intentions')),
 );
+
+/// Строка Главной избранного намерения с номером [number] фикстуры.
+Finder _homeRow(int number) => find.byKey(
+  ValueKey(
+    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id,
+  ),
+);
+
+/// Ручка строки Главной, с которой начинается перетаскивание.
+Finder _homeHandle(int number) => find.descendant(
+  of: _homeRow(number),
+  matching: find.byType(ReorderableDragStartListener),
+);
+
+/// Перетаскивает строку Главной намерения [number] ручкой на одно место
+/// выше: строка занимает место соседа, когда её край заходит за его
+/// середину.
+Future<void> _dragHomeRowUp(WidgetTester tester, int number) async {
+  final rowHeight = tester.getSize(_homeRow(number)).height;
+  final gesture = await tester.startGesture(
+    tester.getCenter(_homeHandle(number)),
+  );
+  const steps = 10;
+  for (var step = 0; step < steps; step++) {
+    await gesture.moveBy(Offset(0, -0.75 * rowHeight / steps));
+    await tester.pump();
+  }
+  await gesture.up();
+  await tester.pumpAndSettle();
+}
 
 /// Строка выдачи каталога намерений с названием [title].
 Finder _catalogRow(String title) => find.descendant(

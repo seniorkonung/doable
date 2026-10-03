@@ -200,6 +200,24 @@ abstract class AppLocalizations {
   /// **'The favorite intention list isn’t up to date because of an unexpected error.'**
   String get homeRefreshUnexpected;
 
+  /// Подсказка ручки, которой перетаскивают строку избранного намерения на Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to move the intention'**
+  String get homeReorderHandleTooltip;
+
+  /// Признак строки Главной, новое место которой после перестановки ещё не подтверждено
+  ///
+  /// In en, this message translates to:
+  /// **'Saving the new position…'**
+  String get homeReorderSaving;
+
+  /// Объявление экранного диктора о подтверждённом новом месте избранного намерения на Главной
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” is now in position {position} of {count}'**
+  String homeReorderMoved(String title, int position, int count);
+
   /// Конфликт актуального состояния: перестановка избранных намерений не сохранена, потому что список изменился
   ///
   /// In en, this message translates to:

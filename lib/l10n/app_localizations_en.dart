@@ -69,6 +69,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'The favorite intention list isn’t up to date because of an unexpected error.';
 
   @override
+  String get homeReorderHandleTooltip => 'Drag to move the intention';
+
+  @override
+  String get homeReorderSaving => 'Saving the new position…';
+
+  @override
+  String homeReorderMoved(String title, int position, int count) {
+    return '“$title” is now in position $position of $count';
+  }
+
+  @override
   String get favoriteOrderConflict =>
       'The new order of favorite intentions wasn’t saved because the list changed.';
 

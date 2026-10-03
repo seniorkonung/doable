@@ -15,6 +15,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -80,8 +81,9 @@ void main() {
 
     testWidgets('экранный диктор получает строки Главной в порядке списка с '
         'названием, готовностью к действию и числом активных связей без '
-        'действий перемещения и снятия отметки, а действие строки открывает '
-        'её намерение: $code', (tester) async {
+        'снятия отметки, а действие строки открывает её намерение: $code', (
+      tester,
+    ) async {
       final semantics = tester.ensureSemantics();
       final app = await _start(tester, locale);
       final l10n = app.l10n;
@@ -98,14 +100,6 @@ void main() {
       ], labels);
       for (final row in _rows) {
         _expectRowAnnounced(tester, l10n, row);
-      }
-      // Ни один элемент экрана не предлагает экранному диктору перемещение.
-      for (final node in traversal) {
-        expect(
-          node.getSemanticsData().hasAction(SemanticsAction.customAction),
-          isFalse,
-          reason: node.label,
-        );
       }
 
       // Действие экранного диктора на второй из тёзок открывает именно её.
@@ -514,22 +508,19 @@ String _rowLabel(AppLocalizations l10n, _Row row) => [
 ].join('\n');
 
 /// Строка объявляется одним узлом с названием, готовностью и числом
-/// активных связей и предлагает только открыть намерение: действий
-/// перемещения, снятия отметки и отдельных элементов с действиями нет.
+/// активных связей и открывает намерение: снятия отметки и отдельных
+/// элементов с действиями в строке нет.
 void _expectRowAnnounced(WidgetTester tester, AppLocalizations l10n, _Row row) {
   final finder = _row(row.number);
-  final node = tester.getSemantics(finder);
+  final node = tester.getSemantics(
+    find.descendant(of: finder, matching: find.byType(IntentionSummaryView)),
+  );
   expect(node.label, _rowLabel(l10n, row));
   final data = node.getSemanticsData();
   expect(data.hasAction(SemanticsAction.tap), isTrue);
-  for (final action in [
-    SemanticsAction.longPress,
-    SemanticsAction.dismiss,
-    SemanticsAction.customAction,
-  ]) {
+  for (final action in [SemanticsAction.longPress, SemanticsAction.dismiss]) {
     expect(data.hasAction(action), isFalse, reason: '$action');
   }
-  expect(data.customSemanticsActionIds ?? const <int>[], isEmpty);
   expect(
     find.descendant(of: finder, matching: find.byType(IconButton)),
     findsNothing,

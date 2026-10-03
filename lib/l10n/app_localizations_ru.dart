@@ -69,6 +69,18 @@ class AppLocalizationsRu extends AppLocalizations {
       'Список избранных намерений не обновлён из-за непредвиденной ошибки.';
 
   @override
+  String get homeReorderHandleTooltip =>
+      'Перетащите, чтобы переместить намерение';
+
+  @override
+  String get homeReorderSaving => 'Новое место сохраняется…';
+
+  @override
+  String homeReorderMoved(String title, int position, int count) {
+    return '«$title» теперь на месте $position из $count';
+  }
+
+  @override
   String get favoriteOrderConflict =>
       'Новый порядок избранных намерений не сохранён, потому что список изменился.';
 

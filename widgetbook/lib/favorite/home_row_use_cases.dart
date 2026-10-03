@@ -19,6 +19,8 @@ List<WidgetbookUseCase> homeRowUseCases() => [
         readiness: IntentionReadiness.ready,
         activeRelationCount: 3,
       ),
+      // Строка вне списка Главной перетаскивание не начинает.
+      reorder: const HomeRowImmovable(),
       onTap: () {},
     ),
   ),
@@ -26,6 +28,8 @@ List<WidgetbookUseCase> homeRowUseCases() => [
     name: 'Не готово к действию',
     builder: (context) => HomeIntentionRow(
       row: _row(title: _title),
+      // Строка вне списка Главной перетаскивание не начинает.
+      reorder: const HomeRowImmovable(),
       onTap: () {},
     ),
   ),
@@ -33,6 +37,8 @@ List<WidgetbookUseCase> homeRowUseCases() => [
     name: 'Длинное название',
     builder: (context) => HomeIntentionRow(
       row: _row(title: _longTitle, activeRelationCount: 12),
+      // Строка вне списка Главной перетаскивание не начинает.
+      reorder: const HomeRowImmovable(),
       onTap: () {},
     ),
   ),

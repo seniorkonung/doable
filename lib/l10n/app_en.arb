@@ -68,6 +68,29 @@
   "@homeRefreshUnexpected": {
     "description": "Неизвестный отказ обновления показанного списка избранных намерений"
   },
+  "homeReorderHandleTooltip": "Drag to move the intention",
+  "@homeReorderHandleTooltip": {
+    "description": "Подсказка ручки, которой перетаскивают строку избранного намерения на Главной"
+  },
+  "homeReorderSaving": "Saving the new position…",
+  "@homeReorderSaving": {
+    "description": "Признак строки Главной, новое место которой после перестановки ещё не подтверждено"
+  },
+  "homeReorderMoved": "“{title}” is now in position {position} of {count}",
+  "@homeReorderMoved": {
+    "description": "Объявление экранного диктора о подтверждённом новом месте избранного намерения на Главной",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "position": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "favoriteOrderConflict": "The new order of favorite intentions wasn’t saved because the list changed.",
   "@favoriteOrderConflict": {
     "description": "Конфликт актуального состояния: перестановка избранных намерений не сохранена, потому что список изменился"

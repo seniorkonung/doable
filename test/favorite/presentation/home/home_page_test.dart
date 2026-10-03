@@ -100,8 +100,7 @@ void main() {
       expect(find.text('Нет описания'), findsNothing);
     });
 
-    testWidgets('не предлагает снятие отметки, перестановку и ручку '
-        'перетаскивания', (tester) async {
+    testWidgets('не предлагает снятие отметки', (tester) async {
       final h = await _pumpHome(tester);
       h.repository.completeRead(
         0,
@@ -109,10 +108,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(ReorderableListView), findsNothing);
-      expect(find.byType(SliverReorderableList), findsNothing);
-      expect(find.byType(ReorderableDragStartListener), findsNothing);
-      expect(find.byIcon(Icons.drag_handle), findsNothing);
+      expect(find.byIcon(Icons.star), findsNothing);
       expect(find.byType(IconButton), findsNothing);
       expect(find.byType(Dismissible), findsNothing);
     });
@@ -587,7 +583,10 @@ void main() {
       await tester.pumpAndSettle();
 
       final node = tester.getSemantics(
-        find.byKey(ValueKey(homeTestIntentionId(1))),
+        find.descendant(
+          of: find.byKey(ValueKey(homeTestIntentionId(1))),
+          matching: find.byType(IntentionSummaryView),
+        ),
       );
       expect(node.label, contains('Читать'));
       expect(node.label, contains('Готово к действию'));
