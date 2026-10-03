@@ -595,6 +595,241 @@ void main() {
       expect(attempts, 1);
     });
 
+    test('перестановка избранного кодируется отдельной операцией с этапом, '
+        'исходом, длительностью и безопасной категорией', () {
+      const failureCodes = [
+        DiagnosticsFailureCode.validation,
+        DiagnosticsFailureCode.conflict,
+        DiagnosticsFailureCode.unavailable,
+        DiagnosticsFailureCode.corruption,
+        DiagnosticsFailureCode.unexpected,
+      ];
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      sink.record(const FavoriteOrderCommandDiagnosticsEvent.started());
+      sink.record(
+        FavoriteOrderCommandDiagnosticsEvent.moved(
+          duration: const Duration(microseconds: 1500),
+        ),
+      );
+      sink.record(
+        FavoriteOrderCommandDiagnosticsEvent.unchanged(
+          duration: const Duration(milliseconds: 2),
+        ),
+      );
+      for (final stage in FavoriteOrderCommandDiagnosticsStage.values) {
+        for (final code in failureCodes) {
+          sink.record(
+            FavoriteOrderCommandDiagnosticsEvent.failed(
+              stage: stage,
+              duration: const Duration(milliseconds: 3),
+              code: code,
+            ),
+          );
+        }
+      }
+
+      expect(FavoriteOrderCommandDiagnosticsStage.values.map((s) => s.name), [
+        'read',
+        'validation',
+        'write',
+      ]);
+      expect(messages.map(jsonDecode), [
+        {
+          'operation': 'favoriteOrderCommand',
+          'stage': 'read',
+          'outcome': 'started',
+        },
+        {
+          'operation': 'favoriteOrderCommand',
+          'stage': 'write',
+          'outcome': 'succeeded',
+          'durationMicros': 1500,
+          'completion': 'moved',
+        },
+        {
+          'operation': 'favoriteOrderCommand',
+          'stage': 'validation',
+          'outcome': 'succeeded',
+          'durationMicros': 2000,
+          'completion': 'unchanged',
+        },
+        for (final stage in ['read', 'validation', 'write'])
+          for (final code in [
+            'validation',
+            'conflict',
+            'unavailable',
+            'corruption',
+            'unexpected',
+          ])
+            {
+              'operation': 'favoriteOrderCommand',
+              'stage': stage,
+              'outcome': 'failed',
+              'durationMicros': 3000,
+              'failureCode': code,
+            },
+      ]);
+    });
+
+    test('конструкторы события перестановки допускают только согласованные '
+        'сочетания этапа, статуса и вида завершения', () {
+      const started = FavoriteOrderCommandDiagnosticsEvent.started();
+      final moved = FavoriteOrderCommandDiagnosticsEvent.moved(
+        duration: const Duration(milliseconds: 4),
+      );
+      final unchanged = FavoriteOrderCommandDiagnosticsEvent.unchanged(
+        duration: const Duration(milliseconds: 5),
+      );
+      final conflict = FavoriteOrderCommandDiagnosticsEvent.failed(
+        stage: FavoriteOrderCommandDiagnosticsStage.validation,
+        duration: const Duration(milliseconds: 6),
+        code: DiagnosticsFailureCode.conflict,
+      );
+
+      expect(started.stage, FavoriteOrderCommandDiagnosticsStage.read);
+      expect(started.status, isA<DiagnosticsStarted>());
+      expect(started.completion, isNull);
+
+      expect(moved.stage, FavoriteOrderCommandDiagnosticsStage.write);
+      expect(
+        moved.status,
+        isA<DiagnosticsSucceeded>().having(
+          (status) => status.duration,
+          'duration',
+          const Duration(milliseconds: 4),
+        ),
+      );
+      expect(moved.completion, FavoriteOrderCommandDiagnosticsCompletion.moved);
+
+      expect(unchanged.stage, FavoriteOrderCommandDiagnosticsStage.validation);
+      expect(
+        unchanged.status,
+        isA<DiagnosticsSucceeded>().having(
+          (status) => status.duration,
+          'duration',
+          const Duration(milliseconds: 5),
+        ),
+      );
+      expect(
+        unchanged.completion,
+        FavoriteOrderCommandDiagnosticsCompletion.unchanged,
+      );
+
+      expect(conflict.stage, FavoriteOrderCommandDiagnosticsStage.validation);
+      expect(
+        conflict.status,
+        isA<DiagnosticsFailed>()
+            .having(
+              (status) => status.duration,
+              'duration',
+              const Duration(milliseconds: 6),
+            )
+            .having(
+              (status) => status.code,
+              'code',
+              DiagnosticsFailureCode.conflict,
+            ),
+      );
+      expect(conflict.completion, isNull);
+    });
+
+    test('конфликт перестановки на этапе проверки сериализуется только '
+        'разрешёнными полями без данных личного графа', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      for (final event in [
+        const FavoriteOrderCommandDiagnosticsEvent.started(),
+        FavoriteOrderCommandDiagnosticsEvent.failed(
+          stage: FavoriteOrderCommandDiagnosticsStage.validation,
+          duration: const Duration(milliseconds: 7),
+          code: DiagnosticsFailureCode.conflict,
+        ),
+        FavoriteOrderCommandDiagnosticsEvent.moved(
+          duration: const Duration(milliseconds: 8),
+        ),
+        FavoriteOrderCommandDiagnosticsEvent.unchanged(
+          duration: const Duration(milliseconds: 9),
+        ),
+      ]) {
+        sink.record(event);
+      }
+
+      expect(messages, hasLength(4));
+      for (final message in messages) {
+        expect(
+          (jsonDecode(message) as Map<String, Object?>).keys,
+          everyElement(
+            isIn(const {
+              'operation',
+              'stage',
+              'outcome',
+              'durationMicros',
+              'failureCode',
+              'completion',
+            }),
+          ),
+        );
+      }
+      expect(jsonDecode(messages[1]), {
+        'operation': 'favoriteOrderCommand',
+        'stage': 'validation',
+        'outcome': 'failed',
+        'durationMicros': 7000,
+        'failureCode': 'conflict',
+      });
+      for (final canary in [
+        'CANARY-название-избранного',
+        'CANARY-описание-избранного',
+        'c0ffee00-cafe-4bad-8ace-0123456789ab',
+        'position',
+        'favorite_intentions',
+        'CANARY-SQL-PARAMETER',
+        'CANARY-database-exception',
+      ]) {
+        expect(messages.join(), isNot(contains(canary)));
+      }
+    });
+
+    test('падающий писатель не повторяет диагностическое событие '
+        'перестановки избранного', () {
+      var attempts = 0;
+      final sink = DeveloperDiagnosticsSink((_) {
+        attempts++;
+        throw StateError('CANARY-diagnostics-writer-failure');
+      });
+
+      expect(
+        () => sink.record(
+          FavoriteOrderCommandDiagnosticsEvent.failed(
+            stage: FavoriteOrderCommandDiagnosticsStage.write,
+            duration: const Duration(milliseconds: 1),
+            code: DiagnosticsFailureCode.unavailable,
+          ),
+        ),
+        returnsNormally,
+      );
+      expect(attempts, 1);
+    });
+
+    test('отказ получателя не меняет подтверждённую перестановку и не '
+        'повторяет запись события', () {
+      final sink = _ThrowingDiagnosticsSink();
+      final event = FavoriteOrderCommandDiagnosticsEvent.moved(
+        duration: const Duration(milliseconds: 2),
+      );
+
+      String confirmedResult() {
+        recordDiagnosticsSafely(sink, event);
+        return 'порядок подтверждён';
+      }
+
+      expect(confirmedResult(), 'порядок подтверждён');
+      expect(sink.attemptedEvents, [same(event)]);
+    });
+
     test('падающий получатель не влияет на исход дневной операции', () {
       final sink = _ThrowingDiagnosticsSink();
       const event = DailyChoiceCommandDiagnosticsEvent(

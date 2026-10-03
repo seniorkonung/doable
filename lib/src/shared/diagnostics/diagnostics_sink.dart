@@ -180,6 +180,64 @@ final class FavoriteIntentionsReadDiagnosticsEvent extends DiagnosticsEvent {
   final FavoriteIntentionsReadDiagnosticsStage stage;
 }
 
+/// Этап перестановки избранного намерения.
+enum FavoriteOrderCommandDiagnosticsStage {
+  /// Чтение полного порядка избранных, включая архивированные намерения.
+  read,
+
+  /// Проверка участников и сохранённого порядка и вычисление нового порядка.
+  validation,
+
+  /// Запись мест и подтверждение её результата.
+  write,
+}
+
+/// Вид успешного завершения перестановки избранного намерения.
+enum FavoriteOrderCommandDiagnosticsCompletion {
+  /// Порядок изменён и подтверждён на новой ревизии.
+  moved,
+
+  /// Перемещение не меняет видимого порядка: записи и новой ревизии нет.
+  unchanged,
+}
+
+/// Перестановка избранного намерения.
+///
+/// Событие несёт только этап, исход, длительность и безопасную категорию
+/// отказа: названий, идентификаторов, состава и порядка избранных намерений,
+/// мест хранения и параметров запросов в нём нет.
+///
+/// Конструкторы допускают только согласованные сочетания этапа, статуса и
+/// вида завершения: вид есть ровно у успешной перестановки, фактическое
+/// изменение подтверждается записью, а его отсутствие — проверкой без записи.
+final class FavoriteOrderCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const FavoriteOrderCommandDiagnosticsEvent.started()
+    : stage = FavoriteOrderCommandDiagnosticsStage.read,
+      completion = null,
+      super(const DiagnosticsStarted());
+
+  FavoriteOrderCommandDiagnosticsEvent.moved({required Duration duration})
+    : stage = FavoriteOrderCommandDiagnosticsStage.write,
+      completion = FavoriteOrderCommandDiagnosticsCompletion.moved,
+      super(DiagnosticsSucceeded(duration));
+
+  FavoriteOrderCommandDiagnosticsEvent.unchanged({required Duration duration})
+    : stage = FavoriteOrderCommandDiagnosticsStage.validation,
+      completion = FavoriteOrderCommandDiagnosticsCompletion.unchanged,
+      super(DiagnosticsSucceeded(duration));
+
+  /// Отказ на этапе [stage], на котором перестановка остановилась.
+  FavoriteOrderCommandDiagnosticsEvent.failed({
+    required this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : completion = null,
+       super(DiagnosticsFailed(duration: duration, code: code));
+
+  final FavoriteOrderCommandDiagnosticsStage stage;
+  final FavoriteOrderCommandDiagnosticsCompletion? completion;
+}
+
 final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
   const DailyChoiceReadDiagnosticsEvent({required DiagnosticsStatus status})
     : super(status);
