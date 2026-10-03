@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/favorite/application/favorite_order_command.dart';
@@ -25,22 +27,30 @@ void main() {
   late sqlite.Database raw;
   late InMemoryDiagnosticsSink diagnostics;
   late _WriteTrace trace;
+  late _WriteGate gate;
   late DriftPersonalGraphRepository repository;
 
   setUp(() async {
     diagnostics = InMemoryDiagnosticsSink();
     trace = _WriteTrace();
+    gate = _WriteGate();
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
-        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-        trace,
+        observeConfiguredLocalDatabaseConnection(
+          openInMemoryLocalDatabase(setup: (connection) => raw = connection),
+          trace,
+        ),
+        gate,
       ),
     );
     await database.open();
     repository = _repository(database, diagnostics);
   });
 
-  tearDown(() => database.close());
+  tearDown(() async {
+    gate.release();
+    await database.close();
+  });
 
   group('Правило перестановки на реальном хранилище', () {
     test('перемещение после опоры ставит намерение сразу за ней и сохраняет '
@@ -334,6 +344,49 @@ void main() {
       expect(
         snapshot.revision.compareTo(confirmed.revision),
         GraphRevisionOrder.same,
+      );
+    });
+
+    test('чтение, поступившее во время перестановки, видит новый порядок '
+        'только после её подтверждения', () async {
+      for (final number in [1, 2, 3]) {
+        _insertFavorite(
+          raw,
+          number: number,
+          title: '$number',
+          position: number,
+        );
+      }
+      final before = await _favorites(repository);
+      expect(before.items.map((row) => row.id), [_id(1), _id(2), _id(3)]);
+
+      gate.arm();
+      final command = _confirmed(repository, _move(3, first: true));
+      await gate.entered;
+      // Транзакция остановлена между сдвигом мест за прежний максимум и
+      // назначением итоговых мест.
+      expect(
+        storedFavoriteMarks(raw).map((mark) => mark.$2),
+        everyElement(greaterThan(3)),
+      );
+      var readCompleted = false;
+      final read = _favorites(repository)
+          .whenComplete(() => readCompleted = true);
+      await pumpEventQueue();
+      expect(readCompleted, isFalse);
+
+      gate.release();
+      final confirmed = await command;
+      final snapshot = await read;
+
+      expect(snapshot.items.map((row) => row.id), [_id(3), _id(1), _id(2)]);
+      expect(
+        snapshot.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(
+        confirmed.revision.compareTo(before.revision),
+        GraphRevisionOrder.newer,
       );
     });
 
@@ -794,6 +847,35 @@ final class _WriteTrace extends LocalDatabaseConnectionObserver {
     if (statement.operation != LocalDatabaseSqlOperation.select) {
       writes.addAll(statement.statements);
     }
+  }
+}
+
+/// Останавливает транзакцию после первой записи до явного продолжения.
+final class _WriteGate extends LocalDatabaseConnectionObserver {
+  Completer<void> _entered = Completer<void>();
+  Completer<void> _released = Completer<void>();
+  bool _armed = false;
+
+  Future<void> get entered => _entered.future;
+
+  void arm() {
+    _entered = Completer<void>();
+    _released = Completer<void>();
+    _armed = true;
+  }
+
+  void release() {
+    if (!_released.isCompleted) _released.complete();
+  }
+
+  @override
+  Future<void> afterStatement(LocalDatabaseSqlStatement statement) async {
+    if (!_armed || statement.operation == LocalDatabaseSqlOperation.select) {
+      return;
+    }
+    _armed = false;
+    _entered.complete();
+    await _released.future;
   }
 }
 
