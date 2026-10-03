@@ -19,6 +19,8 @@ import '../../daily_choice/domain/daily_choice.dart';
 import '../../daily_choice/domain/daily_choice_description.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../favorite/application/favorite_intentions.dart';
+import '../../favorite/application/favorite_order_command.dart';
+import '../../favorite/domain/favorite_order.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -80,6 +82,7 @@ part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_favorite_marks.dart';
 part 'drift_personal_graph_repository_favorite_list.dart';
+part 'drift_personal_graph_repository_favorite_order.dart';
 
 final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   DriftPersonalGraphRepository(
@@ -542,6 +545,8 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       final RemoveTagAssignment removeTagAssignment => await _executeTag(
         removeTagAssignment,
       ),
+      final MoveFavoriteIntention moveFavoriteIntention =>
+        await _executeFavoriteOrder(moveFavoriteIntention),
       _ => throw UnsupportedError(
         'Команда не поддерживается модулем личного графа.',
       ),
