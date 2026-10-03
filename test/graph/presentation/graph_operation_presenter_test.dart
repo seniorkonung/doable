@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -384,6 +386,413 @@ void main() {
       expect(find.text(_deleted('Следующее')), findsOneWidget);
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'отказ перестановки ждёт текущее сообщение, не вытесняет его и предъявляется один раз',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final deletion = harness.startDelete(index: 1, title: 'Текущее');
+      harness.completeDeleted(deletion);
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Текущее')), findsOneWidget);
+
+      final move = harness.startFavoriteOrderMove();
+      harness.completeFavoriteOrderFailure(
+        move,
+        const FavoriteOrderConflictFailure(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Текущее')), findsOneWidget);
+      expect(find.text(_favoriteOrderConflict), findsNothing);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text(_deleted('Текущее')), findsOneWidget);
+      expect(find.text(_favoriteOrderConflict), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_deleted('Текущее')), findsNothing);
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      harness.presenterGeneration.value += 1;
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.favoriteOrderCommands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'следующий результат ждёт закрытия отказа перестановки в порядке принятия',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final move = harness.startFavoriteOrderMove();
+      final deletion = harness.startDelete(index: 1, title: 'Следующее');
+      // Хранилище завершает удаление раньше, но публикация следует порядку
+      // принятия операций.
+      harness.completeDeleted(deletion);
+      harness.completeFavoriteOrderFailure(
+        move,
+        const FavoriteOrderConflictFailure(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+      expect(find.text(_deleted('Следующее')), findsNothing);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+      expect(find.text(_deleted('Следующее')), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_favoriteOrderConflict), findsNothing);
+      expect(find.text(_deleted('Следующее')), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'кадр текущего сообщения не потребляет ожидающий отказ перестановки',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final deletion = harness.startDelete(index: 1, title: 'Предъявленное');
+      final move = harness.startFavoriteOrderMove();
+      harness.completeDeleted(deletion);
+      harness.completeFavoriteOrderFailure(
+        move,
+        const FavoriteOrderConflictFailure(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Предъявленное')), findsOneWidget);
+
+      // Замена presenter снимает подтверждённое сообщение без повтора, а
+      // ожидающий отказ получает новый presenter.
+      harness.presenterGeneration.value += 1;
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Предъявленное')), findsNothing);
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.favoriteOrderCommands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'отказ перестановки без поверхности ждёт её возвращения в прежнем порядке',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      harness.presenterGeneration.value = _withoutPresenter;
+      await tester.pumpAndSettle();
+
+      final move = harness.startFavoriteOrderMove();
+      final deletion = harness.startDelete(index: 1, title: 'Следующее');
+      harness.completeFavoriteOrderFailure(
+        move,
+        const FavoriteOrderConflictFailure(),
+      );
+      harness.completeDeleted(deletion);
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+
+      harness.presenterGeneration.value = 1;
+      await tester.pumpAndSettle();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+      expect(find.text(_deleted('Следующее')), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_favoriteOrderConflict), findsNothing);
+      expect(find.text(_deleted('Следующее')), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.favoriteOrderCommands, hasLength(1));
+    },
+  );
+
+  for (final scenario
+      in <({List<AppLifecycleState> away, List<AppLifecycleState> back})>[
+        (away: [AppLifecycleState.inactive], back: [AppLifecycleState.resumed]),
+        (
+          away: [
+            AppLifecycleState.inactive,
+            AppLifecycleState.hidden,
+            AppLifecycleState.paused,
+          ],
+          back: [
+            AppLifecycleState.hidden,
+            AppLifecycleState.inactive,
+            AppLifecycleState.resumed,
+          ],
+        ),
+      ]) {
+    testWidgets(
+      '${scenario.away.last.name} удерживает отказ перестановки до возвращения фокуса',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester);
+        for (final state in scenario.away) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        final move = harness.startFavoriteOrderMove();
+        harness.completeFavoriteOrderFailure(
+          move,
+          const FavoriteOrderConflictFailure(),
+        );
+        await tester.pump();
+        await tester.pump();
+        expect(find.byType(SnackBar), findsNothing);
+
+        for (final state in scenario.back) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets(
+    'показанный без фокуса отказ перестановки подтверждается только своим кадром после возвращения',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final move = harness.startFavoriteOrderMove();
+      final deletion = harness.startDelete(index: 1, title: 'Следующее');
+      harness.completeFavoriteOrderFailure(
+        move,
+        const FavoriteOrderConflictFailure(),
+      );
+      harness.completeDeleted(deletion);
+      await tester.idle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pumpAndSettle();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      // Сообщение исчезает раньше кадра в приложении с фокусом: отказ не
+      // предъявлен, и следующий результат его не обгоняет.
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+      expect(find.text(_deleted('Следующее')), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_favoriteOrderConflict), findsNothing);
+      expect(find.text(_deleted('Следующее')), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'замена presenter до кадра снимает прежний отказ перестановки и предъявляет его один раз',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final move = harness.startFavoriteOrderMove();
+      harness.completeFavoriteOrderFailure(
+        move,
+        const FavoriteOrderConflictFailure(),
+      );
+      await tester.idle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      harness.presenterGeneration.value += 1;
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      // Запоздалые callbacks прежнего presenter не снимают и не дублируют
+      // сообщение нового.
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      harness.presenterGeneration.value += 1;
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.favoriteOrderCommands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'перестроение presenter и показ на новой странице не повторяют отказ перестановки',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final move = harness.startFavoriteOrderMove();
+      final deletion = harness.startDelete(index: 1, title: 'Следующее');
+      harness.completeFavoriteOrderFailure(
+        move,
+        const FavoriteOrderConflictFailure(),
+      );
+      harness.completeDeleted(deletion);
+      await tester.idle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      harness.rebuildPresenter(tester);
+      await tester.pump();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      // После подтверждения сообщение строится заново и на Scaffold новой
+      // страницы, но остаётся тем же предъявлением.
+      harness.rebuildPresenter(tester);
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .push(
+              MaterialPageRoute<void>(
+                builder: (_) => const Scaffold(body: SizedBox.expand()),
+              ),
+            ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+      expect(find.text(_deleted('Следующее')), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_favoriteOrderConflict), findsNothing);
+      expect(find.text(_deleted('Следующее')), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(harness.repository.favoriteOrderCommands, hasLength(1));
+    },
+  );
+
+  for (final scenario in const [
+    (name: 'изменение порядка', changesOrder: true),
+    (name: 'отсутствие изменения', changesOrder: false),
+  ]) {
+    testWidgets(
+      'успех перестановки (${scenario.name}) между результатами не показывает сообщения и не задерживает очередь',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester);
+        final first = harness.startDelete(index: 1, title: 'Первое');
+        final move = harness.startFavoriteOrderMove();
+        final second = harness.startDelete(index: 2, title: 'Второе');
+        harness.completeDeleted(first);
+        if (scenario.changesOrder) {
+          harness.completeFavoriteOrderMoved(move);
+        } else {
+          harness.completeFavoriteOrderUnchanged(move);
+        }
+        harness.completeDeleted(second);
+        await tester.pumpAndSettle();
+        expect(find.text(_deleted('Первое')), findsOneWidget);
+
+        await _closeMessage(tester);
+        expect(find.text(_deleted('Второе')), findsOneWidget);
+
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'успех перестановки (${scenario.name}) без поверхности не оставляет сообщения для неё',
+      (tester) async {
+        final harness = await _pumpPresenterApp(tester);
+        harness.presenterGeneration.value = _withoutPresenter;
+        await tester.pumpAndSettle();
+
+        final move = harness.startFavoriteOrderMove();
+        if (scenario.changesOrder) {
+          harness.completeFavoriteOrderMoved(move);
+        } else {
+          harness.completeFavoriteOrderUnchanged(move);
+        }
+        await tester.pumpAndSettle();
+
+        harness.presenterGeneration.value = 1;
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar), findsNothing);
+
+        final deletion = harness.startDelete(index: 1, title: 'Следующее');
+        harness.completeDeleted(deletion);
+        await tester.pumpAndSettle();
+        expect(find.text(_deleted('Следующее')), findsOneWidget);
+
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets(
+    'отказ перестановки не меняет владельцев результатов других операций по ADR-0012',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final success = harness.startDelete(
+        index: 1,
+        title: 'Успешное',
+        releaseInitiator: false,
+      );
+      final inline = harness.startDelete(
+        index: 2,
+        title: 'Инлайн',
+        releaseInitiator: false,
+      );
+      final handed = harness.startDelete(
+        index: 3,
+        title: 'Переданное',
+        releaseInitiator: false,
+      );
+      final move = harness.startFavoriteOrderMove();
+      harness.completeDeleted(success);
+      harness.completeUnavailable(inline);
+      harness.completeUnavailable(handed);
+      harness.completeFavoriteOrderFailure(
+        move,
+        const FavoriteOrderConflictFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      // Успех сразу принадлежит оболочке, а ошибки — открытым инициаторам.
+      expect(find.text(_deleted('Успешное')), findsOneWidget);
+
+      // Отказ перестановки не ждёт ошибок, удерживаемых инициаторами.
+      await _closeMessage(tester);
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+
+      // Инлайн-renderer подтверждает свой кадр, а вторая сессия уходит до
+      // кадра и передаёт ошибку оболочке, не вытесняя текущее сообщение.
+      final inlineClaim = harness.claimInitiatorFailure(inline.token);
+      expect(inlineClaim, isNotNull);
+      harness.confirmPresentation(inlineClaim!);
+      expect(harness.claimInitiatorFailure(handed.token), isNotNull);
+      harness.releaseInitiatorPresentation(handed.token);
+      await tester.pumpAndSettle();
+      expect(find.text(_favoriteOrderConflict), findsOneWidget);
+      expect(find.text(_notDeleted('Переданное')), findsNothing);
+
+      await _closeMessage(tester);
+      expect(find.text(_favoriteOrderConflict), findsNothing);
+      expect(find.text(_notDeleted('Переданное')), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.text(_notDeleted('Инлайн')), findsNothing);
+      expect(harness.repository.commands, hasLength(3));
+      expect(harness.repository.favoriteOrderCommands, hasLength(1));
     },
   );
 
@@ -1694,6 +2103,12 @@ void main() {
 
 const _withoutPresenter = -1;
 
+const _presenterHostKey = ValueKey('presenter-host');
+
+const _favoriteOrderConflict =
+    'The new order of favorite intentions wasn’t saved because the list '
+    'changed.';
+
 String _deleted(String title) => 'Delete — “$title”: Intention deleted.';
 
 String _notDeleted(String title) =>
@@ -1961,6 +2376,21 @@ final class _PresenterHarness {
           revision: revision,
           value: FavoriteOrderMoved(
             FavoriteOrderChangedChange(revision: revision),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeFavoriteOrderUnchanged(FavoriteOrderCommandAccepted accepted) {
+    const revision = TestDetailsRevision(8);
+    repository.completeFavoriteOrderCommand(
+      _favoriteOrderIndexes[accepted]!,
+      FavoriteOrderCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: FavoriteOrderUnchanged(
+            FavoriteOrderUnchangedChange(revision: revision),
           ),
         ),
       ),
@@ -2467,6 +2897,15 @@ final class _PresenterHarness {
   void releaseInitiatorClaim(GraphInitiatorPresentationClaim claim) =>
       _coordinator.releaseInitiatorClaim(claim);
 
+  /// Подтверждает кадр инлайн-renderer, который владеет [claim].
+  void confirmPresentation(GraphInitiatorPresentationClaim claim) =>
+      _coordinator.confirmPresentation(claim);
+
+  /// Перестраивает presenter новым виджетом с тем же ключом, сохраняя его
+  /// состояние.
+  void rebuildPresenter(WidgetTester tester) =>
+      tester.element(find.byKey(_presenterHostKey)).markNeedsBuild();
+
   void completeRelationCreated(LongTermRelationCommandAccepted accepted) {
     const revision = TestDetailsRevision(1);
     final relation = LongTermRelation(
@@ -2672,6 +3111,7 @@ Future<_PresenterHarness> _pumpPresenterApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => ValueListenableBuilder<int>(
+          key: _presenterHostKey,
           valueListenable: presenterGeneration,
           builder: (context, generation, _) {
             final content = child ?? const SizedBox.shrink();

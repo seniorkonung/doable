@@ -220,6 +220,66 @@ void main() {
     },
   );
 
+  test('запоздалое подтверждение прежней поверхности не потребляет и не повторяет отказ перестановки', () async {
+    final repository = _ControlledRepository();
+    final coordinator = _coordinator(repository);
+    final previous = coordinator.registerAppPresentation();
+    final previousClaimFuture = previous.nextClaim();
+
+    final move = coordinator.acceptFavoriteOrderMove(
+      _moveAfter(_c, _a),
+    ) as FavoriteOrderCommandAccepted;
+    repository.complete(
+      0,
+      const FavoriteOrderCommandFailed(FavoriteOrderConflictFailure()),
+    );
+    final failure = await move.future;
+    final previousClaim = await previousClaimFuture;
+    expect(previousClaim?.completion, same(failure));
+
+    // Поверхность заменяется до подтверждённого кадра.
+    previous.release();
+    final current = coordinator.registerAppPresentation();
+    final currentClaim = await current.nextClaim();
+    expect(currentClaim?.completion, same(failure));
+    expect(currentClaim, isNot(same(previousClaim)));
+
+    // Запоздалый callback прежней поверхности не потребляет отказ: после
+    // ухода текущей поверхности он снова доступен следующей.
+    coordinator.confirmPresentation(previousClaim!);
+    current.release();
+    final replacement = coordinator.registerAppPresentation();
+    final replacementClaim = await replacement.nextClaim();
+    expect(replacementClaim?.completion, same(failure));
+
+    coordinator
+      ..confirmPresentation(replacementClaim!)
+      ..confirmPresentation(previousClaim)
+      ..confirmPresentation(currentClaim!);
+
+    // Следующий отказ получает обычную очередь, а прежний не повторяется.
+    final next = coordinator.acceptFavoriteOrderMove(
+      _moveFirst(_c),
+    ) as FavoriteOrderCommandAccepted;
+    repository.complete(
+      1,
+      const FavoriteOrderCommandFailed(FavoriteOrderUnavailableFailure()),
+    );
+    final nextFailure = await next.future;
+    final nextClaim = await replacement.nextClaim();
+    expect(nextClaim?.completion, same(nextFailure));
+
+    coordinator.confirmPresentation(nextClaim!);
+    GraphAppPresentationClaim? repeated;
+    unawaited(replacement.nextClaim().then((claim) => repeated = claim));
+    await Future<void>.delayed(Duration.zero);
+    expect(repeated, isNull);
+    expect(repository.commands, hasLength(2));
+
+    replacement.release();
+    await coordinator.shutdown();
+  });
+
   test(
     'отказ намерения при открытой странице остаётся у инициатора по ADR-0012',
     () async {
