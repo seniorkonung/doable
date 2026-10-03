@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
+import 'package:doable/src/favorite/application/favorite_order_command.dart';
+import 'package:doable/src/favorite/domain/favorite_order.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
@@ -38,6 +40,8 @@ final class HomeHarness {
 
   HomeViewModel get model => container.read(homeViewModelProvider.notifier);
   HomeState get state => container.read(homeViewModelProvider);
+  GraphCommandCoordinator get coordinator =>
+      container.read(graphCommandCoordinatorProvider.notifier);
 
   /// Проводит команду намерения через координатор до опубликованного
   /// подтверждённого пакета ревизии [revision].
@@ -174,21 +178,90 @@ final class HomeTestRepository extends Fake implements PersonalGraphRepository {
   void failRead(int index, FavoriteIntentionsReadFailure failure) =>
       reads[index].complete(FavoriteIntentionsError(failure));
 
-  /// Результат, которым граница завершает следующую команду.
+  /// Результат, которым граница завершает следующую команду намерения.
   Object? nextCommandResult;
+
+  /// Полный порядок избранных, включая архивированные, над которым граница
+  /// исполняет перестановку.
+  FavoriteOrder favoriteOrder = FavoriteOrder(const []);
+
+  /// Принятые перестановки; каждая завершается тестом явно.
+  final moves = <HomeTestMove>[];
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
+    if (command case final MoveFavoriteIntention moveCommand) {
+      final move = HomeTestMove(moveCommand);
+      moves.add(move);
+      return await move._result.future
+          as GraphCommandResult<TSuccess, TFailure>;
+    }
     final result = nextCommandResult;
     nextCommandResult = null;
     return result! as GraphCommandResult<TSuccess, TFailure>;
   }
 
+  /// Исполняет перестановку [index] над [favoriteOrder] по контракту
+  /// `MoveFavoriteIntention`: новый порядок вычисляет функция правила
+  /// [moveInFavoriteOrder], а фактическая перестановка подтверждается на
+  /// ревизии [revision]. Успех без изменения подтверждает прежний порядок на
+  /// [revision] — текущей ревизии границы.
+  void completeMove(int index, {required int revision}) {
+    final command = moves[index].command;
+    final graphRevision = HomeTestRevision(revision);
+    final FavoriteOrderCommandResult result;
+    switch (moveInFavoriteOrder(
+      favoriteOrder,
+      intentionId: command.intentionId,
+      placement: command.placement,
+    )) {
+      case FavoriteOrderMoveApplied(:final order):
+        favoriteOrder = order;
+        result = FavoriteOrderCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: graphRevision,
+            value: FavoriteOrderMoved(
+              FavoriteOrderChangedChange(revision: graphRevision),
+            ),
+          ),
+        );
+      case FavoriteOrderMoveWithoutChange():
+        result = FavoriteOrderCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: graphRevision,
+            value: FavoriteOrderUnchanged(
+              FavoriteOrderUnchangedChange(revision: graphRevision),
+            ),
+          ),
+        );
+      case final FavoriteOrderMoveRejected rejection:
+        result = FavoriteOrderCommandFailed(
+          FavoriteOrderCommandFailure.rejected(rejection),
+        );
+    }
+    moves[index]._result.complete(result);
+  }
+
+  /// Завершает перестановку [index] отказом [failure] без записи.
+  void failMove(int index, FavoriteOrderCommandFailure failure) =>
+      moves[index]._result.complete(FavoriteOrderCommandFailed(failure));
+
+  void throwFromMove(int index, Object error) =>
+      moves[index]._result.completeError(error);
+
   void throwFromRead(int index, Object error) =>
       reads[index].completeError(error);
+}
+
+/// Перестановка, принятая тестовой границей и ожидающая завершения тестом.
+final class HomeTestMove {
+  HomeTestMove(this.command);
+
+  final MoveFavoriteIntention command;
+  final _result = Completer<FavoriteOrderCommandResult>();
 }
 
 final class HomeTestRevision implements GraphRevision {
@@ -225,6 +298,21 @@ FavoriteIntentionRow homeTestRow(
   readiness: readiness,
   activeRelationCount: activeRelationCount,
 );
+
+/// Полный порядок избранных тестовой границы из номеров намерений: номера из
+/// [archived] архивированы и на Главной скрыты.
+FavoriteOrder homeTestOrder(
+  List<int> numbers, {
+  Set<int> archived = const {},
+}) => FavoriteOrder([
+  for (final number in numbers)
+    FavoriteOrderEntry(
+      intentionId: homeTestIntentionId(number),
+      archiveState: archived.contains(number)
+          ? IntentionArchiveState.archived
+          : IntentionArchiveState.active,
+    ),
+]);
 
 /// Краткий снимок намерения для каталожной мутации подтверждённого пакета.
 IntentionSummary homeTestSummary(

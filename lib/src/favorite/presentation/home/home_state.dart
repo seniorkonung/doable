@@ -1,5 +1,8 @@
 import '../../../graph/application/graph_revision.dart';
+import '../../../intention/domain/intention.dart';
+import '../../../intention/domain/intention_id.dart';
 import '../../application/favorite_intentions.dart';
+import '../../domain/favorite_order.dart';
 
 sealed class HomeState {
   const HomeState();
@@ -31,6 +34,48 @@ final class HomeFreshnessStale extends HomeFreshness {
   bool get canRetry => failure is FavoriteIntentionsUnavailableFailure;
 }
 
+/// Перестановка показанного списка.
+sealed class HomeReorder {
+  const HomeReorder();
+}
+
+/// Принятой перестановки нет: показан подтверждённый порядок.
+final class HomeReorderIdle extends HomeReorder {
+  const HomeReorderIdle();
+}
+
+/// Принятая перестановка, запрошенное положение которой ещё не подтверждено
+/// цельным снимком: список показывает его с признаком сохранения.
+sealed class HomeReorderPending extends HomeReorder {
+  const HomeReorderPending({
+    required this.intentionId,
+    required this.placement,
+  });
+
+  final IntentionId intentionId;
+  final FavoritePlacement placement;
+}
+
+/// Запись выполняется.
+final class HomeReorderSaving extends HomeReorderPending {
+  const HomeReorderSaving({
+    required super.intentionId,
+    required super.placement,
+  });
+}
+
+/// Запись подтверждена на ревизии [revision], а цельного снимка не старше неё
+/// ещё нет: показанный подтверждённый снимок несёт прежний порядок.
+final class HomeReorderAwaitingSnapshot extends HomeReorderPending {
+  const HomeReorderAwaitingSnapshot({
+    required super.intentionId,
+    required super.placement,
+    required this.revision,
+  });
+
+  final GraphRevision revision;
+}
+
 /// Успешно полученный полный снимок избранного на одной ревизии.
 sealed class HomeLoaded extends HomeState {
   const HomeLoaded({required this.revision, required this.freshness});
@@ -48,13 +93,76 @@ final class HomeList extends HomeLoaded {
     required List<FavoriteIntentionRow> items,
     required super.revision,
     super.freshness = const HomeFreshnessCurrent(),
+    this.reorder = const HomeReorderIdle(),
   }) : items = List.unmodifiable(items);
 
+  /// Последний подтверждённый снимок в едином ручном порядке.
   final List<FavoriteIntentionRow> items;
+  final HomeReorder reorder;
+
+  /// Порядок, который показывает Главная: запрошенное положение принятой
+  /// перестановки, пока его не подтвердил цельный снимок, иначе
+  /// подтверждённый снимок.
+  late final List<FavoriteIntentionRow> displayedItems = switch (reorder) {
+    HomeReorderIdle() => items,
+    HomeReorderPending(:final intentionId, :final placement) =>
+      reorderedItems(intentionId, placement) ?? items,
+  };
+
+  /// Перестановку принимает только текущий подтверждённый список без
+  /// принятой перестановки.
+  bool get acceptsReorder => switch (this) {
+    HomeList(freshness: HomeFreshnessCurrent(), reorder: HomeReorderIdle()) =>
+      true,
+    HomeList() => false,
+  };
+
+  /// Подтверждённый список после перемещения [intentionId] по правилу единого
+  /// порядка либо `null`, если перемещение не меняет положение намерения в
+  /// списке или отклоняется правилом. Все строки списка активны, поэтому
+  /// правило над ними совпадает с правилом над видимой частью полного
+  /// порядка.
+  List<FavoriteIntentionRow>? reorderedItems(
+    IntentionId intentionId,
+    FavoritePlacement placement,
+  ) {
+    final shownOrder = FavoriteOrder([
+      for (final row in items)
+        FavoriteOrderEntry(
+          intentionId: row.id,
+          archiveState: IntentionArchiveState.active,
+        ),
+    ]);
+    switch (moveInFavoriteOrder(
+      shownOrder,
+      intentionId: intentionId,
+      placement: placement,
+    )) {
+      case FavoriteOrderMoveApplied(:final order):
+        final rows = {for (final row in items) row.id: row};
+        return List.unmodifiable([
+          for (final id in order.intentionIds) rows[id]!,
+        ]);
+      case FavoriteOrderMoveWithoutChange() || FavoriteOrderMoveRejected():
+        return null;
+    }
+  }
 
   @override
-  HomeList withFreshness(HomeFreshness freshness) =>
-      HomeList(items: items, revision: revision, freshness: freshness);
+  HomeList withFreshness(HomeFreshness freshness) => HomeList(
+    items: items,
+    revision: revision,
+    freshness: freshness,
+    reorder: reorder,
+  );
+
+  /// Тот же подтверждённый снимок с другим состоянием перестановки.
+  HomeList withReorder(HomeReorder reorder) => HomeList(
+    items: items,
+    revision: revision,
+    freshness: freshness,
+    reorder: reorder,
+  );
 }
 
 enum HomeEmptyReason {

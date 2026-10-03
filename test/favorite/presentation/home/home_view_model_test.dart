@@ -48,6 +48,10 @@ void main() {
     expect(list.revision, isA<HomeTestRevision>());
     expect((list.revision as HomeTestRevision).number, 7);
     expect(list.freshness, isA<HomeFreshnessCurrent>());
+    // Перестановки нет: показан подтверждённый порядок, и она допустима.
+    expect(list.reorder, isA<HomeReorderIdle>());
+    expect(list.displayedItems, list.items);
+    expect(list.acceptsReorder, isTrue);
     expect(h.repository.readCount, 1);
   });
 
