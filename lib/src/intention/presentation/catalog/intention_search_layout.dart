@@ -60,7 +60,10 @@ final class _IntentionSearchLayoutState extends State<IntentionSearchLayout> {
     if (_continuesPage(notification)) {
       _scrollController.scrollWithin(notification.overscroll);
       if (notification.velocity != 0) {
-        _scrollController.fling(notification.velocity);
+        _scrollController.fling(
+          notification.velocity,
+          ignoresPointer: _listIgnoresPointer(notification),
+        );
       }
     }
     return false;
@@ -85,7 +88,10 @@ final class _IntentionSearchLayoutState extends State<IntentionSearchLayout> {
       _ => false,
     };
     if (atEdgeAhead) {
-      _scrollController.fling(velocity);
+      _scrollController.fling(
+        velocity,
+        ignoresPointer: _listIgnoresPointer(notification),
+      );
     }
     return false;
   }
@@ -97,6 +103,20 @@ final class _IntentionSearchLayoutState extends State<IntentionSearchLayout> {
       notification.depth == 0 &&
       notification.metrics.axisDirection == AxisDirection.down &&
       _scrollController.hasClients;
+
+  /// Не пропускает ли список выдачи касания к своему содержимому во время
+  /// жеста, от которого пришло уведомление [notification].
+  ///
+  /// Инерция, которую продолжает страница, сохраняет это правило и ведёт себя
+  /// как собственный флинг страницы: касание во время инерции от пальца
+  /// только останавливает её и не срабатывает на строке выдачи или параметре
+  /// поиска под пальцем. Уведомление без списка считается жестом пальца.
+  bool _listIgnoresPointer(ScrollNotification notification) =>
+      notification.context
+          ?.findAncestorStateOfType<ScrollableState>()
+          ?.position
+          .shouldIgnorePointer ??
+      true;
 
   @override
   Widget build(BuildContext context) => CustomScrollView(
@@ -126,7 +146,7 @@ final class _PageScrollController extends ScrollController {
     ScrollPhysics physics,
     ScrollContext context,
     ScrollPosition? oldPosition,
-  ) => ScrollPositionWithSingleContext(
+  ) => _PageScrollPosition(
     physics: physics,
     context: context,
     initialPixels: initialScrollOffset,
@@ -149,10 +169,45 @@ final class _PageScrollController extends ScrollController {
 
   /// Продолжает прокрутку страницы инерцией со скоростью [velocity] в
   /// пикселях в секунду; положительная скорость ведёт к концу.
-  void fling(double velocity) {
+  ///
+  /// [ignoresPointer] — не пропускает ли инерция касания к содержимому
+  /// страницы.
+  void fling(double velocity, {required bool ignoresPointer}) {
     for (final position in positions) {
-      (position as ScrollPositionWithSingleContext).goBallistic(velocity);
+      (position as _PageScrollPosition).fling(
+        velocity,
+        ignoresPointer: ignoresPointer,
+      );
     }
+  }
+}
+
+/// Позиция прокрутки страницы, которая продолжает инерцию жеста списка
+/// выдачи.
+final class _PageScrollPosition extends ScrollPositionWithSingleContext {
+  _PageScrollPosition({
+    required super.physics,
+    required super.context,
+    super.initialPixels,
+    super.keepScrollOffset,
+    super.oldPosition,
+    super.debugLabel,
+  });
+
+  /// Начинает инерцию со скоростью [velocity], как [goBallistic].
+  ///
+  /// В отличие от [goBallistic], правило касаний во время инерции задаёт
+  /// [ignoresPointer], а не текущее действие страницы: страница, к которой
+  /// переходит жест списка, покоится и пропускает касания к содержимому.
+  void fling(double velocity, {required bool ignoresPointer}) {
+    final simulation = physics.createBallisticSimulation(this, velocity);
+    if (simulation == null) {
+      goIdle();
+      return;
+    }
+    beginActivity(
+      BallisticScrollActivity(this, simulation, context.vsync, ignoresPointer),
+    );
   }
 }
 

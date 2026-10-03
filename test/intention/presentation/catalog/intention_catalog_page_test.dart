@@ -29,6 +29,7 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -632,6 +633,144 @@ void main() {
         _catalogScrollPosition(tester).maxScrollExtent,
       );
       expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final (handoff, variant) in _pageFlingHandoffs) {
+    testWidgets('касание строки во время инерции к концу, которую странице '
+        'передала $variant, только останавливает страницу, а касание после '
+        'остановки открывает страницу намерения', (tester) async {
+      _usePhoneScreen(tester);
+      final items = [
+        for (var index = 1; index <= 20; index++)
+          testSummary(index: index, title: 'Намерение $index'),
+      ];
+      final router = await _openRoutedCatalog(tester, items);
+      if (handoff == _PageFlingHandoff.fromListEdge) {
+        _catalogScrollPosition(tester)
+            .jumpTo(_catalogScrollPosition(tester).maxScrollExtent);
+        await tester.pumpAndSettle();
+      }
+      expect(_pageScrollPosition(tester).pixels, 0);
+
+      await _releaseCatalogListFling(
+        tester,
+        const Offset(0, -_pageFlingTravel),
+        speed: handoff.speed,
+      );
+      await _pumpUntilPageInertia(tester, (page) => page.pixels > 0);
+
+      final list = _catalogScrollPosition(tester);
+      final page = _pageScrollPosition(tester);
+      expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
+      final stopped = page.pixels;
+      final (point, row) = _catalogRowAtListCenter(tester);
+      await tester.tapAt(point);
+      await tester.pumpAndSettle();
+
+      expect(router.current.name, isNot(IntentionDetailsRoute.name));
+      expect(page.isScrollingNotifier.value, isFalse);
+      expect(page.pixels, stopped);
+      expect(page.pixels, lessThan(page.maxScrollExtent));
+      expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
+
+      await tester.tapAt(point);
+      await tester.pumpAndSettle();
+
+      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(
+        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+        items.singleWhere((summary) => summary.title == row).id,
+      );
+    });
+
+    testWidgets('касание поля фильтра названия во время обратной инерции, '
+        'которую странице передала $variant, не ставит в него фокус и '
+        'останавливает страницу, а касание после остановки ставит', (
+      tester,
+    ) async {
+      _usePhoneScreen(tester);
+      await _openRoutedCatalog(tester, [
+        for (var index = 1; index <= 20; index++)
+          testSummary(index: index, title: 'Намерение $index'),
+      ]);
+      await _dragCatalogToEnd(tester);
+      if (handoff == _PageFlingHandoff.fromListEdge) {
+        _catalogScrollPosition(tester).jumpTo(0);
+        await tester.pumpAndSettle();
+      }
+      final page = _pageScrollPosition(tester);
+      expect(page.pixels, page.maxScrollExtent);
+      final filter = find.byKey(const ValueKey('catalog-filter-field'));
+      final appBarBottom = tester.getRect(find.byType(AppBar)).bottom;
+
+      await _releaseCatalogListFling(
+        tester,
+        const Offset(0, _pageFlingTravel),
+        speed: handoff.speed,
+      );
+      // Касание приходится на видимую под шапкой часть поля, пока страница
+      // ещё не дошла до начала.
+      await _pumpUntilPageInertia(
+        tester,
+        (page) =>
+            page.pixels > 0 &&
+            tester.getRect(filter).bottom > appBarBottom + 16,
+      );
+
+      final stopped = page.pixels;
+      final shown = tester.getRect(filter);
+      final point = Offset(
+        shown.center.dx,
+        (math.max(shown.top, appBarBottom) + shown.bottom) / 2,
+      );
+      await tester.tapAt(point);
+      await tester.pumpAndSettle();
+
+      expect(_hasFocus(tester, filter), isFalse);
+      expect(page.isScrollingNotifier.value, isFalse);
+      expect(page.pixels, stopped);
+      expect(page.pixels, greaterThan(0));
+
+      await tester.tapAt(point);
+      await tester.pumpAndSettle();
+
+      expect(_hasFocus(tester, filter), isTrue);
+    });
+
+    // Собственная инерция страницы от трекпада пропускает касания к
+    // содержимому, поэтому и переданная странице — тоже.
+    testWidgets('щелчок во время инерции от трекпада, которую странице '
+        'передала $variant, срабатывает на строке, как во время собственной '
+        'инерции страницы от трекпада', (tester) async {
+      _usePhoneScreen(tester);
+      final items = [
+        for (var index = 1; index <= 20; index++)
+          testSummary(index: index, title: 'Намерение $index'),
+      ];
+      final router = await _openRoutedCatalog(tester, items);
+      if (handoff == _PageFlingHandoff.fromListEdge) {
+        _catalogScrollPosition(tester)
+            .jumpTo(_catalogScrollPosition(tester).maxScrollExtent);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.trackpadFlingFrom(
+        _catalogListFlingStart(tester),
+        const Offset(0, -_pageFlingTravel),
+        handoff.speed,
+      );
+      await _pumpUntilPageInertia(tester, (page) => page.pixels > 0);
+
+      final (point, row) = _catalogRowAtListCenter(tester);
+      await tester.tapAt(point, kind: PointerDeviceKind.mouse);
+      await tester.pumpAndSettle();
+
+      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(
+        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+        items.singleWhere((summary) => summary.title == row).id,
+      );
     });
   }
 
@@ -2352,12 +2491,114 @@ Future<void> _flingCatalogList(
   Offset offset, {
   double speed = 6000,
 }) async {
+  await _releaseCatalogListFling(tester, offset, speed: speed);
+  await tester.pumpAndSettle(const Duration(milliseconds: 16));
+}
+
+/// Выполняет флинг [_flingCatalogList] и отпускает палец, не дожидаясь
+/// конца инерции.
+Future<void> _releaseCatalogListFling(
+  WidgetTester tester,
+  Offset offset, {
+  required double speed,
+}) => tester.flingFrom(_catalogListFlingStart(tester), offset, speed);
+
+/// Точка у верхнего левого края видимой части списка выдачи, из которой
+/// начинается флинг.
+Offset _catalogListFlingStart(WidgetTester tester) {
   final list = tester.getRect(
     find.byKey(const PageStorageKey<String>('intention-catalog-list')),
   );
   final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  await tester.flingFrom(Offset(list.left + 24, top + 24), offset, speed);
-  await tester.pumpAndSettle(const Duration(milliseconds: 16));
+  return Offset(list.left + 24, top + 24);
+}
+
+/// Путь, которым инерция флинга по списку выдачи переходит к странице.
+enum _PageFlingHandoff {
+  /// Флинг начат при списке в начале: страница продолжает инерцию списка,
+  /// дошедшую до его края.
+  listInertia(speed: 6000),
+
+  /// Флинг начат при списке уже у края: список не сдвигается, и инерцию
+  /// пальца сразу продолжает страница.
+  fromListEdge(speed: 2000);
+
+  const _PageFlingHandoff({required this.speed});
+
+  /// Скорость флинга, с которой страница ещё движется, когда касание
+  /// приходится на строку или поле фильтра.
+  final double speed;
+}
+
+/// Ход пальца флинга, инерцию которого продолжает страница: короткий ход
+/// оставляет странице путь и после флинга, начатого у края списка.
+const _pageFlingTravel = 60.0;
+
+const _pageFlingHandoffs = [
+  (_PageFlingHandoff.listInertia, 'инерция списка, дошедшая до его края'),
+  (_PageFlingHandoff.fromListEdge, 'флинг, начатый у края списка'),
+];
+
+/// Ведёт кадры с частотой экрана, пока страница не продолжает инерцию за
+/// списком выдачи и не выполнено [ready], и останавливается посреди
+/// инерции.
+Future<void> _pumpUntilPageInertia(
+  WidgetTester tester,
+  bool Function(ScrollPosition page) ready,
+) async {
+  for (var frame = 0; frame < 120; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+    final page = _pageScrollPosition(tester);
+    if (page.isScrollingNotifier.value && ready(page)) return;
+  }
+  fail('Страница не продолжила инерцию списка выдачи.');
+}
+
+/// Середина видимой части списка выдачи и название строки под ней.
+(Offset, String) _catalogRowAtListCenter(WidgetTester tester) {
+  final list = tester.getRect(
+    find.byKey(const PageStorageKey<String>('intention-catalog-list')),
+  );
+  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
+  final bottom = math.min(list.bottom, screen.height);
+  final point = Offset(list.center.dx, (top + bottom) / 2);
+  final rows = find.byWidgetPredicate(
+    (widget) => widget is IntentionSummaryView,
+  );
+  final row = rows
+      .evaluate()
+      .map((element) => element.widget as IntentionSummaryView)
+      .singleWhere((row) => tester.getRect(find.byWidget(row)).contains(point));
+  return (point, row.title);
+}
+
+/// Стоит ли фокус ввода в текстовом поле [field].
+bool _hasFocus(WidgetTester tester, Finder field) => tester
+    .widget<EditableText>(
+      find.descendant(of: field, matching: find.byType(EditableText)),
+    )
+    .focusNode
+    .hasFocus;
+
+/// Открывает каталог намерений как корневую страницу приложения, в котором
+/// нажатие строки открывает страницу намерения, и показывает выдачу
+/// [items].
+Future<AppRouter> _openRoutedCatalog(
+  WidgetTester tester,
+  List<IntentionSummary> items,
+) async {
+  final repository = ControlledCatalogRepository();
+  final container = reconciliationCatalogContainer(repository);
+  final router = AppRouter();
+  addTearDown(container.dispose);
+  addTearDown(router.dispose);
+  await tester.pumpWidget(_routerTestAppWithContainer(container, router));
+  await tester.pump();
+  await openIntentionGraph(tester);
+  repository.complete(0, _firstPage(items));
+  await tester.pumpAndSettle();
+  return router;
 }
 
 /// Элемент [finder] виден целиком в видимой части списка выдачи.
