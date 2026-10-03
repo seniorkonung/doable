@@ -224,25 +224,13 @@ void main() {
           final page = find.byType(DailyChoiceCatalogPage);
 
           if (insets.keyboard > 0) {
-            // Поле фильтра даты остаётся над клавиатурой и созданием
-            // дневного выбора и получает фокус.
-            await tester.showKeyboard(_dateFilter);
-            await tester.pump();
-            expect(_dateFilter.hitTestable(), findsOneWidget);
-            _expectFullyVisible(tester, _dateFilter, insets);
-            _expectMainAction(tester, _createDailyChoice, insets);
-            expect(
-              tester
-                  .getRect(_dateFilter)
-                  .overlaps(tester.getRect(_createDailyChoice)),
-              isFalse,
-            );
+            await _focusDateFilter(tester, insets);
           }
 
           await _scrollToEnd(tester, page);
 
           final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
-          _expectFullyVisible(tester, loadMore, insets);
+          _expectFullyVisibleInScroll(tester, loadMore, insets);
           _expectMainAction(tester, _createDailyChoice, insets);
           expect(
             tester
@@ -263,7 +251,7 @@ void main() {
           await _scrollToEnd(tester, page);
 
           final lastRow = _dailyChoiceRow(count);
-          _expectFullyVisible(tester, lastRow, insets);
+          _expectFullyVisibleInScroll(tester, lastRow, insets);
           _expectMainAction(tester, _createDailyChoice, insets);
           expect(
             tester
@@ -290,77 +278,87 @@ void main() {
         });
       }
 
-      testWidgets('каталог дневных выборов, ${locale.languageCode}: отказ '
-          'продолжения выдачи и повтор видны над панелью и не закрыты '
-          'созданием дневного выбора, а повтор догружает выдачу', (
-        tester,
-      ) async {
-        const count = _dailyChoicePageSize + 5;
-        final l10n = lookupAppLocalizations(locale);
-        final faults = _ReadFaults();
-        await _start(
-          tester,
-          dailyChoices: count,
-          insets: _safeArea,
-          locale: locale,
-          observer: faults,
-        );
-        await _select(tester, AppDestination.dailyChoices);
-        await _until(
-          tester,
-          find.text(l10n.dailyChoiceCatalogTotalCount(count)),
-        );
-        final page = find.byType(DailyChoiceCatalogPage);
-        await _scrollToEnd(tester, page);
+      for (final insets in [_safeArea, _keyboardOpen]) {
+        testWidgets('каталог дневных выборов, ${locale.languageCode}, '
+            '${insets.name}: отказ продолжения выдачи и повтор видны над '
+            'панелью и не закрыты созданием дневного выбора, а повтор '
+            'догружает выдачу', (tester) async {
+          const count = _dailyChoicePageSize + 5;
+          final l10n = lookupAppLocalizations(locale);
+          final faults = _ReadFaults();
+          await _start(
+            tester,
+            dailyChoices: count,
+            insets: insets,
+            locale: locale,
+            observer: faults,
+          );
+          await _select(tester, AppDestination.dailyChoices);
+          await _until(
+            tester,
+            find.text(l10n.dailyChoiceCatalogTotalCount(count)),
+          );
+          final page = find.byType(DailyChoiceCatalogPage);
+          if (insets.keyboard > 0) {
+            await _focusDateFilter(tester, insets);
+          }
+          await _scrollToEnd(tester, page);
 
-        faults.isFailing = true;
-        await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
-        final failure = find.descendant(
-          of: page,
-          matching: find.text(l10n.dailyChoiceCatalogUnavailable),
-        );
-        await _until(tester, failure);
-        await tester.pumpAndSettle();
-        await _scrollToEnd(tester, page);
+          faults.isFailing = true;
+          await tester.tap(
+            find.byKey(const ValueKey('daily-choice-load-more')),
+          );
+          final failure = find.descendant(
+            of: page,
+            matching: find.text(l10n.dailyChoiceCatalogUnavailable),
+          );
+          await _until(tester, failure);
+          await tester.pumpAndSettle();
+          await _scrollToEnd(tester, page);
 
-        final retry = find.descendant(
-          of: page,
-          matching: find.widgetWithText(TextButton, l10n.commonRetry),
-        );
-        _expectFullyVisible(tester, failure, _safeArea);
-        _expectFullyVisible(tester, retry, _safeArea);
-        _expectMainAction(tester, _createDailyChoice, _safeArea);
-        expect(
-          tester.getRect(failure).overlaps(tester.getRect(_createDailyChoice)),
-          isFalse,
-        );
-        expect(
-          tester.getRect(retry).overlaps(tester.getRect(_createDailyChoice)),
-          isFalse,
-        );
-        expect(retry.hitTestable(), findsOneWidget);
+          final retry = find.descendant(
+            of: page,
+            matching: find.widgetWithText(TextButton, l10n.commonRetry),
+          );
+          _expectFullyVisibleInScroll(tester, failure, insets);
+          _expectFullyVisibleInScroll(tester, retry, insets);
+          _expectMainAction(tester, _createDailyChoice, insets);
+          expect(
+            tester
+                .getRect(failure)
+                .overlaps(tester.getRect(_createDailyChoice)),
+            isFalse,
+          );
+          expect(
+            tester.getRect(retry).overlaps(tester.getRect(_createDailyChoice)),
+            isFalse,
+          );
+          expect(retry.hitTestable(), findsOneWidget);
 
-        faults.isFailing = false;
-        await tester.tap(retry);
-        // Повтор догружает выдачу до конца, а не открывает поиск действия.
-        await _waitFor(
-          tester,
-          () => _continuation(page, l10n).evaluate().isEmpty,
-        );
-        await tester.pumpAndSettle();
-        expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
-        await _scrollToEnd(tester, page);
+          faults.isFailing = false;
+          await tester.tap(retry);
+          // Повтор догружает выдачу до конца, а не открывает поиск действия.
+          await _waitFor(
+            tester,
+            () => _continuation(page, l10n).evaluate().isEmpty,
+          );
+          await tester.pumpAndSettle();
+          expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
+          await _scrollToEnd(tester, page);
 
-        final lastRow = _dailyChoiceRow(count);
-        _expectFullyVisible(tester, lastRow, _safeArea);
-        _expectMainAction(tester, _createDailyChoice, _safeArea);
-        expect(
-          tester.getRect(lastRow).overlaps(tester.getRect(_createDailyChoice)),
-          isFalse,
-        );
-        expect(lastRow.hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      });
+          final lastRow = _dailyChoiceRow(count);
+          _expectFullyVisibleInScroll(tester, lastRow, insets);
+          _expectMainAction(tester, _createDailyChoice, insets);
+          expect(
+            tester
+                .getRect(lastRow)
+                .overlaps(tester.getRect(_createDailyChoice)),
+            isFalse,
+          );
+          expect(lastRow.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
     }
   });
 
@@ -781,6 +779,73 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
   );
 }
 
+/// Элемент [finder] внутри прокрутки виден целиком: он лежит в видимой части
+/// корневой страницы и в видимой части каждой объемлющей его прокрутки, не
+/// обрезанной её краями, а нажатия у его верхнего и нижнего края попадают в
+/// него.
+void _expectFullyVisibleInScroll(
+  WidgetTester tester,
+  Finder finder,
+  _Insets insets,
+) {
+  _expectFullyVisible(tester, finder, insets);
+  final element = finder.evaluate().single;
+  final rect = tester.getRect(finder);
+  var scrollables = 0;
+  element.visitAncestorElements((ancestor) {
+    if (ancestor.widget is Scrollable) {
+      scrollables++;
+      final viewport = ancestor.renderObject! as RenderBox;
+      final visible = viewport.localToGlobal(Offset.zero) & viewport.size;
+      expect(
+        rect.top,
+        greaterThanOrEqualTo(visible.top - precisionErrorTolerance),
+        reason: '$finder: верхний край прокрутки',
+      );
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(visible.bottom + precisionErrorTolerance),
+        reason: '$finder: нижний край прокрутки',
+      );
+    }
+    return true;
+  });
+  expect(scrollables, isPositive, reason: '$finder: вне прокрутки');
+  // Нажатие ровно на границе элементу не принадлежит, поэтому точки
+  // отступают от краёв внутрь.
+  for (final y in [rect.top + 1, rect.bottom - 1]) {
+    final hit = tester.hitTestOnBinding(Offset(rect.center.dx, y));
+    expect(
+      [for (final entry in hit.path) entry.target],
+      contains(element.renderObject),
+      reason: '$finder: нажатие на высоте $y',
+    );
+  }
+}
+
+/// Ставит фокус в поле фильтра даты каталога дневных выборов: поле видно над
+/// клавиатурой и не закрыто созданием дневного выбора.
+Future<void> _focusDateFilter(WidgetTester tester, _Insets insets) async {
+  await tester.showKeyboard(_dateFilter);
+  await tester.pump();
+  expect(
+    tester
+        .widget<EditableText>(
+          find.descendant(of: _dateFilter, matching: find.byType(EditableText)),
+        )
+        .focusNode
+        .hasFocus,
+    isTrue,
+  );
+  expect(_dateFilter.hitTestable(), findsOneWidget);
+  _expectFullyVisibleInScroll(tester, _dateFilter, insets);
+  _expectMainAction(tester, _createDailyChoice, insets);
+  expect(
+    tester.getRect(_dateFilter).overlaps(tester.getRect(_createDailyChoice)),
+    isFalse,
+  );
+}
+
 /// Основное действие корневой страницы стоит в своём углу над панелью либо
 /// клавиатурой: содержимое заканчивается на их верхней границе, без зазора,
 /// и действие принимает нажатия.
@@ -793,13 +858,21 @@ void _expectMainAction(WidgetTester tester, Finder action, _Insets insets) {
   expect(action.hitTestable(), findsOneWidget);
 }
 
-/// Прокручивает корневую страницу [page] жестами до конца её списка.
+/// Прокручивает корневую страницу [page] жестами до конца её выдачи.
 ///
-/// Жест начинается у левого верхнего края видимой части списка — в точке,
-/// не закрытой основным действием страницы. Когда список дошёл до своего
-/// края, тот же жест продолжает прокрутку всей страницы.
+/// Жест начинается у левого верхнего края видимой части прокрутки выдачи —
+/// в точке, не закрытой основным действием страницы. Прокрутка выдачи —
+/// самая вложенная прокрутка страницы: собственный список выдачи каталога
+/// намерений либо прокрутка, которую выдача каталога дневных выборов делит с
+/// фильтрами. Когда список дошёл до своего края, тот же жест продолжает
+/// прокрутку всей страницы.
 Future<void> _scrollToEnd(WidgetTester tester, Finder page) async {
-  final list = find.descendant(of: page, matching: find.byType(ListView));
+  final list = find
+      .descendant(
+        of: page,
+        matching: find.byWidgetPredicate((widget) => widget is ScrollView),
+      )
+      .last;
   final appBar = find.descendant(of: page, matching: find.byType(AppBar));
   for (var attempt = 0; attempt < 120; attempt++) {
     final before = _scrollOffsets(tester, page);

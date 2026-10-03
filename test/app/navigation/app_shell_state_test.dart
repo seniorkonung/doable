@@ -740,13 +740,25 @@ Map<String, Object?> _dailyChoiceCatalogView(WidgetTester tester, _App app) {
 }
 
 /// Фильтры и позиция каталога дневных выборов, как их видит человек.
+///
+/// Фильтры прокручиваются вместе с выдачей, поэтому на прокрученной странице
+/// они могут стоять за верхним краем.
 Map<String, Object?> _dailyChoiceParameters(WidgetTester tester, _App app) => {
   'фильтр даты': tester
-      .widget<TextField>(find.byKey(const ValueKey('daily-choice-date-filter')))
+      .widget<TextField>(
+        find.byKey(
+          const ValueKey('daily-choice-date-filter'),
+          skipOffstage: false,
+        ),
+      )
       .controller!
       .text,
   'фильтр выполнения': _texts(
-    find.byKey(const ValueKey('daily-choice-completion-filter')),
+    find.byKey(
+      const ValueKey('daily-choice-completion-filter'),
+      skipOffstage: false,
+    ),
+    skipOffstage: false,
   ),
   'дата в модели': app.dailyChoiceCatalog.selection.date?.toCanonicalString(),
   'выполнение в модели': app.dailyChoiceCatalog.selection.isCompleted,
@@ -763,10 +775,17 @@ Map<String, Object?> _homeView(WidgetTester tester, _App app) => {
   'чтения списка': app.repository.favoriteReads,
 };
 
-/// Видимые тексты элемента [finder] в порядке дерева.
-List<String?> _texts(Finder finder) => [
+/// Тексты элемента [finder] в порядке дерева; при [skipOffstage] — только
+/// видимые.
+List<String?> _texts(Finder finder, {bool skipOffstage = true}) => [
   for (final element
-      in find.descendant(of: finder, matching: find.byType(Text)).evaluate())
+      in find
+          .descendant(
+            of: finder,
+            matching: find.byType(Text),
+            skipOffstage: skipOffstage,
+          )
+          .evaluate())
     (element.widget as Text).data,
 ];
 
@@ -806,11 +825,13 @@ ScrollPosition _catalogPosition(WidgetTester tester) => _positionOf(
   find.byKey(const PageStorageKey<String>('intention-catalog-list')),
 );
 
+/// Позиция прокрутки страницы каталога дневных выборов: фильтры и выдача
+/// прокручиваются вместе.
 ScrollPosition _dailyChoicePosition(WidgetTester tester) => _positionOf(
   tester,
   find.descendant(
     of: find.byType(daily_page.DailyChoiceCatalogPage),
-    matching: find.byType(ListView),
+    matching: find.byType(CustomScrollView),
   ),
 );
 

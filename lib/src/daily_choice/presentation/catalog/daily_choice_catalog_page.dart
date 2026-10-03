@@ -49,86 +49,81 @@ final class _DailyChoiceCatalogPageState
         icon: const Icon(Icons.add),
         label: Text(l10n.dailyChoiceCreateFromAction),
       ),
+      // Фильтры, количество, полосы обновления и выдача прокручиваются
+      // вместе: прокрученная до конца выдача получает всю высоту тела
+      // страницы, а место под кнопкой создания остаётся последним элементом.
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => Column(
-            children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: constraints.maxHeight * 0.55,
-                ),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 190,
-                          child: TextField(
-                            key: const ValueKey('daily-choice-date-filter'),
-                            controller: _dateController,
-                            keyboardType: TextInputType.datetime,
-                            decoration: InputDecoration(
-                              labelText: l10n.dailyChoiceCatalogDateFilter,
-                              hintText: l10n.dailyChoiceCreationDateHint,
-                              errorText: _dateError,
-                            ),
-                            onSubmitted: (_) => _applyDate(model, l10n),
-                          ),
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 190,
+                      child: TextField(
+                        key: const ValueKey('daily-choice-date-filter'),
+                        controller: _dateController,
+                        keyboardType: TextInputType.datetime,
+                        decoration: InputDecoration(
+                          labelText: l10n.dailyChoiceCatalogDateFilter,
+                          hintText: l10n.dailyChoiceCreationDateHint,
+                          errorText: _dateError,
                         ),
-                        OutlinedButton(
-                          key: const ValueKey('daily-choice-apply-date'),
-                          onPressed: () => _applyDate(model, l10n),
-                          child: Text(l10n.dailyChoiceCatalogApplyDate),
-                        ),
-                        SizedBox(
-                          key: const ValueKey('daily-choice-completion-filter'),
-                          width: 240,
-                          child: DropdownButtonFormField<bool?>(
-                            key: ValueKey(state.selection.isCompleted),
-                            initialValue: state.selection.isCompleted,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText:
-                                  l10n.dailyChoiceCatalogCompletionFilter,
-                            ),
-                            items: [
-                              DropdownMenuItem<bool?>(
-                                value: null,
-                                child: Text(l10n.dailyChoiceCatalogAllStates),
-                              ),
-                              DropdownMenuItem<bool?>(
-                                value: false,
-                                child: Text(l10n.dailyChoiceCatalogIncomplete),
-                              ),
-                              DropdownMenuItem<bool?>(
-                                value: true,
-                                child: Text(l10n.dailyChoiceCatalogCompleted),
-                              ),
-                            ],
-                            onChanged: model.selectCompletion,
-                          ),
-                        ),
-                        TextButton(
-                          key: const ValueKey('daily-choice-clear-filters'),
-                          onPressed: () {
-                            _dateController.clear();
-                            setState(() => _dateError = null);
-                            model.clearFilters();
-                          },
-                          child: Text(l10n.dailyChoiceCatalogClearFilters),
-                        ),
-                      ],
+                        onSubmitted: (_) => _applyDate(model, l10n),
+                      ),
                     ),
-                  ),
+                    OutlinedButton(
+                      key: const ValueKey('daily-choice-apply-date'),
+                      onPressed: () => _applyDate(model, l10n),
+                      child: Text(l10n.dailyChoiceCatalogApplyDate),
+                    ),
+                    SizedBox(
+                      key: const ValueKey('daily-choice-completion-filter'),
+                      width: 240,
+                      child: DropdownButtonFormField<bool?>(
+                        key: ValueKey(state.selection.isCompleted),
+                        initialValue: state.selection.isCompleted,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: l10n.dailyChoiceCatalogCompletionFilter,
+                        ),
+                        items: [
+                          DropdownMenuItem<bool?>(
+                            value: null,
+                            child: Text(l10n.dailyChoiceCatalogAllStates),
+                          ),
+                          DropdownMenuItem<bool?>(
+                            value: false,
+                            child: Text(l10n.dailyChoiceCatalogIncomplete),
+                          ),
+                          DropdownMenuItem<bool?>(
+                            value: true,
+                            child: Text(l10n.dailyChoiceCatalogCompleted),
+                          ),
+                        ],
+                        onChanged: model.selectCompletion,
+                      ),
+                    ),
+                    TextButton(
+                      key: const ValueKey('daily-choice-clear-filters'),
+                      onPressed: () {
+                        _dateController.clear();
+                        setState(() => _dateError = null);
+                        model.clearFilters();
+                      },
+                      child: Text(l10n.dailyChoiceCatalogClearFilters),
+                    ),
+                  ],
                 ),
               ),
-              Expanded(child: _content(state, model, l10n)),
-            ],
-          ),
+            ),
+            ..._content(state, model, l10n),
+          ],
         ),
       ),
     );
@@ -162,25 +157,30 @@ final class _DailyChoiceCatalogPageState
     }
   }
 
-  Widget _content(
+  /// Слайверы выдачи под фильтрами.
+  List<Widget> _content(
     DailyChoiceCatalogState state,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
   ) => switch (state) {
-    DailyChoiceCatalogInitialLoad() => _Status(
-      message: l10n.dailyChoiceCatalogLoading,
-      loading: true,
-    ),
-    DailyChoiceCatalogInitialFailure(:final failure, :final canRetry) =>
-      _Status(
-        message: _failureMessage(failure, l10n),
-        onRetry: canRetry ? model.retryFirstPage : null,
+    DailyChoiceCatalogInitialLoad() => [
+      _SliverStatus(
+        _Status(message: l10n.dailyChoiceCatalogLoading, loading: true),
       ),
+    ],
+    DailyChoiceCatalogInitialFailure(:final failure, :final canRetry) => [
+      _SliverStatus(
+        _Status(
+          message: _failureMessage(failure, l10n),
+          onRetry: canRetry ? model.retryFirstPage : null,
+        ),
+      ),
+    ],
     DailyChoiceCatalogEmpty() => _loaded(state, model, l10n),
     DailyChoiceCatalogLoaded() => _loaded(state, model, l10n),
   };
 
-  Widget _loaded(
+  List<Widget> _loaded(
     DailyChoiceCatalogLoaded state,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
@@ -188,76 +188,82 @@ final class _DailyChoiceCatalogPageState
     final isRefreshing =
         state.freshness == DailyChoiceCatalogFreshness.refreshing;
     final isStale = state.freshness == DailyChoiceCatalogFreshness.stale;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Semantics(
             liveRegion: true,
             child: Text(l10n.dailyChoiceCatalogTotalCount(state.totalCount)),
           ),
         ),
-        if (isRefreshing)
-          _Banner(message: l10n.dailyChoiceCatalogRefreshing, loading: true),
-        if (isStale)
-          _Banner(
+      ),
+      if (isRefreshing)
+        SliverToBoxAdapter(
+          child: _Banner(
+            message: l10n.dailyChoiceCatalogRefreshing,
+            loading: true,
+          ),
+        ),
+      if (isStale)
+        SliverToBoxAdapter(
+          child: _Banner(
             message: _failureMessage(state.refreshFailure!, l10n),
             onRetry:
                 state.refreshFailure is DailyChoiceCatalogUnavailableFailure
                 ? model.retryRefresh
                 : null,
           ),
-        Expanded(
-          child: state.items.isEmpty
-              ? _Status(message: l10n.dailyChoiceCatalogEmpty)
-              : ListView.builder(
-                  // Место под кнопку создания дневного выбора: прокрученные до
-                  // конца последняя строка и продолжение выдачи стоят над ней.
-                  padding: const EdgeInsets.only(bottom: _createActionExtent),
-                  itemCount:
-                      state.items.length + (state.nextCursor == null ? 0 : 1),
-                  itemBuilder: (context, index) {
-                    if (index == state.items.length) {
-                      return _pageFooter(state, model, l10n);
-                    }
-                    final item = state.items[index];
-                    final phrase = l10n.dailyChoiceDetailsPhrase(
-                      item.source.title,
-                      item.selected.title,
-                    );
-                    final date = item.date.toCanonicalString();
-                    final completion = item.isCompleted
-                        ? l10n.dailyChoiceDetailsCompleted
-                        : l10n.dailyChoiceDetailsNotCompleted;
-                    void open() => context.router.push(
-                      DailyChoiceDetailsRoute(choiceId: item.id),
-                    );
-                    return Semantics(
-                      key: ValueKey('daily-choice-row-${index + 1}'),
-                      button: true,
-                      label: l10n.dailyChoiceCatalogRowLabel(
-                        index + 1,
-                        phrase,
-                        date,
-                        completion,
-                      ),
-                      onTap: open,
-                      child: ExcludeSemantics(
-                        child: ListTile(
-                          title: Text(phrase),
-                          subtitle: Text(
-                            '${l10n.dailyChoiceDetailsDate(date)} · $completion',
-                          ),
-                          onTap: open,
-                        ),
-                      ),
-                    );
-                  },
-                ),
         ),
-      ],
-    );
+      if (state.items.isEmpty)
+        _SliverStatus(_Status(message: l10n.dailyChoiceCatalogEmpty))
+      else
+        SliverPadding(
+          // Место под кнопку создания дневного выбора: прокрученные до конца
+          // последняя строка и продолжение выдачи стоят над ней.
+          padding: const EdgeInsets.only(bottom: _createActionExtent),
+          sliver: SliverList.builder(
+            itemCount: state.items.length + (state.nextCursor == null ? 0 : 1),
+            itemBuilder: (context, index) {
+              if (index == state.items.length) {
+                return _pageFooter(state, model, l10n);
+              }
+              final item = state.items[index];
+              final phrase = l10n.dailyChoiceDetailsPhrase(
+                item.source.title,
+                item.selected.title,
+              );
+              final date = item.date.toCanonicalString();
+              final completion = item.isCompleted
+                  ? l10n.dailyChoiceDetailsCompleted
+                  : l10n.dailyChoiceDetailsNotCompleted;
+              void open() => context.router.push(
+                DailyChoiceDetailsRoute(choiceId: item.id),
+              );
+              return Semantics(
+                key: ValueKey('daily-choice-row-${index + 1}'),
+                button: true,
+                label: l10n.dailyChoiceCatalogRowLabel(
+                  index + 1,
+                  phrase,
+                  date,
+                  completion,
+                ),
+                onTap: open,
+                child: ExcludeSemantics(
+                  child: ListTile(
+                    title: Text(phrase),
+                    subtitle: Text(
+                      '${l10n.dailyChoiceDetailsDate(date)} · $completion',
+                    ),
+                    onTap: open,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+    ];
   }
 
   Widget _pageFooter(
@@ -295,6 +301,23 @@ final class _DailyChoiceCatalogPageState
     DailyChoiceCatalogValidationFailure() => l10n.dailyChoiceCatalogInvalid,
     DailyChoiceCatalogUnexpectedFailure() => l10n.dailyChoiceCatalogUnexpected,
   };
+}
+
+/// Состояние без строк выдачи занимает остаток высоты под фильтрами и стоит
+/// над местом под кнопкой создания дневного выбора.
+final class _SliverStatus extends StatelessWidget {
+  const _SliverStatus(this.status);
+
+  final _Status status;
+
+  @override
+  Widget build(BuildContext context) => SliverFillRemaining(
+    hasScrollBody: false,
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: _createActionExtent),
+      child: status,
+    ),
+  );
 }
 
 final class _Status extends StatelessWidget {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -158,6 +159,108 @@ void main() {
     expect(find.text('To Основание, today I Действие'), findsOneWidget);
   });
 
+  testWidgets('фильтры, количество и выдача прокручиваются вместе одним '
+      'жестом по выдаче', (tester) async {
+    final repository = _Repository();
+    await _open(tester, repository, size: _phone);
+    repository.completeFirst(
+      [for (var number = 1; number <= 20; number++) _item(number)],
+      total: 21,
+      cursor: const _Cursor(),
+    );
+    await tester.pumpAndSettle();
+    final dateFilter = find.byKey(const ValueKey('daily-choice-date-filter'));
+    final count = find.text('Всего дневных выборов: 21');
+    final row = find.byKey(const ValueKey('daily-choice-row-2'));
+    final before = [
+      for (final finder in [dateFilter, count, row]) tester.getRect(finder).top,
+    ];
+
+    await tester.drag(row, const Offset(0, -100));
+    await tester.pumpAndSettle();
+
+    final shifts = [
+      for (final (index, finder) in [dateFilter, count, row].indexed)
+        before[index] - tester.getRect(finder).top,
+    ];
+    expect(shifts.first, greaterThan(0));
+    expect(shifts, everyElement(moreOrLessEquals(shifts.first)));
+  });
+
+  for (final (keyboard, variant) in [
+    (0.0, 'без клавиатуры'),
+    (300.0, 'при открытой клавиатуре'),
+  ]) {
+    testWidgets('начальные загрузка, отказ с повтором и пустая выдача стоят '
+        'под фильтрами и доступны над созданием дневного выбора $variant', (
+      tester,
+    ) async {
+      final repository = _Repository();
+      await _open(tester, repository, size: _phone, keyboard: keyboard);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      final create = find.byKey(
+        const ValueKey('daily-choice-create-from-action'),
+      );
+
+      // Прокручивает страницу до конца жестом из-под шапки и проверяет, что
+      // элемент стоит под фильтрами и целиком виден над созданием дневного
+      // выбора, а значит, и над клавиатурой.
+      Future<void> expectReachable(Finder finder) async {
+        final appBar = tester.getRect(find.byType(AppBar));
+        await tester.dragFrom(
+          Offset(appBar.left + 24, appBar.bottom + 24),
+          const Offset(0, -400),
+        );
+        // Индикатор загрузки не даёт кадрам успокоиться.
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        expect(finder, findsOneWidget);
+        final filtersBottom = [
+          for (final key in _filterKeys)
+            tester
+                .getRect(find.byKey(ValueKey(key), skipOffstage: false))
+                .bottom,
+        ].reduce(math.max);
+        final rect = tester.getRect(finder);
+        expect(
+          rect.top,
+          greaterThanOrEqualTo(filtersBottom),
+          reason: '$finder',
+        );
+        expect(
+          rect.top,
+          greaterThanOrEqualTo(appBar.bottom),
+          reason: '$finder',
+        );
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(tester.getRect(create).top),
+          reason: '$finder',
+        );
+      }
+
+      await expectReachable(find.text(l10n.dailyChoiceCatalogLoading));
+
+      repository.failFirst();
+      await tester.pumpAndSettle();
+      final retry = find.widgetWithText(TextButton, l10n.commonRetry);
+      await expectReachable(find.text(l10n.dailyChoiceCatalogUnavailable));
+      await expectReachable(retry);
+      expect(retry.hitTestable(), findsOneWidget);
+
+      await tester.tap(retry);
+      await tester.pump();
+      expect(repository.queries, hasLength(2));
+      await expectReachable(find.text(l10n.dailyChoiceCatalogLoading));
+
+      repository.completeFirst([], index: 1, total: 0);
+      await tester.pumpAndSettle();
+      await expectReachable(find.text(l10n.dailyChoiceCatalogTotalCount(0)));
+      await expectReachable(find.text(l10n.dailyChoiceCatalogEmpty));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('фильтры и строки доступны при увеличенном тексте', (
     tester,
   ) async {
@@ -177,20 +280,42 @@ void main() {
       find.byKey(const ValueKey('daily-choice-completion-filter')),
       findsOneWidget,
     );
+    // Строки идут за крупными фильтрами и становятся видимыми прокруткой
+    // страницы.
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('daily-choice-row-1')),
+      find.byType(CustomScrollView),
+      const Offset(0, -100),
+    );
     expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
   });
 }
 
+/// Экран телефона, на котором фильтры и выдача делят высоту.
+const _phone = Size(400, 800);
+
+/// Фильтры каталога: поле даты, её применение, выполнение и сброс.
+const _filterKeys = [
+  'daily-choice-date-filter',
+  'daily-choice-apply-date',
+  'daily-choice-completion-filter',
+  'daily-choice-clear-filters',
+];
+
+/// Открывает каталог дневных выборов; [keyboard] — высота открытой экранной
+/// клавиатуры.
 Future<AppRouter> _open(
   WidgetTester tester,
   _Repository repository, {
   Locale locale = const Locale('ru'),
   Size size = const Size(1200, 2400),
+  double keyboard = 0,
 }) async {
   final router = AppRouter();
   addTearDown(router.dispose);
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
+  tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ProviderScope(
