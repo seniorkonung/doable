@@ -4,7 +4,9 @@ import 'package:doable_widgetbook/favorite/home_row_use_cases.dart';
 import 'package:doable_widgetbook/navigation/app_navigation_bar_use_cases.dart';
 import 'package:doable_widgetbook/widgetbook_app.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:widgetbook/widgetbook.dart';
 
 void main() {
   testWidgets('каталог показывает раздел намерений в панели навигации', (
@@ -64,6 +66,9 @@ void main() {
       'Готово к действию',
       'Не готово к действию',
       'Длинное название',
+      'Ручка доступна',
+      'Ручка недоступна',
+      'Новое место сохраняется',
     ]);
 
     final labels = {
@@ -95,6 +100,114 @@ void main() {
     }
   });
 
+  testWidgets('строка Главной показывает доступную и недоступную ручку и '
+      'сохранение нового места в обеих локалях', (tester) async {
+    final useCases = {
+      for (final useCase in homeRowUseCases()) useCase.name: useCase,
+    };
+    final texts = {
+      const Locale('ru'): (
+        tooltip: 'Перетащите, чтобы переместить намерение',
+        saving: 'Новое место сохраняется…',
+      ),
+      const Locale('en'): (
+        tooltip: 'Drag to move the intention',
+        saving: 'Saving the new position…',
+      ),
+    };
+    for (final MapEntry(key: locale, value: text) in texts.entries) {
+      for (final (name, movable, saving) in [
+        ('Ручка доступна', true, false),
+        ('Ручка недоступна', false, false),
+        ('Новое место сохраняется', false, true),
+      ]) {
+        await _pumpUseCase(tester, useCases[name]!, locale);
+
+        final row = find.byType(HomeIntentionRow);
+        expect(row, findsOneWidget, reason: name);
+        final handle = find.descendant(
+          of: row,
+          matching: find.byIcon(Icons.drag_handle),
+        );
+        final theme = Theme.of(tester.element(row));
+        expect(
+          tester.widget<Icon>(handle).color,
+          movable ? isNull : theme.disabledColor,
+          reason: name,
+        );
+        expect(
+          find.byType(ReorderableDragStartListener),
+          movable ? findsOneWidget : findsNothing,
+          reason: name,
+        );
+        // Доступную ручку строка получает только в переставляемом списке.
+        expect(
+          find.ancestor(of: row, matching: find.byType(SliverReorderableList)),
+          movable ? findsOneWidget : findsNothing,
+          reason: name,
+        );
+        expect(
+          find.byTooltip(text.tooltip),
+          movable ? findsOneWidget : findsNothing,
+          reason: name,
+        );
+        expect(
+          find.descendant(of: row, matching: find.text(text.saving)),
+          saving ? findsOneWidget : findsNothing,
+          reason: name,
+        );
+        expect(find.byIcon(Icons.star), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+    }
+  });
+
+  testWidgets('строки Главной при масштабе текста 2.5 на экране телефона '
+      'показывают название и состояние сохранения целиком', (tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 2.5;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    for (final locale in const [Locale('ru'), Locale('en')]) {
+      for (final useCase in homeRowUseCases()) {
+        await _pumpUseCase(tester, useCase, locale);
+
+        expect(tester.takeException(), isNull, reason: useCase.name);
+        final row = find.byType(HomeIntentionRow);
+        final rowRect = tester.getRect(row);
+        expect(rowRect.right, lessThanOrEqualTo(360), reason: useCase.name);
+        for (final paragraph in tester.renderObjectList<RenderParagraph>(
+          find.descendant(of: row, matching: find.byType(RichText)),
+        )) {
+          expect(paragraph.didExceedMaxLines, isFalse, reason: useCase.name);
+        }
+        final handle = find.descendant(
+          of: row,
+          matching: find.byIcon(Icons.drag_handle),
+        );
+        expect(
+          tester.getRect(handle).right,
+          lessThanOrEqualTo(360),
+          reason: useCase.name,
+        );
+      }
+    }
+  });
+
+  testWidgets('каталог позволяет увеличить текст до масштаба 2.5', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const WidgetbookApp());
+
+    final addons = tester.widget<Widgetbook>(find.byType(Widgetbook)).addons;
+    final textScale = addons!.whereType<TextScaleAddon>().single;
+    expect(textScale.min, 1);
+    expect(textScale.max, greaterThanOrEqualTo(2.5));
+    expect(textScale.initialScale ?? 1, 1);
+  });
+
   testWidgets('каталог показывает раздел Главной', (tester) async {
     tester.view.physicalSize = const Size(1600, 1000);
     tester.view.devicePixelRatio = 1;
@@ -116,4 +229,21 @@ void main() {
 
     expect(find.text('Навигация'), findsOneWidget);
   });
+}
+
+/// Показывает пример [useCase] в приложении с языком [locale].
+Future<void> _pumpUseCase(
+  WidgetTester tester,
+  WidgetbookUseCase useCase,
+  Locale locale,
+) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(body: Builder(builder: useCase.builder)),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
