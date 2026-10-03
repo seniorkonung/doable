@@ -53,6 +53,11 @@ sealed class HomeReorderPending extends HomeReorder {
   });
 
   final IntentionId intentionId;
+
+  /// Запрошенное положение относительно показанного подтверждённого снимка.
+  /// Пока опора остаётся в списке, это размещение команды; если
+  /// подтверждённое изменение скрыло опору, — после её ближайшего
+  /// показанного предшественника.
   final FavoritePlacement placement;
 }
 
@@ -66,6 +71,10 @@ final class HomeReorderSaving extends HomeReorderPending {
 
 /// Запись подтверждена на ревизии [revision], а цельного снимка не старше неё
 /// ещё нет: показанный подтверждённый снимок несёт прежний порядок.
+///
+/// Отказ обновления ожидание не прекращает: неактуальный список показывает
+/// записанное положение, не выдавая его за подтверждённый снимок, до
+/// успешного чтения.
 final class HomeReorderAwaitingSnapshot extends HomeReorderPending {
   const HomeReorderAwaitingSnapshot({
     required super.intentionId,

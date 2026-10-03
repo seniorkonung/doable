@@ -1,5 +1,8 @@
 import 'package:doable/src/favorite/application/favorite_intentions.dart';
+import 'package:doable/src/favorite/application/favorite_order_command.dart';
+import 'package:doable/src/favorite/domain/favorite_order.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -437,6 +440,48 @@ void main() {
         expect(h.repository.readCount, 3);
       },
     );
+
+    test('чтение, начатое до подтверждённой перестановки, не возвращает '
+        'прежний порядок', () async {
+      final h = await loadedHome();
+      h.repository.favoriteOrder = homeTestOrder([1, 2, 3]);
+
+      await confirmMarkC(h, revision: 2);
+      expect(h.repository.readCount, 2);
+      // Перестановку принял не экран Главной; её пакет приходит во время
+      // чтения, начатого отметкой.
+      final accepted = h.coordinator.acceptFavoriteOrderMove(
+        MoveFavoriteIntention(
+          intentionId: c,
+          placement: const FirstFavoritePlacement(),
+        ),
+      ) as FavoriteOrderCommandAccepted;
+      h.repository.completeMove(0, revision: 3);
+      await accepted.future;
+      await pumpEventQueue();
+      expect(h.repository.readCount, 2);
+
+      h.repository.completeRead(
+        1,
+        items: [homeTestRow(1, 'А'), homeTestRow(2, 'Б'), homeTestRow(3, 'В')],
+        revision: 2,
+      );
+      await pumpEventQueue();
+
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 3);
+
+      h.repository.completeRead(
+        2,
+        items: [homeTestRow(3, 'В'), homeTestRow(1, 'А'), homeTestRow(2, 'Б')],
+        revision: 3,
+      );
+      await pumpEventQueue();
+
+      expect(ids(h), [c, a, b]);
+      expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
+      expect(h.repository.readCount, 3);
+    });
 
     test('первоначальное чтение, начатое до подтверждённого изменения, не '
         'публикует прежний состав', () async {

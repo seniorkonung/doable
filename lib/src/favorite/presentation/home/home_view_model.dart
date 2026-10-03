@@ -106,11 +106,9 @@ final class HomeViewModel extends _$HomeViewModel {
   /// поверхности.
   void move(IntentionId intentionId, FavoritePlacement placement) {
     final current = state;
-    if (current is! HomeList ||
-        !current.acceptsReorder ||
-        current.reorderedItems(intentionId, placement) == null) {
-      return;
-    }
+    if (current is! HomeList || !current.acceptsReorder) return;
+    final requested = current.reorderedItems(intentionId, placement);
+    if (requested == null) return;
     switch (_coordinator.acceptFavoriteOrderMove(
       MoveFavoriteIntention(intentionId: intentionId, placement: placement),
     )) {
@@ -118,9 +116,14 @@ final class HomeViewModel extends _$HomeViewModel {
         _move = _HomeMove(
           token: token,
           intentionId: intentionId,
-          placement: placement,
+          predecessors: [
+            for (final row in requested.takeWhile(
+              (row) => row.id != intentionId,
+            ))
+              row.id,
+          ].reversed.toList(growable: false),
         );
-        state = current.withReorder(_reorder);
+        state = current.withReorder(_reorderIn(current.items));
       case FavoriteOrderCommandAlreadyRunning() ||
           GraphCommandCoordinatorDraining():
         break;
@@ -330,16 +333,16 @@ final class HomeViewModel extends _$HomeViewModel {
   }
 
   /// Отказ обновления сохраняет показанный снимок неактуальным с причиной;
-  /// отказ без показанного снимка остаётся отказом получения. Ожидание
-  /// снимка подтверждённой перестановки отказ прекращает: показан последний
-  /// подтверждённый список, а выполняющаяся запись сохраняет запрошенное
-  /// положение до своего завершения.
+  /// отказ без показанного снимка остаётся отказом получения. Перестановку
+  /// отказ не завершает: подтверждённая запись ждёт цельного снимка до
+  /// успешного чтения, поэтому неактуальный список не изображает её
+  /// откатившейся, а записанное положение не становится подтверждённым
+  /// снимком.
   void _readFailure(FavoriteIntentionsReadFailure failure) {
     final current = state;
     switch (current) {
       case HomeLoaded():
         _refreshTrigger = _RefreshTrigger.anyPackage;
-        if (_move?.confirmedRevision != null) _move = null;
         state = _withMove(current.withFreshness(HomeFreshnessStale(failure)));
       case HomeLoading() ||
           HomeUnavailable() ||
@@ -374,7 +377,7 @@ final class HomeViewModel extends _$HomeViewModel {
       return HomeList(
         items: snapshot.items,
         revision: snapshot.revision,
-        reorder: _reorder,
+        reorder: _reorderIn(snapshot.items),
       );
     }
     return HomeEmpty(
@@ -394,24 +397,23 @@ final class HomeViewModel extends _$HomeViewModel {
     }
   }
 
-  HomeReorder get _reorder => switch (_move) {
+  /// Состояние перестановки над показанным подтверждённым снимком [items].
+  HomeReorder _reorderIn(List<FavoriteIntentionRow> items) => switch (_move) {
     null => const HomeReorderIdle(),
-    _HomeMove(:final intentionId, :final placement, confirmedRevision: null) =>
-      HomeReorderSaving(intentionId: intentionId, placement: placement),
-    _HomeMove(
-      :final intentionId,
-      :final placement,
-      :final GraphRevision confirmedRevision,
-    ) =>
+    final move && _HomeMove(confirmedRevision: null) => HomeReorderSaving(
+      intentionId: move.intentionId,
+      placement: move.placementIn(items),
+    ),
+    final move && _HomeMove(:final GraphRevision confirmedRevision) =>
       HomeReorderAwaitingSnapshot(
-        intentionId: intentionId,
-        placement: placement,
+        intentionId: move.intentionId,
+        placement: move.placementIn(items),
         revision: confirmedRevision,
       ),
   };
 
   HomeLoaded _withMove(HomeLoaded loaded) => switch (loaded) {
-    HomeList() => loaded.withReorder(_reorder),
+    HomeList(:final items) => loaded.withReorder(_reorderIn(items)),
     HomeEmpty() => loaded,
   };
 }
@@ -421,21 +423,40 @@ final class _HomeMove {
   const _HomeMove({
     required this.token,
     required this.intentionId,
-    required this.placement,
+    required this.predecessors,
     this.confirmedRevision,
   });
 
   final FavoriteOrderOperationToken token;
   final IntentionId intentionId;
-  final FavoritePlacement placement;
+
+  /// Намерения, стоявшие перед перемещаемым в запрошенном положении при
+  /// приёме, начиная с ближайшего: первое из них — опора команды, а при
+  /// размещении первым список пуст.
+  final List<IntentionId> predecessors;
 
   /// Ревизия подтверждённой записи; `null`, пока запись выполняется.
   final GraphRevision? confirmedRevision;
 
+  /// Запрошенное положение в показанном списке [items]: сразу после
+  /// ближайшего предшественника, который остаётся в списке, иначе первым.
+  ///
+  /// Подтверждённое изменение во время перестановки может скрыть опору
+  /// архивированием. Запись всё равно ставит намерение сразу после неё во
+  /// всём порядке, и в списке оно оказывается после ближайшего показанного
+  /// предшественника опоры, а не на прежнем месте.
+  FavoritePlacement placementIn(List<FavoriteIntentionRow> items) {
+    final shown = {for (final row in items) row.id};
+    for (final id in predecessors) {
+      if (shown.contains(id)) return AfterFavoritePlacement(id);
+    }
+    return const FirstFavoritePlacement();
+  }
+
   _HomeMove confirmedAt(GraphRevision revision) => _HomeMove(
     token: token,
     intentionId: intentionId,
-    placement: placement,
+    predecessors: predecessors,
     confirmedRevision: revision,
   );
 }
