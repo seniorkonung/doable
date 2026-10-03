@@ -45,6 +45,18 @@ final class UnknownActiveRelationCount extends ActiveRelationCountView {
   const UnknownActiveRelationCount();
 }
 
+/// Узел семантики, которым экранный диктор объявляет представление намерения.
+enum IntentionSummarySemanticsNode {
+  /// Представление объявляется собственным узлом.
+  own,
+
+  /// Название, подписи и переход представления дополняют узел ближайшего
+  /// предка, который добавляет к ним свои действия, например строку
+  /// переставляемого списка с действиями перемещения: экранный диктор
+  /// получает их одним узлом.
+  enclosing,
+}
+
 /// Переиспользуемое представление намерения.
 ///
 /// Сохраняет идентичность намерения: название показывается без изменения, а
@@ -61,6 +73,7 @@ final class IntentionSummaryView extends StatelessWidget {
     this.confirmedFavoriteMark,
     this.onTap,
     this.tapHint,
+    this.semanticsNode = IntentionSummarySemanticsNode.own,
     super.key,
   });
 
@@ -96,44 +109,53 @@ final class IntentionSummaryView extends StatelessWidget {
   /// архивным состоянием и количеством активных связей.
   final String? tapHint;
 
+  /// По умолчанию представление объявляется собственным узлом.
+  final IntentionSummarySemanticsNode semanticsNode;
+
   @override
   Widget build(BuildContext context) {
+    final summary = _summary(context);
+    return switch (semanticsNode) {
+      IntentionSummarySemanticsNode.own => MergeSemantics(child: summary),
+      IntentionSummarySemanticsNode.enclosing => summary,
+    };
+  }
+
+  Widget _summary(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return MergeSemantics(
-      child: Semantics(
-        hint: tapHint,
-        child: ListTile(
-          onTap: onTap,
-          isThreeLine: true,
-          title: Text(title),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (confirmedTags case final tags?)
-                Text(_tagsLabel(localizations, tags)),
-              Wrap(
-                spacing: 12,
-                children: [
-                  for (final trait in traits) Text(trait),
-                  if (showArchiveState) Text(_archiveStateLabel(localizations)),
-                ],
-              ),
-              ..._activeRelationCountLines(localizations, theme),
-            ],
-          ),
-          trailing: switch (confirmedFavoriteMark) {
-            // Звезда — подпись строки, а не управление: отметка различима
-            // наличием значка и ставится только на странице намерения.
-            FavoriteMark.favorite => Icon(
-              Icons.star,
-              applyTextScaling: true,
-              semanticLabel: localizations.intentionSummaryFavoriteMark,
+    return Semantics(
+      hint: tapHint,
+      child: ListTile(
+        onTap: onTap,
+        isThreeLine: true,
+        title: Text(title),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (confirmedTags case final tags?)
+              Text(_tagsLabel(localizations, tags)),
+            Wrap(
+              spacing: 12,
+              children: [
+                for (final trait in traits) Text(trait),
+                if (showArchiveState) Text(_archiveStateLabel(localizations)),
+              ],
             ),
-            FavoriteMark.notFavorite || null => null,
-          },
+            ..._activeRelationCountLines(localizations, theme),
+          ],
         ),
+        trailing: switch (confirmedFavoriteMark) {
+          // Звезда — подпись строки, а не управление: отметка различима
+          // наличием значка и ставится только на странице намерения.
+          FavoriteMark.favorite => Icon(
+            Icons.star,
+            applyTextScaling: true,
+            semanticLabel: localizations.intentionSummaryFavoriteMark,
+          ),
+          FavoriteMark.notFavorite || null => null,
+        },
       ),
     );
   }

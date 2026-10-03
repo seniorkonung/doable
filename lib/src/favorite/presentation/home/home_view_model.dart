@@ -195,8 +195,8 @@ final class HomeViewModel extends _$HomeViewModel {
     }
     final current = state;
     if (current is HomeLoaded) {
-      _settleMove(current.revision);
-      state = _withMove(current);
+      final settled = _settleMove(current.revision);
+      state = _confirming(_withMove(current), settled);
     }
     if (conflict) {
       _staleReadAttempts = 0;
@@ -307,8 +307,8 @@ final class HomeViewModel extends _$HomeViewModel {
         _refreshNeeded = false;
         _staleReadAttempts = 0;
         _refreshTrigger = _RefreshTrigger.favoriteChange;
-        _settleMove(value.revision);
-        state = _loaded(value);
+        final settled = _settleMove(value.revision);
+        state = _confirming(_loaded(value), settled);
       case GraphResultFailure(:final failure):
         // Пакет, пришедший во время отказавшего чтения, даёт ещё одно.
         if (_refreshNeeded) return;
@@ -389,13 +389,28 @@ final class HomeViewModel extends _$HomeViewModel {
   }
 
   /// Цельный снимок ревизии [snapshotRevision] не старше подтверждённой
-  /// записи уже несёт её результат, и перестановка завершена.
-  void _settleMove(GraphRevision snapshotRevision) {
-    final confirmed = _move?.confirmedRevision;
-    if (confirmed != null && !_precedes(snapshotRevision, confirmed)) {
-      _move = null;
+  /// записи уже несёт её результат, и перестановка завершена: возвращает
+  /// перемещённое намерение завершённой перестановки.
+  IntentionId? _settleMove(GraphRevision snapshotRevision) {
+    final move = _move;
+    final confirmed = move?.confirmedRevision;
+    if (move == null ||
+        confirmed == null ||
+        _precedes(snapshotRevision, confirmed)) {
+      return null;
     }
+    _move = null;
+    return move.intentionId;
   }
+
+  /// Снимок [loaded], подтвердивший перестановку [settled] этой Главной.
+  HomeLoaded _confirming(HomeLoaded loaded, IntentionId? settled) =>
+      switch ((loaded, settled)) {
+        (final HomeList list, final IntentionId settled) => list.confirmingMove(
+          settled,
+        ),
+        (HomeList() || HomeEmpty(), _) => loaded,
+      };
 
   /// Состояние перестановки над показанным подтверждённым снимком [items].
   HomeReorder _reorderIn(List<FavoriteIntentionRow> items) => switch (_move) {

@@ -10,6 +10,8 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
+import 'package:doable/src/favorite/presentation/home/home_state.dart';
+import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -184,7 +186,7 @@ void main() {
     testWidgets('загрузка объявляется живой областью и при масштабе текста 2.5 '
         'показана целиком: $code', (tester) async {
       final semantics = tester.ensureSemantics();
-      final faults = _FavoriteReadFaults()..holdNextRead();
+      final faults = _FavoriteStorageFaults()..holdNextRead();
       final app = await _start(tester, locale, largeText: true, faults: faults);
       final l10n = app.l10n;
 
@@ -260,7 +262,7 @@ void main() {
         tester,
       ) async {
         final semantics = tester.ensureSemantics();
-        final faults = _FavoriteReadFaults()..failNextRead(failure);
+        final faults = _FavoriteStorageFaults()..failNextRead(failure);
         final app = await _start(
           tester,
           locale,
@@ -308,7 +310,7 @@ void main() {
           '${retry ? ' и повтор' : ''} при масштабе текста 2.5 показаны '
           'целиком и доступны: $code', (tester) async {
         final semantics = tester.ensureSemantics();
-        final faults = _FavoriteReadFaults();
+        final faults = _FavoriteStorageFaults();
         final app = await _start(
           tester,
           locale,
@@ -376,6 +378,238 @@ void main() {
         semantics.dispose();
       });
     }
+
+    testWidgets('экранный диктор перемещает строки Главной системными '
+        'действиями без перетаскивания, а новое место объявляется живой '
+        'областью только после подтверждения записи: $code', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final faults = _FavoriteStorageFaults();
+      final app = await _start(tester, locale, faults: faults);
+      final l10n = app.l10n;
+      await _until(tester, _row(_rows.last.number));
+      final actions = _systemActions(tester);
+
+      // Невозможных действий у крайних строк нет.
+      expect(_moveActions(l10n, _rows[0]), {
+        actions.reorderItemDown,
+        actions.reorderItemToEnd,
+      });
+      expect(_moveActions(l10n, _rows[1]), {
+        actions.reorderItemToStart,
+        actions.reorderItemUp,
+        actions.reorderItemDown,
+        actions.reorderItemToEnd,
+      });
+      expect(_moveActions(l10n, _rows[2]), {
+        actions.reorderItemToStart,
+        actions.reorderItemUp,
+      });
+
+      // Первая «Гулять» — на одно место ниже; хранилище задерживает запись.
+      faults.holdNextPlaceWrite();
+      tester.semantics.customAction(
+        _rowNode(l10n, _rows[0]),
+        CustomSemanticsAction(label: actions.reorderItemDown),
+      );
+      await _waitFor(tester, () => faults.isHoldingPlaceWrite);
+
+      _expectTraversal(tester, [
+        _rowLabel(l10n, _rows[1]),
+        _rowLabel(l10n, _rows[0], saving: true),
+        _rowLabel(l10n, _rows[2]),
+      ]);
+      expect(
+        find.semantics.byAction(SemanticsAction.customAction),
+        findsNothing,
+      );
+      expect(_announcements(l10n), findsNothing);
+      expect(_storedOrder(app), [_otherWalk, _long, _walk]);
+
+      faults.releasePlaceWrite();
+      await _waitFor(tester, () => _announcements(l10n).evaluate().isNotEmpty);
+
+      final first = _announcements(l10n).evaluate().single;
+      expect(first.label, l10n.homeReorderMoved('Гулять', 2, 3));
+      expect(first.flagsCollection.isLiveRegion, isTrue);
+      expect(_storedOrder(app), [_long, _otherWalk, _walk]);
+      _expectTraversal(tester, [
+        for (final row in [_rows[1], _rows[0], _rows[2]]) _rowLabel(l10n, row),
+      ]);
+      // Успех предъявляется новым порядком, без сообщения на экране.
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.text(first.label), findsNothing);
+
+      // Вторая «Гулять» — на одно место выше: то же место и тот же текст
+      // объявляются заново.
+      tester.semantics.customAction(
+        _rowNode(l10n, _rows[2]),
+        CustomSemanticsAction(label: actions.reorderItemUp),
+      );
+      await _waitFor(
+        tester,
+        () =>
+            _announcements(l10n).evaluate().any((node) => node.id != first.id),
+      );
+
+      expect(
+        _announcements(l10n).evaluate().single.label,
+        l10n.homeReorderMoved('Гулять', 2, 3),
+      );
+      expect(_storedOrder(app), [_long, _walk, _otherWalk]);
+      _expectTraversal(tester, [
+        for (final row in [_rows[1], _rows[2], _rows[0]]) _rowLabel(l10n, row),
+      ]);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+    testWidgets('при масштабе текста 2.5 ручки, длинное название и состояние '
+        'сохранения строк Главной показаны целиком и доступны: $code', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final faults = _FavoriteStorageFaults();
+      final app = await _start(tester, locale, largeText: true, faults: faults);
+      final l10n = app.l10n;
+      await _until(tester, _row(_rows.first.number));
+
+      for (final row in _rows) {
+        final handle = find.descendant(
+          of: _row(row.number),
+          matching: find.byTooltip(l10n.homeReorderHandleTooltip),
+        );
+        await tester.scrollUntilVisible(
+          handle,
+          100,
+          scrollable: _homeScrollable,
+          maxScrolls: 100,
+        );
+        await tester.pumpAndSettle();
+        _expectInHomeList(tester, handle);
+        _expectTappable(tester, handle);
+        expect(tester.getSize(handle).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(handle).height, greaterThanOrEqualTo(48));
+      }
+
+      // Строка с длинным названием — на одно место ниже; запись задержана.
+      faults.holdNextPlaceWrite();
+      tester.semantics.customAction(
+        _rowNode(l10n, _rows[1]),
+        CustomSemanticsAction(label: _systemActions(tester).reorderItemDown),
+      );
+      await _waitFor(tester, () => faults.isHoldingPlaceWrite);
+
+      for (final text in [l10n.homeReorderSaving, _longTitle]) {
+        final finder = find.descendant(
+          of: _row(_long),
+          matching: find.text(text),
+        );
+        await tester.scrollUntilVisible(
+          finder,
+          100,
+          scrollable: _homeScrollable,
+          maxScrolls: 100,
+        );
+        await tester.pumpAndSettle();
+        _expectNotTruncated(tester, finder);
+        _expectInHomeList(tester, finder);
+      }
+      expect(find.byType(ReorderableDragStartListener), findsNothing);
+      await _expectGuidelines(tester);
+
+      faults.releasePlaceWrite();
+      await _waitFor(
+        tester,
+        () => find.text(l10n.homeReorderSaving).evaluate().isEmpty,
+      );
+      expect(_storedOrder(app), [_otherWalk, _walk, _long]);
+      expect(_displayedOrder(app), [_otherWalk, _walk, _long]);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+    testWidgets('отказ перестановки возвращает подтверждённый порядок, а его '
+        'единственное сообщение объявляется живой областью и при масштабе '
+        'текста 2.5 показано целиком над панелью: $code', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final faults = _FavoriteStorageFaults()
+        ..failNextPlaceWrite(_Failure.unavailable);
+      final app = await _start(tester, locale, largeText: true, faults: faults);
+      final l10n = app.l10n;
+      final message = l10n.favoriteOrderUnavailable;
+      await _until(tester, _row(_rows.first.number));
+
+      tester.semantics.customAction(
+        _rowNode(l10n, _rows[0]),
+        CustomSemanticsAction(label: _systemActions(tester).reorderItemDown),
+      );
+      await _until(tester, find.text(message));
+      await tester.pumpAndSettle();
+
+      expect(find.text(message), findsOneWidget);
+      _expectLiveRegion(tester, message);
+      _expectNotTruncated(tester, find.text(message));
+      _expectOnScreen(tester, find.text(message));
+      expect(_storedOrder(app), [_otherWalk, _long, _walk]);
+      expect(_displayedOrder(app), [_otherWalk, _long, _walk]);
+      expect(find.text(l10n.homeReorderSaving), findsNothing);
+      expect(_announcements(l10n), findsNothing);
+
+      // Предъявленное сообщение уходит и не повторяется.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsNothing);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsNothing);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+    testWidgets('смена языка после перестановки человеком переводит названия '
+        'действий перемещения, но не меняет названия намерений и порядок: '
+        '$code → ${otherLocale.languageCode}', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _start(tester, locale);
+      await _until(tester, _row(_rows.last.number));
+      tester.semantics.customAction(
+        _rowNode(app.l10n, _rows[2]),
+        CustomSemanticsAction(label: _systemActions(tester).reorderItemToStart),
+      );
+      await _waitFor(
+        tester,
+        () => _announcements(app.l10n).evaluate().isNotEmpty,
+      );
+      final order = [_walk, _otherWalk, _long];
+      expect(_storedOrder(app), order);
+
+      tester.platformDispatcher.localesTestValue = [otherLocale];
+      await tester.pumpAndSettle();
+
+      final otherL10n = lookupAppLocalizations(otherLocale);
+      final otherActions = _systemActions(tester);
+      final shown = [_rows[2], _rows[0], _rows[1]];
+      _expectTraversal(tester, [
+        for (final row in shown) _rowLabel(otherL10n, row),
+      ]);
+      expect(_moveActions(otherL10n, shown.first), {
+        otherActions.reorderItemDown,
+        otherActions.reorderItemToEnd,
+      });
+      expect(_moveActions(otherL10n, shown.last), {
+        otherActions.reorderItemToStart,
+        otherActions.reorderItemUp,
+      });
+      for (final row in shown) {
+        expect(
+          find.descendant(of: _row(row.number), matching: find.text(row.title)),
+          findsOneWidget,
+        );
+      }
+      expect(_storedOrder(app), order);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
   }
 }
 
@@ -398,7 +632,7 @@ Future<_App> _start(
   bool largeText = false,
   List<int> favorites = _favorites,
   Set<int> archived = const {},
-  _FavoriteReadFaults? faults,
+  _FavoriteStorageFaults? faults,
 }) async {
   // Общая поверхность показывает сообщения только работающему приложению.
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -412,7 +646,7 @@ Future<_App> _start(
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   }
   late sqlite.Database raw;
-  final observer = faults ?? _FavoriteReadFaults();
+  final observer = faults ?? _FavoriteStorageFaults();
   final runtime = AppRuntime(
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openInMemoryLocalDatabase(setup: (database) => raw = database),
@@ -421,7 +655,9 @@ Future<_App> _start(
     diagnosticsSink: InMemoryDiagnosticsSink(),
   );
   addTearDown(() async {
-    observer.releaseRead();
+    observer
+      ..releaseRead()
+      ..releasePlaceWrite();
     await tester.pumpWidget(const SizedBox.shrink());
     await runtime.shutdown();
   });
@@ -501,11 +737,90 @@ final _homeScrollable = find.descendant(
 
 /// Название, готовность и число активных связей строки — так строку
 /// объявляет экранный диктор.
-String _rowLabel(AppLocalizations l10n, _Row row) => [
+String _rowLabel(AppLocalizations l10n, _Row row, {bool saving = false}) => [
   row.title,
   row.isReady ? l10n.catalogReady : l10n.catalogNotReady,
+  if (saving) l10n.homeReorderSaving,
   l10n.intentionActiveRelationCount(row.relations),
 ].join('\n');
+
+/// Узел строки Главной, которым её объявляет экранный диктор.
+SemanticsFinder _rowNode(AppLocalizations l10n, _Row row) =>
+    find.semantics.byLabel(_rowLabel(l10n, row));
+
+/// Системные названия действий перемещения на текущем языке интерфейса.
+WidgetsLocalizations _systemActions(WidgetTester tester) =>
+    WidgetsLocalizations.of(tester.element(find.byType(HomePage)));
+
+/// Названия действий перемещения, которые узел строки предлагает экранному
+/// диктору.
+Set<String> _moveActions(AppLocalizations l10n, _Row row) => {
+  for (final id
+      in _rowNode(
+            l10n,
+            row,
+          ).evaluate().single.getSemanticsData().customSemanticsActionIds ??
+          const <int>[])
+    CustomSemanticsAction.getAction(id)!.label!,
+};
+
+/// Узлы с объявлением нового места любого показанного намерения.
+SemanticsFinder _announcements(AppLocalizations l10n) {
+  final announcements = {
+    for (final row in _rows)
+      for (var position = 1; position <= _rows.length; position++)
+        l10n.homeReorderMoved(row.title, position, _rows.length),
+  };
+  return find.semantics.byPredicate(
+    (node) => announcements.contains(node.label),
+  );
+}
+
+/// Экранный диктор проходит строки Главной [labels] в этом порядке.
+void _expectTraversal(WidgetTester tester, List<String> labels) {
+  expect([
+    for (final node in tester.semantics.simulatedAccessibilityTraversal())
+      if (labels.contains(node.label)) node.label,
+  ], labels);
+}
+
+/// Номера избранных намерений в сохранённом порядке.
+List<int> _storedOrder(_App app) => [
+  for (final (id, _) in storedFavoriteMarks(app.raw))
+    [
+      _long,
+      _walk,
+      _otherWalk,
+      _read,
+      _sleep,
+    ].firstWhere((number) => tagFixtureId(number) == id),
+];
+
+/// Номера строк в порядке, который показывает Главная.
+List<int> _displayedOrder(_App app) => [
+  for (final row
+      in (app.container.read(homeViewModelProvider) as HomeList).displayedItems)
+    [
+      _long,
+      _walk,
+      _otherWalk,
+    ].firstWhere((number) => _intentionId(number) == row.id),
+];
+
+/// Элемент целиком в видимой части списка Главной над панелью.
+void _expectInHomeList(WidgetTester tester, Finder finder) {
+  expect(finder, findsOneWidget);
+  final viewport = tester.getRect(_homeScrollable);
+  final rect = tester.getRect(finder);
+  expect(rect.top, greaterThanOrEqualTo(viewport.top));
+  expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
+  expect(rect.left, greaterThanOrEqualTo(0));
+  expect(rect.right, lessThanOrEqualTo(_screen.width));
+  expect(
+    viewport.bottom,
+    lessThanOrEqualTo(tester.getRect(find.byType(AppNavigationBar)).top),
+  );
+}
 
 /// Строка объявляется одним узлом с названием, готовностью и числом
 /// активных связей и открывает намерение: снятия отметки и отдельных
@@ -650,13 +965,16 @@ Future<void> _waitFor(WidgetTester tester, bool Function() done) async {
   expect(done(), isTrue);
 }
 
-/// Управляет чтениями списка Главной на уровне хранилища: задерживает или
-/// отказывает ближайшему из них. Остальные чтения и записи не затрагиваются,
-/// а отказ классифицирует сам адаптер.
-final class _FavoriteReadFaults extends LocalDatabaseConnectionObserver {
+/// Управляет на уровне хранилища чтениями списка Главной и записью мест
+/// перестановки: задерживает или отказывает ближайшему из них. Остальные
+/// чтения и записи не затрагиваются, а отказ классифицирует сам адаптер.
+final class _FavoriteStorageFaults extends LocalDatabaseConnectionObserver {
   Completer<void>? _nextHold;
   Completer<void>? _held;
   _Failure? _nextFailure;
+  Completer<void>? _nextWriteHold;
+  Completer<void>? _heldWrite;
+  _Failure? _nextWriteFailure;
 
   /// Число чтений списка Главной, дошедших до хранилища.
   var reads = 0;
@@ -674,36 +992,80 @@ final class _FavoriteReadFaults extends LocalDatabaseConnectionObserver {
 
   void failNextRead(_Failure failure) => _nextFailure = failure;
 
+  void holdNextPlaceWrite() => _nextWriteHold = Completer<void>();
+
+  /// Задержанная запись мест дошла до хранилища и ждёт [releasePlaceWrite].
+  bool get isHoldingPlaceWrite => _heldWrite != null;
+
+  void releasePlaceWrite() {
+    final held = _heldWrite;
+    _heldWrite = null;
+    if (held != null && !held.isCompleted) held.complete();
+  }
+
+  void failNextPlaceWrite(_Failure failure) => _nextWriteFailure = failure;
+
   @override
   FutureOr<void> beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (statement.operation != LocalDatabaseSqlOperation.select &&
+        statement.statements.any(
+          (sql) => sql.startsWith('UPDATE favorite_intentions'),
+        )) {
+      return _intercept(
+        failure: _nextWriteFailure,
+        clearFailure: () => _nextWriteFailure = null,
+        hold: _nextWriteHold,
+        holdTaken: (hold) {
+          _nextWriteHold = null;
+          _heldWrite = hold;
+        },
+      );
+    }
+    // Чтение порядка внутри перестановки названий намерений не читает.
     if (statement.operation != LocalDatabaseSqlOperation.select ||
         !statement.statements.any(
-          (sql) => sql.contains('FROM favorite_intentions f'),
+          (sql) =>
+              sql.contains('FROM favorite_intentions f') &&
+              sql.contains('i.title'),
         )) {
       return null;
     }
     reads++;
-    final failure = _nextFailure;
+    return _intercept(
+      failure: _nextFailure,
+      clearFailure: () => _nextFailure = null,
+      hold: _nextHold,
+      holdTaken: (hold) {
+        _nextHold = null;
+        _held = hold;
+      },
+    );
+  }
+
+  FutureOr<void> _intercept({
+    required _Failure? failure,
+    required void Function() clearFailure,
+    required Completer<void>? hold,
+    required void Function(Completer<void> hold) holdTaken,
+  }) {
     if (failure != null) {
-      _nextFailure = null;
+      clearFailure();
       throw switch (failure) {
         _Failure.unavailable => sqlite.SqliteException(
           extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
-          message: 'Управляемая недоступность чтения списка Главной',
+          message: 'Управляемая недоступность хранилища избранного',
         ),
         _Failure.corruption => sqlite.SqliteException(
           extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
-          message: 'Управляемое повреждение чтения списка Главной',
+          message: 'Управляемое повреждение хранилища избранного',
         ),
         _Failure.unexpected => StateError(
-          'Управляемый непредвиденный отказ чтения списка Главной',
+          'Управляемый непредвиденный отказ хранилища избранного',
         ),
       };
     }
-    final hold = _nextHold;
     if (hold == null) return null;
-    _nextHold = null;
-    _held = hold;
+    holdTaken(hold);
     return hold.future;
   }
 }

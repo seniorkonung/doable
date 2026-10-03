@@ -1247,6 +1247,217 @@ void main() {
     });
   });
 
+  group('подтверждённая перестановка для объявления экранному диктору', () {
+    final rowsAdbc = [
+      homeTestRow(1, 'А'),
+      homeTestRow(4, 'Г'),
+      homeTestRow(2, 'Б'),
+      homeTestRow(3, 'В'),
+    ];
+
+    /// Подтверждение несёт перемещённое намерение с его местом в
+    /// подтвердившем снимке, начиная с единицы, и числом строк снимка.
+    void expectConfirmed(
+      HomeConfirmedMove? confirmed, {
+      required IntentionId intentionId,
+      required String title,
+      required int position,
+      required int count,
+    }) {
+      expect(confirmed, isNotNull);
+      expect(confirmed!.row.id, intentionId);
+      expect(confirmed.row.title, title);
+      expect(confirmed.position, position);
+      expect(confirmed.count, count);
+    }
+
+    test('появляется только вместе с цельным снимком, подтвердившим запись, '
+        'и несёт место перемещённого намерения в нём', () async {
+      final h = await loadedHome();
+      expect(list(h).confirmedMove, isNull);
+
+      h.model.move(d, AfterFavoritePlacement(a));
+      expect(list(h).reorder, isA<HomeReorderSaving>());
+      expect(list(h).confirmedMove, isNull);
+
+      h.repository.completeMove(0, revision: 2);
+      await pumpEventQueue();
+      expect(list(h).reorder, isA<HomeReorderAwaitingSnapshot>());
+      expect(list(h).confirmedMove, isNull);
+
+      // Снимок старше записи её не подтверждает.
+      h.repository.completeRead(1, items: rowsAbcd);
+      await pumpEventQueue();
+      expect(list(h).confirmedMove, isNull);
+
+      h.repository.completeRead(2, items: rowsAdbc, revision: 2);
+      await pumpEventQueue();
+
+      expect(list(h).reorder, isA<HomeReorderIdle>());
+      expectConfirmed(
+        list(h).confirmedMove,
+        intentionId: d,
+        title: 'Г',
+        position: 2,
+        count: 4,
+      );
+    });
+
+    test('снимок, уже несущий запись к её завершению, подтверждает её с '
+        'актуальными данными строк', () async {
+      final h = await loadedHome();
+      unawaited(
+        h.confirm(
+          UpdateIntention(id: d, title: 'Гэ', description: null),
+          revision: 2,
+          before: homeTestSummary(4, 'Г'),
+          after: homeTestSummary(4, 'Гэ'),
+        ),
+      );
+      h.model.move(d, AfterFavoritePlacement(a));
+      await pumpEventQueue();
+      h.repository.completeRead(
+        1,
+        items: [
+          homeTestRow(1, 'А'),
+          homeTestRow(4, 'Гэ'),
+          homeTestRow(2, 'Б'),
+          homeTestRow(3, 'В'),
+        ],
+        revision: 3,
+      );
+      await pumpEventQueue();
+      expect(list(h).reorder, isA<HomeReorderSaving>());
+      expect(list(h).confirmedMove, isNull);
+
+      h.repository.completeMove(0, revision: 3);
+      await pumpEventQueue();
+
+      expect(list(h).reorder, isA<HomeReorderIdle>());
+      expectConfirmed(
+        list(h).confirmedMove,
+        intentionId: d,
+        title: 'Гэ',
+        position: 2,
+        count: 4,
+      );
+    });
+
+    test('остаётся с подтвердившим снимком при смене актуальности и не '
+        'переходит в следующий снимок', () async {
+      final h = await loadedHome();
+      h.model.move(d, AfterFavoritePlacement(a));
+      h.repository.completeMove(0, revision: 2);
+      await pumpEventQueue();
+      h.repository.completeRead(1, items: rowsAdbc, revision: 2);
+      await pumpEventQueue();
+      final confirmed = list(h).confirmedMove;
+      expect(confirmed, isNotNull);
+
+      // Отметка Д требует обновления: показан тот же снимок.
+      await h.confirm(
+        MarkIntentionFavorite(homeTestIntentionId(5)),
+        revision: 3,
+        before: homeTestSummary(5, 'Д', favoriteMark: FavoriteMark.notFavorite),
+        after: homeTestSummary(5, 'Д'),
+      );
+      expect(list(h).freshness, isA<HomeFreshnessRefreshing>());
+      expect(identical(list(h).confirmedMove, confirmed), isTrue);
+
+      h.repository.completeRead(
+        2,
+        items: [...rowsAdbc, homeTestRow(5, 'Д')],
+        revision: 3,
+      );
+      await pumpEventQueue();
+
+      expect(list(h).items, hasLength(5));
+      expect(list(h).confirmedMove, isNull);
+    });
+
+    test(
+      'снимок без перемещённого намерения не подтверждает его место',
+      () async {
+        final h = await loadedHome();
+        h.model.move(d, AfterFavoritePlacement(a));
+        h.repository.completeMove(0, revision: 2);
+        await pumpEventQueue();
+        // Г архивировано после записи, до подтверждающего снимка.
+        await h.confirm(
+          ArchiveIntention(d),
+          revision: 3,
+          before: homeTestSummary(4, 'Г'),
+          after: homeTestSummary(
+            4,
+            'Г',
+            archiveState: IntentionArchiveState.archived,
+          ),
+        );
+
+        h.repository.completeRead(
+          1,
+          items: [
+            homeTestRow(1, 'А'),
+            homeTestRow(2, 'Б'),
+            homeTestRow(3, 'В'),
+          ],
+          archivedCount: 1,
+          revision: 3,
+        );
+        await pumpEventQueue();
+
+        expect(list(h).reorder, isA<HomeReorderIdle>());
+        expect(confirmedIds(h), [a, b, c]);
+        expect(list(h).confirmedMove, isNull);
+      },
+    );
+
+    for (final (name, complete) in <(String, void Function(HomeHarness h))>[
+      (
+        'успех без изменения',
+        (h) {
+          h.repository.favoriteOrder = homeTestOrder([1, 4, 2, 3]);
+          h.repository.completeMove(0, revision: 1);
+        },
+      ),
+      (
+        'отказ записи',
+        (h) =>
+            h.repository.failMove(0, const FavoriteOrderUnavailableFailure()),
+      ),
+      (
+        'конфликт актуального состояния',
+        (h) {
+          h.repository.favoriteOrder = homeTestOrder([2, 3, 4]);
+          h.repository.completeMove(0, revision: 1);
+        },
+      ),
+    ]) {
+      test('$name не подтверждает новое место', () async {
+        final h = await loadedHome();
+        h.model.move(d, AfterFavoritePlacement(a));
+
+        complete(h);
+        await pumpEventQueue();
+        if (h.repository.readCount > 1) {
+          h.repository.completeRead(
+            1,
+            items: [
+              homeTestRow(2, 'Б'),
+              homeTestRow(3, 'В'),
+              homeTestRow(4, 'Г'),
+            ],
+            revision: 2,
+          );
+          await pumpEventQueue();
+        }
+
+        expect(list(h).reorder, isA<HomeReorderIdle>());
+        expect(list(h).confirmedMove, isNull);
+      });
+    }
+  });
+
   test('запрошенное положение одноимённых намерений определяется '
       'идентификатором', () {
     final shown = HomeList(

@@ -215,7 +215,7 @@ final class _HomeFavoriteList extends StatelessWidget {
       );
     }
 
-    return CustomScrollView(
+    final scrollView = CustomScrollView(
       key: const PageStorageKey<String>('home-favorite-intentions'),
       slivers: [
         SliverToBoxAdapter(
@@ -249,6 +249,15 @@ final class _HomeFavoriteList extends StatelessWidget {
           ),
       ],
     );
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Живая область лежит под списком: касания и исследование касанием
+        // достаются строкам.
+        _HomeMoveAnnouncement(confirmedMove: list.confirmedMove),
+        scrollView,
+      ],
+    );
   }
 
   /// Переводит перемещение строки с места [from] на место [to] показанного
@@ -280,6 +289,77 @@ final class _HomeFavoriteList extends StatelessWidget {
     ),
     child: child,
   );
+}
+
+/// Живая область, которая объявляет экранному диктору новое место намерения
+/// после подтверждения перестановки цельным снимком.
+///
+/// На экране она ничего не показывает: успешную перестановку человек видит
+/// по новому порядку списка. Объявление длится столько же, сколько общее
+/// сообщение по умолчанию, и затем убирается: иначе экранный диктор
+/// повторял бы прежний результат при каждом возвращении на Главную. Каждое
+/// подтверждение получает новый узел, поэтому тот же текст звучит заново.
+final class _HomeMoveAnnouncement extends StatefulWidget {
+  const _HomeMoveAnnouncement({required this.confirmedMove});
+
+  final HomeConfirmedMove? confirmedMove;
+
+  @override
+  State<_HomeMoveAnnouncement> createState() => _HomeMoveAnnouncementState();
+}
+
+final class _HomeMoveAnnouncementState extends State<_HomeMoveAnnouncement> {
+  static const _duration = Duration(seconds: 4);
+
+  /// Последнее полученное подтверждение: копии снимка несут тот же объект и
+  /// заново не объявляются.
+  HomeConfirmedMove? _received;
+  HomeConfirmedMove? _announced;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _receive(widget.confirmedMove);
+  }
+
+  @override
+  void didUpdateWidget(_HomeMoveAnnouncement oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _receive(widget.confirmedMove);
+  }
+
+  void _receive(HomeConfirmedMove? confirmedMove) {
+    if (confirmedMove == null || identical(confirmedMove, _received)) return;
+    _received = confirmedMove;
+    _announced = confirmedMove;
+    _timer?.cancel();
+    _timer = Timer(_duration, () => setState(() => _announced = null));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final announced = _announced;
+    if (announced == null) return const SizedBox.shrink();
+    return Semantics(
+      key: ObjectKey(announced),
+      container: true,
+      liveRegion: true,
+      label: AppLocalizations.of(context).homeReorderMoved(
+        announced.row.title,
+        announced.position,
+        announced.count,
+      ),
+      // Узел без площади экранный диктор не получает.
+      child: const SizedBox.expand(),
+    );
+  }
 }
 
 /// Участие строки Главной в перестановке.
@@ -328,15 +408,16 @@ final class HomeIntentionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    // Строку экранному диктору объявляет её представление намерения: ручка
-    // своего узла не создаёт.
-    return Row(
+    // Ручка своего узла семантики не создаёт: строку экранному диктору
+    // объявляет одним узлом её представление намерения.
+    final content = Row(
       children: [
         Expanded(
           child: IntentionSummaryView(
             title: row.title,
             archiveState: IntentionArchiveState.active,
             showArchiveState: false,
+            semanticsNode: IntentionSummarySemanticsNode.enclosing,
             traits: [
               switch (row.readiness) {
                 IntentionReadiness.ready => localizations.catalogReady,
@@ -358,6 +439,13 @@ final class HomeIntentionRow extends StatelessWidget {
         ),
       ],
     );
+    return switch (reorder) {
+      // Узел строки создаёт сам переставляемый список вместе с системными
+      // действиями перемещения, и строка дополняет его: экранный диктор
+      // получает название, подписи, переход и перемещение одним узлом.
+      HomeRowMovable() => content,
+      HomeRowImmovable() || HomeRowSaving() => MergeSemantics(child: content),
+    };
   }
 }
 

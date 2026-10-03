@@ -21,6 +21,12 @@ const _titles = {1: 'А', 2: 'Б', 3: 'В', 4: 'Г', 5: 'Д'};
 const _saving = 'Новое место сохраняется…';
 const _handleTooltip = 'Перетащите, чтобы переместить намерение';
 
+// Системные названия действий перемещения строк списка.
+const _moveToStart = 'Переместить в начало';
+const _moveUp = 'Переместить вверх';
+const _moveDown = 'Переместить вниз';
+const _moveToEnd = 'Переместить в конец';
+
 /// Перестановка ручкой на странице Главной над управляемыми границей и
 /// чтением избранного.
 ///
@@ -340,6 +346,214 @@ void main() {
     });
   });
 
+  group('экранный диктор', () {
+    testWidgets('строка объявляется одним узлом с названием, готовностью, '
+        'числом активных связей, переходом и системными действиями '
+        'перемещения без невозможных у крайних строк', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _pumpLoadedHome(tester);
+
+      final expected = {
+        1: {_moveDown, _moveToEnd},
+        2: {_moveToStart, _moveUp, _moveDown, _moveToEnd},
+        3: {_moveToStart, _moveUp, _moveDown, _moveToEnd},
+        4: {_moveToStart, _moveUp},
+      };
+      for (final MapEntry(key: number, value: actions) in expected.entries) {
+        final data = _rowNode(number).evaluate().single.getSemanticsData();
+        expect(data.hasAction(SemanticsAction.tap), isTrue);
+        expect(_customActions(data), actions, reason: _titles[number]);
+      }
+      // Других узлов с действиями перемещения нет.
+      expect(_moveActionNodes(), findsNWidgets(4));
+      semantics.dispose();
+    });
+
+    for (final (action, number, anchor, shown) in [
+      (_moveUp, 3, 1, ['А', 'В', 'Б', 'Г']),
+      (_moveDown, 1, 2, ['Б', 'А', 'В', 'Г']),
+      (_moveToStart, 4, null, ['Г', 'А', 'Б', 'В']),
+      (_moveToEnd, 2, 4, ['А', 'В', 'Г', 'Б']),
+    ]) {
+      testWidgets('действие «$action» у «${_titles[number]}» ставит его '
+          '${anchor == null ? 'первым' : 'после «${_titles[anchor]}»'} без '
+          'перетаскивания, а строки объявляются в показанном порядке с '
+          'признаком сохранения и без действий перемещения', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final h = await _pumpLoadedHome(tester);
+
+        tester.semantics.customAction(
+          _rowNode(number),
+          CustomSemanticsAction(label: action),
+        );
+        await tester.pumpAndSettle();
+
+        final command = h.repository.moves.single.command;
+        expect(command.intentionId, homeTestIntentionId(number));
+        switch (command.placement) {
+          case FirstFavoritePlacement():
+            expect(anchor, isNull);
+          case AfterFavoritePlacement(:final anchorId):
+            expect(anchorId, homeTestIntentionId(anchor!));
+        }
+        expect(_shownTitles(tester), shown);
+        final labels = [
+          for (final title in shown)
+            _rowLabel(title, saving: title == _titles[number]),
+        ];
+        expect([
+          for (final node in tester.semantics.simulatedAccessibilityTraversal())
+            if (labels.contains(node.label)) node.label,
+        ], labels);
+        expect(_moveActionNodes(), findsNothing);
+        semantics.dispose();
+      });
+    }
+
+    testWidgets('новое место объявляется живой областью только после '
+        'цельного снимка, подтвердившего запись, и не показывается на '
+        'экране', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpLoadedHome(tester);
+      const announcement = '«Г» теперь на месте 2 из 4';
+
+      await _dragHandle(tester, 4, -2);
+      expect(_announcements(), findsNothing);
+
+      h.repository.completeMove(0, revision: 2);
+      await tester.pumpAndSettle();
+      expect(_announcements(), findsNothing);
+
+      h.repository.completeRead(1, items: _rows([1, 4, 2, 3]), revision: 2);
+      await tester.pumpAndSettle();
+
+      final node = _announcements().evaluate().single;
+      expect(node.label, announcement);
+      expect(node.flagsCollection.isLiveRegion, isTrue);
+      // Успех предъявляется новым порядком: отдельного сообщения на экране
+      // нет.
+      expect(find.textContaining('теперь на месте'), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(_shownTitles(tester), ['А', 'Г', 'Б', 'В']);
+
+      // Объявление длится столько же, сколько общее сообщение, и затем
+      // исчезает, чтобы не повторяться при возвращении на Главную.
+      await tester.pump(const Duration(seconds: 3));
+      expect(_announcements(), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      expect(_announcements(), findsNothing);
+      semantics.dispose();
+    });
+
+    for (final (name, complete) in <(String, void Function(_Home h))>[
+      (
+        'отказ записи',
+        (h) =>
+            h.repository.failMove(0, const FavoriteOrderUnavailableFailure()),
+      ),
+      (
+        'успех без изменения',
+        (h) {
+          h.repository.favoriteOrder = homeTestOrder([1, 4, 2, 3]);
+          h.repository.completeMove(0, revision: 1);
+        },
+      ),
+      (
+        'конфликт актуального состояния',
+        (h) {
+          h.repository.favoriteOrder = homeTestOrder([2, 3, 4]);
+          h.repository.completeMove(0, revision: 1);
+        },
+      ),
+    ]) {
+      testWidgets('$name не объявляет новое место', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final h = await _pumpLoadedHome(tester);
+        await _dragHandle(tester, 4, -2);
+
+        complete(h);
+        await tester.pumpAndSettle();
+        if (h.repository.readCount > 1) {
+          h.repository.completeRead(1, items: _rows([2, 3, 4]), revision: 2);
+          await tester.pumpAndSettle();
+        }
+
+        expect(_announcements(), findsNothing);
+        semantics.dispose();
+      });
+    }
+
+    testWidgets('то же объявление после следующей подтверждённой '
+        'перестановки звучит заново новым узлом живой области', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpLoadedHome(tester);
+      const announcement = '«Г» теперь на месте 2 из 4';
+      await _dragHandle(tester, 4, -2);
+      h.repository.completeMove(0, revision: 2);
+      await tester.pumpAndSettle();
+      h.repository.completeRead(1, items: _rows([1, 4, 2, 3]), revision: 2);
+      await tester.pumpAndSettle();
+      final first = _announcements().evaluate().single;
+      expect(first.label, announcement);
+
+      // Отметка Д и снятие отметки А ставят Г первым из четырёх без
+      // объявления: объявленный текст остаётся прежним.
+      h.repository.favoriteOrder = homeTestOrder([4, 2, 3, 5]);
+      await _confirmMark(tester, h, revision: 3);
+      await _confirmUnmark(tester, h, 1, revision: 4);
+      h.repository.completeRead(2, items: _rows([4, 2, 3, 5]), revision: 4);
+      await tester.pumpAndSettle();
+      expect(_shownTitles(tester), ['Г', 'Б', 'В', 'Д']);
+      expect(_announcements().evaluate().single.id, first.id);
+      expect(_announcements().evaluate().single.label, announcement);
+
+      // Перемещение Г после Б снова даёт место 2 из 4.
+      tester.semantics.customAction(
+        find.semantics.byLabel(_rowLabel('Г')),
+        const CustomSemanticsAction(label: _moveDown),
+      );
+      await tester.pumpAndSettle();
+      // Координатор после подтверждённых команд намерения завершает
+      // перестановку в настоящем цикле событий.
+      await tester.runAsync(() async {
+        h.repository.completeMove(1, revision: 5);
+        await pumpEventQueue();
+      });
+      await tester.pumpAndSettle();
+      h.repository.completeRead(3, items: _rows([2, 4, 3, 5]), revision: 5);
+      await tester.pumpAndSettle();
+
+      final second = _announcements().evaluate().single;
+      expect(second.label, announcement);
+      expect(second.id, isNot(first.id));
+      semantics.dispose();
+    });
+
+    testWidgets('объявление нового места на языке интерфейса: en', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpLoadedHome(tester, locale: 'en');
+      tester.semantics.customAction(
+        find.semantics.byLabel(
+          _rowLabel('Г', l10n: lookupAppLocalizations(const Locale('en'))),
+        ),
+        const CustomSemanticsAction(label: 'Move up'),
+      );
+      await tester.pumpAndSettle();
+      h.repository.completeMove(0, revision: 2);
+      await tester.pumpAndSettle();
+      h.repository.completeRead(1, items: _rows([1, 2, 4, 3]), revision: 2);
+      await tester.pumpAndSettle();
+
+      expect(
+        _announcements(RegExp('is now in position')).evaluate().single.label,
+        '“Г” is now in position 3 of 4',
+      );
+      semantics.dispose();
+    });
+  });
+
   group('позиция прокрутки', () {
     testWidgets('запрошенное положение, подтверждённый снимок и отказ '
         'перестановки не сбрасывают позицию прокрутки', (tester) async {
@@ -498,7 +712,52 @@ Future<void> _confirmMark(
   ),
 );
 
+/// Подтверждённое снятие отметки намерения [number] на ревизии [revision].
+Future<void> _confirmUnmark(
+  WidgetTester tester,
+  _Home h,
+  int number, {
+  required int revision,
+}) => tester.runAsync(
+  () => h.harness.confirm(
+    UnmarkIntentionFavorite(homeTestIntentionId(number)),
+    revision: revision,
+    before: homeTestSummary(number, _titles[number]!),
+    after: homeTestSummary(
+      number,
+      _titles[number]!,
+      favoriteMark: FavoriteMark.notFavorite,
+    ),
+  ),
+);
+
 Finder _row(int number) => find.byKey(ValueKey(homeTestIntentionId(number)));
+
+/// Название, готовность, признак сохранения и число активных связей строки
+/// одним текстом — так строку объявляет экранный диктор.
+String _rowLabel(String title, {bool saving = false, AppLocalizations? l10n}) {
+  final localizations = l10n ?? lookupAppLocalizations(const Locale('ru'));
+  return [
+    title,
+    localizations.catalogNotReady,
+    if (saving) localizations.homeReorderSaving,
+    localizations.intentionActiveRelationCount(0),
+  ].join('\n');
+}
+
+/// Узел семантики строки намерения [number] без признака сохранения.
+SemanticsFinder _rowNode(int number) =>
+    find.semantics.byLabel(_rowLabel(_titles[number]!));
+
+/// Названия действий перемещения узла.
+Set<String> _customActions(SemanticsData data) => {
+  for (final id in data.customSemanticsActionIds ?? const <int>[])
+    CustomSemanticsAction.getAction(id)!.label!,
+};
+
+/// Узлы живой области с объявлением нового места намерения.
+SemanticsFinder _announcements([Pattern? text]) =>
+    find.semantics.byLabel(text ?? RegExp('теперь на месте'));
 
 Finder _title(int number) =>
     find.descendant(of: _row(number), matching: find.text(_titles[number]!));

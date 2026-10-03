@@ -85,6 +85,45 @@ final class HomeReorderAwaitingSnapshot extends HomeReorderPending {
   final GraphRevision revision;
 }
 
+/// Перестановка этой Главной, которую подтвердил показанный снимок.
+///
+/// Несёт перемещённое намерение с его местом в подтвердившем снимке: именно
+/// его объявляет экранный диктор. Существует только вместе с этим снимком и
+/// его копиями с другой актуальностью или перестановкой — следующий снимок
+/// её не несёт. Каждое подтверждение — отдельный объект, поэтому
+/// подтверждение того же места объявляется заново.
+final class HomeConfirmedMove {
+  HomeConfirmedMove._({
+    required this.row,
+    required this.position,
+    required this.count,
+  });
+
+  /// Подтверждение перемещения [intentionId] снимком [items] либо `null`,
+  /// если намерения в снимке нет: например, его скрыло архивирование.
+  static HomeConfirmedMove? _inSnapshot(
+    List<FavoriteIntentionRow> items,
+    IntentionId intentionId,
+  ) {
+    final index = items.indexWhere((row) => row.id == intentionId);
+    if (index < 0) return null;
+    return HomeConfirmedMove._(
+      row: items[index],
+      position: index + 1,
+      count: items.length,
+    );
+  }
+
+  /// Строка перемещённого намерения в подтвердившем снимке.
+  final FavoriteIntentionRow row;
+
+  /// Место намерения в списке, начиная с единицы.
+  final int position;
+
+  /// Число строк подтвердившего снимка.
+  final int count;
+}
+
 /// Успешно полученный полный снимок избранного на одной ревизии.
 sealed class HomeLoaded extends HomeState {
   const HomeLoaded({required this.revision, required this.freshness});
@@ -100,14 +139,33 @@ sealed class HomeLoaded extends HomeState {
 final class HomeList extends HomeLoaded {
   HomeList({
     required List<FavoriteIntentionRow> items,
+    required GraphRevision revision,
+    HomeFreshness freshness = const HomeFreshnessCurrent(),
+    HomeReorder reorder = const HomeReorderIdle(),
+  }) : this._(
+         items: items,
+         revision: revision,
+         freshness: freshness,
+         reorder: reorder,
+         confirmedMove: null,
+       );
+
+  /// Подтверждение перестановки задаёт только [confirmingMove] по строкам
+  /// этого же снимка, а копии снимка его сохраняют.
+  HomeList._({
+    required List<FavoriteIntentionRow> items,
     required super.revision,
-    super.freshness = const HomeFreshnessCurrent(),
-    this.reorder = const HomeReorderIdle(),
+    required super.freshness,
+    required this.reorder,
+    required this.confirmedMove,
   }) : items = List.unmodifiable(items);
 
   /// Последний подтверждённый снимок в едином ручном порядке.
   final List<FavoriteIntentionRow> items;
   final HomeReorder reorder;
+
+  /// Перестановка этой Главной, которую подтвердил этот снимок.
+  final HomeConfirmedMove? confirmedMove;
 
   /// Порядок, который показывает Главная: запрошенное положение принятой
   /// перестановки, пока его не подтвердил цельный снимок, иначе
@@ -158,19 +216,30 @@ final class HomeList extends HomeLoaded {
   }
 
   @override
-  HomeList withFreshness(HomeFreshness freshness) => HomeList(
+  HomeList withFreshness(HomeFreshness freshness) => HomeList._(
     items: items,
     revision: revision,
     freshness: freshness,
     reorder: reorder,
+    confirmedMove: confirmedMove,
   );
 
   /// Тот же подтверждённый снимок с другим состоянием перестановки.
-  HomeList withReorder(HomeReorder reorder) => HomeList(
+  HomeList withReorder(HomeReorder reorder) => HomeList._(
     items: items,
     revision: revision,
     freshness: freshness,
     reorder: reorder,
+    confirmedMove: confirmedMove,
+  );
+
+  /// Тот же снимок, подтвердивший перестановку [intentionId] этой Главной.
+  HomeList confirmingMove(IntentionId intentionId) => HomeList._(
+    items: items,
+    revision: revision,
+    freshness: freshness,
+    reorder: reorder,
+    confirmedMove: HomeConfirmedMove._inSnapshot(items, intentionId),
   );
 }
 
