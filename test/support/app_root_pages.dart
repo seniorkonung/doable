@@ -1,10 +1,11 @@
 /// Общие шаги входа в корневые страницы приложения и возврата на них.
 ///
-/// Это единственное место в `test/`, которое знает способ входа в каталог
-/// намерений и каталог дневных выборов и вид нижнего маршрута под открытыми
-/// страницами. Сценарий называет только намерение — «открыть граф намерений»,
-/// «открыть дневные выборы», «вернулись на корневую страницу» — и не зависит
-/// от того, как приложение размещает корневые страницы.
+/// Это единственное место в `test/`, которое знает способ входа в Главную,
+/// каталог намерений и каталог дневных выборов и вид нижнего маршрута под
+/// открытыми страницами. Сценарий называет только намерение — «открыть
+/// Главную», «открыть граф намерений», «открыть дневные выборы», «вернулись
+/// на корневую страницу» — и не зависит от того, как приложение размещает
+/// корневые страницы.
 ///
 /// Корневые страницы — вкладки оболочки с нижней панелью: приложение
 /// открывается на Главной, каталоги открываются выбором пункта панели, а
@@ -17,6 +18,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -59,6 +61,22 @@ Future<void> tapWhenFound(WidgetTester tester, Finder finder) async {
   await tester.pump();
 }
 
+/// Возвращает на Главную с другой корневой страницы.
+///
+/// Шаг выбирает пункт панели и завершается, когда Главная показана: она уже
+/// построена при запуске, поэтому её список сценарий проверяет сам. [waitFor]
+/// — ожидание сценария; по умолчанию [pumpUntilFound].
+Future<void> openHome(
+  WidgetTester tester, {
+  RootPageWait waitFor = pumpUntilFound,
+}) async {
+  final entry = _destination(AppDestination.home);
+  await waitFor(tester, entry);
+  await tester.tap(entry);
+  await tester.pump();
+  await waitFor(tester, find.byType(HomePage));
+}
+
 /// Открывает граф намерений — каталог намерений как корневую страницу.
 ///
 /// Шаг выбирает пункт панели и завершается, когда каталог намерений показан.
@@ -97,6 +115,11 @@ void openDailyChoicesOn(StackRouter router) {
   unawaited(
     router.navigate(const AppShellRoute(children: [DailyChoiceCatalogRoute()])),
   );
+}
+
+/// Проверяет, что все страницы поверх закрыты и открыта Главная.
+void expectHomeRootPage(StackRouter router) {
+  _expectRootPage(router, HomeRoute.name);
 }
 
 /// Проверяет, что все страницы поверх закрыты и открыт граф намерений.
