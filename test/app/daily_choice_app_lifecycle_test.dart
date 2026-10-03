@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -166,10 +167,7 @@ void main() {
           await harness.dispose();
         });
         await tester.pumpWidget(MainApp(runtime: runtime));
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('catalog-open-daily-choices')),
-        );
+        await openDailyChoices(tester, tap: _tap);
         await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
         await _tap(
           tester,
@@ -314,10 +312,7 @@ void main() {
         await harness.dispose();
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openDailyChoices(tester, tap: _tap);
       await _tap(
         tester,
         find.byKey(const ValueKey('daily-choice-create-from-action')),
@@ -426,10 +421,7 @@ void main() {
         await harness.dispose();
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openDailyChoices(tester, tap: _tap);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final repository = ready.container.read(personalGraphRepositoryProvider);
@@ -595,6 +587,12 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pump(const Duration(milliseconds: 350));
       }
+      await openIntentionGraph(
+        tester,
+        waitFor: (tester, finder) =>
+            _until(tester, () => finder.evaluate().isNotEmpty),
+        content: find.text('Намерение 1'),
+      );
       await _tap(tester, find.text('Намерение 1').first);
       await _tap(
         tester,
@@ -695,10 +693,7 @@ void main() {
         await harness.dispose();
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openDailyChoices(tester, tap: _tap);
       await _tap(
         tester,
         find.byKey(const ValueKey('daily-choice-create-from-action')),
@@ -785,12 +780,10 @@ void main() {
       await runtime.shutdown();
       runtime = start();
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _until(
+      await openIntentionGraph(
         tester,
-        () => find
-            .byKey(const ValueKey('catalog-open-daily-choices'))
-            .evaluate()
-            .isNotEmpty,
+        waitFor: (tester, finder) =>
+            _until(tester, () => finder.evaluate().isNotEmpty),
       );
       final repository = (await runtime.bootstrap() as AppRuntimeReady)
           .container

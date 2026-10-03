@@ -5,6 +5,7 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
+import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -425,6 +426,65 @@ void main() {
 
     semantics.dispose();
   });
+
+  for (final (language, markLabel) in [
+    ('en', 'Favorite intention'),
+    ('ru', 'Избранное намерение'),
+  ]) {
+    testWidgets('$language: краткие представления участников связи не '
+        'показывают отметку избранного', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledRelationDetailsRepository();
+      addTearDown(repository.dispose);
+      final relationId = testRelationId(9);
+
+      await _pumpRelationDetails(
+        tester,
+        repository,
+        relationId,
+        locale: Locale(language),
+      );
+      repository
+          .watchAt(0)
+          .emitDetails(
+            testRelationDetails(
+              relationId: relationId,
+              sourceId: testIntentionId(1),
+              relatedId: testIntentionId(2),
+              sourceTitle: 'Быть здоровым',
+              relatedTitle: 'Гулять',
+            ),
+            revision: revision,
+          );
+      await tester.pumpAndSettle();
+
+      // Данные участника связи отметку не несут, поэтому представление без
+      // поиска не выводит её и для избранных намерений.
+      final participants = tester
+          .widgetList<IntentionSummaryView>(find.byType(IntentionSummaryView))
+          .toList();
+      expect(participants.map((view) => view.title), [
+        'Быть здоровым',
+        'Гулять',
+      ]);
+      for (final participant in participants) {
+        expect(participant.confirmedFavoriteMark, isNull);
+      }
+      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.byIcon(Icons.star_border), findsNothing);
+      for (final key in const [
+        'relation-details-source-participant',
+        'relation-details-related-participant',
+      ]) {
+        expect(
+          tester.getSemantics(find.byKey(ValueKey(key))).label,
+          isNot(contains(markLabel)),
+        );
+      }
+
+      semantics.dispose();
+    });
+  }
 
   testWidgets('повторно открытый просмотр показывает выполняющееся изменение', (
     tester,

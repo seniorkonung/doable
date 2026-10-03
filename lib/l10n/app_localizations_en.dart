@@ -19,6 +19,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navigationArchive => 'Archive';
 
   @override
+  String get appDestinationHome => 'Home';
+
+  @override
+  String get appDestinationDailyChoices => 'Daily choices';
+
+  @override
+  String get appDestinationIntentionGraph => 'Intention graph';
+
+  @override
+  String get homeFavoritesHeading => 'Favorite intentions';
+
+  @override
+  String get homeLoading => 'Loading favorite intentions…';
+
+  @override
+  String get homeEmptyNoFavorites =>
+      'There are no favorite intentions yet. To add an intention here, mark it as a favorite on its page.';
+
+  @override
+  String get homeEmptyAllArchived =>
+      'All favorite intentions are archived. An intention restored from the archive returns here to its place.';
+
+  @override
+  String get homeOpenIntentionGraph => 'Open intention graph';
+
+  @override
+  String get homeUnavailable =>
+      'Favorite intentions couldn’t be loaded. Try again.';
+
+  @override
+  String get homeCorruption =>
+      'Stored favorite intention data is damaged and can’t be shown.';
+
+  @override
+  String get homeUnexpected =>
+      'Favorite intentions couldn’t be loaded because of an unexpected error.';
+
+  @override
+  String get homeRefreshUnavailable =>
+      'The favorite intention list isn’t up to date: changes couldn’t be loaded.';
+
+  @override
+  String get homeRefreshCorruption =>
+      'The favorite intention list isn’t up to date: stored data is damaged.';
+
+  @override
+  String get homeRefreshUnexpected =>
+      'The favorite intention list isn’t up to date because of an unexpected error.';
+
+  @override
+  String get homeReorderHandleTooltip => 'Drag to move the intention';
+
+  @override
+  String get homeReorderSaving => 'Saving the new position…';
+
+  @override
+  String homeReorderMoved(String title, int position, int count) {
+    return '“$title” is now in position $position of $count';
+  }
+
+  @override
+  String get favoriteOrderConflict =>
+      'The new order of favorite intentions wasn’t saved because the list changed.';
+
+  @override
+  String get favoriteOrderInvalid =>
+      'The new order of favorite intentions wasn’t saved: the move isn’t valid.';
+
+  @override
+  String get favoriteOrderUnavailable =>
+      'The new order of favorite intentions couldn’t be saved. Try again.';
+
+  @override
+  String get favoriteOrderCorruption =>
+      'Stored favorite intention data is damaged. The new order wasn’t saved.';
+
+  @override
+  String get favoriteOrderUnexpected =>
+      'The new order of favorite intentions couldn’t be saved because of an unexpected error.';
+
+  @override
   String get commonLoading => 'Loading…';
 
   @override
@@ -51,9 +132,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get catalogLoading => 'Loading intentions…';
-
-  @override
-  String get catalogTitle => 'Intentions';
 
   @override
   String get catalogScopeLabel => 'Scope';
@@ -194,6 +272,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get intentionSummaryNoTags => 'No tags';
+
+  @override
+  String get intentionSummaryFavoriteMark => 'Favorite intention';
 
   @override
   String get relationNeighborhoodTitle => 'Relations';
@@ -601,6 +682,51 @@ class AppLocalizationsEn extends AppLocalizations {
       'The intention state couldn’t be changed because of an unexpected error.';
 
   @override
+  String get detailsFavoriteMarked => 'Intention marked as favorite.';
+
+  @override
+  String get detailsFavoriteUnmarked => 'Favorite mark removed.';
+
+  @override
+  String get detailsFavoriteMarkInvalid =>
+      'The favorite mark couldn’t be changed.';
+
+  @override
+  String get detailsFavoriteMarkNotFound =>
+      'The intention no longer exists. The favorite mark wasn’t changed.';
+
+  @override
+  String get detailsFavoriteMarkConflict =>
+      'The intention changed elsewhere. The favorite mark wasn’t changed.';
+
+  @override
+  String get detailsFavoriteMarkUnavailable =>
+      'The favorite mark couldn’t be changed. Try again.';
+
+  @override
+  String get detailsFavoriteMarkCorruption =>
+      'Stored data is damaged. The favorite mark wasn’t changed.';
+
+  @override
+  String get detailsFavoriteMarkUnexpected =>
+      'The favorite mark couldn’t be changed because of an unexpected error.';
+
+  @override
+  String get detailsFavoriteMarkLabel => 'Favorite intention';
+
+  @override
+  String get detailsFavoriteMarkStateMarked => 'Marked';
+
+  @override
+  String get detailsFavoriteMarkStateNotMarked => 'Not marked';
+
+  @override
+  String get detailsMarkFavoriteAction => 'Mark as favorite';
+
+  @override
+  String get detailsUnmarkFavoriteAction => 'Remove favorite mark';
+
+  @override
   String get detailsDeleteInvalid => 'The intention couldn’t be deleted.';
 
   @override
@@ -739,6 +865,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get graphOperationDelete => 'Delete';
+
+  @override
+  String get graphOperationMarkFavorite => 'Mark as favorite';
+
+  @override
+  String get graphOperationUnmarkFavorite => 'Remove favorite mark';
 
   @override
   String get graphOperationDeleteBlockingRelations =>

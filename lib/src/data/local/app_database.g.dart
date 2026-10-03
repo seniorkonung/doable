@@ -3,286 +3,6 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
-class Tags extends Table with TableInfo<Tags, Tag> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  Tags(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
-    'creationSequence',
-  );
-  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
-    'creation_sequence',
-    aliasedName,
-    false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints:
-        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
-  );
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL UNIQUE',
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (typeof(name) = \'text\' AND instr(CAST(name AS BLOB), X\'00\') = 0 AND substr(name, 1, 1) <> char(65279) AND doable_tag_name_valid_v1(name) = 1)',
-  );
-  static const VerificationMeta _nameKeyMeta = const VerificationMeta(
-    'nameKey',
-  );
-  late final GeneratedColumn<String> nameKey = GeneratedColumn<String>(
-    'name_key',
-    aliasedName,
-    false,
-    generatedAs: GeneratedAs(
-      const CustomExpression('doable_tag_name_key_v1(name)'),
-      true,
-    ),
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: 'NOT NULL COLLATE BINARY UNIQUE GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [creationSequence, id, name, nameKey];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'tags';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<Tag> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('creation_sequence')) {
-      context.handle(
-        _creationSequenceMeta,
-        creationSequence.isAcceptableOrUnknown(
-          data['creation_sequence']!,
-          _creationSequenceMeta,
-        ),
-      );
-    }
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('name_key')) {
-      context.handle(
-        _nameKeyMeta,
-        nameKey.isAcceptableOrUnknown(data['name_key']!, _nameKeyMeta),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {creationSequence};
-  @override
-  Tag map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Tag(
-      creationSequence: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}creation_sequence'],
-      )!,
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      nameKey: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name_key'],
-      )!,
-    );
-  }
-
-  @override
-  Tags createAlias(String alias) {
-    return Tags(attachedDatabase, alias);
-  }
-
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class Tag extends DataClass implements Insertable<Tag> {
-  final int creationSequence;
-  final String id;
-  final String name;
-  final String nameKey;
-  const Tag({
-    required this.creationSequence,
-    required this.id,
-    required this.name,
-    required this.nameKey,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['creation_sequence'] = Variable<int>(creationSequence);
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    return map;
-  }
-
-  TagsCompanion toCompanion(bool nullToAbsent) {
-    return TagsCompanion(
-      creationSequence: Value(creationSequence),
-      id: Value(id),
-      name: Value(name),
-    );
-  }
-
-  factory Tag.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Tag(
-      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      nameKey: serializer.fromJson<String>(json['name_key']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'creation_sequence': serializer.toJson<int>(creationSequence),
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'name_key': serializer.toJson<String>(nameKey),
-    };
-  }
-
-  Tag copyWith({
-    int? creationSequence,
-    String? id,
-    String? name,
-    String? nameKey,
-  }) => Tag(
-    creationSequence: creationSequence ?? this.creationSequence,
-    id: id ?? this.id,
-    name: name ?? this.name,
-    nameKey: nameKey ?? this.nameKey,
-  );
-  @override
-  String toString() {
-    return (StringBuffer('Tag(')
-          ..write('creationSequence: $creationSequence, ')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('nameKey: $nameKey')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(creationSequence, id, name, nameKey);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is Tag &&
-          other.creationSequence == this.creationSequence &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.nameKey == this.nameKey);
-}
-
-class TagsCompanion extends UpdateCompanion<Tag> {
-  final Value<int> creationSequence;
-  final Value<String> id;
-  final Value<String> name;
-  const TagsCompanion({
-    this.creationSequence = const Value.absent(),
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-  });
-  TagsCompanion.insert({
-    this.creationSequence = const Value.absent(),
-    required String id,
-    required String name,
-  }) : id = Value(id),
-       name = Value(name);
-  static Insertable<Tag> custom({
-    Expression<int>? creationSequence,
-    Expression<String>? id,
-    Expression<String>? name,
-  }) {
-    return RawValuesInsertable({
-      if (creationSequence != null) 'creation_sequence': creationSequence,
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-    });
-  }
-
-  TagsCompanion copyWith({
-    Value<int>? creationSequence,
-    Value<String>? id,
-    Value<String>? name,
-  }) {
-    return TagsCompanion(
-      creationSequence: creationSequence ?? this.creationSequence,
-      id: id ?? this.id,
-      name: name ?? this.name,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (creationSequence.present) {
-      map['creation_sequence'] = Variable<int>(creationSequence.value);
-    }
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('TagsCompanion(')
-          ..write('creationSequence: $creationSequence, ')
-          ..write('id: $id, ')
-          ..write('name: $name')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class Intentions extends Table with TableInfo<Intentions, Intention> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -772,6 +492,697 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class FavoriteIntentions extends Table
+    with TableInfo<FavoriteIntentions, FavoriteIntention> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  FavoriteIntentions(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _intentionIdMeta = const VerificationMeta(
+    'intentionId',
+  );
+  late final GeneratedColumn<String> intentionId = GeneratedColumn<String>(
+    'intention_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE CASCADE',
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL UNIQUE CHECK (typeof(position) = \'integer\' AND position > 0)',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [intentionId, position];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'favorite_intentions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FavoriteIntention> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('intention_id')) {
+      context.handle(
+        _intentionIdMeta,
+        intentionId.isAcceptableOrUnknown(
+          data['intention_id']!,
+          _intentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_intentionIdMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {intentionId};
+  @override
+  FavoriteIntention map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FavoriteIntention(
+      intentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intention_id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+    );
+  }
+
+  @override
+  FavoriteIntentions createAlias(String alias) {
+    return FavoriteIntentions(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class FavoriteIntention extends DataClass
+    implements Insertable<FavoriteIntention> {
+  final String intentionId;
+  final int position;
+  const FavoriteIntention({required this.intentionId, required this.position});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['intention_id'] = Variable<String>(intentionId);
+    map['position'] = Variable<int>(position);
+    return map;
+  }
+
+  FavoriteIntentionsCompanion toCompanion(bool nullToAbsent) {
+    return FavoriteIntentionsCompanion(
+      intentionId: Value(intentionId),
+      position: Value(position),
+    );
+  }
+
+  factory FavoriteIntention.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FavoriteIntention(
+      intentionId: serializer.fromJson<String>(json['intention_id']),
+      position: serializer.fromJson<int>(json['position']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'intention_id': serializer.toJson<String>(intentionId),
+      'position': serializer.toJson<int>(position),
+    };
+  }
+
+  FavoriteIntention copyWith({String? intentionId, int? position}) =>
+      FavoriteIntention(
+        intentionId: intentionId ?? this.intentionId,
+        position: position ?? this.position,
+      );
+  FavoriteIntention copyWithCompanion(FavoriteIntentionsCompanion data) {
+    return FavoriteIntention(
+      intentionId: data.intentionId.present
+          ? data.intentionId.value
+          : this.intentionId,
+      position: data.position.present ? data.position.value : this.position,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FavoriteIntention(')
+          ..write('intentionId: $intentionId, ')
+          ..write('position: $position')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(intentionId, position);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FavoriteIntention &&
+          other.intentionId == this.intentionId &&
+          other.position == this.position);
+}
+
+class FavoriteIntentionsCompanion extends UpdateCompanion<FavoriteIntention> {
+  final Value<String> intentionId;
+  final Value<int> position;
+  final Value<int> rowid;
+  const FavoriteIntentionsCompanion({
+    this.intentionId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FavoriteIntentionsCompanion.insert({
+    required String intentionId,
+    required int position,
+    this.rowid = const Value.absent(),
+  }) : intentionId = Value(intentionId),
+       position = Value(position);
+  static Insertable<FavoriteIntention> custom({
+    Expression<String>? intentionId,
+    Expression<int>? position,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (intentionId != null) 'intention_id': intentionId,
+      if (position != null) 'position': position,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FavoriteIntentionsCompanion copyWith({
+    Value<String>? intentionId,
+    Value<int>? position,
+    Value<int>? rowid,
+  }) {
+    return FavoriteIntentionsCompanion(
+      intentionId: intentionId ?? this.intentionId,
+      position: position ?? this.position,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (intentionId.present) {
+      map['intention_id'] = Variable<String>(intentionId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FavoriteIntentionsCompanion(')
+          ..write('intentionId: $intentionId, ')
+          ..write('position: $position, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class IntentionTitlesFts extends Table
+    with
+        TableInfo<IntentionTitlesFts, IntentionTitlesFt>,
+        VirtualTableInfo<IntentionTitlesFts, IntentionTitlesFt> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  IntentionTitlesFts(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _titleSearchKeyMeta = const VerificationMeta(
+    'titleSearchKey',
+  );
+  late final GeneratedColumn<String> titleSearchKey = GeneratedColumn<String>(
+    'title_search_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: '',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [titleSearchKey];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'intention_titles_fts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<IntentionTitlesFt> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('title_search_key')) {
+      context.handle(
+        _titleSearchKeyMeta,
+        titleSearchKey.isAcceptableOrUnknown(
+          data['title_search_key']!,
+          _titleSearchKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_titleSearchKeyMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => const {};
+  @override
+  IntentionTitlesFt map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return IntentionTitlesFt(
+      titleSearchKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title_search_key'],
+      )!,
+    );
+  }
+
+  @override
+  IntentionTitlesFts createAlias(String alias) {
+    return IntentionTitlesFts(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+  @override
+  String get moduleAndArgs =>
+      'fts5(title_search_key, content = \'intentions\', content_rowid = \'rowid\', tokenize = \'trigram case_sensitive 0 remove_diacritics 0\')';
+}
+
+class IntentionTitlesFt extends DataClass
+    implements Insertable<IntentionTitlesFt> {
+  final String titleSearchKey;
+  const IntentionTitlesFt({required this.titleSearchKey});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['title_search_key'] = Variable<String>(titleSearchKey);
+    return map;
+  }
+
+  IntentionTitlesFtsCompanion toCompanion(bool nullToAbsent) {
+    return IntentionTitlesFtsCompanion(titleSearchKey: Value(titleSearchKey));
+  }
+
+  factory IntentionTitlesFt.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return IntentionTitlesFt(
+      titleSearchKey: serializer.fromJson<String>(json['title_search_key']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'title_search_key': serializer.toJson<String>(titleSearchKey),
+    };
+  }
+
+  IntentionTitlesFt copyWith({String? titleSearchKey}) =>
+      IntentionTitlesFt(titleSearchKey: titleSearchKey ?? this.titleSearchKey);
+  IntentionTitlesFt copyWithCompanion(IntentionTitlesFtsCompanion data) {
+    return IntentionTitlesFt(
+      titleSearchKey: data.titleSearchKey.present
+          ? data.titleSearchKey.value
+          : this.titleSearchKey,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IntentionTitlesFt(')
+          ..write('titleSearchKey: $titleSearchKey')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => titleSearchKey.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is IntentionTitlesFt &&
+          other.titleSearchKey == this.titleSearchKey);
+}
+
+class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
+  final Value<String> titleSearchKey;
+  final Value<int> rowid;
+  const IntentionTitlesFtsCompanion({
+    this.titleSearchKey = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  IntentionTitlesFtsCompanion.insert({
+    required String titleSearchKey,
+    this.rowid = const Value.absent(),
+  }) : titleSearchKey = Value(titleSearchKey);
+  static Insertable<IntentionTitlesFt> custom({
+    Expression<String>? titleSearchKey,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (titleSearchKey != null) 'title_search_key': titleSearchKey,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  IntentionTitlesFtsCompanion copyWith({
+    Value<String>? titleSearchKey,
+    Value<int>? rowid,
+  }) {
+    return IntentionTitlesFtsCompanion(
+      titleSearchKey: titleSearchKey ?? this.titleSearchKey,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (titleSearchKey.present) {
+      map['title_search_key'] = Variable<String>(titleSearchKey.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IntentionTitlesFtsCompanion(')
+          ..write('titleSearchKey: $titleSearchKey, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class Tags extends Table with TableInfo<Tags, Tag> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  Tags(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
+    'creationSequence',
+  );
+  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
+    'creation_sequence',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL UNIQUE',
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(name) = \'text\' AND instr(CAST(name AS BLOB), X\'00\') = 0 AND substr(name, 1, 1) <> char(65279) AND doable_tag_name_valid_v1(name) = 1)',
+  );
+  static const VerificationMeta _nameKeyMeta = const VerificationMeta(
+    'nameKey',
+  );
+  late final GeneratedColumn<String> nameKey = GeneratedColumn<String>(
+    'name_key',
+    aliasedName,
+    false,
+    generatedAs: GeneratedAs(
+      const CustomExpression('doable_tag_name_key_v1(name)'),
+      true,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL COLLATE BINARY UNIQUE GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [creationSequence, id, name, nameKey];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Tag> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('creation_sequence')) {
+      context.handle(
+        _creationSequenceMeta,
+        creationSequence.isAcceptableOrUnknown(
+          data['creation_sequence']!,
+          _creationSequenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('name_key')) {
+      context.handle(
+        _nameKeyMeta,
+        nameKey.isAcceptableOrUnknown(data['name_key']!, _nameKeyMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {creationSequence};
+  @override
+  Tag map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Tag(
+      creationSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}creation_sequence'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      nameKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_key'],
+      )!,
+    );
+  }
+
+  @override
+  Tags createAlias(String alias) {
+    return Tags(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class Tag extends DataClass implements Insertable<Tag> {
+  final int creationSequence;
+  final String id;
+  final String name;
+  final String nameKey;
+  const Tag({
+    required this.creationSequence,
+    required this.id,
+    required this.name,
+    required this.nameKey,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['creation_sequence'] = Variable<int>(creationSequence);
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  TagsCompanion toCompanion(bool nullToAbsent) {
+    return TagsCompanion(
+      creationSequence: Value(creationSequence),
+      id: Value(id),
+      name: Value(name),
+    );
+  }
+
+  factory Tag.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Tag(
+      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      nameKey: serializer.fromJson<String>(json['name_key']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'creation_sequence': serializer.toJson<int>(creationSequence),
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'name_key': serializer.toJson<String>(nameKey),
+    };
+  }
+
+  Tag copyWith({
+    int? creationSequence,
+    String? id,
+    String? name,
+    String? nameKey,
+  }) => Tag(
+    creationSequence: creationSequence ?? this.creationSequence,
+    id: id ?? this.id,
+    name: name ?? this.name,
+    nameKey: nameKey ?? this.nameKey,
+  );
+  @override
+  String toString() {
+    return (StringBuffer('Tag(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('nameKey: $nameKey')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(creationSequence, id, name, nameKey);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Tag &&
+          other.creationSequence == this.creationSequence &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.nameKey == this.nameKey);
+}
+
+class TagsCompanion extends UpdateCompanion<Tag> {
+  final Value<int> creationSequence;
+  final Value<String> id;
+  final Value<String> name;
+  const TagsCompanion({
+    this.creationSequence = const Value.absent(),
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+  });
+  TagsCompanion.insert({
+    this.creationSequence = const Value.absent(),
+    required String id,
+    required String name,
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<Tag> custom({
+    Expression<int>? creationSequence,
+    Expression<String>? id,
+    Expression<String>? name,
+  }) {
+    return RawValuesInsertable({
+      if (creationSequence != null) 'creation_sequence': creationSequence,
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+    });
+  }
+
+  TagsCompanion copyWith({
+    Value<int>? creationSequence,
+    Value<String>? id,
+    Value<String>? name,
+  }) {
+    return TagsCompanion(
+      creationSequence: creationSequence ?? this.creationSequence,
+      id: id ?? this.id,
+      name: name ?? this.name,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (creationSequence.present) {
+      map['creation_sequence'] = Variable<int>(creationSequence.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagsCompanion(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('name: $name')
           ..write(')'))
         .toString();
   }
@@ -2493,199 +2904,81 @@ class DailyChoicePathStepsCompanion
   }
 }
 
-class IntentionTitlesFts extends Table
-    with
-        TableInfo<IntentionTitlesFts, IntentionTitlesFt>,
-        VirtualTableInfo<IntentionTitlesFts, IntentionTitlesFt> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  IntentionTitlesFts(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _titleSearchKeyMeta = const VerificationMeta(
-    'titleSearchKey',
-  );
-  late final GeneratedColumn<String> titleSearchKey = GeneratedColumn<String>(
-    'title_search_key',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: '',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [titleSearchKey];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'intention_titles_fts';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<IntentionTitlesFt> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('title_search_key')) {
-      context.handle(
-        _titleSearchKeyMeta,
-        titleSearchKey.isAcceptableOrUnknown(
-          data['title_search_key']!,
-          _titleSearchKeyMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_titleSearchKeyMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => const {};
-  @override
-  IntentionTitlesFt map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return IntentionTitlesFt(
-      titleSearchKey: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}title_search_key'],
-      )!,
-    );
-  }
-
-  @override
-  IntentionTitlesFts createAlias(String alias) {
-    return IntentionTitlesFts(attachedDatabase, alias);
-  }
-
-  @override
-  bool get dontWriteConstraints => true;
-  @override
-  String get moduleAndArgs =>
-      'fts5(title_search_key, content = \'intentions\', content_rowid = \'rowid\', tokenize = \'trigram case_sensitive 0 remove_diacritics 0\')';
-}
-
-class IntentionTitlesFt extends DataClass
-    implements Insertable<IntentionTitlesFt> {
-  final String titleSearchKey;
-  const IntentionTitlesFt({required this.titleSearchKey});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['title_search_key'] = Variable<String>(titleSearchKey);
-    return map;
-  }
-
-  IntentionTitlesFtsCompanion toCompanion(bool nullToAbsent) {
-    return IntentionTitlesFtsCompanion(titleSearchKey: Value(titleSearchKey));
-  }
-
-  factory IntentionTitlesFt.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return IntentionTitlesFt(
-      titleSearchKey: serializer.fromJson<String>(json['title_search_key']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'title_search_key': serializer.toJson<String>(titleSearchKey),
-    };
-  }
-
-  IntentionTitlesFt copyWith({String? titleSearchKey}) =>
-      IntentionTitlesFt(titleSearchKey: titleSearchKey ?? this.titleSearchKey);
-  IntentionTitlesFt copyWithCompanion(IntentionTitlesFtsCompanion data) {
-    return IntentionTitlesFt(
-      titleSearchKey: data.titleSearchKey.present
-          ? data.titleSearchKey.value
-          : this.titleSearchKey,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('IntentionTitlesFt(')
-          ..write('titleSearchKey: $titleSearchKey')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => titleSearchKey.hashCode;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is IntentionTitlesFt &&
-          other.titleSearchKey == this.titleSearchKey);
-}
-
-class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
-  final Value<String> titleSearchKey;
-  final Value<int> rowid;
-  const IntentionTitlesFtsCompanion({
-    this.titleSearchKey = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  IntentionTitlesFtsCompanion.insert({
-    required String titleSearchKey,
-    this.rowid = const Value.absent(),
-  }) : titleSearchKey = Value(titleSearchKey);
-  static Insertable<IntentionTitlesFt> custom({
-    Expression<String>? titleSearchKey,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (titleSearchKey != null) 'title_search_key': titleSearchKey,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  IntentionTitlesFtsCompanion copyWith({
-    Value<String>? titleSearchKey,
-    Value<int>? rowid,
-  }) {
-    return IntentionTitlesFtsCompanion(
-      titleSearchKey: titleSearchKey ?? this.titleSearchKey,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (titleSearchKey.present) {
-      map['title_search_key'] = Variable<String>(titleSearchKey.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('IntentionTitlesFtsCompanion(')
-          ..write('titleSearchKey: $titleSearchKey, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final Intentions intentions = Intentions(this);
+  late final FavoriteIntentions favoriteIntentions = FavoriteIntentions(this);
+  late final Trigger favoriteIntentionsImmutableIdentity = Trigger(
+    'CREATE TRIGGER favorite_intentions_immutable_identity AFTER UPDATE OF intention_id ON favorite_intentions WHEN new.intention_id <> old.intention_id BEGIN SELECT RAISE (ABORT, \'favorite intention identity is immutable\');END',
+    'favorite_intentions_immutable_identity',
+  );
+  late final IntentionTitlesFts intentionTitlesFts = IntentionTitlesFts(this);
+  late final Trigger intentionsFtsAfterInsert = Trigger(
+    'CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
+    'intentions_fts_after_insert',
+  );
+  late final Trigger intentionsFtsAfterUpdateSearchContent = Trigger(
+    'CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
+    'intentions_fts_after_update_search_content',
+  );
+  late final Trigger intentionsFtsAfterDelete = Trigger(
+    'CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);END',
+    'intentions_fts_after_delete',
+  );
+  late final Index intentionsActiveCreatedAtAscIdAsc = Index(
+    'intentions_active_created_at_asc_id_asc',
+    'CREATE INDEX intentions_active_created_at_asc_id_asc ON intentions (created_at ASC, id ASC) WHERE is_archived = 0',
+  );
+  late final Index intentionsActiveCreatedAtDescIdAsc = Index(
+    'intentions_active_created_at_desc_id_asc',
+    'CREATE INDEX intentions_active_created_at_desc_id_asc ON intentions (created_at DESC, id ASC) WHERE is_archived = 0',
+  );
+  late final Index intentionsActiveUpdatedAtAscIdAsc = Index(
+    'intentions_active_updated_at_asc_id_asc',
+    'CREATE INDEX intentions_active_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC) WHERE is_archived = 0',
+  );
+  late final Index intentionsActiveUpdatedAtDescIdAsc = Index(
+    'intentions_active_updated_at_desc_id_asc',
+    'CREATE INDEX intentions_active_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC) WHERE is_archived = 0',
+  );
+  late final Index intentionsArchivedCreatedAtAscIdAsc = Index(
+    'intentions_archived_created_at_asc_id_asc',
+    'CREATE INDEX intentions_archived_created_at_asc_id_asc ON intentions (created_at ASC, id ASC) WHERE is_archived = 1',
+  );
+  late final Index intentionsArchivedCreatedAtDescIdAsc = Index(
+    'intentions_archived_created_at_desc_id_asc',
+    'CREATE INDEX intentions_archived_created_at_desc_id_asc ON intentions (created_at DESC, id ASC) WHERE is_archived = 1',
+  );
+  late final Index intentionsArchivedUpdatedAtAscIdAsc = Index(
+    'intentions_archived_updated_at_asc_id_asc',
+    'CREATE INDEX intentions_archived_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC) WHERE is_archived = 1',
+  );
+  late final Index intentionsArchivedUpdatedAtDescIdAsc = Index(
+    'intentions_archived_updated_at_desc_id_asc',
+    'CREATE INDEX intentions_archived_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC) WHERE is_archived = 1',
+  );
+  late final Index intentionsAllCreatedAtAscIdAsc = Index(
+    'intentions_all_created_at_asc_id_asc',
+    'CREATE INDEX intentions_all_created_at_asc_id_asc ON intentions (created_at ASC, id ASC)',
+  );
+  late final Index intentionsAllCreatedAtDescIdAsc = Index(
+    'intentions_all_created_at_desc_id_asc',
+    'CREATE INDEX intentions_all_created_at_desc_id_asc ON intentions (created_at DESC, id ASC)',
+  );
+  late final Index intentionsAllUpdatedAtAscIdAsc = Index(
+    'intentions_all_updated_at_asc_id_asc',
+    'CREATE INDEX intentions_all_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC)',
+  );
+  late final Index intentionsAllUpdatedAtDescIdAsc = Index(
+    'intentions_all_updated_at_desc_id_asc',
+    'CREATE INDEX intentions_all_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC)',
+  );
   late final Tags tags = Tags(this);
   late final Trigger tagsImmutableIdentity = Trigger(
     'CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'tag identity is immutable\');END',
     'tags_immutable_identity',
   );
-  late final Intentions intentions = Intentions(this);
   late final TagAssignments tagAssignments = TagAssignments(this);
   late final Index tagAssignmentsTagOrder = Index(
     'tag_assignments_tag_order',
@@ -2784,75 +3077,32 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE TRIGGER intentions_archive_requires_no_active_relations AFTER UPDATE OF is_archived ON intentions WHEN old.is_archived = 0 AND new.is_archived = 1 AND EXISTS (SELECT 1 FROM long_term_relations WHERE is_archived = 0 AND(source_intention_id = new.id OR related_intention_id = new.id)) BEGIN SELECT RAISE (ABORT, \'active relations must be archived first\');END',
     'intentions_archive_requires_no_active_relations',
   );
-  late final IntentionTitlesFts intentionTitlesFts = IntentionTitlesFts(this);
-  late final Trigger intentionsFtsAfterInsert = Trigger(
-    'CREATE TRIGGER intentions_fts_after_insert AFTER INSERT ON intentions BEGIN INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
-    'intentions_fts_after_insert',
-  );
-  late final Trigger intentionsFtsAfterUpdateSearchContent = Trigger(
-    'CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
-    'intentions_fts_after_update_search_content',
-  );
-  late final Trigger intentionsFtsAfterDelete = Trigger(
-    'CREATE TRIGGER intentions_fts_after_delete AFTER DELETE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);END',
-    'intentions_fts_after_delete',
-  );
-  late final Index intentionsActiveCreatedAtAscIdAsc = Index(
-    'intentions_active_created_at_asc_id_asc',
-    'CREATE INDEX intentions_active_created_at_asc_id_asc ON intentions (created_at ASC, id ASC) WHERE is_archived = 0',
-  );
-  late final Index intentionsActiveCreatedAtDescIdAsc = Index(
-    'intentions_active_created_at_desc_id_asc',
-    'CREATE INDEX intentions_active_created_at_desc_id_asc ON intentions (created_at DESC, id ASC) WHERE is_archived = 0',
-  );
-  late final Index intentionsActiveUpdatedAtAscIdAsc = Index(
-    'intentions_active_updated_at_asc_id_asc',
-    'CREATE INDEX intentions_active_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC) WHERE is_archived = 0',
-  );
-  late final Index intentionsActiveUpdatedAtDescIdAsc = Index(
-    'intentions_active_updated_at_desc_id_asc',
-    'CREATE INDEX intentions_active_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC) WHERE is_archived = 0',
-  );
-  late final Index intentionsArchivedCreatedAtAscIdAsc = Index(
-    'intentions_archived_created_at_asc_id_asc',
-    'CREATE INDEX intentions_archived_created_at_asc_id_asc ON intentions (created_at ASC, id ASC) WHERE is_archived = 1',
-  );
-  late final Index intentionsArchivedCreatedAtDescIdAsc = Index(
-    'intentions_archived_created_at_desc_id_asc',
-    'CREATE INDEX intentions_archived_created_at_desc_id_asc ON intentions (created_at DESC, id ASC) WHERE is_archived = 1',
-  );
-  late final Index intentionsArchivedUpdatedAtAscIdAsc = Index(
-    'intentions_archived_updated_at_asc_id_asc',
-    'CREATE INDEX intentions_archived_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC) WHERE is_archived = 1',
-  );
-  late final Index intentionsArchivedUpdatedAtDescIdAsc = Index(
-    'intentions_archived_updated_at_desc_id_asc',
-    'CREATE INDEX intentions_archived_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC) WHERE is_archived = 1',
-  );
-  late final Index intentionsAllCreatedAtAscIdAsc = Index(
-    'intentions_all_created_at_asc_id_asc',
-    'CREATE INDEX intentions_all_created_at_asc_id_asc ON intentions (created_at ASC, id ASC)',
-  );
-  late final Index intentionsAllCreatedAtDescIdAsc = Index(
-    'intentions_all_created_at_desc_id_asc',
-    'CREATE INDEX intentions_all_created_at_desc_id_asc ON intentions (created_at DESC, id ASC)',
-  );
-  late final Index intentionsAllUpdatedAtAscIdAsc = Index(
-    'intentions_all_updated_at_asc_id_asc',
-    'CREATE INDEX intentions_all_updated_at_asc_id_asc ON intentions (updated_at ASC, id ASC)',
-  );
-  late final Index intentionsAllUpdatedAtDescIdAsc = Index(
-    'intentions_all_updated_at_desc_id_asc',
-    'CREATE INDEX intentions_all_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC)',
-  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    intentions,
+    favoriteIntentions,
+    favoriteIntentionsImmutableIdentity,
+    intentionTitlesFts,
+    intentionsFtsAfterInsert,
+    intentionsFtsAfterUpdateSearchContent,
+    intentionsFtsAfterDelete,
+    intentionsActiveCreatedAtAscIdAsc,
+    intentionsActiveCreatedAtDescIdAsc,
+    intentionsActiveUpdatedAtAscIdAsc,
+    intentionsActiveUpdatedAtDescIdAsc,
+    intentionsArchivedCreatedAtAscIdAsc,
+    intentionsArchivedCreatedAtDescIdAsc,
+    intentionsArchivedUpdatedAtAscIdAsc,
+    intentionsArchivedUpdatedAtDescIdAsc,
+    intentionsAllCreatedAtAscIdAsc,
+    intentionsAllCreatedAtDescIdAsc,
+    intentionsAllUpdatedAtAscIdAsc,
+    intentionsAllUpdatedAtDescIdAsc,
     tags,
     tagsImmutableIdentity,
-    intentions,
     tagAssignments,
     tagAssignmentsTagOrder,
     tagAssignmentsIntention,
@@ -2880,25 +3130,44 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     longTermRelationsActiveParticipantsAfterInsert,
     longTermRelationsActiveParticipantsAfterUpdate,
     intentionsArchiveRequiresNoActiveRelations,
-    intentionTitlesFts,
-    intentionsFtsAfterInsert,
-    intentionsFtsAfterUpdateSearchContent,
-    intentionsFtsAfterDelete,
-    intentionsActiveCreatedAtAscIdAsc,
-    intentionsActiveCreatedAtDescIdAsc,
-    intentionsActiveUpdatedAtAscIdAsc,
-    intentionsActiveUpdatedAtDescIdAsc,
-    intentionsArchivedCreatedAtAscIdAsc,
-    intentionsArchivedCreatedAtDescIdAsc,
-    intentionsArchivedUpdatedAtAscIdAsc,
-    intentionsArchivedUpdatedAtDescIdAsc,
-    intentionsAllCreatedAtAscIdAsc,
-    intentionsAllCreatedAtDescIdAsc,
-    intentionsAllUpdatedAtAscIdAsc,
-    intentionsAllUpdatedAtDescIdAsc,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('favorite_intentions', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'favorite_intentions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'tags',
@@ -2997,30 +3266,854 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ),
       result: [],
     ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'intentions',
-        limitUpdateKind: UpdateKind.insert,
-      ),
-      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'intentions',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'intentions',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
-    ),
   ]);
 }
 
+typedef $IntentionsCreateCompanionBuilder = IntentionsCompanion Function({
+  required String id,
+  required String title,
+  Value<String?> description,
+  Value<bool> isActionReady,
+  Value<bool> isArchived,
+  required int createdAt,
+  required int updatedAt,
+  Value<int> rowid,
+});
+typedef $IntentionsUpdateCompanionBuilder = IntentionsCompanion Function({
+  Value<String> id,
+  Value<String> title,
+  Value<String?> description,
+  Value<bool> isActionReady,
+  Value<bool> isArchived,
+  Value<int> createdAt,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+final class $IntentionsReferences
+    extends BaseReferences<_$AppDatabase, Intentions, Intention> {
+  $IntentionsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<FavoriteIntentions, List<FavoriteIntention>>
+  _favoriteIntentionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.favoriteIntentions,
+        aliasName: 'intentions__id__favorite_intentions__intention_id',
+      );
+
+  $FavoriteIntentionsProcessedTableManager get favoriteIntentionsRefs {
+    final manager = $FavoriteIntentionsTableManager(
+      $_db,
+      $_db.favoriteIntentions,
+    ).filter((f) => f.intentionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _favoriteIntentionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<TagAssignments, List<TagAssignment>>
+  _tagAssignmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.tagAssignments,
+    aliasName: 'intentions__id__tag_assignments__intention_id',
+  );
+
+  $TagAssignmentsProcessedTableManager get tagAssignmentsRefs {
+    final manager = $TagAssignmentsTableManager(
+      $_db,
+      $_db.tagAssignments,
+    ).filter((f) => f.intentionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_tagAssignmentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $IntentionsFilterComposer extends Composer<_$AppDatabase, Intentions> {
+  $IntentionsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get titleSearchKey => $composableBuilder(
+    column: $table.titleSearchKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActionReady => $composableBuilder(
+    column: $table.isActionReady,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> favoriteIntentionsRefs(
+    Expression<bool> Function($FavoriteIntentionsFilterComposer f) f,
+  ) {
+    final $FavoriteIntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.favoriteIntentions,
+      getReferencedColumn: (t) => t.intentionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $FavoriteIntentionsFilterComposer(
+            $db: $db,
+            $table: $db.favoriteIntentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> tagAssignmentsRefs(
+    Expression<bool> Function($TagAssignmentsFilterComposer f) f,
+  ) {
+    final $TagAssignmentsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tagAssignments,
+      getReferencedColumn: (t) => t.intentionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagAssignmentsFilterComposer(
+            $db: $db,
+            $table: $db.tagAssignments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $IntentionsOrderingComposer extends Composer<_$AppDatabase, Intentions> {
+  $IntentionsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get titleSearchKey => $composableBuilder(
+    column: $table.titleSearchKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActionReady => $composableBuilder(
+    column: $table.isActionReady,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $IntentionsAnnotationComposer
+    extends Composer<_$AppDatabase, Intentions> {
+  $IntentionsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get titleSearchKey => $composableBuilder(
+    column: $table.titleSearchKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isActionReady => $composableBuilder(
+    column: $table.isActionReady,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> favoriteIntentionsRefs<T extends Object>(
+    Expression<T> Function($FavoriteIntentionsAnnotationComposer a) f,
+  ) {
+    final $FavoriteIntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.favoriteIntentions,
+      getReferencedColumn: (t) => t.intentionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $FavoriteIntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.favoriteIntentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> tagAssignmentsRefs<T extends Object>(
+    Expression<T> Function($TagAssignmentsAnnotationComposer a) f,
+  ) {
+    final $TagAssignmentsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.tagAssignments,
+      getReferencedColumn: (t) => t.intentionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $TagAssignmentsAnnotationComposer(
+            $db: $db,
+            $table: $db.tagAssignments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $IntentionsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          Intentions,
+          Intention,
+          $IntentionsFilterComposer,
+          $IntentionsOrderingComposer,
+          $IntentionsAnnotationComposer,
+          $IntentionsCreateCompanionBuilder,
+          $IntentionsUpdateCompanionBuilder,
+          (Intention, $IntentionsReferences),
+          Intention,
+          PrefetchHooks Function({
+            bool favoriteIntentionsRefs,
+            bool tagAssignmentsRefs,
+          })
+        > {
+  $IntentionsTableManager(_$AppDatabase db, Intentions table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $IntentionsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $IntentionsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $IntentionsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<bool> isActionReady = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => IntentionsCompanion(
+                id: id,
+                title: title,
+                description: description,
+                isActionReady: isActionReady,
+                isArchived: isArchived,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String title,
+                Value<String?> description = const Value.absent(),
+                Value<bool> isActionReady = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+                required int createdAt,
+                required int updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => IntentionsCompanion.insert(
+                id: id,
+                title: title,
+                description: description,
+                isActionReady: isActionReady,
+                isArchived: isArchived,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) =>
+                    (e.readTable(table), $IntentionsReferences(db, table, e)),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({favoriteIntentionsRefs = false, tagAssignmentsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (favoriteIntentionsRefs) db.favoriteIntentions,
+                    if (tagAssignmentsRefs) db.tagAssignments,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (favoriteIntentionsRefs)
+                        await $_getPrefetchedData<
+                          Intention,
+                          Intentions,
+                          FavoriteIntention
+                        >(
+                          currentTable: table,
+                          referencedTable: $IntentionsReferences
+                              ._favoriteIntentionsRefsTable(db),
+                          managerFromTypedResult: (p0) => $IntentionsReferences(
+                            db,
+                            table,
+                            p0,
+                          ).favoriteIntentionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.intentionId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (tagAssignmentsRefs)
+                        await $_getPrefetchedData<
+                          Intention,
+                          Intentions,
+                          TagAssignment
+                        >(
+                          currentTable: table,
+                          referencedTable: $IntentionsReferences
+                              ._tagAssignmentsRefsTable(db),
+                          managerFromTypedResult: (p0) => $IntentionsReferences(
+                            db,
+                            table,
+                            p0,
+                          ).tagAssignmentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.intentionId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $IntentionsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      Intentions,
+      Intention,
+      $IntentionsFilterComposer,
+      $IntentionsOrderingComposer,
+      $IntentionsAnnotationComposer,
+      $IntentionsCreateCompanionBuilder,
+      $IntentionsUpdateCompanionBuilder,
+      (Intention, $IntentionsReferences),
+      Intention,
+      PrefetchHooks Function({
+        bool favoriteIntentionsRefs,
+        bool tagAssignmentsRefs,
+      })
+    >;
+typedef $FavoriteIntentionsCreateCompanionBuilder =
+    FavoriteIntentionsCompanion Function({
+      required String intentionId,
+      required int position,
+      Value<int> rowid,
+    });
+typedef $FavoriteIntentionsUpdateCompanionBuilder =
+    FavoriteIntentionsCompanion Function({
+      Value<String> intentionId,
+      Value<int> position,
+      Value<int> rowid,
+    });
+
+final class $FavoriteIntentionsReferences
+    extends
+        BaseReferences<_$AppDatabase, FavoriteIntentions, FavoriteIntention> {
+  $FavoriteIntentionsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static Intentions _intentionIdTable(_$AppDatabase db) => db.intentions
+      .createAlias('favorite_intentions__intention_id__intentions__id');
+
+  $IntentionsProcessedTableManager get intentionId {
+    final $_column = $_itemColumn<String>('intention_id')!;
+
+    final manager = $IntentionsTableManager(
+      $_db,
+      $_db.intentions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_intentionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $FavoriteIntentionsFilterComposer
+    extends Composer<_$AppDatabase, FavoriteIntentions> {
+  $FavoriteIntentionsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $IntentionsFilterComposer get intentionId {
+    final $IntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.intentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsFilterComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $FavoriteIntentionsOrderingComposer
+    extends Composer<_$AppDatabase, FavoriteIntentions> {
+  $FavoriteIntentionsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $IntentionsOrderingComposer get intentionId {
+    final $IntentionsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.intentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsOrderingComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $FavoriteIntentionsAnnotationComposer
+    extends Composer<_$AppDatabase, FavoriteIntentions> {
+  $FavoriteIntentionsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  $IntentionsAnnotationComposer get intentionId {
+    final $IntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.intentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $FavoriteIntentionsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          FavoriteIntentions,
+          FavoriteIntention,
+          $FavoriteIntentionsFilterComposer,
+          $FavoriteIntentionsOrderingComposer,
+          $FavoriteIntentionsAnnotationComposer,
+          $FavoriteIntentionsCreateCompanionBuilder,
+          $FavoriteIntentionsUpdateCompanionBuilder,
+          (FavoriteIntention, $FavoriteIntentionsReferences),
+          FavoriteIntention,
+          PrefetchHooks Function({bool intentionId})
+        > {
+  $FavoriteIntentionsTableManager(_$AppDatabase db, FavoriteIntentions table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $FavoriteIntentionsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $FavoriteIntentionsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $FavoriteIntentionsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> intentionId = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FavoriteIntentionsCompanion(
+                intentionId: intentionId,
+                position: position,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String intentionId,
+                required int position,
+                Value<int> rowid = const Value.absent(),
+              }) => FavoriteIntentionsCompanion.insert(
+                intentionId: intentionId,
+                position: position,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $FavoriteIntentionsReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({intentionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (intentionId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.intentionId,
+                        referencedTable: $FavoriteIntentionsReferences
+                            ._intentionIdTable(db),
+                        referencedColumn: $FavoriteIntentionsReferences
+                            ._intentionIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $FavoriteIntentionsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      FavoriteIntentions,
+      FavoriteIntention,
+      $FavoriteIntentionsFilterComposer,
+      $FavoriteIntentionsOrderingComposer,
+      $FavoriteIntentionsAnnotationComposer,
+      $FavoriteIntentionsCreateCompanionBuilder,
+      $FavoriteIntentionsUpdateCompanionBuilder,
+      (FavoriteIntention, $FavoriteIntentionsReferences),
+      FavoriteIntention,
+      PrefetchHooks Function({bool intentionId})
+    >;
+typedef $IntentionTitlesFtsCreateCompanionBuilder =
+    IntentionTitlesFtsCompanion Function({
+      required String titleSearchKey,
+      Value<int> rowid,
+    });
+typedef $IntentionTitlesFtsUpdateCompanionBuilder =
+    IntentionTitlesFtsCompanion Function({
+      Value<String> titleSearchKey,
+      Value<int> rowid,
+    });
+
+class $IntentionTitlesFtsFilterComposer
+    extends Composer<_$AppDatabase, IntentionTitlesFts> {
+  $IntentionTitlesFtsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get titleSearchKey => $composableBuilder(
+    column: $table.titleSearchKey,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $IntentionTitlesFtsOrderingComposer
+    extends Composer<_$AppDatabase, IntentionTitlesFts> {
+  $IntentionTitlesFtsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get titleSearchKey => $composableBuilder(
+    column: $table.titleSearchKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $IntentionTitlesFtsAnnotationComposer
+    extends Composer<_$AppDatabase, IntentionTitlesFts> {
+  $IntentionTitlesFtsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get titleSearchKey => $composableBuilder(
+    column: $table.titleSearchKey,
+    builder: (column) => column,
+  );
+}
+
+class $IntentionTitlesFtsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          IntentionTitlesFts,
+          IntentionTitlesFt,
+          $IntentionTitlesFtsFilterComposer,
+          $IntentionTitlesFtsOrderingComposer,
+          $IntentionTitlesFtsAnnotationComposer,
+          $IntentionTitlesFtsCreateCompanionBuilder,
+          $IntentionTitlesFtsUpdateCompanionBuilder,
+          (
+            IntentionTitlesFt,
+            BaseReferences<
+              _$AppDatabase,
+              IntentionTitlesFts,
+              IntentionTitlesFt
+            >,
+          ),
+          IntentionTitlesFt,
+          PrefetchHooks Function()
+        > {
+  $IntentionTitlesFtsTableManager(_$AppDatabase db, IntentionTitlesFts table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $IntentionTitlesFtsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $IntentionTitlesFtsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $IntentionTitlesFtsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> titleSearchKey = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => IntentionTitlesFtsCompanion(
+                titleSearchKey: titleSearchKey,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String titleSearchKey,
+                Value<int> rowid = const Value.absent(),
+              }) => IntentionTitlesFtsCompanion.insert(
+                titleSearchKey: titleSearchKey,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $IntentionTitlesFtsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      IntentionTitlesFts,
+      IntentionTitlesFt,
+      $IntentionTitlesFtsFilterComposer,
+      $IntentionTitlesFtsOrderingComposer,
+      $IntentionTitlesFtsAnnotationComposer,
+      $IntentionTitlesFtsCreateCompanionBuilder,
+      $IntentionTitlesFtsUpdateCompanionBuilder,
+      (
+        IntentionTitlesFt,
+        BaseReferences<_$AppDatabase, IntentionTitlesFts, IntentionTitlesFt>,
+      ),
+      IntentionTitlesFt,
+      PrefetchHooks Function()
+    >;
 typedef $TagsCreateCompanionBuilder = TagsCompanion Function({
   Value<int> creationSequence,
   required String id,
@@ -3275,363 +4368,6 @@ typedef $TagsProcessedTableManager =
       $TagsUpdateCompanionBuilder,
       (Tag, $TagsReferences),
       Tag,
-      PrefetchHooks Function({bool tagAssignmentsRefs})
-    >;
-typedef $IntentionsCreateCompanionBuilder = IntentionsCompanion Function({
-  required String id,
-  required String title,
-  Value<String?> description,
-  Value<bool> isActionReady,
-  Value<bool> isArchived,
-  required int createdAt,
-  required int updatedAt,
-  Value<int> rowid,
-});
-typedef $IntentionsUpdateCompanionBuilder = IntentionsCompanion Function({
-  Value<String> id,
-  Value<String> title,
-  Value<String?> description,
-  Value<bool> isActionReady,
-  Value<bool> isArchived,
-  Value<int> createdAt,
-  Value<int> updatedAt,
-  Value<int> rowid,
-});
-
-final class $IntentionsReferences
-    extends BaseReferences<_$AppDatabase, Intentions, Intention> {
-  $IntentionsReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static MultiTypedResultKey<TagAssignments, List<TagAssignment>>
-  _tagAssignmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.tagAssignments,
-    aliasName: 'intentions__id__tag_assignments__intention_id',
-  );
-
-  $TagAssignmentsProcessedTableManager get tagAssignmentsRefs {
-    final manager = $TagAssignmentsTableManager(
-      $_db,
-      $_db.tagAssignments,
-    ).filter((f) => f.intentionId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_tagAssignmentsRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
-class $IntentionsFilterComposer extends Composer<_$AppDatabase, Intentions> {
-  $IntentionsFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get title => $composableBuilder(
-    column: $table.title,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get titleSearchKey => $composableBuilder(
-    column: $table.titleSearchKey,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get isActionReady => $composableBuilder(
-    column: $table.isActionReady,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  Expression<bool> tagAssignmentsRefs(
-    Expression<bool> Function($TagAssignmentsFilterComposer f) f,
-  ) {
-    final $TagAssignmentsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.tagAssignments,
-      getReferencedColumn: (t) => t.intentionId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $TagAssignmentsFilterComposer(
-            $db: $db,
-            $table: $db.tagAssignments,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $IntentionsOrderingComposer extends Composer<_$AppDatabase, Intentions> {
-  $IntentionsOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get title => $composableBuilder(
-    column: $table.title,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get titleSearchKey => $composableBuilder(
-    column: $table.titleSearchKey,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get isActionReady => $composableBuilder(
-    column: $table.isActionReady,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $IntentionsAnnotationComposer
-    extends Composer<_$AppDatabase, Intentions> {
-  $IntentionsAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get title =>
-      $composableBuilder(column: $table.title, builder: (column) => column);
-
-  GeneratedColumn<String> get titleSearchKey => $composableBuilder(
-    column: $table.titleSearchKey,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<bool> get isActionReady => $composableBuilder(
-    column: $table.isActionReady,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<int> get updatedAt =>
-      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-
-  Expression<T> tagAssignmentsRefs<T extends Object>(
-    Expression<T> Function($TagAssignmentsAnnotationComposer a) f,
-  ) {
-    final $TagAssignmentsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.tagAssignments,
-      getReferencedColumn: (t) => t.intentionId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $TagAssignmentsAnnotationComposer(
-            $db: $db,
-            $table: $db.tagAssignments,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $IntentionsTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          Intentions,
-          Intention,
-          $IntentionsFilterComposer,
-          $IntentionsOrderingComposer,
-          $IntentionsAnnotationComposer,
-          $IntentionsCreateCompanionBuilder,
-          $IntentionsUpdateCompanionBuilder,
-          (Intention, $IntentionsReferences),
-          Intention,
-          PrefetchHooks Function({bool tagAssignmentsRefs})
-        > {
-  $IntentionsTableManager(_$AppDatabase db, Intentions table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $IntentionsFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $IntentionsOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $IntentionsAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> title = const Value.absent(),
-                Value<String?> description = const Value.absent(),
-                Value<bool> isActionReady = const Value.absent(),
-                Value<bool> isArchived = const Value.absent(),
-                Value<int> createdAt = const Value.absent(),
-                Value<int> updatedAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => IntentionsCompanion(
-                id: id,
-                title: title,
-                description: description,
-                isActionReady: isActionReady,
-                isArchived: isArchived,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String title,
-                Value<String?> description = const Value.absent(),
-                Value<bool> isActionReady = const Value.absent(),
-                Value<bool> isArchived = const Value.absent(),
-                required int createdAt,
-                required int updatedAt,
-                Value<int> rowid = const Value.absent(),
-              }) => IntentionsCompanion.insert(
-                id: id,
-                title: title,
-                description: description,
-                isActionReady: isActionReady,
-                isArchived: isArchived,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) =>
-                    (e.readTable(table), $IntentionsReferences(db, table, e)),
-              )
-              .toList(),
-          prefetchHooksCallback: ({tagAssignmentsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [
-                if (tagAssignmentsRefs) db.tagAssignments,
-              ],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (tagAssignmentsRefs)
-                    await $_getPrefetchedData<
-                      Intention,
-                      Intentions,
-                      TagAssignment
-                    >(
-                      currentTable: table,
-                      referencedTable: $IntentionsReferences
-                          ._tagAssignmentsRefsTable(db),
-                      managerFromTypedResult: (p0) => $IntentionsReferences(
-                        db,
-                        table,
-                        p0,
-                      ).tagAssignmentsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where(
-                            (e) => e.intentionId == item.id,
-                          ),
-                      typedResults: items,
-                    ),
-                ];
-              },
-            );
-          },
-        ),
-      );
-}
-
-typedef $IntentionsProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      Intentions,
-      Intention,
-      $IntentionsFilterComposer,
-      $IntentionsOrderingComposer,
-      $IntentionsAnnotationComposer,
-      $IntentionsCreateCompanionBuilder,
-      $IntentionsUpdateCompanionBuilder,
-      (Intention, $IntentionsReferences),
-      Intention,
       PrefetchHooks Function({bool tagAssignmentsRefs})
     >;
 typedef $TagAssignmentsCreateCompanionBuilder =
@@ -5523,143 +6259,17 @@ typedef $DailyChoicePathStepsProcessedTableManager =
       DailyChoicePathStep,
       PrefetchHooks Function({bool dailyChoiceId, bool longTermRelationId})
     >;
-typedef $IntentionTitlesFtsCreateCompanionBuilder =
-    IntentionTitlesFtsCompanion Function({
-      required String titleSearchKey,
-      Value<int> rowid,
-    });
-typedef $IntentionTitlesFtsUpdateCompanionBuilder =
-    IntentionTitlesFtsCompanion Function({
-      Value<String> titleSearchKey,
-      Value<int> rowid,
-    });
-
-class $IntentionTitlesFtsFilterComposer
-    extends Composer<_$AppDatabase, IntentionTitlesFts> {
-  $IntentionTitlesFtsFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get titleSearchKey => $composableBuilder(
-    column: $table.titleSearchKey,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $IntentionTitlesFtsOrderingComposer
-    extends Composer<_$AppDatabase, IntentionTitlesFts> {
-  $IntentionTitlesFtsOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get titleSearchKey => $composableBuilder(
-    column: $table.titleSearchKey,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $IntentionTitlesFtsAnnotationComposer
-    extends Composer<_$AppDatabase, IntentionTitlesFts> {
-  $IntentionTitlesFtsAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get titleSearchKey => $composableBuilder(
-    column: $table.titleSearchKey,
-    builder: (column) => column,
-  );
-}
-
-class $IntentionTitlesFtsTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          IntentionTitlesFts,
-          IntentionTitlesFt,
-          $IntentionTitlesFtsFilterComposer,
-          $IntentionTitlesFtsOrderingComposer,
-          $IntentionTitlesFtsAnnotationComposer,
-          $IntentionTitlesFtsCreateCompanionBuilder,
-          $IntentionTitlesFtsUpdateCompanionBuilder,
-          (
-            IntentionTitlesFt,
-            BaseReferences<
-              _$AppDatabase,
-              IntentionTitlesFts,
-              IntentionTitlesFt
-            >,
-          ),
-          IntentionTitlesFt,
-          PrefetchHooks Function()
-        > {
-  $IntentionTitlesFtsTableManager(_$AppDatabase db, IntentionTitlesFts table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $IntentionTitlesFtsFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $IntentionTitlesFtsOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $IntentionTitlesFtsAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> titleSearchKey = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => IntentionTitlesFtsCompanion(
-                titleSearchKey: titleSearchKey,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String titleSearchKey,
-                Value<int> rowid = const Value.absent(),
-              }) => IntentionTitlesFtsCompanion.insert(
-                titleSearchKey: titleSearchKey,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $IntentionTitlesFtsProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      IntentionTitlesFts,
-      IntentionTitlesFt,
-      $IntentionTitlesFtsFilterComposer,
-      $IntentionTitlesFtsOrderingComposer,
-      $IntentionTitlesFtsAnnotationComposer,
-      $IntentionTitlesFtsCreateCompanionBuilder,
-      $IntentionTitlesFtsUpdateCompanionBuilder,
-      (
-        IntentionTitlesFt,
-        BaseReferences<_$AppDatabase, IntentionTitlesFts, IntentionTitlesFt>,
-      ),
-      IntentionTitlesFt,
-      PrefetchHooks Function()
-    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
-  $TagsTableManager get tags => $TagsTableManager(_db, _db.tags);
   $IntentionsTableManager get intentions =>
       $IntentionsTableManager(_db, _db.intentions);
+  $FavoriteIntentionsTableManager get favoriteIntentions =>
+      $FavoriteIntentionsTableManager(_db, _db.favoriteIntentions);
+  $IntentionTitlesFtsTableManager get intentionTitlesFts =>
+      $IntentionTitlesFtsTableManager(_db, _db.intentionTitlesFts);
+  $TagsTableManager get tags => $TagsTableManager(_db, _db.tags);
   $TagAssignmentsTableManager get tagAssignments =>
       $TagAssignmentsTableManager(_db, _db.tagAssignments);
   $DailyChoicesTableManager get dailyChoices =>
@@ -5668,6 +6278,4 @@ class $AppDatabaseManager {
       $LongTermRelationsTableManager(_db, _db.longTermRelations);
   $DailyChoicePathStepsTableManager get dailyChoicePathSteps =>
       $DailyChoicePathStepsTableManager(_db, _db.dailyChoicePathSteps);
-  $IntentionTitlesFtsTableManager get intentionTitlesFts =>
-      $IntentionTitlesFtsTableManager(_db, _db.intentionTitlesFts);
 }

@@ -28,6 +28,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import 'details_test_support.dart';
 
 void main() {
@@ -105,6 +106,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -1266,6 +1268,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester, content: find.text(intention.title));
       await tester.tap(find.text(intention.title));
       await tester.pump();
       await waitForDetailRequests(repository, 1);
@@ -1289,7 +1292,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
 
       repository.completeCommand(
         0,
@@ -1343,6 +1346,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
 
     await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
     await tester.pumpAndSettle();
@@ -1393,6 +1397,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -1415,12 +1420,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
     expect(find.byType(IntentionDetailsPage), findsNothing);
 
     repository.detailRequests[0].add(ResultSuccess(intention));
     await tester.pump();
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
     expect(find.text(intention.title), findsNothing);
   });
 
@@ -1520,6 +1525,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester);
       unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
@@ -1555,7 +1561,7 @@ void main() {
       repository.completeCommand(1, testDetailsDeletedResult(intention));
       await tester.pumpAndSettle();
 
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.textContaining('Intention deleted.'), findsNothing);
 
@@ -1603,6 +1609,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester, content: find.text(intention.title));
       await tester.tap(find.text(intention.title));
       await tester.pump();
       await waitForDetailRequests(repository, 1);
@@ -1623,7 +1630,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.textContaining(inlineFailure), findsNothing);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -1636,20 +1643,736 @@ void main() {
       expect(find.textContaining(inlineFailure), findsNothing);
     },
   );
+
+  testWidgets(
+    'шапка показывает управление отметкой только при полученных подробных данных',
+    (tester) async {
+      final outcomes = <Result<Intention?>>[
+        const ResultSuccess(null),
+        const ResultFailure(IntentionUnavailableFailure()),
+        const ResultFailure(IntentionCorruptionFailure()),
+        const ResultFailure(IntentionUnexpectedFailure()),
+      ];
+      for (var index = 0; index < outcomes.length; index += 1) {
+        final repository = ControlledDetailsRepository();
+        await _pumpDetailsPage(
+          tester,
+          repository,
+          testDetailsIntentionId(60 + index),
+        );
+        await waitForDetailRequests(repository, 1);
+
+        // Загрузка не изображает отметку отсутствующей.
+        expect(find.text('Loading intention…'), findsOneWidget);
+        expect(find.byKey(_favoriteMarkKey), findsNothing);
+        expect(find.byIcon(Icons.star_border), findsNothing);
+
+        repository.detailRequests.single.add(outcomes[index]);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_favoriteMarkKey), findsNothing);
+        expect(find.byIcon(Icons.star_border), findsNothing);
+        expect(find.byIcon(Icons.star), findsNothing);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    },
+  );
+
+  testWidgets(
+    'шапка различает подтверждённую отметку формой значка у активного и архивированного намерения',
+    (tester) async {
+      final scenarios = <(IntentionArchiveState, FavoriteMark, IconData)>[
+        (
+          IntentionArchiveState.active,
+          FavoriteMark.notFavorite,
+          Icons.star_border,
+        ),
+        (IntentionArchiveState.active, FavoriteMark.favorite, Icons.star),
+        (
+          IntentionArchiveState.archived,
+          FavoriteMark.notFavorite,
+          Icons.star_border,
+        ),
+        (IntentionArchiveState.archived, FavoriteMark.favorite, Icons.star),
+      ];
+      for (var index = 0; index < scenarios.length; index += 1) {
+        final (archiveState, favoriteMark, icon) = scenarios[index];
+        final repository = ControlledDetailsRepository();
+        final intention = testDetailsIntention(
+          index: 70 + index,
+          archiveState: archiveState,
+        );
+        await _pumpDetailsPage(tester, repository, intention.id);
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests.single.add(
+          ResultSuccess(intention),
+          favoriteMark: favoriteMark,
+        );
+        await tester.pumpAndSettle();
+
+        final control = find.byKey(_favoriteMarkKey);
+        expect(
+          find.descendant(of: find.byType(AppBar), matching: control),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: control, matching: find.byType(Icon)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: control, matching: find.byIcon(icon)),
+          findsOneWidget,
+        );
+        expect(tester.widget<IconButton>(control).onPressed, isNotNull);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    },
+  );
+
+  testWidgets(
+    'нажатие отправляет отметку либо её снятие и показывает только подтверждённое состояние',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 80, title: 'Гулять');
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      final control = find.byKey(_favoriteMarkKey);
+
+      await tester.tap(control);
+      await tester.pump();
+
+      expect(
+        repository.commands.single,
+        isA<MarkIntentionFavorite>().having(
+          (command) => command.id,
+          'id',
+          intention.id,
+        ),
+      );
+      // Пока операция выполняется, видна последняя подтверждённая отметка.
+      expect(find.text('Saving changes…'), findsOneWidget);
+      expect(
+        find.descendant(of: control, matching: find.byIcon(Icons.star_border)),
+        findsOneWidget,
+      );
+      expect(tester.widget<IconButton>(control).onPressed, isNull);
+      await tester.tap(control, warnIfMissed: false);
+      await tester.pump();
+      expect(repository.commands, hasLength(1));
+
+      repository.completeCommand(
+        0,
+        testDetailsSavedResult(
+          intention,
+          before: intention,
+          revision: const TestDetailsRevision(1),
+          favoriteMark: FavoriteMark.favorite,
+        ),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(1),
+        favoriteMark: FavoriteMark.favorite,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(of: control, matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
+      // Успех предъявляет только общая поверхность.
+      expect(
+        find.text('Mark as favorite — “Гулять”: Intention marked as favorite.'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('intention-details-state-change-failure')),
+        findsNothing,
+      );
+      await _closeOperationMessage(tester);
+      expect(find.text('Гулять'), findsOneWidget);
+      expect(find.text('Not ready for action'), findsOneWidget);
+      expect(find.text('Active'), findsOneWidget);
+
+      await tester.tap(control);
+      await tester.pump();
+
+      expect(repository.commands, hasLength(2));
+      expect(
+        repository.commands.last,
+        isA<UnmarkIntentionFavorite>().having(
+          (command) => command.id,
+          'id',
+          intention.id,
+        ),
+      );
+      expect(
+        find.descendant(of: control, matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
+
+      repository.completeCommand(
+        1,
+        testDetailsSavedResult(
+          intention,
+          before: intention,
+          revision: const TestDetailsRevision(2),
+          beforeFavoriteMark: FavoriteMark.favorite,
+        ),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 3);
+      repository.detailRequests[2].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(of: control, matching: find.byIcon(Icons.star_border)),
+        findsOneWidget,
+      );
+      await _closeOperationMessage(tester);
+    },
+  );
+
+  testWidgets(
+    'управление отметкой недоступно при открытой форме изменения и другой операции намерения',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 81);
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(
+        ResultSuccess(intention),
+        favoriteMark: FavoriteMark.favorite,
+      );
+      await tester.pumpAndSettle();
+      final control = find.byKey(_favoriteMarkKey);
+
+      final edit = find.byKey(const ValueKey('intention-details-edit'));
+      await tester.ensureVisible(edit);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<IconButton>(control).onPressed, isNull);
+      expect(
+        find.descendant(of: control, matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
+      await tester.tap(control, warnIfMissed: false);
+      await tester.pump();
+      expect(repository.commands, isEmpty);
+
+      final cancel = find.byKey(
+        const ValueKey('intention-details-edit-cancel'),
+      );
+      await tester.ensureVisible(cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(tester.widget<IconButton>(control).onPressed, isNotNull);
+
+      final archive = find.byKey(const ValueKey('intention-details-archive'));
+      await Scrollable.ensureVisible(tester.element(archive), alignment: 0.3);
+      await tester.pumpAndSettle();
+      await tester.tap(archive);
+      await tester.pump();
+
+      expect(repository.commands.single, isA<ArchiveIntention>());
+      expect(tester.widget<IconButton>(control).onPressed, isNull);
+      await tester.tap(control, warnIfMissed: false);
+      await tester.pump();
+      expect(repository.commands, hasLength(1));
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<IconButton>(control).onPressed, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'отказ отметки и её снятия показан под шапкой вне прокрутки с повтором только при недоступности',
+    (tester) async {
+      final scenarios = <(Locale, FavoriteMark, IntentionFailure, String, bool)>[
+        (
+          const Locale('en'),
+          FavoriteMark.notFavorite,
+          const IntentionNotFoundFailure(),
+          'The intention no longer exists. The favorite mark wasn’t changed.',
+          false,
+        ),
+        (
+          const Locale('en'),
+          FavoriteMark.notFavorite,
+          const IntentionUnavailableFailure(),
+          'The favorite mark couldn’t be changed. Try again.',
+          true,
+        ),
+        (
+          const Locale('en'),
+          FavoriteMark.favorite,
+          const IntentionCorruptionFailure(),
+          'Stored data is damaged. The favorite mark wasn’t changed.',
+          false,
+        ),
+        (
+          const Locale('en'),
+          FavoriteMark.favorite,
+          const IntentionUnexpectedFailure(),
+          'The favorite mark couldn’t be changed because of an unexpected error.',
+          false,
+        ),
+        (
+          const Locale('ru'),
+          FavoriteMark.favorite,
+          const IntentionUnavailableFailure(),
+          'Не удалось изменить отметку избранного. Повторите попытку.',
+          true,
+        ),
+        (
+          const Locale('ru'),
+          FavoriteMark.notFavorite,
+          const IntentionCorruptionFailure(),
+          'Сохранённые данные повреждены. Отметка избранного не изменена.',
+          false,
+        ),
+      ];
+
+      for (var index = 0; index < scenarios.length; index += 1) {
+        final (locale, favoriteMark, failure, message, canRetry) =
+            scenarios[index];
+        final isFavorite = favoriteMark == FavoriteMark.favorite;
+        final confirmedIcon = isFavorite ? Icons.star : Icons.star_border;
+        final repository = ControlledDetailsRepository();
+        final intention = testDetailsIntention(
+          index: 90 + index,
+          description: _longDescription,
+        );
+        await _pumpDetailsPage(
+          tester,
+          repository,
+          intention.id,
+          locale: locale,
+        );
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests[0].add(
+          ResultSuccess(intention),
+          favoriteMark: favoriteMark,
+        );
+        await tester.pumpAndSettle();
+        final control = find.byKey(_favoriteMarkKey);
+
+        // Страница прокручена внутри длинного описания: область действий
+        // находится вне видимой части.
+        final position = tester.state<ScrollableState>(_detailsScrollable);
+        position.position.jumpTo(_scrolledOffset);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('intention-details-edit')).hitTestable(),
+          findsNothing,
+        );
+
+        await tester.tap(control);
+        await tester.pump();
+        repository.completeCommand(0, ResultFailure(failure));
+        await tester.pumpAndSettle();
+
+        // Ошибку предъявляет полоса под шапкой: область действий и общая
+        // поверхность её не повторяют, а прокрутка остаётся на месте.
+        final banner = find.byKey(_favoriteMarkFailureKey);
+        expect(find.text(message), findsOneWidget);
+        expect(
+          find.descendant(of: banner, matching: find.text(message)),
+          findsOneWidget,
+        );
+        expect(find.text(message).hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(banner).bottom,
+          lessThanOrEqualTo(tester.getRect(_detailsScrollable).top),
+        );
+        expect(position.position.pixels, _scrolledOffset);
+        expect(find.byKey(_stateChangeFailureKey), findsNothing);
+        expect(find.byKey(_stateChangeRetryKey), findsNothing);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(
+          find.descendant(of: control, matching: find.byIcon(confirmedIcon)),
+          findsOneWidget,
+        );
+        expect(tester.widget<IconButton>(control).onPressed, isNotNull);
+        final retry = find.byKey(_favoriteMarkRetryKey);
+        expect(retry, canRetry ? findsOneWidget : findsNothing);
+        if (canRetry) {
+          // Повтор виден без прокрутки и отправляет новую команду.
+          expect(retry.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(retry).bottom,
+            lessThanOrEqualTo(tester.getRect(_detailsScrollable).top),
+          );
+          await tester.tap(retry);
+          await tester.pump();
+          expect(repository.commands, hasLength(2));
+          expect(
+            repository.commands.last,
+            isFavorite
+                ? isA<UnmarkIntentionFavorite>()
+                : isA<MarkIntentionFavorite>(),
+          );
+          expect(banner, findsNothing);
+          repository.completeCommand(
+            1,
+            const ResultFailure(IntentionUnexpectedFailure()),
+          );
+          await tester.pumpAndSettle();
+          expect(banner, findsOneWidget);
+          expect(retry, findsNothing);
+          expect(position.position.pixels, _scrolledOffset);
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    },
+  );
+
+  testWidgets(
+    'полосы отказа отметки нет после отказа другой операции намерения и после успеха отметки',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(index: 100);
+      await _pumpDetailsPage(tester, repository, intention.id);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      final control = find.byKey(_favoriteMarkKey);
+      final banner = find.byKey(_favoriteMarkFailureKey);
+
+      await tester.tap(control);
+      await tester.pump();
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(banner, findsOneWidget);
+      expect(find.byKey(_favoriteMarkRetryKey), findsOneWidget);
+
+      // Отказ архивирования остаётся в области действий и убирает полосу.
+      final archive = find.byKey(const ValueKey('intention-details-archive'));
+      await tester.ensureVisible(archive);
+      await tester.tap(archive);
+      await tester.pump();
+      expect(repository.commands.last, isA<ArchiveIntention>());
+      repository.completeCommand(
+        1,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(banner, findsNothing);
+      expect(find.byKey(_favoriteMarkRetryKey), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(_stateChangeFailureKey),
+          matching: find.text(
+            'The intention state couldn’t be changed. Try again.',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(_stateChangeRetryKey), findsOneWidget);
+
+      await tester.tap(control);
+      await tester.pump();
+      repository.completeCommand(
+        2,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+      expect(banner, findsOneWidget);
+      expect(find.byKey(_stateChangeFailureKey), findsNothing);
+      expect(find.byKey(_stateChangeRetryKey), findsNothing);
+
+      // Успешный повтор убирает полосу.
+      await tester.tap(find.byKey(_favoriteMarkRetryKey));
+      await tester.pump();
+      repository.completeCommand(
+        3,
+        testDetailsSavedResult(
+          intention,
+          before: intention,
+          revision: const TestDetailsRevision(1),
+          favoriteMark: FavoriteMark.favorite,
+        ),
+      );
+      await tester.pump();
+      await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(1),
+        favoriteMark: FavoriteMark.favorite,
+      );
+      await tester.pumpAndSettle();
+      expect(banner, findsNothing);
+      expect(find.byKey(_favoriteMarkRetryKey), findsNothing);
+      expect(
+        find.descendant(of: control, matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'управление отметкой недоступно от подтверждения до снимка и затем предлагает обратное действие',
+    (tester) async {
+      final scenarios =
+          <(FavoriteMark, FavoriteMark, IconData, String, String)>[
+            (
+              FavoriteMark.notFavorite,
+              FavoriteMark.favorite,
+              Icons.star_border,
+              'Not marked',
+              'Remove favorite mark',
+            ),
+            (
+              FavoriteMark.favorite,
+              FavoriteMark.notFavorite,
+              Icons.star,
+              'Marked',
+              'Mark as favorite',
+            ),
+          ];
+
+      for (var index = 0; index < scenarios.length; index += 1) {
+        final (before, after, confirmedIcon, confirmedValue, reverseAction) =
+            scenarios[index];
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledDetailsRepository();
+        final intention = testDetailsIntention(index: 130 + index);
+        await _pumpDetailsPage(tester, repository, intention.id);
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests[0].add(
+          ResultSuccess(intention),
+          revision: const TestDetailsRevision(1),
+          favoriteMark: before,
+        );
+        await tester.pumpAndSettle();
+        final control = find.byKey(_favoriteMarkKey);
+
+        await tester.tap(control);
+        await tester.pump();
+        repository.completeCommand(
+          0,
+          testDetailsSavedResult(
+            intention,
+            before: intention,
+            revision: const TestDetailsRevision(2),
+            beforeFavoriteMark: before,
+            favoriteMark: after,
+          ),
+        );
+        await tester.pump();
+        await waitForDetailRequests(repository, 2);
+        await tester.pump();
+
+        // Операция завершена, а подробные данные несут прежнюю отметку.
+        expect(find.text('Saving changes…'), findsNothing);
+        expect(tester.widget<IconButton>(control).onPressed, isNull);
+        expect(
+          find.descendant(of: control, matching: find.byIcon(confirmedIcon)),
+          findsOneWidget,
+        );
+        expect(
+          tester.getSemantics(control),
+          isSemantics(value: confirmedValue, isEnabled: false),
+        );
+        await tester.tap(control, warnIfMissed: false);
+        await tester.pump();
+        expect(repository.commands, hasLength(1));
+
+        repository.detailRequests[1].add(
+          ResultSuccess(intention),
+          revision: const TestDetailsRevision(2),
+          favoriteMark: after,
+        );
+        await tester.pump();
+        await tester.pump();
+        expect(tester.widget<IconButton>(control).onPressed, isNotNull);
+        expect(tester.widget<IconButton>(control).tooltip, reverseAction);
+
+        await tester.tap(control);
+        await tester.pump();
+        expect(repository.commands, hasLength(2));
+        expect(
+          repository.commands.last,
+          after == FavoriteMark.favorite
+              ? isA<UnmarkIntentionFavorite>()
+              : isA<MarkIntentionFavorite>(),
+        );
+
+        repository.completeCommand(
+          1,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await tester.pumpAndSettle();
+        semantics.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await _closeOperationMessage(tester);
+      }
+    },
+  );
+
+  testWidgets(
+    'экранный диктор получает название, состояние и доступность управления отметкой на обоих языках',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final scenarios = <(Locale, FavoriteMark, String, String, String)>[
+        (
+          const Locale('en'),
+          FavoriteMark.notFavorite,
+          'Favorite intention',
+          'Not marked',
+          'Mark as favorite',
+        ),
+        (
+          const Locale('en'),
+          FavoriteMark.favorite,
+          'Favorite intention',
+          'Marked',
+          'Remove favorite mark',
+        ),
+        (
+          const Locale('ru'),
+          FavoriteMark.notFavorite,
+          'Избранное намерение',
+          'Не отмечено',
+          'Отметить избранным',
+        ),
+        (
+          const Locale('ru'),
+          FavoriteMark.favorite,
+          'Избранное намерение',
+          'Отмечено',
+          'Снять отметку избранного',
+        ),
+      ];
+
+      for (var index = 0; index < scenarios.length; index += 1) {
+        final (locale, favoriteMark, label, value, action) = scenarios[index];
+        final repository = ControlledDetailsRepository();
+        final intention = testDetailsIntention(index: 110 + index);
+        await _pumpDetailsPage(
+          tester,
+          repository,
+          intention.id,
+          locale: locale,
+        );
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests[0].add(
+          ResultSuccess(intention),
+          favoriteMark: favoriteMark,
+        );
+        await tester.pumpAndSettle();
+        final control = find.byKey(_favoriteMarkKey);
+
+        expect(
+          tester.getSemantics(control),
+          matchesSemantics(
+            label: label,
+            value: value,
+            tooltip: action,
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            isFocusable: true,
+            hasTapAction: true,
+            hasFocusAction: true,
+          ),
+        );
+        expect(find.byTooltip(action), findsOneWidget);
+
+        await tester.tap(control);
+        await tester.pump();
+
+        // Недоступное управление сохраняет название и подтверждённое состояние.
+        expect(
+          tester.getSemantics(control),
+          matchesSemantics(
+            label: label,
+            value: value,
+            tooltip: action,
+            isButton: true,
+            hasEnabledState: true,
+            isFocusable: true,
+            hasFocusAction: true,
+          ),
+        );
+
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+      semantics.dispose();
+    },
+  );
 }
+
+const _favoriteMarkKey = ValueKey('intention-details-favorite-mark');
+const _favoriteMarkFailureKey = ValueKey(
+  'intention-details-favorite-mark-failure',
+);
+const _favoriteMarkRetryKey = ValueKey('intention-details-favorite-mark-retry');
+const _stateChangeFailureKey = ValueKey(
+  'intention-details-state-change-failure',
+);
+const _stateChangeRetryKey = ValueKey('intention-details-state-change-retry');
+
+/// Описание, при котором область действий лежит далеко за видимой частью.
+final _longDescription = List.filled(
+  120,
+  'Длинное описание намерения.',
+).join('\n');
+
+/// Положение прокрутки внутри длинного описания.
+const _scrolledOffset = 240.0;
+
+/// Прокрутка содержимого страницы намерения.
+final _detailsScrollable = find
+    .descendant(
+      of: find.byType(CustomScrollView),
+      matching: find.byType(Scrollable),
+    )
+    .first;
 
 Future<void> _pumpDetailsPage(
   WidgetTester tester,
   ControlledDetailsRepository repository,
-  IntentionId intentionId,
-) async {
+  IntentionId intentionId, {
+  Locale locale = const Locale('en'),
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       retry: (retryCount, error) => null,
-      child: _localizedApp(IntentionDetailsPage(intentionId: intentionId)),
+      child: _localizedApp(
+        IntentionDetailsPage(intentionId: intentionId),
+        locale: locale,
+      ),
     ),
   );
   await tester.pump();

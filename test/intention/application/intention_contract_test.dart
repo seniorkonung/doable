@@ -29,6 +29,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/favorite_read_contract_test_fallback.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/catalog_reconciliation_test_fallback.dart';
 
@@ -422,6 +423,7 @@ void main() {
         activeRelationCount: 2,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        favoriteMark: FavoriteMark.favorite,
         tags: suppliedTags,
       );
 
@@ -436,6 +438,7 @@ void main() {
       expect(copy.archiveState, summary.archiveState);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
+      expect(copy.favoriteMark, FavoriteMark.favorite);
       expect(copy.tags, suppliedTags);
       suppliedTags.clear();
       expect(copy.tags, summary.tags);
@@ -458,6 +461,7 @@ void main() {
         activeRelationCount: 2,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        favoriteMark: FavoriteMark.favorite,
         tags: [
           Tag(id: firstId, name: TagName.fromStored('Первый тег')),
           Tag(id: secondId, name: TagName.fromStored('Второй тег')),
@@ -481,6 +485,7 @@ void main() {
       expect(copy.archiveState, summary.archiveState);
       expect(copy.activeRelationCount, summary.activeRelationCount);
       expect(copy.createdAt, summary.createdAt);
+      expect(copy.favoriteMark, FavoriteMark.favorite);
       expect(copy.updatedAt, summary.updatedAt);
       expect(() => copy.tags.clear(), throwsUnsupportedError);
     });
@@ -501,6 +506,7 @@ void main() {
             name: TagName.fromStored('Здоровье'),
           ),
         ],
+        favoriteMark: FavoriteMark.notFavorite,
       );
 
       final copy = summary.withRenamedTag(
@@ -525,6 +531,7 @@ void main() {
         activeRelationCount: 2,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        favoriteMark: FavoriteMark.favorite,
         tags: [
           Tag(id: firstId, name: TagName.fromStored('Первый тег')),
           Tag(id: secondId, name: TagName.fromStored('Второй тег')),
@@ -543,6 +550,7 @@ void main() {
       expect(copy.archiveState, summary.archiveState);
       expect(copy.activeRelationCount, summary.activeRelationCount);
       expect(copy.createdAt, summary.createdAt);
+      expect(copy.favoriteMark, FavoriteMark.favorite);
       expect(copy.updatedAt, summary.updatedAt);
       expect(() => copy.tags.clear(), throwsUnsupportedError);
     });
@@ -563,6 +571,7 @@ void main() {
             name: TagName.fromStored('Здоровье'),
           ),
         ],
+        favoriteMark: FavoriteMark.notFavorite,
       );
 
       final copy = summary.withoutTag(
@@ -570,6 +579,162 @@ void main() {
       );
 
       expect(copy, same(summary));
+    });
+
+    test('отметка избранного — подтверждённое состояние из двух значений', () {
+      String describe(FavoriteMark mark) => switch (mark) {
+        FavoriteMark.notFavorite => 'без отметки',
+        FavoriteMark.favorite => 'избранное',
+      };
+
+      expect(FavoriteMark.values, [
+        FavoriteMark.notFavorite,
+        FavoriteMark.favorite,
+      ]);
+      expect(FavoriteMark.values.map(describe), ['без отметки', 'избранное']);
+    });
+
+    test('подробные данные несут отметку своего намерения', () {
+      final intention = _intention();
+      final counts = RelationCounts(
+        activeNeedIncoming: 0,
+        activeNeedOutgoing: 0,
+        activeCanIncoming: 0,
+        activeCanOutgoing: 0,
+        archivedNeedIncoming: 0,
+        archivedNeedOutgoing: 0,
+        archivedCanIncoming: 0,
+        archivedCanOutgoing: 0,
+      );
+
+      final favorite = IntentionDetails(
+        intention: intention,
+        relationCounts: counts,
+        favoriteMark: FavoriteMark.favorite,
+      );
+      final notFavorite = IntentionDetails(
+        intention: intention,
+        relationCounts: counts,
+        favoriteMark: FavoriteMark.notFavorite,
+      );
+
+      expect(favorite.favoriteMark, FavoriteMark.favorite);
+      expect(notFavorite.favoriteMark, FavoriteMark.notFavorite);
+      expect(favorite.intention, same(intention));
+    });
+
+    test(
+      'сводки одноимённых намерений несут отметку своего идентификатора',
+      () {
+        final favorite = _summary(
+          id: '00000000-0000-4000-8000-000000000001',
+          title: 'Гулять',
+          favoriteMark: FavoriteMark.favorite,
+        );
+        final notFavorite = _summary(
+          id: '00000000-0000-4000-8000-000000000002',
+          title: 'Гулять',
+          favoriteMark: FavoriteMark.notFavorite,
+        );
+
+        expect(favorite.title, notFavorite.title);
+        expect(favorite.favoriteMark, FavoriteMark.favorite);
+        expect(notFavorite.favoriteMark, FavoriteMark.notFavorite);
+      },
+    );
+
+    test('копии сводки сохраняют отсутствие отметки', () {
+      final tag = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000101'),
+        name: TagName.fromStored('Здоровье'),
+      );
+      final summary = _summary(
+        id: '00000000-0000-4000-8000-000000000001',
+        tags: [tag],
+        favoriteMark: FavoriteMark.notFavorite,
+      );
+
+      expect(
+        summary.withActiveRelationCount(3).favoriteMark,
+        FavoriteMark.notFavorite,
+      );
+      expect(
+        summary
+            .withRenamedTag(Tag(id: tag.id, name: TagName.fromStored('Отдых')))
+            .favoriteMark,
+        FavoriteMark.notFavorite,
+      );
+      expect(summary.withoutTag(tag.id).favoriteMark, FavoriteMark.notFavorite);
+    });
+
+    test('отметка не меняет принадлежность запросу ни в одном охвате', () {
+      for (final scope in IntentionScope.values) {
+        for (final archiveState in IntentionArchiveState.values) {
+          for (final readinessFilter in IntentionReadinessFilter.values) {
+            final query = IntentionCatalogQuery(
+              scope: scope,
+              readinessFilter: readinessFilter,
+              titleFilter: 'гулять',
+              order: IntentionCatalogOrder.createdAtDescending,
+              pageSize: 100,
+            );
+            for (final title in ['Гулять', 'Читать']) {
+              final membership = {
+                for (final mark in FavoriteMark.values)
+                  query.includes(
+                    _summary(
+                      id: '00000000-0000-4000-8000-000000000001',
+                      title: title,
+                      archiveState: archiveState,
+                      favoriteMark: mark,
+                    ),
+                  ),
+              };
+
+              expect(
+                membership,
+                hasLength(1),
+                reason: '$scope, $archiveState, $readinessFilter, $title',
+              );
+            }
+          }
+        }
+      }
+    });
+
+    test('отметка не участвует в сравнении порядка', () {
+      const firstId = '00000000-0000-4000-8000-000000000001';
+      const secondId = '00000000-0000-4000-8000-000000000002';
+      for (final field in IntentionCatalogSortField.values) {
+        for (final direction in IntentionCatalogSortDirection.values) {
+          final query = _order(field, direction);
+          for (final (earlier, later) in [
+            (DateTime.utc(2026, 8, 30, 12), DateTime.utc(2026, 8, 30, 13)),
+            (DateTime.utc(2026, 8, 30, 12), DateTime.utc(2026, 8, 30, 12)),
+          ]) {
+            final comparisons = {
+              for (final leftMark in FavoriteMark.values)
+                for (final rightMark in FavoriteMark.values)
+                  query
+                      .compare(
+                        _summary(
+                          id: firstId,
+                          createdAt: earlier,
+                          favoriteMark: leftMark,
+                        ),
+                        _summary(
+                          id: secondId,
+                          createdAt: later,
+                          favoriteMark: rightMark,
+                        ),
+                      )
+                      .sign,
+            };
+
+            expect(comparisons, hasLength(1), reason: '$field, $direction');
+          }
+        }
+      }
     });
 
     test(
@@ -1001,6 +1166,8 @@ void main() {
           ArchiveIntention(id),
           RestoreIntention(id),
           DeleteIntention(id),
+          MarkIntentionFavorite(id),
+          UnmarkIntentionFavorite(id),
         ];
 
         expect(commands.map(_commandDescription), [
@@ -1011,7 +1178,16 @@ void main() {
           'archive',
           'restore',
           'delete',
+          'markFavorite',
+          'unmarkFavorite',
         ]);
+        expect(
+          commands.whereType<ExistingIntentionCommand>().map(
+            (command) => command.id,
+          ),
+          everyElement(id),
+        );
+        expect(commands.skip(7), everyElement(isA<ExistingIntentionCommand>()));
       },
     );
 
@@ -1308,6 +1484,7 @@ IntentionSummary _summary({
   DateTime? createdAt,
   DateTime? updatedAt,
   List<Tag> tags = const [],
+  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
 }) {
   final created = IntentionTimestamp(
     createdAt ?? DateTime.utc(2026, 8, 30, 12),
@@ -1322,6 +1499,7 @@ IntentionSummary _summary({
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
     tags: tags,
+    favoriteMark: favoriteMark,
   );
 }
 
@@ -1386,6 +1564,8 @@ String _commandDescription(IntentionCommand command) => switch (command) {
   ArchiveIntention() => 'archive',
   RestoreIntention() => 'restore',
   DeleteIntention() => 'delete',
+  MarkIntentionFavorite() => 'markFavorite',
+  UnmarkIntentionFavorite() => 'unmarkFavorite',
 };
 
 String _failureDescription(IntentionFailure failure) => switch (failure) {
@@ -1449,7 +1629,10 @@ TagId _tagId(String value) => switch (TagId.decode(value)) {
 };
 
 final class _FailingPersonalGraphRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        TagReadContractTestFallback,
+        FavoriteReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(

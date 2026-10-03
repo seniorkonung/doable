@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -151,6 +152,7 @@ void main() {
       await harness.dispose();
     });
     await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(tester, waitFor: _until);
     await _until(tester, find.text('Намерение 1'));
     final container = (await runtime.bootstrap() as AppRuntimeReady).container;
     final repository = container.read(personalGraphRepositoryProvider);
@@ -164,10 +166,7 @@ void main() {
             .choice
             .id;
 
-    await _tap(
-      tester,
-      find.byKey(const ValueKey('catalog-open-daily-choices')),
-    );
+    await openDailyChoices(tester, tap: _tap);
     await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
     await _until(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
     expect(find.textContaining('Чтобы Намерение 1'), findsWidgets);
@@ -254,6 +253,7 @@ void main() {
         await harness.dispose();
       });
       await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _until);
       await _until(tester, find.text('Намерение 1'));
       final repository = (await runtime.bootstrap() as AppRuntimeReady)
           .container
@@ -391,6 +391,7 @@ void main() {
       });
 
       await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _until);
       await _until(tester, find.text('Намерение 1'));
       await _tap(tester, find.text('Намерение 1').first);
       await _tap(
@@ -424,10 +425,7 @@ void main() {
       await runtime.shutdown();
       runtime = start();
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openIntentionGraph(tester, waitFor: _until);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final repository = ready.container.read(personalGraphRepositoryProvider);
       final persisted = await _read(repository, editedId);
@@ -442,10 +440,7 @@ void main() {
       final stepIds = persisted.path.map((step) => step.step.id).toList();
       expect((await _read(repository, firstId)).choice.id, firstId);
 
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openDailyChoices(tester, tap: _tap);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
       await _until(
         tester,
@@ -558,10 +553,7 @@ void main() {
       await runtime.shutdown();
       runtime = start();
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openIntentionGraph(tester, waitFor: _until);
       final reopened = (await runtime.bootstrap() as AppRuntimeReady).container
           .read(personalGraphRepositoryProvider);
       expect(
@@ -604,10 +596,7 @@ void main() {
       });
 
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openDailyChoices(tester, tap: _tap);
       await _tap(
         tester,
         find.byKey(const ValueKey('daily-choice-create-from-action')),
@@ -656,10 +645,7 @@ void main() {
       await runtime.shutdown();
       runtime = start();
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openIntentionGraph(tester, waitFor: _until);
       final repository = (await runtime.bootstrap() as AppRuntimeReady)
           .container
           .read(personalGraphRepositoryProvider);
@@ -681,10 +667,7 @@ void main() {
       )).path.map((step) => step.step.id).toList();
       expect(firstStepIds.toSet().intersection(stepIds.toSet()), isEmpty);
 
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openDailyChoices(tester, tap: _tap);
       await _until(tester, find.byKey(const ValueKey('daily-choice-row-2')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
       await _until(
@@ -755,10 +738,7 @@ void main() {
       await runtime.shutdown();
       runtime = start();
       await tester.pumpWidget(MainApp(runtime: runtime));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-      );
+      await openIntentionGraph(tester, waitFor: _until);
       final reopened = (await runtime.bootstrap() as AppRuntimeReady).container
           .read(personalGraphRepositoryProvider);
       final remaining = await _read(reopened, ids.first);

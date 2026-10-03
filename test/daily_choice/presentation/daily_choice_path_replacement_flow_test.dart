@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -211,10 +212,7 @@ void main() {
             .map((step) => step.relation.id)
             .toList();
 
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('catalog-open-daily-choices')),
-        );
+        await openDailyChoices(tester, tap: _tap);
         await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
         await tester.pumpAndSettle();
         await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
@@ -403,10 +401,7 @@ void main() {
             containsAll([_uuid(101), _uuid(102)]),
           );
 
-          await _tap(
-            tester,
-            find.byKey(const ValueKey('catalog-open-daily-choices')),
-          );
+          await openDailyChoices(tester, tap: _tap);
           await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
           await tester.pumpAndSettle();
           await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
@@ -578,10 +573,7 @@ void main() {
     final repository = ready.container.read(personalGraphRepositoryProvider);
     final original = await _read(repository);
 
-    await _tap(
-      tester,
-      find.byKey(const ValueKey('catalog-open-daily-choices')),
-    );
+    await openDailyChoices(tester, tap: _tap);
     await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
     await tester.pumpAndSettle();
     await _tap(tester, find.byKey(const ValueKey('daily-choice-replace-open')));

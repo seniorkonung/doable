@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -11,6 +12,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show testSummary;
 import '../../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart';
+import '../../../support/app_root_pages.dart';
 import '../daily_choice_picker_tag_search_test_support.dart';
 
 void main() {
@@ -90,6 +93,165 @@ void main() {
       expect(await selection, testSummary(index: 3).id);
     },
   );
+
+  for (final (language, markLabel, totalCount) in [
+    ('en', 'Favorite intention', 'Total actions: 2'),
+    ('ru', 'Избранное намерение', 'Всего действий: 2'),
+  ]) {
+    testWidgets(
+      '$language: без условий поиска звезду показывает только '
+      'избранное из одноимённых действий, а отметка не становится действием',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledParticipantPickerRepository();
+        addTearDown(repository.dispose);
+        final router = await _pumpApp(
+          tester,
+          repository,
+          locale: Locale(language),
+        );
+        addTearDown(router.dispose);
+
+        final selection = router.push<IntentionId>(
+          const DailyChoiceActionPickerRoute(),
+        );
+        await _settleRoute(tester);
+        // Условия поиска пусты: отметка показана без фильтра названия и тегов.
+        expect(repository.queryAt(1).titleFilter, isNull);
+        expect(repository.queryAt(1).tagFilter, IntentionTagFilter.empty);
+        _completeFirst(repository, 1, [
+          testSummary(
+            index: 2,
+            title: 'Гулять',
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+          ),
+          testSummary(
+            index: 3,
+            title: 'Гулять',
+            readiness: IntentionReadiness.ready,
+          ),
+        ]);
+        await tester.pumpAndSettle();
+
+        final rows = find.byType(IntentionSummaryView);
+        expect(rows, findsNWidgets(2));
+        expect(find.text(totalCount), findsOneWidget);
+        expect(find.byIcon(Icons.star), findsOneWidget);
+        expect(
+          find.descendant(of: rows.at(0), matching: find.byIcon(Icons.star)),
+          findsOneWidget,
+        );
+        expect(tester.getSemantics(rows.at(0)).label, contains(markLabel));
+        expect(
+          tester.getSemantics(rows.at(1)).label,
+          isNot(contains(markLabel)),
+        );
+
+        // Отметка — подпись строки: её нельзя поставить, снять или выбрать
+        // условием поиска.
+        expect(
+          find.ancestor(
+            of: find.byIcon(Icons.star),
+            matching: find.byType(IconButton),
+          ),
+          findsNothing,
+        );
+        expect(find.byIcon(Icons.star_border), findsNothing);
+        expect(find.text(markLabel), findsNothing);
+        expect(find.byTooltip(markLabel), findsNothing);
+        expect(repository.queries, hasLength(2));
+
+        // Выбор по-прежнему возвращает намерение строки по идентификатору.
+        await tester.tap(find.text('Гулять').first);
+        await tester.pumpAndSettle();
+        expect(await selection, testSummary(index: 2).id);
+
+        semantics.dispose();
+      },
+    );
+  }
+
+  for (final (handoff, variant) in [
+    (_PageFlingHandoff.listInertia, 'инерция списка, дошедшая до его края'),
+    (_PageFlingHandoff.fromListEdge, 'флинг, начатый у края списка'),
+  ]) {
+    testWidgets('касание строки во время инерции к параметрам поиска, которую '
+        'странице в режиме общей прокрутки параметров и выдачи передала '
+        '$variant, не завершает выбор, а касание после остановки выбирает '
+        'действие', (tester) async {
+      // Открытая клавиатура на телефоне в альбомной ориентации оставляет
+      // выдаче под параметрами меньше трети высоты: параметры и выдача
+      // прокручиваются вместе.
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      addTearDown(tester.view.reset);
+      final repository = ControlledParticipantPickerRepository();
+      addTearDown(repository.dispose);
+      final router = await _pumpApp(tester, repository);
+      addTearDown(router.dispose);
+      var selected = false;
+      final selection = router.push<IntentionId>(
+        const DailyChoiceActionPickerRoute(),
+      );
+      unawaited(selection.then((_) => selected = true));
+      await _settleRoute(tester);
+      final items = [
+        for (var index = 1; index <= 8; index++)
+          testSummary(
+            index: index,
+            title: 'Действие $index',
+            readiness: IntentionReadiness.ready,
+          ),
+      ];
+      _completeFirst(repository, 1, items);
+      await tester.pumpAndSettle();
+      final page = _pageScrollPosition(tester);
+      final list = _actionListScrollPosition(tester);
+      expect(page.maxScrollExtent, greaterThan(0));
+      // Прокрученная до конца страница показывает список выдачи целиком.
+      page.jumpTo(page.maxScrollExtent);
+      if (handoff == _PageFlingHandoff.listInertia) {
+        list.jumpTo(list.maxScrollExtent);
+      }
+      await tester.pumpAndSettle();
+
+      await tester.flingFrom(
+        _visibleActionList(tester).topLeft + const Offset(24, 24),
+        const Offset(0, 60),
+        handoff.speed,
+      );
+      // Касание приходится на ещё видимую часть списка, пока страница не
+      // дошла до параметров поиска.
+      await _pumpUntilPageInertia(
+        tester,
+        (page) =>
+            page.pixels < page.maxScrollExtent &&
+            _visibleActionList(tester).height >= 24,
+      );
+
+      expect(list.pixels, moreOrLessEquals(0));
+      final stopped = page.pixels;
+      final point = _visibleActionList(tester).center;
+      final row = _actionRowAt(tester, point);
+      await tester.tapAt(point);
+      await tester.pumpAndSettle();
+
+      expect(selected, isFalse);
+      expect(page.isScrollingNotifier.value, isFalse);
+      expect(page.pixels, stopped);
+      expect(page.pixels, greaterThan(0));
+
+      await tester.tapAt(point);
+      await tester.pumpAndSettle();
+
+      expect(
+        await selection,
+        items.singleWhere((summary) => summary.title == row).id,
+      );
+    });
+  }
 
   testWidgets('различает загрузку, пустой результат и устранимую ошибку', (
     tester,
@@ -274,6 +436,86 @@ void main() {
   });
 }
 
+/// Путь, которым инерция флинга по списку выдачи переходит к странице.
+enum _PageFlingHandoff {
+  /// Флинг начат при списке в начале: страница продолжает инерцию списка,
+  /// дошедшую до его края.
+  listInertia(speed: 6000),
+
+  /// Флинг начат при списке уже у края: список не сдвигается, и инерцию
+  /// пальца сразу продолжает страница.
+  fromListEdge(speed: 2000);
+
+  const _PageFlingHandoff({required this.speed});
+
+  /// Скорость флинга, с которой страница ещё движется, когда касание
+  /// приходится на строку.
+  final double speed;
+}
+
+/// Общая прокрутка параметров поиска и выдачи страницы выбора.
+ScrollPosition _pageScrollPosition(WidgetTester tester) => tester
+    .state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byType(IntentionSearchLayout),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    )
+    .position;
+
+ScrollPosition _actionListScrollPosition(WidgetTester tester) => tester
+    .state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(
+          const PageStorageKey<String>('daily-choice-action-list'),
+        ),
+        matching: find.byType(Scrollable),
+      ),
+    )
+    .position;
+
+/// Видимая часть списка выдачи: под шапкой и над клавиатурой.
+Rect _visibleActionList(WidgetTester tester) {
+  final list = tester.getRect(
+    find.byKey(const PageStorageKey<String>('daily-choice-action-list')),
+  );
+  final view = tester.view;
+  final bodyBottom =
+      (view.physicalSize.height - view.viewInsets.bottom) /
+      view.devicePixelRatio;
+  return Rect.fromLTRB(
+    list.left,
+    math.max(list.top, tester.getRect(find.byType(AppBar)).bottom),
+    list.right,
+    math.min(list.bottom, bodyBottom),
+  );
+}
+
+/// Название действия в строке под точкой [point].
+String _actionRowAt(WidgetTester tester, Offset point) => find
+    .byType(IntentionSummaryView)
+    .evaluate()
+    .map((element) => element.widget as IntentionSummaryView)
+    .singleWhere((row) => tester.getRect(find.byWidget(row)).contains(point))
+    .title;
+
+/// Ведёт кадры с частотой экрана, пока страница не продолжает инерцию за
+/// списком выдачи и не выполнено [ready], и останавливается посреди
+/// инерции.
+Future<void> _pumpUntilPageInertia(
+  WidgetTester tester,
+  bool Function(ScrollPosition page) ready,
+) async {
+  for (var frame = 0; frame < 120; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+    final page = _pageScrollPosition(tester);
+    if (page.isScrollingNotifier.value && ready(page)) return;
+  }
+  fail('Страница не продолжила инерцию списка выдачи.');
+}
+
 List<IntentionSummary> _actions(int page) => [
   for (
     var index = 250 - (page - 1) * 50;
@@ -343,6 +585,7 @@ Future<AppRouter> _pumpApp(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   _completeFirst(repository, 0, []);
   await tester.pumpAndSettle();
   return router;

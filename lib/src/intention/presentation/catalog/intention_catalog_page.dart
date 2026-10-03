@@ -52,20 +52,13 @@ final class _IntentionCatalogPageState
     final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
       appBar: AppBar(
-        title: Text(localizations.catalogTitle),
+        title: Text(localizations.appDestinationIntentionGraph),
         actions: [
           IconButton(
             key: const ValueKey('catalog-open-tags'),
             tooltip: localizations.tagCatalogTitle,
             onPressed: () => context.router.push(TagCatalogRoute()),
             icon: const Icon(Icons.label_outline),
-          ),
-          IconButton(
-            key: const ValueKey('catalog-open-daily-choices'),
-            tooltip: localizations.dailyChoiceCatalogTitle,
-            onPressed: () =>
-                context.router.push(const DailyChoiceCatalogRoute()),
-            icon: const Icon(Icons.today),
           ),
         ],
       ),
@@ -78,6 +71,13 @@ final class _IntentionCatalogPageState
         label: Text(localizations.editorCreateAction),
       ),
       body: IntentionSearchLayout(
+        // Загруженная выдача получает всю высоту тела страницы: прокрученные
+        // до конца параметры и список оставляют последнюю строку и состояние
+        // продолжения над созданием намерения при любой высоте параметров.
+        // Начальные состояния и пустая выдача остаются под параметрами.
+        resultsExtent: IntentionSearchResults.showsList(catalog)
+            ? IntentionSearchResultsExtent.fullViewport
+            : IntentionSearchResultsExtent.remainingWhenSufficient,
         controls: _CatalogControls(
           selection: selection,
           filterController: _filterController,
@@ -292,6 +292,7 @@ final class _IntentionSummaryTile extends StatelessWidget {
       showArchiveState: showArchiveState,
       traits: [readiness, description],
       confirmedTags: summary.tags,
+      confirmedFavoriteMark: summary.favoriteMark,
       activeRelationCount: ConfirmedActiveRelationCount(
         summary.activeRelationCount,
       ),

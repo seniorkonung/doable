@@ -1,0 +1,20 @@
+import 'intention_schema.drift';
+
+-- Избранное намерение — наличие строки: отметка без места и место без отметки
+-- непредставимы. Место — ключ единого ручного порядка, а не плотный номер:
+-- снятие отметки и удаление намерения оставляют пропуск.
+CREATE TABLE favorite_intentions (
+  intention_id TEXT NOT NULL PRIMARY KEY
+    REFERENCES intentions(id) ON UPDATE RESTRICT ON DELETE CASCADE,
+  position INTEGER NOT NULL UNIQUE CHECK (
+    typeof(position) = 'integer' AND
+    position > 0
+  )
+);
+
+CREATE TRIGGER favorite_intentions_immutable_identity
+AFTER UPDATE OF intention_id ON favorite_intentions
+WHEN new.intention_id <> old.intention_id
+BEGIN
+  SELECT RAISE(ABORT, 'favorite intention identity is immutable');
+END;

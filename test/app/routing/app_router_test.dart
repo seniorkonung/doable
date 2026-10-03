@@ -7,6 +7,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
+import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
@@ -32,6 +33,7 @@ import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
     hide testRelationCounts;
+import '../../support/app_root_pages.dart';
 
 void main() {
   testWidgets('навигация по тегу открывается по типизированному TagId', (
@@ -166,7 +168,8 @@ void main() {
   });
 
   testWidgets(
-    'открывает начальный каталог через сгенерированный PageRouteInfo',
+    'открывает начальную Главную и каталоги оболочки через сгенерированные '
+    'PageRouteInfo',
     (tester) async {
       final repository = ControlledCatalogRepository();
       final router = AppRouter();
@@ -187,6 +190,15 @@ void main() {
         ),
       );
       await tester.pump();
+
+      // Начальный маршрут — оболочка с Главной; каталоги ещё не построены.
+      expect(const AppShellRoute(), isA<PageRouteInfo<void>>());
+      expect(router.current.name, AppShellRoute.name);
+      expect(router.topRoute.name, HomeRoute.name);
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(repository.queries, isEmpty);
+
+      await openIntentionGraph(tester);
       repository.queryAt(0);
       repository.complete(
         0,
@@ -203,15 +215,19 @@ void main() {
 
       const route = IntentionCatalogRoute();
       expect(route, isA<PageRouteInfo<void>>());
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expect(router.current.name, AppShellRoute.name);
+      expect(router.topRoute.name, IntentionCatalogRoute.name);
       expect(find.byType(IntentionCatalogPage), findsOneWidget);
-
-      await tester.tap(
+      expect(
         find.byKey(const ValueKey('catalog-open-daily-choices')),
+        findsNothing,
       );
+
+      await openDailyChoices(tester);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(router.current.name, DailyChoiceCatalogRoute.name);
+      expect(router.current.name, AppShellRoute.name);
+      expect(router.topRoute.name, DailyChoiceCatalogRoute.name);
       expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
 
       unawaited(router.push<IntentionId>(const DailyChoiceSourcePickerRoute()));

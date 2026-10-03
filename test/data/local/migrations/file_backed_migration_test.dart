@@ -542,6 +542,16 @@ void _expectCurrentSchemaContract(File databaseFile) {
       ),
       hasLength(1),
     );
+    expect(
+      database
+          .select(
+            "SELECT name FROM sqlite_schema "
+            "WHERE tbl_name = 'favorite_intentions' AND name NOT LIKE 'sqlite_%' "
+            "ORDER BY name",
+          )
+          .map((row) => row['name']),
+      ['favorite_intentions', 'favorite_intentions_immutable_identity'],
+    );
   } finally {
     database.close();
   }

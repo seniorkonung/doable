@@ -116,6 +116,138 @@ abstract class AppLocalizations {
   /// **'Archive'**
   String get navigationArchive;
 
+  /// Название пункта основной навигации и заголовок Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get appDestinationHome;
+
+  /// Название пункта основной навигации и заголовок каталога дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices'**
+  String get appDestinationDailyChoices;
+
+  /// Название пункта основной навигации и заголовок каталога намерений как корневой страницы
+  ///
+  /// In en, this message translates to:
+  /// **'Intention graph'**
+  String get appDestinationIntentionGraph;
+
+  /// Название списка избранных намерений на Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intentions'**
+  String get homeFavoritesHeading;
+
+  /// Первоначальное получение списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Loading favorite intentions…'**
+  String get homeLoading;
+
+  /// Пустая Главная: в личном графе нет избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'There are no favorite intentions yet. To add an intention here, mark it as a favorite on its page.'**
+  String get homeEmptyNoFavorites;
+
+  /// Пустая Главная: избранные намерения есть, но все архивированы
+  ///
+  /// In en, this message translates to:
+  /// **'All favorite intentions are archived. An intention restored from the archive returns here to its place.'**
+  String get homeEmptyAllArchived;
+
+  /// Переход с пустой Главной к каталогу намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Open intention graph'**
+  String get homeOpenIntentionGraph;
+
+  /// Устранимый отказ первоначального получения списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intentions couldn’t be loaded. Try again.'**
+  String get homeUnavailable;
+
+  /// Повреждение сохранённых данных избранного при получении списка
+  ///
+  /// In en, this message translates to:
+  /// **'Stored favorite intention data is damaged and can’t be shown.'**
+  String get homeCorruption;
+
+  /// Неизвестный отказ получения списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intentions couldn’t be loaded because of an unexpected error.'**
+  String get homeUnexpected;
+
+  /// Устранимый отказ обновления показанного списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite intention list isn’t up to date: changes couldn’t be loaded.'**
+  String get homeRefreshUnavailable;
+
+  /// Повреждение при обновлении показанного списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite intention list isn’t up to date: stored data is damaged.'**
+  String get homeRefreshCorruption;
+
+  /// Неизвестный отказ обновления показанного списка избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite intention list isn’t up to date because of an unexpected error.'**
+  String get homeRefreshUnexpected;
+
+  /// Подсказка ручки, которой перетаскивают строку избранного намерения на Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to move the intention'**
+  String get homeReorderHandleTooltip;
+
+  /// Признак строки Главной, новое место которой после перестановки ещё не подтверждено
+  ///
+  /// In en, this message translates to:
+  /// **'Saving the new position…'**
+  String get homeReorderSaving;
+
+  /// Объявление экранного диктора о подтверждённом новом месте избранного намерения на Главной
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” is now in position {position} of {count}'**
+  String homeReorderMoved(String title, int position, int count);
+
+  /// Конфликт актуального состояния: перестановка избранных намерений не сохранена, потому что список изменился
+  ///
+  /// In en, this message translates to:
+  /// **'The new order of favorite intentions wasn’t saved because the list changed.'**
+  String get favoriteOrderConflict;
+
+  /// Безопасная ошибка недопустимого перемещения избранного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The new order of favorite intentions wasn’t saved: the move isn’t valid.'**
+  String get favoriteOrderInvalid;
+
+  /// Устранимая недоступность сохранения перестановки избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The new order of favorite intentions couldn’t be saved. Try again.'**
+  String get favoriteOrderUnavailable;
+
+  /// Повреждение сохранённых данных при перестановке избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Stored favorite intention data is damaged. The new order wasn’t saved.'**
+  String get favoriteOrderCorruption;
+
+  /// Неизвестный отказ сохранения перестановки избранных намерений
+  ///
+  /// In en, this message translates to:
+  /// **'The new order of favorite intentions couldn’t be saved because of an unexpected error.'**
+  String get favoriteOrderUnexpected;
+
   /// Общее состояние загрузки
   ///
   /// In en, this message translates to:
@@ -175,12 +307,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading intentions…'**
   String get catalogLoading;
-
-  /// Заголовок единого каталога намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Intentions'**
-  String get catalogTitle;
 
   /// Подпись выбора охвата каталога
   ///
@@ -421,6 +547,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No tags'**
   String get intentionSummaryNoTags;
+
+  /// Доступное название звезды избранного намерения в результате поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intention'**
+  String get intentionSummaryFavoriteMark;
 
   /// Заголовок соседства намерения
   ///
@@ -1088,6 +1220,84 @@ abstract class AppLocalizations {
   /// **'The intention state couldn’t be changed because of an unexpected error.'**
   String get detailsStateChangeUnexpected;
 
+  /// Подтверждение отметки избранного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention marked as favorite.'**
+  String get detailsFavoriteMarked;
+
+  /// Подтверждение снятия отметки избранного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite mark removed.'**
+  String get detailsFavoriteUnmarked;
+
+  /// Безопасная ошибка недопустимого изменения отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite mark couldn’t be changed.'**
+  String get detailsFavoriteMarkInvalid;
+
+  /// Безопасная ошибка изменения отметки избранного отсутствующего намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention no longer exists. The favorite mark wasn’t changed.'**
+  String get detailsFavoriteMarkNotFound;
+
+  /// Безопасная ошибка конфликта изменения отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'The intention changed elsewhere. The favorite mark wasn’t changed.'**
+  String get detailsFavoriteMarkConflict;
+
+  /// Устранимая недоступность изменения отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite mark couldn’t be changed. Try again.'**
+  String get detailsFavoriteMarkUnavailable;
+
+  /// Терминальное повреждение при изменении отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The favorite mark wasn’t changed.'**
+  String get detailsFavoriteMarkCorruption;
+
+  /// Терминальная непредвиденная ошибка изменения отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'The favorite mark couldn’t be changed because of an unexpected error.'**
+  String get detailsFavoriteMarkUnexpected;
+
+  /// Название управления отметкой избранного в шапке страницы намерения для экранного диктора
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite intention'**
+  String get detailsFavoriteMarkLabel;
+
+  /// Состояние управления отметкой: намерение избранное
+  ///
+  /// In en, this message translates to:
+  /// **'Marked'**
+  String get detailsFavoriteMarkStateMarked;
+
+  /// Состояние управления отметкой: намерение не избранное
+  ///
+  /// In en, this message translates to:
+  /// **'Not marked'**
+  String get detailsFavoriteMarkStateNotMarked;
+
+  /// Подсказка действия отметки намерения избранным
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as favorite'**
+  String get detailsMarkFavoriteAction;
+
+  /// Подсказка действия снятия отметки избранного
+  ///
+  /// In en, this message translates to:
+  /// **'Remove favorite mark'**
+  String get detailsUnmarkFavoriteAction;
+
   /// Безопасная ошибка недопустимого физического удаления
   ///
   /// In en, this message translates to:
@@ -1327,6 +1537,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete'**
   String get graphOperationDelete;
+
+  /// Вид операции отметки избранного намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as favorite'**
+  String get graphOperationMarkFavorite;
+
+  /// Вид операции снятия отметки избранного намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Remove favorite mark'**
+  String get graphOperationUnmarkFavorite;
 
   /// Вид массовой операции в сообщении оболочки
   ///
@@ -3287,7 +3509,7 @@ abstract class AppLocalizations {
   /// **'Confirm daily choice'**
   String get dailyChoiceCreationTitle;
 
-  /// Заголовок каталога дневных выборов и вход из основной навигации
+  /// Заголовок раздела дневных выборов в соседстве намерения, пока их количество не получено
   ///
   /// In en, this message translates to:
   /// **'Daily choices'**

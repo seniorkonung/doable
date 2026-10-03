@@ -51,3 +51,15 @@ final class RestoreIntention extends ExistingIntentionCommand {
 final class DeleteIntention extends ExistingIntentionCommand {
   const DeleteIntention(super.id);
 }
+
+/// Отмечает намерение избранным. Отметка уже избранного намерения успешно
+/// оставляет одну отметку и прежнее место в порядке избранных.
+final class MarkIntentionFavorite extends ExistingIntentionCommand {
+  const MarkIntentionFavorite(super.id);
+}
+
+/// Снимает отметку избранного намерения. Снятие отсутствующей отметки
+/// успешно оставляет намерение без отметки.
+final class UnmarkIntentionFavorite extends ExistingIntentionCommand {
+  const UnmarkIntentionFavorite(super.id);
+}

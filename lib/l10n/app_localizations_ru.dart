@@ -19,6 +19,88 @@ class AppLocalizationsRu extends AppLocalizations {
   String get navigationArchive => 'Архив';
 
   @override
+  String get appDestinationHome => 'Главная';
+
+  @override
+  String get appDestinationDailyChoices => 'Дневные выборы';
+
+  @override
+  String get appDestinationIntentionGraph => 'Граф намерений';
+
+  @override
+  String get homeFavoritesHeading => 'Избранные намерения';
+
+  @override
+  String get homeLoading => 'Загружаем избранные намерения…';
+
+  @override
+  String get homeEmptyNoFavorites =>
+      'Избранных намерений пока нет. Чтобы добавить намерение сюда, отметьте его избранным на его странице.';
+
+  @override
+  String get homeEmptyAllArchived =>
+      'Все избранные намерения в архиве. Намерение, восстановленное из архива, вернётся сюда на своё место.';
+
+  @override
+  String get homeOpenIntentionGraph => 'Открыть граф намерений';
+
+  @override
+  String get homeUnavailable =>
+      'Не удалось загрузить избранные намерения. Повторите попытку.';
+
+  @override
+  String get homeCorruption =>
+      'Сохранённые данные избранных намерений повреждены и не могут быть показаны.';
+
+  @override
+  String get homeUnexpected =>
+      'Не удалось загрузить избранные намерения из-за непредвиденной ошибки.';
+
+  @override
+  String get homeRefreshUnavailable =>
+      'Список избранных намерений не обновлён: не удалось получить изменения.';
+
+  @override
+  String get homeRefreshCorruption =>
+      'Список избранных намерений не обновлён: сохранённые данные повреждены.';
+
+  @override
+  String get homeRefreshUnexpected =>
+      'Список избранных намерений не обновлён из-за непредвиденной ошибки.';
+
+  @override
+  String get homeReorderHandleTooltip =>
+      'Перетащите, чтобы переместить намерение';
+
+  @override
+  String get homeReorderSaving => 'Новое место сохраняется…';
+
+  @override
+  String homeReorderMoved(String title, int position, int count) {
+    return '«$title» теперь на месте $position из $count';
+  }
+
+  @override
+  String get favoriteOrderConflict =>
+      'Новый порядок избранных намерений не сохранён, потому что список изменился.';
+
+  @override
+  String get favoriteOrderInvalid =>
+      'Новый порядок избранных намерений не сохранён: недопустимое перемещение.';
+
+  @override
+  String get favoriteOrderUnavailable =>
+      'Не удалось сохранить новый порядок избранных намерений. Повторите попытку.';
+
+  @override
+  String get favoriteOrderCorruption =>
+      'Сохранённые данные избранных намерений повреждены. Новый порядок не сохранён.';
+
+  @override
+  String get favoriteOrderUnexpected =>
+      'Не удалось сохранить новый порядок избранных намерений из-за непредвиденной ошибки.';
+
+  @override
   String get commonLoading => 'Загрузка…';
 
   @override
@@ -51,9 +133,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get catalogLoading => 'Загружаем намерения…';
-
-  @override
-  String get catalogTitle => 'Намерения';
 
   @override
   String get catalogScopeLabel => 'Охват';
@@ -195,6 +274,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get intentionSummaryNoTags => 'Без тегов';
+
+  @override
+  String get intentionSummaryFavoriteMark => 'Избранное намерение';
 
   @override
   String get relationNeighborhoodTitle => 'Связи';
@@ -602,6 +684,51 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось изменить состояние намерения из-за непредвиденной ошибки.';
 
   @override
+  String get detailsFavoriteMarked => 'Намерение отмечено избранным.';
+
+  @override
+  String get detailsFavoriteUnmarked => 'Отметка избранного снята.';
+
+  @override
+  String get detailsFavoriteMarkInvalid =>
+      'Не удалось изменить отметку избранного.';
+
+  @override
+  String get detailsFavoriteMarkNotFound =>
+      'Намерение больше не существует. Отметка избранного не изменена.';
+
+  @override
+  String get detailsFavoriteMarkConflict =>
+      'Намерение было изменено в другом месте. Отметка избранного не изменена.';
+
+  @override
+  String get detailsFavoriteMarkUnavailable =>
+      'Не удалось изменить отметку избранного. Повторите попытку.';
+
+  @override
+  String get detailsFavoriteMarkCorruption =>
+      'Сохранённые данные повреждены. Отметка избранного не изменена.';
+
+  @override
+  String get detailsFavoriteMarkUnexpected =>
+      'Не удалось изменить отметку избранного из-за непредвиденной ошибки.';
+
+  @override
+  String get detailsFavoriteMarkLabel => 'Избранное намерение';
+
+  @override
+  String get detailsFavoriteMarkStateMarked => 'Отмечено';
+
+  @override
+  String get detailsFavoriteMarkStateNotMarked => 'Не отмечено';
+
+  @override
+  String get detailsMarkFavoriteAction => 'Отметить избранным';
+
+  @override
+  String get detailsUnmarkFavoriteAction => 'Снять отметку избранного';
+
+  @override
   String get detailsDeleteInvalid => 'Не удалось удалить намерение.';
 
   @override
@@ -740,6 +867,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get graphOperationDelete => 'Удаление';
+
+  @override
+  String get graphOperationMarkFavorite => 'Отметка избранного';
+
+  @override
+  String get graphOperationUnmarkFavorite => 'Снятие отметки избранного';
 
   @override
   String get graphOperationDeleteBlockingRelations =>

@@ -1,10 +1,17 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
@@ -627,4 +634,337 @@ void main() {
       expect(repository.queries, hasLength(4));
     },
   );
+
+  group('отметка избранного', () {
+    Future<void> confirmMark(
+      ProviderContainer container,
+      ControlledCatalogRepository repository, {
+      required int index,
+      required int revision,
+      List<Tag> tags = const [],
+    }) => completeCatalogCommand(
+      container,
+      repository,
+      MarkIntentionFavorite(testSummary(index: index).id),
+      IntentionSaved(
+        testIntention(index: index),
+        catalogMutation: IntentionCatalogUpdated(
+          revision: TestCatalogRevision(revision),
+          before: TestCatalogEntrySnapshot(
+            testSummary(index: index, tags: tags),
+          ),
+          after: TestCatalogEntrySnapshot(
+            testSummary(
+              index: index,
+              tags: tags,
+              favoriteMark: FavoriteMark.favorite,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Map<int, FavoriteMark> marks(ProviderContainer container) {
+      final loaded =
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
+              as IntentionCatalogLoaded;
+      return {
+        for (final item in loaded.items)
+          for (final index in [1, 2, 3, 4])
+            if (item.id == testSummary(index: index).id)
+              index: item.favoriteMark,
+      };
+    }
+
+    test('первая порция, начатая до отметки, не возвращает прежнее '
+        'состояние', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      final subscription = container.listen(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+
+      await confirmMark(container, repository, index: 2, revision: 2);
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [testSummary(index: 2), testSummary(index: 1)],
+            totalCount: 2,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+
+      final current = await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
+      expect(marks(container), {
+        2: FavoriteMark.favorite,
+        1: FavoriteMark.notFavorite,
+      });
+      expect(
+        current,
+        isA<IntentionCatalogLoaded>()
+            .having((value) => value.totalCount, 'count', 2)
+            .having((value) => value.nextCursor, 'cursor', isNull)
+            .having(
+              (value) => value.revision.compareTo(const TestCatalogRevision(2)),
+              'ревизия',
+              GraphRevisionOrder.same,
+            ),
+      );
+      expect(repository.queries, hasLength(1));
+    });
+
+    test('продолжение, начатое до отметки, не возвращает прежнее состояние '
+        'строк новой порции', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(
+        repository,
+        pageSize: 2,
+        prefetchRemaining: 1,
+      );
+      final subscription = container.listen(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+
+      const cursor = TestCatalogCursor();
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [testSummary(index: 4), testSummary(index: 3)],
+            totalCount: 4,
+            nextCursor: cursor,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
+
+      final notifier = container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
+      );
+      final load = notifier.loadNextPageIfNeeded(visibleIndex: 1);
+      await waitForCatalogQueries(repository, 2);
+      // Отмечены загруженная строка и намерение из ещё читаемой порции.
+      await confirmMark(container, repository, index: 4, revision: 2);
+      await confirmMark(container, repository, index: 2, revision: 3);
+      expect(marks(container), {
+        4: FavoriteMark.favorite,
+        3: FavoriteMark.notFavorite,
+      });
+
+      repository.complete(
+        1,
+        ResultSuccess(
+          IntentionCatalogContinuationPage(
+            items: [testSummary(index: 2), testSummary(index: 1)],
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await waitForCatalogQueries(repository, 3);
+      expect(repository.queryAt(2).cursor, same(cursor));
+      expect(marks(container), {
+        4: FavoriteMark.favorite,
+        3: FavoriteMark.notFavorite,
+      });
+      repository.complete(
+        2,
+        ResultSuccess(
+          IntentionCatalogContinuationPage(
+            items: [
+              testSummary(index: 2, favoriteMark: FavoriteMark.favorite),
+              testSummary(index: 1),
+            ],
+            nextCursor: null,
+            revision: const TestCatalogRevision(3),
+          ),
+        ),
+      );
+      await load;
+
+      expect(marks(container), {
+        4: FavoriteMark.favorite,
+        3: FavoriteMark.notFavorite,
+        2: FavoriteMark.favorite,
+        1: FavoriteMark.notFavorite,
+      });
+      final current =
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
+              as IntentionCatalogLoaded;
+      expect(current.totalCount, 4);
+      expect(current.nextCursor, isNull);
+      expect(repository.queries, hasLength(3));
+    });
+
+    test('чтение согласования, начатое до отметки, не возвращает прежнее '
+        'состояние сохранённых и недостающих строк', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      final subscription = container.listen(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+
+      final required = _tag(1, 'Здоровье');
+      final excluded = _tag(2, 'Спорт');
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
+      container
+          .read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+                .notifier,
+          )
+          .changeTagFilter(
+            IntentionTagFilter(
+              requiredTagIds: [required.id],
+              excludedTagIds: [excluded.id],
+            ),
+          );
+      await waitForCatalogQueries(repository, 2);
+      repository.complete(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [
+              testSummary(index: 3, tags: [required]),
+              testSummary(index: 2, tags: [required]),
+            ],
+            totalCount: 2,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
+
+      // Удаление исключённого тега открывает намерение 4 и требует чтения
+      // недостающей части; отметки подтверждены, пока оно выполняется.
+      await completeTagCommand(
+        container,
+        repository,
+        DeleteTag(excluded.id),
+        tagDeletionSuccess(
+          tagId: excluded.id,
+          revision: const TestCatalogRevision(2),
+        ),
+      );
+      await waitForReconciliationQueries(repository, 1);
+      await confirmMark(
+        container,
+        repository,
+        index: 4,
+        revision: 3,
+        tags: [required],
+      );
+      await confirmMark(
+        container,
+        repository,
+        index: 2,
+        revision: 4,
+        tags: [required],
+      );
+      repository.completeReconciliation(
+        0,
+        reconciliationFirstPortion(
+          [
+            testSummary(index: 4, tags: [required]),
+          ],
+          totalCount: 3,
+          revision: 2,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(marks(container), {
+        4: FavoriteMark.favorite,
+        3: FavoriteMark.notFavorite,
+        2: FavoriteMark.favorite,
+      });
+      final current =
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
+              as IntentionCatalogLoaded;
+      expect(current.items.map((item) => item.id), [
+        testSummary(index: 4).id,
+        testSummary(index: 3).id,
+        testSummary(index: 2).id,
+      ]);
+      expect(current.totalCount, 3);
+      expect(current.nextCursor, isNull);
+      expect(
+        current.revision.compareTo(const TestCatalogRevision(4)),
+        GraphRevisionOrder.same,
+      );
+      expect(current.refresh, isA<IntentionCatalogRefreshIdle>());
+      expect(repository.queries, hasLength(2));
+      expect(repository.reconciliationQueries, hasLength(1));
+    });
+  });
 }
+
+Tag _tag(int index, String name) => Tag(
+  id: switch (TagId.decode(
+    '00000000-0000-4000-8000-${index.toString().padLeft(12, '0')}',
+  )) {
+    TagIdDecodingSuccess(:final id) => id,
+    InvalidTagIdDecoding() => throw StateError(
+      'Некорректный идентификатор тега в тесте.',
+    ),
+  },
+  name: TagName.fromInput(name),
+);

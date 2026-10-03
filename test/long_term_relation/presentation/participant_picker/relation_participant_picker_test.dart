@@ -30,6 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../intention/presentation/catalog/catalog_reconciliation_test_support.dart';
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show ControlledCatalogRepository, TestCatalogRevision, testSummary;
+import '../../../support/app_root_pages.dart';
 import 'participant_picker_test_support.dart';
 
 void main() {
@@ -197,6 +198,125 @@ void main() {
       expect(find.text('Active relations: 5'), findsOneWidget);
     },
   );
+
+  for (final (language, markLabel) in [
+    ('en', 'Favorite intention'),
+    ('ru', 'Избранное намерение'),
+  ]) {
+    testWidgets('$language: без условий поиска звезду показывает только '
+        'избранное из одноимённых намерений, а отметка не становится '
+        'действием', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledParticipantPickerRepository();
+      addTearDown(repository.dispose);
+      final router = await _pumpAppWithCatalog(
+        tester,
+        repository,
+        locale: Locale(language),
+      );
+      addTearDown(router.dispose);
+
+      final selection = _pushPicker(router, excludedIndex: 9);
+      await _settleRoute(tester);
+      // Условия поиска пусты: отметка показана без фильтра названия и тегов.
+      expect(repository.queryAt(1).titleFilter, isNull);
+      expect(repository.queryAt(1).tagFilter, IntentionTagFilter.empty);
+      _completePage(repository, 1, [
+        testSummary(
+          index: 1,
+          title: 'Гулять',
+          favoriteMark: FavoriteMark.favorite,
+        ),
+        testSummary(index: 2, title: 'Гулять'),
+      ]);
+      await tester.pumpAndSettle();
+
+      final rows = find.byType(IntentionSummaryView);
+      expect(rows, findsNWidgets(2));
+      expect(find.byIcon(Icons.star), findsOneWidget);
+      expect(
+        find.descendant(of: rows.at(0), matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
+      expect(tester.getSemantics(rows.at(0)).label, contains(markLabel));
+      expect(tester.getSemantics(rows.at(1)).label, isNot(contains(markLabel)));
+
+      // Отметка — подпись строки: её нельзя поставить, снять или выбрать
+      // условием поиска.
+      expect(
+        find.ancestor(
+          of: find.byIcon(Icons.star),
+          matching: find.byType(IconButton),
+        ),
+        findsNothing,
+      );
+      expect(find.byIcon(Icons.star_border), findsNothing);
+      expect(find.text(markLabel), findsNothing);
+      expect(find.byTooltip(markLabel), findsNothing);
+      expect(repository.queries, hasLength(2));
+
+      // Выбор по-прежнему возвращает участника строки по идентификатору.
+      await tester.tap(find.text('Гулять').first);
+      await tester.pumpAndSettle();
+      expect(
+        await selection,
+        isA<GraphSnapshot<RelationParticipantSummary>>().having(
+          (snapshot) => snapshot.value.id,
+          'идентификатор',
+          _testIntentionId(1),
+        ),
+      );
+
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('выбор участника архивной связи показывает звезду '
+      'архивированного избранного намерения вместе с архивным состоянием', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+
+    unawaited(
+      _pushPicker(
+        router,
+        excludedIndex: 9,
+        selectionContext: RelationParticipantSelectionContext.archivedRelation,
+      ),
+    );
+    await _settleRoute(tester);
+    expect(repository.queryAt(1).scope, IntentionScope.all);
+    _completePage(repository, 1, [
+      testSummary(index: 1, title: 'Активное'),
+      testSummary(
+        index: 2,
+        title: 'Архивное',
+        archiveState: IntentionArchiveState.archived,
+        favoriteMark: FavoriteMark.favorite,
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    final archived = find.ancestor(
+      of: find.text('Архивное'),
+      matching: find.byType(IntentionSummaryView),
+    );
+    expect(find.byIcon(Icons.star), findsOneWidget);
+    expect(
+      find.descendant(of: archived, matching: find.byIcon(Icons.star)),
+      findsOneWidget,
+    );
+    final label = tester.getSemantics(archived).label;
+    expect(label, contains('Архивное'));
+    expect(label, contains('Archived'));
+    expect(label, contains('Favorite intention'));
+
+    semantics.dispose();
+  });
 
   testWidgets('открывает подробные данные намерения без завершения выбора', (
     tester,
@@ -667,6 +787,7 @@ Future<AppRouter> _pumpAppWithCatalog(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   _completePage(repository, 0, [testSummary(index: 1, title: 'Ходить')]);
   await tester.pumpAndSettle();
   return router;
@@ -1504,6 +1625,7 @@ Future<_OpenedTagSearchPicker> _openTagSearchPicker(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   repository.complete(0, _tagSearchPage(const []));
   await tester.pumpAndSettle();
   final selection = router.push<GraphSnapshot<RelationParticipantSummary>>(

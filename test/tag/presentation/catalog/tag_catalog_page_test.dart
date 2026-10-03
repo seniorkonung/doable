@@ -29,6 +29,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 
 String _id(int number) =>
@@ -359,6 +360,7 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          await openIntentionGraph(tester);
           final intentionId = second
               ? (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id
               : (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
@@ -473,6 +475,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester);
       final intentionId =
           (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
       final result = router.push<Object?>(
@@ -702,6 +705,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsNothing);
@@ -795,6 +799,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
@@ -877,6 +882,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester);
       final intentionId =
           (IntentionId.decode(_id(101)) as IntentionIdDecodingSuccess).id;
       final result = router.push<Object?>(
@@ -972,6 +978,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openIntentionGraph(tester);
       final intentionId =
           (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
       router.push<Object?>(TagCatalogRoute(intentionId: intentionId));
@@ -1063,6 +1070,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
@@ -1162,6 +1170,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openIntentionGraph(tester);
     await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
     await tester.pumpAndSettle();
 

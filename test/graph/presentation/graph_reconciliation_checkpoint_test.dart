@@ -70,6 +70,7 @@ import '../../intention/presentation/catalog/catalog_test_support.dart'
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
+import '../../support/favorite_read_contract_test_fallback.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/catalog_reconciliation_test_fallback.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -2537,7 +2538,10 @@ final class _CheckpointHarness {
 
 /// Управляемый граф, обслуживающий все чтения и команды контрольной точки.
 final class _CheckpointGraphRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        TagReadContractTestFallback,
+        FavoriteReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
@@ -2641,7 +2645,11 @@ final class _CheckpointGraphRepository
     _controllerFor(id).add(
       ResultSuccess(
         GraphSnapshot(
-          value: IntentionDetails(intention: intention, relationCounts: counts),
+          value: IntentionDetails(
+            intention: intention,
+            relationCounts: counts,
+            favoriteMark: FavoriteMark.notFavorite,
+          ),
           revision: revision,
         ),
       ),

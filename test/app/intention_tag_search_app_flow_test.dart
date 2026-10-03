@@ -36,6 +36,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/tag_storage_fixture.dart';
 
 const _health = 301;
@@ -223,10 +224,7 @@ void main() {
 
         // Создание выбора: только активные готовые намерения, теги видны
         // без условий, условия каталога в поиск действия не переносятся.
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('catalog-open-daily-choices')),
-        );
+        await openDailyChoices(tester, tap: _tap);
         await _tap(
           tester,
           find.byKey(const ValueKey('daily-choice-create-from-action')),
@@ -629,7 +627,13 @@ void main() {
         // тега снимет его с экрана.
         tester.view.physicalSize = const Size(1200, 700);
         await tester.pumpAndSettle();
-        await tester.drag(_catalogList, const Offset(0, -200));
+        // Жест начинается в видимой части списка: его нижняя часть под
+        // параметрами поиска лежит за нижним краем экрана.
+        final list = tester.getRect(_catalogList);
+        await tester.dragFrom(
+          Offset(list.center.dx, (list.top + 700) / 2),
+          const Offset(0, -200),
+        );
         await tester.pumpAndSettle();
         expect(_catalogListPosition(tester).pixels, greaterThan(0));
 
@@ -743,6 +747,7 @@ final class _App {
     final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
     _seed(raw);
     await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(tester, waitFor: _until);
     await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
     await _until(tester, find.byType(IntentionSummaryView));
     await tester.pumpAndSettle();
@@ -1053,11 +1058,16 @@ Future<void> _waitFor(WidgetTester tester, bool Function() done) async {
   expect(done(), isTrue);
 }
 
+/// Нажимает элемент [finder], прокручивая к нему, только если он не
+/// принимает нажатие: прокрутка к видимой строке выдачи увела бы параметры
+/// поиска каталога намерений за верхний край страницы.
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _until(tester, finder);
   await tester.pumpAndSettle();
-  await tester.ensureVisible(finder);
-  await tester.pumpAndSettle();
+  if (finder.hitTestable().evaluate().isEmpty) {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+  }
   await tester.tap(finder);
   await tester.pump();
 }

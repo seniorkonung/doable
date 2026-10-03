@@ -22,6 +22,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/app_root_pages.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 
@@ -135,6 +136,7 @@ void main() {
           ),
         );
         await tester.pump();
+        await openIntentionGraph(tester);
         repository.complete(0, _firstPage(const []));
         await _pumpFrames(tester);
         if (page.route case final route?) {
@@ -207,10 +209,11 @@ void main() {
         await tester.tap(absent);
         await _pumpFrames(tester);
         expect(tester.takeException(), isNull);
-        expect(
-          router.current.name,
-          page.route?.routeName ?? IntentionCatalogRoute.name,
-        );
+        if (page.route case final route?) {
+          expect(router.current.name, route.routeName);
+        } else {
+          expectIntentionGraphRootPage(router);
+        }
         expect(container.read(conditionsProvider).conditions, [
           for (var index = 0; index < _initialConditions; index++)
             _condition(

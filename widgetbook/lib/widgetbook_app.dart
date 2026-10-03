@@ -23,6 +23,9 @@ final class WidgetbookApp extends StatelessWidget {
         locales: const [Locale('ru'), Locale('en')],
         localizationsDelegates: AppLocalizations.localizationsDelegates,
       ),
+      // Увеличенный системный размер текста — от обычного до 2.5, как в
+      // проверках доступности приложения.
+      TextScaleAddon(min: 1, max: 2.5),
     ],
   );
 }

@@ -12,6 +12,105 @@
   "@navigationArchive": {
     "description": "Пункт навигации к архиву намерений"
   },
+  "appDestinationHome": "Home",
+  "@appDestinationHome": {
+    "description": "Название пункта основной навигации и заголовок Главной"
+  },
+  "appDestinationDailyChoices": "Daily choices",
+  "@appDestinationDailyChoices": {
+    "description": "Название пункта основной навигации и заголовок каталога дневных выборов"
+  },
+  "appDestinationIntentionGraph": "Intention graph",
+  "@appDestinationIntentionGraph": {
+    "description": "Название пункта основной навигации и заголовок каталога намерений как корневой страницы"
+  },
+  "homeFavoritesHeading": "Favorite intentions",
+  "@homeFavoritesHeading": {
+    "description": "Название списка избранных намерений на Главной"
+  },
+  "homeLoading": "Loading favorite intentions…",
+  "@homeLoading": {
+    "description": "Первоначальное получение списка избранных намерений"
+  },
+  "homeEmptyNoFavorites": "There are no favorite intentions yet. To add an intention here, mark it as a favorite on its page.",
+  "@homeEmptyNoFavorites": {
+    "description": "Пустая Главная: в личном графе нет избранных намерений"
+  },
+  "homeEmptyAllArchived": "All favorite intentions are archived. An intention restored from the archive returns here to its place.",
+  "@homeEmptyAllArchived": {
+    "description": "Пустая Главная: избранные намерения есть, но все архивированы"
+  },
+  "homeOpenIntentionGraph": "Open intention graph",
+  "@homeOpenIntentionGraph": {
+    "description": "Переход с пустой Главной к каталогу намерений"
+  },
+  "homeUnavailable": "Favorite intentions couldn’t be loaded. Try again.",
+  "@homeUnavailable": {
+    "description": "Устранимый отказ первоначального получения списка избранных намерений"
+  },
+  "homeCorruption": "Stored favorite intention data is damaged and can’t be shown.",
+  "@homeCorruption": {
+    "description": "Повреждение сохранённых данных избранного при получении списка"
+  },
+  "homeUnexpected": "Favorite intentions couldn’t be loaded because of an unexpected error.",
+  "@homeUnexpected": {
+    "description": "Неизвестный отказ получения списка избранных намерений"
+  },
+  "homeRefreshUnavailable": "The favorite intention list isn’t up to date: changes couldn’t be loaded.",
+  "@homeRefreshUnavailable": {
+    "description": "Устранимый отказ обновления показанного списка избранных намерений"
+  },
+  "homeRefreshCorruption": "The favorite intention list isn’t up to date: stored data is damaged.",
+  "@homeRefreshCorruption": {
+    "description": "Повреждение при обновлении показанного списка избранных намерений"
+  },
+  "homeRefreshUnexpected": "The favorite intention list isn’t up to date because of an unexpected error.",
+  "@homeRefreshUnexpected": {
+    "description": "Неизвестный отказ обновления показанного списка избранных намерений"
+  },
+  "homeReorderHandleTooltip": "Drag to move the intention",
+  "@homeReorderHandleTooltip": {
+    "description": "Подсказка ручки, которой перетаскивают строку избранного намерения на Главной"
+  },
+  "homeReorderSaving": "Saving the new position…",
+  "@homeReorderSaving": {
+    "description": "Признак строки Главной, новое место которой после перестановки ещё не подтверждено"
+  },
+  "homeReorderMoved": "“{title}” is now in position {position} of {count}",
+  "@homeReorderMoved": {
+    "description": "Объявление экранного диктора о подтверждённом новом месте избранного намерения на Главной",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "position": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "favoriteOrderConflict": "The new order of favorite intentions wasn’t saved because the list changed.",
+  "@favoriteOrderConflict": {
+    "description": "Конфликт актуального состояния: перестановка избранных намерений не сохранена, потому что список изменился"
+  },
+  "favoriteOrderInvalid": "The new order of favorite intentions wasn’t saved: the move isn’t valid.",
+  "@favoriteOrderInvalid": {
+    "description": "Безопасная ошибка недопустимого перемещения избранного намерения"
+  },
+  "favoriteOrderUnavailable": "The new order of favorite intentions couldn’t be saved. Try again.",
+  "@favoriteOrderUnavailable": {
+    "description": "Устранимая недоступность сохранения перестановки избранных намерений"
+  },
+  "favoriteOrderCorruption": "Stored favorite intention data is damaged. The new order wasn’t saved.",
+  "@favoriteOrderCorruption": {
+    "description": "Повреждение сохранённых данных при перестановке избранных намерений"
+  },
+  "favoriteOrderUnexpected": "The new order of favorite intentions couldn’t be saved because of an unexpected error.",
+  "@favoriteOrderUnexpected": {
+    "description": "Неизвестный отказ сохранения перестановки избранных намерений"
+  },
   "commonLoading": "Loading…",
   "@commonLoading": {
     "description": "Общее состояние загрузки"
@@ -51,10 +150,6 @@
   "catalogLoading": "Loading intentions…",
   "@catalogLoading": {
     "description": "Начальная загрузка каталога намерений"
-  },
-  "catalogTitle": "Intentions",
-  "@catalogTitle": {
-    "description": "Заголовок единого каталога намерений"
   },
   "catalogScopeLabel": "Scope",
   "@catalogScopeLabel": {
@@ -230,6 +325,10 @@
   "intentionSummaryNoTags": "No tags",
   "@intentionSummaryNoTags": {
     "description": "Подтверждённое отсутствие тегов у намерения в результате поиска"
+  },
+  "intentionSummaryFavoriteMark": "Favorite intention",
+  "@intentionSummaryFavoriteMark": {
+    "description": "Доступное название звезды избранного намерения в результате поиска"
   },
   "relationNeighborhoodTitle": "Relations",
   "relationNeighborhoodSelectedCount": "Selected relations: {count}",
@@ -627,6 +726,58 @@
   "@detailsStateChangeUnexpected": {
     "description": "Терминальная непредвиденная ошибка перехода состояния"
   },
+  "detailsFavoriteMarked": "Intention marked as favorite.",
+  "@detailsFavoriteMarked": {
+    "description": "Подтверждение отметки избранного намерения"
+  },
+  "detailsFavoriteUnmarked": "Favorite mark removed.",
+  "@detailsFavoriteUnmarked": {
+    "description": "Подтверждение снятия отметки избранного намерения"
+  },
+  "detailsFavoriteMarkInvalid": "The favorite mark couldn’t be changed.",
+  "@detailsFavoriteMarkInvalid": {
+    "description": "Безопасная ошибка недопустимого изменения отметки избранного"
+  },
+  "detailsFavoriteMarkNotFound": "The intention no longer exists. The favorite mark wasn’t changed.",
+  "@detailsFavoriteMarkNotFound": {
+    "description": "Безопасная ошибка изменения отметки избранного отсутствующего намерения"
+  },
+  "detailsFavoriteMarkConflict": "The intention changed elsewhere. The favorite mark wasn’t changed.",
+  "@detailsFavoriteMarkConflict": {
+    "description": "Безопасная ошибка конфликта изменения отметки избранного"
+  },
+  "detailsFavoriteMarkUnavailable": "The favorite mark couldn’t be changed. Try again.",
+  "@detailsFavoriteMarkUnavailable": {
+    "description": "Устранимая недоступность изменения отметки избранного"
+  },
+  "detailsFavoriteMarkCorruption": "Stored data is damaged. The favorite mark wasn’t changed.",
+  "@detailsFavoriteMarkCorruption": {
+    "description": "Терминальное повреждение при изменении отметки избранного"
+  },
+  "detailsFavoriteMarkUnexpected": "The favorite mark couldn’t be changed because of an unexpected error.",
+  "@detailsFavoriteMarkUnexpected": {
+    "description": "Терминальная непредвиденная ошибка изменения отметки избранного"
+  },
+  "detailsFavoriteMarkLabel": "Favorite intention",
+  "@detailsFavoriteMarkLabel": {
+    "description": "Название управления отметкой избранного в шапке страницы намерения для экранного диктора"
+  },
+  "detailsFavoriteMarkStateMarked": "Marked",
+  "@detailsFavoriteMarkStateMarked": {
+    "description": "Состояние управления отметкой: намерение избранное"
+  },
+  "detailsFavoriteMarkStateNotMarked": "Not marked",
+  "@detailsFavoriteMarkStateNotMarked": {
+    "description": "Состояние управления отметкой: намерение не избранное"
+  },
+  "detailsMarkFavoriteAction": "Mark as favorite",
+  "@detailsMarkFavoriteAction": {
+    "description": "Подсказка действия отметки намерения избранным"
+  },
+  "detailsUnmarkFavoriteAction": "Remove favorite mark",
+  "@detailsUnmarkFavoriteAction": {
+    "description": "Подсказка действия снятия отметки избранного"
+  },
   "detailsDeleteInvalid": "The intention couldn’t be deleted.",
   "@detailsDeleteInvalid": {
     "description": "Безопасная ошибка недопустимого физического удаления"
@@ -791,6 +942,14 @@
   "graphOperationDelete": "Delete",
   "@graphOperationDelete": {
     "description": "Вид операции удаления намерения в сообщении оболочки"
+  },
+  "graphOperationMarkFavorite": "Mark as favorite",
+  "@graphOperationMarkFavorite": {
+    "description": "Вид операции отметки избранного намерения в сообщении оболочки"
+  },
+  "graphOperationUnmarkFavorite": "Remove favorite mark",
+  "@graphOperationUnmarkFavorite": {
+    "description": "Вид операции снятия отметки избранного намерения в сообщении оболочки"
   },
   "graphOperationDeleteBlockingRelations": "Delete selected relations",
   "@graphOperationDeleteBlockingRelations": {
@@ -1749,7 +1908,7 @@
   "dailyChoiceCatalogTitle": "Daily choices",
   "dailyChoiceCreateFromAction": "Create a choice from an action",
   "@dailyChoiceCreateFromAction": {"description": "Вход в создание дневного выбора от действия"},
-  "@dailyChoiceCatalogTitle": {"description": "Заголовок каталога дневных выборов и вход из основной навигации"},
+  "@dailyChoiceCatalogTitle": {"description": "Заголовок раздела дневных выборов в соседстве намерения, пока их количество не получено"},
   "dailyChoiceCatalogLoading": "Loading daily choices…",
   "@dailyChoiceCatalogLoading": {"description": "Начальная загрузка дневного каталога"},
   "dailyChoiceCatalogDateFilter": "Date",

@@ -406,6 +406,7 @@ Future<void> _showAccessibleSearch(
     ),
   );
   addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+  await openIntentionGraph(tester, waitFor: _until);
   await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
   unawaited(router.push(TagCatalogRoute(intentionId: intentionId)));
   await _until(tester, readyMarker ?? find.text(tagName ?? 'Работа'));
