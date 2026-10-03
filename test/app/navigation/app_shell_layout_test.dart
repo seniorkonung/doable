@@ -127,13 +127,31 @@ void main() {
         await _select(tester, AppDestination.intentionGraph);
         await _until(tester, find.text('Total intentions: $count'));
 
+        final create = find.byKey(const ValueKey('catalog-create-intention'));
         if (insets.keyboard > 0) {
-          // Поле фильтра остаётся над клавиатурой и сужает выдачу.
+          // Поле фильтра в фокусе остаётся над клавиатурой и сужает выдачу.
           await tester.enterText(_titleFilter, 'Намерение 00');
           await _until(tester, find.text('Total intentions: 9'));
           await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<EditableText>(
+                  find.descendant(
+                    of: _titleFilter,
+                    matching: find.byType(EditableText),
+                  ),
+                )
+                .focusNode
+                .hasFocus,
+            isTrue,
+          );
           expect(_titleFilter.hitTestable(), findsOneWidget);
           _expectFullyVisible(tester, _titleFilter, insets);
+          _expectMainAction(tester, create, insets);
+          expect(
+            tester.getRect(_titleFilter).overlaps(tester.getRect(create)),
+            isFalse,
+          );
         }
 
         await _scrollToEnd(tester, find.byType(IntentionCatalogPage));
@@ -141,13 +159,13 @@ void main() {
         // Порядок по умолчанию — от новых к старым: первое намерение стоит
         // последним.
         final lastRow = _catalogRow(_intentionTitle(1));
-        final create = find.byKey(const ValueKey('catalog-create-intention'));
         _expectFullyVisible(tester, lastRow, insets);
         _expectMainAction(tester, create, insets);
         expect(
           tester.getRect(lastRow).overlaps(tester.getRect(create)),
           isFalse,
         );
+        expect(lastRow.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }
@@ -171,18 +189,19 @@ void main() {
       await _scrollToEnd(tester, page);
 
       final continuation = find.byType(IntentionCatalogContinuationStatusView);
+      final failure = find.descendant(
+        of: continuation,
+        matching: find.text('More intentions couldn’t be loaded.'),
+      );
       final retry = find.descendant(
         of: continuation,
         matching: find.byType(FilledButton),
       );
-      expect(
-        find.descendant(
-          of: continuation,
-          matching: find.text('More intentions couldn’t be loaded.'),
-        ),
-        findsOneWidget,
-      );
-      _expectFullyVisible(tester, continuation, _safeArea);
+      // Отступы состояния нажатий не принимают: полную видимость проверяют
+      // его сообщение и повтор, а отсутствие пересечения с кнопкой — всё
+      // состояние.
+      _expectFullyVisible(tester, failure, _safeArea);
+      _expectFullyVisible(tester, retry, _safeArea);
       _expectMainAction(tester, create, _safeArea);
       expect(
         tester.getRect(continuation).overlaps(tester.getRect(create)),
@@ -230,7 +249,7 @@ void main() {
           await _scrollToEnd(tester, page);
 
           final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
-          _expectFullyVisibleInScroll(tester, loadMore, insets);
+          _expectFullyVisible(tester, loadMore, insets);
           _expectMainAction(tester, _createDailyChoice, insets);
           expect(
             tester
@@ -251,7 +270,7 @@ void main() {
           await _scrollToEnd(tester, page);
 
           final lastRow = _dailyChoiceRow(count);
-          _expectFullyVisibleInScroll(tester, lastRow, insets);
+          _expectFullyVisible(tester, lastRow, insets);
           _expectMainAction(tester, _createDailyChoice, insets);
           expect(
             tester
@@ -320,8 +339,8 @@ void main() {
             of: page,
             matching: find.widgetWithText(TextButton, l10n.commonRetry),
           );
-          _expectFullyVisibleInScroll(tester, failure, insets);
-          _expectFullyVisibleInScroll(tester, retry, insets);
+          _expectFullyVisible(tester, failure, insets);
+          _expectFullyVisible(tester, retry, insets);
           _expectMainAction(tester, _createDailyChoice, insets);
           expect(
             tester
@@ -347,7 +366,7 @@ void main() {
           await _scrollToEnd(tester, page);
 
           final lastRow = _dailyChoiceRow(count);
-          _expectFullyVisibleInScroll(tester, lastRow, insets);
+          _expectFullyVisible(tester, lastRow, insets);
           _expectMainAction(tester, _createDailyChoice, insets);
           expect(
             tester
@@ -760,57 +779,46 @@ Future<void> _buildEveryTab(WidgetTester tester) async {
   }
 }
 
-/// Элемент [finder] целиком находится в видимой части корневой страницы: под
-/// её шапкой и над панелью либо клавиатурой.
+/// Элемент [finder] виден целиком.
+///
+/// Элемент лежит в видимой части корневой страницы — под её шапкой и над
+/// панелью либо клавиатурой. Элемент внутри прокрутки, кроме того, лежит в
+/// видимой части каждой объемлющей его прокрутки, не обрезанной её краями, а
+/// нажатия у его верхнего и нижнего края попадают в него.
 void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
   expect(finder, findsOneWidget);
-  final rect = tester.getRect(finder);
-  final appBar = tester.getRect(find.byType(AppBar));
-  // Прокрутка до края даёт координаты с ошибкой округления.
-  expect(
-    rect.top,
-    greaterThanOrEqualTo(appBar.bottom - precisionErrorTolerance),
-    reason: '$finder',
-  );
-  expect(
-    rect.bottom,
-    lessThanOrEqualTo(insets.contentBottom + precisionErrorTolerance),
-    reason: '$finder',
-  );
-}
-
-/// Элемент [finder] внутри прокрутки виден целиком: он лежит в видимой части
-/// корневой страницы и в видимой части каждой объемлющей его прокрутки, не
-/// обрезанной её краями, а нажатия у его верхнего и нижнего края попадают в
-/// него.
-void _expectFullyVisibleInScroll(
-  WidgetTester tester,
-  Finder finder,
-  _Insets insets,
-) {
-  _expectFullyVisible(tester, finder, insets);
   final element = finder.evaluate().single;
   final rect = tester.getRect(finder);
-  var scrollables = 0;
+  // Видимая часть корневой страницы, суженная видимой частью каждой
+  // объемлющей прокрутки.
+  var visibleTop = tester.getRect(find.byType(AppBar)).bottom;
+  var visibleBottom = insets.contentBottom;
+  var inScroll = false;
   element.visitAncestorElements((ancestor) {
     if (ancestor.widget is Scrollable) {
-      scrollables++;
+      inScroll = true;
       final viewport = ancestor.renderObject! as RenderBox;
-      final visible = viewport.localToGlobal(Offset.zero) & viewport.size;
-      expect(
-        rect.top,
-        greaterThanOrEqualTo(visible.top - precisionErrorTolerance),
-        reason: '$finder: верхний край прокрутки',
-      );
-      expect(
-        rect.bottom,
-        lessThanOrEqualTo(visible.bottom + precisionErrorTolerance),
-        reason: '$finder: нижний край прокрутки',
+      final viewportTop = viewport.localToGlobal(Offset.zero).dy;
+      visibleTop = math.max(visibleTop, viewportTop);
+      visibleBottom = math.min(
+        visibleBottom,
+        viewportTop + viewport.size.height,
       );
     }
     return true;
   });
-  expect(scrollables, isPositive, reason: '$finder: вне прокрутки');
+  // Прокрутка до края даёт координаты с ошибкой округления.
+  expect(
+    rect.top,
+    greaterThanOrEqualTo(visibleTop - precisionErrorTolerance),
+    reason: '$finder: верхний край видимой части',
+  );
+  expect(
+    rect.bottom,
+    lessThanOrEqualTo(visibleBottom + precisionErrorTolerance),
+    reason: '$finder: нижний край видимой части',
+  );
+  if (!inScroll) return;
   // Нажатие ровно на границе элементу не принадлежит, поэтому точки
   // отступают от краёв внутрь.
   for (final y in [rect.top + 1, rect.bottom - 1]) {
@@ -838,7 +846,7 @@ Future<void> _focusDateFilter(WidgetTester tester, _Insets insets) async {
     isTrue,
   );
   expect(_dateFilter.hitTestable(), findsOneWidget);
-  _expectFullyVisibleInScroll(tester, _dateFilter, insets);
+  _expectFullyVisible(tester, _dateFilter, insets);
   _expectMainAction(tester, _createDailyChoice, insets);
   expect(
     tester.getRect(_dateFilter).overlaps(tester.getRect(_createDailyChoice)),

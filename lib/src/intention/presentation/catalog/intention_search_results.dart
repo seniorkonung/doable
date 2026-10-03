@@ -93,6 +93,17 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
   /// конец выдачи и состояние продолжения прокручиваются выше него.
   final double trailingInset;
 
+  /// Показывает ли выдача [catalog] загруженный список, а не состояние вместо
+  /// него: загрузку, отказ или пустую выдачу.
+  static bool showsList(AsyncValue<IntentionCatalogState> catalog) =>
+      catalog.when(
+        skipLoadingOnReload: false,
+        skipLoadingOnRefresh: false,
+        data: (state) => state is IntentionCatalogLoaded,
+        error: (_, _) => false,
+        loading: () => false,
+      );
+
   @override
   ConsumerState<IntentionSearchResults> createState() =>
       _IntentionSearchResultsState();

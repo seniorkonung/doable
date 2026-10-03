@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+/// Высота, которую компоновка поиска отводит выдаче под параметрами.
+enum IntentionSearchResultsExtent {
+  /// Пока параметры оставляют выдаче не меньше трети высоты, выдача занимает
+  /// всё оставшееся место и страница не прокручивается. При нехватке места —
+  /// увеличенный текст, открытая клавиатура, много условий по тегам — выдача
+  /// получает всю высоту, а параметры и выдача прокручиваются вместе.
+  remainingWhenSufficient,
+
+  /// Выдача всегда получает всю высоту, а параметры и выдача прокручиваются
+  /// вместе: прокрученная до конца выдача занимает всю область просмотра при
+  /// любой высоте параметров.
+  fullViewport,
+}
+
 /// Компоновка страницы поиска намерений: параметры поиска над выдачей.
 ///
-/// Пока параметры оставляют выдаче не меньше трети высоты, выдача занимает
-/// всё оставшееся место и страница не прокручивается. При нехватке места —
-/// увеличенный текст, открытая клавиатура, много условий по тегам — выдача
-/// получает полную высоту, а параметры и выдача прокручиваются вместе, поэтому
-/// ни поле названия, ни условия, ни строки результата не переполняют экран.
+/// Высоту выдачи определяет [resultsExtent]. Когда выдача получает всю высоту,
+/// параметры и выдача прокручиваются вместе, поэтому ни поле названия, ни
+/// условия, ни строки результата не переполняют экран.
 final class IntentionSearchLayout extends StatefulWidget {
   const IntentionSearchLayout({
     required this.controls,
     required this.results,
+    this.resultsExtent = IntentionSearchResultsExtent.remainingWhenSufficient,
     super.key,
   });
 
@@ -20,6 +33,8 @@ final class IntentionSearchLayout extends StatefulWidget {
 
   /// Состояние выдачи с собственной прокруткой списка результатов.
   final Widget results;
+
+  final IntentionSearchResultsExtent resultsExtent;
 
   @override
   State<IntentionSearchLayout> createState() => _IntentionSearchLayoutState();
@@ -60,6 +75,7 @@ final class _IntentionSearchLayoutState extends State<IntentionSearchLayout> {
     slivers: [
       SliverToBoxAdapter(child: widget.controls),
       _SliverSearchResults(
+        extent: widget.resultsExtent,
         child: NotificationListener<OverscrollNotification>(
           onNotification: _continuePageScroll,
           child: widget.results,
@@ -70,25 +86,52 @@ final class _IntentionSearchLayoutState extends State<IntentionSearchLayout> {
 }
 
 final class _SliverSearchResults extends SingleChildRenderObjectWidget {
-  const _SliverSearchResults({required Widget super.child});
+  const _SliverSearchResults({
+    required this.extent,
+    required Widget super.child,
+  });
+
+  final IntentionSearchResultsExtent extent;
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderSliverSearchResults();
+      _RenderSliverSearchResults(extent);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderSliverSearchResults renderObject,
+  ) {
+    renderObject.extent = extent;
+  }
 }
 
 /// Выдача занимает остаток области просмотра либо всю её высоту.
 final class _RenderSliverSearchResults extends RenderSliverSingleBoxAdapter {
+  _RenderSliverSearchResults(this._extent);
+
   /// Наименьшая доля высоты, при которой выдача остаётся под параметрами.
   static const _minRemainingFraction = 1 / 3;
+
+  IntentionSearchResultsExtent _extent;
+
+  set extent(IntentionSearchResultsExtent value) {
+    if (value == _extent) {
+      return;
+    }
+    _extent = value;
+    markNeedsLayout();
+  }
 
   @override
   void performLayout() {
     final viewport = constraints.viewportMainAxisExtent;
     final remaining = viewport - constraints.precedingScrollExtent;
-    final extent = remaining >= viewport * _minRemainingFraction
-        ? remaining
-        : viewport;
+    final extent = switch (_extent) {
+      IntentionSearchResultsExtent.fullViewport => viewport,
+      IntentionSearchResultsExtent.remainingWhenSufficient =>
+        remaining >= viewport * _minRemainingFraction ? remaining : viewport,
+    };
     child!.layout(
       constraints.asBoxConstraints(minExtent: extent, maxExtent: extent),
     );

@@ -71,6 +71,13 @@ final class _IntentionCatalogPageState
         label: Text(localizations.editorCreateAction),
       ),
       body: IntentionSearchLayout(
+        // Загруженная выдача получает всю высоту тела страницы: прокрученные
+        // до конца параметры и список оставляют последнюю строку и состояние
+        // продолжения над созданием намерения при любой высоте параметров.
+        // Начальные состояния и пустая выдача остаются под параметрами.
+        resultsExtent: IntentionSearchResults.showsList(catalog)
+            ? IntentionSearchResultsExtent.fullViewport
+            : IntentionSearchResultsExtent.remainingWhenSufficient,
         controls: _CatalogControls(
           selection: selection,
           filterController: _filterController,

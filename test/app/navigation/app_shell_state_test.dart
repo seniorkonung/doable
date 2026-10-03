@@ -632,6 +632,12 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   position.jumpTo(position.maxScrollExtent * 0.6);
   await _settle(tester);
 
+  // Параметры поиска прокручиваются вместе с выдачей: страница стоит между
+  // ними и концом выдачи.
+  final page = _catalogPagePosition(tester);
+  page.jumpTo(page.maxScrollExtent / 2);
+  await _settle(tester);
+
   final catalog = app.intentionCatalog;
   expect(catalog.items, hasLength(2 * _intentionPageSize));
   expect(catalog.totalCount, _archivedCount);
@@ -641,6 +647,7 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   expect(catalog.items.first.title, 'Архив 001');
   expect(_conditions(tester), ['Здоровье']);
   expect(position.pixels, greaterThan(0));
+  expect(page.pixels, greaterThan(0));
 }
 
 /// Каталог дневных выборов: фильтр даты и невыполненных, две загруженные
@@ -722,6 +729,7 @@ Map<String, Object?> _intentionCatalogParameters(
   'условия в модели': app.intentionCatalog.selection.tagFilter,
   'порядок в модели': app.intentionCatalog.selection.order,
   'позиция прокрутки': _catalogPosition(tester).pixels,
+  'позиция прокрутки страницы': _catalogPagePosition(tester).pixels,
 };
 
 /// Наблюдаемое состояние каталога дневных выборов.
@@ -823,6 +831,16 @@ Future<void> _scrollToEnd(WidgetTester tester, ScrollPosition position) async {
 ScrollPosition _catalogPosition(WidgetTester tester) => _positionOf(
   tester,
   find.byKey(const PageStorageKey<String>('intention-catalog-list')),
+);
+
+/// Позиция прокрутки страницы каталога намерений: параметры поиска и выдача
+/// прокручиваются вместе.
+ScrollPosition _catalogPagePosition(WidgetTester tester) => _positionOf(
+  tester,
+  find.descendant(
+    of: find.byType(catalog_page.IntentionCatalogPage),
+    matching: find.byType(CustomScrollView),
+  ),
 );
 
 /// Позиция прокрутки страницы каталога дневных выборов: фильтры и выдача

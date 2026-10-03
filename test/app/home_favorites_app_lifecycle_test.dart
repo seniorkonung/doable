@@ -1040,11 +1040,16 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
   }
 }
 
+/// Нажимает элемент [finder], прокручивая к нему, только если он не
+/// принимает нажатие: прокрутка к видимой строке выдачи увела бы параметры
+/// поиска каталога намерений за верхний край страницы.
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _until(tester, finder);
   await tester.pumpAndSettle();
-  await tester.ensureVisible(finder);
-  await tester.pumpAndSettle();
+  if (finder.hitTestable().evaluate().isEmpty) {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+  }
   await tester.tap(finder);
   await tester.pump();
 }
