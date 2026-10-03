@@ -190,24 +190,33 @@ void seedLargeFavoriteFixture(
 List<LargeFavoriteFixtureRow> largeFavoriteFixtureActiveRows({
   required int count,
   int archivedEvery = 0,
-}) {
-  final indexes =
-      [
-        for (var index = 0; index < count; index++)
-          if (!_isLargeFavoriteArchived(index, archivedEvery)) index,
-      ]..sort(
-        (a, b) => _largeFavoritePlace(a, count) - _largeFavoritePlace(b, count),
-      );
-  return [
-    for (final index in indexes)
+}) => [
+  for (final index in _largeFavoriteIndexesInOrder(count))
+    if (!_isLargeFavoriteArchived(index, archivedEvery))
       (
         id: largeFavoriteFixtureId(index),
         title: _largeFavoriteTitle(index),
         isActionReady: index.isEven,
         activeRelationCount: _largeFavoriteRelations(index),
       ),
-  ];
-}
+];
+
+/// Место большой фикстуры в едином порядке вместе с архивным состоянием
+/// намерения.
+typedef LargeFavoriteFixturePlace = ({String id, bool isArchived});
+
+/// Весь единый порядок, который создаёт [seedLargeFavoriteFixture], включая
+/// архивированные избранные намерения, в порядке мест.
+List<LargeFavoriteFixturePlace> largeFavoriteFixtureOrder({
+  required int count,
+  int archivedEvery = 0,
+}) => [
+  for (final index in _largeFavoriteIndexesInOrder(count))
+    (
+      id: largeFavoriteFixtureId(index),
+      isArchived: _isLargeFavoriteArchived(index, archivedEvery),
+    ),
+];
 
 /// Число архивированных избранных намерений большой фикстуры.
 int largeFavoriteFixtureArchivedCount({
@@ -233,6 +242,12 @@ String _largeFavoriteTitle(int index) =>
 
 int _largeFavoritePlace(int index, int count) =>
     index * _largeFavoritePlaceStep % count * 2 + 1;
+
+/// Номера всех избранных намерений большой фикстуры в порядке мест.
+List<int> _largeFavoriteIndexesInOrder(int count) =>
+    [for (var index = 0; index < count; index++) index]..sort(
+      (a, b) => _largeFavoritePlace(a, count) - _largeFavoritePlace(b, count),
+    );
 
 bool _isLargeFavoriteArchived(int index, int archivedEvery) =>
     archivedEvery > 0 && index % archivedEvery == archivedEvery - 1;
