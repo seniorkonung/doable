@@ -41,7 +41,7 @@ final class IntentionSearchLayout extends StatefulWidget {
 }
 
 final class _IntentionSearchLayoutState extends State<IntentionSearchLayout> {
-  final _scrollController = ScrollController();
+  final _scrollController = _PageScrollController();
 
   @override
   void dispose() {
@@ -49,25 +49,54 @@ final class _IntentionSearchLayoutState extends State<IntentionSearchLayout> {
     super.dispose();
   }
 
-  /// Продолжает прокрутку страницы, когда список выдачи дошёл до своего края.
+  /// Продолжает прокрутку страницы, когда список выдачи дошёл до своего края
+  /// под пальцем или во время инерции флинга.
   ///
-  /// Без этого жест внутри списка не возвращал бы к параметрам поиска и не
-  /// доводил бы до конца выдачи, скрытого за нижним краем экрана.
+  /// Страница проходит остаток пути, на который список ушёл бы за край, и
+  /// продолжает оставшуюся инерцию. Без этого жест внутри списка не возвращал
+  /// бы к параметрам поиска и не доводил бы до конца выдачи, скрытого за
+  /// нижним краем экрана.
   bool _continuePageScroll(OverscrollNotification notification) {
-    if (notification.depth == 0 &&
-        notification.metrics.axis == Axis.vertical &&
-        notification.dragDetails != null &&
-        _scrollController.hasClients) {
-      final position = _scrollController.position;
-      position.jumpTo(
-        (position.pixels + notification.overscroll).clamp(
-          position.minScrollExtent,
-          position.maxScrollExtent,
-        ),
-      );
+    if (_continuesPage(notification)) {
+      _scrollController.scrollWithin(notification.overscroll);
+      if (notification.velocity != 0) {
+        _scrollController.fling(notification.velocity);
+      }
     }
     return false;
   }
+
+  /// Передаёт странице флинг, начатый у края списка выдачи.
+  ///
+  /// Список, отпущенный у своего края с инерцией к этому краю, сам не
+  /// прокручивается и не сообщает о выходе за край, поэтому инерцию
+  /// продолжает страница.
+  bool _continuePageFling(ScrollEndNotification notification) {
+    final fingerVelocity = notification.dragDetails?.primaryVelocity;
+    if (!_continuesPage(notification) || fingerVelocity == null) {
+      return false;
+    }
+    // Палец, идущий вверх, прокручивает к концу.
+    final velocity = -fingerVelocity;
+    final metrics = notification.metrics;
+    final atEdgeAhead = switch (velocity) {
+      > 0 => metrics.pixels >= metrics.maxScrollExtent,
+      < 0 => metrics.pixels <= metrics.minScrollExtent,
+      _ => false,
+    };
+    if (atEdgeAhead) {
+      _scrollController.fling(velocity);
+    }
+    return false;
+  }
+
+  /// Продолжает ли страница прокрутку из уведомления [notification]: оно
+  /// пришло от самого списка выдачи, который прокручивается в том же
+  /// направлении, что и страница.
+  bool _continuesPage(ScrollNotification notification) =>
+      notification.depth == 0 &&
+      notification.metrics.axisDirection == AxisDirection.down &&
+      _scrollController.hasClients;
 
   @override
   Widget build(BuildContext context) => CustomScrollView(
@@ -78,11 +107,53 @@ final class _IntentionSearchLayoutState extends State<IntentionSearchLayout> {
         extent: widget.resultsExtent,
         child: NotificationListener<OverscrollNotification>(
           onNotification: _continuePageScroll,
-          child: widget.results,
+          child: NotificationListener<ScrollEndNotification>(
+            onNotification: _continuePageFling,
+            child: widget.results,
+          ),
         ),
       ),
     ],
   );
+}
+
+/// Прокрутка страницы, которая продолжает жест, дошедший до края списка
+/// выдачи.
+final class _PageScrollController extends ScrollController {
+  /// Позицию создаёт сам контроллер, поэтому её тип известен [fling].
+  @override
+  ScrollPosition createScrollPosition(
+    ScrollPhysics physics,
+    ScrollContext context,
+    ScrollPosition? oldPosition,
+  ) => ScrollPositionWithSingleContext(
+    physics: physics,
+    context: context,
+    initialPixels: initialScrollOffset,
+    keepScrollOffset: keepScrollOffset,
+    oldPosition: oldPosition,
+    debugLabel: debugLabel,
+  );
+
+  /// Сдвигает страницу на [delta] в пределах её прокрутки.
+  void scrollWithin(double delta) {
+    for (final position in positions) {
+      position.jumpTo(
+        (position.pixels + delta).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        ),
+      );
+    }
+  }
+
+  /// Продолжает прокрутку страницы инерцией со скоростью [velocity] в
+  /// пикселях в секунду; положительная скорость ведёт к концу.
+  void fling(double velocity) {
+    for (final position in positions) {
+      (position as ScrollPositionWithSingleContext).goBallistic(velocity);
+    }
+  }
 }
 
 final class _SliverSearchResults extends SingleChildRenderObjectWidget {
