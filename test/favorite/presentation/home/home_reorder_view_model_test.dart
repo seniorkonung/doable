@@ -774,6 +774,17 @@ void main() {
         archivedCount: 1,
       ),
       (
+        name: 'полное создание сразу избранного намерения',
+        confirm: (h, revision) => h.create(
+          homeTestSummary(6, 'Е', tags: [homeTestTag(1, 'Дом')]),
+          revision: revision,
+        ),
+        order: homeTestOrder([1, 2, 5, 3, 4, 6], archived: {5}),
+        changed: rows([1, 2, 3, 4, 6]),
+        moved: rows([1, 4, 2, 3, 6]),
+        archivedCount: 1,
+      ),
+      (
         name: 'снятие отметки',
         confirm: (h, revision) => h.confirm(
           UnmarkIntentionFavorite(b),

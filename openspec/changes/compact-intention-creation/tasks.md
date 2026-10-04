@@ -110,7 +110,7 @@
   - **Files likely touched:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_revision_protocol_test.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.10 Согласовать Главную с намерением, созданным сразу избранным, в том числе при скрытой вкладке
+- [x] 1.10 Согласовать Главную с намерением, созданным сразу избранным, в том числе при скрытой вкладке
   - **Acceptance criteria:**
     - Загруженная Главная получает новое активное избранное намерение из результата создания в конце актуального полного порядка, сохраняя взаимный порядок прежних элементов. Создание без отметки не добавляет его в избранное.
     - Согласование работает и на скрытой корневой странице; устаревшее чтение, повторная доставка пакета и обновление во время перестановки не возвращают прежний состав или порядок.

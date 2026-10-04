@@ -3,6 +3,7 @@ import 'package:doable/src/favorite/application/favorite_order_command.dart';
 import 'package:doable/src/favorite/domain/favorite_order.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -1078,6 +1079,259 @@ void main() {
 
       expect(h.state, same(restored));
       expect(h.repository.readCount, 3);
+    });
+  });
+
+  group('полное создание намерения согласуется по отметке окончательного '
+      'снимка', () {
+    /// Окончательный снимок намерения 3 «В», созданного готовым к действию,
+    /// с двумя тегами и отметкой [favoriteMark].
+    IntentionSummary createdC({
+      FavoriteMark favoriteMark = FavoriteMark.favorite,
+    }) => homeTestSummary(
+      3,
+      'В',
+      favoriteMark: favoriteMark,
+      readiness: IntentionReadiness.ready,
+      tags: [homeTestTag(1, 'Дом'), homeTestTag(2, 'Выходные')],
+    );
+
+    final rowA = homeTestRow(1, 'А');
+    final rowB = homeTestRow(2, 'Б');
+    final rowC = homeTestRow(3, 'В', readiness: IntentionReadiness.ready);
+
+    /// Главная со списком А, Б на ревизии 1: единый порядок А, архивированное
+    /// Д, Б, и архивированное место Главная не показывает.
+    Future<HomeHarness> loadedWithArchived() async {
+      final h = HomeHarness();
+      addTearDown(h.dispose);
+      h.repository.completeRead(0, items: [rowA, rowB], archivedCount: 1);
+      await pumpEventQueue();
+      expect(ids(h), [a, b]);
+      return h;
+    }
+
+    void expectCurrentABC(HomeHarness h, {required int revision}) {
+      final list = h.state as HomeList;
+      expect(list.items, [rowA, rowB, rowC]);
+      expect(list.freshness, isA<HomeFreshnessCurrent>());
+      expect((list.revision as HomeTestRevision).number, revision);
+      expect(list.reorder, isA<HomeReorderIdle>());
+    }
+
+    test('созданное избранным намерение встаёт последним, а прежние '
+        'сохраняют взаимный порядок', () async {
+      final h = await loadedWithArchived();
+
+      await h.create(createdC(), revision: 2);
+
+      // Главная согласуется самим пакетом создания: без отдельной команды
+      // отметки и без поверхности сообщений, которой в контейнере нет.
+      expect(h.repository.commands, [isA<CreateIntention>()]);
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 2);
+
+      h.repository.completeRead(
+        1,
+        items: [rowA, rowB, rowC],
+        archivedCount: 1,
+        revision: 2,
+      );
+      await pumpEventQueue();
+
+      expectCurrentABC(h, revision: 2);
+      expect(
+        (h.state as HomeList).items.last.readiness,
+        IntentionReadiness.ready,
+      );
+      expect(h.repository.readCount, 2);
+      expect(h.repository.commands, hasLength(1));
+    });
+
+    test('созданное без отметки намерение Главную не меняет и чтения не '
+        'вызывает', () async {
+      final h = await loadedWithArchived();
+      final before = h.state;
+
+      await h.create(
+        createdC(favoriteMark: FavoriteMark.notFavorite),
+        revision: 2,
+      );
+
+      expect(h.state, same(before));
+      expect(h.repository.readCount, 1);
+      expect(h.repository.commands, [isA<CreateIntention>()]);
+    });
+
+    for (final (reason, archivedCount) in const [
+      (HomeEmptyReason.noFavorites, 0),
+      (HomeEmptyReason.allArchived, 1),
+    ]) {
+      test('пустая Главная (${reason.name}) показывает созданное избранным '
+          'намерение', () async {
+        final h = HomeHarness();
+        addTearDown(h.dispose);
+        h.repository.completeRead(0, archivedCount: archivedCount);
+        await pumpEventQueue();
+        expect((h.state as HomeEmpty).reason, reason);
+
+        await h.create(createdC(), revision: 2);
+
+        final refreshing = h.state as HomeEmpty;
+        expect(refreshing.reason, reason);
+        expect(refreshing.freshness, isA<HomeFreshnessRefreshing>());
+        expect(h.repository.readCount, 2);
+
+        h.repository.completeRead(
+          1,
+          items: [rowC],
+          archivedCount: archivedCount,
+          revision: 2,
+        );
+        await pumpEventQueue();
+
+        expect((h.state as HomeList).items, [rowC]);
+        expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
+      });
+    }
+
+    test('снимок старше ревизии создания не публикуется и '
+        'перечитывается', () async {
+      final h = await loadedWithArchived();
+
+      await h.create(createdC(), revision: 2);
+      // Чтение обогнало подтверждение создания и вернуло прежний состав.
+      h.repository.completeRead(
+        1,
+        items: [rowA, rowB],
+        archivedCount: 1,
+        revision: 1,
+      );
+      await pumpEventQueue();
+
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 3);
+
+      h.repository.completeRead(
+        2,
+        items: [rowA, rowB, rowC],
+        archivedCount: 1,
+        revision: 2,
+      );
+      await pumpEventQueue();
+
+      expectCurrentABC(h, revision: 2);
+      expect(h.repository.readCount, 3);
+    });
+
+    test('чтение, начатое до создания и завершённое после него, не '
+        'публикует прежний состав', () async {
+      final h = await loadedWithArchived();
+
+      // Чтение вызвано переименованием А, а пакет создания приходит, пока
+      // оно выполняется.
+      await h.confirm(
+        UpdateIntention(id: a, title: 'Альфа', description: null),
+        revision: 2,
+        before: homeTestSummary(1, 'А'),
+        after: homeTestSummary(1, 'Альфа'),
+      );
+      await h.create(createdC(), revision: 3);
+      expect(h.repository.readCount, 2);
+
+      h.repository.completeRead(
+        1,
+        items: [homeTestRow(1, 'Альфа'), rowB],
+        archivedCount: 1,
+        revision: 2,
+      );
+      await pumpEventQueue();
+
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 3);
+
+      h.repository.completeRead(
+        2,
+        items: [homeTestRow(1, 'Альфа'), rowB, rowC],
+        archivedCount: 1,
+        revision: 3,
+      );
+      await pumpEventQueue();
+
+      expect(ids(h), [a, b, c]);
+      expect((h.state as HomeList).items.first.title, 'Альфа');
+      expect((h.state as HomeList).freshness, isA<HomeFreshnessCurrent>());
+      expect(h.repository.readCount, 3);
+    });
+
+    test('первоначальное чтение, начатое до создания, не публикует прежний '
+        'состав', () async {
+      final h = HomeHarness();
+      addTearDown(h.dispose);
+
+      await h.create(createdC(), revision: 5);
+      expect(h.repository.readCount, 1);
+
+      h.repository.completeRead(
+        0,
+        items: [rowA, rowB],
+        archivedCount: 1,
+        revision: 4,
+      );
+      await pumpEventQueue();
+
+      expect(h.state, isA<HomeLoading>());
+      expect(h.repository.readCount, 2);
+
+      h.repository.completeRead(
+        1,
+        items: [rowA, rowB, rowC],
+        archivedCount: 1,
+        revision: 5,
+      );
+      await pumpEventQueue();
+
+      expectCurrentABC(h, revision: 5);
+    });
+
+    test('повторная доставка уже отражённого пакета создания чтения не '
+        'вызывает и состав не меняет', () async {
+      final h = await loadedWithArchived();
+      await h.create(createdC(), revision: 2);
+      h.repository.completeRead(
+        1,
+        items: [rowA, rowB, rowC],
+        archivedCount: 1,
+        revision: 2,
+      );
+      await pumpEventQueue();
+      final reconciled = h.state;
+
+      await h.create(createdC(), revision: 2);
+
+      expect(h.state, same(reconciled));
+      expect(h.repository.readCount, 2);
+    });
+
+    test('повторная доставка пакета создания во время чтения не запускает '
+        'параллельного и лишнего чтения', () async {
+      final h = await loadedWithArchived();
+
+      await h.create(createdC(), revision: 2);
+      await h.create(createdC(), revision: 2);
+      expectRefreshingAB(h);
+      expect(h.repository.readCount, 2);
+
+      h.repository.completeRead(
+        1,
+        items: [rowA, rowB, rowC],
+        archivedCount: 1,
+        revision: 2,
+      );
+      await pumpEventQueue();
+
+      expectCurrentABC(h, revision: 2);
+      expect(h.repository.readCount, 2);
     });
   });
 
