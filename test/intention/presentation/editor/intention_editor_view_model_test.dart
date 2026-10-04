@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -12,6 +13,7 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_view_m
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/operation/operation_state.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -387,7 +389,7 @@ void main() {
       expect(state.draft.readiness, IntentionReadiness.notReady);
       expect(state.draft.favoriteMark, FavoriteMark.notFavorite);
       expect(state.draft.isChanged, isFalse);
-      expect(state.selectedTagNames, isEmpty);
+      expect(state.selectedTags, isEmpty);
       expect(state.operation, isA<OperationIdle<Intention>>());
       expect(
         container.read(provider.notifier).draftTagSet.current.tagIds,
@@ -433,7 +435,7 @@ void main() {
       }
 
       expect(container.read(provider).draft.tagIds, isEmpty);
-      expect(container.read(provider).selectedTagNames, isEmpty);
+      expect(container.read(provider).selectedTags, isEmpty);
       expect(repository.commands, isEmpty);
       expect(repository.tagCommands, isEmpty);
     });
@@ -489,10 +491,7 @@ void main() {
       expect(second, IntentionDraftTagAddition.added);
       final state = container.read(provider);
       expect(state.draft.tagIds, [_tagId(1), _tagId(2)]);
-      expect(
-        state.selectedTagNames.map((id, name) => MapEntry(id, name.value)),
-        {_tagId(1): 'Дом', _tagId(2): 'Выходные'},
-      );
+      expect(_tagNames(state), {_tagId(1): 'Дом', _tagId(2): 'Выходные'});
       expect(tagSet.current.tagIds, [_tagId(1), _tagId(2)]);
       expect(tagSet.current.availability, IntentionDraftAvailability.editable);
       expect(published.map((snapshot) => snapshot.tagIds), [
@@ -545,14 +544,11 @@ void main() {
         final tagSet = editor.draftTagSet..add(_tag(1, 'Дом'));
         final stateTags = container.read(provider).draft.tagIds;
         final contractTags = tagSet.current.tagIds;
-        final names = container.read(provider).selectedTagNames;
+        final names = container.read(provider).selectedTags;
 
         expect(() => stateTags.add(_tagId(2)), throwsUnsupportedError);
         expect(() => contractTags.add(_tagId(2)), throwsUnsupportedError);
-        expect(
-          () => names[_tagId(2)] = TagName.fromInput('Чужой'),
-          throwsUnsupportedError,
-        );
+        expect(() => names.remove(_tagId(1)), throwsUnsupportedError);
 
         tagSet.add(_tag(2, 'Выходные'));
         editor.removeTag(_tagId(1));
@@ -561,7 +557,7 @@ void main() {
         expect(contractTags, [_tagId(1)]);
         expect(names.keys, [_tagId(1)]);
         expect(container.read(provider).draft.tagIds, [_tagId(2)]);
-        expect(container.read(provider).selectedTagNames.keys, [_tagId(2)]);
+        expect(container.read(provider).selectedTags.keys, [_tagId(2)]);
       },
     );
 
@@ -591,7 +587,7 @@ void main() {
 
       final state = container.read(provider);
       expect(state.draft.tagIds, [_tagId(2)]);
-      expect(state.selectedTagNames.keys, [_tagId(2)]);
+      expect(state.selectedTags.keys, [_tagId(2)]);
       expect(state.draft.favoriteMark, FavoriteMark.favorite);
       expect(state.draft.readiness, IntentionReadiness.ready);
       expect(state.operation, isA<OperationIdle<Intention>>());
@@ -1074,11 +1070,10 @@ void main() {
             FavoriteMark.favorite,
             reason: name,
           );
-          expect(
-            failed.selectedTagNames.map((id, name) => MapEntry(id, name.value)),
-            {_tagId(1): 'Дом', _tagId(2): 'Выходные'},
-            reason: name,
-          );
+          expect(_tagNames(failed), {
+            _tagId(1): 'Дом',
+            _tagId(2): 'Выходные',
+          }, reason: name);
           expect(
             failed.operation,
             isA<OperationFailed<Intention>>().having(
@@ -1380,10 +1375,7 @@ void main() {
       expect(failed.draft.tagIds, [_tagId(1), _tagId(2)]);
       expect(failed.draft.readiness, IntentionReadiness.ready);
       expect(failed.draft.favoriteMark, FavoriteMark.favorite);
-      expect(
-        failed.selectedTagNames.map((id, name) => MapEntry(id, name.value)),
-        {_tagId(1): 'Дом', _tagId(2): 'Выходные'},
-      );
+      expect(_tagNames(failed), {_tagId(1): 'Дом', _tagId(2): 'Выходные'});
       expect(failed.draftAvailability, IntentionDraftAvailability.editable);
       expect(failed.canSubmit, isFalse);
       expect(editor.draftTagSet.current.tagIds, [_tagId(1), _tagId(2)]);
@@ -1512,6 +1504,429 @@ void main() {
       expect(firstCommand.tagIds, {_tagId(1)});
       expect(firstCommand.favoriteMark, FavoriteMark.favorite);
       expect(repository.tagCommands, isEmpty);
+    });
+  });
+
+  group('проекция выбранных тегов', () {
+    test('название из выбора доступно сразу, а переименование через watchTag обновляет только проекцию', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier);
+
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'));
+
+      final added = container.read(provider);
+      expect(_tagNames(added), {_tagId(1): 'Дом', _tagId(2): 'Выходные'});
+      expect(_tagStatus(added, 1), isA<IntentionDraftTagLoading>());
+      expect(_tagStatus(added, 2), isA<IntentionDraftTagLoading>());
+      expect(watches.of(_tagId(1)), hasLength(1));
+      expect(watches.of(_tagId(2)), hasLength(1));
+      await _deliverEvents(container);
+      final tagIds = container.read(provider).draft.tagIds;
+      final published = <IntentionDraftTagSetSnapshot>[];
+      final changesSubscription = editor.draftTagSet.changes.listen(
+        published.add,
+      );
+      addTearDown(changesSubscription.cancel);
+
+      watches.single(_tagId(1)).observe(_tag(1, 'Быт'), revision: 2);
+      watches.single(_tagId(2)).observe(_tag(2, 'Выходные'), revision: 2);
+      await _deliverEvents(container);
+
+      final renamed = container.read(provider);
+      expect(_tagNames(renamed), {_tagId(1): 'Быт', _tagId(2): 'Выходные'});
+      expect(_tagStatus(renamed, 1), isA<IntentionDraftTagAvailable>());
+      expect(_tagStatus(renamed, 2), isA<IntentionDraftTagAvailable>());
+      expect(renamed.draft.tagIds, same(tagIds));
+      expect(renamed.draft.tagIds, [_tagId(1), _tagId(2)]);
+      expect(editor.draftTagSet.current.tagIds, same(tagIds));
+      expect(published, isEmpty);
+      expect(renamed.operation, isA<OperationIdle<Intention>>());
+      expect(watches.count, 2);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('подтверждённое отсутствие сохраняет идентификатор и последнее название до явного снятия и не подменяется одноимённым тегом', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение');
+      editor.draftTagSet.add(_tag(1, 'Дом'));
+      await _deliverEvents(container);
+      final deletedWatch = watches.single(_tagId(1))
+        ..observe(_tag(1, 'Быт'), revision: 2)
+        ..observe(null, revision: 3);
+      await _deliverEvents(container);
+
+      final missing = container.read(provider);
+      expect(missing.draft.tagIds, [_tagId(1)]);
+      expect(_tagNames(missing), {_tagId(1): 'Быт'});
+      expect(_tagStatus(missing, 1), isA<IntentionDraftTagMissing>());
+      // Отсутствие в проекции не заменяет транзакционную проверку при
+      // сохранении и само не блокирует отправку.
+      expect(missing.operation, isA<OperationIdle<Intention>>());
+      expect(missing.canSubmit, isTrue);
+
+      expect(
+        editor.draftTagSet.add(_tag(4, 'Быт')),
+        IntentionDraftTagAddition.added,
+      );
+      watches.single(_tagId(4)).observe(_tag(4, 'Быт'), revision: 4);
+      // Окончание наблюдения после подтверждённого отсутствия сохраняет его.
+      deletedWatch.end();
+      await _deliverEvents(container);
+
+      final withReplacement = container.read(provider);
+      expect(withReplacement.draft.tagIds, [_tagId(1), _tagId(4)]);
+      expect(_tagNames(withReplacement), {_tagId(1): 'Быт', _tagId(4): 'Быт'});
+      expect(_tagStatus(withReplacement, 1), isA<IntentionDraftTagMissing>());
+      expect(_tagStatus(withReplacement, 4), isA<IntentionDraftTagAvailable>());
+
+      editor.removeTag(_tagId(1));
+
+      final corrected = container.read(provider);
+      expect(corrected.draft.tagIds, [_tagId(4)]);
+      expect(_tagNames(corrected), {_tagId(4): 'Быт'});
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('загрузка и типизированный отказ чтения отличаются от удаления, а повтор наблюдения доступен только после устранимого отказа', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier);
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'))
+        ..add(_tag(3, 'Спорт'));
+      final loading = container.read(provider);
+      for (final number in [1, 2, 3]) {
+        expect(
+          _tagStatus(loading, number),
+          isA<IntentionDraftTagLoading>(),
+          reason: '$number',
+        );
+      }
+      await _deliverEvents(container);
+
+      watches.single(_tagId(1)).fail(const TagReadUnavailableFailure());
+      watches.single(_tagId(2)).fail(const TagReadCorruptionFailure());
+      watches.single(_tagId(3)).fail(const TagReadUnexpectedFailure());
+      await _deliverEvents(container);
+
+      final failed = container.read(provider);
+      expect(failed.draft.tagIds, [_tagId(1), _tagId(2), _tagId(3)]);
+      expect(_tagNames(failed), {
+        _tagId(1): 'Дом',
+        _tagId(2): 'Выходные',
+        _tagId(3): 'Спорт',
+      });
+      expect(
+        _tagStatus(failed, 1),
+        _readFailed<TagReadUnavailableFailure>(canRetry: true),
+      );
+      expect(
+        _tagStatus(failed, 2),
+        _readFailed<TagReadCorruptionFailure>(canRetry: false),
+      );
+      expect(
+        _tagStatus(failed, 3),
+        _readFailed<TagReadUnexpectedFailure>(canRetry: false),
+      );
+      expect(failed.canSubmit, isTrue);
+
+      editor
+        ..retryTagObservation(_tagId(2))
+        ..retryTagObservation(_tagId(3));
+
+      expect(watches.of(_tagId(2)), hasLength(1));
+      expect(watches.of(_tagId(3)), hasLength(1));
+      expect(container.read(provider), same(failed));
+
+      editor
+        ..retryTagObservation(_tagId(1))
+        ..retryTagObservation(_tagId(1));
+
+      final retrying = container.read(provider);
+      expect(watches.of(_tagId(1)), hasLength(2));
+      expect(_tagStatus(retrying, 1), isA<IntentionDraftTagLoading>());
+      expect(_tagNames(retrying)[_tagId(1)], 'Дом');
+
+      final [failedWatch, retriedWatch] = watches.of(_tagId(1));
+      retriedWatch.observe(_tag(1, 'Быт'), revision: 2);
+      // Поздний ответ отказавшего наблюдения не меняет восстановленное.
+      failedWatch
+        ..deliverLate(_tag(1, 'Поздний'), revision: 3)
+        ..endLate();
+      await _deliverEvents(container);
+
+      final recovered = container.read(provider);
+      expect(_tagNames(recovered)[_tagId(1)], 'Быт');
+      expect(_tagStatus(recovered, 1), isA<IntentionDraftTagAvailable>());
+      expect(failedWatch.isReleased, isTrue);
+      expect(retriedWatch.isReleased, isFalse);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('окончание наблюдения сохраняет установленную причину, а необъяснённое окончание даёт неизвестный отказ', () async {
+      final watches = _TagWatches()..failingIds.add(_tagId(5));
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier);
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'))
+        ..add(_tag(3, 'Спорт'))
+        ..add(_tag(4, 'Чтение'))
+        ..add(_tag(5, 'Сад'));
+      await _deliverEvents(container);
+
+      watches.single(_tagId(1))
+        ..fail(const TagReadUnavailableFailure())
+        ..end();
+      watches.single(_tagId(2))
+        ..observe(_tag(2, 'Выходные'), revision: 1)
+        ..end();
+      watches.single(_tagId(3)).end();
+      watches.single(_tagId(4)).throwError();
+      await _deliverEvents(container);
+
+      final ended = container.read(provider);
+      expect(ended.draft.tagIds, [for (var n = 1; n <= 5; n++) _tagId(n)]);
+      expect(_tagNames(ended), {
+        _tagId(1): 'Дом',
+        _tagId(2): 'Выходные',
+        _tagId(3): 'Спорт',
+        _tagId(4): 'Чтение',
+        _tagId(5): 'Сад',
+      });
+      expect(
+        _tagStatus(ended, 1),
+        _readFailed<TagReadUnavailableFailure>(canRetry: true),
+      );
+      for (final number in [2, 3, 4, 5]) {
+        expect(
+          _tagStatus(ended, number),
+          _readFailed<TagReadUnexpectedFailure>(canRetry: false),
+          reason: '$number',
+        );
+      }
+      expect(watches.of(_tagId(5)), isEmpty);
+      expect(ended.canSubmit, isTrue);
+      expect(repository.commands, isEmpty);
+    });
+
+    test('старый ответ не отменяет новое название, не возвращает снятый тег и не меняет повторно добавленный', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier);
+      final tagSet = editor.draftTagSet..add(_tag(1, 'Дом'));
+      await _deliverEvents(container);
+      final firstWatch = watches.single(_tagId(1))
+        ..observe(_tag(1, 'Быт'), revision: 3)
+        ..observe(_tag(1, 'Дом'), revision: 2)
+        ..observe(null, revision: 1);
+      await _deliverEvents(container);
+
+      final renamed = container.read(provider);
+      expect(_tagNames(renamed), {_tagId(1): 'Быт'});
+      expect(_tagStatus(renamed, 1), isA<IntentionDraftTagAvailable>());
+
+      editor.removeTag(_tagId(1));
+      await _deliverEvents(container);
+      expect(firstWatch.isReleased, isTrue);
+      final published = <IntentionDraftTagSetSnapshot>[];
+      final changesSubscription = tagSet.changes.listen(published.add);
+      addTearDown(changesSubscription.cancel);
+
+      firstWatch
+        ..deliverLate(_tag(1, 'Поздний'), revision: 4)
+        ..endLate();
+      await _deliverEvents(container);
+
+      final removed = container.read(provider);
+      expect(removed.draft.tagIds, isEmpty);
+      expect(removed.selectedTags, isEmpty);
+      expect(removed.draft.isChanged, isFalse);
+      expect(published, isEmpty);
+
+      expect(tagSet.add(_tag(1, 'Дом')), IntentionDraftTagAddition.added);
+      expect(watches.of(_tagId(1)), hasLength(2));
+      firstWatch
+        ..deliverLate(_tag(1, 'Поздний'), revision: 5)
+        ..deliverLate(null, revision: 6)
+        ..endLate();
+      await _deliverEvents(container);
+
+      final readded = container.read(provider);
+      expect(readded.draft.tagIds, [_tagId(1)]);
+      expect(_tagNames(readded), {_tagId(1): 'Дом'});
+      expect(_tagStatus(readded, 1), isA<IntentionDraftTagLoading>());
+
+      final readdedWatch = watches.of(_tagId(1)).last
+        ..observe(_tag(1, 'Дом'), revision: 7);
+      await _deliverEvents(container);
+
+      expect(
+        _tagStatus(container.read(provider), 1),
+        isA<IntentionDraftTagAvailable>(),
+      );
+      expect(readdedWatch.isReleased, isFalse);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('наблюдения разных сессий одного тега независимы', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final firstProvider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final secondProvider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final firstSubscription = container.listen(firstProvider, (_, _) {});
+      final secondSubscription = container.listen(secondProvider, (_, _) {});
+      addTearDown(secondSubscription.close);
+      container.read(firstProvider.notifier).draftTagSet.add(_tag(1, 'Дом'));
+      container.read(secondProvider.notifier).draftTagSet.add(_tag(1, 'Дом'));
+      await _deliverEvents(container);
+      final [firstWatch, secondWatch] = watches.of(_tagId(1));
+
+      firstWatch.observe(_tag(1, 'Быт'), revision: 2);
+      await _deliverEvents(container);
+
+      final first = container.read(firstProvider);
+      final second = container.read(secondProvider);
+      expect(_tagNames(first), {_tagId(1): 'Быт'});
+      expect(_tagStatus(first, 1), isA<IntentionDraftTagAvailable>());
+      expect(_tagNames(second), {_tagId(1): 'Дом'});
+      expect(_tagStatus(second, 1), isA<IntentionDraftTagLoading>());
+
+      firstSubscription.close();
+      await _deliverEvents(container);
+      secondWatch.observe(_tag(1, 'Быт'), revision: 2);
+      await _deliverEvents(container);
+
+      expect(firstWatch.isReleased, isTrue);
+      expect(secondWatch.isReleased, isFalse);
+      expect(_tagNames(container.read(secondProvider)), {_tagId(1): 'Быт'});
+      expect(repository.commands, isEmpty);
+    });
+
+    test('снятие, успешное создание и освобождение сессии освобождают подписки, а наблюдения не отправляют команды графа', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final completions = <GraphCommandCompletion>[];
+      final completionSubscription = container
+          .read(graphCommandCoordinatorProvider.notifier)
+          .completions
+          .listen(completions.add);
+      addTearDown(completionSubscription.cancel);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение');
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'))
+        ..add(_tag(3, 'Спорт'));
+      await _deliverEvents(container);
+
+      editor.removeTag(_tagId(3));
+
+      expect(watches.single(_tagId(3)).isReleased, isTrue);
+      expect(watches.single(_tagId(1)).isReleased, isFalse);
+      expect(watches.single(_tagId(2)).isReleased, isFalse);
+
+      editor.submit();
+      // Во время отправки проекция обновляется, а состав набора зафиксирован.
+      watches.single(_tagId(1)).observe(_tag(1, 'Быт'), revision: 2);
+      editor.removeTag(_tagId(2));
+      await _deliverEvents(container);
+
+      final running = container.read(provider);
+      expect(running.operation, isA<OperationRunning<Intention>>());
+      expect(running.draft.tagIds, [_tagId(1), _tagId(2)]);
+      expect(_tagNames(running), {_tagId(1): 'Быт', _tagId(2): 'Выходные'});
+      expect(watches.single(_tagId(2)).isReleased, isFalse);
+      expect(
+        repository.commands.single,
+        isA<CreateIntention>().having((command) => command.tagIds, 'теги', {
+          _tagId(1),
+          _tagId(2),
+        }),
+      );
+
+      repository.completeCommand(0, _savedResult());
+      await _deliverEvents(container);
+
+      final closed = container.read(provider);
+      expect(closed.draftAvailability, IntentionDraftAvailability.closed);
+      expect(watches.single(_tagId(1)).isReleased, isTrue);
+      expect(watches.single(_tagId(2)).isReleased, isTrue);
+      watches.single(_tagId(1)).deliverLate(_tag(1, 'Поздний'), revision: 3);
+      expect(container.read(provider), same(closed));
+
+      final otherProvider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final otherSubscription = container.listen(otherProvider, (_, _) {});
+      container.read(otherProvider.notifier).draftTagSet.add(_tag(4, 'Сад'));
+      await _deliverEvents(container);
+      otherSubscription.close();
+      await _deliverEvents(container);
+
+      expect(watches.single(_tagId(4)).isReleased, isTrue);
+      expect(watches.count, 4);
+      expect(repository.commands, hasLength(1));
+      expect(repository.tagCommands, isEmpty);
+      expect(completions, hasLength(1));
     });
   });
 }
@@ -1662,3 +2077,108 @@ TagId _tagId(int number) => switch (TagId.decode(
 
 Tag _tag(int number, String name) =>
     Tag(id: _tagId(number), name: TagName.fromInput(name));
+
+Map<TagId, String> _tagNames(IntentionEditorState state) =>
+    state.selectedTags.map((id, tag) => MapEntry(id, tag.name.value));
+
+IntentionDraftTagStatus? _tagStatus(IntentionEditorState state, int number) =>
+    state.selectedTags[_tagId(number)]?.status;
+
+Matcher _readFailed<F extends TagReadFailure>({required bool canRetry}) =>
+    isA<IntentionDraftTagReadFailed>()
+        .having((status) => status.failure, 'отказ чтения', isA<F>())
+        .having((status) => status.canRetry, 'повтор', canRetry);
+
+/// Управляемый источник контракта `watchTag`: каждое наблюдение — отдельный
+/// поток, для которого видны освобождение подписки и её callbacks.
+final class _TagWatches {
+  final _watches = <_TagWatch>[];
+
+  /// Теги, наблюдение которых отказывает синхронно при подписке.
+  final failingIds = <TagId>{};
+
+  int get count => _watches.length;
+
+  Stream<TagReadResult> watch(TagId id) {
+    if (failingIds.contains(id)) {
+      throw StateError('SQL и личные данные');
+    }
+    final watch = _TagWatch(id);
+    _watches.add(watch);
+    return watch._stream;
+  }
+
+  /// Наблюдения тега [id] в порядке запроса.
+  List<_TagWatch> of(TagId id) => [
+    for (final watch in _watches)
+      if (watch.id == id) watch,
+  ];
+
+  _TagWatch single(TagId id) => of(id).single;
+}
+
+final class _TagWatch {
+  _TagWatch(this.id) {
+    _controller = StreamController<TagReadResult>(
+      onCancel: () => _isReleased = !_isEndedBySource,
+    );
+  }
+
+  final TagId id;
+  late final StreamController<TagReadResult> _controller;
+  void Function(TagReadResult)? _onData;
+  void Function()? _onDone;
+  bool _isEndedBySource = false;
+  bool _isReleased = false;
+
+  /// Подписку отменил наблюдатель, а не источник.
+  bool get isReleased => _isReleased;
+
+  Stream<TagReadResult> get _stream => _CapturingTagStream(this);
+
+  void observe(Tag? tag, {required int revision}) =>
+      _controller.add(_snapshot(tag, revision));
+
+  void fail(TagReadFailure failure) => _controller.add(TagReadError(failure));
+
+  void throwError() => _controller.addError(StateError('SQL и личные данные'));
+
+  void end() {
+    _isEndedBySource = true;
+    unawaited(_controller.close());
+  }
+
+  /// Доставляет ответ, поставленный в очередь до освобождения подписки.
+  void deliverLate(Tag? tag, {required int revision}) =>
+      _onData!(_snapshot(tag, revision));
+
+  void endLate() => _onDone!();
+
+  TagReadResult _snapshot(Tag? tag, int revision) => TagReadSuccess(
+    GraphSnapshot(value: tag, revision: TestCatalogRevision(revision)),
+  );
+}
+
+final class _CapturingTagStream extends Stream<TagReadResult> {
+  _CapturingTagStream(this._watch);
+
+  final _TagWatch _watch;
+
+  @override
+  StreamSubscription<TagReadResult> listen(
+    void Function(TagReadResult)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    _watch
+      .._onData = onData
+      .._onDone = onDone;
+    return _watch._controller.stream.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
+}

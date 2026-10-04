@@ -27,8 +27,10 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
@@ -104,6 +106,13 @@ final class ControlledCatalogRepository
         ),
         null => super.getTagCatalog(mode),
       };
+
+  /// Источник наблюдения тега; без него наблюдение сразу отказывает.
+  Stream<TagReadResult> Function(TagId id)? tagObservations;
+
+  @override
+  Stream<TagReadResult> watchTag(TagId id) =>
+      tagObservations?.call(id) ?? super.watchTag(id);
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 

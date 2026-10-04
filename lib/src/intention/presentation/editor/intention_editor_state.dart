@@ -1,4 +1,5 @@
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../tag/application/tag_read_result.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../../tag/domain/tag_name.dart';
@@ -146,10 +147,62 @@ abstract interface class IntentionDraftTagSet {
   IntentionDraftTagAddition add(Tag tag);
 }
 
+/// Выбранный тег черновика для показа: последнее известное название и
+/// состояние его наблюдения.
+///
+/// Проекция отделена от набора идентичностей черновика: её изменения не
+/// меняют состав набора, изменённость черновика и данные отправки и не
+/// заменяют проверку существования тегов при сохранении.
+final class IntentionDraftTag {
+  const IntentionDraftTag({required this.name, required this.status});
+
+  /// Последнее подтверждённое название: сначала из выбора, затем из
+  /// наблюдения. Сохраняется при отсутствии тега и отказе чтения.
+  final TagName name;
+  final IntentionDraftTagStatus status;
+
+  IntentionDraftTag withStatus(IntentionDraftTagStatus value) =>
+      IntentionDraftTag(name: name, status: value);
+}
+
+sealed class IntentionDraftTagStatus {
+  const IntentionDraftTagStatus();
+}
+
+/// Наблюдение ещё не подтвердило тег; показывается название из выбора.
+final class IntentionDraftTagLoading extends IntentionDraftTagStatus {
+  const IntentionDraftTagLoading();
+}
+
+/// Наблюдение подтвердило тег и его актуальное название.
+final class IntentionDraftTagAvailable extends IntentionDraftTagStatus {
+  const IntentionDraftTagAvailable();
+}
+
+/// Наблюдение подтвердило отсутствие тега. Удалённый тег не возвращается с
+/// прежним идентификатором, поэтому он остаётся в наборе недоступным с
+/// последним известным названием до явного снятия.
+final class IntentionDraftTagMissing extends IntentionDraftTagStatus {
+  const IntentionDraftTagMissing();
+}
+
+/// Наблюдение завершилось отказом чтения; это не отсутствие тега.
+final class IntentionDraftTagReadFailed extends IntentionDraftTagStatus {
+  const IntentionDraftTagReadFailed(this.failure);
+
+  final TagReadFailure failure;
+
+  /// Повтор наблюдения предлагается только при устранимой недоступности.
+  bool get canRetry => switch (failure) {
+    TagReadUnavailableFailure() => true,
+    TagReadCorruptionFailure() || TagReadUnexpectedFailure() => false,
+  };
+}
+
 final class IntentionEditorState {
   const IntentionEditorState._({
     required this.draft,
-    required this.selectedTagNames,
+    required this.selectedTags,
     required this.operation,
     required this.event,
     required this.failurePresentation,
@@ -157,17 +210,17 @@ final class IntentionEditorState {
 
   const IntentionEditorState.initial()
     : draft = const IntentionCreationDraft.initial(),
-      selectedTagNames = const {},
+      selectedTags = const {},
       operation = const OperationIdle<Intention>(),
       event = null,
       failurePresentation = null;
 
   final IntentionCreationDraft draft;
 
-  /// Последние известные названия выбранных тегов — неизменяемая проекция
-  /// для показа с теми же ключами, что и набор черновика. Она не входит в
-  /// черновик и не влияет на его изменённость.
-  final Map<TagId, TagName> selectedTagNames;
+  /// Выбранные теги для показа — неизменяемая проекция с теми же ключами и
+  /// в том же порядке, что и набор черновика. Она не входит в черновик и не
+  /// влияет на его изменённость.
+  final Map<TagId, IntentionDraftTag> selectedTags;
   final OperationState<Intention> operation;
   final IntentionEditorEvent? event;
 
@@ -225,19 +278,36 @@ final class IntentionEditorState {
       ? this
       : _withEditedTags(
           draft.withTag(tag.id),
-          selectedTagNames: Map.unmodifiable({
-            ...selectedTagNames,
-            tag.id: tag.name,
+          selectedTags: Map.unmodifiable({
+            ...selectedTags,
+            tag.id: IntentionDraftTag(
+              name: tag.name,
+              status: const IntentionDraftTagLoading(),
+            ),
           }),
         );
 
   IntentionEditorState withoutTag(TagId id) => draft.tagIds.contains(id)
       ? _withEditedTags(
           draft.withoutTag(id),
-          selectedTagNames: Map.unmodifiable({
-            for (final MapEntry(:key, :value) in selectedTagNames.entries)
+          selectedTags: Map.unmodifiable({
+            for (final MapEntry(:key, :value) in selectedTags.entries)
               if (key != id) key: value,
           }),
+        )
+      : this;
+
+  /// Заменяет проекцию тега [id], только пока он входит в набор черновика:
+  /// проекция не возвращает снятый тег. Черновик, отправка и право
+  /// предъявления ошибки не меняются.
+  IntentionEditorState withSelectedTag(TagId id, IntentionDraftTag tag) =>
+      draft.tagIds.contains(id)
+      ? IntentionEditorState._(
+          draft: draft,
+          selectedTags: Map.unmodifiable({...selectedTags, id: tag}),
+          operation: operation,
+          event: event,
+          failurePresentation: failurePresentation,
         )
       : this;
 
@@ -255,7 +325,7 @@ final class IntentionEditorState {
     GraphInitiatorPresentationClaim? failurePresentation,
   }) => IntentionEditorState._(
     draft: draft,
-    selectedTagNames: selectedTagNames,
+    selectedTags: selectedTags,
     operation: value,
     event: event,
     failurePresentation: failurePresentation,
@@ -263,22 +333,20 @@ final class IntentionEditorState {
 
   IntentionEditorState withoutEvent() => IntentionEditorState._(
     draft: draft,
-    selectedTagNames: selectedTagNames,
+    selectedTags: selectedTags,
     operation: operation,
     event: null,
     failurePresentation: failurePresentation,
   );
 
-  IntentionEditorState _withDraft(
-    IntentionCreationDraft draft, {
-    Map<TagId, TagName>? selectedTagNames,
-  }) => IntentionEditorState._(
-    draft: draft,
-    selectedTagNames: selectedTagNames ?? this.selectedTagNames,
-    operation: operation,
-    event: event,
-    failurePresentation: failurePresentation,
-  );
+  IntentionEditorState _withDraft(IntentionCreationDraft draft) =>
+      IntentionEditorState._(
+        draft: draft,
+        selectedTags: selectedTags,
+        operation: operation,
+        event: event,
+        failurePresentation: failurePresentation,
+      );
 
   IntentionEditorState _withEditedText({
     required IntentionCreationDraft draft,
@@ -287,7 +355,7 @@ final class IntentionEditorState {
     final nextOperation = _operationAfterEditing(_DraftTextEdit(field));
     return IntentionEditorState._(
       draft: draft,
-      selectedTagNames: selectedTagNames,
+      selectedTags: selectedTags,
       operation: nextOperation,
       event: null,
       failurePresentation: nextOperation is OperationFailed<Intention>
@@ -298,14 +366,14 @@ final class IntentionEditorState {
 
   IntentionEditorState _withEditedTags(
     IntentionCreationDraft draft, {
-    required Map<TagId, TagName> selectedTagNames,
+    required Map<TagId, IntentionDraftTag> selectedTags,
   }) {
     final nextOperation = _operationAfterEditing(
       _DraftTagSetEdit(draft.tagIds),
     );
     return IntentionEditorState._(
       draft: draft,
-      selectedTagNames: selectedTagNames,
+      selectedTags: selectedTags,
       operation: nextOperation,
       event: event,
       failurePresentation: nextOperation is OperationFailed<Intention>

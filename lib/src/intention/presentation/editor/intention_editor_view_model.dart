@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_revision.dart';
+import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../tag/application/tag_read_result.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../application/intention_command.dart';
@@ -28,17 +31,26 @@ part 'intention_editor_view_model.g.dart';
 /// предъявления ошибки renderer страницы. Новая отправка становится доступна
 /// только после правки, устраняющей типизированную причину отказа, либо как
 /// явный повтор устранимой недоступности; сама сессия её не запускает.
+///
+/// Проекцию выбранных тегов сессия поддерживает собственным наблюдением
+/// `watchTag` каждого выбранного идентификатора. Наблюдение меняет только
+/// проекцию, не отправляет команд графа и освобождается при снятии тега и
+/// завершении сессии.
 @riverpod
 final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   late GraphCommandCoordinator _coordinator;
   late IntentionCreationFormKey _formKey;
+  late TagReadContract _tagReads;
   late _SessionDraftTagSet _draftTagSet;
   IntentionOperationToken? _activeToken;
+  final _tagObservations = <TagId, _DraftTagObservation>{};
+  var _tagObservationGeneration = 0;
 
   @override
   IntentionEditorState build(IntentionCreationFormKey formKey) {
     _formKey = formKey;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    _tagReads = ref.watch(personalGraphRepositoryProvider);
     const initial = IntentionEditorState.initial();
     final draftTagSet = _draftTagSet = _SessionDraftTagSet(
       this,
@@ -57,10 +69,12 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
           }
         case IntentionDraftAvailability.closed:
           draftTagSet._close();
+          _releaseTagObservations();
       }
     });
     ref.onDispose(() {
       draftTagSet._close();
+      _releaseTagObservations();
       final activeToken = _activeToken;
       if (activeToken != null) {
         _coordinator.releaseInitiatorPresentation(activeToken);
@@ -85,8 +99,28 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   }
 
   void removeTag(TagId id) {
-    if (_acceptsDraftChanges) {
+    if (_acceptsDraftChanges && state.draft.tagIds.contains(id)) {
       state = state.withoutTag(id);
+      _releaseTagObservation(id);
+    }
+  }
+
+  /// Повторяет наблюдение выбранного тега после устранимого отказа чтения.
+  /// Повтор меняет только проекцию и доступен, пока сессия не закрыта.
+  void retryTagObservation(TagId id) {
+    if (!_observesTags) {
+      return;
+    }
+    if (state.selectedTags[id]
+        case IntentionDraftTag(
+              status: IntentionDraftTagReadFailed(canRetry: true),
+            ) &&
+            final tag) {
+      state = state.withSelectedTag(
+        id,
+        tag.withStatus(const IntentionDraftTagLoading()),
+      );
+      _observeTag(id);
     }
   }
 
@@ -183,6 +217,14 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     IntentionOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
 
+  bool get _observesTags =>
+      ref.mounted &&
+      switch (state.draftAvailability) {
+        IntentionDraftAvailability.editable ||
+        IntentionDraftAvailability.submitting => true,
+        IntentionDraftAvailability.closed => false,
+      };
+
   bool get _acceptsDraftChanges =>
       ref.mounted &&
       switch (state.draftAvailability) {
@@ -205,8 +247,139 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
           return IntentionDraftTagAddition.alreadyIncluded;
         }
         state = state.withTag(tag);
+        _observeTag(tag.id);
         return IntentionDraftTagAddition.added;
     }
+  }
+
+  /// Начинает новое поколение наблюдения выбранного тега. При повторе
+  /// сохраняется ревизия последнего принятого ответа, чтобы более старый
+  /// снимок не вернул прежнее название.
+  void _observeTag(TagId id) {
+    final previous = _tagObservations.remove(id)?..release();
+    final generation = ++_tagObservationGeneration;
+    final observation = _tagObservations[id] = _DraftTagObservation(
+      generation,
+      revision: previous?.revision,
+    );
+    try {
+      observation.subscription = _tagReads
+          .watchTag(id)
+          .listen(
+            (result) => _onTagRead(id, generation, result),
+            onError: (Object _) => _tagObservationFailed(
+              id,
+              generation,
+              const TagReadUnexpectedFailure(),
+            ),
+            onDone: () => _tagObservationEnded(id, generation),
+          );
+    } on Object {
+      _tagObservationFailed(id, generation, const TagReadUnexpectedFailure());
+    }
+  }
+
+  void _onTagRead(TagId id, int generation, TagReadResult result) {
+    final observation = _activeTagObservation(id, generation);
+    final tag = state.selectedTags[id];
+    if (observation == null || tag == null) {
+      return;
+    }
+    switch (result) {
+      case TagReadSuccess(:final value):
+        final known = observation.revision;
+        if (known != null &&
+            value.revision.compareTo(known) == GraphRevisionOrder.older) {
+          return;
+        }
+        final observed = value.value;
+        if (observed != null && observed.id != id) {
+          _tagObservationFailed(
+            id,
+            generation,
+            const TagReadCorruptionFailure(),
+          );
+          return;
+        }
+        observation.revision = value.revision;
+        // Новая ревизия без изменения тега не публикует проекцию заново.
+        switch ((observed, tag.status)) {
+          case (null, IntentionDraftTagMissing()):
+            return;
+          case (final Tag current, IntentionDraftTagAvailable())
+              when current.name == tag.name:
+            return;
+          case (null, _):
+            state = state.withSelectedTag(
+              id,
+              tag.withStatus(const IntentionDraftTagMissing()),
+            );
+          case (final Tag current, _):
+            state = state.withSelectedTag(
+              id,
+              IntentionDraftTag(
+                name: current.name,
+                status: const IntentionDraftTagAvailable(),
+              ),
+            );
+        }
+      case TagReadError(:final failure):
+        _tagObservationFailed(id, generation, failure);
+    }
+  }
+
+  /// Отказ завершает поколение наблюдения: его поздние ответы не
+  /// принимаются, а причина сохраняется до явного повтора.
+  void _tagObservationFailed(TagId id, int generation, TagReadFailure failure) {
+    final observation = _activeTagObservation(id, generation);
+    final tag = state.selectedTags[id];
+    if (observation == null || tag == null) {
+      return;
+    }
+    observation.release();
+    state = state.withSelectedTag(
+      id,
+      tag.withStatus(IntentionDraftTagReadFailed(failure)),
+    );
+  }
+
+  /// Подтверждённое отсутствие окончательно и переживает окончание потока;
+  /// иное окончание без установленной причины — неизвестный отказ.
+  void _tagObservationEnded(TagId id, int generation) {
+    final observation = _activeTagObservation(id, generation);
+    final tag = state.selectedTags[id];
+    if (observation == null || tag == null) {
+      return;
+    }
+    switch (tag.status) {
+      case IntentionDraftTagMissing() || IntentionDraftTagReadFailed():
+        observation.release();
+      case IntentionDraftTagLoading() || IntentionDraftTagAvailable():
+        _tagObservationFailed(id, generation, const TagReadUnexpectedFailure());
+    }
+  }
+
+  /// Наблюдение, которому ещё принадлежит право менять проекцию тега [id].
+  _DraftTagObservation? _activeTagObservation(TagId id, int generation) {
+    if (!ref.mounted) {
+      return null;
+    }
+    final observation = _tagObservations[id];
+    return observation != null &&
+            observation.isActive &&
+            observation.generation == generation
+        ? observation
+        : null;
+  }
+
+  void _releaseTagObservation(TagId id) =>
+      _tagObservations.remove(id)?.release();
+
+  void _releaseTagObservations() {
+    for (final observation in _tagObservations.values) {
+      observation.release();
+    }
+    _tagObservations.clear();
   }
 
   void _changeFavoriteMark(FavoriteMark value) {
@@ -264,5 +437,23 @@ final class _SessionDraftTagSet implements IntentionDraftTagSet {
     );
     _isClosed = true;
     unawaited(_changes.close());
+  }
+}
+
+/// Одно поколение наблюдения выбранного тега черновика.
+final class _DraftTagObservation {
+  _DraftTagObservation(this.generation, {this.revision});
+
+  final int generation;
+
+  /// Ревизия последнего принятого ответа о теге.
+  GraphRevision? revision;
+  StreamSubscription<TagReadResult>? subscription;
+  bool isActive = true;
+
+  void release() {
+    isActive = false;
+    unawaited(subscription?.cancel());
+    subscription = null;
   }
 }
