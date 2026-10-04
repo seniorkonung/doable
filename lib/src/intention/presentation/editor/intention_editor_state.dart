@@ -107,6 +107,7 @@ final class IntentionEditorState {
         const OperationIdle<Intention>(),
       IntentionGenericValidationFailure() => const OperationIdle<Intention>(),
       IntentionTextInputValidationFailure() ||
+      IntentionCreationTagsMissingFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
       IntentionHasBlockingRelationsFailure() ||

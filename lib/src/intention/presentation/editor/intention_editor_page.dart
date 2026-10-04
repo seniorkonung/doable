@@ -184,7 +184,8 @@ final class _IntentionEditorPageState
               textFailure.field == IntentionTextField.description =>
         null,
       IntentionGenericValidationFailure() ||
-      IntentionTextInputValidationFailure() => localizations.editorInvalidInput,
+      IntentionTextInputValidationFailure() ||
+      IntentionCreationTagsMissingFailure() => localizations.editorInvalidInput,
       IntentionConflictFailure() => localizations.editorCreateConflict,
       IntentionHasBlockingRelationsFailure() =>
         localizations.editorCreateUnexpected,

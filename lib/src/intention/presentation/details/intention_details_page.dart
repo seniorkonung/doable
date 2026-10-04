@@ -274,7 +274,8 @@ final class _FavoriteMarkFailureBanner extends StatelessWidget {
 
   String _message(AppLocalizations localizations) => switch (failure) {
     IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() =>
+    IntentionTextInputValidationFailure() ||
+    IntentionCreationTagsMissingFailure() =>
       localizations.detailsFavoriteMarkInvalid,
     IntentionNotFoundFailure() => localizations.detailsFavoriteMarkNotFound,
     IntentionConflictFailure() => localizations.detailsFavoriteMarkConflict,
@@ -834,7 +835,8 @@ final class _DetailsActions extends StatelessWidget {
     IntentionFailure failure,
   ) => switch (failure) {
     IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() => localizations.detailsDeleteInvalid,
+    IntentionTextInputValidationFailure() ||
+    IntentionCreationTagsMissingFailure() => localizations.detailsDeleteInvalid,
     IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
     IntentionConflictFailure() => localizations.detailsDeleteConflict,
     IntentionHasBlockingRelationsFailure() =>
@@ -849,7 +851,8 @@ final class _DetailsActions extends StatelessWidget {
     IntentionFailure failure,
   ) => switch (failure) {
     IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() =>
+    IntentionTextInputValidationFailure() ||
+    IntentionCreationTagsMissingFailure() =>
       localizations.detailsStateChangeInvalid,
     IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
     IntentionConflictFailure() => localizations.detailsStateChangeConflict,
@@ -1055,7 +1058,8 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
               textFailure.field == IntentionTextField.description =>
         null,
       IntentionGenericValidationFailure() ||
-      IntentionTextInputValidationFailure() =>
+      IntentionTextInputValidationFailure() ||
+      IntentionCreationTagsMissingFailure() =>
         localizations.detailsUpdateInvalidInput,
       IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
       IntentionConflictFailure() => localizations.detailsUpdateConflict,
