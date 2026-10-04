@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/fts_integrity.dart';
 import 'package:doable/src/data/local/sqlite_connection_setup.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -14,11 +17,22 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
+import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/application/tagged_intentions_page.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/doable_schema_verifier.dart';
+import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_creation_durability_fixture.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/tag_storage_fixture.dart';
 
 void main() {
   group('file-backed DriftPersonalGraphRepository', () {
@@ -534,7 +548,543 @@ void main() {
       );
     }
   });
+
+  group('Полное создание намерения в файловом хранилище', () {
+    test('повторное открытие восстанавливает подтверждённое намерение со '
+        'всеми тегами, готовностью, избранным, местом и временем в новой '
+        'эпохе ревизий', () async {
+      final harness = await LocalDatabaseHarness.fileBacked();
+      addTearDown(harness.dispose);
+      final prepared = await _prepareCreationStorage(harness);
+
+      final database = await harness.openReadyDatabase();
+      final result = await creationDurabilityRepository(database)
+          .execute(creationDurabilityCommand());
+      expect(
+        result,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      final creationRevision =
+          (result
+                  as ResultSuccess<
+                    ConfirmedGraphResult<IntentionCommandSuccess>
+                  >)
+              .value
+              .revision;
+      await harness.closePersistenceObjectGraph();
+
+      late sqlite.Database raw;
+      final reopenedDatabase = await harness.openReadyDatabase(
+        setup: (db) => raw = db,
+      );
+      final reopenedRepository = _reopenedRepository(reopenedDatabase);
+
+      final reopenedRevision = await _expectWholeCreation(
+        reopenedRepository,
+        raw,
+        prepared,
+      );
+      expect(
+        creationRevision.compareTo(reopenedRevision),
+        GraphRevisionOrder.differentEpoch,
+      );
+      await _expectIntactStorage(
+        reopenedRepository,
+        reopenedDatabase,
+        raw,
+        prepared,
+      );
+    });
+
+    for (final boundary in _CreationFaultBoundary.values) {
+      test('отказ ${boundary.description} не оставляет частей создания '
+          'после повторного открытия', () async {
+        final harness = await LocalDatabaseHarness.fileBacked();
+        addTearDown(harness.dispose);
+        final prepared = await _prepareCreationStorage(harness);
+        final interceptor = _CreationFaultInterceptor(boundary);
+
+        final database = await harness.openReadyDatabase(observer: interceptor);
+        interceptor.arm();
+        final result = await creationDurabilityRepository(database)
+            .execute(creationDurabilityCommand());
+        expect(result, _unexpectedCommandFailure());
+        expect(interceptor.hasFailed, isTrue);
+        await harness.closePersistenceObjectGraph();
+
+        late sqlite.Database raw;
+        final reopenedDatabase = await harness.openReadyDatabase(
+          setup: (db) => raw = db,
+        );
+        final repository = _reopenedRepository(reopenedDatabase);
+        await _expectNoCreation(repository, raw, prepared);
+        await _expectIntactStorage(repository, reopenedDatabase, raw, prepared);
+      });
+    }
+
+    group('Остановка отдельного процесса', () {
+      for (final stopPoint in _CreationStopPoint.values) {
+        test('${stopPoint.testDescription} оставляет целое состояние после '
+            'повторного открытия', () async {
+          final harness = await LocalDatabaseHarness.fileBacked();
+          addTearDown(harness.dispose);
+          final prepared = await _prepareCreationStorage(harness);
+
+          await _runCreationWorkerUntilStopPoint(harness, stopPoint);
+
+          late sqlite.Database raw;
+          final reopenedDatabase = await harness.openReadyDatabase(
+            setup: (db) => raw = db,
+          );
+          final repository = _reopenedRepository(reopenedDatabase);
+          switch (stopPoint) {
+            case _CreationStopPoint.beforeCommit:
+              await _expectNoCreation(repository, raw, prepared);
+            case _CreationStopPoint.afterCommit:
+              await _expectWholeCreation(repository, raw, prepared);
+          }
+          await _expectIntactStorage(
+            repository,
+            reopenedDatabase,
+            raw,
+            prepared,
+          );
+        }, timeout: Timeout.none);
+      }
+    });
+  });
 }
+
+/// Хранилище до создания намерения: строки прежнего графа, схема и ревизия
+/// репозитория, который записал прежний граф.
+typedef _PreparedCreationStorage = ({
+  Map<String, List<List<Object?>>> graph,
+  List<List<Object?>> schema,
+  GraphRevision revision,
+});
+
+/// Записывает прежний граф и самостоятельный тег «Спорт» отдельной
+/// подтверждённой командой и закрывает хранилище.
+Future<_PreparedCreationStorage> _prepareCreationStorage(
+  LocalDatabaseHarness harness,
+) async {
+  late sqlite.Database raw;
+  final database = await harness.openReadyDatabase(setup: (db) => raw = db);
+  seedCreationDurabilityGraph(raw);
+  final created = await creationDurabilityRepository(database)
+      .execute(CreateTag(TagName.fromInput('Спорт')));
+  expect(created, isA<TagCommandSucceeded>());
+  final prepared = (
+    graph: _storedGraph(raw),
+    schema: _storedSchema(raw),
+    revision: (created as TagCommandSucceeded).value.revision,
+  );
+  await harness.closePersistenceObjectGraph();
+  return prepared;
+}
+
+/// Репозиторий повторно открытого хранилища: собственных идентификаторов и
+/// показаний часов у него нет, ревизии начинаются в новой эпохе.
+DriftPersonalGraphRepository _reopenedRepository(AppDatabase database) =>
+    DriftPersonalGraphRepository(
+      database,
+      _SequenceIntentionIdGenerator(const []),
+      () => DateTime.utc(2026, 10, 4, 18),
+      InMemoryDiagnosticsSink(),
+    );
+
+/// Подтверждённое полное создание видно публичными чтениями и поиском,
+/// а прежний граф не изменён. Возвращает ревизию чтения намерения.
+Future<GraphRevision> _expectWholeCreation(
+  DriftPersonalGraphRepository repository,
+  sqlite.Database raw,
+  _PreparedCreationStorage prepared,
+) async {
+  final id = creationDurabilityIntentionId;
+  final standaloneTagId = creationDurabilityStandaloneTagId;
+  final existingTagId = creationDurabilityExistingTagId;
+
+  final snapshot = _readValue(await repository.watchIntention(id).first);
+  expect(
+    prepared.revision.compareTo(snapshot.revision),
+    GraphRevisionOrder.differentEpoch,
+  );
+  final details = snapshot.value;
+  expect(details, isNotNull);
+  final intention = details!.intention;
+  expect(intention.title, 'Полное намерение');
+  expect(intention.description, '  Подробное\nописание  ');
+  expect(intention.readiness, IntentionReadiness.ready);
+  expect(intention.archiveState, IntentionArchiveState.active);
+  expect(intention.createdAt.value, creationDurabilityTime);
+  expect(intention.updatedAt.value, creationDurabilityTime);
+  expect(details.favoriteMark, FavoriteMark.favorite);
+
+  final assignments = _readValue(await repository.getTagAssignments(id));
+  expect(
+    [for (final tag in assignments.items) (tag.id, tag.name.value)],
+    [(existingTagId, 'Дом'), (standaloneTagId, 'Спорт')],
+  );
+
+  // Поиск сочетает название с готовностью и обоими назначенными тегами.
+  final found = _firstPage(
+    await repository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: 'полное',
+        tagFilter: IntentionTagFilter(
+          requiredTagIds: [existingTagId, standaloneTagId],
+        ),
+        order: IntentionCatalogOrder.createdAtAscending,
+        pageSize: 10,
+      ),
+    ),
+  );
+  expect(found.totalCount, 1);
+  final summary = found.items.single;
+  expect(summary.id, id);
+  expect(summary.readiness, IntentionReadiness.ready);
+  expect(summary.favoriteMark, FavoriteMark.favorite);
+  expect(summary.tags.map((tag) => tag.id), [existingTagId, standaloneTagId]);
+  expect(summary.createdAt.value, creationDurabilityTime);
+  expect(summary.updatedAt.value, creationDurabilityTime);
+
+  final favorites = _readValue(await repository.getFavoriteIntentions());
+  expect(favorites.items.map((row) => row.id), [_id(tagFixtureId(1)), id]);
+  expect(favorites.archivedCount, 1);
+  expect(await _taggedActiveIds(repository, standaloneTagId), [id]);
+  expect(await _taggedActiveIds(repository, existingTagId), [
+    _id(tagFixtureId(1)),
+    id,
+  ]);
+
+  // Место встаёт за максимумом всего порядка, включая архивированное.
+  expect(storedFavoriteMarks(raw), [
+    (tagFixtureId(1), 2),
+    (tagFixtureId(2), 5),
+    (id.toCanonicalString(), 6),
+  ]);
+  expect(_storedGraph(raw, excluded: id), prepared.graph);
+  return snapshot.revision;
+}
+
+/// Ни намерения, ни его назначений, ни места избранного нет: публичные
+/// чтения и строки хранилища совпадают с прежним графом.
+Future<void> _expectNoCreation(
+  DriftPersonalGraphRepository repository,
+  sqlite.Database raw,
+  _PreparedCreationStorage prepared,
+) async {
+  final id = creationDurabilityIntentionId;
+  expect(_watched(await repository.watchIntention(id).first), isNull);
+  expect(
+    await repository.getTagAssignments(id),
+    isA<TagAssignmentsError>().having(
+      (result) => result.failure,
+      'причина',
+      isA<TagAssignmentsIntentionNotFound>(),
+    ),
+  );
+  final found = _firstPage(
+    await repository.getCatalogPage(
+      _catalogQuery(IntentionScope.all, titleFilter: 'полное'),
+    ),
+  );
+  expect(found.totalCount, 0);
+  expect(found.items, isEmpty);
+
+  final favorites = _readValue(await repository.getFavoriteIntentions());
+  expect(favorites.items.map((row) => row.id), [_id(tagFixtureId(1))]);
+  expect(favorites.archivedCount, 1);
+  expect(
+    await _taggedActiveIds(repository, creationDurabilityStandaloneTagId),
+    isEmpty,
+  );
+  expect(await _taggedActiveIds(repository, creationDurabilityExistingTagId), [
+    _id(tagFixtureId(1)),
+  ]);
+
+  expect(storedFavoriteMarks(raw), [
+    (tagFixtureId(1), 2),
+    (tagFixtureId(2), 5),
+  ]);
+  expect(_storedGraph(raw), prepared.graph);
+}
+
+/// Самостоятельный тег доступен, хранилище целостно, поисковая проекция
+/// согласована, а схема и её версия не изменились.
+Future<void> _expectIntactStorage(
+  DriftPersonalGraphRepository repository,
+  AppDatabase database,
+  sqlite.Database raw,
+  _PreparedCreationStorage prepared,
+) async {
+  final tags = _readValue(
+    await repository.getTagCatalog(const TagCatalogBrowseMode()),
+  );
+  expect(
+    [for (final tag in tags.items) (tag.id, tag.name.value)],
+    containsAllInOrder([
+      (creationDurabilityExistingTagId, 'Дом'),
+      (creationDurabilityStandaloneTagId, 'Спорт'),
+    ]),
+  );
+  expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
+  expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+  await verifyIntentionTitlesFtsIntegrity(database);
+  await expectLater(verifyDoableDatabaseSchema(database), completes);
+  expect(
+    raw.select('PRAGMA user_version').single.values.single,
+    AppDatabase.currentSchemaVersion,
+  );
+  expect(_storedSchema(raw), prepared.schema);
+}
+
+Future<List<IntentionId>> _taggedActiveIds(
+  DriftPersonalGraphRepository repository,
+  TagId tagId,
+) async => [
+  for (final item in _readValue(
+    await repository.getTaggedIntentionsPage(
+      TaggedIntentionsQuery(tagId: tagId, scope: TaggedIntentionsScope.active),
+    ),
+  ).items)
+    item.id,
+];
+
+/// Строки личного графа в порядке записи. Для намерения [excluded] не
+/// учитываются его собственная строка, назначения и место избранного.
+Map<String, List<List<Object?>>> _storedGraph(
+  sqlite.Database database, {
+  IntentionId? excluded,
+}) => {
+  for (final (table, ownerColumn) in const [
+    ('intentions', 'id'),
+    ('tag_assignments', 'intention_id'),
+    ('favorite_intentions', 'intention_id'),
+    ('tags', null),
+    ('long_term_relations', null),
+    ('daily_choices', null),
+    ('daily_choice_path_steps', null),
+  ])
+    table: database
+        .select(
+          switch (ownerColumn) {
+            null => 'SELECT * FROM $table ORDER BY rowid',
+            final column =>
+              'SELECT * FROM $table WHERE $column IS NOT ? ORDER BY rowid',
+          },
+          [if (ownerColumn != null) excluded?.toCanonicalString()],
+        )
+        .map((row) => row.values.toList())
+        .toList(),
+};
+
+List<List<Object?>> _storedSchema(sqlite.Database database) => database
+    .select('SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY name')
+    .map((row) => row.values.toList())
+    .toList();
+
+T _readValue<T, F extends GraphCommandFailure>(GraphResult<T, F> result) =>
+    switch (result) {
+      GraphResultSuccess(:final value) => value,
+      GraphResultFailure(:final failure) => throw TestFailure(
+        'Ожидался успех чтения, получен отказ $failure.',
+      ),
+    };
+
+Future<void> _runCreationWorkerUntilStopPoint(
+  LocalDatabaseHarness harness,
+  _CreationStopPoint stopPoint,
+) async {
+  final workerPath = File.fromUri(
+    Directory.current.uri.resolve(
+      'test/support/graph_operation_process_worker.dart',
+    ),
+  ).path;
+  final process = await Process.start(
+    _findFlutterExecutable(),
+    ['test', '--no-pub', '--reporter', 'compact', workerPath],
+    workingDirectory: Directory.current.path,
+    environment: {
+      _workerOperationEnvironment: 'intention_full_create',
+      _workerStopPointEnvironment: stopPoint.environmentValue,
+      _workerDatabasePathEnvironment: harness.databaseFile.path,
+    },
+  );
+  final stdoutBuffer = StringBuffer();
+  final stderrBuffer = StringBuffer();
+  final ready = Completer<int>();
+  final startedPidPattern = RegExp('$_workerStartedMarker:(\\d+)');
+  final readyPidPattern = RegExp('$_workerReadyMarker:(\\d+)');
+  final stdoutDone = Completer<void>();
+  final stderrDone = Completer<void>();
+  int? startedWorkerPid;
+
+  process.stdout.transform(utf8.decoder).listen((chunk) {
+    stdoutBuffer.write(chunk);
+    final output = stdoutBuffer.toString();
+    final startedMatch = startedPidPattern.firstMatch(output);
+    if (startedMatch != null) {
+      startedWorkerPid = int.parse(startedMatch.group(1)!);
+    }
+    final readyMatch = readyPidPattern.firstMatch(output);
+    if (readyMatch != null && !ready.isCompleted) {
+      ready.complete(int.parse(readyMatch.group(1)!));
+    }
+  }, onDone: stdoutDone.complete);
+  process.stderr
+      .transform(utf8.decoder)
+      .listen(stderrBuffer.write, onDone: stderrDone.complete);
+  unawaited(
+    process.exitCode.then((exitCode) {
+      if (!ready.isCompleted) {
+        ready.completeError(
+          StateError(
+            'Процесс полного создания завершился с кодом $exitCode до точки '
+            '${stopPoint.environmentValue}.\nstdout:\n$stdoutBuffer\n'
+            'stderr:\n$stderrBuffer',
+          ),
+        );
+      }
+    }),
+  );
+
+  var workerWasKilled = false;
+  try {
+    final workerPid = await ready.future.timeout(
+      const Duration(seconds: 45),
+      onTimeout: () => throw TimeoutException(
+        'Процесс полного создания не достиг точки '
+        '${stopPoint.environmentValue}.\nstdout:\n$stdoutBuffer\n'
+        'stderr:\n$stderrBuffer',
+      ),
+    );
+    // Точку остановки сообщил тот же отдельный процесс, который начал
+    // операцию, а не процесс самого теста.
+    expect(workerPid, startedWorkerPid);
+    expect(workerPid, isNot(pid));
+    workerWasKilled = Process.killPid(workerPid, ProcessSignal.sigkill);
+    expect(
+      workerWasKilled,
+      isTrue,
+      reason: 'Не удалось принудительно завершить процесс полного создания.',
+    );
+  } finally {
+    if (!workerWasKilled) {
+      final workerPid = startedWorkerPid;
+      if (workerPid != null) {
+        Process.killPid(workerPid, ProcessSignal.sigkill);
+      }
+      process.kill(ProcessSignal.sigkill);
+    }
+  }
+
+  final exitCode = await process.exitCode.timeout(const Duration(seconds: 15));
+  await Future.wait([stdoutDone.future, stderrDone.future]);
+  expect(exitCode, isNot(0));
+}
+
+String _findFlutterExecutable() {
+  var directory = File(Platform.resolvedExecutable).parent;
+  while (true) {
+    final candidate = File(
+      '${directory.path}/bin/${Platform.isWindows ? 'flutter.bat' : 'flutter'}',
+    );
+    if (candidate.existsSync()) return candidate.path;
+    final parent = directory.parent;
+    if (parent.path == directory.path) {
+      throw StateError(
+        'Не удалось найти Flutter SDK от Platform.resolvedExecutable.',
+      );
+    }
+    directory = parent;
+  }
+}
+
+enum _CreationStopPoint {
+  beforeCommit(
+    environmentValue: 'before_commit',
+    testDescription:
+        'остановка после всех записей полного создания до подтверждения',
+  ),
+  afterCommit(
+    environmentValue: 'after_commit',
+    testDescription: 'остановка после подтверждения полного создания',
+  );
+
+  const _CreationStopPoint({
+    required this.environmentValue,
+    required this.testDescription,
+  });
+
+  final String environmentValue;
+  final String testDescription;
+}
+
+/// Границы транзакции полного создания, сразу после которых она отказывает.
+enum _CreationFaultBoundary {
+  intentionInsert('после вставки намерения'),
+  firstAssignment('после части назначений'),
+  favoritePlace('после записи места избранного'),
+  finalRead('при чтении окончательного результата');
+
+  const _CreationFaultBoundary(this.description);
+
+  final String description;
+}
+
+/// После [arm] прерывает транзакцию на заданной границе: действие операции
+/// уже внесено в транзакцию, а её результат не доходит до репозитория.
+final class _CreationFaultInterceptor extends LocalDatabaseConnectionObserver {
+  _CreationFaultInterceptor(this._boundary);
+
+  final _CreationFaultBoundary _boundary;
+  var _armed = false;
+  var _wroteFavoritePlace = false;
+  var hasFailed = false;
+
+  void arm() => _armed = true;
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (!_armed || hasFailed) return;
+    final insertedTable = switch (statement.operation) {
+      LocalDatabaseSqlOperation.insert => _insertedTable(statement),
+      _ => null,
+    };
+    final reached = switch (_boundary) {
+      _CreationFaultBoundary.intentionInsert => insertedTable == 'intentions',
+      _CreationFaultBoundary.firstAssignment =>
+        insertedTable == 'tag_assignments',
+      _CreationFaultBoundary.favoritePlace =>
+        insertedTable == 'favorite_intentions',
+      _CreationFaultBoundary.finalRead =>
+        _wroteFavoritePlace &&
+            statement.operation == LocalDatabaseSqlOperation.select,
+    };
+    if (insertedTable == 'favorite_intentions') _wroteFavoritePlace = true;
+    if (!reached) return;
+    hasFailed = true;
+    throw StateError('CANARY-creation-fault');
+  }
+}
+
+String _insertedTable(LocalDatabaseSqlStatement statement) {
+  final match = RegExp(
+    r'^\s*INSERT\s+INTO\s+"?(\w+)"?',
+    caseSensitive: false,
+  ).firstMatch(statement.statements.single);
+  return match?.group(1) ??
+      (throw StateError('Не удалось определить таблицу вставки.'));
+}
+
+const _workerOperationEnvironment = 'DOABLE_GRAPH_OPERATION';
+const _workerStopPointEnvironment = 'DOABLE_GRAPH_STOP_POINT';
+const _workerDatabasePathEnvironment = 'DOABLE_GRAPH_DATABASE_PATH';
+const _workerStartedMarker = 'DOABLE_GRAPH_WORKER_STARTED';
+const _workerReadyMarker = 'DOABLE_GRAPH_WORKER_READY';
 
 Future<GraphRevision> _createFirstObjectGraph(
   LocalDatabaseHarness harness, {
