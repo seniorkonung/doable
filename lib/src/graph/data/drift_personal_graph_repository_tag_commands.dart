@@ -302,6 +302,34 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     return tag;
   }
 
+  /// Находит сохранённые теги набора [ids] одним чтением; отсутствующих
+  /// тегов в результате нет. Набор передаётся одним JSON-параметром, поэтому
+  /// его размер не ограничен числом параметров SQL-выражения.
+  Future<Map<TagId, tag_domain.Tag>> _findTagsByIds(Set<TagId> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await _database
+        .customSelect(
+          'SELECT id, name FROM tags '
+          'WHERE id IN (SELECT value FROM json_each(?))',
+          variables: [
+            Variable<String>(
+              jsonEncode([for (final id in ids) id.toCanonicalString()]),
+            ),
+          ],
+          readsFrom: {_database.tags},
+        )
+        .get();
+    final found = <TagId, tag_domain.Tag>{};
+    for (final row in rows) {
+      final tag = _decodeStoredTag(row.data);
+      if (!ids.contains(tag.id) || found.containsKey(tag.id)) {
+        throw const _StoredIntentionCorruption();
+      }
+      found[tag.id] = tag;
+    }
+    return found;
+  }
+
   Future<tag_domain.Tag?> _findTagByNameKey(String key) async {
     final row = await _database
         .customSelect(

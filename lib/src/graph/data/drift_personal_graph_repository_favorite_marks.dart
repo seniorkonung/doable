@@ -63,13 +63,21 @@ extension _FavoriteMarkCommands on DriftPersonalGraphRepository {
     id,
     domain.FavoriteMark.favorite,
     onWrite: onWrite,
-    write: () => _database.customInsert(
+    write: () => _insertFavoritePlace(id),
+  );
+
+  /// Записывает отметку намерения [id] на месте после текущего максимума
+  /// всего порядка, включая места архивированных намерений. Существование
+  /// намерения и отсутствие его отметки проверяет вызывающая операция.
+  /// Вызывается внутри транзакции команды.
+  Future<void> _insertFavoritePlace(IntentionId id) async {
+    await _database.customInsert(
       '''INSERT INTO favorite_intentions (intention_id, position)
        SELECT ?, COALESCE(MAX(position), 0) + 1 FROM favorite_intentions''',
       variables: [Variable<String>(id.toCanonicalString())],
       updates: {_database.favoriteIntentions},
-    ),
-  );
+    );
+  }
 
   /// Снимает отметку избранного существующего намерения удалением её строки;
   /// места остальных избранных намерений не меняются. Вызывается внутри

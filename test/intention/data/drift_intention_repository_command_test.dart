@@ -1,4 +1,7 @@
-import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/data/local/app_database.dart'
+    hide Intention, TagAssignment;
+import 'package:doable/src/favorite/application/favorite_intentions.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -11,14 +14,18 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -1858,8 +1865,444 @@ void main() {
       ).revision;
       expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
     });
+
+    group('Создание с полным начальным состоянием', () {
+      // «Выходные» созданы раньше «Дома»: собственные теги снимка следуют
+      // порядку создания тегов, а не порядку выбора в команде.
+      final weekendTagId = _tagId(tagFixtureId(firstTagNumber));
+      final homeTagId = _tagId(tagFixtureId(lastTagNumber));
+      final newId = _id(_firstUuid);
+      final activeFavoriteId = _idForSequence(0x601);
+      final archivedFavoriteId = _idForSequence(0x602);
+      final createdAt = DateTime.utc(2026, 9, 3, 12);
+      final allQuery = IntentionCatalogQuery(
+        scope: IntentionScope.all,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 100,
+      );
+      final readyHomeQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.readyOnly,
+        titleFilter: null,
+        tagFilter: IntentionTagFilter(requiredTagIds: [homeTagId]),
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 100,
+      );
+
+      setUp(() async {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          weekendTagId.toCanonicalString(),
+          'Выходные',
+        ]);
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          homeTagId.toCanonicalString(),
+          'Дом',
+        ]);
+        await _insertIntention(
+          database,
+          id: activeFavoriteId.toCanonicalString(),
+          title: 'Активное избранное',
+          createdAt: DateTime.utc(2026, 9, 1),
+        );
+        await _insertIntention(
+          database,
+          id: archivedFavoriteId.toCanonicalString(),
+          title: 'Архивное избранное',
+          isArchived: true,
+          createdAt: DateTime.utc(2026, 9, 2),
+        );
+        // Последнее место полного порядка принадлежит архивному намерению.
+        storeFavoriteMark(
+          raw,
+          intentionId: activeFavoriteId.toCanonicalString(),
+          position: 2,
+        );
+        storeFavoriteMark(
+          raw,
+          intentionId: archivedFavoriteId.toCanonicalString(),
+          position: 5,
+        );
+        writeTrace.operations.clear();
+        writeTrace.updateStatements.clear();
+      });
+
+      final scenarios = [
+        (
+          name: 'минимальная команда',
+          command: const CreateIntention(
+            title: '  Убрать дом  ',
+            description: '  Вымыть окна\n',
+          ),
+          readiness: IntentionReadiness.notReady,
+          favoriteMark: FavoriteMark.notFavorite,
+          withTags: false,
+        ),
+        for (final readiness in IntentionReadiness.values)
+          for (final favoriteMark in FavoriteMark.values)
+            for (final withTags in [false, true])
+              (
+                name: [
+                  switch (readiness) {
+                    IntentionReadiness.ready => 'готовность',
+                    IntentionReadiness.notReady => 'без готовности',
+                  },
+                  switch (favoriteMark) {
+                    FavoriteMark.favorite => 'избранное',
+                    FavoriteMark.notFavorite => 'без избранного',
+                  },
+                  withTags ? 'два тега' : 'без тегов',
+                ].join(', '),
+                command: CreateIntention.withInitialState(
+                  title: '  Убрать дом  ',
+                  description: '  Вымыть окна\n',
+                  readiness: readiness,
+                  favoriteMark: favoriteMark,
+                  tagIds: withTags
+                      ? [homeTagId, weekendTagId, homeTagId]
+                      : const <TagId>[],
+                ),
+                readiness: readiness,
+                favoriteMark: favoriteMark,
+                withTags: withTags,
+              ),
+      ];
+
+      for (final scenario in scenarios) {
+        test(
+          '${scenario.name}: одна транзакция даёт целый пакет новой ревизии, '
+          'совпадающий с повторным чтением графа',
+          () async {
+            final revisionBefore = _firstCatalogPage(
+              await repository.getCatalogPage(allQuery),
+            ).revision;
+            final isFavorite = scenario.favoriteMark == FavoriteMark.favorite;
+            final expectedTagIds = scenario.withTags
+                ? [weekendTagId, homeTagId]
+                : const <TagId>[];
+
+            final result = await repository.execute(scenario.command);
+
+            // Записи одной команды: строка намерения, назначения и место
+            // избранного без последующих изменений строки намерения.
+            expect(
+              writeTrace.operations.where(
+                (operation) => operation == LocalDatabaseSqlOperation.insert,
+              ),
+              hasLength(1 + expectedTagIds.length + (isFavorite ? 1 : 0)),
+            );
+            expect(
+              writeTrace.operations,
+              isNot(
+                anyOf(
+                  contains(LocalDatabaseSqlOperation.update),
+                  contains(LocalDatabaseSqlOperation.delete),
+                ),
+              ),
+            );
+            expect(
+              diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+              [_successfulCommand(IntentionCommandDiagnosticsType.create)],
+            );
+            expect(
+              diagnostics.events.whereType<TagCommandDiagnosticsEvent>(),
+              isEmpty,
+            );
+
+            final confirmed = _confirmedCommand(result);
+            expect(
+              confirmed.revision.compareTo(revisionBefore),
+              GraphRevisionOrder.newer,
+            );
+            final saved = _commandSuccess(result) as IntentionSaved;
+            final created = saved.catalogMutation as IntentionCatalogCreated;
+            expect(saved.catalogMutations, [same(created)]);
+            expect(confirmed.changes, [
+              same(created),
+              for (final tagId in expectedTagIds)
+                isA<TagAssignmentChangedChange>()
+                    .having(
+                      (change) => change.assignment,
+                      'assignment',
+                      TagAssignment(tagId: tagId, intentionId: newId),
+                    )
+                    .having(
+                      (change) => change.state,
+                      'state',
+                      TagAssignmentState.assigned,
+                    ),
+            ]);
+
+            final intention = saved.intention;
+            expect(intention.id, newId);
+            expect(intention.title, 'Убрать дом');
+            expect(intention.description, '  Вымыть окна\n');
+            expect(intention.readiness, scenario.readiness);
+            expect(intention.archiveState, IntentionArchiveState.active);
+            expect(intention.createdAt.value, createdAt);
+            expect(intention.updatedAt, intention.createdAt);
+            expect(idGenerator.generated, [newId]);
+            expect(clock.calls, 1);
+
+            final summary = created.entry.summary;
+            expect(summary.id, newId);
+            expect(summary.readiness, scenario.readiness);
+            expect(summary.favoriteMark, scenario.favoriteMark);
+            expect(summary.archiveState, IntentionArchiveState.active);
+            expect(summary.createdAt, intention.createdAt);
+            expect(summary.updatedAt, intention.createdAt);
+            expect(summary.tags.map((tag) => tag.id), expectedTagIds);
+            expect(
+              summary.tags.map((tag) => tag.name.value),
+              scenario.withTags ? ['Выходные', 'Дом'] : isEmpty,
+            );
+            final matchesReadyHome =
+                scenario.readiness == IntentionReadiness.ready &&
+                scenario.withTags;
+            expect(created.entry.matches(readyHomeQuery), matchesReadyHome);
+
+            final page = _firstCatalogPage(
+              await repository.getCatalogPage(allQuery),
+            );
+            expect(
+              page.revision.compareTo(confirmed.revision),
+              GraphRevisionOrder.same,
+            );
+            expect(
+              _summaryFacts(page.items.singleWhere((item) => item.id == newId)),
+              _summaryFacts(summary),
+            );
+            expect(
+              _catalogItems(await repository.getCatalogPage(readyHomeQuery))
+                  .map((item) => item.id),
+              matchesReadyHome ? [newId] : isEmpty,
+            );
+            expect(
+              (await _tagAssignments(
+                repository,
+                newId,
+              )).items.map((tag) => tag.id),
+              expectedTagIds,
+            );
+            final details = await _details(repository, newId);
+            expect(details.intention.readiness, scenario.readiness);
+            expect(details.favoriteMark, scenario.favoriteMark);
+            expect(_favoritePlaces(raw), [
+              (activeFavoriteId.toCanonicalString(), 2),
+              (archivedFavoriteId.toCanonicalString(), 5),
+              if (isFavorite) (newId.toCanonicalString(), 6),
+            ]);
+            final favorites = await _favoriteIntentions(repository);
+            expect(favorites.items.map((row) => row.id), [
+              activeFavoriteId,
+              if (isFavorite) newId,
+            ]);
+            expect(favorites.archivedCount, 1);
+          },
+        );
+      }
+
+      test(
+        'отсутствующие выбранные теги отклоняют всё создание с точным набором '
+        'без записи, генерации идентификатора и новой ревизии',
+        () async {
+          final firstMissing = _tagId(tagFixtureId(777));
+          final secondMissing = _tagId(tagFixtureId(778));
+          final revisionBefore = _firstCatalogPage(
+            await repository.getCatalogPage(allQuery),
+          ).revision;
+          final intentionsBefore = _storedRows(raw, 'intentions');
+          final placesBefore = _favoritePlaces(raw);
+          writeTrace.operations.clear();
+
+          final result = await repository.execute(
+            CreateIntention.withInitialState(
+              title: 'Убрать дом',
+              description: null,
+              readiness: IntentionReadiness.ready,
+              favoriteMark: FavoriteMark.favorite,
+              tagIds: [firstMissing, homeTagId, secondMissing],
+            ),
+          );
+
+          expect(
+            result,
+            isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+                .having(
+                  (result) => result.failure,
+                  'failure',
+                  isA<IntentionCreationTagsMissingFailure>().having(
+                    (failure) => failure.missingTagIds,
+                    'missingTagIds',
+                    {firstMissing, secondMissing},
+                  ),
+                ),
+          );
+          expect(
+            writeTrace.operations,
+            isNot(
+              anyOf(
+                contains(LocalDatabaseSqlOperation.insert),
+                contains(LocalDatabaseSqlOperation.update),
+                contains(LocalDatabaseSqlOperation.delete),
+              ),
+            ),
+          );
+          expect(idGenerator.generated, isEmpty);
+          expect(clock.calls, 0);
+          expect(_storedRows(raw, 'intentions'), intentionsBefore);
+          expect(_storedRows(raw, 'tag_assignments'), isEmpty);
+          expect(_favoritePlaces(raw), placesBefore);
+          expect(
+            _firstCatalogPage(await repository.getCatalogPage(allQuery))
+                .revision
+                .compareTo(revisionBefore),
+            GraphRevisionOrder.same,
+          );
+          expect(
+            diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+            [
+              _failedCommand(
+                IntentionCommandDiagnosticsType.create,
+                DiagnosticsFailureCode.validation,
+              ),
+            ],
+          );
+        },
+      );
+
+      test('переименованный выбранный тег назначается по идентичности с '
+          'актуальным названием без создания нового тега', () async {
+        final renamed = await repository.execute(
+          RenameTag(tagId: homeTagId, name: TagName.fromInput('Быт')),
+        );
+        expect(renamed, isA<TagCommandSucceeded>());
+
+        final saved = _commandSuccess(
+          await repository.execute(
+            CreateIntention.withInitialState(
+              title: 'Убрать дом',
+              description: null,
+              readiness: IntentionReadiness.notReady,
+              favoriteMark: FavoriteMark.notFavorite,
+              tagIds: [homeTagId],
+            ),
+          ),
+        ) as IntentionSaved;
+
+        expect(
+          saved.catalogMutation.after!.summary.tags.map(
+            (tag) => (tag.id, tag.name.value),
+          ),
+          [(homeTagId, 'Быт')],
+        );
+        expect(
+          (await _tagAssignments(
+            repository,
+            newId,
+          )).items.map((tag) => (tag.id, tag.name.value)),
+          [(homeTagId, 'Быт')],
+        );
+        expect(_storedRows(raw, 'tags'), hasLength(2));
+      });
+
+      test('недопустимое название с полным начальным состоянием отклоняется '
+          'проверкой текста без чтения тегов и записи', () async {
+        writeTrace.operations.clear();
+
+        final result = await repository.execute(
+          CreateIntention.withInitialState(
+            title: '   ',
+            description: null,
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+            tagIds: [homeTagId],
+          ),
+        );
+
+        expect(
+          result,
+          _textValidationFailure(
+            field: IntentionTextField.title,
+            reason: IntentionTextValidationReason.empty,
+          ),
+        );
+        expect(writeTrace.operations, isEmpty);
+        expect(idGenerator.generated, isEmpty);
+        expect(clock.calls, 0);
+        expect(_storedRows(raw, 'tag_assignments'), isEmpty);
+      });
+    });
   });
 }
+
+ConfirmedGraphResult<IntentionCommandSuccess> _confirmedCommand(
+  Result<ConfirmedGraphResult<IntentionCommandSuccess>> result,
+) {
+  expect(
+    result,
+    isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+  );
+  return (result
+          as ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>)
+      .value;
+}
+
+/// Наблюдаемые поля сводки каталога, включая собственные теги и отметку.
+List<Object?> _summaryFacts(IntentionSummary summary) => [
+  summary.id,
+  summary.title,
+  summary.hasDescription,
+  summary.readiness,
+  summary.archiveState,
+  summary.activeRelationCount,
+  summary.createdAt,
+  summary.updatedAt,
+  [for (final tag in summary.tags) (tag.id, tag.name.value)],
+  summary.favoriteMark,
+];
+
+Future<TagAssignmentsSnapshot> _tagAssignments(
+  DriftPersonalGraphRepository repository,
+  IntentionId id,
+) async => switch (await repository.getTagAssignments(id)) {
+  GraphResultSuccess(:final value) => value,
+  GraphResultFailure(:final failure) => throw TestFailure(
+    'Чтение назначений завершилось отказом $failure.',
+  ),
+};
+
+Future<FavoriteIntentionsSnapshot> _favoriteIntentions(
+  DriftPersonalGraphRepository repository,
+) async => switch (await repository.getFavoriteIntentions()) {
+  GraphResultSuccess(:final value) => value,
+  GraphResultFailure(:final failure) => throw TestFailure(
+    'Чтение избранного завершилось отказом $failure.',
+  ),
+};
+
+Future<IntentionDetails> _details(
+  DriftPersonalGraphRepository repository,
+  IntentionId id,
+) async {
+  final result = await repository.watchIntention(id).first;
+  expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
+  return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+      .value
+      .value!;
+}
+
+/// Места избранного в порядке единого списка.
+List<(String, int)> _favoritePlaces(Database raw) => [
+  for (final row in raw.select(
+    'SELECT intention_id, position FROM favorite_intentions ORDER BY position',
+  ))
+    (row['intention_id'] as String, row['position'] as int),
+];
+
+List<Map<String, Object?>> _storedRows(Database raw, String table) => [
+  for (final row in raw.select('SELECT * FROM $table ORDER BY 1')) {...row},
+];
 
 const _firstUuid = '018f0b5d-6b2e-7c80-8000-000000000401';
 const _secondUuid = '018f0b5d-6b2e-7c80-8000-000000000402';
