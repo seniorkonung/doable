@@ -11,7 +11,6 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         LocalDatabaseConnectionObserver,
-        LocalDatabaseSqlOperation,
         LocalDatabaseSqlStatement,
         observeConfiguredLocalDatabaseConnection,
         openFileBackedLocalDatabase;
@@ -367,12 +366,13 @@ void main() {
             // записано всё заданное командой начальное состояние: название
             // и описание, готовность к действию, активное состояние,
             // назначение каждого выбранного тега и место избранного. Учтена
-            // каждая запись после взвода отказа — вставка, обновление,
-            // удаление, пакет или произвольный оператор: это только вставки
-            // строки намерения, назначений и места избранного в этом
-            // порядке. Запись начального состояния, отложенная за место
-            // избранного, к моменту отказа не выполнена, поэтому неполное
-            // состояние роняет сценарий.
+            // каждая изменяющая данные запись после взвода отказа —
+            // вставка, обновление, удаление, пакет, произвольный оператор
+            // или запись с возвратом строк, которую drift выполняет через
+            // путь чтения: это только вставки строки намерения, назначений
+            // и места избранного в этом порядке. Запись начального
+            // состояния, отложенная за место избранного, к моменту отказа
+            // не выполнена, поэтому неполное состояние роняет сценарий.
             final fault = install.faults.faultPoint;
             expect(fault, isNotNull, reason: 'Отказ хранилища не сработал');
             expect(fault!.inTransaction, isTrue);
@@ -973,10 +973,11 @@ typedef _CreationFaultPoint = ({
   _CreatedRows created,
 });
 
-/// По требованию прерывает ближайшую запись места избранного сразу после
-/// её выполнения устранимой недоступностью хранилища и фиксирует, что к
-/// этому моменту записано на соединении приложения. Отказ не проверяет
-/// состав записей сам: его проверяет сценарий по [faultPoint].
+/// По требованию прерывает ближайшую запись места избранного в любом виде,
+/// включая запись с возвратом строк, сразу после её выполнения устранимой
+/// недоступностью хранилища и фиксирует, что к этому моменту записано на
+/// соединении приложения. Отказ не проверяет состав записей сам: его
+/// проверяет сценарий по [faultPoint].
 final class _CreationFaults extends LocalDatabaseConnectionObserver {
   /// Таблица, которую изменяет оператор SQL.
   static final _writtenTable = RegExp(
@@ -989,9 +990,9 @@ final class _CreationFaults extends LocalDatabaseConnectionObserver {
   /// подтверждённой транзакции.
   late sqlite.Database connection;
 
-  /// Записи после взвода отказа: вид операции и изменяемые таблицы либо
-  /// оператор, если таблицу не удаётся определить; `null`, пока отказ не
-  /// взведён.
+  /// Записи после взвода отказа: вид операции, как его помечает перехватчик
+  /// соединения, и изменяемые таблицы либо оператор, если таблицу не
+  /// удаётся определить; `null`, пока отказ не взведён.
   List<String>? _writes;
 
   /// Состояние хранилища в момент отказа; `null`, пока отказ не сработал.
@@ -999,19 +1000,22 @@ final class _CreationFaults extends LocalDatabaseConnectionObserver {
 
   void failAfterFavoritePlaceWrite() => _writes = [];
 
-  /// Учитывает каждую операцию, кроме чтения: вставку, обновление,
-  /// удаление, пакет и произвольный оператор.
+  /// Учитывает каждую операцию, которая изменяет данные, в любом виде:
+  /// вставку, обновление, удаление, пакет, произвольный оператор и запись с
+  /// возвратом строк (`RETURNING`). Запись с возвратом строк drift выполняет
+  /// через путь чтения, поэтому перехватчик помечает её как `select`.
+  /// Изменяет ли оператор данные, определяет сам SQLite; пропускаются только
+  /// операции, ни один оператор которых данные не изменяет.
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
     final writes = _writes;
-    if (writes == null ||
-        statement.operation == LocalDatabaseSqlOperation.select) {
-      return;
-    }
+    if (writes == null) return;
     final tables = [
       for (final sql in statement.statements)
-        _writtenTable.firstMatch(sql)?.group(1) ?? sql,
+        for (final written in _dataChangingStatements(sql))
+          _writtenTable.firstMatch(written)?.group(1) ?? written,
     ];
+    if (tables.isEmpty) return;
     writes.add('${statement.operation.name} ${tables.join(', ')}');
     if (!tables.contains('favorite_intentions')) return;
     _writes = null;
@@ -1024,5 +1028,21 @@ final class _CreationFaults extends LocalDatabaseConnectionObserver {
       extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
       message: 'Управляемый отказ после записи места избранного',
     );
+  }
+
+  /// Операторы текста [sql], которые по оценке SQLite
+  /// (`sqlite3_stmt_readonly`) изменяют данные.
+  List<String> _dataChangingStatements(String sql) {
+    final prepared = connection.prepareMultiple(sql);
+    try {
+      return [
+        for (final statement in prepared)
+          if (!statement.isReadOnly) statement.sql,
+      ];
+    } finally {
+      for (final statement in prepared) {
+        statement.close();
+      }
+    }
   }
 }
