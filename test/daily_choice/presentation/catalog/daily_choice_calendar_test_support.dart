@@ -1,4 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
@@ -166,6 +167,11 @@ final class CalendarConsumer {
   void restoreCalendar() => _host.currentState!._setCalendarShown(true);
 }
 
+/// Показывает календарь у нового потребителя.
+///
+/// [locale] — системная локаль устройства. Локаль календаря выбирают правила и
+/// делегаты приложения, поэтому смена `tester.platformDispatcher.localesTestValue`
+/// меняет язык у того же потребителя, а неподдерживаемый язык даёт английский.
 Future<CalendarConsumer> pumpCalendarConsumer(
   WidgetTester tester, {
   required CalendarDate selectedDate,
@@ -173,12 +179,14 @@ Future<CalendarConsumer> pumpCalendarConsumer(
   required CalendarDate today,
   Locale locale = const Locale('ru'),
 }) async {
+  tester.platformDispatcher.localesTestValue = [locale];
+  addTearDown(tester.platformDispatcher.clearLocalesTestValue);
   final consumer = CalendarConsumer._();
   await tester.pumpWidget(
     MaterialApp(
-      locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      localeListResolutionCallback: resolveAppLocale,
       home: Scaffold(
         body: CustomScrollView(
           slivers: [

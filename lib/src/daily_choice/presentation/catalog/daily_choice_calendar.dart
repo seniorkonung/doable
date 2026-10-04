@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../l10n/app_localizations.dart';
@@ -33,6 +34,13 @@ import 'daily_choice_calendar_viewport.dart';
 ///
 /// Шапка называет месяц и год даты просмотра, а отдельная подпись — полную
 /// выбранную дату, даже если её нет в видимом периоде.
+///
+/// Для вспомогательных технологий каждый допустимый день — одна кнопка выбора
+/// с полной датой, днём недели, состоянием выбранности и отдельной отметкой
+/// «сегодня»; дни читаются в календарном порядке после шапки. Команды шапки
+/// названы по текущему представлению и сообщают свою доступность; все действия
+/// выполнимы доступной активацией без жестов. Подписи следуют локали
+/// приложения и меняются вместе с ней без событий.
 ///
 /// `table_calendar`, его форматы, контроллер страниц и технические `DateTime`
 /// остаются деталями реализации и не входят в контракт (ADR-0017).
@@ -76,28 +84,30 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
           onNext: _hasNextPeriod(viewport) ? _showNextPeriod : null,
           onToggleMode: _toggleMode,
         ),
-        TableCalendar<Never>(
-          locale: Localizations.localeOf(context).toLanguageTag(),
+        // Основа библиотеки без готовых ячеек: ячейка `TableCalendar` задаёт
+        // собственную подпись даты, скрывает содержимое от вспомогательных
+        // технологий и объявляет пустое долгое нажатие. Дни и подписи дней
+        // недели строит календарь, а страницы, жесты и сетка остаются за
+        // библиотекой.
+        TableCalendarBase(
           firstDay: _firstDay,
           lastDay: _lastDay,
           focusedDay: _technicalDate(viewport.focusedDate),
-          currentDay: _technicalDate(widget.today),
           calendarFormat: switch (viewport.mode) {
             DailyChoiceCalendarMode.week => CalendarFormat.week,
             DailyChoiceCalendarMode.month => CalendarFormat.month,
           },
-          availableCalendarFormats: _calendarFormats,
           startingDayOfWeek: StartingDayOfWeek.monday,
-          rangeSelectionMode: RangeSelectionMode.disabled,
           // Представление переключает только потребитель, поэтому вертикальные
           // жесты остаются общей прокрутке страницы.
           availableGestures: AvailableGestures.horizontalSwipe,
-          headerVisible: false,
+          rowHeight: _rowHeight,
+          dowHeight: _weekdayHeight,
+          dowBuilder: _buildWeekday,
+          dayBuilder: _buildDay,
           pageAnimationDuration: _pageAnimationDuration,
           pageAnimationCurve: _pageAnimationCurve,
-          calendarBuilders: CalendarBuilders(prioritizedBuilder: _buildDay),
           onCalendarCreated: (pages) => _pages = pages,
-          onDaySelected: _selectDay,
           onPageChanged: _reportFocusedDay,
         ),
       ],
@@ -147,10 +157,28 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
     }
   }
 
+  /// Короткое название дня недели над колонкой. Каждый день и так называет
+  /// свой день недели, поэтому подпись колонки не читается отдельно.
+  Widget _buildWeekday(BuildContext context, DateTime day) {
+    final theme = Theme.of(context);
+    return Center(
+      child: ExcludeSemantics(
+        child: Text(
+          DateFormat.E(Localizations.localeOf(context).toLanguageTag())
+              .format(day),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDay(BuildContext context, DateTime day, DateTime focusedDay) {
     final date = _availableDate(day);
     // Позиция крайней недели за пределами CalendarDate сохраняет место в
-    // строке, но не показывает несуществующую дату.
+    // строке, но не показывает несуществующую дату, не объявляется и не
+    // выбирается.
     if (date == null) {
       return _unavailableDay;
     }
@@ -162,18 +190,9 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
       isOutsideMonth:
           widget.viewport.mode == DailyChoiceCalendarMode.month &&
           (day.year != focusedDay.year || day.month != focusedDay.month),
+      // Дату просмотра в нажатый день переносит потребитель.
+      onSelected: () => widget.onDateSelected(date),
     );
-  }
-
-  // Аргумент фокуса библиотеки не используется: дату просмотра в нажатый
-  // день переносит потребитель.
-  void _selectDay(DateTime day, DateTime _) {
-    // Библиотека не сообщает о нажатии дней за пределами диапазона; проверка
-    // сохраняет это свойство адаптера независимо от версии пакета.
-    final date = _availableDate(day);
-    if (date != null) {
-      widget.onDateSelected(date);
-    }
   }
 
   void _reportFocusedDay(DateTime focusedDay) {
@@ -196,12 +215,13 @@ const _unavailableDay = SizedBox.expand(
   key: ValueKey('daily-choice-calendar-unavailable-day'),
 );
 
+/// Высоты строки дней и строки названий дней недели.
+const _rowHeight = 52.0;
+const _weekdayHeight = 16.0;
+
 /// Переход к соседнему периоду: общий для свайпа и кнопок шапки.
 const _pageAnimationDuration = Duration(milliseconds: 300);
 const _pageAnimationCurve = Curves.easeOut;
-
-/// Названия форматов нужны только скрытой кнопке формата библиотеки.
-const _calendarFormats = {CalendarFormat.month: '', CalendarFormat.week: ''};
 
 /// Библиотека вычисляет периоды над `DateTime` в UTC. Это нейтральное
 /// представление календарных частей, а не часовой пояс даты дневного выбора.
