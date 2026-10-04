@@ -5,6 +5,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -88,6 +89,59 @@ Future<IntentionCommandCompletion> completeCatalogCommand(
   await Future<void>.delayed(Duration.zero);
   return completion;
 }
+
+/// Создаёт намерение с полным начальным состоянием [created] через
+/// coordinator до опубликованного завершения.
+///
+/// Команда несёт готовность, отметку и теги снимка, а подтверждение
+/// повторяет пакет настоящего создания: см. [fullCreationSuccess].
+Future<IntentionCommandCompletion> completeFullCreation(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  IntentionSummary created, {
+  required GraphRevision revision,
+}) => completeCatalogCommand(
+  container,
+  repository,
+  CreateIntention.withInitialState(
+    title: created.title,
+    description: null,
+    readiness: created.readiness,
+    favoriteMark: created.favoriteMark,
+    tagIds: [for (final tag in created.tags) tag.id],
+  ),
+  fullCreationSuccess(created, revision: revision),
+);
+
+/// Подтверждение полного создания: одна [IntentionCatalogCreated] с
+/// окончательным снимком [created] и по одному факту назначения на каждый
+/// его тег, все на одной ревизии [revision].
+IntentionSaved fullCreationSuccess(
+  IntentionSummary created, {
+  required GraphRevision revision,
+}) => IntentionSaved(
+  Intention(
+    id: created.id,
+    title: created.title,
+    description: null,
+    readiness: created.readiness,
+    archiveState: created.archiveState,
+    createdAt: created.createdAt,
+    updatedAt: created.updatedAt,
+  ),
+  catalogMutation: IntentionCatalogCreated(
+    revision: revision,
+    entry: TestCatalogEntrySnapshot(created),
+  ),
+  additionalChanges: [
+    for (final tag in created.tags)
+      TagAssignmentChangedChange(
+        revision: revision,
+        assignment: TagAssignment(tagId: tag.id, intentionId: created.id),
+        state: TagAssignmentState.assigned,
+      ),
+  ],
+);
 
 /// Проводит команду связи через coordinator до опубликованного завершения.
 ///

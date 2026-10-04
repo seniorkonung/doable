@@ -8,6 +8,10 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
@@ -964,6 +968,151 @@ void main() {
       expect(repository.reconciliationQueries, isEmpty);
     });
   });
+
+  group('полное создание', () {
+    final health = _tag(1);
+    final sport = _tag(2);
+    final rest = _tag(3);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [health.id],
+      excludedTagIds: [sport.id],
+    );
+
+    IntentionSummary created({
+      String title = 'Ходить в лес',
+      IntentionReadiness readiness = IntentionReadiness.ready,
+      required List<Tag> tags,
+    }) => testSummary(
+      index: 9,
+      title: title,
+      readiness: readiness,
+      tags: tags,
+      favoriteMark: FavoriteMark.favorite,
+    );
+
+    for (final (name, purpose, entry, matches)
+        in <(String, IntentionCatalogPurpose, IntentionSummary, bool)>[
+          (
+            'подходит названию, готовности и тегам',
+            const BrowseIntentionCatalog(),
+            created(tags: [health, rest]),
+            true,
+          ),
+          (
+            'не подходит названию',
+            const BrowseIntentionCatalog(),
+            created(title: 'Читать в лесу', tags: [health, rest]),
+            false,
+          ),
+          (
+            'без обязательного тега',
+            const BrowseIntentionCatalog(),
+            created(tags: [rest]),
+            false,
+          ),
+          (
+            'с исключённым тегом',
+            const BrowseIntentionCatalog(),
+            created(tags: [health, sport, rest]),
+            false,
+          ),
+          (
+            'готовое при выборе действия',
+            const SelectDailyChoiceAction(),
+            created(tags: [health]),
+            true,
+          ),
+          (
+            'неготовое при выборе действия',
+            const SelectDailyChoiceAction(),
+            created(readiness: IntentionReadiness.notReady, tags: [health]),
+            false,
+          ),
+        ]) {
+      test('принадлежность выдаче задаёт окончательный снимок, а пакет с '
+          'фактами назначений применяется одним изменением ревизии: '
+          '$name', () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(
+          repository,
+          pageSize: 2,
+          prefetchRemaining: 0,
+        );
+        final provider = intentionCatalogViewModelProvider(purpose);
+        final published = <AsyncValue<IntentionCatalogState>>[];
+        final subscription = container.listen(
+          provider,
+          (_, next) => published.add(next),
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        final model = container.read(provider.notifier);
+        model.changeTitleFilter('ходить');
+        model.changeTagFilter(filter);
+        await waitForCatalogQueries(repository, 2);
+        const cursor = TestCatalogCursor();
+        final first = testSummary(
+          index: 5,
+          title: 'Ходить в парк',
+          readiness: IntentionReadiness.ready,
+          tags: [health],
+        );
+        final second = testSummary(
+          index: 4,
+          title: 'Ходить в зал',
+          readiness: IntentionReadiness.ready,
+          tags: [health, rest],
+        );
+        repository.complete(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [first, second],
+              totalCount: 3,
+              nextCursor: cursor,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        final before =
+            await container.read(provider.future) as IntentionCatalogLoaded;
+        expect(before.query.includes(entry), matches);
+        published.clear();
+
+        final completion = await completeFullCreation(
+          container,
+          repository,
+          entry,
+          revision: const TestCatalogRevision(2),
+        );
+
+        expect(completion.isFailure, isFalse);
+        expect(
+          completion.confirmedChange!.changes
+              .whereType<IntentionCatalogMutation>(),
+          hasLength(1),
+        );
+        final current =
+            container.read(provider).requireValue as IntentionCatalogLoaded;
+        expect(
+          current.items,
+          matches ? [entry, first, second] : [first, second],
+        );
+        expect(current.totalCount, matches ? 4 : 3);
+        expect(current.nextCursor, same(cursor));
+        expect(current.query, same(before.query));
+        expect(current.selection.titleFilterText, 'ходить');
+        expect(current.selection.tagFilter, filter);
+        expect(current.revision, const TestCatalogRevision(2));
+        expect(current.continuation, isA<IntentionCatalogContinuationIdle>());
+        expect(published.map((state) => state.value), [same(current)]);
+        expect(repository.commands, hasLength(1));
+        expect(repository.tagCommands, isEmpty);
+        expect(repository.queries, hasLength(2));
+        expect(repository.reconciliationQueries, isEmpty);
+      });
+    }
+  });
 }
 
 /// Порядок выдачи фикстур: [testSummary] выводит обе временные метки из
@@ -995,6 +1144,16 @@ IntentionSummary _withMark(IntentionSummary summary, FavoriteMark mark) =>
       tags: summary.tags,
       favoriteMark: mark,
     );
+
+Tag _tag(int number) => Tag(
+  id: switch (TagId.decode(
+    '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
+  )) {
+    TagIdDecodingSuccess(:final id) => id,
+    InvalidTagIdDecoding() => throw StateError('Неверный ID тега.'),
+  },
+  name: TagName.fromInput('Тег $number'),
+);
 
 /// Намерение подтверждённой команды отметки: его поля отметка не меняет.
 Intention _intentionOf(IntentionSummary summary) => Intention(

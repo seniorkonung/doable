@@ -2,6 +2,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -565,6 +566,253 @@ void main() {
       expect(current.totalCount, 1);
       expect(current.revision, _revision(5));
       expect(published, [same(current)]);
+    });
+  });
+
+  group('полное создание во время чтения выдачи', () {
+    final health = _tag(1);
+    final sport = _tag(2);
+    final rest = _tag(3);
+    final filter = IntentionTagFilter(
+      requiredTagIds: [health.id],
+      excludedTagIds: [sport.id],
+    );
+    final created = testSummary(
+      index: 9,
+      title: 'Ходить в лес',
+      readiness: IntentionReadiness.ready,
+      tags: [health, rest],
+      favoriteMark: FavoriteMark.favorite,
+    );
+
+    for (final (name, pageRevision, packageFirst) in [
+      ('пакет до ответа прежней ревизии', 1, true),
+      ('пакет до ответа, уже отражающего создание', 2, true),
+      ('ответ, уже отражающий создание, до пакета', 2, false),
+    ]) {
+      test('первая порция и пакет создания согласуются без повторной строки '
+          'и отката: $name', () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(repository);
+        final subscription = container.listen(_provider, (_, _) {});
+        addTearDown(container.dispose);
+        addTearDown(subscription.close);
+        final model = container.read(_provider.notifier);
+        model.changeTitleFilter('ходить');
+        model.changeTagFilter(filter);
+        await waitForCatalogQueries(repository, 2);
+        final older = testSummary(
+          index: 3,
+          title: 'Ходить в парк',
+          tags: [health],
+        );
+        final reflectsCreation = pageRevision == 2;
+        final Result<IntentionCatalogPage> page = ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: reflectsCreation ? [created, older] : [older],
+            totalCount: reflectsCreation ? 2 : 1,
+            nextCursor: null,
+            revision: TestCatalogRevision(pageRevision),
+          ),
+        );
+
+        IntentionCatalogState? loadedBeforePackage;
+        if (packageFirst) {
+          await completeFullCreation(
+            container,
+            repository,
+            created,
+            revision: const TestCatalogRevision(2),
+          );
+          repository.complete(1, page);
+        } else {
+          repository.complete(1, page);
+          loadedBeforePackage = await container.read(_provider.future);
+          await completeFullCreation(
+            container,
+            repository,
+            created,
+            revision: const TestCatalogRevision(2),
+          );
+        }
+
+        final current = await container.read(_provider.future);
+        expect(current, isA<IntentionCatalogLoaded>());
+        final loaded = current as IntentionCatalogLoaded;
+        expect(loaded.items, [created, older]);
+        expect(loaded.totalCount, 2);
+        expect(loaded.nextCursor, isNull);
+        expect(loaded.revision, _revision(2));
+        expect(loaded.query.tagFilter, filter);
+        expect(loaded.query.titleFilter?.map((text) => text), 'ходить');
+        if (loadedBeforePackage != null) {
+          expect(loaded, same(loadedBeforePackage));
+        }
+        expect(repository.queries, hasLength(2));
+      });
+    }
+
+    for (final (name, continuationRevision, packageFirst) in [
+      ('пакет во время продолжения прежней ревизии', 1, true),
+      ('пакет до продолжения, уже отражающего создание', 2, true),
+      ('продолжение, уже отражающее создание, до пакета', 2, false),
+    ]) {
+      test('созданное намерение за границей загруженной области учитывается '
+          'количеством и приходит с продолжением один раз: $name', () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(
+          repository,
+          pageSize: 2,
+          prefetchRemaining: 0,
+        );
+        final subscription = container.listen(_provider, (_, _) {});
+        addTearDown(container.dispose);
+        addTearDown(subscription.close);
+        final model = container.read(_provider.notifier);
+        model.changeOrder(IntentionCatalogOrder.createdAtAscending);
+        model.changeTagFilter(filter);
+        await waitForCatalogQueries(repository, 2);
+        expect(
+          repository.queryAt(1).order,
+          IntentionCatalogOrder.createdAtAscending,
+        );
+        const cursor = TestCatalogCursor();
+        final first = testSummary(index: 1, tags: [health]);
+        final second = testSummary(index: 2, tags: [health]);
+        final third = testSummary(index: 3, tags: [health]);
+        repository.complete(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [first, second],
+              totalCount: 3,
+              nextCursor: cursor,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        final loaded =
+            await container.read(_provider.future) as IntentionCatalogLoaded;
+        final continuation = model.loadNextPageIfNeeded(visibleIndex: 1);
+        await waitForCatalogQueries(repository, 3);
+        expect(repository.queryAt(2).cursor, same(cursor));
+        final Result<IntentionCatalogPage> reflectingCreation = ResultSuccess(
+          IntentionCatalogContinuationPage(
+            items: [third, created],
+            nextCursor: null,
+            revision: const TestCatalogRevision(2),
+          ),
+        );
+
+        if (packageFirst) {
+          await completeFullCreation(
+            container,
+            repository,
+            created,
+            revision: const TestCatalogRevision(2),
+          );
+          final counted = _currentLoaded(container);
+          expect(counted.items, [first, second]);
+          expect(counted.totalCount, 4);
+          expect(
+            counted.continuation,
+            isA<IntentionCatalogContinuationLoading>(),
+          );
+          if (continuationRevision == 1) {
+            repository.complete(
+              2,
+              ResultSuccess(
+                IntentionCatalogContinuationPage(
+                  items: [third],
+                  nextCursor: null,
+                  revision: const TestCatalogRevision(1),
+                ),
+              ),
+            );
+            await waitForCatalogQueries(repository, 4);
+            expect(repository.queryAt(3).cursor, same(cursor));
+            repository.complete(3, reflectingCreation);
+          } else {
+            repository.complete(2, reflectingCreation);
+          }
+        } else {
+          repository.complete(2, reflectingCreation);
+          await Future<void>.delayed(Duration.zero);
+          final pending = _currentLoaded(container);
+          expect(pending.items, [first, second]);
+          expect(pending.totalCount, 3);
+          expect(
+            pending.continuation,
+            isA<IntentionCatalogContinuationLoading>(),
+          );
+          await completeFullCreation(
+            container,
+            repository,
+            created,
+            revision: const TestCatalogRevision(2),
+          );
+        }
+        await continuation;
+
+        final current = _currentLoaded(container);
+        expect(current.items, [first, second, third, created]);
+        expect(current.totalCount, 4);
+        expect(current.nextCursor, isNull);
+        expect(current.revision, _revision(2));
+        expect(current.query, same(loaded.query));
+        expect(current.continuation, isA<IntentionCatalogContinuationIdle>());
+        expect(
+          repository.queries,
+          hasLength(continuationRevision == 1 ? 4 : 3),
+        );
+      });
+    }
+
+    test('пакет создания во время согласования области применяется к '
+        'кандидату одним изменением ревизии', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      final published = _observePublished(container);
+      final tenth = testSummary(index: 10, tags: [health]);
+      final before = await _loadCompleted(container, repository, filter, [
+        tenth,
+      ]);
+      published.clear();
+
+      await _completeTagDelete(container, repository, sport.id, revision: 2);
+      await waitForReconciliationQueries(repository, 1);
+      final createdAfterDeletion = testSummary(
+        index: 11,
+        title: 'Ходить в лес',
+        readiness: IntentionReadiness.ready,
+        tags: [health, rest],
+        favoriteMark: FavoriteMark.favorite,
+      );
+      await completeFullCreation(
+        container,
+        repository,
+        createdAfterDeletion,
+        revision: const TestCatalogRevision(3),
+      );
+      expect(published, isEmpty);
+      expect(container.read(_provider).requireValue, same(before));
+
+      final ninth = testSummary(index: 9, tags: [health]);
+      repository.completeReconciliation(
+        0,
+        _reconciliationFirst([ninth], totalCount: 2, revision: 2),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final current = _currentLoaded(container);
+      expect(current.items, [createdAfterDeletion, tenth, ninth]);
+      expect(current.totalCount, 3);
+      expect(current.revision, _revision(3));
+      expect(current.refresh, isA<IntentionCatalogRefreshIdle>());
+      expect(current.query, same(before.query));
+      expect(published, [same(current)]);
+      expect(repository.reconciliationQueries, hasLength(1));
+      expect(repository.queries, hasLength(2));
     });
   });
 }
