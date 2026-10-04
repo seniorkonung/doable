@@ -179,6 +179,41 @@ void main() {
     );
   });
 
+  test(
+    'системные строки календаря каталога локализованы на обоих языках',
+    () async {
+      final english = await AppLocalizations.delegate.load(const Locale('en'));
+      final russian = await AppLocalizations.delegate.load(const Locale('ru'));
+
+      // Полную дату форматируют средства локализации Flutter; ресурс только
+      // встраивает её в подпись.
+      expect(
+        english.dailyChoiceCalendarSelectedDate('Sunday, October 4, 2026'),
+        'Selected date: Sunday, October 4, 2026',
+      );
+      expect(
+        russian.dailyChoiceCalendarSelectedDate(
+          'воскресенье, 4 октября 2026 г.',
+        ),
+        'Выбранная дата: воскресенье, 4 октября 2026 г.',
+      );
+      expect(english.dailyChoiceCalendarToday, 'Today');
+      expect(russian.dailyChoiceCalendarToday, 'Сегодня');
+      expect(english.dailyChoiceCalendarExpand, 'Expand calendar');
+      expect(russian.dailyChoiceCalendarExpand, 'Развернуть календарь');
+      expect(english.dailyChoiceCalendarCollapse, 'Collapse calendar');
+      expect(russian.dailyChoiceCalendarCollapse, 'Свернуть календарь');
+      expect(english.dailyChoiceCalendarPreviousWeek, 'Previous week');
+      expect(russian.dailyChoiceCalendarPreviousWeek, 'Предыдущая неделя');
+      expect(english.dailyChoiceCalendarNextWeek, 'Next week');
+      expect(russian.dailyChoiceCalendarNextWeek, 'Следующая неделя');
+      expect(english.dailyChoiceCalendarPreviousMonth, 'Previous month');
+      expect(russian.dailyChoiceCalendarPreviousMonth, 'Предыдущий месяц');
+      expect(english.dailyChoiceCalendarNextMonth, 'Next month');
+      expect(russian.dailyChoiceCalendarNextMonth, 'Следующий месяц');
+    },
+  );
+
   test('русский и английский ARB содержат один полный набор строк', () async {
     final english = jsonDecode(
       await File('lib/l10n/app_en.arb').readAsString(),

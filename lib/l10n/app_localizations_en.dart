@@ -2066,6 +2066,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter a valid date as YYYY-MM-DD.';
 
   @override
+  String dailyChoiceCalendarSelectedDate(String date) {
+    return 'Selected date: $date';
+  }
+
+  @override
+  String get dailyChoiceCalendarToday => 'Today';
+
+  @override
+  String get dailyChoiceCalendarExpand => 'Expand calendar';
+
+  @override
+  String get dailyChoiceCalendarCollapse => 'Collapse calendar';
+
+  @override
+  String get dailyChoiceCalendarPreviousWeek => 'Previous week';
+
+  @override
+  String get dailyChoiceCalendarNextWeek => 'Next week';
+
+  @override
+  String get dailyChoiceCalendarPreviousMonth => 'Previous month';
+
+  @override
+  String get dailyChoiceCalendarNextMonth => 'Next month';
+
+  @override
   String get dailyChoiceCatalogCompletionFilter => 'Completion';
 
   @override

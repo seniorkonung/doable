@@ -3545,6 +3545,54 @@ abstract class AppLocalizations {
   /// **'Enter a valid date as YYYY-MM-DD.'**
   String get dailyChoiceCatalogDateInvalid;
 
+  /// Подпись выбранной даты фильтра календаря, видимая и при просмотре другого периода
+  ///
+  /// In en, this message translates to:
+  /// **'Selected date: {date}'**
+  String dailyChoiceCalendarSelectedDate(String date);
+
+  /// Доступное состояние дня календаря, совпадающего с текущим локальным днём устройства, а не с выбранной датой
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get dailyChoiceCalendarToday;
+
+  /// Команда раскрытия календаря из недели в сетку месяца даты просмотра
+  ///
+  /// In en, this message translates to:
+  /// **'Expand calendar'**
+  String get dailyChoiceCalendarExpand;
+
+  /// Команда сворачивания календаря из сетки месяца в неделю даты просмотра
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse calendar'**
+  String get dailyChoiceCalendarCollapse;
+
+  /// Команда просмотра предыдущей недели в свёрнутом календаре без выбора дня
+  ///
+  /// In en, this message translates to:
+  /// **'Previous week'**
+  String get dailyChoiceCalendarPreviousWeek;
+
+  /// Команда просмотра следующей недели в свёрнутом календаре без выбора дня
+  ///
+  /// In en, this message translates to:
+  /// **'Next week'**
+  String get dailyChoiceCalendarNextWeek;
+
+  /// Команда просмотра предыдущего месяца в раскрытом календаре без выбора дня
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get dailyChoiceCalendarPreviousMonth;
+
+  /// Команда просмотра следующего месяца в раскрытом календаре без выбора дня
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get dailyChoiceCalendarNextMonth;
+
   /// Фильтр по выполнению
   ///
   /// In en, this message translates to:

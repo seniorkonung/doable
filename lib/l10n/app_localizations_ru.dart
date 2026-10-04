@@ -2067,6 +2067,32 @@ class AppLocalizationsRu extends AppLocalizations {
       'Введите корректную дату в формате ГГГГ-ММ-ДД.';
 
   @override
+  String dailyChoiceCalendarSelectedDate(String date) {
+    return 'Выбранная дата: $date';
+  }
+
+  @override
+  String get dailyChoiceCalendarToday => 'Сегодня';
+
+  @override
+  String get dailyChoiceCalendarExpand => 'Развернуть календарь';
+
+  @override
+  String get dailyChoiceCalendarCollapse => 'Свернуть календарь';
+
+  @override
+  String get dailyChoiceCalendarPreviousWeek => 'Предыдущая неделя';
+
+  @override
+  String get dailyChoiceCalendarNextWeek => 'Следующая неделя';
+
+  @override
+  String get dailyChoiceCalendarPreviousMonth => 'Предыдущий месяц';
+
+  @override
+  String get dailyChoiceCalendarNextMonth => 'Следующий месяц';
+
+  @override
   String get dailyChoiceCatalogCompletionFilter => 'Выполнение';
 
   @override
