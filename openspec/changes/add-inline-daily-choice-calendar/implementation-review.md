@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Компонент календаря Phase 1 выполняет контракт дат, независимость выбора от просмотра, перелистывание, смену представления, локализацию, доступность и размещение в общей прокрутке на настоящем `table_calendar`. Проверки проекта на рецензируемой ревизии проходят. Изоляция страничной механики библиотеки от `PageStorage` страницы-хоста закреплена в решении 3 design и передана в незавершённые задачи 1.12 и 1.13 `tasks.md`. Автоматическая проверка календарных дат в поясе America/New_York с переходом на летнее время передана в незавершённые задачи 1.14 и 1.15. Активная находка — F3: design описывает адаптер на `TableCalendar` с `CalendarBuilders`, а реализация построена на публичном `TableCalendarBase`. Принятых остаточных рисков нет.
+**Summary:** Компонент календаря Phase 1 выполняет контракт дат, независимость выбора от просмотра, перелистывание, смену представления, локализацию, доступность и размещение в общей прокрутке на настоящем `table_calendar`. Проверки проекта на рецензируемой ревизии проходят. Изоляция страничной механики библиотеки от `PageStorage` страницы-хоста закреплена в решении 3 design и передана в незавершённые задачи 1.12 и 1.13 `tasks.md`. Автоматическая проверка календарных дат в поясе America/New_York с переходом на летнее время передана в незавершённые задачи 1.14 и 1.15. Основа адаптера — публичный `TableCalendarBase` с ячейками и подписями дней недели, которые строит компонент, — и причина отказа от готовой ячейки `TableCalendar` описаны в решении 3 design. Активных находок и принятых остаточных рисков нет.
 
 ## Review target
 
@@ -77,14 +77,7 @@
 
 ## Findings
 
-### F3 · Low — Design описывает адаптер на TableCalendar с CalendarBuilders, реализация построена на TableCalendarBase
-
-- **Evidence:** Решение 3 в `openspec/changes/add-inline-daily-choice-calendar/design.md` описывает адаптацию через `TableCalendar`: выключенный выбор диапазона, `CalendarBuilders` и тема приложения для оформления обычного, выбранного, сегодняшнего, соседнего и недоступного дня (ссылка на API CalendarBuilders). Критерий задачи 1.2 говорит о «настоящем `TableCalendar`». Реализация `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart:103-131` использует публичный `TableCalendarBase` (экспортируется из `package:table_calendar/table_calendar.dart`) с собственными `dayBuilder`/`dowBuilder` и ячейкой `daily_choice_calendar_day.dart`. Причина отступления верна: ячейка `TableCalendar` сама задаёт семантическую подпись, исключает содержимое из семантики и объявляет долгое нажатие (`table_calendar-3.3.0/lib/src/widgets/cell_content.dart:49-57`, `lib/src/table_calendar.dart:553-570`). Однако она записана только в сообщениях коммитов 441fb525217167e8c54ba16ffcce1cef90f8749e и 10fcc63519550f87319fbabe21d5c88b760dad20; design не обновлён. ADR-0017 говорит только о `table_calendar` внутри компонента и остаётся верной.
-- **Evidence revisions:** ["10fcc63519550f87319fbabe21d5c88b760dad20"]
-- **Impact:** Design — источник направления для Phase 2 и отдельной работы по оформлению. Сейчас он неверно описывает основной механизм адаптера и точку настройки оформления. Следующий исполнитель или ревьюер будет искать `CalendarBuilders` и может «вернуть» `TableCalendar`, сломав доступную семантику дней. Обоснование решения доступно только в истории Git, а не в артефактах изменения.
-- **Required outcome:** Решение 3 design (и связанные упоминания механизма оформления) описывает фактическую основу адаптера: `TableCalendarBase` с ячейками и подписями дней недели, которые строит компонент, причину отказа от готовой ячейки `TableCalendar` и место будущей настройки оформления. Отметки и история выполненных задач сохраняются.
-- **Earliest source of truth:** design/ADR
-- **Affected artifacts:** ["openspec/changes/add-inline-daily-choice-calendar/design.md"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
