@@ -134,7 +134,7 @@
   - **Files likely touched:** `lib/src/tag/presentation/navigation/tag_navigation_view_model.dart`, `lib/src/tag/presentation/assignments/tag_assignments_view_model.dart`, `test/tag/presentation/navigation/tag_navigation_view_model_test.dart`, `test/tag/presentation/navigation/tag_navigation_catalog_integration_scenarios.dart`, `test/tag/presentation/assignments/tag_assignments_view_model_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.12 Подтвердить готовность полного атомарного создания к подключению сессии черновика
+- [x] 1.12 Подтвердить готовность полного атомарного создания к подключению сессии черновика
   - **Acceptance criteria:**
     - Реальная связка координатора, постоянного хранилища и потребителей подтверждает результат первой фазы: целое начальное состояние либо различимый отказ без частичных записей, долговечность, согласование каталога, Главной и тегов и однократное предъявление исхода.
     - Целевые проверки пакета, полный набор проверок репозитория, сборка и строгая валидация изменения проходят. Производные файлы согласованы с источниками; схема и существующие данные совместимы с предусмотренным дизайном откатом.
