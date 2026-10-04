@@ -584,17 +584,17 @@ final class _LoadedCatalog extends StatelessWidget {
     };
     // Признак строки передаётся текстом, а не только цветом: назначение
     // существующему намерению или включение в набор черновика.
-    String? rowStatus(({Tag tag, bool isAssigned}) row) =>
+    Widget? rowStatus(({Tag tag, bool isAssigned}) row) =>
         switch (selectionContext) {
           TagBrowseContext() => null,
-          TagAssignmentContext() =>
+          TagAssignmentContext() => Text(
             row.isAssigned
                 ? localizations.tagCatalogAssigned
                 : localizations.tagCatalogAvailable,
-          TagDraftContext() =>
-            draftTagIds.contains(row.tag.id)
-                ? localizations.tagCatalogInDraft
-                : localizations.tagCatalogAvailableForDraft,
+          ),
+          TagDraftContext() => _DraftRowStatus(
+            included: draftTagIds.contains(row.tag.id),
+          ),
         };
     if (state.isEmpty &&
         filter.isEmpty &&
@@ -721,14 +721,13 @@ final class _LoadedCatalog extends StatelessWidget {
               final row = rows[index - (selectedOutsideSnapshot ? 1 : 0)];
               final tag = row.tag;
               final selectedId = selection.id;
-              final status = rowStatus(row);
               return Semantics(
                 key: ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'),
                 container: true,
                 selected: tag.id == selectedId,
                 child: ListTile(
                   title: Text(tag.name.value),
-                  subtitle: status == null ? null : Text(status),
+                  subtitle: rowStatus(row),
                   onTap:
                       choosing &&
                           state.canUseCurrentItems &&
@@ -752,6 +751,27 @@ final class _LoadedCatalog extends StatelessWidget {
               );
             },
           ),
+      ],
+    );
+  }
+}
+
+/// Признак включения тега в набор черновика. Строка резервирует высоту
+/// большей из двух подписей, поэтому добавление не сдвигает строки списка
+/// при любом языке и размере текста; диктору доступна только текущая подпись.
+final class _DraftRowStatus extends StatelessWidget {
+  const _DraftRowStatus({required this.included});
+
+  final bool included;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    return IndexedStack(
+      index: included ? 1 : 0,
+      children: [
+        Text(localizations.tagCatalogAvailableForDraft),
+        Text(localizations.tagCatalogInDraft),
       ],
     );
   }
