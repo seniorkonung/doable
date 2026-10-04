@@ -20,6 +20,7 @@ import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionCatalogCreated, IntentionCommandSuccess, IntentionSaved;
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -82,8 +83,9 @@ enum _CreationFailure {
   /// Один из выбранных тегов отсутствует при проверке в транзакции.
   missingTag('отсутствующий выбранный тег'),
 
-  /// Хранилище недоступно после записи намерения, назначений и места
-  /// избранного, до подтверждения транзакции.
+  /// Хранилище недоступно внутри ещё не подтверждённой транзакции создания
+  /// после записи намерения, назначения каждого выбранного тега и места
+  /// избранного.
   storageAfterWrites('недоступность хранилища после всех записей');
 
   const _CreationFailure(this.description);
@@ -304,6 +306,7 @@ void main() {
             app,
             details: _intentionId(_walk),
           );
+          final shownRevisions = _revisions(shown);
           final events = app.diagnostics.events.length;
           final completions = <GraphCommandCompletion>[];
           final subscription = app.coordinator.completions.listen(
@@ -312,7 +315,7 @@ void main() {
           addTearDown(subscription.cancel);
 
           if (failure == _CreationFailure.storageAfterWrites) {
-            install.faults.failNextFavoritePlaceWrite();
+            install.faults.failAfterFavoritePlaceWrite();
           }
           final accepted = app.coordinator.acceptCreation(
             IntentionCreationFormKey(),
@@ -354,7 +357,27 @@ void main() {
           );
           expect(completion.confirmedChange, isNull);
           if (failure == _CreationFailure.storageAfterWrites) {
-            expect(install.faults.failedFavoritePlaceWrite, isTrue);
+            // Отказ сработал в открытой транзакции, которая уже содержала
+            // намерение, назначение каждого выбранного тега и место
+            // избранного, записанные в этом порядке.
+            final fault = install.faults.faultPoint;
+            expect(fault, isNotNull, reason: 'Отказ хранилища не сработал');
+            expect(fault!.inTransaction, isTrue);
+            expect(fault.writes, [
+              'intentions',
+              'tag_assignments',
+              'tag_assignments',
+              'favorite_intentions',
+            ]);
+            expect(fault.created.intentions, hasLength(1));
+            expect(
+              fault.created.tags,
+              unorderedEquals([
+                tagFixtureId(_homeTag),
+                tagFixtureId(_gardenTag),
+              ]),
+            );
+            expect(fault.created.places, [4]);
           }
           expect(completions, [same(completion)]);
           expect(_commandEvents(app, since: events), [
@@ -370,7 +393,19 @@ void main() {
             },
           ]);
 
-          // Ни части записи, ни новой ревизии: потребители сохраняют те же
+          // Свежее чтение графа после отклонённого создания сообщает ту же
+          // ревизию, что подтверждённые снимки потребителей до него.
+          final revision = await _freshRevision(tester, app);
+          for (final MapEntry(key: consumer, value: shownRevision)
+              in shownRevisions.entries) {
+            expect(
+              revision.compareTo(shownRevision),
+              GraphRevisionOrder.same,
+              reason: consumer,
+            );
+          }
+
+          // Ни части записи в хранилище: потребители сохраняют те же
           // подтверждённые снимки, а живая форма удерживает своё сообщение.
           await _settleStorage(tester);
           expect(_storedGraph(app.raw), stored);
@@ -531,6 +566,7 @@ Future<_Launch> _launch(
     await runtime.shutdown();
   });
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+  install.faults.connection = raw;
   seed?.call(raw);
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));
@@ -681,6 +717,30 @@ Map<String, Object?> _consumerStates(
   if (details != null) 'назначения': _assignments(app, details),
 };
 
+/// Ревизии подтверждённых снимков потребителей [states].
+Map<String, GraphRevision> _revisions(Map<String, Object?> states) => {
+  for (final MapEntry(:key, :value) in states.entries)
+    key: switch (value) {
+      HomeLoaded(:final revision) ||
+      IntentionCatalogConfirmedState(:final revision) ||
+      TagNavigationLoaded(:final revision) ||
+      TagAssignmentsLoaded(:final revision) => revision,
+      _ => fail('У потребителя «$key» нет подтверждённого снимка: $value'),
+    },
+};
+
+/// Ревизия графа по свежему публичному чтению модуля графа.
+Future<GraphRevision> _freshRevision(WidgetTester tester, _Launch app) async {
+  final repository = app.container.read(personalGraphRepositoryProvider);
+  final result = await tester.runAsync(
+    () => repository.getRelationCounts(_intentionId(_walk)),
+  );
+  return switch (result) {
+    ResultSuccess(:final value) => value.revision,
+    final result => fail('Чтение графа не удалось: $result'),
+  };
+}
+
 void _expectSameStates(
   Map<String, Object?> actual,
   Map<String, Object?> expected,
@@ -825,29 +885,89 @@ Future<void> _waitFor(
   expect(done(), isTrue, reason: reason?.call());
 }
 
+/// Идентификаторы намерений с названием [_created], теги их назначений и
+/// места избранного.
+typedef _CreatedRows = ({
+  List<String> intentions,
+  List<String> tags,
+  List<int> places,
+});
+
+/// Строки намерения [_created], видимые на соединении [raw], включая записи
+/// его ещё не подтверждённой транзакции.
+_CreatedRows _createdRows(sqlite.Database raw) {
+  const created = 'SELECT id FROM intentions WHERE title = ?';
+  return (
+    intentions: [
+      for (final row in raw.select(created, [_created])) row['id'] as String,
+    ],
+    tags: [
+      for (final row in raw.select(
+        'SELECT tag_id FROM tag_assignments WHERE intention_id IN ($created)',
+        [_created],
+      ))
+        row['tag_id'] as String,
+    ],
+    places: [
+      for (final row in raw.select(
+        'SELECT position FROM favorite_intentions '
+        'WHERE intention_id IN ($created)',
+        [_created],
+      ))
+        row['position'] as int,
+    ],
+  );
+}
+
+/// Состояние хранилища в момент управляемого отказа: открыта ли
+/// транзакция, таблицы вставок после взвода отказа в порядке выполнения и
+/// видимые на соединении строки создаваемого намерения.
+typedef _CreationFaultPoint = ({
+  bool inTransaction,
+  List<String> writes,
+  _CreatedRows created,
+});
+
 /// По требованию прерывает ближайшую запись места избранного сразу после
-/// её выполнения устранимой недоступностью хранилища: намерение и
-/// назначения к этому моменту уже записаны, транзакция ещё не подтверждена.
+/// её выполнения устранимой недоступностью хранилища и фиксирует, что к
+/// этому моменту записано на соединении приложения. Отказ не проверяет
+/// состав записей сам: его проверяет сценарий по [faultPoint].
 final class _CreationFaults extends LocalDatabaseConnectionObserver {
-  static final _favoritePlaceInsert = RegExp(
-    r'^\s*INSERT\s+INTO\s+"?favorite_intentions"?\s',
+  static final _insertedTable = RegExp(
+    r'^\s*INSERT\s+INTO\s+"?(\w+)"?',
     caseSensitive: false,
   );
 
-  var _failNext = false;
-  var failedFavoritePlaceWrite = false;
+  /// Соединение запущенного приложения: на нём видны записи ещё не
+  /// подтверждённой транзакции.
+  late sqlite.Database connection;
 
-  void failNextFavoritePlaceWrite() => _failNext = true;
+  /// Таблицы вставок после взвода отказа; `null`, пока отказ не взведён.
+  List<String>? _writes;
+
+  /// Состояние хранилища в момент отказа; `null`, пока отказ не сработал.
+  _CreationFaultPoint? faultPoint;
+
+  void failAfterFavoritePlaceWrite() => _writes = [];
 
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
-    if (!_failNext ||
-        statement.operation != LocalDatabaseSqlOperation.insert ||
-        !statement.statements.any(_favoritePlaceInsert.hasMatch)) {
+    final writes = _writes;
+    if (writes == null ||
+        statement.operation != LocalDatabaseSqlOperation.insert) {
       return;
     }
-    _failNext = false;
-    failedFavoritePlaceWrite = true;
+    final table =
+        _insertedTable.firstMatch(statement.statements.single)?.group(1) ??
+        (throw StateError('Не удалось определить таблицу вставки.'));
+    writes.add(table);
+    if (table != 'favorite_intentions') return;
+    _writes = null;
+    faultPoint = (
+      inTransaction: !connection.autocommit,
+      writes: List.unmodifiable(writes),
+      created: _createdRows(connection),
+    );
     throw sqlite.SqliteException(
       extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
       message: 'Управляемый отказ после записи места избранного',
