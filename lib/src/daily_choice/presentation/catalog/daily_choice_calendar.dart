@@ -25,7 +25,11 @@ import 'daily_choice_calendar_viewport.dart';
 /// представление. Перелистывание периода горизонтальным свайпом или кнопками
 /// шапки сообщает только [onViewportChanged] и не выбирает день; за первую и
 /// последнюю неделю или месяц диапазона [CalendarDate] перелистать нельзя.
-/// Изменения входов потребителем отражаются без обратных событий.
+/// Команда раскрытия или сворачивания шапки также сообщает только
+/// [onViewportChanged]: меняется представление, а дата просмотра сохраняется
+/// точно, поэтому раскрывается месяц и сворачивается неделя этой даты.
+/// Вертикальные жесты представление не переключают. Изменения входов
+/// потребителем отражаются без обратных событий.
 ///
 /// Шапка называет месяц и год даты просмотра, а отдельная подпись — полную
 /// выбранную дату, даже если её нет в видимом периоде.
@@ -70,6 +74,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
           viewport: viewport,
           onPrevious: _hasPreviousPeriod(viewport) ? _showPreviousPeriod : null,
           onNext: _hasNextPeriod(viewport) ? _showNextPeriod : null,
+          onToggleMode: _toggleMode,
         ),
         TableCalendar<Never>(
           locale: Localizations.localeOf(context).toLanguageTag(),
@@ -113,6 +118,34 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
       curve: _pageAnimationCurve,
     ),
   );
+
+  // Дата просмотра сохраняется, а к периоду нового представления библиотека
+  // переходит без сообщения о смене страницы.
+  void _toggleMode() {
+    _stopPaging();
+    final viewport = widget.viewport;
+    widget.onViewportChanged(
+      viewport.withMode(switch (viewport.mode) {
+        DailyChoiceCalendarMode.week => DailyChoiceCalendarMode.month,
+        DailyChoiceCalendarMode.month => DailyChoiceCalendarMode.week,
+      }),
+    );
+  }
+
+  /// Останавливает незаконченное перелистывание на странице, о которой
+  /// потребитель уже знает.
+  ///
+  /// Анимация страницы продвигается в следующем кадре раньше, чем календарь
+  /// получит новые входы. Без остановки библиотека сообщила бы о переходе,
+  /// рассчитанном для прежнего представления, и он заменил бы просмотр,
+  /// выбранный последней командой.
+  void _stopPaging() {
+    // PageView сообщает о странице, ближайшей к текущему положению, поэтому
+    // переход к ней не создаёт нового сообщения.
+    if (_pages.page case final page?) {
+      _pages.jumpToPage(page.round());
+    }
+  }
 
   Widget _buildDay(BuildContext context, DateTime day, DateTime focusedDay) {
     final date = _availableDate(day);
@@ -233,14 +266,16 @@ DateTime _visiblePeriodEnd(DailyChoiceCalendarViewport viewport) {
   };
 }
 
-/// Шапка календаря: полная выбранная дата, месяц и год даты просмотра и
-/// команды соседних периодов текущего представления.
+/// Шапка календаря: полная выбранная дата, месяц и год даты просмотра,
+/// команды соседних периодов текущего представления и команда раскрытия или
+/// сворачивания.
 final class _DailyChoiceCalendarHeader extends StatelessWidget {
   const _DailyChoiceCalendarHeader({
     required this.selectedDate,
     required this.viewport,
     required this.onPrevious,
     required this.onNext,
+    required this.onToggleMode,
   });
 
   final CalendarDate selectedDate;
@@ -250,19 +285,30 @@ final class _DailyChoiceCalendarHeader extends StatelessWidget {
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
 
+  final VoidCallback onToggleMode;
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final dates = MaterialLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final (previousLabel, nextLabel) = switch (viewport.mode) {
+    final (
+      previousLabel,
+      nextLabel,
+      toggleLabel,
+      toggleIcon,
+    ) = switch (viewport.mode) {
       DailyChoiceCalendarMode.week => (
         localizations.dailyChoiceCalendarPreviousWeek,
         localizations.dailyChoiceCalendarNextWeek,
+        localizations.dailyChoiceCalendarExpand,
+        Icons.expand_more,
       ),
       DailyChoiceCalendarMode.month => (
         localizations.dailyChoiceCalendarPreviousMonth,
         localizations.dailyChoiceCalendarNextMonth,
+        localizations.dailyChoiceCalendarCollapse,
+        Icons.expand_less,
       ),
     };
     return Column(
@@ -295,6 +341,11 @@ final class _DailyChoiceCalendarHeader extends StatelessWidget {
               onPressed: onNext,
               tooltip: nextLabel,
               icon: const Icon(Icons.chevron_right),
+            ),
+            IconButton(
+              onPressed: onToggleMode,
+              tooltip: toggleLabel,
+              icon: Icon(toggleIcon),
             ),
           ],
         ),

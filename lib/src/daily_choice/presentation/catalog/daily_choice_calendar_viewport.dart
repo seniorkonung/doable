@@ -25,6 +25,9 @@ final class DailyChoiceCalendarViewport {
   DailyChoiceCalendarViewport withFocusedDate(CalendarDate value) =>
       DailyChoiceCalendarViewport(focusedDate: value, mode: mode);
 
+  DailyChoiceCalendarViewport withMode(DailyChoiceCalendarMode value) =>
+      DailyChoiceCalendarViewport(focusedDate: focusedDate, mode: value);
+
   @override
   bool operator ==(Object other) =>
       other is DailyChoiceCalendarViewport &&

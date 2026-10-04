@@ -119,6 +119,39 @@ void main() {
     },
   );
 
+  testWidgets(
+    'выбор дня после раскрытия сохраняет месячное представление до сворачивания',
+    (tester) async {
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: date(2026, 10, 4),
+        viewport: week(date(2026, 10, 4)),
+        today: date(2026, 10, 4),
+      );
+
+      await tester.tap(find.byTooltip('Развернуть календарь'));
+      await tester.pumpAndSettle();
+      await tester.tap(calendarDay(date(2026, 10, 15)));
+      await tester.pumpAndSettle();
+
+      expect(consumer.events, [
+        ViewportChanged(month(date(2026, 10, 4))),
+        DateSelected(date(2026, 10, 15)),
+      ]);
+      expect(consumer.viewport, month(date(2026, 10, 15)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 28), 5));
+      expect(dayCell(tester, date(2026, 10, 15)).isSelected, isTrue);
+      expect(find.byTooltip('Свернуть календарь'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Свернуть календарь'));
+      await tester.pumpAndSettle();
+
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
+      expect(consumer.events.last, ViewportChanged(week(date(2026, 10, 15))));
+      expect(consumer.selectedDate, date(2026, 10, 15));
+    },
+  );
+
   testWidgets('повторное нажатие выбранного дня снова передаёт одно событие', (
     tester,
   ) async {
