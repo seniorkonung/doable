@@ -68,6 +68,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../intention/presentation/catalog/catalog_test_support.dart'
     as catalog_support;
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
 import '../../support/favorite_read_contract_test_fallback.dart';
@@ -592,6 +593,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           personalGraphRepositoryProvider.overrideWithValue(repository),
+          ControlledDailyChoiceLocalDate(durabilityChoiceDate).override,
         ],
         retry: (retryCount, error) => null,
       );
@@ -629,6 +631,11 @@ void main() {
           subscription.close();
         }
       });
+      // Каталог показывает день повторяемого выбора независимо от
+      // первоначального охвата.
+      container
+          .read(dailyChoiceCatalogViewModelProvider.notifier)
+          .selectDate(durabilityChoiceDate);
       final details = DailyChoiceDetailsViewModel(repository, firstId);
       addTearDown(details.dispose);
       final suggestions = ChoicePathSuggestionsViewModel.fromCoordinator(
@@ -718,6 +725,7 @@ void main() {
         for (final number in [1, 2, 3, 4, 5])
           number: intention(number).intention,
       };
+      expect(catalog().selection.date, durabilityChoiceDate);
       expect(catalog().items.map((item) => item.id), [firstId]);
       expect(group(1).items.map((item) => item.id), [firstId]);
       expect(group(3).items.map((item) => item.id), [firstId]);

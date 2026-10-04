@@ -34,6 +34,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_local_date.dart';
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
@@ -42,7 +43,7 @@ void main() {
   test('фильтр меняет поколение и отклоняет позднюю первую порцию', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);
-    final date = CalendarDate.fromParts(2026, 9, 24);
+    final date = CalendarDate.fromParts(2026, 9, 25);
     harness.model.selectDate(date);
     expect(harness.repository.queries[1].date, date);
     harness.repository.first(1, [_item(2, date: date)], total: 1);
@@ -228,14 +229,15 @@ void main() {
   });
 
   test(
-    'смена даты перемещает строку из выбранного дня в общий каталог',
+    'смена даты убирает строку из выбранного дня и показывает её в новом дне',
     () async {
       final harness = _Harness();
       addTearDown(harness.dispose);
-      final oldDate = CalendarDate.fromParts(2026, 9, 24);
-      final newDate = CalendarDate.fromParts(2026, 9, 25);
+      final oldDate = CalendarDate.fromParts(2026, 9, 25);
+      final newDate = CalendarDate.fromParts(2026, 9, 26);
       harness.model.selectDate(oldDate);
-      harness.repository.first(1, [_item(1)], total: 1);
+      expect(harness.repository.queries[1].date, oldDate);
+      harness.repository.first(1, [_item(1, date: oldDate)], total: 1);
       await pumpEventQueue();
       harness.repository.first(0, [], total: 0);
       await pumpEventQueue();
@@ -253,12 +255,14 @@ void main() {
         (harness.state as DailyChoiceCatalogLoaded).freshness,
         DailyChoiceCatalogFreshness.refreshing,
       );
+      expect(harness.repository.queries[2].date, oldDate);
       harness.repository.first(2, [], total: 0, revision: 2);
       await pumpEventQueue();
       expect(harness.state, isA<DailyChoiceCatalogEmpty>());
       expect(harness.state.selection.date, oldDate);
 
-      harness.model.clearFilters();
+      harness.model.selectDate(newDate);
+      expect(harness.repository.queries[3].date, newDate);
       harness.repository.first(
         3,
         [_item(1, date: newDate)],
@@ -270,6 +274,7 @@ void main() {
         (harness.state as DailyChoiceCatalogLoaded).items.single.date,
         newDate,
       );
+      expect(harness.state.selection.date, newDate);
     },
   );
 
@@ -298,7 +303,7 @@ void main() {
         readiness: IntentionReadiness.notReady,
       ),
       selected: _item(1).selected,
-      date: CalendarDate.fromParts(2026, 9, 24),
+      date: _today,
       isCompleted: false,
     );
     harness.repository.first(1, [newItem], total: 1, revision: 2);
@@ -429,11 +434,16 @@ void main() {
   });
 }
 
+/// Локальное сегодня проверок модели и дата строк фикстуры: первое чтение
+/// каталога охватывает этот день.
+final _today = CalendarDate.fromParts(2026, 9, 24);
+
 final class _Harness {
   _Harness() {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWith((ref) => repository),
+        ControlledDailyChoiceLocalDate(_today).override,
       ],
     );
     subscription = container.listen(
@@ -466,7 +476,7 @@ final class _Harness {
               relatedIntentionId: _intentionId(2),
             ),
           ]),
-          date: CalendarDate.fromParts(2026, 9, 24),
+          date: _today,
           description: null,
           isCompleted: false,
         ),
@@ -569,7 +579,7 @@ final class _Repository
       id: _choiceId(id),
       sourceIntentionId: _intentionId(1),
       selectedIntentionId: _intentionId(2),
-      date: CalendarDate.fromParts(2026, 9, 24),
+      date: _today,
       description: null,
       isCompleted: isCompleted,
     );
@@ -611,7 +621,7 @@ final class _Repository
       id: _choiceId(id),
       sourceIntentionId: _intentionId(1),
       selectedIntentionId: _intentionId(2),
-      date: CalendarDate.fromParts(2026, 9, 24),
+      date: _today,
       description: null,
       isCompleted: false,
     );
@@ -716,7 +726,7 @@ final class _Repository
       id: _choiceId(id),
       sourceIntentionId: _intentionId(1),
       selectedIntentionId: _intentionId(2),
-      date: CalendarDate.fromParts(2026, 9, 24),
+      date: _today,
       description: null,
       isCompleted: false,
     );
@@ -803,7 +813,7 @@ DailyChoiceCatalogItem _item(int id, {CalendarDate? date}) =>
         archiveState: IntentionArchiveState.active,
         readiness: IntentionReadiness.ready,
       ),
-      date: date ?? CalendarDate.fromParts(2026, 9, 24),
+      date: date ?? _today,
       isCompleted: false,
     );
 

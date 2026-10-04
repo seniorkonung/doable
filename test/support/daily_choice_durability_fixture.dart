@@ -99,6 +99,9 @@ Future<void> seedDurabilityGraph(AppDatabase database) async {
   }
 }
 
+/// Дата дневного выбора, создаваемого [durabilityCreate] по умолчанию.
+final durabilityChoiceDate = CalendarDate.fromParts(2026, 9, 23);
+
 ConfirmedChoicePath durabilityPath(List<int> relationNumbers) =>
     ConfirmedChoicePath([
       for (final number in relationNumbers)
@@ -133,7 +136,7 @@ CreateDailyChoice durabilityCreate({
   sourceIntentionId: durabilityIntention(1),
   selectedIntentionId: durabilityIntention(path.last == 103 ? 4 : 3),
   path: durabilityPath(path),
-  date: date ?? CalendarDate.fromParts(2026, 9, 23),
+  date: date ?? durabilityChoiceDate,
   description: description == null
       ? null
       : DailyChoiceDescription.fromInput(description),

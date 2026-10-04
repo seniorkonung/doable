@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/daily_choice_local_date.dart';
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
@@ -100,14 +101,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
 
+    final selectedDay = CalendarDate.fromParts(2026, 9, 25);
     await tester.enterText(
       find.byKey(const ValueKey('daily-choice-date-filter')),
-      '2026-09-24',
+      '2026-09-25',
     );
     await tester.tap(find.byKey(const ValueKey('daily-choice-apply-date')));
     await tester.pump();
-    expect(repository.queries[2].date, CalendarDate.fromParts(2026, 9, 24));
-    repository.completeFirst([_item(2)], index: 2, total: 1);
+    expect(repository.queries[2].date, selectedDay);
+    repository.completeFirst([_item(2, date: selectedDay)], index: 2, total: 1);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('daily-choice-completion-filter')),
@@ -123,7 +125,11 @@ void main() {
     await tester.pump();
     expect(repository.queries[4].date, isNull);
     expect(repository.queries[4].isCompleted, isNull);
-    repository.completeFirst([_item(1), _item(2)], index: 4, total: 2);
+    repository.completeFirst(
+      [_item(1), _item(2, date: selectedDay)],
+      index: 4,
+      total: 2,
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
     expect(find.text('Все состояния'), findsOneWidget);
@@ -294,6 +300,10 @@ void main() {
 /// Экран телефона, на котором фильтры и выдача делят высоту.
 const _phone = Size(400, 800);
 
+/// Локальное сегодня проверок страницы и дата строк фикстуры: первое чтение
+/// каталога охватывает этот день.
+final _today = CalendarDate.fromParts(2026, 9, 24);
+
 /// Фильтры каталога: поле даты, её применение, выполнение и сброс.
 const _filterKeys = [
   'daily-choice-date-filter',
@@ -321,6 +331,7 @@ Future<AppRouter> _open(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
+        ControlledDailyChoiceLocalDate(_today).override,
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(
@@ -420,23 +431,24 @@ final class _Cursor implements DailyChoiceCatalogCursor {
   const _Cursor();
 }
 
-DailyChoiceCatalogItem _item(int number) => DailyChoiceCatalogItem(
-  id: _id(number),
-  source: DailyChoiceCatalogParticipant(
-    id: _intentionId(1),
-    title: 'Основание',
-    archiveState: IntentionArchiveState.archived,
-    readiness: IntentionReadiness.notReady,
-  ),
-  selected: DailyChoiceCatalogParticipant(
-    id: _intentionId(2),
-    title: 'Действие',
-    archiveState: IntentionArchiveState.active,
-    readiness: IntentionReadiness.ready,
-  ),
-  date: CalendarDate.fromParts(2026, 9, 24),
-  isCompleted: false,
-);
+DailyChoiceCatalogItem _item(int number, {CalendarDate? date}) =>
+    DailyChoiceCatalogItem(
+      id: _id(number),
+      source: DailyChoiceCatalogParticipant(
+        id: _intentionId(1),
+        title: 'Основание',
+        archiveState: IntentionArchiveState.archived,
+        readiness: IntentionReadiness.notReady,
+      ),
+      selected: DailyChoiceCatalogParticipant(
+        id: _intentionId(2),
+        title: 'Действие',
+        archiveState: IntentionArchiveState.active,
+        readiness: IntentionReadiness.ready,
+      ),
+      date: date ?? _today,
+      isCompleted: false,
+    );
 
 DailyChoiceId _id(int number) => (DailyChoiceId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',

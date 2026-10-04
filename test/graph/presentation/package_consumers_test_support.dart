@@ -30,9 +30,17 @@ import 'package:doable/src/long_term_relation/presentation/neighborhood/relation
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+
+/// Локальное сегодня потребителей пакетов: день дневного выбора фикстуры.
+/// Подставляется в контейнер до первого открытия каталога дневных выборов.
+Override packageConsumersLocalDate() =>
+    ControlledDailyChoiceLocalDate(durabilityChoiceDate).override;
 
 /// Номер объекта фикстуры по его UUID.
 int _label(String uuid) => int.parse(uuid.split('-').last, radix: 16);
@@ -427,8 +435,10 @@ final class PackageConsumerProbes {
 
   bool get allLoaded => all.every((probe) => probe.loaded);
 
+  /// Каталог дневных выборов загружен для явно выбранного дня выбора
+  /// фикстуры и охвата выполненных.
   bool get dailyCatalogSelected =>
-      dailyCatalogSelection == (null, true) &&
+      dailyCatalogSelection == (durabilityChoiceDate, true) &&
       _container.read(dailyChoiceCatalogViewModelProvider)
           is DailyChoiceCatalogLoaded;
 

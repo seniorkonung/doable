@@ -7,6 +7,7 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -14,6 +15,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_local_date.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -33,6 +35,8 @@ void main() {
   test(
     'реальный каталог и подробности согласуют дубликаты и изменения графа',
     () async {
+      final sourceDay = CalendarDate.fromParts(2026, 9, 24);
+      final targetDay = CalendarDate.fromParts(2026, 9, 25);
       final database = AppDatabase(openInMemoryLocalDatabase());
       await database.open();
       addTearDown(database.close);
@@ -85,9 +89,12 @@ void main() {
         () => DateTime.utc(2026, 9, 24),
         InMemoryDiagnosticsSink(),
       );
+      // Локальное сегодня совпадает с днём записей, но каталог выбирает этот
+      // день явно и не зависит от первоначального охвата.
       final container = ProviderContainer(
         overrides: [
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
+          ControlledDailyChoiceLocalDate(sourceDay).override,
         ],
       );
       addTearDown(container.dispose);
@@ -106,11 +113,13 @@ void main() {
         graphCommandCoordinatorProvider.notifier,
       );
 
+      model.selectDate(sourceDay);
       await _until(
         () =>
             container.read(dailyChoiceCatalogViewModelProvider)
                 is DailyChoiceCatalogLoaded,
       );
+      expect(catalog().selection.date, sourceDay);
       expect(catalog().totalCount, 51);
       expect(catalog().items, hasLength(50));
       expect(catalog().items.first.id, _choice(251));
@@ -143,21 +152,28 @@ void main() {
         UpdateDailyChoiceFields(
           choiceId: _choice(201),
           patch: DailyChoiceFieldsPatch(
-            date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 9, 25)),
+            date: DailyChoiceFieldSet(targetDay),
             isCompleted: const DailyChoiceFieldSet(true),
           ),
         ),
       ) as DailyChoiceCommandAccepted;
-      expect(await update.future, isA<DailyChoiceCommandCompletion>());
+      final moved = await update.future;
+      expect(moved, isA<DailyChoiceCommandCompletion>());
       await _until(
         () =>
             catalog().freshness == DailyChoiceCatalogFreshness.current &&
-            catalog().items.first.id == _choice(201) &&
+            catalog().revision.compareTo(moved.revision!) ==
+                GraphRevisionOrder.same &&
             opened().details.choice.isCompleted,
       );
-      expect(catalog().totalCount, 51);
-      expect(catalog().items.first.date, CalendarDate.fromParts(2026, 9, 25));
-      expect(opened().details.choice.date, catalog().items.first.date);
+      // Перенесённая запись исчезает из исходного дня вместе с количеством.
+      expect(catalog().selection.date, sourceDay);
+      expect(catalog().totalCount, 50);
+      expect(catalog().items, hasLength(50));
+      expect(catalog().nextCursor, isNull);
+      expect(catalog().items.any((item) => item.id == _choice(201)), isFalse);
+      expect(catalog().items.every((item) => item.date == sourceDay), isTrue);
+      expect(opened().details.choice.date, targetDay);
 
       final rename = coordinator.acceptExisting(
         UpdateIntention(
@@ -171,10 +187,29 @@ void main() {
       await _until(
         () =>
             catalog().freshness == DailyChoiceCatalogFreshness.current &&
-            catalog().items.first.source.title == 'Новое основание' &&
+            catalog().items.every(
+              (item) => item.source.title == 'Новое основание',
+            ) &&
             opened().details.source.title == 'Новое основание',
       );
-      expect(catalog().totalCount, 51);
+      expect(catalog().totalCount, 50);
+      expect(catalog().items, hasLength(50));
+
+      // В новом дне перенесённая запись доступна с подтверждёнными полями.
+      model.selectDate(targetDay);
+      await _until(
+        () =>
+            container.read(dailyChoiceCatalogViewModelProvider)
+                is DailyChoiceCatalogLoaded &&
+            catalog().selection.date == targetDay,
+      );
+      expect(catalog().totalCount, 1);
+      expect(catalog().nextCursor, isNull);
+      expect(catalog().items.single.id, _choice(201));
+      expect(catalog().items.single.date, targetDay);
+      expect(catalog().items.single.isCompleted, isTrue);
+      expect(catalog().items.single.source.title, 'Новое основание');
+      expect(opened().details.choice.date, catalog().items.single.date);
 
       final deletion = coordinator.acceptDailyChoiceDelete(
         DeleteDailyChoice(_choice(201)),
@@ -183,11 +218,11 @@ void main() {
       await _until(
         () =>
             catalog().freshness == DailyChoiceCatalogFreshness.current &&
-            catalog().totalCount == 50 &&
+            catalog().totalCount == 0 &&
             details.state is DailyChoiceDetailsNotFound,
       );
-      expect(catalog().items, hasLength(50));
-      expect(catalog().items.any((item) => item.id == _choice(201)), isFalse);
+      expect(catalog(), isA<DailyChoiceCatalogEmpty>());
+      expect(catalog().selection.date, targetDay);
     },
   );
 }
