@@ -350,28 +350,25 @@ void main() {
   );
 
   group('признаки дня на экране', () {
-    testWidgets(
-      'выбранный день залит кругом, сегодняшний обведён, и при совпадении '
-      'видны оба признака',
-      (tester) async {
-        final consumer = await pumpCalendarConsumer(
-          tester,
-          selectedDate: date(2026, 10, 5),
-          viewport: week(date(2026, 10, 5)),
-          today: date(2026, 10, 6),
-        );
+    testWidgets('выбранный день залит, сегодняшний обведён, и при совпадении '
+        'видны оба признака', (tester) async {
+      final consumer = await pumpCalendarConsumer(
+        tester,
+        selectedDate: date(2026, 10, 5),
+        viewport: week(date(2026, 10, 5)),
+        today: date(2026, 10, 6),
+      );
 
-        expect(_mark(tester, date(2026, 10, 5)), (disc: true, ring: false));
-        expect(_mark(tester, date(2026, 10, 6)), (disc: false, ring: true));
-        expect(_mark(tester, date(2026, 10, 7)), (disc: false, ring: false));
+      expect(_mark(tester, date(2026, 10, 5)), (disc: true, ring: false));
+      expect(_mark(tester, date(2026, 10, 6)), (disc: false, ring: true));
+      expect(_mark(tester, date(2026, 10, 7)), (disc: false, ring: false));
 
-        consumer.replaceInputs(selectedDate: date(2026, 10, 6));
-        await tester.pumpAndSettle();
+      consumer.replaceInputs(selectedDate: date(2026, 10, 6));
+      await tester.pumpAndSettle();
 
-        expect(_mark(tester, date(2026, 10, 6)), (disc: true, ring: true));
-        expect(_mark(tester, date(2026, 10, 5)), (disc: false, ring: false));
-      },
-    );
+      expect(_mark(tester, date(2026, 10, 6)), (disc: true, ring: true));
+      expect(_mark(tester, date(2026, 10, 5)), (disc: false, ring: false));
+    });
   });
 }
 
@@ -504,7 +501,7 @@ Future<List<CalendarEvent>> _controlWithoutSwipes(
 }
 
 /// Признаки выбранности и «сегодня», различимые формой, а не только цветом:
-/// заливка круга и его контур.
+/// заливка выделения и его контур.
 ({bool disc, bool ring}) _mark(WidgetTester tester, CalendarDate value) {
   final decoration =
       tester
@@ -515,7 +512,10 @@ Future<List<CalendarEvent>> _controlWithoutSwipes(
                 ),
               )
               .decoration
-          as BoxDecoration;
-  expect(decoration.shape, BoxShape.circle);
-  return (disc: decoration.color != null, ring: decoration.border != null);
+          as ShapeDecoration;
+  final shape = decoration.shape as StadiumBorder;
+  return (
+    disc: decoration.color != null,
+    ring: shape.side.style != BorderStyle.none,
+  );
 }

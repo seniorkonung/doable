@@ -172,12 +172,16 @@ final class CalendarConsumer {
 /// [locale] — системная локаль устройства. Локаль календаря выбирают правила и
 /// делегаты приложения, поэтому смена `tester.platformDispatcher.localesTestValue`
 /// меняет язык у того же потребителя, а неподдерживаемый язык даёт английский.
+///
+/// Календарь — первый элемент общей вертикальной прокрутки потребителя, как в
+/// каталоге; [contentBelow] — следующие за ним элементы той же прокрутки.
 Future<CalendarConsumer> pumpCalendarConsumer(
   WidgetTester tester, {
   required CalendarDate selectedDate,
   required DailyChoiceCalendarViewport viewport,
   required CalendarDate today,
   Locale locale = const Locale('ru'),
+  List<Widget> contentBelow = const [],
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -199,6 +203,7 @@ Future<CalendarConsumer> pumpCalendarConsumer(
                 today: today,
               ),
             ),
+            ...contentBelow,
           ],
         ),
       ),

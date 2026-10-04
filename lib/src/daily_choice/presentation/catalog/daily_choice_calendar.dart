@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
+import 'daily_choice_calendar_text_metrics.dart';
 import 'daily_choice_calendar_viewport.dart';
 
 /// Встроенный недельный и месячный календарь каталога дневных выборов.
@@ -34,6 +36,15 @@ import 'daily_choice_calendar_viewport.dart';
 ///
 /// Шапка называет месяц и год даты просмотра, а отдельная подпись — полную
 /// выбранную дату, даже если её нет в видимом периоде.
+///
+/// Календарь рассчитан на размещение элементом общей вертикальной прокрутки
+/// страницы: он занимает доступную ширину, а высоту определяет сам по шапке,
+/// числу недель видимого периода и системному масштабу текста. Раскрытие
+/// увеличивает эту высоту и сдвигает последующее содержимое; собственной
+/// вертикальной прокрутки у календаря нет, и вертикальные жесты по нему
+/// прокручивают страницу. Семь колонок дней всегда занимают всю ширину: при
+/// крупном тексте шапка, числа и подписи дней недели переносятся, а строки
+/// становятся выше, без уменьшения текста.
 ///
 /// Для вспомогательных технологий каждый допустимый день — одна кнопка выбора
 /// с полной датой, днём недели, состоянием выбранности и отдельной отметкой
@@ -84,31 +95,41 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
           onNext: _hasNextPeriod(viewport) ? _showNextPeriod : null,
           onToggleMode: _toggleMode,
         ),
-        // Основа библиотеки без готовых ячеек: ячейка `TableCalendar` задаёт
-        // собственную подпись даты, скрывает содержимое от вспомогательных
-        // технологий и объявляет пустое долгое нажатие. Дни и подписи дней
-        // недели строит календарь, а страницы, жесты и сетка остаются за
-        // библиотекой.
-        TableCalendarBase(
-          firstDay: _firstDay,
-          lastDay: _lastDay,
-          focusedDay: _technicalDate(viewport.focusedDate),
-          calendarFormat: switch (viewport.mode) {
-            DailyChoiceCalendarMode.week => CalendarFormat.week,
-            DailyChoiceCalendarMode.month => CalendarFormat.month,
+        // Библиотека задаёт строкам фиксированную высоту, поэтому её
+        // рассчитывает календарь: по ширине колонки и масштабу текста.
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columnWidth = _columnWidth(constraints.maxWidth);
+            // Основа библиотеки без готовых ячеек: ячейка `TableCalendar`
+            // задаёт собственную подпись даты, скрывает содержимое от
+            // вспомогательных технологий и объявляет пустое долгое нажатие.
+            // Дни и подписи дней недели строит календарь, а страницы, жесты и
+            // сетка остаются за библиотекой.
+            return TableCalendarBase(
+              firstDay: _firstDay,
+              lastDay: _lastDay,
+              focusedDay: _technicalDate(viewport.focusedDate),
+              calendarFormat: switch (viewport.mode) {
+                DailyChoiceCalendarMode.week => CalendarFormat.week,
+                DailyChoiceCalendarMode.month => CalendarFormat.month,
+              },
+              startingDayOfWeek: StartingDayOfWeek.monday,
+              // Представление переключает только потребитель, поэтому
+              // вертикальные жесты остаются общей прокрутке страницы.
+              availableGestures: AvailableGestures.horizontalSwipe,
+              rowHeight: DailyChoiceCalendarDay.rowHeight(
+                context,
+                columnWidth: columnWidth,
+              ),
+              dowHeight: _weekdayHeight(context, columnWidth: columnWidth),
+              dowBuilder: _buildWeekday,
+              dayBuilder: _buildDay,
+              pageAnimationDuration: _pageAnimationDuration,
+              pageAnimationCurve: _pageAnimationCurve,
+              onCalendarCreated: (pages) => _pages = pages,
+              onPageChanged: _reportFocusedDay,
+            );
           },
-          startingDayOfWeek: StartingDayOfWeek.monday,
-          // Представление переключает только потребитель, поэтому вертикальные
-          // жесты остаются общей прокрутке страницы.
-          availableGestures: AvailableGestures.horizontalSwipe,
-          rowHeight: _rowHeight,
-          dowHeight: _weekdayHeight,
-          dowBuilder: _buildWeekday,
-          dayBuilder: _buildDay,
-          pageAnimationDuration: _pageAnimationDuration,
-          pageAnimationCurve: _pageAnimationCurve,
-          onCalendarCreated: (pages) => _pages = pages,
-          onPageChanged: _reportFocusedDay,
         ),
       ],
     );
@@ -164,11 +185,10 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
     return Center(
       child: ExcludeSemantics(
         child: Text(
-          DateFormat.E(Localizations.localeOf(context).toLanguageTag())
-              .format(day),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          _weekdayLabel(context, day),
+          textAlign: TextAlign.center,
+          style: _weekdayStyle(theme)
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
       ),
     );
@@ -215,9 +235,40 @@ const _unavailableDay = SizedBox.expand(
   key: ValueKey('daily-choice-calendar-unavailable-day'),
 );
 
-/// Высоты строки дней и строки названий дней недели.
-const _rowHeight = 52.0;
-const _weekdayHeight = 16.0;
+/// Наименьшая высота строки названий дней недели.
+const _minWeekdayHeight = 16.0;
+
+/// Ширина колонки дня, не больше фактической: высоты строк, рассчитанные по
+/// ней, вмещают текст колонки.
+double _columnWidth(double width) =>
+    (width / DateTime.daysPerWeek).floorToDouble();
+
+String _weekdayLabel(BuildContext context, DateTime day) =>
+    DateFormat.E(Localizations.localeOf(context).toLanguageTag()).format(day);
+
+TextStyle? _weekdayStyle(ThemeData theme) => theme.textTheme.bodySmall;
+
+/// Высота строки названий дней недели, в которую каждое название при ширине
+/// колонки [columnWidth] помещается целиком, при необходимости с переносом.
+double _weekdayHeight(BuildContext context, {required double columnWidth}) {
+  // Названия не зависят от недели: подойдёт любая неделя с понедельника.
+  final monday = DateTime.utc(2024);
+  return math.max(
+    _minWeekdayHeight,
+    tallestTextHeight(
+      context,
+      texts: [
+        for (var offset = 0; offset < DateTime.daysPerWeek; offset++)
+          _weekdayLabel(
+            context,
+            DateTime.utc(monday.year, monday.month, monday.day + offset),
+          ),
+      ],
+      style: _weekdayStyle(Theme.of(context)),
+      maxWidth: columnWidth,
+    ),
+  );
+}
 
 /// Переход к соседнему периоду: общий для свайпа и кнопок шапки.
 const _pageAnimationDuration = Duration(milliseconds: 300);
