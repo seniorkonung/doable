@@ -2206,6 +2206,103 @@ void main() {
         expect(_storedRows(raw, 'tags'), hasLength(2));
       });
 
+      test('удалённый и заново созданный одноимённый выбранный тег отклоняет '
+          'всё создание точным отсутствующим идентификатором без подмены '
+          'новым тегом', () async {
+        _tagCommandSuccess(await repository.execute(DeleteTag(homeTagId)));
+        final recreated = _tagCommandSuccess(
+          await repository.execute(CreateTag(TagName.fromInput('Дом'))),
+        );
+        final recreatedTagId = (recreated.value as TagCreated).tag.id;
+        expect(recreatedTagId, isNot(homeTagId));
+        final revisionBefore = _firstCatalogPage(
+          await repository.getCatalogPage(allQuery),
+        ).revision;
+        final intentionsBefore = _storedRows(raw, 'intentions');
+        final placesBefore = _favoritePlaces(raw);
+        final recreatedTagQuery = IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: null,
+          tagFilter: IntentionTagFilter(requiredTagIds: [recreatedTagId]),
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 100,
+        );
+        writeTrace.operations.clear();
+
+        final result = await repository.execute(
+          CreateIntention.withInitialState(
+            title: 'Убрать дом',
+            description: null,
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+            tagIds: [homeTagId, weekendTagId],
+          ),
+        );
+
+        // В отказе только удалённый идентификатор: существующие «Выходные»
+        // и новый одноимённый «Дом» в нём не появляются.
+        expect(
+          result,
+          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+              .having(
+                (result) => result.failure,
+                'failure',
+                isA<IntentionCreationTagsMissingFailure>().having(
+                  (failure) => failure.missingTagIds,
+                  'missingTagIds',
+                  {homeTagId},
+                ),
+              ),
+        );
+        expect(
+          writeTrace.operations,
+          isNot(
+            anyOf(
+              contains(LocalDatabaseSqlOperation.insert),
+              contains(LocalDatabaseSqlOperation.update),
+              contains(LocalDatabaseSqlOperation.delete),
+            ),
+          ),
+        );
+        expect(idGenerator.generated, isEmpty);
+        expect(_storedRows(raw, 'intentions'), intentionsBefore);
+        expect(_storedRows(raw, 'tag_assignments'), isEmpty);
+        expect(_favoritePlaces(raw), placesBefore);
+        expect(
+          _catalogItems(await repository.getCatalogPage(recreatedTagQuery)),
+          isEmpty,
+        );
+        expect(
+          _firstCatalogPage(await repository.getCatalogPage(allQuery)).revision
+              .compareTo(revisionBefore),
+          GraphRevisionOrder.same,
+        );
+
+        // Явное исправление набора назначает новый «Дом» по его идентичности.
+        final saved = _commandSuccess(
+          await repository.execute(
+            CreateIntention.withInitialState(
+              title: 'Убрать дом',
+              description: null,
+              readiness: IntentionReadiness.ready,
+              favoriteMark: FavoriteMark.favorite,
+              tagIds: [recreatedTagId, weekendTagId],
+            ),
+          ),
+        ) as IntentionSaved;
+        expect(
+          saved.catalogMutation.after!.summary.tags.map(
+            (tag) => (tag.id, tag.name.value),
+          ),
+          [(weekendTagId, 'Выходные'), (recreatedTagId, 'Дом')],
+        );
+        expect(
+          _catalogItems(await repository.getCatalogPage(recreatedTagQuery))
+              .map((item) => item.id),
+          [newId],
+        );
+      });
+
       test('недопустимое название с полным начальным состоянием отклоняется '
           'проверкой текста без чтения тегов и записи', () async {
         writeTrace.operations.clear();
