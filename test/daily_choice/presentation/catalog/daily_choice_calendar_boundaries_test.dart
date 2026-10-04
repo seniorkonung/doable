@@ -6,9 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 
-// Проверки не зависят от часового пояса процесса. Их следует повторять при
-// TZ=UTC и TZ=America/New_York: недели перехода на летнее и зимнее время ниже
-// взяты по правилам America/New_York.
+// Проверки не зависят от часового пояса процесса. Помимо обычного прогона их
+// автоматически выполняет daily_choice_calendar_time_zone_test.dart в
+// отдельном процессе с TZ=America/New_York: недели перехода на летнее и зимнее
+// время ниже взяты по правилам этого пояса.
 void main() {
   group('календарные периоды', () {
     testWidgets('неделя на границе года показывает дни обоих лет по порядку', (
@@ -200,6 +201,33 @@ void main() {
           expect(visibleWeeks(tester), weeksFrom(weekStart, 1));
         },
       );
+
+      // Недели с понедельника по обе стороны перехода: при расчёте периода по
+      // местному времени полночь понедельника летнего времени отстояла бы от
+      // начала диапазона на час меньше целых суток, и календарь показал бы
+      // предыдущую неделю.
+      for (final monday in [weekStart, nextWeekStart]) {
+        testWidgets(
+          'неделя с понедельника ${monday.toCanonicalString()} у перехода на $transition время показывает и выбирает свои дни',
+          (tester) async {
+            final consumer = await pumpCalendarConsumer(
+              tester,
+              selectedDate: date(2026, 10, 4),
+              viewport: week(monday),
+              today: date(2026, 10, 4),
+            );
+            expect(visibleWeeks(tester), weeksFrom(monday, 1));
+
+            await tester.tap(calendarDay(monday));
+            await tester.pumpAndSettle();
+
+            expect(consumer.events, [DateSelected(monday)]);
+            expect(consumer.selectedDate, monday);
+            expect(consumer.viewport, week(monday));
+            expect(visibleWeeks(tester), weeksFrom(monday, 1));
+          },
+        );
+      }
 
       testWidgets(
         'месяц перехода на $transition время показывает и выбирает день перехода',
