@@ -46,6 +46,11 @@ import 'daily_choice_calendar_viewport.dart';
 /// крупном тексте шапка, числа и подписи дней недели переносятся, а строки
 /// становятся выше, без уменьшения текста.
 ///
+/// Созданный или пересозданный календарь показывает период [viewport] при
+/// любых `PageStorageKey` страницы. Он ничего не читает из хранилища страниц
+/// ([PageStorage]) предков и ничего туда не записывает, поэтому сохранённое
+/// положение общей прокрутки страницы не меняется.
+///
 /// Для вспомогательных технологий каждый допустимый день — одна кнопка выбора
 /// с полной датой, днём недели, состоянием выбранности и отдельной отметкой
 /// «сегодня»; дни читаются в календарном порядке после шапки. Команды шапки
@@ -76,6 +81,17 @@ final class DailyChoiceCalendar extends StatefulWidget {
 }
 
 final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
+  /// Собственное хранилище страниц, которое живёт столько же, сколько
+  /// календарь.
+  ///
+  /// Сетка библиотеки сохраняет номер страницы в ближайшем [PageStorage] и при
+  /// создании заменяет им начальную страницу. Запись в хранилище предков
+  /// определяется их `PageStorageKey`, поэтому под прокруткой страницы с таким
+  /// ключом календарь делил бы с ней одну запись: после пересоздания показал
+  /// бы период по её смещению и испортил бы сохранённое смещение. Запись в
+  /// собственном хранилище не переживает календарь.
+  final _pageStorage = PageStorageBucket();
+
   /// Контроллер страниц принадлежит библиотеке: она создаёт его вместе с
   /// сеткой и сама освобождает. Кнопки шапки перелистывают им страницы, чтобы
   /// переход шёл тем же путём, что и свайп.
@@ -84,7 +100,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
   @override
   Widget build(BuildContext context) {
     final viewport = widget.viewport;
-    return Column(
+    final calendar = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -133,6 +149,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar> {
         ),
       ],
     );
+    return PageStorage(bucket: _pageStorage, child: calendar);
   }
 
   // О смене страницы, как и после свайпа, сообщает _reportFocusedDay.

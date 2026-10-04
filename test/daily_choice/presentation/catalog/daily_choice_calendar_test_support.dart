@@ -165,6 +165,15 @@ final class CalendarConsumer {
 
   /// Создаёт календарь заново с текущими входами потребителя.
   void restoreCalendar() => _host.currentState!._setCalendarShown(true);
+
+  /// Убирает общую прокрутку вместе с календарём, сохраняя потребителя, его
+  /// входы и журнал.
+  void removeScrollView() => _host.currentState!._setScrollViewShown(false);
+
+  /// Создаёт общую прокрутку и календарь заново с текущими входами
+  /// потребителя. Прокрутка с ключом хранения восстанавливает сохранённое
+  /// смещение.
+  void restoreScrollView() => _host.currentState!._setScrollViewShown(true);
 }
 
 /// Показывает календарь у нового потребителя.
@@ -175,6 +184,8 @@ final class CalendarConsumer {
 ///
 /// Календарь — первый элемент общей вертикальной прокрутки потребителя, как в
 /// каталоге; [contentBelow] — следующие за ним элементы той же прокрутки.
+/// [scrollStorageKey] — ключ, под которым общая прокрутка сохраняет смещение в
+/// хранилище страниц маршрута, как прокрутки страниц приложения.
 Future<CalendarConsumer> pumpCalendarConsumer(
   WidgetTester tester, {
   required CalendarDate selectedDate,
@@ -182,6 +193,7 @@ Future<CalendarConsumer> pumpCalendarConsumer(
   required CalendarDate today,
   Locale locale = const Locale('ru'),
   List<Widget> contentBelow = const [],
+  PageStorageKey<String>? scrollStorageKey,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -192,19 +204,14 @@ Future<CalendarConsumer> pumpCalendarConsumer(
       supportedLocales: AppLocalizations.supportedLocales,
       localeListResolutionCallback: resolveAppLocale,
       home: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: _CalendarConsumerHost(
-                key: consumer._host,
-                consumer: consumer,
-                selectedDate: selectedDate,
-                viewport: viewport,
-                today: today,
-              ),
-            ),
-            ...contentBelow,
-          ],
+        body: _CalendarConsumerHost(
+          key: consumer._host,
+          consumer: consumer,
+          selectedDate: selectedDate,
+          viewport: viewport,
+          today: today,
+          contentBelow: contentBelow,
+          scrollStorageKey: scrollStorageKey,
         ),
       ),
     ),
@@ -220,12 +227,16 @@ final class _CalendarConsumerHost extends StatefulWidget {
     required this.selectedDate,
     required this.viewport,
     required this.today,
+    required this.contentBelow,
+    required this.scrollStorageKey,
   });
 
   final CalendarConsumer consumer;
   final CalendarDate selectedDate;
   final DailyChoiceCalendarViewport viewport;
   final CalendarDate today;
+  final List<Widget> contentBelow;
+  final PageStorageKey<String>? scrollStorageKey;
 
   @override
   State<_CalendarConsumerHost> createState() => _CalendarConsumerHostState();
@@ -235,6 +246,7 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
   late CalendarDate _selectedDate = widget.selectedDate;
   late DailyChoiceCalendarViewport _viewport = widget.viewport;
   late CalendarDate _today = widget.today;
+  bool _scrollViewShown = true;
   bool _calendarShown = true;
 
   void _rebuild() {
@@ -243,6 +255,10 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
 
   void _setCalendarShown(bool value) {
     setState(() => _calendarShown = value);
+  }
+
+  void _setScrollViewShown(bool value) {
+    setState(() => _scrollViewShown = value);
   }
 
   void _replace({
@@ -259,24 +275,34 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_calendarShown) {
+    if (!_scrollViewShown) {
       return const SizedBox.shrink();
     }
-    return DailyChoiceCalendar(
-      selectedDate: _selectedDate,
-      viewport: _viewport,
-      today: _today,
-      onDateSelected: (value) {
-        widget.consumer.events.add(DateSelected(value));
-        setState(() {
-          _selectedDate = value;
-          _viewport = _viewport.withFocusedDate(value);
-        });
-      },
-      onViewportChanged: (value) {
-        widget.consumer.events.add(ViewportChanged(value));
-        setState(() => _viewport = value);
-      },
+    return CustomScrollView(
+      key: widget.scrollStorageKey,
+      slivers: [
+        SliverToBoxAdapter(
+          child: _calendarShown ? _buildCalendar() : const SizedBox.shrink(),
+        ),
+        ...widget.contentBelow,
+      ],
     );
   }
+
+  Widget _buildCalendar() => DailyChoiceCalendar(
+    selectedDate: _selectedDate,
+    viewport: _viewport,
+    today: _today,
+    onDateSelected: (value) {
+      widget.consumer.events.add(DateSelected(value));
+      setState(() {
+        _selectedDate = value;
+        _viewport = _viewport.withFocusedDate(value);
+      });
+    },
+    onViewportChanged: (value) {
+      widget.consumer.events.add(ViewportChanged(value));
+      setState(() => _viewport = value);
+    },
+  );
 }
