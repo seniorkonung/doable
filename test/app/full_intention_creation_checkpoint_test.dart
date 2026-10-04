@@ -76,6 +76,9 @@ const _tagNames = {_homeTag: 'Дом', _gardenTag: 'Сад', _workTag: 'Рабо
 /// Название создаваемого намерения.
 const _created = 'Рисовать';
 
+/// Описание создаваемого намерения в сценариях отказа.
+const _createdDescription = 'Акварелью, по выходным';
+
 const _message = ValueKey('graph-operation-message');
 
 /// Отказ полного создания на настоящем хранилище.
@@ -83,10 +86,13 @@ enum _CreationFailure {
   /// Один из выбранных тегов отсутствует при проверке в транзакции.
   missingTag('отсутствующий выбранный тег'),
 
-  /// Хранилище недоступно внутри ещё не подтверждённой транзакции создания
-  /// после записи намерения, назначения каждого выбранного тега и места
-  /// избранного.
-  storageAfterWrites('недоступность хранилища после всех записей');
+  /// Хранилище недоступно внутри ещё не подтверждённой транзакции создания,
+  /// когда в ней уже записано всё заданное командой начальное состояние
+  /// намерения: название и описание, готовность к действию, активное
+  /// состояние, назначение каждого выбранного тега и место избранного.
+  storageAfterInitialState(
+    'недоступность хранилища после записи всего начального состояния',
+  );
 
   const _CreationFailure(this.description);
 
@@ -314,14 +320,14 @@ void main() {
           );
           addTearDown(subscription.cancel);
 
-          if (failure == _CreationFailure.storageAfterWrites) {
+          if (failure == _CreationFailure.storageAfterInitialState) {
             install.faults.failAfterFavoritePlaceWrite();
           }
           final accepted = app.coordinator.acceptCreation(
             IntentionCreationFormKey(),
             CreateIntention.withInitialState(
               title: _created,
-              description: null,
+              description: _createdDescription,
               readiness: IntentionReadiness.ready,
               favoriteMark: FavoriteMark.favorite,
               tagIds: switch (failure) {
@@ -329,7 +335,7 @@ void main() {
                   _tagId(_homeTag),
                   _tagId(_missingTag),
                 ],
-                _CreationFailure.storageAfterWrites => [
+                _CreationFailure.storageAfterInitialState => [
                   _tagId(_homeTag),
                   _tagId(_gardenTag),
                 ],
@@ -350,26 +356,40 @@ void main() {
                     'отсутствующие теги',
                     {_tagId(_missingTag)},
                   ),
-                _CreationFailure.storageAfterWrites =>
+                _CreationFailure.storageAfterInitialState =>
                   isA<IntentionUnavailableFailure>(),
               },
             ),
           );
           expect(completion.confirmedChange, isNull);
-          if (failure == _CreationFailure.storageAfterWrites) {
-            // Отказ сработал в открытой транзакции, которая уже содержала
-            // намерение, назначение каждого выбранного тега и место
-            // избранного, записанные в этом порядке.
+          if (failure == _CreationFailure.storageAfterInitialState) {
+            // Отказ сработал в открытой транзакции, когда в ней уже было
+            // записано всё заданное командой начальное состояние: название
+            // и описание, готовность к действию, активное состояние,
+            // назначение каждого выбранного тега и место избранного. Учтена
+            // каждая запись после взвода отказа — вставка, обновление,
+            // удаление, пакет или произвольный оператор: это только вставки
+            // строки намерения, назначений и места избранного в этом
+            // порядке. Запись начального состояния, отложенная за место
+            // избранного, к моменту отказа не выполнена, поэтому неполное
+            // состояние роняет сценарий.
             final fault = install.faults.faultPoint;
             expect(fault, isNotNull, reason: 'Отказ хранилища не сработал');
             expect(fault!.inTransaction, isTrue);
             expect(fault.writes, [
-              'intentions',
-              'tag_assignments',
-              'tag_assignments',
-              'favorite_intentions',
+              'insert intentions',
+              'insert tag_assignments',
+              'insert tag_assignments',
+              'insert favorite_intentions',
             ]);
-            expect(fault.created.intentions, hasLength(1));
+            expect(fault.created.intentions, [
+              (
+                title: _created,
+                description: _createdDescription,
+                readiness: IntentionReadiness.ready,
+                archiveState: IntentionArchiveState.active,
+              ),
+            ]);
             expect(
               fault.created.tags,
               unorderedEquals([
@@ -386,7 +406,7 @@ void main() {
                 IntentionCreationCommandDiagnosticsStage.validation,
                 _failedWith(DiagnosticsFailureCode.validation),
               ),
-              _CreationFailure.storageAfterWrites => _createEvent(
+              _CreationFailure.storageAfterInitialState => _createEvent(
                 IntentionCreationCommandDiagnosticsStage.write,
                 _failedWith(DiagnosticsFailureCode.unavailable),
               ),
@@ -423,7 +443,7 @@ void main() {
               l10n.graphOperationNewIntention,
               switch (failure) {
                 _CreationFailure.missingTag => l10n.editorInvalidInput,
-                _CreationFailure.storageAfterWrites =>
+                _CreationFailure.storageAfterInitialState =>
                   l10n.editorCreateUnavailable,
               },
             ),
@@ -885,26 +905,51 @@ Future<void> _waitFor(
   expect(done(), isTrue, reason: reason?.call());
 }
 
-/// Идентификаторы намерений с названием [_created], теги их назначений и
+/// Поля строки намерения, которые задаёт команда создания.
+typedef _IntentionRow = ({
+  String title,
+  String? description,
+  IntentionReadiness readiness,
+  IntentionArchiveState archiveState,
+});
+
+/// Строки намерений, которых нет в исходном графе, теги их назначений и
 /// места избранного.
 typedef _CreatedRows = ({
-  List<String> intentions,
+  List<_IntentionRow> intentions,
   List<String> tags,
   List<int> places,
 });
 
-/// Строки намерения [_created], видимые на соединении [raw], включая записи
-/// его ещё не подтверждённой транзакции.
+/// Строки намерений вне исходного графа, видимые на соединении [raw],
+/// включая записи ещё не подтверждённой транзакции.
 _CreatedRows _createdRows(sqlite.Database raw) {
-  const created = 'SELECT id FROM intentions WHERE title = ?';
+  const created = 'SELECT id FROM intentions WHERE id NOT IN (?, ?, ?)';
+  final seeded = [
+    for (final intention in [_walk, _read, _swim]) tagFixtureId(intention),
+  ];
   return (
     intentions: [
-      for (final row in raw.select(created, [_created])) row['id'] as String,
+      for (final row in raw.select(
+        'SELECT title, description, is_action_ready, is_archived '
+        'FROM intentions WHERE id IN ($created)',
+        seeded,
+      ))
+        (
+          title: row['title'] as String,
+          description: row['description'] as String?,
+          readiness: row['is_action_ready'] == 1
+              ? IntentionReadiness.ready
+              : IntentionReadiness.notReady,
+          archiveState: row['is_archived'] == 1
+              ? IntentionArchiveState.archived
+              : IntentionArchiveState.active,
+        ),
     ],
     tags: [
       for (final row in raw.select(
         'SELECT tag_id FROM tag_assignments WHERE intention_id IN ($created)',
-        [_created],
+        seeded,
       ))
         row['tag_id'] as String,
     ],
@@ -912,7 +957,7 @@ _CreatedRows _createdRows(sqlite.Database raw) {
       for (final row in raw.select(
         'SELECT position FROM favorite_intentions '
         'WHERE intention_id IN ($created)',
-        [_created],
+        seeded,
       ))
         row['position'] as int,
     ],
@@ -920,7 +965,7 @@ _CreatedRows _createdRows(sqlite.Database raw) {
 }
 
 /// Состояние хранилища в момент управляемого отказа: открыта ли
-/// транзакция, таблицы вставок после взвода отказа в порядке выполнения и
+/// транзакция, все записи после взвода отказа в порядке выполнения и
 /// видимые на соединении строки создаваемого намерения.
 typedef _CreationFaultPoint = ({
   bool inTransaction,
@@ -933,8 +978,10 @@ typedef _CreationFaultPoint = ({
 /// этому моменту записано на соединении приложения. Отказ не проверяет
 /// состав записей сам: его проверяет сценарий по [faultPoint].
 final class _CreationFaults extends LocalDatabaseConnectionObserver {
-  static final _insertedTable = RegExp(
-    r'^\s*INSERT\s+INTO\s+"?(\w+)"?',
+  /// Таблица, которую изменяет оператор SQL.
+  static final _writtenTable = RegExp(
+    r'^\s*(?:INSERT(?:\s+OR\s+\w+)?\s+INTO|REPLACE\s+INTO|'
+    r'UPDATE(?:\s+OR\s+\w+)?|DELETE\s+FROM)\s+"?(\w+)"?',
     caseSensitive: false,
   );
 
@@ -942,7 +989,9 @@ final class _CreationFaults extends LocalDatabaseConnectionObserver {
   /// подтверждённой транзакции.
   late sqlite.Database connection;
 
-  /// Таблицы вставок после взвода отказа; `null`, пока отказ не взведён.
+  /// Записи после взвода отказа: вид операции и изменяемые таблицы либо
+  /// оператор, если таблицу не удаётся определить; `null`, пока отказ не
+  /// взведён.
   List<String>? _writes;
 
   /// Состояние хранилища в момент отказа; `null`, пока отказ не сработал.
@@ -950,18 +999,21 @@ final class _CreationFaults extends LocalDatabaseConnectionObserver {
 
   void failAfterFavoritePlaceWrite() => _writes = [];
 
+  /// Учитывает каждую операцию, кроме чтения: вставку, обновление,
+  /// удаление, пакет и произвольный оператор.
   @override
   void afterStatement(LocalDatabaseSqlStatement statement) {
     final writes = _writes;
     if (writes == null ||
-        statement.operation != LocalDatabaseSqlOperation.insert) {
+        statement.operation == LocalDatabaseSqlOperation.select) {
       return;
     }
-    final table =
-        _insertedTable.firstMatch(statement.statements.single)?.group(1) ??
-        (throw StateError('Не удалось определить таблицу вставки.'));
-    writes.add(table);
-    if (table != 'favorite_intentions') return;
+    final tables = [
+      for (final sql in statement.statements)
+        _writtenTable.firstMatch(sql)?.group(1) ?? sql,
+    ];
+    writes.add('${statement.operation.name} ${tables.join(', ')}');
+    if (!tables.contains('favorite_intentions')) return;
     _writes = null;
     faultPoint = (
       inTransaction: !connection.autocommit,
