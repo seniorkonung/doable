@@ -17,6 +17,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
+import '../../support/daily_choice_catalog_controls.dart';
+import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -25,6 +27,13 @@ String _uuid(int number) =>
 
 DailyChoiceId _choice(int number) =>
     (DailyChoiceId.decode(_uuid(number)) as DailyChoiceIdDecodingSuccess).id;
+
+/// День заменяемого дневного выбора 201.
+final _replacedChoiceDate = CalendarDate.fromParts(2024, 9, 24);
+
+/// Локальное сегодня каталога — день другого дневного выбора 202: каталог
+/// открывается не на дне заменяемого выбора.
+final _catalogToday = CalendarDate.fromParts(2026, 9, 24);
 
 Future<void> _seed(LocalDatabaseHarness harness) async {
   final database = await harness.openReadyDatabase();
@@ -72,8 +81,8 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
     );
   }
   for (final (id, source, action, date, description) in [
-    (201, 1, 3, '2024-09-24', 'Прежнее описание'),
-    (202, 4, 5, '2026-09-24', 'Описание подсказки'),
+    (201, 1, 3, _replacedChoiceDate, 'Прежнее описание'),
+    (202, 4, 5, _catalogToday, 'Описание подсказки'),
   ]) {
     await database.customInsert(
       '''INSERT INTO daily_choices
@@ -83,7 +92,7 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
         Variable.withString(_uuid(id)),
         Variable.withString(_uuid(source)),
         Variable.withString(_uuid(action)),
-        Variable.withString(date),
+        Variable.withString(date.toCanonicalString()),
         Variable.withString(description),
       ],
     );
@@ -123,6 +132,15 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump();
+}
+
+/// Открывает подробности заменяемого выбора из каталога дневных выборов.
+Future<void> _openReplacedChoice(WidgetTester tester) async {
+  await openDailyChoices(tester, tap: _tap);
+  // Каталог открывается на другом дне: человек выбирает день заменяемого
+  // выбора, и тот оказывается единственной строкой выдачи.
+  await selectDailyChoiceCatalogDate(tester, _replacedChoiceDate, tap: _tap);
+  await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
 }
 
 Future<DailyChoiceDetails> _read(PersonalGraphRepository repository) async {
@@ -197,6 +215,9 @@ void main() {
           connectionFactory: () =>
               openFileBackedLocalDatabase(harness.databaseFile),
           diagnosticsSink: InMemoryDiagnosticsSink(),
+          dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
+            _catalogToday,
+          ).read,
         );
         addTearDown(() async {
           await tester.pumpWidget(const SizedBox.shrink());
@@ -212,8 +233,7 @@ void main() {
             .map((step) => step.relation.id)
             .toList();
 
-        await openDailyChoices(tester, tap: _tap);
-        await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
+        await _openReplacedChoice(tester);
         await tester.pumpAndSettle();
         await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
         await _tap(
@@ -383,6 +403,9 @@ void main() {
             connectionFactory: () =>
                 openFileBackedLocalDatabase(harness.databaseFile),
             diagnosticsSink: InMemoryDiagnosticsSink(),
+            dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
+              _catalogToday,
+            ).read,
           );
           addTearDown(() async {
             await tester.pumpWidget(const SizedBox.shrink());
@@ -401,8 +424,7 @@ void main() {
             containsAll([_uuid(101), _uuid(102)]),
           );
 
-          await openDailyChoices(tester, tap: _tap);
-          await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
+          await _openReplacedChoice(tester);
           await tester.pumpAndSettle();
           await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
           await _tap(
@@ -529,7 +551,7 @@ void main() {
           final after = await _read(repository);
           expect(after.choice.id, before.choice.id);
           expect(_creationSequence(harness), originalSequence);
-          expect(after.choice.date, CalendarDate.fromParts(2024, 9, 24));
+          expect(after.choice.date, _replacedChoiceDate);
           expect(after.choice.description?.value, 'Прежнее описание');
           expect(after.choice.isCompleted, isTrue);
           expect(after.choice.sourceIntentionId.toCanonicalString(), _uuid(4));
@@ -562,6 +584,8 @@ void main() {
       connectionFactory: () =>
           openFileBackedLocalDatabase(harness.databaseFile),
       diagnosticsSink: InMemoryDiagnosticsSink(),
+      dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_catalogToday)
+          .read,
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -573,8 +597,7 @@ void main() {
     final repository = ready.container.read(personalGraphRepositoryProvider);
     final original = await _read(repository);
 
-    await openDailyChoices(tester, tap: _tap);
-    await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
+    await _openReplacedChoice(tester);
     await tester.pumpAndSettle();
     await _tap(tester, find.byKey(const ValueKey('daily-choice-replace-open')));
     await _tap(

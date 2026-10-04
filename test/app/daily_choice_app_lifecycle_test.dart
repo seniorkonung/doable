@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -12,7 +13,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
+import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 
@@ -153,12 +156,15 @@ void main() {
         );
         await harness.closePersistenceObjectGraph();
         final gate = _ChoiceSqlGate();
+        // Каталог открывается на дне заменяемого дневного выбора.
+        final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
         final runtime = AppRuntime(
           connectionFactory: () => observeConfiguredLocalDatabaseConnection(
             openFileBackedLocalDatabase(harness.databaseFile),
             gate,
           ),
           diagnosticsSink: InMemoryDiagnosticsSink(),
+          dailyChoiceLocalDateSource: localDate.read,
         );
         addTearDown(() async {
           gate.release();
@@ -298,12 +304,17 @@ void main() {
       );
       await harness.closePersistenceObjectGraph();
       final gate = _ChoiceSqlGate();
+      // Каталог открывается на дне прежнего дневного выбора, а новый выбор
+      // создаётся на другой день.
+      final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
+      final createdDate = CalendarDate.fromParts(2027, 1, 2);
       final runtime = AppRuntime(
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openFileBackedLocalDatabase(harness.databaseFile),
           gate,
         ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: localDate.read,
       );
       addTearDown(() async {
         gate.release();
@@ -331,7 +342,7 @@ void main() {
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-date')),
-        '2027-01-02',
+        createdDate.toCanonicalString(),
       );
       gate.arm(
         fail: false,
@@ -373,8 +384,13 @@ void main() {
       ScaffoldMessenger.of(tester.element(message.first)).hideCurrentSnackBar();
       await tester.pumpAndSettle();
       expect(message, findsNothing);
+      // Новый выбор относится к другому дню: человек выбирает этот день.
+      await selectDailyChoiceCatalogDate(tester, createdDate, tap: _tap);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-      expect(find.textContaining('2027-01-02'), findsWidgets);
+      expect(
+        find.textContaining(createdDate.toCanonicalString()),
+        findsWidgets,
+      );
       expect(_storedIds(harness, 'daily_choices'), hasLength(2));
       await tester.pump(const Duration(seconds: 1));
       expect(message, findsNothing);
@@ -407,12 +423,15 @@ void main() {
       await harness.closePersistenceObjectGraph();
 
       final gate = _ChoiceSqlGate();
+      // Каталог открывается на дне изменяемых дневных выборов.
+      final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
       final runtime = AppRuntime(
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openFileBackedLocalDatabase(harness.databaseFile),
           gate,
         ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: localDate.read,
       );
       addTearDown(() async {
         gate.release();
@@ -678,12 +697,15 @@ void main() {
       await seedDurabilityGraph(seeded);
       await harness.closePersistenceObjectGraph();
       final gate = _ChoiceSqlGate();
+      // Каждый запуск открывает каталог на одном и том же дне.
+      final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
       AppRuntime start() => AppRuntime(
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
           openFileBackedLocalDatabase(harness.databaseFile),
           gate,
         ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: localDate.read,
       );
       var runtime = start();
       addTearDown(() async {

@@ -227,7 +227,7 @@
   - **Вероятные файлы:** `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 2.3 Подготовить сквозные сценарии дневного выбора к просмотру одной определённой даты
+- [x] 2.3 Подготовить сквозные сценарии дневного выбора к просмотру одной определённой даты
   - **Критерии приёмки:**
     - Сценарии создания, замены пути, редактирования, жизненного цикла и перестановки избранного, использующие каталог, задают часы до открытия каталога и явно выбирают дату ожидаемой записи, когда она отличается от начальной.
     - Проверки сохранения, отказов, подтверждённых команд и повторного запуска сохраняют прежнюю силу; перенос записи не предполагает её присутствия в выдаче другой даты. Тесты не получают строки обходом фильтра и не меняют пользовательские правила создания или редактирования.
