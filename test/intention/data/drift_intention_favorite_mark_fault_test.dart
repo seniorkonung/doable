@@ -259,7 +259,8 @@ void main() {
       ]);
     });
 
-    test('остальные команды намерения не получают этап', () async {
+    test('этап избранного не получают остальные команды намерения, а '
+        'создание несёт собственный этап', () async {
       seedGraph();
 
       await _confirmed(
@@ -277,12 +278,18 @@ void main() {
         IntentionCommandDiagnosticsType.delete,
       ]);
       expect(diagnostics.commandEvents.map((event) => event.stage), [
-        null,
+        IntentionCreationCommandDiagnosticsStage.resultRead,
         null,
         null,
         null,
       ]);
-      for (final message in diagnostics.messages) {
+      expect(diagnostics.messages.map((message) => message['stage']), [
+        'resultRead',
+        null,
+        null,
+        null,
+      ]);
+      for (final message in diagnostics.messages.skip(1)) {
         expect(message.keys, isNot(contains('stage')));
       }
     });

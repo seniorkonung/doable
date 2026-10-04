@@ -563,13 +563,17 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     var favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.validation;
     void onFavoriteMarkWrite() =>
         favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.write;
+    var creationStage = IntentionCreationCommandDiagnosticsStage.validation;
 
     try {
       _validateCommandText(command);
       final success = await _sequencer.run(() async {
         final committed = await _database.transaction(
           () => switch (command) {
-            CreateIntention() => _createIntention(command),
+            CreateIntention() => _createIntention(
+              command,
+              onStage: (stage) => creationStage = stage,
+            ),
             UpdateIntention() => _updateIntention(command),
             EnableIntentionReadiness() => _changeReadiness(
               command.id,
@@ -613,6 +617,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         _commandDiagnosticsEvent(
           command,
           favoriteMarkStage: favoriteMarkStage,
+          creationStage: creationStage,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
       );
@@ -623,6 +628,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         _commandDiagnosticsEvent(
           command,
           favoriteMarkStage: favoriteMarkStage,
+          creationStage: creationStage,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
             code: _diagnosticsFailureCode(failure),
@@ -683,15 +689,22 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
   /// снимок читается и сверяется с командой до подтверждения транзакции,
   /// поэтому любой отказ откатывает намерение, назначения и место избранного
   /// вместе.
+  ///
+  /// [onStage] сообщает диагностике переход к записи и к проверке
+  /// результата: отказ относится к последнему сообщённому этапу, до первого
+  /// перехода — к проверке.
   Future<_CommittedIntentionCommand> _createIntention(
-    CreateIntention command,
-  ) async {
+    CreateIntention command, {
+    required void Function(IntentionCreationCommandDiagnosticsStage) onStage,
+  }) async {
     final title = IntentionText.normalizeTitle(command.title);
     final description = switch (command.description) {
       null => null,
       final value => IntentionText.normalizeDescription(value),
     };
     await _requireCreationTags(command.tagIds);
+
+    onStage(IntentionCreationCommandDiagnosticsStage.write);
     final createdAt = domain.IntentionTimestamp(_now());
     final intention = domain.Intention(
       id: _idGenerator.generate(),
@@ -733,6 +746,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
       await _insertFavoritePlace(intention.id);
     }
 
+    onStage(IntentionCreationCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(intention.id);
     if (stored == null) throw const _StoredIntentionCorruption();
     final storedIntention = _rehydrateStored(stored.detail);
@@ -2231,10 +2245,12 @@ void _validateCommandText(IntentionCommand command) {
 }
 
 /// Событие диагностики команды намерения. Этап [favoriteMarkStage] несут
-/// только отметка избранного и её снятие.
+/// только отметка избранного и её снятие, этап [creationStage] — только
+/// создание.
 IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
   IntentionCommand command, {
   required FavoriteMarkCommandDiagnosticsStage favoriteMarkStage,
+  required IntentionCreationCommandDiagnosticsStage creationStage,
   required DiagnosticsStatus status,
 }) {
   IntentionCommandDiagnosticsEvent event(
@@ -2245,7 +2261,10 @@ IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
   );
 
   return switch (command) {
-    CreateIntention() => event(IntentionCommandDiagnosticsType.create),
+    CreateIntention() => IntentionCommandDiagnosticsEvent.create(
+      stage: creationStage,
+      status: status,
+    ),
     UpdateIntention() => event(IntentionCommandDiagnosticsType.update),
     EnableIntentionReadiness() => event(
       IntentionCommandDiagnosticsType.enableReadiness,

@@ -456,7 +456,118 @@ void main() {
       ]);
     });
 
-    test('этап несут только отметка избранного и её снятие', () {
+    test('создание намерения кодируется видом команды с этапом проверки, '
+        'записи или проверки результата и безопасной категорией', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      for (final event in const [
+        IntentionCommandDiagnosticsEvent.create(
+          stage: IntentionCreationCommandDiagnosticsStage.resultRead,
+          status: DiagnosticsSucceeded(Duration(microseconds: 1500)),
+        ),
+        IntentionCommandDiagnosticsEvent.create(
+          stage: IntentionCreationCommandDiagnosticsStage.validation,
+          status: DiagnosticsFailed(
+            duration: Duration(milliseconds: 2),
+            code: DiagnosticsFailureCode.validation,
+          ),
+        ),
+        IntentionCommandDiagnosticsEvent.create(
+          stage: IntentionCreationCommandDiagnosticsStage.write,
+          status: DiagnosticsFailed(
+            duration: Duration(milliseconds: 3),
+            code: DiagnosticsFailureCode.unavailable,
+          ),
+        ),
+        IntentionCommandDiagnosticsEvent.create(
+          stage: IntentionCreationCommandDiagnosticsStage.resultRead,
+          status: DiagnosticsFailed(
+            duration: Duration(milliseconds: 4),
+            code: DiagnosticsFailureCode.corruption,
+          ),
+        ),
+      ]) {
+        sink.record(event);
+      }
+
+      expect(
+        IntentionCreationCommandDiagnosticsStage.values.map((s) => s.name),
+        ['validation', 'write', 'resultRead'],
+      );
+      expect(messages.map(jsonDecode), [
+        {
+          'operation': 'intentionCommand',
+          'stage': 'resultRead',
+          'outcome': 'succeeded',
+          'durationMicros': 1500,
+          'commandType': 'create',
+        },
+        {
+          'operation': 'intentionCommand',
+          'stage': 'validation',
+          'outcome': 'failed',
+          'durationMicros': 2000,
+          'failureCode': 'validation',
+          'commandType': 'create',
+        },
+        {
+          'operation': 'intentionCommand',
+          'stage': 'write',
+          'outcome': 'failed',
+          'durationMicros': 3000,
+          'failureCode': 'unavailable',
+          'commandType': 'create',
+        },
+        {
+          'operation': 'intentionCommand',
+          'stage': 'resultRead',
+          'outcome': 'failed',
+          'durationMicros': 4000,
+          'failureCode': 'corruption',
+          'commandType': 'create',
+        },
+      ]);
+    });
+
+    test('событие создания описывает только окончательный исход, а успех — '
+        'только после проверки результата', () {
+      for (final stage in IntentionCreationCommandDiagnosticsStage.values) {
+        final failed = IntentionCommandDiagnosticsEvent.create(
+          stage: stage,
+          status: const DiagnosticsFailed(
+            duration: Duration(milliseconds: 1),
+            code: DiagnosticsFailureCode.unexpected,
+          ),
+        );
+        expect(failed.commandType, IntentionCommandDiagnosticsType.create);
+        expect(failed.stage, stage, reason: stage.name);
+
+        expect(
+          () => IntentionCommandDiagnosticsEvent.create(
+            stage: stage,
+            status: const DiagnosticsStarted(),
+          ),
+          throwsAssertionError,
+          reason: stage.name,
+        );
+
+        IntentionCommandDiagnosticsEvent succeeded() =>
+            IntentionCommandDiagnosticsEvent.create(
+              stage: stage,
+              status: const DiagnosticsSucceeded(Duration(milliseconds: 1)),
+            );
+        switch (stage) {
+          case IntentionCreationCommandDiagnosticsStage.resultRead:
+            expect(succeeded().stage, stage);
+          case IntentionCreationCommandDiagnosticsStage.validation ||
+              IntentionCreationCommandDiagnosticsStage.write:
+            expect(succeeded, throwsAssertionError, reason: stage.name);
+        }
+      }
+    });
+
+    test('этап несут только создание, отметка избранного и её снятие', () {
       for (final commandType in IntentionCommandDiagnosticsType.values) {
         IntentionCommandDiagnosticsEvent withoutStage() =>
             IntentionCommandDiagnosticsEvent(
@@ -465,11 +576,11 @@ void main() {
             );
 
         switch (commandType) {
-          case IntentionCommandDiagnosticsType.markFavorite ||
+          case IntentionCommandDiagnosticsType.create ||
+              IntentionCommandDiagnosticsType.markFavorite ||
               IntentionCommandDiagnosticsType.unmarkFavorite:
             expect(withoutStage, throwsAssertionError);
-          case IntentionCommandDiagnosticsType.create ||
-              IntentionCommandDiagnosticsType.update ||
+          case IntentionCommandDiagnosticsType.update ||
               IntentionCommandDiagnosticsType.enableReadiness ||
               IntentionCommandDiagnosticsType.disableReadiness ||
               IntentionCommandDiagnosticsType.archive ||
