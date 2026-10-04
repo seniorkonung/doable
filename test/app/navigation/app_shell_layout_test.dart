@@ -47,11 +47,19 @@ const _relation = 1001;
 const _firstChoice = 2001;
 const _firstPathStep = 4001;
 
-/// Нижние вставки окна, как их сообщает платформа.
+/// Системные вставки окна, как их сообщает платформа.
 final class _Insets {
-  const _Insets(this.name, {this.safeBottom = 0, this.keyboard = 0});
+  const _Insets(
+    this.name, {
+    this.safeTop = 0,
+    this.safeBottom = 0,
+    this.keyboard = 0,
+  });
 
   final String name;
+
+  /// Верхний безопасный отступ для строки состояния и выреза экрана.
+  final double safeTop;
 
   /// Физический нижний безопасный отступ экрана.
   final double safeBottom;
@@ -72,9 +80,14 @@ final class _Insets {
 }
 
 const _plain = _Insets('без нижних вставок');
-const _safeArea = _Insets('нижний безопасный отступ', safeBottom: 34);
+const _safeArea = _Insets(
+  'верхний и нижний безопасные отступы',
+  safeTop: 47,
+  safeBottom: 34,
+);
 const _keyboardOpen = _Insets(
   'открытая экранная клавиатура',
+  safeTop: 47,
   safeBottom: 34,
   keyboard: 300,
 );
@@ -99,6 +112,7 @@ void main() {
           await tester.pump();
 
           final data = MediaQuery.of(tester.element(page));
+          expect(data.padding.top, insets.safeTop, reason: insets.name);
           expect(data.padding.bottom, 0, reason: insets.name);
           expect(
             data.viewInsets.bottom,
@@ -110,6 +124,21 @@ void main() {
           expect(bar.bottom, _screen.height, reason: insets.name);
           expect(bar.height, insets.barExtent, reason: insets.name);
           expect(tester.getRect(page).bottom, bar.top, reason: insets.name);
+          // Значки центрированы в самой панели, без верхнего системного
+          // отступа и нижней безопасной области.
+          for (final item in AppDestination.values) {
+            final icon = find.descendant(
+              of: find.byType(AppNavigationBar),
+              matching: find.byIcon(
+                item == destination ? item.selectedIcon : item.icon,
+              ),
+            );
+            expect(
+              tester.getCenter(icon).dy,
+              bar.top + AppNavigationBar.height / 2,
+              reason: '${insets.name}: ${_names[item]}',
+            );
+          }
           // Изменение вставок не пересоздаёт корневую страницу.
           expect(tester.element(page), same(pageElement), reason: insets.name);
           expect(tester.takeException(), isNull, reason: insets.name);
@@ -718,10 +747,16 @@ final class _App {
   final GraphCommandCoordinator coordinator;
 }
 
-/// Сообщает окну нижние вставки [insets].
+/// Сообщает окну системные вставки [insets].
 void _apply(WidgetTester tester, _Insets insets) {
-  tester.view.padding = FakeViewPadding(bottom: insets.padding);
-  tester.view.viewPadding = FakeViewPadding(bottom: insets.safeBottom);
+  tester.view.padding = FakeViewPadding(
+    top: insets.safeTop,
+    bottom: insets.padding,
+  );
+  tester.view.viewPadding = FakeViewPadding(
+    top: insets.safeTop,
+    bottom: insets.safeBottom,
+  );
   tester.view.viewInsets = FakeViewPadding(bottom: insets.keyboard);
 }
 

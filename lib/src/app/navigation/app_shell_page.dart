@@ -39,10 +39,16 @@ final class AppShellPage extends StatelessWidget {
                   child: _AppShellTabs(selected: selected, children: children),
                 ),
               ),
-              AppNavigationBar(
-                selected: selected,
-                onSelected: (destination) =>
-                    tabsRouter.setActiveIndex(destination.index),
+              // Как и `Scaffold.bottomNavigationBar`, панель не получает
+              // верхний системный отступ: он относится к содержимому страницы.
+              MediaQuery.removePadding(
+                context: context,
+                removeTop: true,
+                child: AppNavigationBar(
+                  selected: selected,
+                  onSelected: (destination) =>
+                      tabsRouter.setActiveIndex(destination.index),
+                ),
               ),
             ],
           ),
