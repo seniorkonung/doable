@@ -227,7 +227,7 @@
   - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_state.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/intention/presentation/operation/intention_command_coordinator_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 2.3 Сохранять полный черновик при отказе и разрешать исправление или повтор только по его типизированной причине
+- [x] 2.3 Сохранять полный черновик при отказе и разрешать исправление или повтор только по его типизированной причине
   - **Acceptance criteria:**
     - Любой отказ оставляет сырые строки, выбранные идентификаторы и обе отметки без нормализации или сброса. Ошибка текста снимается исправлением соответствующего поля; `IntentionCreationTagsMissingFailure` сохраняет точные отсутствующие идентификаторы и разрешает новую проверку после явного изменения набора, без пропуска или замены одноимённым тегом.
     - Доказанно устранимая `unavailable` предоставляет явную повторную отправку с новым токеном. Остальные `conflict`, `corruption` и `unexpected` не получают обычного повтора; нерелевантная правка, обновление названия тега или повторное добавление уже включённого тега не снимают блокирующую причину.
