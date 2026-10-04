@@ -95,6 +95,9 @@ final class IntentionCreationDraft {
 enum IntentionDraftAvailability {
   editable,
 
+  /// Принятая отправка выполняется: черновик зафиксирован до её результата.
+  submitting,
+
   /// Сессия завершена успешным созданием или освобождена.
   closed,
 }
@@ -117,6 +120,9 @@ enum IntentionDraftTagAddition {
   /// Тег уже входит в набор; черновик не изменился.
   alreadyIncluded,
 
+  /// Выполняется принятая отправка; черновик не изменился.
+  submitting,
+
   /// Сессия закрыта; черновик не изменился.
   sessionClosed,
 }
@@ -126,8 +132,8 @@ enum IntentionDraftTagAddition {
 /// Связан с одной сессией создания: предоставляет только наблюдаемый набор
 /// идентификаторов и явное локальное добавление. Добавление меняет только
 /// черновик и не записывает назначений; команды графа, ревизии и детали
-/// хранилища в контракт не входят. После закрытия сессии контракт отвергает
-/// изменения.
+/// хранилища в контракт не входят. Во время отправки и после закрытия сессии
+/// контракт отвергает изменения.
 abstract interface class IntentionDraftTagSet {
   IntentionDraftTagSetSnapshot get current;
 
@@ -171,8 +177,8 @@ final class IntentionEditorState {
 
   IntentionDraftAvailability get draftAvailability => switch (operation) {
     OperationSucceeded<Intention>() => IntentionDraftAvailability.closed,
+    OperationRunning<Intention>() => IntentionDraftAvailability.submitting,
     OperationIdle<Intention>() ||
-    OperationRunning<Intention>() ||
     OperationFailed<Intention>() => IntentionDraftAvailability.editable,
   };
 

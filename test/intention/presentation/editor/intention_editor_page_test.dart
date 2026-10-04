@@ -114,6 +114,55 @@ void main() {
     await tester.pump();
   });
 
+  testWidgets(
+    'не даёт менять текст выполняющейся отправки и повторяет отправку с показанным текстом',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      await _openEditor(tester, repository);
+      TextField field(String key) =>
+          tester.widget<TextField>(find.byKey(ValueKey(key)));
+
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Намерение',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-description')),
+        'Описание',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await tester.pump();
+
+      expect(field('intention-editor-title').readOnly, isTrue);
+      expect(field('intention-editor-description').readOnly, isTrue);
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(field('intention-editor-title').readOnly, isFalse);
+      expect(field('intention-editor-description').readOnly, isFalse);
+      expect(field('intention-editor-title').controller?.text, 'Намерение');
+      await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
+      await tester.pump();
+
+      expect(repository.commands, hasLength(2));
+      expect(
+        repository.commands.last,
+        isA<CreateIntention>()
+            .having((command) => command.title, 'название', 'Намерение')
+            .having((command) => command.description, 'описание', 'Описание'),
+      );
+      repository.completeCommand(
+        1,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('сохраняет поля и локализует field-specific validation', (
     tester,
   ) async {

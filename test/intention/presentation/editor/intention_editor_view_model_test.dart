@@ -767,6 +767,291 @@ void main() {
       },
     );
   });
+
+  group('отправка черновика', () {
+    test('передаёт координатору по ключу сессии одну команду со всеми пятью полями черновика', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final formKey = IntentionCreationFormKey();
+      final provider = intentionEditorViewModelProvider(formKey);
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('  Быть здоровым  ')
+        ..changeDescription('  Описание буквально\n')
+        ..markFavorite()
+        ..confirmReadiness();
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'));
+
+      editor.submit();
+
+      expect(repository.commands, [
+        isA<CreateIntention>()
+            .having((command) => command.title, 'название', '  Быть здоровым  ')
+            .having(
+              (command) => command.description,
+              'описание',
+              '  Описание буквально\n',
+            )
+            .having(
+              (command) => command.readiness,
+              'готовность',
+              IntentionReadiness.ready,
+            )
+            .having(
+              (command) => command.favoriteMark,
+              'избранное',
+              FavoriteMark.favorite,
+            )
+            .having((command) => command.tagIds, 'теги', {
+              _tagId(1),
+              _tagId(2),
+            }),
+      ]);
+      expect(coordinator.isKeyRunning(formKey), isTrue);
+      expect(
+        container.read(provider).operation,
+        isA<OperationRunning<Intention>>(),
+      );
+      expect(repository.tagCommands, isEmpty);
+
+      repository.completeCommand(0, _savedResult());
+      await _settle(container);
+    });
+
+    test(
+      'минимальный черновик отправляется без описания, тегов и обеих отметок',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _container(repository);
+        final provider = intentionEditorViewModelProvider(
+          IntentionCreationFormKey(),
+        );
+        final subscription = container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+
+        container.read(provider.notifier)
+          ..changeTitle('Намерение')
+          ..submit();
+
+        expect(repository.commands, [
+          isA<CreateIntention>()
+              .having((command) => command.title, 'название', 'Намерение')
+              .having((command) => command.description, 'описание', isNull)
+              .having(
+                (command) => command.readiness,
+                'готовность',
+                IntentionReadiness.notReady,
+              )
+              .having(
+                (command) => command.favoriteMark,
+                'избранное',
+                FavoriteMark.notFavorite,
+              )
+              .having((command) => command.tagIds, 'теги', isEmpty),
+        ]);
+
+        repository.completeCommand(0, _savedResult());
+        await _settle(container);
+      },
+    );
+
+    test('до результата отвергает все правки, запоздалое добавление общего выбора и повторную отправку, сохраняя состав принятой команды', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Название')
+        ..changeDescription('Описание')
+        ..markFavorite()
+        ..confirmReadiness();
+      // Общий выбор получил контракт набора до отправки и вызывает его позже.
+      final tagSet = editor.draftTagSet..add(_tag(1, 'Дом'));
+      await _deliverEvents(container);
+      final published = <IntentionDraftTagSetSnapshot>[];
+      final changesSubscription = tagSet.changes.listen(published.add);
+      addTearDown(changesSubscription.cancel);
+
+      editor.submit();
+      final submitted = container.read(provider);
+      final command = repository.commands.single as CreateIntention;
+
+      final lateAddition = tagSet.add(_tag(2, 'Выходные'));
+      editor
+        ..changeTitle('Правка во время отправки')
+        ..changeDescription('Правка во время отправки')
+        ..removeTag(_tagId(1))
+        ..unmarkFavorite()
+        ..disableReadiness()
+        ..submit();
+      await _deliverEvents(container);
+
+      expect(lateAddition, IntentionDraftTagAddition.submitting);
+      expect(container.read(provider), same(submitted));
+      expect(submitted.draft.title, 'Название');
+      expect(submitted.draft.description, 'Описание');
+      expect(submitted.draft.tagIds, [_tagId(1)]);
+      expect(submitted.draft.readiness, IntentionReadiness.ready);
+      expect(submitted.draft.favoriteMark, FavoriteMark.favorite);
+      expect(
+        submitted.draftAvailability,
+        IntentionDraftAvailability.submitting,
+      );
+      expect(tagSet.current.tagIds, [_tagId(1)]);
+      expect(
+        tagSet.current.availability,
+        IntentionDraftAvailability.submitting,
+      );
+      expect(published.map((snapshot) => snapshot.availability), [
+        IntentionDraftAvailability.submitting,
+      ]);
+      expect(repository.commands, [same(command)]);
+      expect(command.title, 'Название');
+      expect(command.description, 'Описание');
+      expect(command.tagIds, {_tagId(1)});
+      expect(command.readiness, IntentionReadiness.ready);
+      expect(command.favoriteMark, FavoriteMark.favorite);
+      expect(repository.tagCommands, isEmpty);
+
+      // Результат снимает фиксацию черновика, но не меняет принятую команду.
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await _deliverEvents(container);
+
+      expect(tagSet.current.availability, IntentionDraftAvailability.editable);
+      expect(published.last.availability, IntentionDraftAvailability.editable);
+      expect(tagSet.add(_tag(2, 'Выходные')), IntentionDraftTagAddition.added);
+      editor.unmarkFavorite();
+      expect(container.read(provider).draft.tagIds, [_tagId(1), _tagId(2)]);
+      expect(
+        container.read(provider).draft.favoriteMark,
+        FavoriteMark.notFavorite,
+      );
+      expect(command.tagIds, {_tagId(1)});
+      expect(command.favoriteMark, FavoriteMark.favorite);
+      expect(repository.commands, hasLength(1));
+    });
+
+    test('успех публикует событие завершения только своей сессии и только один раз', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final otherProvider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final events = <IntentionEditorEvent>[];
+      final subscription = container.listen(provider, (previous, next) {
+        final event = next.event;
+        if (event != null && previous?.event == null) {
+          events.add(event);
+        }
+      });
+      addTearDown(subscription.close);
+      final otherSubscription = container.listen(otherProvider, (_, _) {});
+      addTearDown(otherSubscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение')
+        ..markFavorite()
+        ..submit();
+
+      repository.completeCommand(0, _savedResult());
+      await _deliverEvents(container);
+      editor
+        ..consumeEvent()
+        ..submit()
+        ..changeTitle('После успеха');
+      await _deliverEvents(container);
+
+      expect(events, [isA<IntentionEditorCreated>()]);
+      expect(container.read(provider).event, isNull);
+      expect(
+        container.read(provider).operation,
+        isA<OperationSucceeded<Intention>>(),
+      );
+      expect(container.read(otherProvider).event, isNull);
+      expect(
+        container.read(otherProvider).operation,
+        isA<OperationIdle<Intention>>(),
+      );
+      expect(repository.commands, hasLength(1));
+    });
+
+    test('освобождение инициатора не отменяет принятую отправку полного черновика и не снимает её ограничение до результата', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
+      final formKey = IntentionCreationFormKey();
+      final provider = intentionEditorViewModelProvider(formKey);
+      final firstSubscription = container.listen(provider, (_, _) {});
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Полное намерение')
+        ..markFavorite()
+        ..confirmReadiness();
+      editor.draftTagSet.add(_tag(1, 'Дом'));
+      editor.submit();
+      final command = repository.commands.single;
+
+      firstSubscription.close();
+      await _deliverEvents(container);
+
+      expect(coordinator.isKeyRunning(formKey), isTrue);
+      final reopenedSubscription = container.listen(provider, (_, _) {});
+      addTearDown(reopenedSubscription.close);
+      container.read(provider.notifier)
+        ..changeTitle('Повтор той же сессии')
+        ..submit();
+      expect(repository.commands, [same(command)]);
+      expect(
+        command,
+        isA<CreateIntention>()
+            .having((command) => command.title, 'название', 'Полное намерение')
+            .having(
+              (command) => command.readiness,
+              'готовность',
+              IntentionReadiness.ready,
+            )
+            .having(
+              (command) => command.favoriteMark,
+              'избранное',
+              FavoriteMark.favorite,
+            )
+            .having((command) => command.tagIds, 'теги', {_tagId(1)}),
+      );
+
+      repository.completeCommand(0, _savedResult());
+      await _settle(container);
+
+      final claim = await presenter.nextClaim();
+      expect(
+        claim!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'результат',
+          isA<ResultSuccess<IntentionCommandSuccess>>(),
+        ),
+      );
+      expect(coordinator.isKeyRunning(formKey), isFalse);
+      expect(container.read(provider).event, isNull);
+      coordinator.confirmPresentation(claim);
+      expect(repository.commands, hasLength(1));
+    });
+  });
 }
 
 ProviderContainer _container(ControlledCatalogRepository repository) {

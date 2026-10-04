@@ -50,6 +50,13 @@ final class _IntentionEditorPageState
       }
     });
 
+    // Во время отправки черновик зафиксирован: поля не должны показывать
+    // текст, которого нет в принятой команде.
+    final isDraftFixed = switch (editor.draftAvailability) {
+      IntentionDraftAvailability.editable => false,
+      IntentionDraftAvailability.submitting ||
+      IntentionDraftAvailability.closed => true,
+    };
     final generalFailure = _generalFailure(localizations, editor.operation);
     final titleFailure = _fieldFailure(
       localizations,
@@ -70,6 +77,7 @@ final class _IntentionEditorPageState
             TextField(
               key: const ValueKey('intention-editor-title'),
               controller: _titleController,
+              readOnly: isDraftFixed,
               autofocus: true,
               textInputAction: TextInputAction.next,
               decoration: InputDecoration(
@@ -87,6 +95,7 @@ final class _IntentionEditorPageState
             TextField(
               key: const ValueKey('intention-editor-description'),
               controller: _descriptionController,
+              readOnly: isDraftFixed,
               minLines: 4,
               maxLines: null,
               keyboardType: TextInputType.multiline,

@@ -17,8 +17,12 @@ part 'intention_editor_view_model.g.dart';
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
 /// До отправки владеет черновиком: правки текста, набора тегов и обеих
-/// отметок меняют только его и не отправляют команд графа. Сессия закрыта
-/// после успешного создания или освобождения и отвергает правки черновика.
+/// отметок меняют только его и не отправляют команд графа. Отправка передаёт
+/// координатору одну команду с неизменяемым снимком всех пяти полей и до
+/// результата отвергает правки черновика и повторную отправку. Принятую
+/// отправку удерживает координатор: освобождение сессии её не отменяет и не
+/// снимает ограничение ключа формы. Сессия закрыта после успешного создания
+/// или освобождения и отвергает правки черновика.
 @riverpod
 final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   late GraphCommandCoordinator _coordinator;
@@ -40,8 +44,10 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         return;
       }
       switch (next.draftAvailability) {
-        case IntentionDraftAvailability.editable:
-          if (!identical(previous.draft.tagIds, next.draft.tagIds)) {
+        case IntentionDraftAvailability.editable ||
+            IntentionDraftAvailability.submitting:
+          if (!identical(previous.draft.tagIds, next.draft.tagIds) ||
+              previous.draftAvailability != next.draftAvailability) {
             draftTagSet._publish(next.draftTagSet);
           }
         case IntentionDraftAvailability.closed:
@@ -90,17 +96,24 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 
   void disableReadiness() => _changeReadiness(IntentionReadiness.notReady);
 
+  /// Передаёт координатору весь черновик одной командой.
+  ///
+  /// Команда хранит собственный снимок черновика; до результата сессия
+  /// отвергает его правки, а повтор не принимается и не ставится в очередь.
   void submit() {
-    if (!state.canSubmit) {
+    if (!ref.mounted || !state.canSubmit) {
       return;
     }
 
     final draft = state.draft;
     final start = _coordinator.acceptCreation(
       _formKey,
-      CreateIntention(
+      CreateIntention.withInitialState(
         title: draft.title,
         description: draft.description.isEmpty ? null : draft.description,
+        readiness: draft.readiness,
+        favoriteMark: draft.favoriteMark,
+        tagIds: draft.tagIds,
       ),
     );
     switch (start) {
@@ -169,18 +182,26 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       ref.mounted &&
       switch (state.draftAvailability) {
         IntentionDraftAvailability.editable => true,
+        IntentionDraftAvailability.submitting ||
         IntentionDraftAvailability.closed => false,
       };
 
   IntentionDraftTagAddition _addTag(Tag tag) {
-    if (!_acceptsDraftChanges) {
+    if (!ref.mounted) {
       return IntentionDraftTagAddition.sessionClosed;
     }
-    if (state.draft.tagIds.contains(tag.id)) {
-      return IntentionDraftTagAddition.alreadyIncluded;
+    switch (state.draftAvailability) {
+      case IntentionDraftAvailability.submitting:
+        return IntentionDraftTagAddition.submitting;
+      case IntentionDraftAvailability.closed:
+        return IntentionDraftTagAddition.sessionClosed;
+      case IntentionDraftAvailability.editable:
+        if (state.draft.tagIds.contains(tag.id)) {
+          return IntentionDraftTagAddition.alreadyIncluded;
+        }
+        state = state.withTag(tag);
+        return IntentionDraftTagAddition.added;
     }
-    state = state.withTag(tag);
-    return IntentionDraftTagAddition.added;
   }
 
   void _changeFavoriteMark(FavoriteMark value) {
@@ -196,9 +217,9 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   }
 }
 
-/// Контракт набора тегов, связанный с одним построением сессии: после её
-/// закрытия публикует закрытое состояние, завершает поток и отвергает
-/// добавление.
+/// Контракт набора тегов, связанный с одним построением сессии: публикует
+/// изменения набора и его доступности, а после закрытия сессии публикует
+/// закрытое состояние, завершает поток и отвергает добавление.
 final class _SessionDraftTagSet implements IntentionDraftTagSet {
   _SessionDraftTagSet(this._session, this._current);
 
