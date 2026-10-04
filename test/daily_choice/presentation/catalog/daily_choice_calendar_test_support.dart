@@ -154,6 +154,11 @@ final class CalendarConsumer {
     today: today,
   );
 
+  /// Перестраивает потребителя с прежними входами: календарь получает новый
+  /// экземпляр виджета с теми же значениями, как при обновлении страницы по
+  /// причинам, не связанным с календарём.
+  void rebuild() => _host.currentState!._rebuild();
+
   /// Убирает календарь из дерева, сохраняя потребителя, его входы и журнал.
   void removeCalendar() => _host.currentState!._setCalendarShown(false);
 
@@ -218,6 +223,10 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
   late DailyChoiceCalendarViewport _viewport = widget.viewport;
   late CalendarDate _today = widget.today;
   bool _calendarShown = true;
+
+  void _rebuild() {
+    setState(() {});
+  }
 
   void _setCalendarShown(bool value) {
     setState(() => _calendarShown = value);
