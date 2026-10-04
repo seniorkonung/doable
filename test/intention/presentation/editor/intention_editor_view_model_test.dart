@@ -1341,6 +1341,178 @@ void main() {
       expect(session.state.draft.title, 'После конфликта');
       expect(session.repository.commands, hasLength(2));
     });
+
+    test('отказ координатора принять отправку сохраняет весь черновик и не отправляет команду', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final formKey = IntentionCreationFormKey();
+      final provider = intentionEditorViewModelProvider(formKey);
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle(_rawTitle)
+        ..changeDescription(_rawDescription)
+        ..markFavorite()
+        ..confirmReadiness();
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'));
+      // Остановка приложения запрещает координатору принимать новую работу.
+      await coordinator.shutdown();
+
+      editor.submit();
+      await _deliverEvents(container);
+
+      final failed = container.read(provider);
+      expect(
+        failed.operation,
+        isA<OperationFailed<Intention>>().having(
+          (operation) => operation.failure,
+          'отказ',
+          isA<IntentionUnexpectedFailure>(),
+        ),
+      );
+      expect(failed.draft.title, _rawTitle);
+      expect(failed.draft.description, _rawDescription);
+      expect(failed.draft.tagIds, [_tagId(1), _tagId(2)]);
+      expect(failed.draft.readiness, IntentionReadiness.ready);
+      expect(failed.draft.favoriteMark, FavoriteMark.favorite);
+      expect(
+        failed.selectedTagNames.map((id, name) => MapEntry(id, name.value)),
+        {_tagId(1): 'Дом', _tagId(2): 'Выходные'},
+      );
+      expect(failed.draftAvailability, IntentionDraftAvailability.editable);
+      expect(failed.canSubmit, isFalse);
+      expect(editor.draftTagSet.current.tagIds, [_tagId(1), _tagId(2)]);
+      expect(coordinator.isKeyRunning(formKey), isFalse);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('одновременные отправки и отказ одной сессии не меняют черновик, набор и результат другой', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final firstProvider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final secondProvider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final firstSubscription = container.listen(firstProvider, (_, _) {});
+      final secondSubscription = container.listen(secondProvider, (_, _) {});
+      addTearDown(firstSubscription.close);
+      addTearDown(secondSubscription.close);
+      final first = container.read(firstProvider.notifier)
+        ..changeTitle('Первое')
+        ..changeDescription('Описание первого')
+        ..markFavorite()
+        ..confirmReadiness();
+      first.draftTagSet.add(_tag(1, 'Дом'));
+      final second = container.read(secondProvider.notifier)
+        ..changeTitle('  Второе  ');
+      second.draftTagSet.add(_tag(2, 'Выходные'));
+      await _deliverEvents(container);
+      final firstPublished = <IntentionDraftTagSetSnapshot>[];
+      final firstChanges = first.draftTagSet.changes.listen(firstPublished.add);
+      addTearDown(firstChanges.cancel);
+
+      first.submit();
+      final firstCommand = repository.commands.single as CreateIntention;
+
+      // Отправка первой сессии не фиксирует черновик второй.
+      expect(
+        second.draftTagSet.current.availability,
+        IntentionDraftAvailability.editable,
+      );
+      expect(
+        second.draftTagSet.add(_tag(1, 'Дом')),
+        IntentionDraftTagAddition.added,
+      );
+      second
+        ..unmarkFavorite()
+        ..markFavorite()
+        ..submit();
+      await _deliverEvents(container);
+
+      expect(repository.commands, hasLength(2));
+      expect(container.read(firstProvider).draft.tagIds, [_tagId(1)]);
+      expect(
+        container.read(secondProvider).operation,
+        isA<OperationRunning<Intention>>(),
+      );
+
+      repository.completeCommand(
+        0,
+        ResultFailure(IntentionCreationTagsMissingFailure([_tagId(1)])),
+      );
+      await _deliverEvents(container);
+
+      final firstFailed = container.read(firstProvider);
+      expect(firstFailed.missingTagIds, {_tagId(1)});
+      expect(firstFailed.failurePresentation, isNotNull);
+      expect(firstFailed.draft.title, 'Первое');
+      expect(firstFailed.draft.description, 'Описание первого');
+      expect(firstFailed.draft.tagIds, [_tagId(1)]);
+      expect(firstFailed.draft.readiness, IntentionReadiness.ready);
+      expect(firstFailed.draft.favoriteMark, FavoriteMark.favorite);
+      // Отказ первой сессии не помечает тот же тег отсутствующим во второй
+      // и не снимает фиксацию её принятой отправки.
+      final secondRunning = container.read(secondProvider);
+      expect(secondRunning.operation, isA<OperationRunning<Intention>>());
+      expect(secondRunning.missingTagIds, isEmpty);
+      expect(secondRunning.failurePresentation, isNull);
+      expect(
+        second.draftTagSet.current.availability,
+        IntentionDraftAvailability.submitting,
+      );
+
+      repository.completeCommand(1, _savedResult());
+      await _deliverEvents(container);
+
+      final secondSucceeded = container.read(secondProvider);
+      expect(secondSucceeded.operation, isA<OperationSucceeded<Intention>>());
+      expect(secondSucceeded.event, isA<IntentionEditorCreated>());
+      expect(
+        second.draftTagSet.current.availability,
+        IntentionDraftAvailability.closed,
+      );
+      expect(container.read(firstProvider), same(firstFailed));
+      expect(
+        first.draftTagSet.current.availability,
+        IntentionDraftAvailability.editable,
+      );
+      expect(firstPublished.map((snapshot) => snapshot.tagIds), [
+        [_tagId(1)],
+        [_tagId(1)],
+      ]);
+      expect(firstPublished.map((snapshot) => snapshot.availability), [
+        IntentionDraftAvailability.submitting,
+        IntentionDraftAvailability.editable,
+      ]);
+      expect(repository.commands, [
+        same(firstCommand),
+        isA<CreateIntention>()
+            .having((command) => command.title, 'название', '  Второе  ')
+            .having((command) => command.description, 'описание', isNull)
+            .having((command) => command.tagIds, 'теги', {_tagId(2), _tagId(1)})
+            .having(
+              (command) => command.readiness,
+              'готовность',
+              IntentionReadiness.notReady,
+            )
+            .having(
+              (command) => command.favoriteMark,
+              'избранное',
+              FavoriteMark.favorite,
+            ),
+      ]);
+      expect(firstCommand.tagIds, {_tagId(1)});
+      expect(firstCommand.favoriteMark, FavoriteMark.favorite);
+      expect(repository.tagCommands, isEmpty);
+    });
   });
 }
 
