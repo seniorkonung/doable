@@ -9,6 +9,7 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
@@ -56,6 +57,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/daily_choice_catalog_controls.dart';
+import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -88,7 +91,11 @@ const _relation = 501;
 const _firstChoice = 1001;
 const _choiceCount = 240;
 const _firstPathStep = 2001;
-const _choiceDate = '2026-09-25';
+final _choiceDate = CalendarDate.fromParts(2026, 9, 25);
+
+/// Локальное сегодня приложения — следующий день: в каталоге выбирается
+/// прошлый день дневных выборов, отличный от начального.
+final _today = CalendarDate.fromParts(2026, 9, 26);
 
 /// Размеры порций каталога намерений и каталога дневных выборов.
 const _intentionPageSize = 100;
@@ -249,7 +256,7 @@ void main() {
       const changed = _firstChoice + _choiceCount - 1;
       final wasCompleted = _isCompleted(changed);
       await _select(tester, AppDestination.dailyChoices);
-      await _applyDate(tester, app, _choiceDate, total: _choiceCount);
+      await _selectDay(tester, app, _choiceDate, total: _choiceCount);
       // Первая строка остаётся в видимой части.
       _dailyChoicePosition(tester).jumpTo(30);
       await tester.pumpAndSettle();
@@ -536,6 +543,11 @@ final class _App {
         final other => fail('Каталог дневных выборов без записей: $other'),
       };
 
+  /// Каталог дневных выборов показывает полученную выдачу, в том числе пустую.
+  bool get hasDailyChoiceCatalogResult =>
+      container.read(dailyChoiceCatalogViewModelProvider)
+          is DailyChoiceCatalogLoaded;
+
   HomeList get home => switch (container.read(homeViewModelProvider)) {
     final HomeList list => list,
     final other => fail('Главная не показывает список: $other'),
@@ -563,6 +575,7 @@ Future<_App> _start(WidgetTester tester) async {
       faults,
     ),
     diagnosticsSink: diagnostics,
+    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_today).read,
     repositoryFactory: (database) => repository = _ObservedRepository(
       DriftPersonalGraphRepository(
         database,
@@ -646,7 +659,7 @@ void _seed(sqlite.Database database) {
         tagFixtureId(choice),
         tagFixtureId(1),
         tagFixtureId(2),
-        _choiceDate,
+        _choiceDate.toCanonicalString(),
         _isCompleted(choice) ? 1 : 0,
       ],
     );
@@ -725,12 +738,12 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   expect(page.pixels, greaterThan(0));
 }
 
-/// Каталог дневных выборов: фильтр даты и невыполненных, две загруженные
+/// Каталог дневных выборов: прошлый день и невыполненные, две загруженные
 /// порции из трёх и прокрутка внутри них.
 Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   final incomplete = _choiceCount ~/ 2;
   await _select(tester, AppDestination.dailyChoices);
-  await _applyDate(tester, app, _choiceDate, total: _choiceCount);
+  await _selectDay(tester, app, _choiceDate, total: _choiceCount);
   await _tap(
     tester,
     find.byKey(const ValueKey('daily-choice-completion-filter')),
@@ -757,6 +770,8 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   await _settle(tester);
 
   final catalog = app.dailyChoiceCatalog;
+  expect(shownDailyChoiceCatalogDate(tester), _choiceDate);
+  expect(catalog.selection.date, _choiceDate);
   expect(catalog.totalCount, incomplete);
   expect(catalog.nextCursor, isNotNull);
   expect(catalog.selection.isCompleted, isFalse);
@@ -827,15 +842,7 @@ Map<String, Object?> _dailyChoiceCatalogView(WidgetTester tester, _App app) {
 /// Фильтры прокручиваются вместе с выдачей, поэтому на прокрученной странице
 /// они могут стоять за верхним краем.
 Map<String, Object?> _dailyChoiceParameters(WidgetTester tester, _App app) => {
-  'фильтр даты': tester
-      .widget<TextField>(
-        find.byKey(
-          const ValueKey('daily-choice-date-filter'),
-          skipOffstage: false,
-        ),
-      )
-      .controller!
-      .text,
+  'выбранный день': shownDailyChoiceCatalogDate(tester),
   'фильтр выполнения': _texts(
     find.byKey(
       const ValueKey('daily-choice-completion-filter'),
@@ -843,7 +850,7 @@ Map<String, Object?> _dailyChoiceParameters(WidgetTester tester, _App app) => {
     ),
     skipOffstage: false,
   ),
-  'дата в модели': app.dailyChoiceCatalog.selection.date?.toCanonicalString(),
+  'дата в модели': app.dailyChoiceCatalog.selection.date,
   'выполнение в модели': app.dailyChoiceCatalog.selection.isCompleted,
   'загружено': app.dailyChoiceCatalog.items.length,
   'всего': app.dailyChoiceCatalog.totalCount,
@@ -991,7 +998,7 @@ String? _dailyChoiceRow(WidgetTester tester, int number) => tester
     .data;
 
 String _completion(AppLocalizations l10n, bool completed) =>
-    '${l10n.dailyChoiceDetailsDate(_choiceDate)} · '
+    '${l10n.dailyChoiceDetailsDate(_choiceDate.toCanonicalString())} · '
     '${completed ? l10n.dailyChoiceDetailsCompleted : l10n.dailyChoiceDetailsNotCompleted}';
 
 String? _favoriteTooltip(WidgetTester tester) =>
@@ -1033,20 +1040,16 @@ Future<void> _enterTitleFilter(
   await tester.pumpAndSettle();
 }
 
-/// Применяет фильтр даты каталога дневных выборов и ждёт выдачу с [total]
-/// записями.
-Future<void> _applyDate(
+/// Выбирает [date] днём каталога дневных выборов, когда выдача начального
+/// дня уже получена, и ждёт выдачу выбранного дня с [total] записями.
+Future<void> _selectDay(
   WidgetTester tester,
   _App app,
-  String date, {
+  CalendarDate date, {
   required int total,
 }) async {
-  await _until(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-  await tester.enterText(
-    find.byKey(const ValueKey('daily-choice-date-filter')),
-    date,
-  );
-  await _tap(tester, find.byKey(const ValueKey('daily-choice-apply-date')));
+  await _waitFor(tester, () => app.hasDailyChoiceCatalogResult);
+  await selectDailyChoiceCatalogDate(tester, date, tap: _tap);
   await _until(tester, find.text(app.l10n.dailyChoiceCatalogTotalCount(total)));
   await tester.pumpAndSettle();
 }

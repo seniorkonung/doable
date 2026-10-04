@@ -5,6 +5,7 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
@@ -36,6 +37,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -52,6 +54,10 @@ const _run = 2;
 const _relation = 101;
 const _choice = 201;
 const _tag = 301;
+
+/// День дневного выбора — локальное сегодня приложения: каталог дневных
+/// выборов открывается на дне с его строкой.
+final _choiceDate = CalendarDate.fromParts(2026, 9, 25);
 
 void main() {
   test('дочерние маршруты оболочки — только три корневые страницы без '
@@ -559,6 +565,8 @@ Future<AppRouter> _start(WidgetTester tester) async {
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
+    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_choiceDate)
+        .read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -602,7 +610,7 @@ void _seed(sqlite.Database database) {
       tagFixtureId(_choice),
       tagFixtureId(_read),
       tagFixtureId(_run),
-      '2026-09-25',
+      _choiceDate.toCanonicalString(),
       0,
     ],
   );
