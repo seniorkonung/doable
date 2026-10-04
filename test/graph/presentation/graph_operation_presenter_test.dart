@@ -17,8 +17,10 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -101,6 +103,90 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     },
   );
+
+  for (final scenario in <({Locale locale, String created, String invalid})>[
+    (
+      locale: const Locale('en'),
+      created: 'Create — “Полное намерение”: Intention created.',
+      invalid: 'Create — “new intention”: Check the entered data.',
+    ),
+    (
+      locale: const Locale('ru'),
+      created: 'Создание — «Полное намерение»: Намерение создано.',
+      invalid: 'Создание — «новое намерение»: Проверьте введённые данные.',
+    ),
+  ]) {
+    for (final releaseInitiator in [false, true]) {
+      final initiator = releaseInitiator
+          ? 'после ухода формы'
+          : 'при живой форме';
+      testWidgets(
+        'успех полного создания $initiator предъявляется одним сообщением без '
+        'отдельных исходов готовности, избранного и назначений, '
+        '${scenario.locale.languageCode}',
+        (tester) async {
+          final harness = await _pumpPresenterApp(
+            tester,
+            locale: scenario.locale,
+          );
+          final creation = harness.startFullCreation(
+            releaseInitiator: releaseInitiator,
+          );
+          harness.completeFullCreated(creation);
+          await tester.pumpAndSettle();
+
+          expect(find.byType(SnackBar), findsOneWidget);
+          expect(find.text(scenario.created), findsOneWidget);
+          expect(
+            harness.claimInitiatorFailure(creation.token),
+            isNull,
+            reason: 'успех не принадлежит форме',
+          );
+
+          await _closeMessage(tester);
+          expect(find.byType(SnackBar), findsNothing);
+          await _closeMessage(tester);
+          expect(find.byType(SnackBar), findsNothing);
+        },
+      );
+    }
+
+    testWidgets('отказ отсутствующих тегов живой формы не дублируется общей '
+        'поверхностью, а после её ухода предъявляется ею один раз, '
+        '${scenario.locale.languageCode}', (tester) async {
+      final harness = await _pumpPresenterApp(tester, locale: scenario.locale);
+      final creation = harness.startFullCreation(releaseInitiator: false);
+      harness.completeFailure(
+        creation,
+        IntentionCreationTagsMissingFailure([_tagId]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+      final initiatorClaim = harness.claimInitiatorFailure(creation.token);
+      expect(
+        initiatorClaim!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.kind,
+          'вид операции',
+          IntentionCommandKind.create,
+        ),
+      );
+
+      harness.releaseInitiatorPresentation(creation.token);
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text(scenario.invalid), findsOneWidget);
+      expect(find.textContaining(_tagId.toCanonicalString()), findsNothing);
+
+      // Запоздалый кадр закрытой формы не подтверждает право оболочки.
+      harness.confirmPresentation(initiatorClaim);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+  }
 
   testWidgets(
     'показывает безопасный конфликт блокирующих связей в общей поверхности',
@@ -2315,6 +2401,24 @@ final _tagId = switch (TagId.decode('018f1400-0000-7000-8000-000000000003')) {
   InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
 };
 
+final _otherTagId = switch (TagId.decode(
+  '018f1400-0000-7000-8000-000000000004',
+)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
+};
+
+final class _CreatedCatalogEntrySnapshot
+    implements IntentionCatalogEntrySnapshot {
+  const _CreatedCatalogEntrySnapshot(this.summary);
+
+  @override
+  final IntentionSummary summary;
+
+  @override
+  bool matches(IntentionCatalogQuery query) => query.includes(summary);
+}
+
 final _choicePathStepId = switch (ChoicePathStepId.decode(
   '018f1400-0000-7000-8000-000000000002',
 )) {
@@ -2759,6 +2863,66 @@ final class _PresenterHarness {
     _commandIndexes[accepted] = commandIndex;
     _titles[accepted] = (index, title);
     return accepted;
+  }
+
+  /// Создание с готовностью, избранным и двумя тегами из отдельной формы.
+  IntentionCommandAccepted startFullCreation({required bool releaseInitiator}) {
+    final commandIndex = repository.commands.length;
+    final accepted = _coordinator.acceptCreation(
+      IntentionCreationFormKey(),
+      CreateIntention.withInitialState(
+        title: 'Полное намерение',
+        description: null,
+        readiness: IntentionReadiness.ready,
+        favoriteMark: FavoriteMark.favorite,
+        tagIds: [_tagId, _otherTagId],
+      ),
+    ) as IntentionCommandAccepted;
+    if (releaseInitiator) {
+      _coordinator.releaseInitiatorPresentation(accepted.token);
+    }
+    _commandIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  /// Подтверждает полное создание одним пакетом: каталожная мутация нового
+  /// намерения и факт каждого назначения на одной ревизии.
+  void completeFullCreated(IntentionCommandAccepted accepted) {
+    const revision = TestDetailsRevision(10);
+    final intention = testDetailsIntention(
+      index: 7,
+      title: 'Полное намерение',
+      description: null,
+      readiness: IntentionReadiness.ready,
+    );
+    repository.completeCommand(
+      _commandIndexes[accepted]!,
+      ResultSuccess(
+        IntentionSaved(
+          intention,
+          catalogMutation: IntentionCatalogCreated(
+            revision: revision,
+            entry: _CreatedCatalogEntrySnapshot(
+              testDetailsSummary(
+                intention,
+                favoriteMark: FavoriteMark.favorite,
+              ),
+            ),
+          ),
+          additionalChanges: [
+            for (final tagId in [_tagId, _otherTagId])
+              TagAssignmentChangedChange(
+                revision: revision,
+                assignment: TagAssignment(
+                  tagId: tagId,
+                  intentionId: intention.id,
+                ),
+                state: TagAssignmentState.assigned,
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   IntentionCommandAccepted startExisting(

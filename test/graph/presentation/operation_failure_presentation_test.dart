@@ -12,8 +12,10 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -566,6 +568,123 @@ void main() {
     },
   );
 
+  for (final scenario in <({Locale locale, String message})>[
+    (locale: const Locale('en'), message: 'Check the entered data.'),
+    (locale: const Locale('ru'), message: 'Проверьте введённые данные.'),
+  ]) {
+    testWidgets(
+      'отказ отсутствующих тегов полного создания подтверждается кадром живой формы для ${scenario.locale.languageCode}',
+      (tester) async {
+        final harness = _FailureHarness();
+        addTearDown(harness.dispose);
+        final claim = await harness.createFullCreationTagsMissingClaim();
+        GraphAppPresentationClaim? fallback;
+        unawaited(
+          harness.registration.nextClaim().then((value) => fallback = value),
+        );
+
+        await tester.pumpWidget(
+          harness.app(
+            Builder(
+              builder: (context) => OperationFailurePresentation(
+                claim: claim,
+                message: AppLocalizations.of(context).editorInvalidInput,
+                messageKey: const ValueKey('creation-failure-message'),
+              ),
+            ),
+            locale: scenario.locale,
+          ),
+        );
+
+        expect(find.text(scenario.message), findsOneWidget);
+        expect(
+          tester.getSemantics(
+            find.byKey(const ValueKey('creation-failure-message')),
+          ),
+          matchesSemantics(
+            label: scenario.message,
+            isLiveRegion: true,
+            textDirection: TextDirection.ltr,
+          ),
+        );
+        expect(harness.claimAgain(claim), isNull);
+
+        // Предъявленная формой ошибка не повторяется общей поверхностью
+        // после закрытия формы.
+        harness.coordinator.releaseInitiatorPresentation(claim.token);
+        await tester.pumpWidget(harness.app(const SizedBox.shrink()));
+        await tester.pump();
+        expect(fallback, isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'исчезнувшая до кадра форма передаёт отказ отсутствующих тегов общей поверхности тем же token',
+    (tester) async {
+      final harness = _FailureHarness();
+      addTearDown(harness.dispose);
+      final claim = await harness.createFullCreationTagsMissingClaim();
+      final showError = ValueNotifier(true);
+      addTearDown(showError.dispose);
+      GraphAppPresentationClaim? fallback;
+      unawaited(
+        harness.registration.nextClaim().then((value) => fallback = value),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      await tester.pumpWidget(
+        harness.app(
+          ValueListenableBuilder<bool>(
+            valueListenable: showError,
+            builder: (context, visible, _) => visible
+                ? OperationFailurePresentation(
+                    claim: claim,
+                    message: 'Проверьте введённые данные.',
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(harness.claimAgain(claim), same(claim));
+      expect(fallback, isNull);
+
+      showError.value = false;
+      await tester.pump();
+      await tester.pump();
+      expect(fallback?.token, same(claim.token));
+      expect(
+        fallback?.completion,
+        isA<IntentionCommandCompletion>()
+            .having(
+              (completion) => completion.kind,
+              'вид операции',
+              IntentionCommandKind.create,
+            )
+            .having(
+              (completion) => completion.result,
+              'исход',
+              isA<ResultFailure<IntentionCommandSuccess>>().having(
+                (result) => result.failure,
+                'отказ',
+                isA<IntentionCreationTagsMissingFailure>(),
+              ),
+            ),
+      );
+
+      // Возвращение фокуса не даёт кадру исчезнувшей формы подтвердить
+      // право общей поверхности.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(harness.claimAgain(claim), isNull);
+      harness.registration.release();
+      final replacement = harness.coordinator.registerAppPresentation();
+      addTearDown(replacement.release);
+      expect((await replacement.nextClaim())?.token, same(claim.token));
+    },
+  );
+
   testWidgets('массовый отказ подтверждается кадром инлайн-renderer', (
     tester,
   ) async {
@@ -808,6 +927,34 @@ final class _FailureHarness {
     repository.completeCommand(
       repository.commands.length - 1,
       const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await accepted.future;
+    return coordinator.claimInitiatorFailure(accepted.token)!;
+  }
+
+  /// Право живой формы на отказ полного создания, один из выбранных тегов
+  /// которого отсутствует.
+  Future<GraphInitiatorPresentationClaim>
+  createFullCreationTagsMissingClaim() async {
+    final missingTag = switch (TagId.decode(
+      '018f1400-0000-7000-8000-000000000004',
+    )) {
+      TagIdDecodingSuccess(:final id) => id,
+      InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
+    };
+    final accepted = coordinator.acceptCreation(
+      IntentionCreationFormKey(),
+      CreateIntention.withInitialState(
+        title: 'Полное намерение',
+        description: null,
+        readiness: IntentionReadiness.ready,
+        favoriteMark: FavoriteMark.favorite,
+        tagIds: [missingTag],
+      ),
+    ) as IntentionCommandAccepted;
+    repository.completeCommand(
+      repository.commands.length - 1,
+      ResultFailure(IntentionCreationTagsMissingFailure([missingTag])),
     );
     await accepted.future;
     return coordinator.claimInitiatorFailure(accepted.token)!;

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
@@ -9,7 +10,12 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart'
-    show openInMemoryLocalDatabase;
+    show
+        LocalDatabaseConnectionObserver,
+        LocalDatabaseSqlOperation,
+        LocalDatabaseSqlStatement,
+        observeConfiguredLocalDatabaseConnection,
+        openInMemoryLocalDatabase;
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -27,14 +33,19 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/favorite_read_contract_test_fallback.dart';
+import '../support/favorite_storage_fixture.dart';
 import '../support/tag_read_contract_test_fallback.dart';
 import '../support/catalog_reconciliation_test_fallback.dart';
+import '../support/tag_storage_fixture.dart';
 
 void main() {
   testWidgets(
@@ -639,6 +650,302 @@ void main() {
       expect(find.text('No active intentions yet.'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'принятое полное создание завершается настоящим хранилищем после ухода '
+    'инициатора и предъявляется общей поверхностью один раз',
+    (tester) async {
+      final writeGate = _CreationWriteGate();
+      final app = await _RealStorageApp.start(
+        tester,
+        const Locale('en'),
+        observer: writeGate,
+      );
+      final completions = <IntentionCommandCompletion>[];
+      final subscription = app.coordinator.intentionCompletions.listen(
+        completions.add,
+      );
+      addTearDown(subscription.cancel);
+      final formKey = IntentionCreationFormKey();
+
+      writeGate.hold();
+      addTearDown(writeGate.release);
+      final accepted = app.coordinator.acceptCreation(
+        formKey,
+        CreateIntention.withInitialState(
+          title: 'Полное намерение',
+          description: null,
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: [_storedTag(_homeTag), _storedTag(_weekendTag)],
+        ),
+      ) as IntentionCommandAccepted;
+      await _waitForStorage(tester, () => writeGate.isHolding);
+
+      // Форма ушла до результата: команда продолжается, повтор той же
+      // формы не принимается, а запись ещё не подтверждена.
+      app.coordinator.releaseInitiatorPresentation(accepted.token);
+      expect(
+        app.coordinator.acceptCreation(
+          formKey,
+          const CreateIntention(title: 'Повтор', description: null),
+        ),
+        isA<IntentionCommandAlreadyRunning>(),
+      );
+      await tester.pump();
+      expect(app.coordinator.isKeyRunning(formKey), isTrue);
+      expect(completions, isEmpty);
+      expect(find.byKey(_operationMessage), findsNothing);
+      expect(_storedIntentionCount(app.raw), 0);
+
+      writeGate.release();
+      await _waitForStorage(
+        tester,
+        () => find.byKey(_operationMessage).evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.text('Create — “Полное намерение”: Intention created.'),
+        findsOneWidget,
+      );
+      expect(app.coordinator.isKeyRunning(formKey), isFalse);
+      expect(completions, hasLength(1));
+      final changes = completions.single.confirmedChange!.changes.toList();
+      expect(changes, [
+        isA<IntentionCatalogCreated>(),
+        isA<TagAssignmentChangedChange>(),
+        isA<TagAssignmentChangedChange>(),
+      ]);
+      expect(
+        changes.map((change) => change.revision),
+        everyElement(same(completions.single.revision)),
+      );
+      final intentionId = app.raw
+          .select('SELECT id, is_action_ready FROM intentions')
+          .single;
+      expect(intentionId['is_action_ready'], 1);
+      expect(
+        app.raw
+            .select(
+              'SELECT tag_id FROM tag_assignments WHERE intention_id = ? '
+              'ORDER BY tag_id',
+              [intentionId['id']],
+            )
+            .map((row) => row['tag_id']),
+        [tagFixtureId(_homeTag), tagFixtureId(_weekendTag)],
+      );
+      expect(storedFavoriteMarks(app.raw), [(intentionId['id'], 1)]);
+
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(completions, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'отказ отсутствующего тега остаётся у живой формы и после её ухода '
+    'предъявляется общей поверхностью один раз без частичной записи',
+    (tester) async {
+      final app = await _RealStorageApp.start(tester, const Locale('ru'));
+      final before = _storedGraph(app.raw);
+      final accepted = app.coordinator.acceptCreation(
+        IntentionCreationFormKey(),
+        CreateIntention.withInitialState(
+          title: 'Полное намерение',
+          description: null,
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: [_storedTag(_homeTag), _storedTag(_missingTag)],
+        ),
+      ) as IntentionCommandAccepted;
+      IntentionCommandCompletion? completion;
+      unawaited(accepted.future.then((value) => completion = value));
+      await _waitForStorage(tester, () => completion != null);
+
+      expect(
+        completion!.result,
+        isA<ResultFailure<IntentionCommandSuccess>>().having(
+          (result) => result.failure,
+          'отказ',
+          isA<IntentionCreationTagsMissingFailure>().having(
+            (failure) => failure.missingTagIds,
+            'отсутствующие теги',
+            {_storedTag(_missingTag)},
+          ),
+        ),
+      );
+      expect(_storedGraph(app.raw), before);
+
+      // Живая форма удерживает право на своё сообщение.
+      final initiatorClaim = app.coordinator.claimInitiatorFailure(
+        accepted.token,
+      );
+      expect(initiatorClaim, isNotNull);
+      await tester.pumpAndSettle();
+      expect(find.byKey(_operationMessage), findsNothing);
+
+      app.coordinator.releaseInitiatorPresentation(accepted.token);
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.text('Создание — «новое намерение»: Проверьте введённые данные.'),
+        findsOneWidget,
+      );
+
+      // Запоздалый кадр закрытой формы не подтверждает право оболочки и не
+      // повторяет сообщение.
+      app.coordinator.confirmPresentation(initiatorClaim!);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(_storedGraph(app.raw), before);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+const _operationMessage = ValueKey('graph-operation-message');
+const _homeTag = 301;
+const _weekendTag = 302;
+
+/// Тег, которого нет в хранилище на момент создания.
+const _missingTag = 303;
+
+TagId _storedTag(int number) =>
+    (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
+
+int _storedIntentionCount(sqlite.Database raw) =>
+    raw.select('SELECT COUNT(*) AS count FROM intentions').single['count']
+        as int;
+
+/// Намерения, назначения, отметки избранного и теги хранилища.
+Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
+  for (final table in [
+    'intentions',
+    'intention_titles_fts',
+    'tags',
+    'tag_assignments',
+    'favorite_intentions',
+  ])
+    table: raw
+        .select('SELECT * FROM $table ORDER BY rowid')
+        .map((row) => row.values.toList())
+        .toList(),
+};
+
+/// Приложение на настоящем адаптере in-memory хранилища с тегами «Дом» и
+/// «Выходные».
+final class _RealStorageApp {
+  _RealStorageApp(this.raw, this.coordinator);
+
+  final sqlite.Database raw;
+  final GraphCommandCoordinator coordinator;
+
+  static Future<_RealStorageApp> start(
+    WidgetTester tester,
+    Locale locale, {
+    LocalDatabaseConnectionObserver? observer,
+  }) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = [locale];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    late sqlite.Database raw;
+    final runtime = AppRuntime(
+      connectionFactory: () {
+        final connection = openInMemoryLocalDatabase(
+          setup: (database) => raw = database,
+        );
+        return switch (observer) {
+          null => connection,
+          final observer => observeConfiguredLocalDatabaseConnection(
+            connection,
+            observer,
+          ),
+        };
+      },
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+    });
+    final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+    for (final (number, name) in [
+      (_homeTag, 'Дом'),
+      (_weekendTag, 'Выходные'),
+    ]) {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(number),
+        name,
+      ]);
+    }
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(
+      tester,
+      waitFor: (tester, finder) =>
+          _waitForStorage(tester, () => finder.evaluate().isNotEmpty),
+    );
+    // Пустая выдача каталога загружена из хранилища.
+    final emptyCatalog = find.text(
+      lookupAppLocalizations(locale).catalogActiveEmpty,
+    );
+    await _waitForStorage(tester, () => emptyCatalog.evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    return _RealStorageApp(
+      raw,
+      ready.container.read(graphCommandCoordinatorProvider.notifier),
+    );
+  }
+}
+
+/// Задерживает вставку строки намерения после [hold] до [release]: принятое
+/// создание остаётся выполняющимся без подтверждённой записи.
+final class _CreationWriteGate extends LocalDatabaseConnectionObserver {
+  Completer<void>? _release;
+  var isHolding = false;
+
+  void hold() => _release = Completer<void>();
+
+  void release() {
+    final release = _release;
+    _release = null;
+    if (release != null && !release.isCompleted) {
+      release.complete();
+    }
+  }
+
+  @override
+  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
+    final release = _release;
+    if (release == null ||
+        statement.operation != LocalDatabaseSqlOperation.insert ||
+        !RegExp(
+          r'^\s*INSERT\s+INTO\s+"?intentions"?\s',
+          caseSensitive: false,
+        ).hasMatch(statement.statements.single)) {
+      return;
+    }
+    isHolding = true;
+    await release.future;
+  }
+}
+
+/// Ожидание настоящего хранилища: реальное время для его операций и кадры
+/// для интерфейса.
+Future<void> _waitForStorage(WidgetTester tester, bool Function() done) async {
+  for (var attempt = 0; attempt < 100 && !done(); attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  expect(done(), isTrue);
 }
 
 Future<void> _closeOperationMessage(WidgetTester tester) async {

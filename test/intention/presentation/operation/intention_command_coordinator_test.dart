@@ -23,6 +23,11 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -124,6 +129,251 @@ void main() {
       coordinator.releaseInitiatorPresentation(secondCompletion.token);
       await subscription.cancel();
       await coordinator.shutdown();
+    });
+
+    test('удерживает одну отправку полного начального набора до результата '
+        'после ухода инициатора и публикует её пакет один раз', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final registration = coordinator.registerAppPresentation();
+      final completions = <IntentionCommandCompletion>[];
+      final subscription = coordinator.intentionCompletions.listen(
+        completions.add,
+      );
+      final formKey = IntentionCreationFormKey();
+      final selectedTags = [_tagId(_firstTagUuid), _tagId(_secondTagUuid)];
+      final command = CreateIntention.withInitialState(
+        title: 'Полное намерение',
+        description: 'Описание',
+        readiness: IntentionReadiness.ready,
+        favoriteMark: FavoriteMark.favorite,
+        tagIds: selectedTags,
+      );
+
+      final accepted = coordinator.acceptCreation(
+        formKey,
+        command,
+      ) as IntentionCommandAccepted;
+      // Повтор той же формы не принимается ни с другим набором, ни с
+      // минимальными данными.
+      expect(
+        coordinator.acceptCreation(
+          formKey,
+          CreateIntention.withInitialState(
+            title: 'Другой набор',
+            description: null,
+            readiness: IntentionReadiness.notReady,
+            favoriteMark: FavoriteMark.notFavorite,
+            tagIds: [_tagId(_secondTagUuid)],
+          ),
+        ),
+        isA<IntentionCommandAlreadyRunning>(),
+      );
+      expect(
+        coordinator.acceptCreation(
+          formKey,
+          const CreateIntention(title: 'Повтор', description: null),
+        ),
+        isA<IntentionCommandAlreadyRunning>(),
+      );
+      selectedTags.clear();
+
+      // Хранилище получает одну команду со всем зафиксированным набором.
+      expect(repository.commands, [same(command)]);
+      expect(
+        repository.commands.single,
+        isA<CreateIntention>()
+            .having(
+              (command) => command.readiness,
+              'готовность',
+              IntentionReadiness.ready,
+            )
+            .having(
+              (command) => command.favoriteMark,
+              'избранное',
+              FavoriteMark.favorite,
+            )
+            .having((command) => command.tagIds, 'теги', {
+              _tagId(_firstTagUuid),
+              _tagId(_secondTagUuid),
+            }),
+      );
+
+      // Уход инициатора не отменяет команду и не снимает ограничение формы.
+      coordinator.releaseInitiatorPresentation(accepted.token);
+      await Future<void>.delayed(Duration.zero);
+      expect(coordinator.isKeyRunning(formKey), isTrue);
+      expect(
+        coordinator.acceptCreation(
+          formKey,
+          const CreateIntention(title: 'После ухода', description: null),
+        ),
+        isA<IntentionCommandAlreadyRunning>(),
+      );
+      expect(repository.commands, hasLength(1));
+      expect(completions, isEmpty);
+
+      final revision = _OrderedTestGraphRevision(Object(), 1);
+      repository.complete(0, _confirmedFullCreatedResult(revision));
+      final completion = await accepted.future;
+
+      expect(coordinator.isKeyRunning(formKey), isFalse);
+      expect(completions, [same(completion)]);
+      expect(completion.kind, IntentionCommandKind.create);
+      expect(completion.target, isA<CreatingIntentionOperationTarget>());
+      expect(completion.presentationTitle, 'Полное намерение');
+      expect(completion.revision, same(revision));
+      // Готовность, избранное и назначения входят в один пакет создания на
+      // его ревизии, а не в отдельные завершения.
+      final changes = completion.confirmedChange!.changes.toList();
+      expect(changes, [
+        isA<IntentionCatalogCreated>(),
+        isA<TagAssignmentChangedChange>(),
+        isA<TagAssignmentChangedChange>(),
+      ]);
+      expect(
+        changes.map((change) => change.revision),
+        everyElement(same(revision)),
+      );
+
+      // Успех сразу принадлежит общей поверхности и предъявляется один раз.
+      expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+      final claim = await registration.nextClaim();
+      expect(claim!.completion, same(completion));
+      coordinator.confirmPresentation(claim);
+      GraphAppPresentationClaim? repeated;
+      var repeatedIssued = false;
+      unawaited(
+        registration.nextClaim().then((value) {
+          repeated = value;
+          repeatedIssued = true;
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(repeatedIssued, isFalse);
+
+      await subscription.cancel();
+      await coordinator.shutdown();
+      expect(repeated, isNull);
+      expect(completions, hasLength(1));
+      expect(repository.commands, hasLength(1));
+    });
+
+    test(
+      'отказ отсутствующих тегов остаётся у живой формы, после её ухода '
+      'переходит общей поверхности, а прежнее право его не подтверждает',
+      () async {
+        final repository = _ControlledPersonalGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final registration = coordinator.registerAppPresentation();
+        final missingTag = _tagId(_secondTagUuid);
+        final formKey = IntentionCreationFormKey();
+
+        final accepted = coordinator.acceptCreation(
+          formKey,
+          CreateIntention.withInitialState(
+            title: 'Полное намерение',
+            description: null,
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+            tagIds: [_tagId(_firstTagUuid), missingTag],
+          ),
+        ) as IntentionCommandAccepted;
+        repository.complete(
+          0,
+          ResultFailure(IntentionCreationTagsMissingFailure([missingTag])),
+        );
+        final completion = await accepted.future;
+
+        // Завершение несёт типизированный отказ с точным набором отсутствующих
+        // тегов и не продвигает ревизию.
+        expect(
+          completion.result,
+          isA<ResultFailure<IntentionCommandSuccess>>().having(
+            (result) => result.failure,
+            'отказ',
+            isA<IntentionCreationTagsMissingFailure>().having(
+              (failure) => failure.missingTagIds,
+              'отсутствующие теги',
+              {missingTag},
+            ),
+          ),
+        );
+        expect(completion.kind, IntentionCommandKind.create);
+        expect(completion.confirmedChange, isNull);
+        expect(completion.presentationTitle, isNull);
+        expect(coordinator.isKeyRunning(formKey), isFalse);
+
+        // Живая форма удерживает право на своё сообщение.
+        final initiatorClaim = coordinator.claimInitiatorFailure(
+          accepted.token,
+        );
+        expect(initiatorClaim!.completion, same(completion));
+        GraphAppPresentationClaim? fallback;
+        final fallbackRequest = registration.nextClaim()
+          ..then((claim) => fallback = claim);
+        await Future<void>.delayed(Duration.zero);
+        expect(fallback, isNull);
+
+        // Форма закрыта до кадра: сообщение переходит общей поверхности.
+        coordinator.releaseInitiatorPresentation(accepted.token);
+        await fallbackRequest;
+        expect(fallback!.completion, same(completion));
+        expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+
+        // Запоздалые callbacks прежнего renderer не подтверждают и не
+        // освобождают право общей поверхности.
+        coordinator
+          ..confirmPresentation(initiatorClaim)
+          ..releaseInitiatorClaim(initiatorClaim);
+        registration.release();
+        final replacement = coordinator.registerAppPresentation();
+        final reissued = await replacement.nextClaim();
+        expect(reissued!.token, same(accepted.token));
+        expect(reissued.completion, same(completion));
+
+        coordinator.confirmPresentation(reissued);
+        await coordinator.shutdown();
+        expect(await replacement.nextClaim(), isNull);
+        expect(repository.commands, hasLength(1));
+      },
+    );
+
+    test('отказ отсутствующих тегов, предъявленный живой формой, не '
+        'передаётся общей поверхности после её ухода', () async {
+      final repository = _ControlledPersonalGraphRepository();
+      final coordinator = _graphCoordinator(repository);
+      final registration = coordinator.registerAppPresentation();
+      final missingTag = _tagId(_firstTagUuid);
+
+      final accepted = coordinator.acceptCreation(
+        IntentionCreationFormKey(),
+        CreateIntention.withInitialState(
+          title: 'Полное намерение',
+          description: null,
+          readiness: IntentionReadiness.notReady,
+          favoriteMark: FavoriteMark.notFavorite,
+          tagIds: [missingTag],
+        ),
+      ) as IntentionCommandAccepted;
+      repository.complete(
+        0,
+        ResultFailure(IntentionCreationTagsMissingFailure([missingTag])),
+      );
+      await accepted.future;
+      var fallbackIssued = false;
+      final fallbackRequest = registration.nextClaim()
+        ..then((_) => fallbackIssued = true);
+
+      coordinator.confirmPresentation(
+        coordinator.claimInitiatorFailure(accepted.token)!,
+      );
+      coordinator.releaseInitiatorPresentation(accepted.token);
+      await Future<void>.delayed(Duration.zero);
+      expect(fallbackIssued, isFalse);
+
+      await coordinator.shutdown();
+      expect(await fallbackRequest, isNull);
     });
   });
 
@@ -1101,6 +1351,53 @@ Result<ConfirmedGraphResult<IntentionCommandSuccess>> _confirmedDeletedResult(
   ),
 );
 
+/// Подтверждённое полное создание: одна каталожная мутация с готовностью,
+/// избранным и обоими тегами и по факту на каждое назначение, все на
+/// [revision].
+Result<ConfirmedGraphResult<IntentionCommandSuccess>>
+_confirmedFullCreatedResult(GraphRevision revision) {
+  final id = _id(_firstUuid);
+  final timestamp = IntentionTimestamp(DateTime.utc(2026, 10, 4));
+  final tags = [
+    Tag(id: _tagId(_firstTagUuid), name: TagName.fromInput('Дом')),
+    Tag(id: _tagId(_secondTagUuid), name: TagName.fromInput('Выходные')),
+  ];
+  return ResultSuccess(
+    ConfirmedGraphResult(
+      revision: revision,
+      value: IntentionSaved(
+        Intention(
+          id: id,
+          title: 'Полное намерение',
+          description: 'Описание',
+          readiness: IntentionReadiness.ready,
+          archiveState: IntentionArchiveState.active,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        ),
+        catalogMutation: IntentionCatalogCreated(
+          revision: revision,
+          entry: _TestCatalogEntrySnapshot(
+            id,
+            title: 'Полное намерение',
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+            tags: tags,
+          ),
+        ),
+        additionalChanges: [
+          for (final tag in tags)
+            TagAssignmentChangedChange(
+              revision: revision,
+              assignment: TagAssignment(tagId: tag.id, intentionId: id),
+              state: TagAssignmentState.assigned,
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
 GraphCommandCoordinator _graphCoordinator(PersonalGraphRepository repository) {
   final container = ProviderContainer.test(
     overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
@@ -1375,16 +1672,20 @@ final class _TestCatalogRevision implements GraphRevision {
 final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
   _TestCatalogEntrySnapshot(
     IntentionId id, {
+    String title = 'Намерение',
+    IntentionReadiness readiness = IntentionReadiness.notReady,
     FavoriteMark favoriteMark = FavoriteMark.notFavorite,
+    List<Tag> tags = const [],
   }) : summary = IntentionSummary(
          id: id,
-         title: 'Намерение',
+         title: title,
          hasDescription: false,
-         readiness: IntentionReadiness.notReady,
+         readiness: readiness,
          archiveState: IntentionArchiveState.active,
          activeRelationCount: 0,
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+         tags: tags,
          favoriteMark: favoriteMark,
        );
 
@@ -1402,6 +1703,13 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
   ),
 };
 
+TagId _tagId(String value) => switch (TagId.decode(value)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw StateError('Некорректный UUID тега.'),
+};
+
 const _firstUuid = '018f47c2-6b7d-7abc-8def-0123456789ab';
 const _secondUuid = '018f47c2-6b7d-7abc-8def-0123456789ac';
 const _thirdUuid = '018f47c2-6b7d-7abc-8def-0123456789ad';
+const _firstTagUuid = '018f47c2-6b7d-7abc-8def-0123456789ba';
+const _secondTagUuid = '018f47c2-6b7d-7abc-8def-0123456789bb';
