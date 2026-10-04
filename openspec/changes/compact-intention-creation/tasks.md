@@ -239,7 +239,7 @@
   - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_state.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 2.4 Подтвердить совместные гарантии локального черновика, единственной отправки и восстановления после отказов
+- [x] 2.4 Подтвердить совместные гарантии локального черновика, единственной отправки и восстановления после отказов
   - **Acceptance criteria:**
     - Проверки 2.1–2.3 подтверждают отсутствие команд при подготовке, неизменность принятого снимка и сохранение всех данных после каждого отказа. Разные сессии не обмениваются состоянием.
     - Существующее минимальное создание, блокировка координатора и предъявление ошибок проходят регрессии; анализ проходит. Контракт набора пригоден для общего выбора без знания устройства записи.
