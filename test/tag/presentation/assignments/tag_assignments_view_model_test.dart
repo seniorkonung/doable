@@ -372,6 +372,120 @@ void main() {
     expect(h.model.canActOn(_id(2)), isTrue);
   });
 
+  test('снимок созданного намерения уже включает пакет создания без повторного '
+      'чтения', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.reads.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа')], revision: 2);
+    await pumpEventQueue();
+    final loaded = h.state as TagAssignmentsLoaded;
+
+    h.changes.add(
+      _creation(2, h.intentionId, [_tag(2, 'Работа'), _tag(1, 'Дом')]),
+    );
+    h.changes.add(
+      _creation(2, h.intentionId, [_tag(2, 'Работа'), _tag(1, 'Дом')]),
+    );
+    await pumpEventQueue();
+
+    expect(h.state, same(loaded));
+    expect(h.reads.queries, hasLength(1));
+    expect(h.model.canActOn(_id(1)), isTrue);
+    expect(h.model.canActOn(_id(2)), isTrue);
+  });
+
+  test('пакет создания во время чтения не публикует частичный набор и '
+      'отвергает прежнее отсутствие намерения', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final states = <TagAssignmentsState>[];
+    final observer = h.container.listen(
+      tagAssignmentsViewModelProvider(h.intentionId),
+      (_, state) => states.add(state),
+    );
+    addTearDown(observer.close);
+
+    h.changes.add(
+      _creation(2, h.intentionId, [_tag(1, 'Дом'), _tag(2, 'Работа')]),
+    );
+    expect(h.state, isA<TagAssignmentsInitialLoading>());
+    // Чтение, начатое до создания, ещё не видит намерение.
+    h.reads.fail(0, const TagAssignmentsIntentionNotFound());
+    await pumpEventQueue();
+    expect(h.state, isA<TagAssignmentsInitialLoading>());
+    expect(h.reads.queries, hasLength(2));
+    // Снимок прежней ревизии не заменяет требуемый набор.
+    h.reads.page(1, [_tag(1, 'Дом')]);
+    await pumpEventQueue();
+    expect(h.state, isA<TagAssignmentsInitialLoading>());
+    expect(h.reads.queries, hasLength(3));
+
+    h.reads.page(2, [_tag(1, 'Дом'), _tag(2, 'Работа')], revision: 2);
+    await pumpEventQueue();
+    final loaded = h.state as TagAssignmentsLoaded;
+    expect(loaded.items.map((tag) => (tag.id, tag.name.value)), [
+      (_id(1), 'Дом'),
+      (_id(2), 'Работа'),
+    ]);
+    expect(
+      loaded.revision.compareTo(const _Revision(2)),
+      GraphRevisionOrder.same,
+    );
+    expect(loaded.canUseCurrentItems, isTrue);
+    expect(states, [same(loaded)]);
+    expect(h.reads.queries, hasLength(3));
+  });
+
+  const refreshFailures = [
+    TagAssignmentsUnavailableFailure(),
+    TagAssignmentsCorruptionFailure(),
+    TagAssignmentsUnexpectedFailure(),
+  ];
+  for (final failure in refreshFailures) {
+    test('пакет создания другого намерения с общим тегом сохраняет строки при '
+        'отказе обновления категории ${failure.category}', () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.reads.page(0, [_tag(1, 'Дом')]);
+      await pumpEventQueue();
+
+      h.changes.add(
+        _creation(2, _intentionId(2), [_tag(1, 'Дом'), _tag(2, 'Работа')]),
+      );
+      final refreshing = h.state as TagAssignmentsLoaded;
+      expect(refreshing.items.map((tag) => tag.id), [_id(1)]);
+      expect(refreshing.freshness, TagAssignmentsFreshness.refreshing);
+      expect(h.model.canActOn(_id(1)), isFalse);
+      expect(h.reads.queries, [h.intentionId, h.intentionId]);
+
+      h.reads.fail(1, failure);
+      await pumpEventQueue();
+      final stale = h.state as TagAssignmentsLoaded;
+      expect(stale.items.map((tag) => tag.id), [_id(1)]);
+      expect(stale.freshness, TagAssignmentsFreshness.stale);
+      expect(stale.refreshFailure, same(failure));
+      expect(h.model.canActOn(_id(1)), isFalse);
+
+      final retry = h.model.retryRefresh();
+      if (failure is TagAssignmentsUnavailableFailure) {
+        expect(h.reads.queries, hasLength(3));
+        h.reads.page(2, [_tag(1, 'Дом')], revision: 2);
+        await retry;
+        final current = h.state as TagAssignmentsLoaded;
+        expect(current.items.map((tag) => tag.id), [_id(1)]);
+        expect(
+          current.revision.compareTo(const _Revision(2)),
+          GraphRevisionOrder.same,
+        );
+        expect(h.model.canActOn(_id(1)), isTrue);
+      } else {
+        await retry;
+        expect(h.state, same(stale));
+        expect(h.reads.queries, hasLength(2));
+      }
+    });
+  }
+
   test(
     'удаление намерения немедленно исключает старые и поздние назначения',
     () async {
@@ -408,8 +522,26 @@ void main() {
   );
 }
 
+/// Пакет единого создания: одна каталожная мутация с окончательным снимком и
+/// факты всех начальных назначений на одной ревизии, как в `IntentionSaved`.
+_Package _creation(int revision, IntentionId intentionId, List<Tag> tags) {
+  final at = _Revision(revision);
+  return _Package(at, [
+    IntentionCatalogCreated(
+      revision: at,
+      entry: _Entry(intentionId, tags: tags),
+    ),
+    for (final tag in tags)
+      TagAssignmentChangedChange(
+        revision: at,
+        assignment: TagAssignment(tagId: tag.id, intentionId: intentionId),
+        state: TagAssignmentState.assigned,
+      ),
+  ]);
+}
+
 final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
-  _Entry(IntentionId id)
+  _Entry(IntentionId id, {List<Tag> tags = const []})
     : summary = IntentionSummary(
         id: id,
         title: 'Одинаковое намерение',
@@ -419,6 +551,7 @@ final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
         activeRelationCount: 0,
         createdAt: IntentionTimestamp(DateTime.utc(2026)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+        tags: tags,
         favoriteMark: FavoriteMark.notFavorite,
       );
 

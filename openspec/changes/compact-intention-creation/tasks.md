@@ -122,7 +122,7 @@
   - **Files likely touched:** `lib/src/favorite/presentation/home/home_view_model.dart`, `test/favorite/presentation/home/home_reconciliation_test.dart`, `test/favorite/presentation/home/home_test_support.dart`, `test/app/home_favorites_app_flow_test.dart`, `test/app/home_favorites_app_lifecycle_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.11 Согласовать навигацию по тегу и чтение назначений с фактами единого создания
+- [x] 1.11 Согласовать навигацию по тегу и чтение назначений с фактами единого создания
   - **Acceptance criteria:**
     - Уже открытая навигация по выбранному тегу отражает подходящее созданное намерение по подтверждённому пакету, сохраняя охват и параметры. Несколько начальных тегов не вызывают повторного добавления или публикации частичного набора.
     - Чтение назначений созданного намерения показывает весь сохранённый набор с актуальными названиями. Более старые чтения не заменяют результат, ошибки чтения сохраняют свои состояния.

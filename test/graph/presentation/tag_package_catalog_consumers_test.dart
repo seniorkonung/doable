@@ -10,6 +10,7 @@ import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -262,4 +263,45 @@ void main() {
       );
     },
   );
+
+  test('факты начальных назначений в пакете создания действуют на '
+      'потребителей так же, как минимальное создание', () async {
+    final contentBefore = probes.visibleContent();
+    final formBefore = probes.intentionDetailsEdit(observed);
+
+    Future<List<Object>> create(CreateIntention command) async {
+      probes.reset();
+      final firstEvent = diagnostics.events.length;
+      final completion = await (coordinator.acceptCreation(
+        IntentionCreationFormKey(),
+        command,
+      ) as IntentionCommandAccepted).future;
+      expect(completion.isFailure, isFalse);
+      await quiescePackageConsumers();
+      for (final probe in probes.all) {
+        expect(probe.updates, 0, reason: probe.name);
+        expect(probe.forbiddenStates, isEmpty, reason: probe.name);
+      }
+      expect(probes.visibleContent(), contentBefore);
+      expect(probes.intentionDetailsEdit(observed), formBefore);
+      return [
+        successfulReadCounts(diagnostics, from: firstEvent),
+        probes.emissions,
+      ];
+    }
+
+    final minimal = await create(
+      const CreateIntention(title: 'Ходить пешком', description: null),
+    );
+    final full = await create(
+      CreateIntention.withInitialState(
+        title: 'Ходить пешком',
+        description: 'Каждый день',
+        readiness: IntentionReadiness.ready,
+        favoriteMark: FavoriteMark.favorite,
+        tagIds: [tagId],
+      ),
+    );
+    expect(full, minimal);
+  });
 }
