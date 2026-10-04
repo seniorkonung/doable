@@ -180,3 +180,19 @@
   - **Dependencies:** 1.13.
   - **Files likely touched:** `test/app/full_intention_creation_checkpoint_test.dart`, `docs/verification/compact-intention-creation-phase-one-readiness.md`.
   - **Estimated scope:** S.
+
+- [ ] 1.15 Учитывать в точке отказа сквозной контрольной точки первой фазы записи с возвратом строк, которые выполняются через путь чтения
+  - **Acceptance criteria:**
+    - В сценарии недоступности хранилища `full_intention_creation_checkpoint_test.dart` в точке отказа учитывается каждая запись на соединении приложения после взвода отказа, включая записи с возвратом строк (`RETURNING`), которые drift выполняет через путь чтения, а перехватчик соединения помечает как чтение. Пропускаются только операции, не изменяющие данные. Лишняя, отсутствующая или переставленная запись любой формы до места избранного приводит к падению сценария.
+    - Название сценария, комментарии теста, документация наблюдателя отказа и запись готовности `docs/verification/compact-intention-creation-phase-one-readiness.md` утверждают только фактически проверяемое. Проверки начального состояния в точке отказа, ревизии, сохранённых данных и подтверждённых снимков потребителей не ослабляются; продуктовый код, включая перехватчик соединения в `lib/src/data/local/database_connection.dart`, не меняется.
+    - Итоговые проверки первой фазы повторены на коммите с усилением; их результаты и подтверждённая чувствительность отражены в записи готовности.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/app/full_intention_creation_checkpoint_test.dart --reporter expanded`
+    - Подтвердить чувствительность временными незафиксированными искажениями кода: строка намерения вставляется с выключенной готовностью к действию, а готовность записывается обновлением с возвратом строк (`writeReturning`) между назначениями и местом избранного, — оба сценария недоступности хранилища падают, хотя версия теста до этой задачи пропускает искажение. Искажения задач 1.13 и 1.14 по-прежнему приводят к падению соответствующих сценариев.
+    - `mise run check`
+    - `mise run codegen-check` — в чистой рабочей копии проверяемого коммита: скрипт требует отсутствия незакоммиченных файлов до и после генерации.
+    - `mise exec --no-deps -- flutter build apk --release`
+    - `mise exec --no-deps -- openspec validate compact-intention-creation --type change --strict --json --no-interactive`
+  - **Dependencies:** 1.14.
+  - **Files likely touched:** `test/app/full_intention_creation_checkpoint_test.dart`, `docs/verification/compact-intention-creation-phase-one-readiness.md`.
+  - **Estimated scope:** S.
