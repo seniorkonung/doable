@@ -61,20 +61,18 @@ final class DailyChoiceCalendar extends StatelessWidget {
       availableGestures: AvailableGestures.horizontalSwipe,
       headerVisible: false,
       calendarBuilders: CalendarBuilders(prioritizedBuilder: _buildDay),
-      // Аргумент фокуса библиотеки не используется: дату просмотра в нажатый
-      // день переносит потребитель.
-      onDaySelected: (day, _) => onDateSelected(_calendarDate(day)),
+      onDaySelected: _selectDay,
       onPageChanged: _reportFocusedDay,
     );
   }
 
-  Widget? _buildDay(BuildContext context, DateTime day, DateTime focusedDay) {
-    // Технические дни за пределами CalendarDate не становятся датами и
-    // сохраняют недоступное оформление библиотеки.
-    if (day.isBefore(_firstDay) || day.isAfter(_lastDay)) {
-      return null;
+  Widget _buildDay(BuildContext context, DateTime day, DateTime focusedDay) {
+    final date = _availableDate(day);
+    // Позиция крайней недели за пределами CalendarDate сохраняет место в
+    // строке, но не показывает несуществующую дату.
+    if (date == null) {
+      return _unavailableDay;
     }
-    final date = _calendarDate(day);
     return DailyChoiceCalendarDay(
       key: ValueKey('daily-choice-calendar-day-${date.toCanonicalString()}'),
       date: date,
@@ -86,8 +84,21 @@ final class DailyChoiceCalendar extends StatelessWidget {
     );
   }
 
+  // Аргумент фокуса библиотеки не используется: дату просмотра в нажатый
+  // день переносит потребитель.
+  void _selectDay(DateTime day, DateTime _) {
+    // Библиотека не сообщает о нажатии дней за пределами диапазона; проверка
+    // сохраняет это свойство адаптера независимо от версии пакета.
+    final date = _availableDate(day);
+    if (date != null) {
+      onDateSelected(date);
+    }
+  }
+
   void _reportFocusedDay(DateTime focusedDay) {
-    final focusedDate = _calendarDate(focusedDay);
+    // Технический фокус крайней недели может выйти за предел диапазона;
+    // ближайший допустимый день принадлежит той же неделе.
+    final focusedDate = _calendarDate(_clampToRange(focusedDay));
     // Библиотека сообщает о смене страницы и после синхронизации с входами
     // потребителя; повтор текущего просмотра не является его изменением.
     if (focusedDate != viewport.focusedDate) {
@@ -97,8 +108,12 @@ final class DailyChoiceCalendar extends StatelessWidget {
 }
 
 /// Пределы календаря совпадают с допустимым диапазоном [CalendarDate].
-final _firstDay = _technicalDate(CalendarDate.fromParts(1, 1, 1));
-final _lastDay = _technicalDate(CalendarDate.fromParts(9999, 12, 31));
+final _firstDay = _technicalDate(CalendarDate.earliest);
+final _lastDay = _technicalDate(CalendarDate.latest);
+
+const _unavailableDay = SizedBox.expand(
+  key: ValueKey('daily-choice-calendar-unavailable-day'),
+);
 
 /// Названия форматов нужны только скрытой кнопке формата библиотеки.
 const _calendarFormats = {CalendarFormat.month: '', CalendarFormat.week: ''};
@@ -110,3 +125,16 @@ DateTime _technicalDate(CalendarDate date) =>
 
 CalendarDate _calendarDate(DateTime day) =>
     CalendarDate.fromParts(day.year, day.month, day.day);
+
+/// Календарная дата технического дня или `null` для позиции за пределами
+/// диапазона [CalendarDate].
+CalendarDate? _availableDate(DateTime day) =>
+    day.isBefore(_firstDay) || day.isAfter(_lastDay)
+    ? null
+    : _calendarDate(day);
+
+DateTime _clampToRange(DateTime day) => day.isBefore(_firstDay)
+    ? _firstDay
+    : day.isAfter(_lastDay)
+    ? _lastDay
+    : day;

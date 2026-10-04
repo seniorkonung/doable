@@ -27,7 +27,7 @@
   - **Вероятные файлы:** новые `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_calendar_test_support.dart`.
   - **Оценка объёма:** M.
 
-- [ ] 1.3 Сохранить календарные даты и доступность крайних периодов во всём диапазоне `CalendarDate`
+- [x] 1.3 Сохранить календарные даты и доступность крайних периодов во всём диапазоне `CalendarDate`
   - **Критерии приёмки:**
     - Адаптер строит технические даты через `DateTime.utc(year, month, day)` и возвращает допустимые календарные части через `CalendarDate.fromParts`. Выбор не использует `toUtc`/`toLocal` или прибавление локальных 24 часов; существующая валидация предметного типа остаётся общей границей допустимости.
     - Реальная сетка допускает `0001-01-01` и `9999-12-31` в обоих режимах. Крайняя неделя сохраняет семь позиций; технические ячейки вне диапазона не выбираются и не преобразуются в `CalendarDate`. Выходящий за диапазон технический фокус крайней недели нормализуется к допустимому дню той же недели без изменения выбора.

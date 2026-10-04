@@ -29,15 +29,27 @@ Finder calendarDay(CalendarDate value) => find.byKey(
 DailyChoiceCalendarDay dayCell(WidgetTester tester, CalendarDate value) =>
     tester.widget<DailyChoiceCalendarDay>(calendarDay(value));
 
-/// Даты видимых ячеек по строкам сверху вниз, внутри строки — слева направо.
-List<List<CalendarDate>> visibleWeeks(WidgetTester tester) {
-  final rows = <double, List<(double, CalendarDate)>>{};
-  for (final element in find.byType(DailyChoiceCalendarDay).evaluate()) {
+/// Позиции крайней недели за пределами диапазона [CalendarDate].
+final Finder unavailableCalendarDays = find.byKey(
+  const ValueKey('daily-choice-calendar-unavailable-day'),
+);
+
+/// Видимые позиции дней по строкам сверху вниз, внутри строки — слева
+/// направо: дата доступного дня или `null` для позиции за пределами диапазона.
+List<List<CalendarDate?>> visibleWeeks(WidgetTester tester) {
+  final rows = <double, List<(double, CalendarDate?)>>{};
+  void addPosition(Element element, CalendarDate? value) {
     final position = (element.renderObject! as RenderBox).localToGlobal(
       Offset.zero,
     );
-    final cell = element.widget as DailyChoiceCalendarDay;
-    rows.putIfAbsent(position.dy, () => []).add((position.dx, cell.date));
+    rows.putIfAbsent(position.dy, () => []).add((position.dx, value));
+  }
+
+  for (final element in find.byType(DailyChoiceCalendarDay).evaluate()) {
+    addPosition(element, (element.widget as DailyChoiceCalendarDay).date);
+  }
+  for (final element in unavailableCalendarDays.evaluate()) {
+    addPosition(element, null);
   }
   final tops = rows.keys.toList()..sort();
   return [
