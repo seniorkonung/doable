@@ -17,7 +17,11 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -1490,24 +1494,247 @@ void main() {
       );
     },
   );
+  group('типизированный контекст общего выбора', () {
+    test(
+      'черновик читает обычный каталог, а назначение — снимок получателя',
+      () {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        final first = _DraftSession(h.container);
+        final second = _DraftSession(h.container);
+
+        expect(const TagBrowseContext().readMode, const TagCatalogBrowseMode());
+        expect(
+          TagAssignmentContext(_intentionId(1)).readMode,
+          TagCatalogSelectionMode(_intentionId(1)),
+        );
+        expect(
+          TagDraftContext(first.tagSet).readMode,
+          const TagCatalogBrowseMode(),
+        );
+        expect(
+          TagAssignmentContext(_intentionId(1)),
+          TagAssignmentContext(_intentionId(1)),
+        );
+        expect(
+          TagAssignmentContext(_intentionId(1)),
+          isNot(TagAssignmentContext(_intentionId(2))),
+        );
+        expect(TagDraftContext(first.tagSet), TagDraftContext(first.tagSet));
+        expect(
+          TagDraftContext(first.tagSet),
+          isNot(TagDraftContext(second.tagSet)),
+        );
+        expect(TagDraftContext(first.tagSet), isNot(const TagBrowseContext()));
+      },
+    );
+
+    test('постоянное назначение принимает AssignTag только для подтверждённой свободной пары', () async {
+      final intentionId = _intentionId(1);
+      final h = _Harness(mode: TagAssignmentContext(intentionId).readMode);
+      addTearDown(h.dispose);
+      h.repository.selectionPage(0, intentionId, [
+        TagSelectionRow(tag: _tag(1, 'Дом'), isAssigned: true),
+        TagSelectionRow(tag: _tag(2, 'Работа'), isAssigned: false),
+      ]);
+      await pumpEventQueue();
+      final action = TagAssignmentAction(h.model);
+
+      expect(action.canPerform, isFalse);
+      expect(action.perform(), isNull);
+
+      h.model.selectTag(_id(1));
+      expect(action.canPerform, isFalse);
+      expect(action.perform(), isNull);
+
+      h.model.selectTag(_id(52));
+      h.repository.tagRead(_tag(52, 'Из редактора'));
+      await pumpEventQueue();
+      expect(h.repository.statusQueries.single, (_id(52), intentionId));
+      expect(
+        (h.state as TagCatalogLoaded).selectedAssignment,
+        TagCatalogSelectedAssignment.unknown,
+      );
+      expect(action.canPerform, isFalse);
+      expect(action.perform(), isNull);
+      expect(h.repository.executed, isEmpty);
+
+      h.model.selectTag(_id(2));
+      expect(action.canPerform, isTrue);
+      expect(action.perform(), isA<TagCommandAccepted>());
+      expect(
+        h.repository.executed.single,
+        isA<AssignTag>()
+            .having((command) => command.tagId, 'tagId', _id(2))
+            .having(
+              (command) => command.intentionId,
+              'intentionId',
+              intentionId,
+            ),
+      );
+      expect(action.canPerform, isFalse);
+      expect(action.perform(), isNull);
+      expect(h.repository.executed, hasLength(1));
+    });
+
+    test(
+      'добавление в черновик меняет только наблюдаемый набор сессии',
+      () async {
+        final h = _Harness(opening: TagCatalogOpening());
+        addTearDown(h.dispose);
+        final draft = _DraftSession(h.container);
+        expect(
+          h.repository.queries.single,
+          TagDraftContext(draft.tagSet).readMode,
+        );
+        h.repository.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
+        await pumpEventQueue();
+        final published = <Set<TagId>>[];
+        final changes = draft.tagSet.changes.listen(
+          (snapshot) => published.add(snapshot.tagIds),
+        );
+        addTearDown(changes.cancel);
+        final action = TagDraftAdditionAction(h.model, draft.tagSet);
+
+        expect(action.canPerform, isFalse);
+        expect(action.perform(), isNull);
+        expect(draft.tagSet.current.tagIds, isEmpty);
+
+        h.model.selectTag(_id(1));
+        expect(action.canPerform, isTrue);
+        expect(action.perform(), IntentionDraftTagAddition.added);
+        expect(draft.tagSet.current.tagIds, {_id(1)});
+        expect(action.canPerform, isFalse);
+        expect(action.perform(), IntentionDraftTagAddition.alreadyIncluded);
+        expect(draft.tagSet.current.tagIds, {_id(1)});
+
+        h.model.selectTag(_id(2));
+        h.repository.tagRead(_tag(2, 'Карьера'), revision: 2);
+        await pumpEventQueue();
+        expect(action.canPerform, isTrue);
+        expect(action.perform(), IntentionDraftTagAddition.added);
+        await pumpEventQueue();
+
+        expect(draft.tagSet.current.tagIds, [_id(1), _id(2)]);
+        expect(published, [
+          {_id(1)},
+          {_id(1), _id(2)},
+        ]);
+        expect(
+          draft.state.selectedTags[_id(2)]?.name,
+          TagName.fromInput('Карьера'),
+        );
+        expect(
+          (h.state as TagCatalogLoaded).selection,
+          isA<TagCatalogSelectionReady>().having(
+            (selection) => selection.id,
+            'id',
+            _id(2),
+          ),
+        );
+        expect(h.repository.executed, isEmpty);
+        expect(h.repository.statusQueries, isEmpty);
+        expect(h.repository.queries, [const TagCatalogBrowseMode()]);
+      },
+    );
+
+    test('черновик не принимает неподтверждённого или удалённого кандидата и не проверяет назначение', () async {
+      final h = _Harness(opening: TagCatalogOpening());
+      addTearDown(h.dispose);
+      final draft = _DraftSession(h.container);
+      h.repository.page(0, [_tag(1, 'Дом')]);
+      await pumpEventQueue();
+      final action = TagDraftAdditionAction(h.model, draft.tagSet);
+
+      h.model.selectTag(_id(52));
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogSelectionLoading>(),
+      );
+      expect(action.canPerform, isFalse);
+      expect(action.perform(), isNull);
+
+      h.repository.tagRead(null, revision: 2);
+      await pumpEventQueue();
+      expect(
+        (h.state as TagCatalogLoaded).selection,
+        isA<TagCatalogNoSelection>(),
+      );
+      expect(action.canPerform, isFalse);
+      expect(action.perform(), isNull);
+
+      expect(draft.tagSet.current.tagIds, isEmpty);
+      expect(h.repository.statusQueries, isEmpty);
+      expect(h.repository.executed, isEmpty);
+    });
+
+    test(
+      'черновик отвергает добавление во время отправки и после закрытия сессии',
+      () async {
+        final h = _Harness(opening: TagCatalogOpening());
+        addTearDown(h.dispose);
+        h.repository.page(0, [_tag(1, 'Дом'), _tag(2, 'Работа')]);
+        await pumpEventQueue();
+        final submitted = _DraftSession(h.container);
+        final closed = _DraftSession(h.container);
+        final submittedAction = TagDraftAdditionAction(
+          h.model,
+          submitted.tagSet,
+        );
+        final closedAction = TagDraftAdditionAction(h.model, closed.tagSet);
+        h.model.selectTag(_id(1));
+        expect(submittedAction.perform(), IntentionDraftTagAddition.added);
+
+        submitted.editor
+          ..changeTitle('Намерение')
+          ..submit();
+        h.model.selectTag(_id(2));
+
+        expect(
+          submitted.tagSet.current.availability,
+          IntentionDraftAvailability.submitting,
+        );
+        expect(submittedAction.canPerform, isFalse);
+        expect(submittedAction.perform(), IntentionDraftTagAddition.submitting);
+        expect(submitted.tagSet.current.tagIds, {_id(1)});
+        expect(h.repository.executed.single, isA<CreateIntention>());
+
+        expect(closedAction.canPerform, isTrue);
+        await closed.close();
+
+        expect(
+          closed.tagSet.current.availability,
+          IntentionDraftAvailability.closed,
+        );
+        expect(closedAction.canPerform, isFalse);
+        expect(closedAction.perform(), IntentionDraftTagAddition.sessionClosed);
+        expect(closed.tagSet.current.tagIds, isEmpty);
+        expect(h.repository.executed.whereType<AssignTag>(), isEmpty);
+        expect(h.repository.statusQueries, isEmpty);
+      },
+    );
+  });
 }
 
 final class _Harness {
-  _Harness() {
+  _Harness({
+    TagCatalogMode mode = const TagCatalogBrowseMode(),
+    TagCatalogOpening? opening,
+  }) : provider = tagCatalogViewModelProvider(mode: mode, opening: opening) {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWith((ref) => repository),
       ],
     );
-    subscription = container.listen(tagCatalogViewModelProvider(), (_, _) {});
+    subscription = container.listen(provider, (_, _) {});
   }
 
   final repository = _Repository();
+  final TagCatalogViewModelProvider provider;
   late final ProviderContainer container;
   late final ProviderSubscription<TagCatalogState> subscription;
-  TagCatalogViewModel get model =>
-      container.read(tagCatalogViewModelProvider().notifier);
-  TagCatalogState get state => container.read(tagCatalogViewModelProvider());
+  TagCatalogViewModel get model => container.read(provider.notifier);
+  TagCatalogState get state => container.read(provider);
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
 
@@ -1553,8 +1780,31 @@ final class _Harness {
   }
 }
 
+/// Открытая сессия создания в контейнере выбора; набор тегов фиксируется
+/// при открытии, чтобы после закрытия проверять тот же контракт.
+final class _DraftSession {
+  _DraftSession(this.container)
+    : provider = intentionEditorViewModelProvider(IntentionCreationFormKey()) {
+    subscription = container.listen(provider, (_, _) {});
+    tagSet = editor.draftTagSet;
+  }
+
+  final ProviderContainer container;
+  final IntentionEditorViewModelProvider provider;
+  late final ProviderSubscription<IntentionEditorState> subscription;
+  late final IntentionDraftTagSet tagSet;
+  IntentionEditorViewModel get editor => container.read(provider.notifier);
+  IntentionEditorState get state => container.read(provider);
+
+  Future<void> close() async {
+    subscription.close();
+    await pumpEventQueue();
+  }
+}
+
 final class _Repository extends Fake implements PersonalGraphRepository {
   final queries = <TagCatalogMode>[];
+  final executed = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
   final pages = <Completer<TagCatalogResult>>[];
   final commands = <Completer<TagCommandResult>>[];
   final tagReads = <StreamController<TagReadResult>>[];
@@ -1638,6 +1888,7 @@ final class _Repository extends Fake implements PersonalGraphRepository {
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
+    executed.add(command);
     final completer = Completer<TagCommandResult>();
     commands.add(completer);
     return await completer.future as GraphCommandResult<TSuccess, TFailure>;

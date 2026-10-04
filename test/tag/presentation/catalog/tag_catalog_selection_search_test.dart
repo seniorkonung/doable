@@ -5,7 +5,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
-import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -13,6 +12,7 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -217,7 +217,7 @@ Future<_Harness> _show(
         home: ValueListenableBuilder(
           valueListenable: h.intention,
           builder: (_, intentionId, _) => TagCatalogView(
-            mode: TagCatalogSelectionMode(intentionId),
+            selectionContext: TagAssignmentContext(intentionId),
             onOpenEditor: onOpenEditor ?? (_) async => null,
             onOpenNavigation: (_) {},
           ),

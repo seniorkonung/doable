@@ -12,6 +12,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
@@ -23,7 +24,9 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1615,6 +1618,92 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Show more tags'), findsNothing);
       expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'выбор для черновика читает обычный каталог в своём открытии и меняет только кандидата',
+    (tester) async {
+      final repository = _CatalogRepository();
+      addTearDown(repository.dispose);
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      final session = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final sessionSubscription = container.listen(session, (_, _) {});
+      addTearDown(sessionSubscription.close);
+      final catalogSubscription = container.listen(
+        tagCatalogViewModelProvider(),
+        (_, _) {},
+      );
+      addTearDown(catalogSubscription.close);
+      repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
+      final tagSet = container.read(session.notifier).draftTagSet;
+      var navigations = 0;
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: TagCatalogView(
+              selectionContext: TagDraftContext(tagSet),
+              onOpenEditor: (_) async => null,
+              onOpenNavigation: (_) => navigations++,
+            ),
+          ),
+        ),
+      );
+      repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
+      await tester.pumpAndSettle();
+
+      expect(repository.queries, [
+        const TagCatalogBrowseMode(),
+        const TagCatalogBrowseMode(),
+      ]);
+      expect(find.text('Choose a tag'), findsOneWidget);
+      expect(find.text('Available to assign'), findsNothing);
+      expect(find.byKey(const ValueKey('tag-catalog-assign')), findsNothing);
+      expect(
+        find.byKey(
+          ValueKey('tag-catalog-open-${_tag(1, 'Дом').id.toCanonicalString()}'),
+        ),
+        findsNothing,
+      );
+
+      await tester.tap(find.text('Дом'));
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<Semantics>(
+              find.byKey(
+                ValueKey(
+                  'tag-catalog-row-${_tag(1, 'Дом').id.toCanonicalString()}',
+                ),
+              ),
+            )
+            .properties
+            .selected,
+        isTrue,
+      );
+      expect(
+        (container.read(
+          tagCatalogViewModelProvider(),
+        ) as TagCatalogLoaded).selection,
+        isA<TagCatalogNoSelection>(),
+      );
+      expect(tagSet.current.tagIds, isEmpty);
+      expect(repository.statusReads, isEmpty);
+      expect(repository._commands, isEmpty);
+      expect(repository.queries, hasLength(2));
+      expect(navigations, 0);
     },
   );
 }

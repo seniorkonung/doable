@@ -13,6 +13,7 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -326,7 +327,7 @@ Future<_ControlledRepository> _showCatalog(
           child: child!,
         ),
         home: TagCatalogView(
-          mode: TagCatalogSelectionMode(intentionId),
+          selectionContext: TagAssignmentContext(intentionId),
           onOpenEditor: (_) async => null,
           onOpenNavigation: (_) {},
         ),

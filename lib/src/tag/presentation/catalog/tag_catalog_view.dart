@@ -20,18 +20,21 @@ import 'tag_catalog_search_controller.dart';
 import 'tag_catalog_state.dart';
 import 'tag_catalog_view_model.dart';
 import 'tag_delete_confirmation.dart';
+import 'tag_selection_context.dart';
 
-/// Общий каталог или выбор тега для назначения конкретному намерению.
-/// Поиск принадлежит одному открытию; маршруты задаются потребителем.
+/// Общий каталог тегов или выбор тега в типизированном контексте.
+/// Поиск принадлежит одному открытию; маршруты и контекст задаются
+/// потребителем.
 final class TagCatalogView extends ConsumerStatefulWidget {
   const TagCatalogView({
     required this.onOpenEditor,
     required this.onOpenNavigation,
-    this.mode = const TagCatalogBrowseMode(),
+    this.selectionContext = const TagBrowseContext(),
     super.key,
   });
 
-  final TagCatalogMode mode;
+  /// Определяет режим чтения каталога и смысл явного действия выбора.
+  final TagSelectionContext selectionContext;
   final Future<Tag?> Function(TagEditorContext) onOpenEditor;
   final ValueChanged<TagId> onOpenNavigation;
 
@@ -46,6 +49,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
   TagCatalogFilter _filter = TagCatalogFilter.empty;
   bool _searchIsInvalid = false;
   int _modeGeneration = 0;
+  TagCatalogOpening _draftOpening = TagCatalogOpening();
   late final GraphCommandCoordinator _coordinator;
   TagOperationToken? _activeDeleteToken;
   TagOperationToken? _failureToken;
@@ -66,8 +70,9 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
   @override
   void didUpdateWidget(covariant TagCatalogView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.mode == widget.mode) return;
+    if (oldWidget.selectionContext == widget.selectionContext) return;
     _modeGeneration++;
+    _draftOpening = TagCatalogOpening();
     _releasePresentation();
     _activeAssignToken = null;
     _assignFailure = null;
@@ -106,7 +111,21 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     _failureClaim = null;
   }
 
-  TagCatalogMode get _mode => widget.mode;
+  /// Просмотр и назначение разделяют состояние по режиму чтения; выбор для
+  /// черновика читает обычный каталог в собственном открытии, не разделяя
+  /// кандидата с каталогом тегов.
+  TagCatalogViewModelProvider get _provider => tagCatalogViewModelProvider(
+    mode: widget.selectionContext.readMode,
+    opening: switch (widget.selectionContext) {
+      TagBrowseContext() || TagAssignmentContext() => null,
+      TagDraftContext() => _draftOpening,
+    },
+  );
+
+  bool get _browsing => switch (widget.selectionContext) {
+    TagBrowseContext() => true,
+    TagAssignmentContext() || TagDraftContext() => false,
+  };
 
   void _updateSearch(String input) {
     final result = TagCatalogFilter.fromInput(input);
@@ -139,11 +158,10 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     _updateSearch('');
   }
 
-  void _assignSelected() {
+  void _assignSelected(TagAssignmentAction action) {
     if (_activeAssignToken != null) return;
-    final model = ref.read(tagCatalogViewModelProvider(mode: _mode).notifier);
     _releasePresentation();
-    final start = model.assignSelected();
+    final start = action.perform();
     switch (start) {
       case TagCommandAccepted(:final token, :final future):
         setState(() {
@@ -164,7 +182,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     if (_activeAssignToken != null) return;
     _releasePresentation();
     setState(() => _assignFailure = null);
-    ref.read(tagCatalogViewModelProvider(mode: _mode).notifier).selectTag(id);
+    ref.read(_provider.notifier).selectTag(id);
   }
 
   Future<void> _finishAssign(
@@ -204,9 +222,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
   Future<void> _confirmDelete(Tag tag) async {
     if (_confirmationOpen ||
         _activeDeleteToken != null ||
-        !ref
-            .read(tagCatalogViewModelProvider(mode: _mode).notifier)
-            .canActOn(tag.id)) {
+        !ref.read(_provider.notifier).canActOn(tag.id)) {
       return;
     }
     final generation = _modeGeneration;
@@ -215,9 +231,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     if (!mounted || generation != _modeGeneration) return;
     setState(() => _confirmationOpen = false);
     if (!confirmed) return;
-    if (!ref
-        .read(tagCatalogViewModelProvider(mode: _mode).notifier)
-        .canActOn(tag.id)) {
+    if (!ref.read(_provider.notifier).canActOn(tag.id)) {
       return;
     }
     _releasePresentation();
@@ -301,18 +315,14 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     final generation = _modeGeneration;
     final selected = await widget.onOpenEditor(editorContext);
     if (mounted && selected != null && generation == _modeGeneration) {
-      ref
-          .read(tagCatalogViewModelProvider(mode: _mode).notifier)
-          .selectTag(selected.id);
+      ref.read(_provider.notifier).selectTag(selected.id);
     }
   }
 
   void _openNavigation(TagId tagId) {
     if (!mounted ||
-        widget.mode is TagCatalogSelectionMode ||
-        !ref
-            .read(tagCatalogViewModelProvider(mode: _mode).notifier)
-            .canActOn(tagId)) {
+        !_browsing ||
+        !ref.read(_provider.notifier).canActOn(tagId)) {
       return;
     }
     widget.onOpenNavigation(tagId);
@@ -321,15 +331,15 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final state = ref.watch(tagCatalogViewModelProvider(mode: _mode));
-    final model = ref.read(tagCatalogViewModelProvider(mode: _mode).notifier);
+    final state = ref.watch(_provider);
+    final model = ref.read(_provider.notifier);
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.mode is TagCatalogBrowseMode
-              ? localizations.tagCatalogTitle
-              : localizations.tagCatalogSelectionTitle,
-        ),
+        title: Text(switch (widget.selectionContext) {
+          TagBrowseContext() => localizations.tagCatalogTitle,
+          TagAssignmentContext() ||
+          TagDraftContext() => localizations.tagCatalogSelectionTitle,
+        }),
         actions: [
           if (state is! TagCatalogIntentionMissing)
             IconButton(
@@ -340,19 +350,18 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
             ),
         ],
       ),
-      bottomNavigationBar: switch (state) {
-        TagCatalogLoaded loaded when loaded.mode is TagCatalogSelectionMode =>
-          Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: _AssignAction(
-              state: loaded,
-              filter: _filter,
-              model: model,
-              onAssign: _assignSelected,
-            ),
+      bottomNavigationBar: switch ((widget.selectionContext, state)) {
+        (TagAssignmentContext(), TagCatalogLoaded loaded) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
           ),
+          child: _AssignAction(
+            state: loaded,
+            filter: _filter,
+            action: TagAssignmentAction(model),
+            onAssign: _assignSelected,
+          ),
+        ),
         _ => null,
       },
       body: SizedBox.expand(
@@ -476,6 +485,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
                 ),
               ),
               TagCatalogLoaded loaded => _LoadedCatalog(
+                selectionContext: widget.selectionContext,
                 state: loaded,
                 filter: _filter,
                 model: model,
@@ -500,6 +510,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
 
 final class _LoadedCatalog extends StatelessWidget {
   const _LoadedCatalog({
+    required this.selectionContext,
     required this.state,
     required this.filter,
     required this.model,
@@ -511,6 +522,7 @@ final class _LoadedCatalog extends StatelessWidget {
     required this.onOpen,
   });
 
+  final TagSelectionContext selectionContext;
   final TagCatalogLoaded state;
   final TagCatalogFilter filter;
   final TagCatalogViewModel model;
@@ -524,7 +536,11 @@ final class _LoadedCatalog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final choosing = state.mode is TagCatalogSelectionMode;
+    final (choosing, showsAssignment) = switch (selectionContext) {
+      TagBrowseContext() => (false, false),
+      TagAssignmentContext() => (true, true),
+      TagDraftContext() => (true, false),
+    };
     if (state.isEmpty &&
         filter.isEmpty &&
         state.canUseCurrentItems &&
@@ -601,7 +617,9 @@ final class _LoadedCatalog extends StatelessWidget {
                   message: _selectedReadFailure(localizations, failure),
                   onRetry: canRetry ? model.retrySelectedTag : null,
                 ),
-              if (choosing && selection.id != null && assignmentFailure != null)
+              if (showsAssignment &&
+                  selection.id != null &&
+                  assignmentFailure != null)
                 _CatalogInlineStatus(
                   message: assignmentFailure,
                   onRetry:
@@ -648,14 +666,14 @@ final class _LoadedCatalog extends StatelessWidget {
               final row = rows[index - (selectedOutsideSnapshot ? 1 : 0)];
               final tag = row.tag;
               final selectedId = selection.id;
-              final assigned = choosing && row.isAssigned;
+              final assigned = showsAssignment && row.isAssigned;
               return Semantics(
                 key: ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'),
                 container: true,
                 selected: tag.id == selectedId,
                 child: ListTile(
                   title: Text(tag.name.value),
-                  subtitle: choosing
+                  subtitle: showsAssignment
                       ? Text(
                           assigned
                               ? localizations.tagCatalogAssigned
@@ -694,14 +712,14 @@ final class _AssignAction extends StatelessWidget {
   const _AssignAction({
     required this.state,
     required this.filter,
-    required this.model,
+    required this.action,
     required this.onAssign,
   });
 
   final TagCatalogLoaded state;
   final TagCatalogFilter filter;
-  final TagCatalogViewModel model;
-  final VoidCallback onAssign;
+  final TagAssignmentAction action;
+  final ValueChanged<TagAssignmentAction> onAssign;
 
   @override
   Widget build(BuildContext context) {
@@ -764,15 +782,7 @@ final class _AssignAction extends StatelessWidget {
               ),
               FilledButton(
                 key: const ValueKey('tag-catalog-assign'),
-                onPressed:
-                    selected != null &&
-                        state.canUseCurrentItems &&
-                        state.assignmentStatus is TagCatalogAssignmentIdle &&
-                        state.selectedAssignment ==
-                            TagCatalogSelectedAssignment.available &&
-                        model.canActOn(selected.id)
-                    ? onAssign
-                    : null,
+                onPressed: action.canPerform ? () => onAssign(action) : null,
                 child: Text(
                   localizations.tagCatalogAssign,
                   semanticsLabel: selected == null
