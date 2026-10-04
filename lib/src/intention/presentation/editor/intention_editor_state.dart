@@ -187,6 +187,20 @@ final class IntentionEditorState {
     availability: draftAvailability,
   );
 
+  /// Выбранные теги черновика, отсутствие которых подтвердил последний отказ
+  /// создания, — данные для показа недоступных тегов. Пока набор не пуст,
+  /// новая проверка недоступна: каждый такой тег снимается только явно.
+  Set<TagId> get missingTagIds => switch (operation) {
+    OperationFailed<Intention>(
+      failure: IntentionCreationTagsMissingFailure(:final missingTagIds),
+    ) =>
+      Set.unmodifiable(draft.tagIds.where(missingTagIds.contains)),
+    OperationIdle<Intention>() ||
+    OperationRunning<Intention>() ||
+    OperationSucceeded<Intention>() ||
+    OperationFailed<Intention>() => const {},
+  };
+
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
     OperationIdle<Intention>() ||
@@ -209,7 +223,7 @@ final class IntentionEditorState {
 
   IntentionEditorState withTag(Tag tag) => draft.tagIds.contains(tag.id)
       ? this
-      : _withDraft(
+      : _withEditedTags(
           draft.withTag(tag.id),
           selectedTagNames: Map.unmodifiable({
             ...selectedTagNames,
@@ -218,7 +232,7 @@ final class IntentionEditorState {
         );
 
   IntentionEditorState withoutTag(TagId id) => draft.tagIds.contains(id)
-      ? _withDraft(
+      ? _withEditedTags(
           draft.withoutTag(id),
           selectedTagNames: Map.unmodifiable({
             for (final MapEntry(:key, :value) in selectedTagNames.entries)
@@ -270,7 +284,7 @@ final class IntentionEditorState {
     required IntentionCreationDraft draft,
     required IntentionTextField field,
   }) {
-    final nextOperation = _operationAfterEditing(field);
+    final nextOperation = _operationAfterEditing(_DraftTextEdit(field));
     return IntentionEditorState._(
       draft: draft,
       selectedTagNames: selectedTagNames,
@@ -282,24 +296,66 @@ final class IntentionEditorState {
     );
   }
 
-  OperationState<Intention> _operationAfterEditing(IntentionTextField field) {
+  IntentionEditorState _withEditedTags(
+    IntentionCreationDraft draft, {
+    required Map<TagId, TagName> selectedTagNames,
+  }) {
+    final nextOperation = _operationAfterEditing(
+      _DraftTagSetEdit(draft.tagIds),
+    );
+    return IntentionEditorState._(
+      draft: draft,
+      selectedTagNames: selectedTagNames,
+      operation: nextOperation,
+      event: event,
+      failurePresentation: nextOperation is OperationFailed<Intention>
+          ? failurePresentation
+          : null,
+    );
+  }
+
+  /// Снимает отказ, только если правка устраняет его типизированную причину.
+  /// Иначе отказ сохраняется вместе с правом предъявления, а повтор остаётся
+  /// доступным лишь для устранимой недоступности.
+  OperationState<Intention> _operationAfterEditing(_DraftEdit edit) {
     final current = operation;
     if (current is! OperationFailed<Intention>) {
       return current;
     }
-    return switch (current.failure) {
-      IntentionTextInputValidationFailure(:final textFailure)
-          when textFailure.field == field =>
-        const OperationIdle<Intention>(),
-      IntentionGenericValidationFailure() => const OperationIdle<Intention>(),
-      IntentionTextInputValidationFailure() ||
-      IntentionCreationTagsMissingFailure() ||
+    final isResolved = switch (current.failure) {
+      IntentionTextInputValidationFailure(:final textFailure) =>
+        edit is _DraftTextEdit && edit.field == textFailure.field,
+      IntentionGenericValidationFailure() => edit is _DraftTextEdit,
+      // Удалённый тег не возвращается с прежним идентификатором: новая
+      // проверка имеет смысл только после явного снятия каждого
+      // отсутствующего тега, а одноимённая замена отказ не снимает.
+      IntentionCreationTagsMissingFailure(:final missingTagIds) =>
+        edit is _DraftTagSetEdit && !edit.tagIds.any(missingTagIds.contains),
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
       IntentionHasBlockingRelationsFailure() ||
       IntentionUnavailableFailure() ||
       IntentionCorruptionFailure() ||
-      IntentionUnexpectedFailure() => current,
+      IntentionUnexpectedFailure() => false,
     };
+    return isResolved ? const OperationIdle<Intention>() : current;
   }
+}
+
+/// Изменённая часть черновика, по которой правка может снять отказ.
+sealed class _DraftEdit {
+  const _DraftEdit();
+}
+
+final class _DraftTextEdit extends _DraftEdit {
+  const _DraftTextEdit(this.field);
+
+  final IntentionTextField field;
+}
+
+/// Изменение состава набора тегов; [tagIds] — набор после правки.
+final class _DraftTagSetEdit extends _DraftEdit {
+  const _DraftTagSetEdit(this.tagIds);
+
+  final Set<TagId> tagIds;
 }

@@ -12,6 +12,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -222,6 +223,112 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets(
+    'правка другого поля сохраняет ошибку описания, а исправление описания снимает её без отправки',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      await _openEditor(tester, repository);
+      FilledButton submit() => tester.widget<FilledButton>(
+        find.byKey(const ValueKey('intention-editor-submit')),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Намерение',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-description')),
+        '  Слишком длинное\n',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      repository.completeCommand(
+        0,
+        const ResultFailure(
+          IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(
+              field: IntentionTextField.description,
+              reason: IntentionTextValidationReason.tooLong,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Use no more than 4096 characters.'), findsOneWidget);
+      expect(submit().onPressed, isNull);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Другое намерение',
+      );
+      await tester.pump();
+
+      expect(find.text('Use no more than 4096 characters.'), findsOneWidget);
+      expect(submit().onPressed, isNull);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-description')),
+        'Короткое',
+      );
+      await tester.pump();
+
+      expect(find.text('Use no more than 4096 characters.'), findsNothing);
+      expect(submit().onPressed, isNotNull);
+      expect(repository.commands, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'правка текста не снимает конфликт и отказ отсутствующих тегов и не открывает повтор',
+    (tester) async {
+      final cases = <(IntentionFailure, String)>[
+        (
+          const IntentionConflictFailure(),
+          'The intention couldn’t be created because of a conflict.',
+        ),
+        (
+          IntentionCreationTagsMissingFailure([_tagId(1)]),
+          'Check the entered data.',
+        ),
+      ];
+
+      for (final (failure, message) in cases) {
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository);
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          'Намерение',
+        );
+        await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+        repository.completeCommand(0, ResultFailure(failure));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          'Исправленное намерение',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-description')),
+          'Описание',
+        );
+        await tester.pump();
+
+        expect(find.text(message), findsOneWidget);
+        expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('intention-editor-submit')),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(repository.commands, hasLength(1));
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
 
   testWidgets(
     'не подтверждает field failure по кадру видимого поля до появления сообщения',
@@ -701,3 +808,10 @@ Result<IntentionCommandSuccess> _savedResult({required String title}) {
     ),
   );
 }
+
+TagId _tagId(int number) => switch (TagId.decode(
+  '018f47c2-6b7d-7abc-8def-${number.toString().padLeft(12, '0')}',
+)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw StateError('Некорректный UUID тега.'),
+};

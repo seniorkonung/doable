@@ -1052,6 +1052,389 @@ void main() {
       expect(repository.commands, hasLength(1));
     });
   });
+
+  group('восстановление после отказа', () {
+    test(
+      'любой отказ сохраняет весь сырой черновик без нормализации и сброса',
+      () async {
+        for (final (name, failure) in _failureCases()) {
+          final session = await _failedFullDraftSession(failure);
+          final failed = session.state;
+
+          expect(failed.draft.title, _rawTitle, reason: name);
+          expect(failed.draft.description, _rawDescription, reason: name);
+          expect(failed.draft.tagIds, [_tagId(1), _tagId(2)], reason: name);
+          expect(
+            failed.draft.readiness,
+            IntentionReadiness.ready,
+            reason: name,
+          );
+          expect(
+            failed.draft.favoriteMark,
+            FavoriteMark.favorite,
+            reason: name,
+          );
+          expect(
+            failed.selectedTagNames.map((id, name) => MapEntry(id, name.value)),
+            {_tagId(1): 'Дом', _tagId(2): 'Выходные'},
+            reason: name,
+          );
+          expect(
+            failed.operation,
+            isA<OperationFailed<Intention>>().having(
+              (operation) => operation.failure,
+              'отказ',
+              same(failure),
+            ),
+            reason: name,
+          );
+          expect(
+            failed.draftAvailability,
+            IntentionDraftAvailability.editable,
+            reason: name,
+          );
+          expect(session.editor.draftTagSet.current.tagIds, [
+            _tagId(1),
+            _tagId(2),
+          ], reason: name);
+          expect(failed.failurePresentation, isNotNull, reason: name);
+          expect(session.repository.commands, hasLength(1), reason: name);
+          expect(session.repository.tagCommands, isEmpty, reason: name);
+        }
+      },
+    );
+
+    test('правка снимает отказ только по его типизированной причине и не отправляет черновик сама', () async {
+      final edits = <String, void Function(IntentionEditorViewModel)>{
+        'название': (editor) => editor.changeTitle('Исправленное название'),
+        'описание': (editor) => editor.changeDescription('Исправленное'),
+        'добавление нового тега': (editor) =>
+            editor.draftTagSet.add(_tag(3, 'Спорт')),
+        'повторное добавление включённого тега с новым названием': (editor) =>
+            editor.draftTagSet.add(_tag(1, 'Быт')),
+        'снятие доступного тега': (editor) => editor.removeTag(_tagId(2)),
+        'снятие отсутствующего тега': (editor) => editor.removeTag(_tagId(1)),
+        'избранное': (editor) => editor.unmarkFavorite(),
+        'готовность': (editor) => editor.disableReadiness(),
+      };
+      _Recovery expected(IntentionFailure failure, String edit) =>
+          switch (failure) {
+            IntentionTextInputValidationFailure(:final textFailure) => switch ((
+              textFailure.field,
+              edit,
+            )) {
+              (IntentionTextField.title, 'название') ||
+              (
+                IntentionTextField.description,
+                'описание',
+              ) => _Recovery.correctable,
+              _ => _Recovery.blocked,
+            },
+            IntentionGenericValidationFailure() =>
+              edit == 'название' || edit == 'описание'
+                  ? _Recovery.correctable
+                  : _Recovery.blocked,
+            IntentionCreationTagsMissingFailure() =>
+              edit == 'снятие отсутствующего тега'
+                  ? _Recovery.correctable
+                  : _Recovery.blocked,
+            IntentionUnavailableFailure() => _Recovery.retryable,
+            IntentionNotFoundFailure() ||
+            IntentionConflictFailure() ||
+            IntentionHasBlockingRelationsFailure() ||
+            IntentionCorruptionFailure() ||
+            IntentionUnexpectedFailure() => _Recovery.blocked,
+          };
+
+      for (final (name, failure) in _failureCases()) {
+        for (final MapEntry(key: edit, value: apply) in edits.entries) {
+          final reason = '$name × $edit';
+          final session = await _failedFullDraftSession(failure);
+          final failed = session.state;
+          final claim = failed.failurePresentation!;
+
+          apply(session.editor);
+          await _deliverEvents(session.container);
+
+          final edited = session.state;
+          switch (expected(failure, edit)) {
+            case _Recovery.correctable:
+              expect(
+                edited.operation,
+                isA<OperationIdle<Intention>>(),
+                reason: reason,
+              );
+              expect(edited.canSubmit, isTrue, reason: reason);
+              expect(edited.failurePresentation, isNull, reason: reason);
+            case _Recovery.retryable:
+              expect(edited.operation, same(failed.operation), reason: reason);
+              expect(edited.canRetry, isTrue, reason: reason);
+              expect(edited.canSubmit, isTrue, reason: reason);
+              expect(edited.failurePresentation, same(claim), reason: reason);
+            case _Recovery.blocked:
+              expect(edited.operation, same(failed.operation), reason: reason);
+              expect(edited.canRetry, isFalse, reason: reason);
+              expect(edited.canSubmit, isFalse, reason: reason);
+              expect(edited.failurePresentation, same(claim), reason: reason);
+          }
+          // Право предъявления остаётся у renderer: ViewModel его не
+          // подтверждает и не освобождает.
+          expect(
+            session.coordinator.claimInitiatorFailure(claim.token),
+            same(claim),
+            reason: reason,
+          );
+          expect(session.repository.commands, hasLength(1), reason: reason);
+          expect(session.repository.tagCommands, isEmpty, reason: reason);
+        }
+      }
+    });
+
+    test('отказ отсутствующих тегов сохраняет точные идентификаторы и разрешает новую проверку только после явного снятия каждого из них', () async {
+      final missing = IntentionCreationTagsMissingFailure([
+        _tagId(1),
+        _tagId(3),
+      ]);
+      final session = await _failedFullDraftSession(
+        missing,
+        tags: [_tag(1, 'Дом'), _tag(2, 'Выходные'), _tag(3, 'Спорт')],
+      );
+      final editor = session.editor;
+      final claim = session.state.failurePresentation;
+      expect(session.state.missingTagIds, {_tagId(1), _tagId(3)});
+
+      // Одноимённый новый тег не заменяет отсутствующий.
+      expect(
+        editor.draftTagSet.add(_tag(4, 'Дом')),
+        IntentionDraftTagAddition.added,
+      );
+      expect(
+        editor.draftTagSet.add(_tag(1, 'Быт')),
+        IntentionDraftTagAddition.alreadyIncluded,
+      );
+      editor
+        ..removeTag(_tagId(2))
+        ..changeTitle('Другое название')
+        ..unmarkFavorite();
+      await _deliverEvents(session.container);
+
+      expect(session.state.draft.tagIds, [_tagId(1), _tagId(3), _tagId(4)]);
+      expect(session.state.canSubmit, isFalse);
+      expect(session.state.missingTagIds, {_tagId(1), _tagId(3)});
+      expect(session.state.failurePresentation, same(claim));
+
+      editor.removeTag(_tagId(1));
+      await _deliverEvents(session.container);
+
+      expect(session.state.canSubmit, isFalse);
+      expect(session.state.missingTagIds, {_tagId(3)});
+      expect(
+        session.state.operation,
+        isA<OperationFailed<Intention>>().having(
+          (operation) => operation.failure,
+          'отказ',
+          isA<IntentionCreationTagsMissingFailure>()
+              .having((failure) => failure, 'тот же отказ', same(missing))
+              .having(
+                (failure) => failure.missingTagIds,
+                'точные отсутствующие теги',
+                {_tagId(1), _tagId(3)},
+              ),
+        ),
+      );
+      editor.submit();
+      expect(session.repository.commands, hasLength(1));
+
+      editor.removeTag(_tagId(3));
+      await _deliverEvents(session.container);
+
+      expect(session.state.operation, isA<OperationIdle<Intention>>());
+      expect(session.state.canSubmit, isTrue);
+      expect(session.state.missingTagIds, isEmpty);
+      expect(session.state.failurePresentation, isNull);
+      expect(session.repository.commands, hasLength(1));
+
+      editor.submit();
+
+      expect(session.repository.commands, hasLength(2));
+      expect(
+        session.repository.commands.last,
+        isA<CreateIntention>()
+            .having((command) => command.title, 'название', 'Другое название')
+            .having(
+              (command) => command.description,
+              'описание',
+              _rawDescription,
+            )
+            .having((command) => command.tagIds, 'теги', {_tagId(4)})
+            .having(
+              (command) => command.readiness,
+              'готовность',
+              IntentionReadiness.ready,
+            )
+            .having(
+              (command) => command.favoriteMark,
+              'избранное',
+              FavoriteMark.notFavorite,
+            ),
+      );
+      session.repository.completeCommand(1, _savedResult());
+      await _settle(session.container);
+    });
+
+    test('устранимая unavailable повторяется только явной отправкой с новым токеном и текущим черновиком', () async {
+      final session = await _failedFullDraftSession(
+        const IntentionUnavailableFailure(),
+      );
+      final tokens = <IntentionOperationToken>[];
+      final completionSubscription = session.coordinator.intentionCompletions
+          .listen((completion) => tokens.add(completion.token));
+      addTearDown(completionSubscription.cancel);
+      final firstToken = session.state.failurePresentation!.token;
+      final editor = session.editor..changeTitle('Повтор');
+      editor.draftTagSet.add(_tag(3, 'Спорт'));
+      await _deliverEvents(session.container);
+
+      expect(session.state.canRetry, isTrue);
+      expect(session.repository.commands, hasLength(1));
+
+      editor.submit();
+
+      expect(session.repository.commands, hasLength(2));
+      expect(
+        session.repository.commands.last,
+        isA<CreateIntention>()
+            .having((command) => command.title, 'название', 'Повтор')
+            .having((command) => command.tagIds, 'теги', {
+              _tagId(1),
+              _tagId(2),
+              _tagId(3),
+            }),
+      );
+      expect(session.state.operation, isA<OperationRunning<Intention>>());
+      expect(session.state.failurePresentation, isNull);
+
+      session.repository.completeCommand(
+        1,
+        const ResultFailure(IntentionConflictFailure()),
+      );
+      await _deliverEvents(session.container);
+
+      expect(tokens, hasLength(1));
+      expect(identical(tokens.single, firstToken), isFalse);
+      expect(session.state.failurePresentation!.token, same(tokens.single));
+      editor
+        ..changeTitle('После конфликта')
+        ..removeTag(_tagId(3))
+        ..submit();
+      await _deliverEvents(session.container);
+
+      expect(session.state.canSubmit, isFalse);
+      expect(
+        session.state.operation,
+        isA<OperationFailed<Intention>>().having(
+          (operation) => operation.failure,
+          'отказ',
+          isA<IntentionConflictFailure>(),
+        ),
+      );
+      expect(session.state.draft.title, 'После конфликта');
+      expect(session.repository.commands, hasLength(2));
+    });
+  });
+}
+
+enum _Recovery {
+  /// Правка устранила причину: возможна новая проверка всей команды.
+  correctable,
+
+  /// Причина устранима повтором: явная отправка остаётся доступной.
+  retryable,
+
+  /// Причина не устранена: отправка недоступна.
+  blocked,
+}
+
+const _rawTitle = '  Название  ';
+const _rawDescription = '  Описание буквально\n';
+
+List<(String, IntentionFailure)> _failureCases() => [
+  (
+    'ошибка названия',
+    const IntentionTextInputValidationFailure(
+      IntentionTextValidationFailure(
+        field: IntentionTextField.title,
+        reason: IntentionTextValidationReason.tooLong,
+      ),
+    ),
+  ),
+  (
+    'ошибка описания',
+    const IntentionTextInputValidationFailure(
+      IntentionTextValidationFailure(
+        field: IntentionTextField.description,
+        reason: IntentionTextValidationReason.tooLong,
+      ),
+    ),
+  ),
+  ('общая ошибка проверки', const IntentionGenericValidationFailure()),
+  ('отсутствующий тег', IntentionCreationTagsMissingFailure([_tagId(1)])),
+  ('недоступность', const IntentionUnavailableFailure()),
+  ('конфликт', const IntentionConflictFailure()),
+  (
+    'блокирующие связи',
+    IntentionHasBlockingRelationsFailure(testIntention().id),
+  ),
+  ('отсутствие намерения', const IntentionNotFoundFailure()),
+  ('повреждение данных', const IntentionCorruptionFailure()),
+  ('непредвиденная ошибка', const IntentionUnexpectedFailure()),
+];
+
+/// Сессия, отправка полного черновика которой отклонена [failure].
+final class _FailedSession {
+  const _FailedSession({
+    required this.container,
+    required this.repository,
+    required this.provider,
+  });
+
+  final ProviderContainer container;
+  final ControlledCatalogRepository repository;
+  final IntentionEditorViewModelProvider provider;
+
+  IntentionEditorState get state => container.read(provider);
+
+  IntentionEditorViewModel get editor => container.read(provider.notifier);
+
+  GraphCommandCoordinator get coordinator =>
+      container.read(graphCommandCoordinatorProvider.notifier);
+}
+
+Future<_FailedSession> _failedFullDraftSession(
+  IntentionFailure failure, {
+  List<Tag>? tags,
+}) async {
+  final repository = ControlledCatalogRepository();
+  final container = _container(repository);
+  final provider = intentionEditorViewModelProvider(IntentionCreationFormKey());
+  final subscription = container.listen(provider, (_, _) {});
+  addTearDown(subscription.close);
+  final editor = container.read(provider.notifier)
+    ..changeTitle(_rawTitle)
+    ..changeDescription(_rawDescription)
+    ..markFavorite()
+    ..confirmReadiness();
+  for (final tag in tags ?? [_tag(1, 'Дом'), _tag(2, 'Выходные')]) {
+    editor.draftTagSet.add(tag);
+  }
+  editor.submit();
+  repository.completeCommand(0, ResultFailure(failure));
+  await _deliverEvents(container);
+  return _FailedSession(
+    container: container,
+    repository: repository,
+    provider: provider,
+  );
 }
 
 ProviderContainer _container(ControlledCatalogRepository repository) {
