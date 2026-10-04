@@ -87,7 +87,7 @@
   - **Files likely touched:** `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `test/intention/presentation/operation/intention_command_coordinator_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/app/intention_app_lifecycle_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.8 Подтвердить долговечность и независимое от экрана завершение полного создания
+- [x] 1.8 Подтвердить долговечность и независимое от экрана завершение полного создания
   - **Acceptance criteria:**
     - Проверки файловой базы, диагностики и времени жизни команды подтверждают один и тот же контракт полного создания. Результат сохраняется после закрытия инициатора, а отказ не оставляет частей записи или потерянного сообщения.
     - Целевые регрессии диагностики, координатора и представления проходят; существующие обработчики команд остаются исчерпывающими, анализ проходит.
