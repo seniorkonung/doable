@@ -1964,6 +1964,48 @@ abstract class AppLocalizations {
   /// **'Assigning tag…'**
   String get tagCatalogAssigning;
 
+  /// Тег уже входит в набор черновика создаваемого намерения; назначение ещё не сохранено
+  ///
+  /// In en, this message translates to:
+  /// **'In draft'**
+  String get tagCatalogInDraft;
+
+  /// Тег можно явно добавить в набор черновика создаваемого намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Available to add'**
+  String get tagCatalogAvailableForDraft;
+
+  /// Видимая подпись явного добавления выбранного тега в черновик
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get tagCatalogAddToDraft;
+
+  /// Доступная подпись добавления в черновик, пока тег не выбран
+  ///
+  /// In en, this message translates to:
+  /// **'Add tag to draft'**
+  String get tagCatalogAddToDraftSemantic;
+
+  /// Доступная подпись добавления выбранного тега в черновик без сохранения назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Add tag {tagName} to draft'**
+  String tagCatalogAddToDraftNamed(String tagName);
+
+  /// Добавление в черновик недоступно, пока выполняется принятая отправка
+  ///
+  /// In en, this message translates to:
+  /// **'The intention is being saved, so tags can’t be added now.'**
+  String get tagCatalogDraftSubmitting;
+
+  /// Добавление недоступно: сессия черновика завершена
+  ///
+  /// In en, this message translates to:
+  /// **'This draft is closed, so tags can’t be added.'**
+  String get tagCatalogDraftClosed;
+
   /// Начальная загрузка каталога тегов
   ///
   /// In en, this message translates to:

@@ -12,6 +12,8 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -27,6 +29,7 @@ import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
+import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1706,6 +1709,263 @@ void main() {
       expect(navigations, 0);
     },
   );
+  testWidgets(
+    'выбор для черновика явно добавляет несколько тегов в одном открытии без записи назначений',
+    (tester) async {
+      final repository = _CatalogRepository();
+      addTearDown(repository.dispose);
+      final draft = _DraftChooser(repository);
+      addTearDown(draft.dispose);
+      await draft.open(tester);
+      repository.complete(
+        _page([_tag(1, 'Дом'), _tag(2, 'Работа'), _tag(3, 'Спорт')]),
+      );
+      await tester.pumpAndSettle();
+      final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
+
+      expect(find.text('Available to add'), findsNWidgets(3));
+      expect(find.text('In draft'), findsNothing);
+      expect(find.text('Available to assign'), findsNothing);
+      expect(find.text('Add'), findsOneWidget);
+      expect(find.bySemanticsLabel('Add tag to draft'), findsOneWidget);
+      expect(tester.widget<FilledButton>(add).onPressed, isNull);
+
+      await tester.tap(find.text('Дом'));
+      await tester.pump();
+
+      expect(draft.tagSet.current.tagIds, isEmpty);
+      expect(find.text('In draft'), findsNothing);
+      expect(find.bySemanticsLabel('Add tag Дом to draft'), findsOneWidget);
+      expect(tester.widget<FilledButton>(add).onPressed, isNotNull);
+
+      await tester.tap(add);
+      await tester.pump();
+
+      expect(draft.tagSet.current.tagIds, [_tag(1, 'Дом').id]);
+      expect(_rowStatus(_tag(1, 'Дом'), 'In draft'), findsOneWidget);
+      expect(_rowStatus(_tag(2, 'Работа'), 'Available to add'), findsOneWidget);
+      expect(tester.widget<FilledButton>(add).onPressed, isNull);
+      expect(draft.chooserIsCurrent(tester), isTrue);
+
+      await tester.tap(add, warnIfMissed: false);
+      await tester.pump();
+      expect(draft.tagSet.current.tagIds, [_tag(1, 'Дом').id]);
+
+      await tester.tap(find.text('Работа'));
+      await tester.pump();
+      expect(draft.tagSet.current.tagIds, [_tag(1, 'Дом').id]);
+      await tester.tap(add);
+      await tester.tap(add);
+      await tester.pump();
+
+      expect(draft.tagSet.current.tagIds, [
+        _tag(1, 'Дом').id,
+        _tag(2, 'Работа').id,
+      ]);
+      expect(_rowStatus(_tag(2, 'Работа'), 'In draft'), findsOneWidget);
+      expect(_rowStatus(_tag(3, 'Спорт'), 'Available to add'), findsOneWidget);
+      expect(tester.widget<FilledButton>(add).onPressed, isNull);
+
+      await tester.tap(find.text('Спорт'));
+      await tester.pump();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+
+      expect(draft.tagSet.current.tagIds, [
+        _tag(1, 'Дом').id,
+        _tag(2, 'Работа').id,
+        _tag(3, 'Спорт').id,
+      ]);
+      expect(find.text('In draft'), findsNWidgets(3));
+      expect(draft.chooserIsCurrent(tester), isTrue);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(repository.queries, [const TagCatalogBrowseMode()]);
+      expect(repository.statusReads, isEmpty);
+      expect(repository._commands, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'выбор для черновика не добавляет неподтверждённого или удалённого кандидата и сохраняет уже включённый тег',
+    (tester) async {
+      final repository = _CatalogRepository();
+      addTearDown(repository.dispose);
+      final draft = _DraftChooser(
+        repository,
+        onOpenEditor: (_) async => _tag(52, 'Из редактора'),
+      );
+      addTearDown(draft.dispose);
+      await draft.open(tester);
+      repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
+      await tester.pumpAndSettle();
+      final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
+
+      await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+      await tester.pump();
+
+      expect(tester.widget<FilledButton>(add).onPressed, isNull);
+      await tester.tap(add, warnIfMissed: false);
+      await tester.pump();
+      expect(draft.tagSet.current.tagIds, isEmpty);
+
+      await tester.tap(find.text('Дом'));
+      await tester.pump();
+      await tester.tap(add);
+      await tester.pump();
+      expect(draft.tagSet.current.tagIds, [_tag(1, 'Дом').id]);
+
+      repository.tagRead(null, revision: 2);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Дом'), findsNothing);
+      expect(tester.widget<FilledButton>(add).onPressed, isNull);
+      await tester.tap(add, warnIfMissed: false);
+      await tester.pump();
+      expect(draft.tagSet.current.tagIds, [_tag(1, 'Дом').id]);
+      expect(draft.state.selectedTags[_tag(1, 'Дом').id], isNotNull);
+      expect(repository.statusReads, isEmpty);
+      expect(repository._commands, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  for (final (closed, reason, notice) in [
+    (
+      false,
+      'выполняющаяся отправка',
+      'The intention is being saved, so tags can’t be added now.',
+    ),
+    (true, 'закрытая сессия', 'This draft is closed, so tags can’t be added.'),
+  ]) {
+    testWidgets(
+      '$reason не разрешает добавление в черновик и объясняет причину',
+      (tester) async {
+        final repository = _CatalogRepository();
+        addTearDown(repository.dispose);
+        final draft = _DraftChooser(repository);
+        addTearDown(draft.dispose);
+        await draft.open(tester);
+        repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
+        await tester.pumpAndSettle();
+        final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
+        await tester.tap(find.text('Дом'));
+        await tester.pump();
+        await tester.tap(add);
+        await tester.pump();
+        await tester.tap(find.text('Работа'));
+        await tester.pump();
+        expect(tester.widget<FilledButton>(add).onPressed, isNotNull);
+        expect(
+          find.byKey(const ValueKey('tag-catalog-draft-unavailable')),
+          findsNothing,
+        );
+
+        if (closed) {
+          draft.closeSession();
+        } else {
+          draft.editor
+            ..changeTitle('Намерение')
+            ..submit();
+        }
+        await tester.pump();
+        await tester.pump();
+
+        final unavailable = find.byKey(
+          const ValueKey('tag-catalog-draft-unavailable'),
+        );
+        expect(unavailable, findsOneWidget);
+        expect(
+          find.descendant(of: unavailable, matching: find.text(notice)),
+          findsOneWidget,
+        );
+        expect(tester.widget<FilledButton>(add).onPressed, isNull);
+        await tester.tap(add, warnIfMissed: false);
+        await tester.pump();
+        expect(draft.tagSet.current.tagIds, [_tag(1, 'Дом').id]);
+        expect(_rowStatus(_tag(1, 'Дом'), 'In draft'), findsOneWidget);
+        expect(
+          _rowStatus(_tag(2, 'Работа'), 'Available to add'),
+          findsOneWidget,
+        );
+        expect(repository.statusReads, isEmpty);
+        expect(repository._commands, hasLength(closed ? 0 : 1));
+        expect(repository.queries, [const TagCatalogBrowseMode()]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+}
+
+Finder _rowStatus(Tag tag, String status) => find.descendant(
+  of: find.byKey(ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}')),
+  matching: find.text(status),
+);
+
+/// Общий выбор в контексте живой сессии черновика, открытый поверх
+/// исходной страницы, чтобы проверять отсутствие автоматического закрытия.
+final class _DraftChooser {
+  _DraftChooser(
+    _CatalogRepository repository, {
+    Future<Tag?> Function(TagEditorContext)? onOpenEditor,
+  }) : _onOpenEditor = onOpenEditor ?? ((_) async => null),
+       container = ProviderContainer(
+         overrides: [
+           personalGraphRepositoryProvider.overrideWithValue(repository),
+         ],
+       ) {
+    _session = container.listen(session, (_, _) {});
+    tagSet = editor.draftTagSet;
+  }
+
+  final ProviderContainer container;
+  final Future<Tag?> Function(TagEditorContext) _onOpenEditor;
+  final session = intentionEditorViewModelProvider(IntentionCreationFormKey());
+  final _navigator = GlobalKey<NavigatorState>();
+  late final ProviderSubscription<IntentionEditorState> _session;
+  late final IntentionDraftTagSet tagSet;
+
+  IntentionEditorViewModel get editor => container.read(session.notifier);
+  IntentionEditorState get state => container.read(session);
+
+  Future<void> open(WidgetTester tester) async {
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          navigatorKey: _navigator,
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const SizedBox.shrink(),
+        ),
+      ),
+    );
+    unawaited(
+      _navigator.currentState!.push<void>(
+        MaterialPageRoute(
+          builder: (_) => TagCatalogView(
+            selectionContext: TagDraftContext(tagSet),
+            onOpenEditor: _onOpenEditor,
+            onOpenNavigation: (_) {},
+          ),
+        ),
+      ),
+    );
+    // Индикатор загрузки каталога анимируется, поэтому переход завершается
+    // явным ожиданием вместо pumpAndSettle.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+  }
+
+  bool chooserIsCurrent(WidgetTester tester) =>
+      ModalRoute.of(tester.element(find.byType(TagCatalogView)))!.isCurrent;
+
+  void closeSession() => _session.close();
+
+  void dispose() {
+    _session.close();
+    container.dispose();
+  }
 }
 
 Future<void> _waitForEditorToClose(WidgetTester tester) async {

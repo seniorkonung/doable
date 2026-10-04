@@ -7,6 +7,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/presentation/editor/intention_draft_tag_set.dart';
 import '../../application/tag_catalog.dart';
 import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
@@ -60,11 +61,13 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
   TagOperationToken? _activeAssignToken;
   TagCommandFailure? _assignFailure;
   StreamSubscription<GraphCommandCompletion>? _busyDeleteSubscription;
+  StreamSubscription<IntentionDraftTagSetSnapshot>? _draftSetChanges;
 
   @override
   void initState() {
     super.initState();
     _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+    _observeDraftSet();
   }
 
   @override
@@ -86,6 +89,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     _filter = TagCatalogFilter.empty;
     _searchIsInvalid = false;
     _scrollToStart();
+    _observeDraftSet();
   }
 
   @override
@@ -93,6 +97,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     _scrollController.dispose();
     _searchController.dispose();
     unawaited(_busyDeleteSubscription?.cancel());
+    unawaited(_draftSetChanges?.cancel());
     _releasePresentation();
     super.dispose();
   }
@@ -121,6 +126,19 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
       TagDraftContext() => _draftOpening,
     },
   );
+
+  /// Признаки строк и доступность добавления читают текущий набор сессии;
+  /// изменения набора и его доступности перестраивают выбор без смены
+  /// открытия, поиска и прокрутки.
+  void _observeDraftSet() {
+    unawaited(_draftSetChanges?.cancel());
+    _draftSetChanges = switch (widget.selectionContext) {
+      TagDraftContext(:final tagSet) => tagSet.changes.listen((_) {
+        if (mounted) setState(() {});
+      }),
+      TagBrowseContext() || TagAssignmentContext() => null,
+    };
+  }
 
   bool get _browsing => switch (widget.selectionContext) {
     TagBrowseContext() => true,
@@ -176,6 +194,13 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
       case null:
         break;
     }
+  }
+
+  /// Меняет только набор черновика: команд графа, назначений, сообщений и
+  /// чтений каталога добавление не порождает. Набор сессии обновляется
+  /// синхронно, поэтому признаки строк перестраиваются в том же кадре.
+  void _addToDraft(TagDraftAdditionAction action) {
+    if (action.perform() != null) setState(() {});
   }
 
   void _selectTag(TagId id) {
@@ -351,17 +376,24 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
         ],
       ),
       bottomNavigationBar: switch ((widget.selectionContext, state)) {
-        (TagAssignmentContext(), TagCatalogLoaded loaded) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: _AssignAction(
+        (TagAssignmentContext(), TagCatalogLoaded loaded) => _aboveKeyboard(
+          _AssignAction(
             state: loaded,
             filter: _filter,
             action: TagAssignmentAction(model),
             onAssign: _assignSelected,
           ),
         ),
+        (TagDraftContext(:final tagSet), TagCatalogLoaded loaded) =>
+          _aboveKeyboard(
+            _DraftAddAction(
+              state: loaded,
+              filter: _filter,
+              draftSet: tagSet.current,
+              action: TagDraftAdditionAction(model, tagSet),
+              onAdd: _addToDraft,
+            ),
+          ),
         _ => null,
       },
       body: SizedBox.expand(
@@ -506,6 +538,11 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
       ),
     );
   }
+
+  Widget _aboveKeyboard(Widget action) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: action,
+  );
 }
 
 final class _LoadedCatalog extends StatelessWidget {
@@ -541,6 +578,24 @@ final class _LoadedCatalog extends StatelessWidget {
       TagAssignmentContext() => (true, true),
       TagDraftContext() => (true, false),
     };
+    final draftTagIds = switch (selectionContext) {
+      TagDraftContext(:final tagSet) => tagSet.current.tagIds,
+      TagBrowseContext() || TagAssignmentContext() => const <TagId>{},
+    };
+    // Признак строки передаётся текстом, а не только цветом: назначение
+    // существующему намерению или включение в набор черновика.
+    String? rowStatus(({Tag tag, bool isAssigned}) row) =>
+        switch (selectionContext) {
+          TagBrowseContext() => null,
+          TagAssignmentContext() =>
+            row.isAssigned
+                ? localizations.tagCatalogAssigned
+                : localizations.tagCatalogAvailable,
+          TagDraftContext() =>
+            draftTagIds.contains(row.tag.id)
+                ? localizations.tagCatalogInDraft
+                : localizations.tagCatalogAvailableForDraft,
+        };
     if (state.isEmpty &&
         filter.isEmpty &&
         state.canUseCurrentItems &&
@@ -666,20 +721,14 @@ final class _LoadedCatalog extends StatelessWidget {
               final row = rows[index - (selectedOutsideSnapshot ? 1 : 0)];
               final tag = row.tag;
               final selectedId = selection.id;
-              final assigned = showsAssignment && row.isAssigned;
+              final status = rowStatus(row);
               return Semantics(
                 key: ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}'),
                 container: true,
                 selected: tag.id == selectedId,
                 child: ListTile(
                   title: Text(tag.name.value),
-                  subtitle: showsAssignment
-                      ? Text(
-                          assigned
-                              ? localizations.tagCatalogAssigned
-                              : localizations.tagCatalogAvailable,
-                        )
-                      : null,
+                  subtitle: status == null ? null : Text(status),
                   onTap:
                       choosing &&
                           state.canUseCurrentItems &&
@@ -724,14 +773,7 @@ final class _AssignAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final selected = switch (state.selection) {
-      TagCatalogSelectionReady(:final tag) => tag,
-      _ => null,
-    };
-    final hiddenSelected =
-        selected != null &&
-        (!filter.matches(selected.name) ||
-            !state.items.any((tag) => tag.id == selected.id));
+    final selected = _readySelection(state);
     final assignmentLabel = switch (state.selectedAssignment) {
       TagCatalogSelectedAssignment.available =>
         localizations.tagCatalogAvailable,
@@ -742,6 +784,114 @@ final class _AssignAction extends StatelessWidget {
       TagCatalogSelectedAssignment.unexpected =>
         localizations.tagCatalogAssignmentUnknown,
     };
+    return _SelectionActionArea(
+      hiddenSelection: switch (_hiddenSelection(state, filter)) {
+        final hidden? => (name: hidden.name.value, status: assignmentLabel),
+        null => null,
+      },
+      action: FilledButton(
+        key: const ValueKey('tag-catalog-assign'),
+        onPressed: action.canPerform ? () => onAssign(action) : null,
+        child: Text(
+          localizations.tagCatalogAssign,
+          semanticsLabel: selected == null
+              ? localizations.tagCatalogAssign
+              : localizations.tagCatalogAssignNamed(selected.name.value),
+        ),
+      ),
+    );
+  }
+}
+
+/// Явное добавление кандидата в набор черновика. Подпись и семантика
+/// говорят о черновике, а не о сохранённом назначении; уже включённый тег,
+/// неподтверждённый кандидат, отправка и закрытая сессия действие отключают.
+final class _DraftAddAction extends StatelessWidget {
+  const _DraftAddAction({
+    required this.state,
+    required this.filter,
+    required this.draftSet,
+    required this.action,
+    required this.onAdd,
+  });
+
+  final TagCatalogLoaded state;
+  final TagCatalogFilter filter;
+  final IntentionDraftTagSetSnapshot draftSet;
+  final TagDraftAdditionAction action;
+  final ValueChanged<TagDraftAdditionAction> onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final selected = _readySelection(state);
+    return _SelectionActionArea(
+      hiddenSelection: switch (_hiddenSelection(state, filter)) {
+        final hidden? => (
+          name: hidden.name.value,
+          status: draftSet.tagIds.contains(hidden.id)
+              ? localizations.tagCatalogInDraft
+              : localizations.tagCatalogAvailableForDraft,
+        ),
+        null => null,
+      },
+      unavailableReason: switch (draftSet.availability) {
+        IntentionDraftAvailability.editable => null,
+        IntentionDraftAvailability.submitting =>
+          localizations.tagCatalogDraftSubmitting,
+        IntentionDraftAvailability.closed =>
+          localizations.tagCatalogDraftClosed,
+      },
+      action: FilledButton(
+        key: const ValueKey('tag-catalog-add-to-draft'),
+        onPressed: action.canPerform ? () => onAdd(action) : null,
+        child: Text(
+          localizations.tagCatalogAddToDraft,
+          semanticsLabel: selected == null
+              ? localizations.tagCatalogAddToDraftSemantic
+              : localizations.tagCatalogAddToDraftNamed(selected.name.value),
+        ),
+      ),
+    );
+  }
+}
+
+Tag? _readySelection(TagCatalogLoaded state) => switch (state.selection) {
+  TagCatalogSelectionReady(:final tag) => tag,
+  _ => null,
+};
+
+/// Выбранный тег, которого не видно в списке: его скрывает поиск или он ещё
+/// не вошёл в отображаемый снимок.
+Tag? _hiddenSelection(TagCatalogLoaded state, TagCatalogFilter filter) {
+  final selected = _readySelection(state);
+  return selected != null &&
+          (!filter.matches(selected.name) ||
+              !state.items.any((tag) => tag.id == selected.id))
+      ? selected
+      : null;
+}
+
+/// Закреплённая область явного действия общего выбора.
+final class _SelectionActionArea extends StatelessWidget {
+  const _SelectionActionArea({
+    required this.hiddenSelection,
+    required this.action,
+    this.unavailableReason,
+  });
+
+  /// Название и признак выбранного тега, которого не видно в списке.
+  final ({String name, String status})? hiddenSelection;
+
+  /// Причина недоступности действия, не зависящая от выбранного тега.
+  final String? unavailableReason;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final hiddenSelection = this.hiddenSelection;
+    final unavailableReason = this.unavailableReason;
     return SafeArea(
       top: false,
       child: Padding(
@@ -755,43 +905,49 @@ final class _AssignAction extends StatelessWidget {
                 // Постоянная высота сохраняет границы списка при смене выбора.
                 // Длинное название и увеличенный текст доступны через прокрутку.
                 height: 96.0.clamp(0, MediaQuery.sizeOf(context).height / 3),
-                child: hiddenSelected
-                    ? SingleChildScrollView(
-                        child: Semantics(
-                          key: const ValueKey('tag-catalog-hidden-selection'),
-                          container: true,
-                          selected: true,
-                          liveRegion: true,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(localizations.tagCatalogSelected),
-                              Text(
-                                selected.name.value,
-                                textAlign: TextAlign.center,
+                child: hiddenSelection == null && unavailableReason == null
+                    ? null
+                    : SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (unavailableReason != null)
+                              Semantics(
+                                key: const ValueKey(
+                                  'tag-catalog-draft-unavailable',
+                                ),
+                                container: true,
+                                liveRegion: true,
+                                child: Text(
+                                  unavailableReason,
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
-                              Text(
-                                assignmentLabel,
-                                textAlign: TextAlign.center,
+                            if (hiddenSelection case (
+                              :final name,
+                              :final status,
+                            ))
+                              Semantics(
+                                key: const ValueKey(
+                                  'tag-catalog-hidden-selection',
+                                ),
+                                container: true,
+                                selected: true,
+                                liveRegion: true,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(localizations.tagCatalogSelected),
+                                    Text(name, textAlign: TextAlign.center),
+                                    Text(status, textAlign: TextAlign.center),
+                                  ],
+                                ),
                               ),
-                            ],
-                          ),
+                          ],
                         ),
-                      )
-                    : null,
+                      ),
               ),
-              FilledButton(
-                key: const ValueKey('tag-catalog-assign'),
-                onPressed: action.canPerform ? () => onAssign(action) : null,
-                child: Text(
-                  localizations.tagCatalogAssign,
-                  semanticsLabel: selected == null
-                      ? localizations.tagCatalogAssign
-                      : localizations.tagCatalogAssignNamed(
-                          selected.name.value,
-                        ),
-                ),
-              ),
+              action,
             ],
           ),
         ),

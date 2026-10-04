@@ -1129,6 +1129,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCatalogAssigning => 'Assigning tag…';
 
   @override
+  String get tagCatalogInDraft => 'In draft';
+
+  @override
+  String get tagCatalogAvailableForDraft => 'Available to add';
+
+  @override
+  String get tagCatalogAddToDraft => 'Add';
+
+  @override
+  String get tagCatalogAddToDraftSemantic => 'Add tag to draft';
+
+  @override
+  String tagCatalogAddToDraftNamed(String tagName) {
+    return 'Add tag $tagName to draft';
+  }
+
+  @override
+  String get tagCatalogDraftSubmitting =>
+      'The intention is being saved, so tags can’t be added now.';
+
+  @override
+  String get tagCatalogDraftClosed =>
+      'This draft is closed, so tags can’t be added.';
+
+  @override
   String get tagCatalogLoading => 'Loading tags…';
 
   @override

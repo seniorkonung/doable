@@ -1130,6 +1130,31 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagCatalogAssigning => 'Назначаем тег…';
 
   @override
+  String get tagCatalogInDraft => 'В черновике';
+
+  @override
+  String get tagCatalogAvailableForDraft => 'Можно добавить';
+
+  @override
+  String get tagCatalogAddToDraft => 'Добавить';
+
+  @override
+  String get tagCatalogAddToDraftSemantic => 'Добавить тег в черновик';
+
+  @override
+  String tagCatalogAddToDraftNamed(String tagName) {
+    return 'Добавить тег «$tagName» в черновик';
+  }
+
+  @override
+  String get tagCatalogDraftSubmitting =>
+      'Намерение сохраняется, поэтому добавить теги сейчас нельзя.';
+
+  @override
+  String get tagCatalogDraftClosed =>
+      'Черновик закрыт, поэтому добавить теги нельзя.';
+
+  @override
   String get tagCatalogLoading => 'Загружаем теги…';
 
   @override
