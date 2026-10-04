@@ -8,12 +8,27 @@ part of 'intention_editor_view_model.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Экранная сессия создания намерения по собственному ключу формы.
+///
+/// До отправки владеет черновиком: правки текста, набора тегов и обеих
+/// отметок меняют только его и не отправляют команд графа. Сессия закрыта
+/// после успешного создания или освобождения и отвергает правки черновика.
 
 @ProviderFor(IntentionEditorViewModel)
 final intentionEditorViewModelProvider = IntentionEditorViewModelFamily._();
 
+/// Экранная сессия создания намерения по собственному ключу формы.
+///
+/// До отправки владеет черновиком: правки текста, набора тегов и обеих
+/// отметок меняют только его и не отправляют команд графа. Сессия закрыта
+/// после успешного создания или освобождения и отвергает правки черновика.
 final class IntentionEditorViewModelProvider
     extends $NotifierProvider<IntentionEditorViewModel, IntentionEditorState> {
+  /// Экранная сессия создания намерения по собственному ключу формы.
+  ///
+  /// До отправки владеет черновиком: правки текста, набора тегов и обеих
+  /// отметок меняют только его и не отправляют команд графа. Сессия закрыта
+  /// после успешного создания или освобождения и отвергает правки черновика.
   IntentionEditorViewModelProvider._({
     required IntentionEditorViewModelFamily super.from,
     required IntentionCreationFormKey super.argument,
@@ -60,7 +75,13 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'0397213b893b5e37f44f295f5e494534dd0603ea';
+    r'157d0be909257b52bed202de180342909ec79ada';
+
+/// Экранная сессия создания намерения по собственному ключу формы.
+///
+/// До отправки владеет черновиком: правки текста, набора тегов и обеих
+/// отметок меняют только его и не отправляют команд графа. Сессия закрыта
+/// после успешного создания или освобождения и отвергает правки черновика.
 
 final class IntentionEditorViewModelFamily extends $Family
     with
@@ -80,12 +101,24 @@ final class IntentionEditorViewModelFamily extends $Family
         isAutoDispose: true,
       );
 
+  /// Экранная сессия создания намерения по собственному ключу формы.
+  ///
+  /// До отправки владеет черновиком: правки текста, набора тегов и обеих
+  /// отметок меняют только его и не отправляют команд графа. Сессия закрыта
+  /// после успешного создания или освобождения и отвергает правки черновика.
+
   IntentionEditorViewModelProvider call(IntentionCreationFormKey formKey) =>
       IntentionEditorViewModelProvider._(argument: formKey, from: this);
 
   @override
   String toString() => r'intentionEditorViewModelProvider';
 }
+
+/// Экранная сессия создания намерения по собственному ключу формы.
+///
+/// До отправки владеет черновиком: правки текста, набора тегов и обеих
+/// отметок меняют только его и не отправляют команд графа. Сессия закрыта
+/// после успешного создания или освобождения и отвергает правки черновика.
 
 abstract class _$IntentionEditorViewModel
     extends $Notifier<IntentionEditorState> {
