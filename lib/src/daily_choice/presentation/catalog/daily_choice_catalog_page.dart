@@ -27,8 +27,18 @@ final class DailyChoiceCatalogPage extends ConsumerStatefulWidget {
 
 final class _DailyChoiceCatalogPageState
     extends ConsumerState<DailyChoiceCatalogPage> {
-  final _dateController = TextEditingController();
+  /// Поле показывает применённый день каталога; отклонённый ввод его не
+  /// меняет.
+  late final TextEditingController _dateController;
   String? _dateError;
+
+  @override
+  void initState() {
+    super.initState();
+    _dateController = TextEditingController(
+      text: _selectedDate().toCanonicalString(),
+    );
+  }
 
   @override
   void dispose() {
@@ -112,9 +122,10 @@ final class _DailyChoiceCatalogPageState
                     TextButton(
                       key: const ValueKey('daily-choice-clear-filters'),
                       onPressed: () {
-                        _dateController.clear();
-                        setState(() => _dateError = null);
                         model.clearFilters();
+                        _dateController.text = _selectedDate()
+                            .toCanonicalString();
+                        setState(() => _dateError = null);
                       },
                       child: Text(l10n.dailyChoiceCatalogClearFilters),
                     ),
@@ -141,15 +152,13 @@ final class _DailyChoiceCatalogPageState
     );
   }
 
+  CalendarDate _selectedDate() =>
+      ref.read(dailyChoiceCatalogViewModelProvider).selection.date;
+
+  /// Пустой или некорректный ввод отклоняется: день каталога обязателен.
   void _applyDate(DailyChoiceCatalogViewModel model, AppLocalizations l10n) {
-    final input = _dateController.text.trim();
-    if (input.isEmpty) {
-      setState(() => _dateError = null);
-      model.selectDate(null);
-      return;
-    }
     try {
-      final date = CalendarDate.parseCanonical(input);
+      final date = CalendarDate.parseCanonical(_dateController.text.trim());
       setState(() => _dateError = null);
       model.selectDate(date);
     } on CalendarDateValidationException {

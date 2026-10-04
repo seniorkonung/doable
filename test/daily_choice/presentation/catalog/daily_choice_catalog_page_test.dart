@@ -86,11 +86,18 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('фильтры, подгрузка и сброс возвращают полный охват', (
+  testWidgets('фильтры, подгрузка и сброс сохраняют выбранный день', (
     tester,
   ) async {
     final repository = _Repository();
     await _open(tester, repository);
+    final dateField = find.byKey(const ValueKey('daily-choice-date-filter'));
+    expect(repository.queries.single.date, _today);
+    expect(repository.queries.single.isCompleted, isNull);
+    expect(
+      find.descendant(of: dateField, matching: find.text('2026-09-24')),
+      findsOneWidget,
+    );
     repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
     await tester.pumpAndSettle();
     expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
@@ -102,10 +109,7 @@ void main() {
     expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
 
     final selectedDay = CalendarDate.fromParts(2026, 9, 25);
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-date-filter')),
-      '2026-09-25',
-    );
+    await tester.enterText(dateField, '2026-09-25');
     await tester.tap(find.byKey(const ValueKey('daily-choice-apply-date')));
     await tester.pump();
     expect(repository.queries[2].date, selectedDay);
@@ -117,31 +121,46 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Выполненные').last);
     await tester.pump();
+    expect(repository.queries[3].date, selectedDay);
     expect(repository.queries[3].isCompleted, true);
     repository.completeFirst([], index: 3, total: 0);
     await tester.pumpAndSettle();
     expect(find.text('Дневных выборов по фильтрам нет.'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('daily-choice-clear-filters')));
     await tester.pump();
-    expect(repository.queries[4].date, isNull);
+    expect(repository.queries[4].date, selectedDay);
     expect(repository.queries[4].isCompleted, isNull);
-    repository.completeFirst(
-      [_item(1), _item(2, date: selectedDay)],
-      index: 4,
-      total: 2,
+    expect(
+      find.descendant(of: dateField, matching: find.text('2026-09-25')),
+      findsOneWidget,
     );
+    repository.completeFirst([_item(2, date: selectedDay)], index: 4, total: 1);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
     expect(find.text('Все состояния'), findsOneWidget);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-date-filter')),
-      '2026-02-30',
-    );
-    await tester.tap(find.byKey(const ValueKey('daily-choice-apply-date')));
+    for (final input in ['2026-02-30', '']) {
+      await tester.enterText(dateField, input);
+      await tester.tap(find.byKey(const ValueKey('daily-choice-apply-date')));
+      await tester.pump();
+      expect(
+        find.text('Введите корректную дату в формате ГГГГ-ММ-ДД.'),
+        findsOneWidget,
+        reason: '«$input»',
+      );
+      expect(repository.queries, hasLength(5), reason: '«$input»');
+    }
+
+    // Сброс при полном охвате ничего не читает и возвращает в поле
+    // применённый день вместо отклонённого ввода.
+    await tester.tap(find.byKey(const ValueKey('daily-choice-clear-filters')));
     await tester.pump();
     expect(
       find.text('Введите корректную дату в формате ГГГГ-ММ-ДД.'),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: dateField, matching: find.text('2026-09-25')),
       findsOneWidget,
     );
     expect(repository.queries, hasLength(5));
