@@ -40,7 +40,7 @@
   - **Files likely touched:** `test/intention/data/drift_intention_repository_fault_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/graph/data/favorite_order_concurrency_test.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.4 Подтвердить готовность атомарной границы создания перед подключением потребителей результата
+- [x] 1.4 Подтвердить готовность атомарной границы создания перед подключением потребителей результата
   - **Acceptance criteria:**
     - Контракт 1.1 подтверждён реальным адаптером: полный успех, типизированные отказы, откат, окончательный пакет и единая ревизия проверены без подмены постоянного хранилища.
     - Существующие минимальное создание, самостоятельная отметка избранного и назначение тегов проходят регрессионные проверки; изменения собираются и проходят анализ.
