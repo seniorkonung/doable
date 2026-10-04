@@ -196,3 +196,177 @@
   - **Dependencies:** 1.14.
   - **Files likely touched:** `test/app/full_intention_creation_checkpoint_test.dart`, `docs/verification/compact-intention-creation-phase-one-readiness.md`.
   - **Estimated scope:** S.
+
+Пакет второй фазы следует решениям 1, 4, 5 и 8–9 [дизайна](design.md), требованиям [создания и сессии намерения](specs/intention-management/spec.md), [общего выбора тегов](specs/tag-management/spec.md) и [начального избранного](specs/favorite-intention-management/spec.md), а также [ADR-0017](../../../docs/adr/0017-manage-modal-creation-sessions-in-root-stack.md) и [ADR-0018](../../../docs/adr/0018-separate-tag-selection-context-from-persistence.md). Он использует подтверждённую границу сохранения фазы 1. Геометрия нижней панели и подключение решения сессии к её жестам и навигации остаются в фазе 3 по [плану](plan.md) и [спецификации навигации](specs/app-navigation/spec.md).
+
+Пути задач — оценка по изученным модулям; новые файлы явно отмечены или ограничены существующим модулем ответственности. Производные Riverpod-файлы, маршруты и локализации обновляются вместе со своими источниками. Проверки потребителей на управляемых зависимостях дополняются реальной сборкой в 2.11 и постоянным хранилищем в 2.13. Задачи выполняются в порядке файла; зависимости обозначают обязательные предпосылки, а не возможность пропустить предыдущие задачи.
+
+## Phase 2: Черновик подготавливает полное намерение через общий выбор тегов
+
+- [ ] 2.1 Сделать полный черновик создания самостоятельным состоянием сессии и предоставить узкий контракт его набора тегов
+  - **Acceptance criteria:**
+    - Сессия по собственному `IntentionCreationFormKey` хранит сырые название и описание, неизменяемый набор `TagId`, `IntentionReadiness` и `FavoriteMark`; начальные значения пусты или выключены. Новый экземпляр не наследует прежний черновик или фильтры каталога и не имеет `IntentionId`.
+    - Изменённость определяется сравнением всех пяти полей с начальными значениями, включая полностью пробельные строки; возврат к исходным значениям снимает её. Поиск, кандидат, фокус и будущий размер панели не входят в предметные данные.
+    - Контракт для общего выбора предоставляет наблюдаемый набор и явное локальное добавление подтверждённого тега с последним известным названием; снятие и обе отметки изменяют только черновик. Повторное добавление идемпотентно, готовность не выводится из других полей и включается только по явному подтверждению критериев действия. Закрытая сессия отвергает изменения; постоянные команды и детали хранилища не входят в этот контракт.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor/intention_editor_view_model_test.dart --reporter expanded`
+    - Проверить каждое поле отдельно, пробельный ввод, возврат к начальному состоянию, два независимых открытия и неизменяемость опубликованного набора; ни одно локальное действие не отправляет команду графа.
+  - **Dependencies:** 1.15.
+  - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_state.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`; узкий контракт набора — рядом с состоянием сессии в том же модуле.
+  - **Estimated scope:** M.
+
+- [ ] 2.2 Отправлять неизменяемый снимок всего черновика одной командой и блокировать его изменение до результата
+  - **Acceptance criteria:**
+    - `submit` передаёт координатору одну `CreateIntention` со всеми пятью полями по ключу сессии, используя готовый путь фазы 1. Принятая отправка имеет собственный токен; повтор не принимается и не ставится в очередь.
+    - Все методы изменения текста, набора и отметок, включая запоздалые callbacks общего выбора, отвергаются во время отправки. Наблюдаемая проекция названий может обновляться, но состав принятой команды остаётся неизменным.
+    - Успех публикует событие завершения своей сессии один раз; данные согласуются только через координатор. Освобождение инициатора не отменяет принятую операцию и не освобождает её блокировку; минимальное создание существующей формой продолжает работать.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor/intention_editor_view_model_test.dart test/intention/presentation/operation/intention_command_coordinator_test.dart --concurrency=2 --reporter expanded`
+    - На задержанном выполнении вызвать все методы правки и повторную отправку, затем сравнить полный состав единственной команды с исходным черновиком; проверить успех и завершение после освобождения инициатора.
+  - **Dependencies:** 2.1.
+  - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_state.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/intention/presentation/operation/intention_command_coordinator_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.3 Сохранять полный черновик при отказе и разрешать исправление или повтор только по его типизированной причине
+  - **Acceptance criteria:**
+    - Любой отказ оставляет сырые строки, выбранные идентификаторы и обе отметки без нормализации или сброса. Ошибка текста снимается исправлением соответствующего поля; `IntentionCreationTagsMissingFailure` сохраняет точные отсутствующие идентификаторы и разрешает новую проверку после явного изменения набора, без пропуска или замены одноимённым тегом.
+    - Доказанно устранимая `unavailable` предоставляет явную повторную отправку с новым токеном. Остальные `conflict`, `corruption` и `unexpected` не получают обычного повтора; нерелевантная правка, обновление названия тега или повторное добавление уже включённого тега не снимают блокирующую причину.
+    - Состояние ошибки предоставляет её тип и действующее право предъявления существующему `OperationFailurePresentation`; ViewModel не подтверждает видимость сообщения и не вводит отдельный presenter. Существующая форма сохраняет свои проверки ошибок полей, а данные для будущего отображения отсутствующих тегов различимы.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor test/graph/presentation/operation_failure_presentation_test.dart --concurrency=2 --reporter expanded`
+    - Проверить матрицу «категория отказа × исправляемое поле», весь сохранённый черновик и число отправок; отдельно проверить отсутствие автоматической отправки после исправления и новый токен допустимого повтора.
+  - **Dependencies:** 2.2.
+  - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_state.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.4 Подтвердить совместные гарантии локального черновика, единственной отправки и восстановления после отказов
+  - **Acceptance criteria:**
+    - Проверки 2.1–2.3 подтверждают отсутствие команд при подготовке, неизменность принятого снимка и сохранение всех данных после каждого отказа. Разные сессии не обмениваются состоянием.
+    - Существующее минимальное создание, блокировка координатора и предъявление ошибок проходят регрессии; анализ проходит. Контракт набора пригоден для общего выбора без знания устройства записи.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor test/intention/presentation/operation/intention_command_coordinator_test.dart test/graph/presentation/operation_failure_presentation_test.dart --concurrency=2 --reporter expanded`
+    - `mise exec --no-deps -- flutter analyze`
+  - **Dependencies:** 2.1, 2.2, 2.3.
+  - **Files likely touched:** Нет — контрольная точка.
+  - **Estimated scope:** XS.
+
+- [ ] 2.5 Поддерживать актуальную проекцию выбранных тегов без изменения их идентичностей и состава черновика
+  - **Acceptance criteria:**
+    - Для каждого выбранного `TagId` сессия использует существующий `watchTag`; последнее подтверждённое название из выбора доступно сразу. Переименование обновляет только проекцию, а подтверждённое отсутствие сохраняет идентификатор и последнее имя в различимом недоступном состоянии до явного снятия.
+    - Загрузка и типизированный отказ чтения отличаются от удаления. Только устранимый отказ предлагает повтор наблюдения; окончание потока сохраняет установленную причину, необъяснённое окончание даёт неизвестный отказ. Ошибка проекции не заменяет транзакционную проверку при сохранении.
+    - Ревизия и поколение наблюдения не позволяют старому ответу отменить новое название, восстановить снятый тег или изменить повторно добавленный тег и другую сессию. Снятие и завершение сессии освобождают соответствующие подписки; наблюдения не отправляют команды графа.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor/intention_editor_view_model_test.dart --reporter expanded`
+    - Проверить переименование, удаление с одноимённым новым тегом, отказ и восстановление чтения, поздние ответы после снятия и повторного добавления, завершение потоков и освобождение подписок управляемым источником контракта `watchTag`.
+  - **Dependencies:** 2.4.
+  - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_state.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`; при выделении владельца наблюдений — отдельный файл в этом же модуле.
+  - **Estimated scope:** M.
+
+- [ ] 2.6 Разделить типизированный контекст общего выбора и режим чтения, сохранив постоянное назначение существующему намерению
+  - **Acceptance criteria:**
+    - Общий выбор получает закрытые варианты просмотра, назначения существующему намерению и добавления в черновик с явными зависимостями. Контекст черновика читает `TagCatalogBrowseMode` и использует контракт набора из 2.1; существующий получатель продолжает использовать `TagCatalogSelectionMode`. Сессионные данные и фиктивный `IntentionId` не добавляются в репозиторий.
+    - Контракт явного действия различает локальное добавление и постоянную команду, включая недоступность при закрытой или отправленной сессии. Адаптер постоянного назначения сохраняет проверки пары и существования, актуальность кандидата, блокировки координатора и права предъявления; неизвестный статус пары не разрешает запись.
+    - Общие список, выбор кандидата и наблюдение его идентичности остаются едиными. Существующие вызывающие стороны компилируются и сохраняют поведение на каждом шаге переноса; общий компонент не получает весь объект приложения и не решает, когда создавать намерение.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_view_model_test.dart test/tag/presentation/catalog/tag_catalog_snapshot_selection_test.dart test/tag/presentation/catalog/tag_catalog_selection_stability_test.dart test/tag/presentation/catalog/tag_catalog_page_test.dart --concurrency=2 --reporter expanded`
+    - Проверить оба адаптера через предоставляемый ими контракт: постоянный путь принимает `AssignTag`, локальный меняет только наблюдаемый набор; чтение черновика не запрашивает статус назначения несуществующему получателю.
+  - **Dependencies:** 2.4.
+  - **Files likely touched:** `lib/src/tag/presentation/catalog/tag_catalog_state.dart`, `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, `lib/src/tag/presentation/catalog/tag_catalog_view.dart`, `test/tag/presentation/catalog/tag_catalog_view_model_test.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`; типизированный контекст и адаптеры — в этом же модуле, имена уточняются при реализации.
+  - **Estimated scope:** M.
+
+- [ ] 2.7 Добавлять несколько тегов в черновик через общий компонент с понятными состояниями и доступным явным действием
+  - **Acceptance criteria:**
+    - Тот же `TagCatalogView` показывает включённые и доступные теги. Нажатие строки меняет только кандидата; закреплённое действие «Добавить» меняет набор явно, повторное включение недоступно. Несколько тегов добавляются в одном открытии без автоматического закрытия, записи назначений и перечитывания каталога ради локального изменения.
+    - Обновление набора сразу меняет признаки строк, сохраняя идентичность открытия, поиск, строки, геометрию и прокрутку. Удалённый или неподтверждённый кандидат, закрытая сессия и выполняющаяся отправка не разрешают добавление; уже включённый отсутствующий тег остаётся в сессии.
+    - Русские и английские подписи и семантика различают добавление в черновик и сохранённое назначение; состояние понятно без одного цвета. Действие и выбранный кандидат доступны с экранным диктором, клавиатурой и увеличенным текстом; локальные правки не порождают сообщения или диагностические события постоянного назначения.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_page_test.dart test/tag/presentation/catalog/tag_catalog_selection_stability_test.dart test/tag/presentation/tag_accessibility_test.dart --concurrency=2 --reporter expanded`
+    - Проверить общий компонент в обоих контекстах, семантику на `ru` и `en`, быстрые повторные нажатия и число чтений и команд. Производные локализации обновить штатной генерацией вместе с исходными ARB.
+  - **Dependencies:** 2.5, 2.6.
+  - **Files likely touched:** `lib/src/tag/presentation/catalog/tag_catalog_view.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`; производные файлы `lib/l10n/app_localizations*.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.8 Подтвердить общий выбор для черновика без регрессий существующего назначения тегов
+  - **Acceptance criteria:**
+    - Совместные проверки проекции и общего компонента подтверждают различие локального включения и постоянного назначения, отсутствие потери выбранных идентичностей и единственный явный эффект действия.
+    - Существующие выбор кандидата, проверка пары, поиск, стабильность списка и доступность проходят регрессии; локальное изменение набора не запускает команду, перечитывание каталога или сброс открытия.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor test/tag/presentation/catalog test/tag/presentation/tag_accessibility_test.dart test/app/tag_assignment_app_flow_test.dart test/app/tag_assignment_app_lifecycle_test.dart --concurrency=2 --reporter expanded`
+    - `mise exec --no-deps -- flutter analyze`
+  - **Dependencies:** 2.5, 2.6, 2.7.
+  - **Files likely touched:** Нет — контрольная точка.
+  - **Estimated scope:** XS.
+
+- [ ] 2.9 Сохранять поиск и набор черновика в пределах открытия общего выбора при переходах в редактор тегов
+  - **Acceptance criteria:**
+    - Каждое открытие выбора для конкретной сессии имеет собственный `TagCatalogOpening`, кандидат и поиск. Обновление набора и возврат из редактора сохраняют их; закрытие и новое открытие либо смена сессии сбрасывают поиск. Два одновременно открытых выбора не разделяют своё состояние.
+    - Поиск использует существующие Unicode-проверку, полный case folding, последний корректный фильтр и пустые состояния. Изменение, очистка и отсутствие совпадений не меняют набор; скрытый кандидат остаётся понятен у явного действия и не подмешивается в совпадения. Отказ чтения с допустимым повтором сохраняет сырой поисковый ввод.
+    - «+» вызывает существующий редактор: успешный `CreateTag` сохраняет самостоятельный тег и может выбрать кандидата, но не включает его в черновик; отмена не создаёт тег и не меняет набор. Поздний возврат редактора прежнего открытия не меняет другое открытие; локальные правки не сбрасывают защиту этих callbacks.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_selection_search_test.dart test/tag/presentation/catalog/tag_catalog_search_page_test.dart test/tag/presentation/catalog/tag_catalog_search_read_cost_widget_test.dart test/tag/presentation/editor/tag_editor_page_test.dart --concurrency=2 --reporter expanded`
+    - В контексте черновика проверить корректный и некорректный поиск, скрытый выбор, возврат после сохранения и отмены редактора, сбой чтения, повторное открытие и два независимых открытия; сравнить набор до и после каждого перехода.
+  - **Dependencies:** 2.8.
+  - **Files likely touched:** `lib/src/tag/presentation/catalog/tag_catalog_view.dart`, `lib/src/tag/presentation/catalog/tag_catalog_view_model.dart`, `test/tag/presentation/catalog/tag_catalog_selection_search_test.dart`, `test/tag/presentation/catalog/tag_catalog_search_page_test.dart`, `test/tag/presentation/catalog/tag_catalog_search_read_cost_widget_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.10 Определять завершение сессии через единое решение о закрытии с защитой от запоздалых подтверждений
+  - **Acceptance criteria:**
+    - Сессия предоставляет типизированный результат запроса закрытия: неизменённую можно завершить сразу, изменённая требует одного подтверждения. Продолжение сохраняет все данные, подтверждённый сброс до отправки не создаёт намерение; во время отправки решение явно сообщает, что сохранение продолжится. Переход в выбор или редактор и возврат не завершают сессию.
+    - Подтверждение связано с ключом сессии и актуальным состоянием отправки. Успех при ожидающем подтверждении завершает только свою сессию и делает её прежний callback недействительным; повторный запрос не создаёт второе подтверждение. После сброса новое открытие пусто и не получает данные или событие старой команды.
+    - Завершение освобождает наблюдения и право непредъявленной ошибки по существующему протоколу, не отменяя координатор и не подтверждая сообщение во ViewModel. Временное перекрытие живого renderer сохраняет его право; окончательное удаление до предъявления передаёт его общей поверхности. Реальные жесты, диалог и навигационное закрытие панели подключаются в фазе 3.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor/intention_editor_view_model_test.dart test/graph/presentation/operation_failure_presentation_test.dart test/intention/presentation/operation/intention_command_coordinator_test.dart --concurrency=2 --reporter expanded`
+    - Проверить закрытие при каждом изменённом поле, продолжение, сброс, отправку во время ожидания подтверждения, успех и отказ при подтверждении, освобождение и новое открытие. В управляемом renderer проверить удержание и передачу конкретного права, не имитируя успех вызовом подтверждения из ViewModel.
+  - **Dependencies:** 2.4, 2.5.
+  - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_state.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/graph/presentation/operation_failure_presentation_test.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.11 Подключить контекст черновика к существующей странице выбора тегов и проверить сборку с настоящим редактором
+  - **Acceptance criteria:**
+    - Существующая `TagCatalogPage` принимает типизированный контекст и передаёт явные зависимости общему компоненту; вызывающие стороны просмотра и назначения сохраняют прежнюю семантику. Нет второй страницы выбора, глобального черновика, нового режима репозитория или отдельного навигатора.
+    - Связка сессии, общего выбора и существующего `TagEditorRoute` проверяется через настоящее создание и отмену тега: возврат сохраняет тот же черновик и поиск, а закрытие только выбора сохраняет владельца сессии. Окончательное завершение делает переданный контекст недоступным для дальнейшего изменения.
+    - Маршрут выбора и его производные аргументы согласованы штатной генерацией. Форма создания ещё не переводится в нижнюю панель: подключение её маршрута, кнопок и реальных способов ухода остаётся фазе 3; сборка фазы 2 проверяет готовые компоненты без второго механизма сохранения.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/tag/presentation/catalog/tag_catalog_page_test.dart test/tag/presentation/editor/tag_editor_page_test.dart test/app/tag_app_flow_test.dart test/app/tag_assignment_app_flow_test.dart --concurrency=2 --reporter expanded`
+    - Через существующий маршрутизатор открыть общий выбор с контекстом живой сессии, сохранить и отменить тег, вернуться и повторно открыть выбор; проверить прежние места вызова каталога и назначения. Сессию в проверке удерживает владелец, пока открыты дочерние страницы.
+  - **Dependencies:** 2.9, 2.10.
+  - **Files likely touched:** `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`, `test/app/tag_app_flow_test.dart`; производный `lib/src/app/routing/app_router.gr.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.12 Подтвердить независимые жизненные циклы черновика, открытия выбора и самостоятельного редактора тега
+  - **Acceptance criteria:**
+    - Поиск и редактор не теряют ввод сессии, разные открытия не смешиваются, а решение о закрытии принадлежит сессии. Успех, отказ и запоздалое подтверждение не меняют новое открытие.
+    - Общий выбор собран с существующими маршрутами тегов, прежнее назначение работает; локализации, анализ и целевые проверки проходят. Гарантии модальной геометрии и реальных способов закрытия ещё не объявляются доказанными.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor test/tag/presentation/catalog test/tag/presentation/editor test/app/tag_app_flow_test.dart test/app/tag_assignment_app_flow_test.dart test/app/tag_assignment_app_lifecycle_test.dart test/graph/presentation/operation_failure_presentation_test.dart --concurrency=2 --reporter expanded`
+    - `mise exec --no-deps -- flutter analyze`
+  - **Dependencies:** 2.9, 2.10, 2.11.
+  - **Files likely touched:** Нет — контрольная точка.
+  - **Estimated scope:** XS.
+
+- [ ] 2.13 Доказать совместную работу сессии и общего выбора на настоящем хранилище до отправки, при успехе и при отказе
+  - **Acceptance criteria:**
+    - Связка настоящих сессии, `TagCatalogView`, координатора и Drift-адаптера подтверждает подготовку всех пяти полей без создания намерения, назначений или избранного и без событий постоянных команд локальных правок. Отдельно созданный через редактор тег сохраняется сразу, переживает сброс и отказ создания; его явное включение до отправки ничего не назначает.
+    - Отправка подготовленного набора даёт один полный результат через путь фазы 1. Переименование сохраняет идентичность; удаление выбранного тега, в том числе с одноимённой заменой, отклоняет весь набор. После явного исправления возможна новая проверка; при отказе записи сохраняются черновик и прежний граф, без частичных данных или продвижения ревизии.
+    - Задержанная отправка после завершения сессии заканчивается один раз и предъявляет результат по общему протоколу; новое открытие остаётся независимым. Наблюдения выбранных тегов освобождаются, диагностика не раскрывает тексты и идентификаторы. Проверка использует реальное соединение и публичные чтения, а управляемые отказы — существующие hooks локального хранилища.
+  - **Verification:**
+    - `mise exec --no-deps -- flutter test test/app/intention_creation_draft_integration_test.dart test/app/full_intention_creation_checkpoint_test.dart test/app/tag_assignment_app_flow_test.dart --concurrency=1 --reporter expanded`
+    - Добавить `test/app/intention_creation_draft_integration_test.dart` как проверку компонентов фазы 2 по образцу существующей контрольной точки. Наблюдать команды, фактический граф, ревизию и предъявление результата; не заменять этот путь заранее подготовленным `CreateIntention` в обход сессии и общего выбора.
+  - **Dependencies:** 2.12.
+  - **Files likely touched:** `test/app/intention_creation_draft_integration_test.dart` — новый файл в изученном `test/app/`; при необходимости `test/support/local_database_harness.dart`, `test/support/in_memory_diagnostics_sink.dart`.
+  - **Estimated scope:** M.
+
+- [ ] 2.14 Подтвердить готовность полного черновика и общего выбора к подключению управляемой модальной панели
+  - **Acceptance criteria:**
+    - Критерий готовности фазы 2 доказан связкой с настоящим хранилищем: ввод сохраняется, до отправки нет записей намерения, изменение выбранных тегов и отказы обработаны, самостоятельные теги живут независимо. Существующее назначение тегов сохраняет проверки и однократное предъявление.
+    - Контракты сессии и контекстов выбора документированы рядом с кодом, генерация согласована с источниками; целевые и общие проверки, сборка и строгая валидация изменения проходят. Завершение этой фазы не означает завершения всего изменения.
+    - Сессия предоставляет данные, отправку, исправление отказа и решение о закрытии, необходимые панели, без дополнительной записи или глобального черновика. Оценка готовности не включает ещё не реализованные геометрию панели, жесты и её маршрут из фазы 3.
+  - **Verification:**
+    - `mise run check`
+    - `mise run codegen-check` — после коммита в чистой рабочей копии: штатный скрипт требует чистоты до и после генерации.
+    - `mise exec --no-deps -- flutter build apk --release`
+    - `mise exec --no-deps -- openspec validate compact-intention-creation --type change --strict --json --no-interactive`
+    - После изменений Dart проверить доступное запущенное приложение через DTD, горячую перезагрузку или перезапуск и runtime errors; при его отсутствии использовать указанные проверки CLI. Сопоставить результаты 2.4, 2.8, 2.12 и 2.13 с `Ready to advance` фазы 2.
+  - **Dependencies:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.12, 2.13.
+  - **Files likely touched:** Нет — итоговая контрольная точка.
+  - **Estimated scope:** XS.
