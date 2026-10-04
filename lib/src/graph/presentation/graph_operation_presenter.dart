@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
+import '../../favorite/presentation/favorite_order_failure_message.dart';
 import '../application/delete_blocking_relations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
@@ -23,6 +24,9 @@ import '../application/graph_command_result.dart';
 /// Показывает в [ScaffoldMessenger] не больше одного сообщения, ждёт его
 /// закрытия и только затем запрашивает у coordinator следующий результат.
 /// Новый результат не снимает текущее сообщение.
+///
+/// Что предъявлять, решает coordinator: перестановка избранных намерений
+/// приходит сюда только отказом (ADR-0016).
 final class GraphOperationPresenter extends ConsumerStatefulWidget {
   const GraphOperationPresenter({required this.child, super.key});
 
@@ -186,7 +190,7 @@ final class _PresentationSurface {
 
 String _messageFor(
   AppLocalizations localizations,
-  GraphCommandCompletion completion,
+  GraphPresentableCompletion completion,
 ) => switch (completion) {
   IntentionCommandCompletion() => _intentionMessage(localizations, completion),
   LongTermRelationCommandCompletion() => _relationMessage(
@@ -202,6 +206,10 @@ String _messageFor(
     completion,
   ),
   TagCommandCompletion() => _tagMessage(localizations, completion),
+  FavoriteOrderFailedCompletion(:final failure) => favoriteOrderFailureMessage(
+    localizations,
+    failure,
+  ),
 };
 
 String _tagMessage(
@@ -315,6 +323,10 @@ String _intentionMessage(
     IntentionCommandKind.archive => localizations.graphOperationArchive,
     IntentionCommandKind.restore => localizations.graphOperationRestore,
     IntentionCommandKind.delete => localizations.graphOperationDelete,
+    IntentionCommandKind.markFavorite =>
+      localizations.graphOperationMarkFavorite,
+    IntentionCommandKind.unmarkFavorite =>
+      localizations.graphOperationUnmarkFavorite,
   };
   final target =
       completion.presentationTitle ??
@@ -435,6 +447,10 @@ String _successFor(
     localizations.detailsRestoredSuccess,
   (IntentionCommandKind.delete, IntentionDeleted()) =>
     localizations.detailsDeleted,
+  (IntentionCommandKind.markFavorite, IntentionSaved()) =>
+    localizations.detailsFavoriteMarked,
+  (IntentionCommandKind.unmarkFavorite, IntentionSaved()) =>
+    localizations.detailsFavoriteUnmarked,
   (IntentionCommandKind.create, IntentionDeleted()) =>
     localizations.editorCreateUnexpected,
   (IntentionCommandKind.update, IntentionDeleted()) =>
@@ -447,6 +463,11 @@ String _successFor(
     IntentionDeleted(),
   ) =>
     localizations.detailsStateChangeUnexpected,
+  (
+    IntentionCommandKind.markFavorite || IntentionCommandKind.unmarkFavorite,
+    IntentionDeleted(),
+  ) =>
+    localizations.detailsFavoriteMarkUnexpected,
   (IntentionCommandKind.delete, IntentionSaved()) =>
     localizations.detailsDeleteUnexpected,
 };
@@ -499,5 +520,17 @@ String _failureFor(
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
+  },
+  IntentionCommandKind.markFavorite ||
+  IntentionCommandKind.unmarkFavorite => switch (failure) {
+    IntentionValidationFailure() => localizations.detailsFavoriteMarkInvalid,
+    IntentionNotFoundFailure() => localizations.detailsFavoriteMarkNotFound,
+    IntentionConflictFailure() => localizations.detailsFavoriteMarkConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsFavoriteMarkUnexpected,
+    IntentionUnavailableFailure() =>
+      localizations.detailsFavoriteMarkUnavailable,
+    IntentionCorruptionFailure() => localizations.detailsFavoriteMarkCorruption,
+    IntentionUnexpectedFailure() => localizations.detailsFavoriteMarkUnexpected,
   },
 };

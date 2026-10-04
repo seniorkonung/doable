@@ -24,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/catalog/catalog_reconciliation_test_support.dart';
 import '../../intention/presentation/catalog/catalog_test_support.dart';
+import '../../support/app_root_pages.dart';
 
 /// Страница выбора намерения для дневного выбора и её ограничения поиска.
 ///
@@ -719,6 +720,7 @@ Future<_OpenedPicker> _openPicker(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   repository.complete(0, _firstPage(const []));
   await tester.pumpAndSettle();
   final selection = router.push<IntentionId>(page.route);

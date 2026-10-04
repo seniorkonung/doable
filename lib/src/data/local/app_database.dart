@@ -13,7 +13,9 @@ import 'sqlite_connection_setup.dart';
 part 'app_database.g.dart';
 part 'database_connection.dart';
 
-@DriftDatabase(include: {'schema/tag_schema.drift'})
+@DriftDatabase(
+  include: {'schema/tag_schema.drift', 'schema/favorite_schema.drift'},
+)
 final class AppDatabase extends _$AppDatabase {
   AppDatabase(
     ConfiguredLocalDatabaseConnection connection, {

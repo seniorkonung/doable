@@ -1071,6 +1071,73 @@ void main() {
     },
   );
 
+  testWidgets('соседство избранного намерения не показывает отметку у '
+      'участников связей', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledNeighborhoodRepository();
+    addTearDown(repository.dispose);
+    final ownerId = testIntentionId(1);
+    final counts = testRelationCounts(activeNeedOutgoing: 2);
+
+    await _pumpDetailsPage(tester, repository, ownerId);
+    repository.emitIntention(
+      testNeighborhoodIntention(id: ownerId, title: 'Моё намерение'),
+      counts: counts,
+      revision: revision,
+      favoriteMark: FavoriteMark.favorite,
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: ownerId,
+          from: 1,
+          count: 2,
+          ownerTitle: 'Моё намерение',
+          neighborTitles: const {1: 'Сосед один', 2: 'Сосед два'},
+        ),
+        counts: counts,
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Намерение избранное: шапка страницы показывает его отметку.
+    expect(find.byIcon(Icons.star), findsOneWidget);
+
+    await _scrollTo(tester, find.text('To Моё намерение, you need Сосед один'));
+    final neighborhood = find.byType(RelationNeighborhoodSliver);
+    final participants = find.descendant(
+      of: neighborhood,
+      matching: find.byType(IntentionSummaryView),
+    );
+    // Избранное намерение само участвует в каждой связи своего соседства.
+    expect(
+      find.descendant(of: participants, matching: find.text('Моё намерение')),
+      findsWidgets,
+    );
+    expect(
+      find.descendant(of: neighborhood, matching: find.byIcon(Icons.star)),
+      findsNothing,
+    );
+    for (final participant in participants.evaluate()) {
+      expect(
+        (participant.widget as IntentionSummaryView).confirmedFavoriteMark,
+        isNull,
+      );
+    }
+    expect(
+      find.descendant(
+        of: neighborhood,
+        matching: find.bySemanticsLabel(RegExp('Favorite intention')),
+      ),
+      findsNothing,
+    );
+
+    semantics.dispose();
+  });
+
   testWidgets(
     'восемь переходов открывают только выбранную группу и сохраняют параметры',
     (tester) async {

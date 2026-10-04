@@ -368,6 +368,7 @@ Result<IntentionCommandSuccess> _savedResult() {
             activeRelationCount: 0,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,
+            favoriteMark: FavoriteMark.notFavorite,
           ),
         ),
       ),

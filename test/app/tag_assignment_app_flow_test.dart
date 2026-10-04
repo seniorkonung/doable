@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 
@@ -58,6 +59,7 @@ void main() {
         final graphBefore = retainedTagFixtureGraph(raw);
         final router = ready.container.read(appRouterProvider);
         await tester.pumpWidget(MainApp(runtime: runtime));
+        await openIntentionGraph(tester, waitFor: _until);
         await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
 
         if (isIntention) {

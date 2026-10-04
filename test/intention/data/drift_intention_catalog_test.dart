@@ -1206,6 +1206,7 @@ void main() {
           createdAt: original.createdAt,
           updatedAt: original.updatedAt,
           tags: suppliedTags,
+          favoriteMark: original.favoriteMark,
         );
         suppliedTags.clear();
         expect(summary.tags, original.tags);

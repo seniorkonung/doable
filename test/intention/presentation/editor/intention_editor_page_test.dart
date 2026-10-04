@@ -9,12 +9,14 @@ import 'package:doable/src/graph/presentation/operation_failure_presentation.dar
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import '../catalog/catalog_test_support.dart';
 
 void main() {
@@ -103,7 +105,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(router.current.name, IntentionCatalogRoute.name);
+    expectIntentionGraphRootPage(router);
     expect(repository.commands, hasLength(1));
     repository.completeCommand(
       0,
@@ -308,7 +310,7 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.textContaining('Intention created.'), findsOneWidget);
     },
   );
@@ -528,7 +530,7 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.textContaining('Intention created.'), findsNothing);
 
@@ -565,7 +567,7 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.textContaining(failure), findsNothing);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -608,6 +610,7 @@ Future<AppRouter> _openEditor(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   repository.complete(
     0,
     ResultSuccess(
@@ -642,6 +645,7 @@ Result<IntentionCommandSuccess> _savedResult({required String title}) {
             activeRelationCount: 0,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,
+            favoriteMark: FavoriteMark.notFavorite,
           ),
         ),
       ),

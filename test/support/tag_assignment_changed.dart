@@ -33,6 +33,7 @@ final class _TagAssignmentCatalogEntry
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: const [],
+        favoriteMark: FavoriteMark.notFavorite,
       );
 
   @override

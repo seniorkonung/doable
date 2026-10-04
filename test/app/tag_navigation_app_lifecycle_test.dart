@@ -33,6 +33,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 
@@ -652,6 +653,11 @@ final class _App {
     seedTagNavigationFixture(raw, extraPairsPerScope: 51);
     final router = ready.container.read(appRouterProvider);
     await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(
+      tester,
+      waitFor: (tester, finder) =>
+          _waitFor(tester, () => finder.evaluate().isNotEmpty),
+    );
     await _waitFor(
       tester,
       () =>

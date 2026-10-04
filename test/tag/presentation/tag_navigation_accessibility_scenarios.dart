@@ -48,6 +48,7 @@ void _registerNavigationEntryScenarios() {
           final router = ready.container.read(appRouterProvider);
           final l10n = await AppLocalizations.delegate.load(locale);
           await tester.pumpWidget(MainApp(runtime: runtime));
+          await openIntentionGraph(tester, waitFor: _until);
           await _until(tester, find.text('Одинаковое намерение'));
           final tagId = (TagId.decode(
             tagFixtureId(firstTagNumber),

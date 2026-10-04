@@ -11,6 +11,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -20,6 +21,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -219,6 +221,277 @@ void main() {
         }
       },
     );
+  });
+
+  group('Чтения намерений — отказы получения отметки избранного', () {
+    test(
+      'отказ чтения отметки сохраняет категорию без частичного успеха',
+      () async {
+        for (final (error, expected, code)
+            in <(Object, Matcher, DiagnosticsFailureCode)>[
+              (
+                SqliteException(
+                  extendedResultCode: SqlError.SQLITE_BUSY,
+                  message: 'CANARY-недоступность',
+                ),
+                isA<IntentionUnavailableFailure>(),
+                DiagnosticsFailureCode.unavailable,
+              ),
+              (
+                SqliteException(
+                  extendedResultCode: SqlError.SQLITE_CORRUPT,
+                  message: 'CANARY-повреждение',
+                ),
+                isA<IntentionCorruptionFailure>(),
+                DiagnosticsFailureCode.corruption,
+              ),
+              (
+                StateError('CANARY-неизвестный-отказ'),
+                isA<IntentionUnexpectedFailure>(),
+                DiagnosticsFailureCode.unexpected,
+              ),
+              (
+                SqliteException(
+                  extendedResultCode: SqlError.SQLITE_READONLY,
+                  message: 'CANARY-неизвестный-SQLite-отказ',
+                ),
+                isA<IntentionUnexpectedFailure>(),
+                DiagnosticsFailureCode.unexpected,
+              ),
+            ]) {
+          final interceptor = _FavoriteMarkReadInterceptor(failure: error);
+          late Database raw;
+          final replacement = await _replaceDatabase(
+            interceptor,
+            database,
+            diagnostics,
+            setup: (connection) => raw = connection,
+          );
+          database = replacement.database;
+          repository = replacement.repository;
+          await _insertIntention(
+            database,
+            id: _id(_firstUuid),
+            title: 'CANARY-намерение',
+            createdAt: DateTime.utc(2026, 9, 2, 10),
+          );
+          storeFavoriteMark(raw, intentionId: _firstUuid, position: 1);
+          final query = IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+          );
+          Matcher failed<TEvent extends DiagnosticsEvent>(
+            DiagnosticsStatus Function(TEvent) status,
+          ) => isA<TEvent>().having(
+            status,
+            'исход',
+            isA<DiagnosticsFailed>().having(
+              (status) => status.code,
+              'категория',
+              code,
+            ),
+          );
+
+          expect(
+            await repository.getCatalogPage(query),
+            isA<ResultFailure<IntentionCatalogPage>>().having(
+              (result) => result.failure,
+              'причина',
+              expected,
+            ),
+          );
+          expect(
+            diagnostics.events.last,
+            failed<CatalogPageReadDiagnosticsEvent>((event) => event.status),
+          );
+
+          expect(
+            await repository.getCatalogReconciliationPortion(
+              IntentionCatalogReconciliationQuery(
+                catalogQuery: query,
+                boundary: const IntentionCatalogCompletedBoundary(),
+                window: IntentionCatalogFinalReconciliationWindow(const []),
+              ),
+            ),
+            isA<ResultFailure<IntentionCatalogReconciliationOutcome>>().having(
+              (result) => result.failure,
+              'причина',
+              expected,
+            ),
+          );
+
+          expect(
+            await repository.watchIntention(_id(_firstUuid)).first,
+            isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
+              (result) => result.failure,
+              'причина',
+              expected,
+            ),
+          );
+          expect(
+            diagnostics.events.last,
+            failed<IntentionDetailReadDiagnosticsEvent>(
+              (event) => event.status,
+            ),
+          );
+
+          // Снимок «до» читает отметку раньше записи: команда не оставляет
+          // изменения намерения.
+          expect(
+            await repository.execute(
+              UpdateIntention(
+                id: _id(_firstUuid),
+                title: 'CANARY-новое название',
+                description: null,
+              ),
+            ),
+            isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+                .having((result) => result.failure, 'причина', expected),
+          );
+          expect(
+            diagnostics.events.last,
+            _failedCommand(IntentionCommandDiagnosticsType.update, code),
+          );
+          await _expectStoredIntention(
+            database,
+            id: _id(_firstUuid),
+            title: 'CANARY-намерение',
+            description: null,
+            isActionReady: false,
+            isArchived: false,
+            createdAt: DateTime.utc(2026, 9, 2, 10),
+          );
+          expect(interceptor.failedReads, 4);
+          expect(diagnostics.events.toString(), isNot(contains('CANARY')));
+        }
+      },
+    );
+
+    test('место без намерения вне запрошенных не отказывает чтению, а повреждённая отметка запрошенного отказывает', () async {
+      late Database raw;
+      final replacement = await _replaceDatabase(
+        const _PassiveObserver(),
+        database,
+        diagnostics,
+        setup: (connection) => raw = connection,
+      );
+      database = replacement.database;
+      repository = replacement.repository;
+      await _insertIntention(
+        database,
+        id: _id(_firstUuid),
+        title: 'CANARY-целостное',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: _id(_secondUuid),
+        title: 'CANARY-повреждённое',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      storeFavoritePlaceWithoutIntention(
+        raw,
+        intentionId: _relationUuid,
+        position: 1,
+      );
+      storeFavoriteMark(raw, intentionId: _firstUuid, position: 2);
+      storeFavoriteMarkWithInvalidPosition(
+        raw,
+        intentionId: _secondUuid,
+        position: 0,
+      );
+      IntentionCatalogQuery query({
+        required int pageSize,
+        IntentionCatalogCursor? cursor,
+      }) => IntentionCatalogQuery(
+        scope: IntentionScope.all,
+        titleFilter: null,
+        order: IntentionCatalogOrder.createdAtAscending,
+        pageSize: pageSize,
+        cursor: cursor,
+      );
+      Matcher corrupted<TEvent extends DiagnosticsEvent>(
+        DiagnosticsStatus Function(TEvent) status,
+      ) => isA<TEvent>().having(
+        status,
+        'исход',
+        isA<DiagnosticsFailed>().having(
+          (status) => status.code,
+          'категория',
+          DiagnosticsFailureCode.corruption,
+        ),
+      );
+
+      // Порция и подробные данные целостного намерения не зависят от
+      // места без намерения и от повреждённой отметки вне запрошенных.
+      final intactPage = await repository.getCatalogPage(query(pageSize: 1));
+      expect(intactPage, isA<ResultSuccess<IntentionCatalogPage>>());
+      final page = (intactPage as ResultSuccess<IntentionCatalogPage>).value;
+      expect(page.items.single.id, _id(_firstUuid));
+      expect(page.items.single.favoriteMark, FavoriteMark.favorite);
+      expect(
+        diagnostics.events.last,
+        isA<CatalogPageReadDiagnosticsEvent>().having(
+          (event) => event.status,
+          'исход',
+          isA<DiagnosticsSucceeded>(),
+        ),
+      );
+      final intactDetails = await repository
+          .watchIntention(_id(_firstUuid))
+          .first;
+      expect(
+        intactDetails,
+        isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>(),
+      );
+      expect(
+        (intactDetails as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+            .value
+            .value!
+            .favoriteMark,
+        FavoriteMark.favorite,
+      );
+
+      // Повреждённая отметка запрошенного намерения отклоняет порцию,
+      // её продолжение и подробные данные целиком.
+      for (final failing in [
+        query(pageSize: 2),
+        query(pageSize: 1, cursor: page.nextCursor),
+      ]) {
+        expect(
+          await repository.getCatalogPage(failing),
+          isA<ResultFailure<IntentionCatalogPage>>().having(
+            (result) => result.failure,
+            'причина',
+            isA<IntentionCorruptionFailure>(),
+          ),
+        );
+        expect(
+          diagnostics.events.last,
+          corrupted<CatalogPageReadDiagnosticsEvent>((event) => event.status),
+        );
+      }
+      expect(
+        await repository.watchIntention(_id(_secondUuid)).first,
+        isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
+          (result) => result.failure,
+          'причина',
+          isA<IntentionCorruptionFailure>(),
+        ),
+      );
+      expect(
+        diagnostics.events.last,
+        corrupted<IntentionDetailReadDiagnosticsEvent>((event) => event.status),
+      );
+      expect(storedFavoriteMarks(raw), [
+        (_secondUuid, 0),
+        (_relationUuid, 1),
+        (_firstUuid, 2),
+      ]);
+      expect(diagnostics.events.toString(), isNot(contains('CANARY')));
+    });
   });
 
   group('DriftPersonalGraphRepository.execute — физическое удаление', () {
@@ -934,6 +1207,31 @@ final class _TagAssignmentReadInterceptor
     List<Map<String, Object?>> rows,
   ) {
     if (statement.statements.single.contains('FROM tag_assignments')) {
+      throw failure;
+    }
+    return rows;
+  }
+}
+
+/// Наблюдатель без вмешательства: даёт доступ к соединению хранилища.
+final class _PassiveObserver extends LocalDatabaseConnectionObserver {
+  const _PassiveObserver();
+}
+
+final class _FavoriteMarkReadInterceptor
+    extends LocalDatabaseConnectionObserver {
+  _FavoriteMarkReadInterceptor({required this.failure});
+
+  final Object failure;
+  var failedReads = 0;
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    if (statement.statements.single.contains('FROM favorite_intentions')) {
+      failedReads++;
       throw failure;
     }
     return rows;

@@ -58,6 +58,17 @@ enum IntentionCommandDiagnosticsType {
   archive,
   restore,
   delete,
+  markFavorite,
+  unmarkFavorite,
+}
+
+/// Этап команды отметки избранного или её снятия.
+enum FavoriteMarkCommandDiagnosticsStage {
+  /// Проверка существования намерения и его текущей отметки.
+  validation,
+
+  /// Запись отметки и подтверждение её результата.
+  write,
 }
 
 enum LongTermRelationCommandDiagnosticsType {
@@ -145,6 +156,86 @@ final class TagDetailReadDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(status);
 
   final TagReadDiagnosticsStage stage;
+}
+
+/// Этап чтения списка избранных намерений.
+enum FavoriteIntentionsReadDiagnosticsStage {
+  /// Чтение строк избранного и счётчиков активных связей.
+  read,
+
+  /// Проверка сохранённых данных всего избранного до публикации списка.
+  validation,
+}
+
+/// Чтение полного списка избранных намерений.
+///
+/// Событие несёт только этап и исход: названий, идентификаторов, состава и
+/// порядка избранных намерений в нём нет.
+final class FavoriteIntentionsReadDiagnosticsEvent extends DiagnosticsEvent {
+  const FavoriteIntentionsReadDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final FavoriteIntentionsReadDiagnosticsStage stage;
+}
+
+/// Этап перестановки избранного намерения.
+enum FavoriteOrderCommandDiagnosticsStage {
+  /// Чтение полного порядка избранных, включая архивированные намерения.
+  read,
+
+  /// Проверка участников и сохранённого порядка и вычисление нового порядка.
+  validation,
+
+  /// Запись мест и подтверждение её результата.
+  write,
+}
+
+/// Вид успешного завершения перестановки избранного намерения.
+enum FavoriteOrderCommandDiagnosticsCompletion {
+  /// Порядок изменён и подтверждён на новой ревизии.
+  moved,
+
+  /// Перемещение не меняет видимого порядка: записи и новой ревизии нет.
+  unchanged,
+}
+
+/// Перестановка избранного намерения.
+///
+/// Событие несёт только этап, исход, длительность и безопасную категорию
+/// отказа: названий, идентификаторов, состава и порядка избранных намерений,
+/// мест хранения и параметров запросов в нём нет.
+///
+/// Конструкторы допускают только согласованные сочетания этапа, статуса и
+/// вида завершения: вид есть ровно у успешной перестановки, фактическое
+/// изменение подтверждается записью, а его отсутствие — проверкой без записи.
+final class FavoriteOrderCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const FavoriteOrderCommandDiagnosticsEvent.started()
+    : stage = FavoriteOrderCommandDiagnosticsStage.read,
+      completion = null,
+      super(const DiagnosticsStarted());
+
+  FavoriteOrderCommandDiagnosticsEvent.moved({required Duration duration})
+    : stage = FavoriteOrderCommandDiagnosticsStage.write,
+      completion = FavoriteOrderCommandDiagnosticsCompletion.moved,
+      super(DiagnosticsSucceeded(duration));
+
+  FavoriteOrderCommandDiagnosticsEvent.unchanged({required Duration duration})
+    : stage = FavoriteOrderCommandDiagnosticsStage.validation,
+      completion = FavoriteOrderCommandDiagnosticsCompletion.unchanged,
+      super(DiagnosticsSucceeded(duration));
+
+  /// Отказ на этапе [stage], на котором перестановка остановилась.
+  FavoriteOrderCommandDiagnosticsEvent.failed({
+    required this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : completion = null,
+       super(DiagnosticsFailed(duration: duration, code: code));
+
+  final FavoriteOrderCommandDiagnosticsStage stage;
+  final FavoriteOrderCommandDiagnosticsCompletion? completion;
 }
 
 final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
@@ -325,13 +416,37 @@ final class SelectedRelationsReadDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(status);
 }
 
+/// Команда намерения.
+///
+/// Конструкторы допускают только согласованные сочетания вида команды и
+/// этапа: этап есть ровно у отметки избранного и её снятия.
 final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
+  /// Команда намерения, кроме отметки избранного и её снятия.
   const IntentionCommandDiagnosticsEvent({
     required this.commandType,
     required DiagnosticsStatus status,
-  }) : super(status);
+  }) : assert(
+         commandType != IntentionCommandDiagnosticsType.markFavorite &&
+             commandType != IntentionCommandDiagnosticsType.unmarkFavorite,
+         'Отметка избранного и её снятие несут этап.',
+       ),
+       stage = null,
+       super(status);
+
+  const IntentionCommandDiagnosticsEvent.markFavorite({
+    required FavoriteMarkCommandDiagnosticsStage this.stage,
+    required DiagnosticsStatus status,
+  }) : commandType = IntentionCommandDiagnosticsType.markFavorite,
+       super(status);
+
+  const IntentionCommandDiagnosticsEvent.unmarkFavorite({
+    required FavoriteMarkCommandDiagnosticsStage this.stage,
+    required DiagnosticsStatus status,
+  }) : commandType = IntentionCommandDiagnosticsType.unmarkFavorite,
+       super(status);
 
   final IntentionCommandDiagnosticsType commandType;
+  final FavoriteMarkCommandDiagnosticsStage? stage;
 }
 
 final class LongTermRelationCommandDiagnosticsEvent extends DiagnosticsEvent {

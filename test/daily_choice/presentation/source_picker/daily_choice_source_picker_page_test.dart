@@ -21,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show testSummary;
 import '../../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart';
+import '../../../support/app_root_pages.dart';
 import '../daily_choice_picker_tag_search_test_support.dart';
 
 void main() {
@@ -96,6 +97,84 @@ void main() {
       expect(await selection, testSummary(index: 3).id);
     },
   );
+
+  for (final (language, markLabel, totalCount) in [
+    ('en', 'Favorite intention', 'Total intentions: 2'),
+    ('ru', 'Избранное намерение', 'Всего намерений: 2'),
+  ]) {
+    testWidgets(
+      '$language: без условий поиска звезду показывает только '
+      'избранное из одноимённых оснований, а отметка не становится действием',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledParticipantPickerRepository();
+        addTearDown(repository.dispose);
+        final router = await _pumpApp(
+          tester,
+          repository,
+          locale: Locale(language),
+        );
+        addTearDown(router.dispose);
+
+        final selection = router.push<IntentionId>(
+          const DailyChoiceSourcePickerRoute(),
+        );
+        await _settleRoute(tester);
+        // Условия поиска пусты: отметка показана без фильтра названия и тегов.
+        expect(repository.queryAt(1).titleFilter, isNull);
+        expect(repository.queryAt(1).tagFilter, IntentionTagFilter.empty);
+        _completeFirst(repository, 1, [
+          testSummary(
+            index: 2,
+            title: 'Гулять',
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+          ),
+          testSummary(
+            index: 3,
+            title: 'Гулять',
+            readiness: IntentionReadiness.ready,
+          ),
+        ]);
+        await tester.pumpAndSettle();
+
+        final rows = find.byType(IntentionSummaryView);
+        expect(rows, findsNWidgets(2));
+        expect(find.text(totalCount), findsOneWidget);
+        expect(find.byIcon(Icons.star), findsOneWidget);
+        expect(
+          find.descendant(of: rows.at(0), matching: find.byIcon(Icons.star)),
+          findsOneWidget,
+        );
+        expect(tester.getSemantics(rows.at(0)).label, contains(markLabel));
+        expect(
+          tester.getSemantics(rows.at(1)).label,
+          isNot(contains(markLabel)),
+        );
+
+        // Отметка — подпись строки: её нельзя поставить, снять или выбрать
+        // условием поиска.
+        expect(
+          find.ancestor(
+            of: find.byIcon(Icons.star),
+            matching: find.byType(IconButton),
+          ),
+          findsNothing,
+        );
+        expect(find.byIcon(Icons.star_border), findsNothing);
+        expect(find.text(markLabel), findsNothing);
+        expect(find.byTooltip(markLabel), findsNothing);
+        expect(repository.queries, hasLength(2));
+
+        // Выбор по-прежнему возвращает намерение строки по идентификатору.
+        await tester.tap(find.text('Гулять').first);
+        await tester.pumpAndSettle();
+        expect(await selection, testSummary(index: 2).id);
+
+        semantics.dispose();
+      },
+    );
+  }
 
   testWidgets('различает загрузку, пустой результат и устранимую ошибку', (
     tester,
@@ -354,6 +433,7 @@ Future<AppRouter> _pumpApp(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   _completeFirst(repository, 0, []);
   await tester.pumpAndSettle();
   return router;

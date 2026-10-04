@@ -30,6 +30,7 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show TestCatalogRevision, testRelationCounts, testSummary;
 import '../../../intention/presentation/details/details_test_support.dart'
     show testDetailsIntention;
+import '../../../support/app_root_pages.dart';
 import '../details/relation_details_test_support.dart' show testRelationDetails;
 import 'relation_form_test_support.dart';
 
@@ -702,7 +703,7 @@ void main() {
       repository.completeRelationCreated(1);
       await tester.pumpAndSettle();
 
-      expect(router.current.name, IntentionCatalogRoute.name);
+      expectIntentionGraphRootPage(router);
       expect(find.text(busyMessage), findsOneWidget);
       expect(find.text(successMessage), findsNothing);
 
@@ -1685,6 +1686,7 @@ Future<AppRouter> _openForm(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   repository.completeCatalogPage(0, const []);
   await tester.pumpAndSettle();
   unawaited(
@@ -1730,6 +1732,7 @@ Future<AppRouter> _openDetailsForEditing(
     ),
   );
   await tester.pump();
+  await openIntentionGraph(tester);
   repository.completeCatalogPage(0, const []);
   await tester.pumpAndSettle();
   unawaited(router.push(RelationDetailsRoute(relationId: details.relation.id)));

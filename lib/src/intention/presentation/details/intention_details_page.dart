@@ -78,11 +78,38 @@ final class _IntentionDetailsPageState
       }
     });
     return Scaffold(
-      appBar: AppBar(title: Text(localizations.detailsTitle)),
+      appBar: AppBar(
+        title: Text(localizations.detailsTitle),
+        actions: [
+          // Отметка входит в подробные данные: без них управления нет, и
+          // отметка не изображается отсутствующей.
+          if (details is IntentionDetailsLoaded)
+            _FavoriteMarkControl(
+              state: details,
+              onMark: ref.read(provider.notifier).markFavorite,
+              onUnmark: ref.read(provider.notifier).unmarkFavorite,
+            ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
             if (details.isOperationRunning) const _RunningOperationStatus(),
+            // Отметка запускается из шапки, вне прокручиваемого содержимого:
+            // её отказ остаётся виден при любом положении прокрутки.
+            if (details case IntentionDetailsLoaded(
+              :final stateChange?,
+              :final isOperationRunning,
+            ))
+              if (_failureAt(stateChange, _StateChangeFailurePlace.headerBanner)
+                  case final failure?)
+                _FavoriteMarkFailureBanner(
+                  stateChange: stateChange,
+                  failure: failure,
+                  onRetry: isOperationRunning
+                      ? null
+                      : ref.read(provider.notifier).retryStateChange,
+                ),
             Expanded(
               child: _DetailsContent(
                 intentionId: intentionId,
@@ -97,6 +124,167 @@ final class _IntentionDetailsPageState
       ),
     );
   }
+}
+
+/// Управление отметкой избранного в шапке страницы намерения.
+///
+/// Показывает только подтверждённую отметку: значок меняет форму после
+/// подтверждённого снимка, а не после нажатия.
+final class _FavoriteMarkControl extends StatelessWidget {
+  const _FavoriteMarkControl({
+    required this.state,
+    required this.onMark,
+    required this.onUnmark,
+  });
+
+  final IntentionDetailsLoaded state;
+  final VoidCallback onMark;
+  final VoidCallback onUnmark;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final (
+      icon,
+      value,
+      action,
+      onPressed,
+    ) = switch (state.details.favoriteMark) {
+      FavoriteMark.favorite => (
+        Icons.star,
+        localizations.detailsFavoriteMarkStateMarked,
+        localizations.detailsUnmarkFavoriteAction,
+        onUnmark,
+      ),
+      FavoriteMark.notFavorite => (
+        Icons.star_border,
+        localizations.detailsFavoriteMarkStateNotMarked,
+        localizations.detailsMarkFavoriteAction,
+        onMark,
+      ),
+    };
+    // До снимка подтверждённой отметки действие вычислено по прежней.
+    final enabled =
+        !state.isOperationRunning &&
+        state.edit == null &&
+        !state.isAwaitingFavoriteMarkSnapshot;
+    return MergeSemantics(
+      child: Semantics(
+        label: localizations.detailsFavoriteMarkLabel,
+        value: value,
+        child: IconButton(
+          key: const ValueKey('intention-details-favorite-mark'),
+          tooltip: action,
+          onPressed: enabled ? onPressed : null,
+          icon: Icon(icon),
+        ),
+      ),
+    );
+  }
+}
+
+/// Место, где страница намерения предъявляет отказ перехода состояния.
+enum _StateChangeFailurePlace {
+  /// Закреплённая полоса под шапкой, вне прокручиваемого содержимого.
+  headerBanner,
+
+  /// Область действий рядом с кнопкой, запустившей переход.
+  actions,
+}
+
+/// Отказ отметки предъявляется рядом с её управлением в шапке, отказы
+/// остальных переходов — рядом с кнопками области действий.
+_StateChangeFailurePlace _failurePlace(IntentionDetailsStateChangeKind kind) =>
+    switch (kind) {
+      IntentionDetailsStateChangeKind.markFavorite ||
+      IntentionDetailsStateChangeKind.unmarkFavorite =>
+        _StateChangeFailurePlace.headerBanner,
+      IntentionDetailsStateChangeKind.enableReadiness ||
+      IntentionDetailsStateChangeKind.disableReadiness ||
+      IntentionDetailsStateChangeKind.archive ||
+      IntentionDetailsStateChangeKind.restore ||
+      IntentionDetailsStateChangeKind.delete =>
+        _StateChangeFailurePlace.actions,
+    };
+
+/// Отказ перехода, который предъявляет [place]; у отказа одно место.
+IntentionFailure? _failureAt(
+  IntentionDetailsStateChange? stateChange,
+  _StateChangeFailurePlace place,
+) {
+  if (stateChange == null || _failurePlace(stateChange.kind) != place) {
+    return null;
+  }
+  return switch (stateChange.operation) {
+    OperationFailed<Intention>(:final failure) => failure,
+    OperationIdle<Intention>() ||
+    OperationRunning<Intention>() ||
+    OperationSucceeded<Intention>() => null,
+  };
+}
+
+/// Закреплённая полоса отказа отметки и её снятия под шапкой страницы.
+///
+/// Единственный renderer этого отказа: область действий его не повторяет.
+final class _FavoriteMarkFailureBanner extends StatelessWidget {
+  const _FavoriteMarkFailureBanner({
+    required this.stateChange,
+    required this.failure,
+    required this.onRetry,
+  });
+
+  final IntentionDetailsStateChange stateChange;
+  final IntentionFailure failure;
+
+  /// Повтор недоступен, пока выполняется операция намерения.
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OperationFailurePresentation(
+            claim: stateChange.failurePresentation,
+            message: _message(localizations),
+            messageKey: const ValueKey(
+              'intention-details-favorite-mark-failure',
+            ),
+          ),
+          if (stateChange.canRetry) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FilledButton(
+                key: const ValueKey('intention-details-favorite-mark-retry'),
+                onPressed: onRetry,
+                child: Text(localizations.commonRetry),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+        ],
+      ),
+    );
+  }
+
+  String _message(AppLocalizations localizations) => switch (failure) {
+    IntentionGenericValidationFailure() ||
+    IntentionTextInputValidationFailure() =>
+      localizations.detailsFavoriteMarkInvalid,
+    IntentionNotFoundFailure() => localizations.detailsFavoriteMarkNotFound,
+    IntentionConflictFailure() => localizations.detailsFavoriteMarkConflict,
+    IntentionHasBlockingRelationsFailure() =>
+      localizations.detailsFavoriteMarkUnexpected,
+    IntentionUnavailableFailure() =>
+      localizations.detailsFavoriteMarkUnavailable,
+    IntentionCorruptionFailure() => localizations.detailsFavoriteMarkCorruption,
+    IntentionUnexpectedFailure() => localizations.detailsFavoriteMarkUnexpected,
+  };
 }
 
 final class _RunningOperationStatus extends StatelessWidget {
@@ -616,18 +804,28 @@ final class _DetailsActions extends StatelessWidget {
     }
   }
 
+  /// Сообщение отказа, который предъявляет область действий. Отказ отметки
+  /// сюда не попадает: его показывает полоса под шапкой.
   String? _failureMessage(AppLocalizations localizations) {
     final stateChange = state.stateChange;
-    final operation = stateChange?.operation;
-    return switch (operation) {
-      OperationFailed<Intention>(:final failure) =>
-        stateChange!.kind == IntentionDetailsStateChangeKind.delete
-            ? _deleteFailureMessage(localizations, failure)
-            : _stateChangeFailureMessage(localizations, failure),
-      null ||
-      OperationIdle<Intention>() ||
-      OperationRunning<Intention>() ||
-      OperationSucceeded<Intention>() => null,
+    final failure = _failureAt(stateChange, _StateChangeFailurePlace.actions);
+    if (stateChange == null || failure == null) {
+      return null;
+    }
+    return switch (stateChange.kind) {
+      IntentionDetailsStateChangeKind.delete => _deleteFailureMessage(
+        localizations,
+        failure,
+      ),
+      IntentionDetailsStateChangeKind.enableReadiness ||
+      IntentionDetailsStateChangeKind.disableReadiness ||
+      IntentionDetailsStateChangeKind.archive ||
+      IntentionDetailsStateChangeKind.restore => _stateChangeFailureMessage(
+        localizations,
+        failure,
+      ),
+      IntentionDetailsStateChangeKind.markFavorite ||
+      IntentionDetailsStateChangeKind.unmarkFavorite => null,
     };
   }
 

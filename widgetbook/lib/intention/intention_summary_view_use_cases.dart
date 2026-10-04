@@ -22,6 +22,22 @@ List<WidgetbookUseCase> intentionSummaryViewUseCases() => [
     builder: (context) => _catalogRow(context, title: _longTitle),
   ),
   WidgetbookUseCase(
+    name: 'Избранное намерение',
+    builder: (context) => _catalogRow(
+      context,
+      title: _title,
+      favoriteMark: FavoriteMark.favorite,
+    ),
+  ),
+  WidgetbookUseCase(
+    name: 'Избранное намерение с длинным названием',
+    builder: (context) => _catalogRow(
+      context,
+      title: _longTitle,
+      favoriteMark: FavoriteMark.favorite,
+    ),
+  ),
+  WidgetbookUseCase(
     name: 'Без тегов',
     builder: (context) =>
         _catalogRow(context, title: _title, tagNames: const []),
@@ -73,13 +89,14 @@ List<WidgetbookUseCase> intentionSummaryViewUseCases() => [
 ];
 
 /// Строка в том виде, в каком её собирает каталог намерений: с готовностью,
-/// наличием описания и тегами.
+/// наличием описания, тегами и отметкой избранного.
 Widget _catalogRow(
   BuildContext context, {
   required String title,
   List<String> tagNames = const ['здоровье', 'каждый день'],
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   ActiveRelationCountView? activeRelationCount,
+  FavoriteMark favoriteMark = FavoriteMark.notFavorite,
 }) {
   final localizations = AppLocalizations.of(context);
   return IntentionSummaryView(
@@ -95,6 +112,7 @@ Widget _catalogRow(
     confirmedTags: [
       for (final (index, name) in tagNames.indexed) _tag(index, name),
     ],
+    confirmedFavoriteMark: favoriteMark,
     onTap: () {},
   );
 }

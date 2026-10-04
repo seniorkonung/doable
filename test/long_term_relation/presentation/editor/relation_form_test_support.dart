@@ -27,6 +27,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 
 import '../../../intention/presentation/catalog/catalog_test_support.dart';
 import '../details/relation_details_test_support.dart';
+import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
 
@@ -36,7 +37,10 @@ import '../../../support/catalog_reconciliation_test_fallback.dart';
 /// Соседство и отдельная сводка здесь недоступны: форма получает выбор из
 /// каталога и наблюдает выбранные на замену намерения до сохранения связи.
 final class ControlledRelationFormRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with
+        TagReadContractTestFallback,
+        FavoriteReadContractTestFallback,
+        CatalogReconciliationTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathSuggestionsResult> getChoicePathSuggestions(
@@ -101,7 +105,11 @@ final class ControlledRelationFormRepository
   }) => _intentionStreams[intention.id]!.add(
     ResultSuccess(
       GraphSnapshot(
-        value: IntentionDetails(intention: intention, relationCounts: counts),
+        value: IntentionDetails(
+          intention: intention,
+          relationCounts: counts,
+          favoriteMark: FavoriteMark.notFavorite,
+        ),
         revision: revision,
       ),
     ),

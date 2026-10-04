@@ -57,6 +57,17 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
+  FavoriteIntentionsReadDiagnosticsEvent(:final stage) => {
+    'operation': 'favoriteIntentionsRead',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
+  FavoriteOrderCommandDiagnosticsEvent(:final stage, :final completion) => {
+    'operation': 'favoriteOrderCommand',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+    'completion': ?completion?.name,
+  },
   DailyChoiceReadDiagnosticsEvent() => {
     'operation': 'dailyChoiceDetailRead',
     'stage': 'read',
@@ -171,8 +182,9 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'operation': 'selectedRelationsRead',
     ..._encodeStatus(event.status),
   },
-  IntentionCommandDiagnosticsEvent(:final commandType) => {
+  IntentionCommandDiagnosticsEvent(:final commandType, :final stage) => {
     'operation': 'intentionCommand',
+    'stage': ?stage?.name,
     ..._encodeStatus(event.status),
     'commandType': commandType.name,
   },
