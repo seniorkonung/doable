@@ -1,4 +1,3 @@
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -185,8 +184,7 @@ void main() {
       today: date(2026, 10, 4),
     );
 
-    await tester.drag(find.byType(DailyChoiceCalendar), const Offset(-600, 0));
-    await tester.pumpAndSettle();
+    await swipeToNextPeriod(tester);
 
     expect(consumer.events, [ViewportChanged(week(date(2026, 10, 11)))]);
     expect(consumer.selectedDate, date(2026, 10, 4));

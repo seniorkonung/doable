@@ -1,5 +1,4 @@
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:flutter/material.dart';
@@ -187,18 +186,10 @@ void main() {
 
           await tester.tap(calendarDay(transitionDay));
           await tester.pumpAndSettle();
-          await tester.drag(
-            find.byType(DailyChoiceCalendar),
-            const Offset(-600, 0),
-          );
-          await tester.pumpAndSettle();
+          await swipeToNextPeriod(tester);
           expect(visibleWeeks(tester), weeksFrom(nextWeekStart, 1));
 
-          await tester.drag(
-            find.byType(DailyChoiceCalendar),
-            const Offset(600, 0),
-          );
-          await tester.pumpAndSettle();
+          await swipeToPreviousPeriod(tester);
 
           expect(consumer.events, [
             DateSelected(transitionDay),
@@ -369,13 +360,13 @@ void main() {
           today: date(2026, 10, 4),
         );
 
-        await _swipeToPrevious(tester);
+        await swipeToPreviousPeriod(tester);
         expect(consumer.events, isEmpty);
         expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 1));
 
-        await _swipeToNext(tester);
+        await swipeToNextPeriod(tester);
         expect(visibleWeeks(tester), weeksFrom(date(1, 1, 8), 1));
-        await _swipeToPrevious(tester);
+        await swipeToPreviousPeriod(tester);
 
         expect(consumer.events, [
           ViewportChanged(week(date(1, 1, 8))),
@@ -396,13 +387,13 @@ void main() {
           today: date(2026, 10, 4),
         );
 
-        await _swipeToNext(tester);
+        await swipeToNextPeriod(tester);
         expect(consumer.events, isEmpty);
         expect(visibleWeeks(tester), [_lastWeekPositions]);
 
-        await _swipeToPrevious(tester);
+        await swipeToPreviousPeriod(tester);
         expect(visibleWeeks(tester), weeksFrom(date(9999, 12, 20), 1));
-        await _swipeToNext(tester);
+        await swipeToNextPeriod(tester);
 
         expect(consumer.events, [
           ViewportChanged(week(date(9999, 12, 24))),
@@ -424,7 +415,7 @@ void main() {
         );
         expect(visibleWeeks(tester), weeksFrom(date(9999, 12, 20), 1));
 
-        await _swipeToNext(tester);
+        await swipeToNextPeriod(tester);
 
         expect(consumer.events, [ViewportChanged(week(date(9999, 12, 31)))]);
         expect(consumer.selectedDate, date(2026, 10, 4));
@@ -442,13 +433,13 @@ void main() {
         today: date(2026, 10, 4),
       );
 
-      await _swipeToPrevious(tester);
+      await swipeToPreviousPeriod(tester);
       expect(consumer.events, isEmpty);
       expect(visibleWeeks(tester), weeksFrom(date(1, 1, 1), 5));
 
-      await _swipeToNext(tester);
+      await swipeToNextPeriod(tester);
       expect(visibleWeeks(tester), weeksFrom(date(1, 1, 29), 5));
-      await _swipeToPrevious(tester);
+      await swipeToPreviousPeriod(tester);
 
       expect(consumer.events, [
         ViewportChanged(month(date(1, 2, 1))),
@@ -472,13 +463,13 @@ void main() {
           _lastWeekPositions,
         ];
 
-        await _swipeToNext(tester);
+        await swipeToNextPeriod(tester);
         expect(consumer.events, isEmpty);
         expect(visibleWeeks(tester), lastMonth);
 
-        await _swipeToPrevious(tester);
+        await swipeToPreviousPeriod(tester);
         expect(visibleWeeks(tester), weeksFrom(date(9999, 11, 1), 5));
-        await _swipeToNext(tester);
+        await swipeToNextPeriod(tester);
 
         expect(consumer.events, [
           ViewportChanged(month(date(9999, 11, 1))),
@@ -534,13 +525,3 @@ final List<CalendarDate?> _lastWeekPositions = [
   null,
   null,
 ];
-
-Future<void> _swipeToNext(WidgetTester tester) async {
-  await tester.drag(find.byType(DailyChoiceCalendar), const Offset(-600, 0));
-  await tester.pumpAndSettle();
-}
-
-Future<void> _swipeToPrevious(WidgetTester tester) async {
-  await tester.drag(find.byType(DailyChoiceCalendar), const Offset(600, 0));
-  await tester.pumpAndSettle();
-}

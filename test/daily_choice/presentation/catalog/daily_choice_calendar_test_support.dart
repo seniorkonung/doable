@@ -62,6 +62,22 @@ List<List<CalendarDate?>> visibleWeeks(WidgetTester tester) {
   ];
 }
 
+/// Начало жеста перелистывания: пользователь проводит по дням периода, а не
+/// по шапке календаря.
+Finder get calendarPeriodArea => find.byType(DailyChoiceCalendarDay).first;
+
+/// Перелистывает календарь горизонтальным свайпом к следующему периоду.
+Future<void> swipeToNextPeriod(WidgetTester tester) async {
+  await tester.drag(calendarPeriodArea, const Offset(-600, 0));
+  await tester.pumpAndSettle();
+}
+
+/// Перелистывает календарь горизонтальным свайпом к предыдущему периоду.
+Future<void> swipeToPreviousPeriod(WidgetTester tester) async {
+  await tester.drag(calendarPeriodArea, const Offset(600, 0));
+  await tester.pumpAndSettle();
+}
+
 /// [count] последовательных недель по семь дней, начиная с [firstDay].
 List<List<CalendarDate>> weeksFrom(CalendarDate firstDay, int count) => [
   for (var row = 0; row < count; row++)
@@ -137,6 +153,12 @@ final class CalendarConsumer {
     viewport: viewport,
     today: today,
   );
+
+  /// Убирает календарь из дерева, сохраняя потребителя, его входы и журнал.
+  void removeCalendar() => _host.currentState!._setCalendarShown(false);
+
+  /// Создаёт календарь заново с текущими входами потребителя.
+  void restoreCalendar() => _host.currentState!._setCalendarShown(true);
 }
 
 Future<CalendarConsumer> pumpCalendarConsumer(
@@ -195,6 +217,11 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
   late CalendarDate _selectedDate = widget.selectedDate;
   late DailyChoiceCalendarViewport _viewport = widget.viewport;
   late CalendarDate _today = widget.today;
+  bool _calendarShown = true;
+
+  void _setCalendarShown(bool value) {
+    setState(() => _calendarShown = value);
+  }
 
   void _replace({
     CalendarDate? selectedDate,
@@ -210,6 +237,9 @@ final class _CalendarConsumerHostState extends State<_CalendarConsumerHost> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_calendarShown) {
+      return const SizedBox.shrink();
+    }
     return DailyChoiceCalendar(
       selectedDate: _selectedDate,
       viewport: _viewport,
