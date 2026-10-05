@@ -22,10 +22,13 @@ DailyChoiceCalendarViewport month(CalendarDate focusedDate) =>
       mode: DailyChoiceCalendarMode.month,
     );
 
-/// Ячейка дня календаря по её календарной дате.
-Finder calendarDay(CalendarDate value) => find.byKey(
-  ValueKey('daily-choice-calendar-day-${value.toCanonicalString()}'),
-);
+/// Ячейка дня календаря по её календарной дате; при [skipOffstage] `false` —
+/// и за краем видимой части прокрутки.
+Finder calendarDay(CalendarDate value, {bool skipOffstage = true}) =>
+    find.byKey(
+      ValueKey('daily-choice-calendar-day-${value.toCanonicalString()}'),
+      skipOffstage: skipOffstage,
+    );
 
 DailyChoiceCalendarDay dayCell(WidgetTester tester, CalendarDate value) =>
     tester.widget<DailyChoiceCalendarDay>(calendarDay(value));
@@ -37,7 +40,13 @@ final Finder unavailableCalendarDays = find.byKey(
 
 /// Видимые позиции дней по строкам сверху вниз, внутри строки — слева
 /// направо: дата доступного дня или `null` для позиции за пределами диапазона.
-List<List<CalendarDate?>> visibleWeeks(WidgetTester tester) {
+///
+/// При [skipOffstage] `false` учитываются и строки показанного периода за
+/// краем видимой части общей прокрутки.
+List<List<CalendarDate?>> visibleWeeks(
+  WidgetTester tester, {
+  bool skipOffstage = true,
+}) {
   final rows = <double, List<(double, CalendarDate?)>>{};
   void addPosition(Element element, CalendarDate? value) {
     final position = (element.renderObject! as RenderBox).localToGlobal(
@@ -46,10 +55,15 @@ List<List<CalendarDate?>> visibleWeeks(WidgetTester tester) {
     rows.putIfAbsent(position.dy, () => []).add((position.dx, value));
   }
 
-  for (final element in find.byType(DailyChoiceCalendarDay).evaluate()) {
+  final days = find.byType(DailyChoiceCalendarDay, skipOffstage: skipOffstage);
+  for (final element in days.evaluate()) {
     addPosition(element, (element.widget as DailyChoiceCalendarDay).date);
   }
-  for (final element in unavailableCalendarDays.evaluate()) {
+  final unavailable = find.byKey(
+    const ValueKey('daily-choice-calendar-unavailable-day'),
+    skipOffstage: skipOffstage,
+  );
+  for (final element in unavailable.evaluate()) {
     addPosition(element, null);
   }
   final tops = rows.keys.toList()..sort();

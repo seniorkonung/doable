@@ -113,16 +113,15 @@ final class _DailyChoiceCatalogPageState
                   runSpacing: 12,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    SizedBox(
-                      key: const ValueKey('daily-choice-completion-filter'),
-                      width: 240,
-                      child: DropdownButtonFormField<bool?>(
+                    _CompletionFilter(
+                      label: l10n.dailyChoiceCatalogCompletionFilter,
+                      field: DropdownButtonFormField<bool?>(
                         key: ValueKey(state.selection.isCompleted),
                         initialValue: state.selection.isCompleted,
                         isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: l10n.dailyChoiceCatalogCompletionFilter,
-                        ),
+                        // Выбранное состояние переносится и растягивает поле
+                        // по высоте вместо обрезки по одной строке.
+                        isDense: false,
                         items: [
                           DropdownMenuItem<bool?>(
                             value: null,
@@ -320,6 +319,47 @@ final class _DailyChoiceCatalogPageState
     DailyChoiceCatalogValidationFailure() => l10n.dailyChoiceCatalogInvalid,
     DailyChoiceCatalogUnexpectedFailure() => l10n.dailyChoiceCatalogUnexpected,
   };
+}
+
+/// Фильтр выполнения: название фильтра над полем выбора состояния.
+///
+/// Плавающая подпись поля ввода рассчитана на одну строку и при крупном
+/// тексте обрезается, поэтому название стоит отдельной переносимой строкой.
+/// Для вспомогательных технологий название и выбранное состояние — одна
+/// кнопка выбора. Ширина при обычном тексте вмещает самое длинное состояние
+/// в одну строку и растёт вместе с системным размером текста до ширины
+/// страницы; дальше название и состояние переносятся.
+final class _CompletionFilter extends StatelessWidget {
+  const _CompletionFilter({required this.label, required this.field});
+
+  final String label;
+  final Widget field;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MergeSemantics(
+      child: SizedBox(
+        // Ширина больше доступной ограничивается шириной ряда фильтров.
+        width: MediaQuery.textScalerOf(context).scale(280),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            KeyedSubtree(
+              key: const ValueKey('daily-choice-completion-filter'),
+              child: field,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Состояние без строк выдачи занимает остаток высоты под фильтрами и стоит
