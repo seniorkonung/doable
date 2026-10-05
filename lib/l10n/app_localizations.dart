@@ -3527,23 +3527,53 @@ abstract class AppLocalizations {
   /// **'Loading daily choices…'**
   String get dailyChoiceCatalogLoading;
 
-  /// Фильтр по календарной дате
+  /// Подпись выбранной даты фильтра календаря, видимая и при просмотре другого периода
   ///
   /// In en, this message translates to:
-  /// **'Date'**
-  String get dailyChoiceCatalogDateFilter;
+  /// **'Selected date: {date}'**
+  String dailyChoiceCalendarSelectedDate(String date);
 
-  /// Применить фильтр даты
+  /// Доступное состояние дня календаря, совпадающего с текущим локальным днём устройства, а не с выбранной датой
   ///
   /// In en, this message translates to:
-  /// **'Apply date'**
-  String get dailyChoiceCatalogApplyDate;
+  /// **'Today'**
+  String get dailyChoiceCalendarToday;
 
-  /// Некорректная дата фильтра
+  /// Команда раскрытия календаря из недели в сетку месяца даты просмотра
   ///
   /// In en, this message translates to:
-  /// **'Enter a valid date as YYYY-MM-DD.'**
-  String get dailyChoiceCatalogDateInvalid;
+  /// **'Expand calendar'**
+  String get dailyChoiceCalendarExpand;
+
+  /// Команда сворачивания календаря из сетки месяца в неделю даты просмотра
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse calendar'**
+  String get dailyChoiceCalendarCollapse;
+
+  /// Команда просмотра предыдущей недели в свёрнутом календаре без выбора дня
+  ///
+  /// In en, this message translates to:
+  /// **'Previous week'**
+  String get dailyChoiceCalendarPreviousWeek;
+
+  /// Команда просмотра следующей недели в свёрнутом календаре без выбора дня
+  ///
+  /// In en, this message translates to:
+  /// **'Next week'**
+  String get dailyChoiceCalendarNextWeek;
+
+  /// Команда просмотра предыдущего месяца в раскрытом календаре без выбора дня
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get dailyChoiceCalendarPreviousMonth;
+
+  /// Команда просмотра следующего месяца в раскрытом календаре без выбора дня
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get dailyChoiceCalendarNextMonth;
 
   /// Фильтр по выполнению
   ///

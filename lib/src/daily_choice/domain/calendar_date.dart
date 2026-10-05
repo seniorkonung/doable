@@ -21,6 +21,12 @@ final class CalendarDateValidationException implements Exception {
 final class CalendarDate {
   const CalendarDate._(this.year, this.month, this.day);
 
+  /// Первая допустимая дата.
+  static const CalendarDate earliest = CalendarDate._(1, 1, 1);
+
+  /// Последняя допустимая дата.
+  static const CalendarDate latest = CalendarDate._(9999, 12, 31);
+
   static final RegExp _canonicalPattern = RegExp(
     r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$',
   );

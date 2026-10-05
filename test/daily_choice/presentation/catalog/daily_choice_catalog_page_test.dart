@@ -8,6 +8,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -20,9 +21,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/daily_choice_local_date.dart';
 import '../../../support/favorite_read_contract_test_fallback.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
+import 'daily_choice_calendar_test_support.dart';
 
 void main() {
   for (final (locale, label) in [
@@ -85,60 +88,518 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('фильтры, подгрузка и сброс возвращают полный охват', (
-    tester,
-  ) async {
+  testWidgets('охват выполнения и сброс сохраняют выбранный день и просмотр '
+      'календаря', (tester) async {
     final repository = _Repository();
     await _open(tester, repository);
+    final l10n = lookupAppLocalizations(const Locale('ru'));
+    expect(repository.queries.single.date, _today);
+    expect(repository.queries.single.isCompleted, isNull);
     repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
     await tester.pumpAndSettle();
     expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
     await tester.pump();
     expect(repository.queries[1].cursor, isA<_Cursor>());
+    expect(repository.queries[1].date, _today);
     repository.completeMore(1, [_item(2)]);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-date-filter')),
-      '2026-09-24',
-    );
-    await tester.tap(find.byKey(const ValueKey('daily-choice-apply-date')));
+    final selectedDay = date(2026, 9, 25);
+    await tester.tap(calendarDay(selectedDay));
     await tester.pump();
-    expect(repository.queries[2].date, CalendarDate.fromParts(2026, 9, 24));
-    repository.completeFirst([_item(2)], index: 2, total: 1);
+    expect(repository.queries[2].date, selectedDay);
+    repository.completeFirst([_item(2, date: selectedDay)], index: 2, total: 1);
     await tester.pumpAndSettle();
+
+    // Просмотр другой недели не меняет условий выдачи, а смена охвата и сброс
+    // не меняют просматриваемую неделю.
+    await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+    final viewed = week(date(2026, 10, 2));
+    expect(_calendar(tester).viewport, viewed);
+    expect(repository.queries, hasLength(3));
+
     await tester.tap(
       find.byKey(const ValueKey('daily-choice-completion-filter')),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Выполненные').last);
     await tester.pump();
+    expect(repository.queries, hasLength(4));
+    expect(repository.queries[3].date, selectedDay);
     expect(repository.queries[3].isCompleted, true);
+    expect(repository.queries[3].cursor, isNull);
+    expect(_calendar(tester).viewport, viewed);
     repository.completeFirst([], index: 3, total: 0);
     await tester.pumpAndSettle();
     expect(find.text('Дневных выборов по фильтрам нет.'), findsOneWidget);
+
     await tester.tap(find.byKey(const ValueKey('daily-choice-clear-filters')));
     await tester.pump();
-    expect(repository.queries[4].date, isNull);
+    expect(repository.queries, hasLength(5));
+    expect(repository.queries[4].date, selectedDay);
     expect(repository.queries[4].isCompleted, isNull);
-    repository.completeFirst([_item(1), _item(2)], index: 4, total: 2);
+    expect(_calendar(tester).selectedDate, selectedDay);
+    expect(_calendar(tester).viewport, viewed);
+    repository.completeFirst([_item(2, date: selectedDay)], index: 4, total: 1);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
     expect(find.text('Все состояния'), findsOneWidget);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-date-filter')),
-      '2026-02-30',
-    );
-    await tester.tap(find.byKey(const ValueKey('daily-choice-apply-date')));
+    // Сброс при полном охвате ничего не читает и не снимает выбранный день.
+    await tester.tap(find.byKey(const ValueKey('daily-choice-clear-filters')));
     await tester.pump();
-    expect(
-      find.text('Введите корректную дату в формате ГГГГ-ММ-ДД.'),
-      findsOneWidget,
-    );
     expect(repository.queries, hasLength(5));
+    expect(_calendar(tester).selectedDate, selectedDay);
+    expect(find.text(_selectedDateLabel(tester, selectedDay)), findsOneWidget);
+  });
+
+  group('встроенный календарь', () {
+    testWidgets('первое открытие выбирает сегодня в свёрнутой неделе и читает '
+        'только этот день вместо ручного ввода даты', (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+
+      final calendar = _calendar(tester);
+      expect(calendar.selectedDate, _today);
+      expect(calendar.today, _today);
+      expect(calendar.viewport, week(_today));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
+      expect(find.text(_selectedDateLabel(tester, _today)), findsOneWidget);
+      final query = repository.queries.single;
+      expect(query.date, _today);
+      expect(query.isCompleted, isNull);
+      expect(query.cursor, isNull);
+      expect(find.byType(TextField), findsNothing);
+      expect(
+        find.byKey(const ValueKey('daily-choice-apply-date')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('календарь стоит первым в общей прокрутке над фильтром '
+        'выполнения и выдачей', (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+      repository.completeFirst([_item(1)], total: 1);
+      await tester.pumpAndSettle();
+
+      final scroll = tester.widget<CustomScrollView>(
+        find.byType(CustomScrollView),
+      );
+      final first = scroll.slivers.first;
+      expect(first, isA<SliverToBoxAdapter>());
+      expect(
+        find.descendant(
+          of: find.byWidget(first),
+          matching: find.byType(DailyChoiceCalendar),
+        ),
+        findsOneWidget,
+      );
+      final calendarBottom = tester
+          .getRect(find.byType(DailyChoiceCalendar))
+          .bottom;
+      for (final key in _filterKeys) {
+        expect(
+          tester.getRect(find.byKey(ValueKey(key))).top,
+          greaterThanOrEqualTo(calendarBottom),
+          reason: key,
+        );
+      }
+    });
+
+    testWidgets('нажатие другого дня недели синхронно начинает одну первую '
+        'порцию с прежним охватом и не показывает выдачу прежнего дня', (
+      tester,
+    ) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+      repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
+      await tester.pump();
+      repository.completeMore(1, [_item(2)]);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-completion-filter')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Не выполненные').last);
+      await tester.pump();
+      repository.completeFirst(
+        [_item(1), _item(2)],
+        index: 2,
+        total: 3,
+        cursor: const _Cursor(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
+
+      final nextDay = date(2026, 9, 25);
+      await tester.tap(calendarDay(nextDay));
+
+      // Выбор применён до следующего кадра.
+      expect(repository.queries, hasLength(4));
+      final query = repository.queries[3];
+      expect(query.date, nextDay);
+      expect(query.isCompleted, false);
+      expect(query.cursor, isNull);
+
+      await tester.pump();
+      expect(_calendar(tester).selectedDate, nextDay);
+      expect(_calendar(tester).viewport, week(nextDay));
+      expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
+      expect(find.text('Всего дневных выборов: 3'), findsNothing);
+      expect(find.byKey(const ValueKey('daily-choice-row-1')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('daily-choice-load-more')),
+        findsNothing,
+      );
+
+      repository.completeFirst([_item(3, date: nextDay)], index: 3, total: 1);
+      await tester.pumpAndSettle();
+      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
+      expect(repository.queries, hasLength(4));
+    });
+
+    testWidgets('в раскрытом месяце 2028-02-29 выбирается после просмотра '
+        'соседнего месяца, а календарь остаётся раскрытым', (tester) async {
+      final today = date(2028, 1, 20);
+      final leapDay = date(2028, 2, 29);
+      final repository = _Repository();
+      await _open(tester, repository, today: today);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      repository.completeFirst([], total: 0);
+      await tester.pumpAndSettle();
+
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
+      expect(_calendar(tester).viewport, month(today));
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
+      expect(_calendar(tester).viewport, month(date(2028, 2, 1)));
+      expect(visibleWeeks(tester), weeksFrom(date(2028, 1, 31), 5));
+      // Выбранный день вне просматриваемого месяца остаётся названным.
+      expect(find.text(_selectedDateLabel(tester, today)), findsOneWidget);
+      expect(repository.queries, hasLength(1));
+
+      await tester.tap(calendarDay(leapDay));
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries[1].date, leapDay);
+      expect(repository.queries[1].isCompleted, isNull);
+
+      await _settleCalendar(tester);
+      expect(_calendar(tester).selectedDate, leapDay);
+      expect(_calendar(tester).viewport, month(leapDay));
+      expect(visibleWeeks(tester), weeksFrom(date(2028, 1, 31), 5));
+      expect(find.byTooltip(l10n.dailyChoiceCalendarCollapse), findsOneWidget);
+      expect(find.text(_selectedDateLabel(tester, leapDay)), findsOneWidget);
+      expect(repository.queries, hasLength(2));
+    });
+
+    testWidgets('перелистывание, раскрытие и сворачивание меняют только '
+        'просмотр, не прерывая чтение и сохраняя выдачу', (tester) async {
+      final today = date(2026, 10, 4);
+      final repository = _Repository();
+      await _open(tester, repository, today: today);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+
+      // Первое чтение ещё не завершено: просмотр его не отменяет и не
+      // повторяет.
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      expect(_calendar(tester).viewport, week(date(2026, 10, 11)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
+      await _swipeCalendar(tester, toNext: true);
+      expect(_calendar(tester).viewport, week(date(2026, 10, 18)));
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousWeek);
+      expect(_calendar(tester).viewport, week(date(2026, 10, 11)));
+      expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
+      expect(repository.queries, hasLength(1));
+
+      repository.completeFirst([
+        _item(1, date: today),
+        _item(2, date: today),
+      ], total: 2);
+      await tester.pumpAndSettle();
+      final count = find.text('Всего дневных выборов: 2');
+      expect(count, findsOneWidget);
+
+      // Неделя с датой просмотра в ноябре раскрывается в ноябрь, сдвигая
+      // выдачу вниз.
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _swipeCalendar(tester, toNext: true);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      expect(_calendar(tester).viewport, week(date(2026, 11, 1)));
+      final weekCountTop = tester.getRect(count).top;
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
+      expect(_calendar(tester).viewport, month(date(2026, 11, 1)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 6));
+      expect(tester.getRect(count).top, greaterThan(weekCountTop));
+
+      await _swipeCalendar(tester, toNext: true);
+      expect(_calendar(tester).viewport, month(date(2026, 12, 1)));
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
+      expect(_calendar(tester).viewport, month(date(2026, 11, 1)));
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
+      expect(_calendar(tester).viewport, week(date(2026, 11, 1)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 26), 1));
+      expect(tester.getRect(count).top, moreOrLessEquals(weekCountTop));
+
+      // Свёрнутая неделя показывает точную дату просмотра из середины месяца.
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      expect(_calendar(tester).viewport, week(date(2026, 11, 15)));
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
+      expect(_calendar(tester).viewport, week(date(2026, 11, 15)));
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 11, 9), 1));
+
+      expect(repository.queries, hasLength(1));
+      expect(_calendar(tester).selectedDate, today);
+      expect(find.text(_selectedDateLabel(tester, today)), findsOneWidget);
+      expect(count, findsOneWidget);
+      expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
+    });
+
+    testWidgets('повторное нажатие выбранного дня возвращает к нему просмотр '
+        'без чтения', (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      repository.completeFirst([_item(1)], total: 1);
+      await tester.pumpAndSettle();
+
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextMonth);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
+      expect(_calendar(tester).viewport, month(date(2026, 9, 1)));
+
+      await tester.tap(calendarDay(_today));
+      await _settleCalendar(tester);
+      expect(_calendar(tester).selectedDate, _today);
+      expect(_calendar(tester).viewport, month(_today));
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
+      expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
+
+      expect(repository.queries, hasLength(1));
+      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
+    });
+
+    testWidgets('при отказе выбранный день сохраняется, его повторное '
+        'нажатие не заменяет повтор, а другой день выбирается', (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      final futureDay = date(2026, 9, 26);
+      await tester.tap(calendarDay(futureDay));
+      await tester.pump();
+      repository.failFirst(index: 1);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsOneWidget);
+      expect(_calendar(tester).selectedDate, futureDay);
+
+      await tester.tap(calendarDay(futureDay));
+      await tester.pump();
+      expect(repository.queries, hasLength(2));
+      expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, l10n.commonRetry));
+      await tester.pump();
+      expect(repository.queries, hasLength(3));
+      expect(repository.queries[2].date, futureDay);
+      expect(repository.queries[2].cursor, isNull);
+      repository.failFirst(index: 2);
+      await tester.pumpAndSettle();
+      expect(_calendar(tester).selectedDate, futureDay);
+
+      final otherDay = date(2026, 9, 27);
+      await tester.tap(calendarDay(otherDay));
+      expect(repository.queries, hasLength(4));
+      expect(repository.queries[3].date, otherDay);
+      await tester.pump();
+      expect(_calendar(tester).selectedDate, otherDay);
+      expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsNothing);
+    });
+
+    testWidgets('поздний ответ за 2026-10-05 не возвращает его выдачу после '
+        'выбора 2026-10-06', (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository, today: date(2026, 10, 7));
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      final firstDay = date(2026, 10, 5);
+      final secondDay = date(2026, 10, 6);
+      await tester.tap(calendarDay(firstDay));
+      await tester.pump();
+      await tester.tap(calendarDay(secondDay));
+      await tester.pump();
+      expect(repository.queries.map((query) => query.date), [
+        date(2026, 10, 7),
+        firstDay,
+        secondDay,
+      ]);
+
+      repository.completeFirst([_item(3, date: secondDay)], index: 2, total: 1);
+      await tester.pumpAndSettle();
+      repository.completeFirst(
+        [_item(1, date: firstDay), _item(2, date: firstDay)],
+        index: 1,
+        total: 3,
+        cursor: const _Cursor(),
+      );
+      repository.failFirst();
+      await tester.pumpAndSettle();
+
+      expect(_calendar(tester).selectedDate, secondDay);
+      expect(find.text(_selectedDateLabel(tester, secondDay)), findsOneWidget);
+      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('daily-choice-row-2')), findsNothing);
+      expect(
+        find.textContaining(secondDay.toCanonicalString()),
+        findsOneWidget,
+      );
+      expect(find.textContaining(firstDay.toCanonicalString()), findsNothing);
+      expect(
+        find.byKey(const ValueKey('daily-choice-load-more')),
+        findsNothing,
+      );
+      expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsNothing);
+      expect(repository.queries, hasLength(3));
+    });
+
+    testWidgets('просмотр календаря до завершения первой порции и подгрузки '
+        'выбранного дня не отменяет и не повторяет их', (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      repository.completeFirst([], total: 0);
+      await tester.pumpAndSettle();
+      final selectedDay = date(2026, 9, 25);
+      await tester.tap(calendarDay(selectedDay));
+      await tester.pump();
+      expect(repository.queries, hasLength(2));
+
+      // Первая порция выбранного дня ещё читается.
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarNextWeek);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarExpand);
+      await _swipeCalendar(tester, toNext: true);
+      expect(_calendar(tester).viewport, month(date(2026, 11, 1)));
+      expect(find.text(l10n.dailyChoiceCatalogLoading), findsOneWidget);
+      expect(repository.queries, hasLength(2));
+      repository.completeFirst(
+        [_item(1, date: selectedDay)],
+        index: 1,
+        total: 2,
+        cursor: const _Cursor(),
+      );
+      await _settleCalendar(tester);
+      expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
+      expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
+
+      // Подгрузка выбранного дня ещё читается.
+      await tester.tap(find.byKey(const ValueKey('daily-choice-load-more')));
+      await tester.pump();
+      expect(repository.queries, hasLength(3));
+      expect(repository.queries[2].date, selectedDay);
+      expect(repository.queries[2].cursor, isA<_Cursor>());
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarPreviousMonth);
+      await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
+      await _swipeCalendar(tester, toNext: false);
+      expect(_calendar(tester).viewport, week(date(2026, 9, 24)));
+      expect(find.text(l10n.dailyChoiceCatalogLoadingMore), findsOneWidget);
+      expect(repository.queries, hasLength(3));
+      repository.completeMore(2, [_item(2, date: selectedDay)]);
+      await _settleCalendar(tester);
+
+      expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
+      expect(find.text(l10n.dailyChoiceCatalogLoadingMore), findsNothing);
+      expect(_calendar(tester).selectedDate, selectedDay);
+      expect(repository.queries, hasLength(3));
+    });
+
+    testWidgets('повреждение и неизвестный отказ объясняются без повтора, '
+        'временный отказ подгрузки повторяется для выбранного дня, а другой '
+        'день выбирается из каждого отказа', (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      final retry = find.widgetWithText(TextButton, l10n.commonRetry);
+      final loadMore = find.byKey(const ValueKey('daily-choice-load-more'));
+
+      repository.fail(0, const DailyChoiceCatalogCorruptionFailure());
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceCatalogCorruption), findsOneWidget);
+      expect(retry, findsNothing);
+
+      final secondDay = date(2026, 9, 25);
+      await tester.tap(calendarDay(secondDay));
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries[1].date, secondDay);
+      expect(repository.queries[1].cursor, isNull);
+      repository.completeFirst(
+        [_item(1, date: secondDay)],
+        index: 1,
+        total: 2,
+        cursor: const _Cursor(),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(loadMore);
+      await tester.pump();
+      repository.fail(2, const DailyChoiceCatalogUnexpectedFailure());
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceCatalogUnexpected), findsOneWidget);
+      expect(retry, findsNothing);
+      expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
+
+      final thirdDay = date(2026, 9, 26);
+      await tester.tap(calendarDay(thirdDay));
+      expect(repository.queries, hasLength(4));
+      expect(repository.queries[3].date, thirdDay);
+      expect(repository.queries[3].cursor, isNull);
+      repository.completeFirst(
+        [_item(2, date: thirdDay)],
+        index: 3,
+        total: 2,
+        cursor: const _Cursor(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceCatalogUnexpected), findsNothing);
+      await tester.tap(loadMore);
+      await tester.pump();
+      repository.failFirst(index: 4);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsOneWidget);
+
+      await tester.tap(retry);
+      await tester.pump();
+      expect(repository.queries, hasLength(6));
+      expect(repository.queries[5].date, thirdDay);
+      expect(repository.queries[5].isCompleted, isNull);
+      expect(repository.queries[5].cursor, isA<_Cursor>());
+      repository.completeMore(5, [_item(3, date: thirdDay)]);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
+      expect(_calendar(tester).selectedDate, thirdDay);
+    });
+
+    testWidgets('пустая выдача сохраняет выбранный день и позволяет выбрать '
+        'другой', (tester) async {
+      final repository = _Repository();
+      await _open(tester, repository);
+      repository.completeFirst([], total: 0);
+      await tester.pumpAndSettle();
+      expect(find.text('Дневных выборов по фильтрам нет.'), findsOneWidget);
+      expect(_calendar(tester).selectedDate, _today);
+
+      final otherDay = date(2026, 9, 23);
+      await tester.tap(calendarDay(otherDay));
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries[1].date, otherDay);
+      await tester.pump();
+      expect(_calendar(tester).selectedDate, otherDay);
+      expect(_calendar(tester).viewport, week(otherDay));
+    });
   });
 
   testWidgets('различает ошибку чтения и повторную попытку на английском', (
@@ -169,18 +630,18 @@ void main() {
       cursor: const _Cursor(),
     );
     await tester.pumpAndSettle();
-    final dateFilter = find.byKey(const ValueKey('daily-choice-date-filter'));
+    final calendar = find.byType(DailyChoiceCalendar);
     final count = find.text('Всего дневных выборов: 21');
     final row = find.byKey(const ValueKey('daily-choice-row-2'));
     final before = [
-      for (final finder in [dateFilter, count, row]) tester.getRect(finder).top,
+      for (final finder in [calendar, count, row]) tester.getRect(finder).top,
     ];
 
     await tester.drag(row, const Offset(0, -100));
     await tester.pumpAndSettle();
 
     final shifts = [
-      for (final (index, finder) in [dateFilter, count, row].indexed)
+      for (final (index, finder) in [calendar, count, row].indexed)
         before[index] - tester.getRect(finder).top,
     ];
     expect(shifts.first, greaterThan(0));
@@ -216,6 +677,9 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
         expect(finder, findsOneWidget);
         final filtersBottom = [
+          tester
+              .getRect(find.byType(DailyChoiceCalendar, skipOffstage: false))
+              .bottom,
           for (final key in _filterKeys)
             tester
                 .getRect(find.byKey(ValueKey(key), skipOffstage: false))
@@ -272,10 +736,7 @@ void main() {
     await _open(tester, repository, size: const Size(360, 640));
     repository.completeFirst([_item(1)], total: 1);
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('daily-choice-date-filter')),
-      findsOneWidget,
-    );
+    expect(find.byType(DailyChoiceCalendar), findsOneWidget);
     expect(
       find.byKey(const ValueKey('daily-choice-completion-filter')),
       findsOneWidget,
@@ -294,19 +755,55 @@ void main() {
 /// Экран телефона, на котором фильтры и выдача делят высоту.
 const _phone = Size(400, 800);
 
-/// Фильтры каталога: поле даты, её применение, выполнение и сброс.
+/// Локальное сегодня проверок страницы и дата строк фикстуры: первое чтение
+/// каталога охватывает этот день.
+final _today = CalendarDate.fromParts(2026, 9, 24);
+
+/// Фильтры каталога под календарём: выполнение и сброс.
 const _filterKeys = [
-  'daily-choice-date-filter',
-  'daily-choice-apply-date',
   'daily-choice-completion-filter',
   'daily-choice-clear-filters',
 ];
 
-/// Открывает каталог дневных выборов; [keyboard] — высота открытой экранной
-/// клавиатуры.
+/// Календарь открытого каталога: его входы — состояние страницы и модели.
+DailyChoiceCalendar _calendar(WidgetTester tester) =>
+    tester.widget<DailyChoiceCalendar>(find.byType(DailyChoiceCalendar));
+
+/// Подпись полной выбранной даты в шапке календаря по текущей локали.
+String _selectedDateLabel(WidgetTester tester, CalendarDate value) {
+  final context = tester.element(find.byType(DailyChoiceCalendar));
+  return AppLocalizations.of(context).dailyChoiceCalendarSelectedDate(
+    MaterialLocalizations.of(context)
+        .formatFullDate(DateTime.utc(value.year, value.month, value.day)),
+  );
+}
+
+/// Доводит до конца перелистывание календаря. Индикатор загрузки выдачи не
+/// даёт дождаться покоя всех анимаций, поэтому время продвигается явно.
+Future<void> _settleCalendar(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+  await tester.pump();
+}
+
+/// Выполняет команду шапки календаря по её доступному названию.
+Future<void> _tapCalendarCommand(WidgetTester tester, String label) async {
+  await tester.tap(find.byTooltip(label));
+  await _settleCalendar(tester);
+}
+
+/// Перелистывает календарь горизонтальным свайпом по дням периода.
+Future<void> _swipeCalendar(WidgetTester tester, {required bool toNext}) async {
+  await tester.drag(calendarPeriodArea, Offset(toNext ? -900 : 900, 0));
+  await _settleCalendar(tester);
+}
+
+/// Открывает каталог дневных выборов; [today] — локальное сегодня,
+/// [keyboard] — высота открытой экранной клавиатуры.
 Future<AppRouter> _open(
   WidgetTester tester,
   _Repository repository, {
+  CalendarDate? today,
   Locale locale = const Locale('ru'),
   Size size = const Size(1200, 2400),
   double keyboard = 0,
@@ -321,6 +818,7 @@ Future<AppRouter> _open(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
+        ControlledDailyChoiceLocalDate(today ?? _today).override,
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(
@@ -385,9 +883,12 @@ final class _Repository
     );
   }
 
-  void failFirst() => _requests[0].complete(
+  void failFirst({int index = 0}) => _requests[index].complete(
     const DailyChoiceCatalogPageError(DailyChoiceCatalogUnavailableFailure()),
   );
+
+  void fail(int index, DailyChoiceCatalogReadFailure failure) =>
+      _requests[index].complete(DailyChoiceCatalogPageError(failure));
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -420,23 +921,24 @@ final class _Cursor implements DailyChoiceCatalogCursor {
   const _Cursor();
 }
 
-DailyChoiceCatalogItem _item(int number) => DailyChoiceCatalogItem(
-  id: _id(number),
-  source: DailyChoiceCatalogParticipant(
-    id: _intentionId(1),
-    title: 'Основание',
-    archiveState: IntentionArchiveState.archived,
-    readiness: IntentionReadiness.notReady,
-  ),
-  selected: DailyChoiceCatalogParticipant(
-    id: _intentionId(2),
-    title: 'Действие',
-    archiveState: IntentionArchiveState.active,
-    readiness: IntentionReadiness.ready,
-  ),
-  date: CalendarDate.fromParts(2026, 9, 24),
-  isCompleted: false,
-);
+DailyChoiceCatalogItem _item(int number, {CalendarDate? date}) =>
+    DailyChoiceCatalogItem(
+      id: _id(number),
+      source: DailyChoiceCatalogParticipant(
+        id: _intentionId(1),
+        title: 'Основание',
+        archiveState: IntentionArchiveState.archived,
+        readiness: IntentionReadiness.notReady,
+      ),
+      selected: DailyChoiceCatalogParticipant(
+        id: _intentionId(2),
+        title: 'Действие',
+        archiveState: IntentionArchiveState.active,
+        readiness: IntentionReadiness.ready,
+      ),
+      date: date ?? _today,
+      isCompleted: false,
+    );
 
 DailyChoiceId _id(int number) => (DailyChoiceId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',

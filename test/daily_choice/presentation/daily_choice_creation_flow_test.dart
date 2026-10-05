@@ -22,6 +22,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
+import '../../support/daily_choice_catalog_controls.dart';
+import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -234,10 +236,19 @@ void main() {
           await _seed(harness);
           await _seedPreviousChoice(harness);
         });
+        // Каталог открывается на дне прежнего выбора. Выбор снизу создаётся
+        // на тот же день, выбор сверху — на другой.
+        final catalogToday = CalendarDate.fromParts(2030, 9, 24);
+        final createdDate = bottomUp
+            ? catalogToday
+            : CalendarDate.fromParts(2024, 9, 24);
         final runtime = AppRuntime(
           connectionFactory: () =>
               openFileBackedLocalDatabase(harness.databaseFile),
           diagnosticsSink: InMemoryDiagnosticsSink(),
+          dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
+            catalogToday,
+          ).read,
         );
         addTearDown(() async {
           await tester.pumpWidget(const SizedBox.shrink());
@@ -356,7 +367,7 @@ void main() {
 
         await tester.enterText(
           find.byKey(const ValueKey('daily-choice-date')),
-          bottomUp ? '2030-09-24' : '2024-09-24',
+          createdDate.toCanonicalString(),
         );
         if (bottomUp) {
           await tester.enterText(
@@ -383,10 +394,7 @@ void main() {
         expect(source.choice.date, CalendarDate.fromParts(2030, 9, 24));
         expect(source.choice.description?.value, 'Описание источника');
         expect(source.choice.isCompleted, isTrue);
-        expect(
-          created.choice.date,
-          CalendarDate.fromParts(bottomUp ? 2030 : 2024, 9, 24),
-        );
+        expect(created.choice.date, createdDate);
         expect(
           created.choice.description?.value,
           bottomUp ? 'Описание источника' : null,
@@ -405,40 +413,52 @@ void main() {
           await tester.pumpAndSettle();
           await openDailyChoices(tester, tap: _tap);
         }
-        await _waitFor(
-          tester,
-          find.byKey(const ValueKey('daily-choice-row-2')),
-        );
-        final expectedOrder = bottomUp
-            ? [ids.last, ids.first]
-            : [ids.first, ids.last];
-        for (var index = 0; index < expectedOrder.length; index += 1) {
-          await _tap(
-            tester,
-            find.byKey(ValueKey('daily-choice-row-${index + 1}')),
-          );
+        // Каталог показывает выборы одного дня: выбор, созданный на другой
+        // день, человек находит, выбрав этот день.
+        final expectedDays = bottomUp
+            ? [
+                (catalogToday, [ids.last, ids.first]),
+              ]
+            : [
+                (catalogToday, [ids.first]),
+                (createdDate, [ids.last]),
+              ];
+        for (final (day, expectedOrder) in expectedDays) {
+          if (day != catalogToday) {
+            await selectDailyChoiceCatalogDate(tester, day, tap: _tap);
+          }
           await _waitFor(
             tester,
-            find.byKey(const ValueKey('daily-choice-edit-open')),
+            find.byKey(ValueKey('daily-choice-row-${expectedOrder.length}')),
           );
-          expect(
-            tester
-                .widget<DailyChoiceDetailsPage>(
-                  find.byType(DailyChoiceDetailsPage),
-                )
-                .choiceId,
-            expectedOrder[index],
-          );
-          expect(
-            find.byKey(const ValueKey('daily-choice-relation-1')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const ValueKey('daily-choice-relation-2')),
-            findsOneWidget,
-          );
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
+          for (var index = 0; index < expectedOrder.length; index += 1) {
+            await _tap(
+              tester,
+              find.byKey(ValueKey('daily-choice-row-${index + 1}')),
+            );
+            await _waitFor(
+              tester,
+              find.byKey(const ValueKey('daily-choice-edit-open')),
+            );
+            expect(
+              tester
+                  .widget<DailyChoiceDetailsPage>(
+                    find.byType(DailyChoiceDetailsPage),
+                  )
+                  .choiceId,
+              expectedOrder[index],
+            );
+            expect(
+              find.byKey(const ValueKey('daily-choice-relation-1')),
+              findsOneWidget,
+            );
+            expect(
+              find.byKey(const ValueKey('daily-choice-relation-2')),
+              findsOneWidget,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+          }
         }
       },
     );
@@ -455,10 +475,15 @@ void main() {
 
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
       await tester.runAsync(() => _seed(harness));
+      // Каталог открывается на дне выборов, которые сценарий создаёт
+      // последними.
       final runtime = AppRuntime(
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
+          CalendarDate.fromParts(2030, 9, 24),
+        ).read,
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
@@ -716,10 +741,14 @@ void main() {
 
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
       await tester.runAsync(() => _seed(harness));
+      // Каталог открывается на дне создаваемого выбора.
       final runtime = AppRuntime(
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
+          CalendarDate.fromParts(2026, 9, 25),
+        ).read,
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());

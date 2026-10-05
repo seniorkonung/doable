@@ -50,7 +50,7 @@ final class DailyChoiceCatalogViewModelProvider
 }
 
 String _$dailyChoiceCatalogViewModelHash() =>
-    r'46028122163b8541901e6ca06941cd56e73da99b';
+    r'bcf85038a3fd6e44219e73f041eb082fb04fe4b4';
 
 /// Согласовывает ограниченную загруженную часть с подтверждённым графом.
 

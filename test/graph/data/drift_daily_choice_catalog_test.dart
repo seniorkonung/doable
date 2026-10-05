@@ -18,10 +18,26 @@ String _uuid(int number) =>
 final class _ReadProbe extends LocalDatabaseConnectionObserver {
   final statements = <String>[];
 
+  /// Аргументы чтений в порядке [statements].
+  final arguments = <List<Object?>>[];
+
+  void clear() {
+    statements.clear();
+    arguments.clear();
+  }
+
+  /// Чтения, текст которых содержит [fragment], вместе с аргументами.
+  List<({String sql, List<Object?> arguments})> matching(String fragment) => [
+    for (var index = 0; index < statements.length; index++)
+      if (statements[index].contains(fragment))
+        (sql: statements[index], arguments: arguments[index]),
+  ];
+
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation == LocalDatabaseSqlOperation.select) {
       statements.add(statement.statements.single);
+      arguments.add(statement.arguments);
     }
   }
 }
@@ -185,7 +201,7 @@ void main() {
         'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
         [_uuid(201)],
       );
-      probe.statements.clear();
+      probe.clear();
 
       final first = page(
         await repository.getDailyChoiceCatalogPage(
@@ -419,5 +435,180 @@ void main() {
           .length,
       2,
     );
+  });
+
+  test('выдача одного дня отдаёт больше пятидесяти полных дубликатов порциями '
+      'по 50 по убыванию создания и не читает соседние дни', () async {
+    // Записи прошлого и будущего дня перемежаются с записями выбранного дня
+    // в порядке создания, поэтому граница дня проверяется в каждой порции.
+    final day = CalendarDate.fromParts(2026, 9, 23);
+    final created = <String>[];
+    final neighbours = <String>{};
+    for (var index = 0; index < 120; index++) {
+      addChoice(300 + index);
+      created.add(_uuid(300 + index));
+      if (index % 10 == 0) {
+        addChoice(600 + index, date: '2026-09-22', completed: 1);
+        addChoice(800 + index, date: '2026-09-24');
+        neighbours.addAll([_uuid(600 + index), _uuid(800 + index)]);
+      }
+    }
+    probe.clear();
+
+    final pages = <DailyChoiceCatalogPage>[];
+    DailyChoiceCatalogCursor? cursor;
+    do {
+      final next = page(
+        await repository.getDailyChoiceCatalogPage(
+          DailyChoiceCatalogQuery(date: day, cursor: cursor),
+        ),
+      );
+      pages.add(next);
+      cursor = next.nextCursor;
+    } while (cursor != null);
+
+    expect(pages.map((portion) => portion.items.length), [50, 50, 20]);
+    expect(
+      pages.first,
+      isA<DailyChoiceCatalogFirstPage>().having(
+        (first) => first.totalCount,
+        'точное количество дня',
+        120,
+      ),
+    );
+    expect(
+      pages.skip(1),
+      everyElement(isA<DailyChoiceCatalogContinuationPage>()),
+    );
+    final items = [for (final portion in pages) ...portion.items];
+    expect(items.map((item) => item.id.toCanonicalString()), created.reversed);
+    expect(items.map((item) => item.date), everyElement(day));
+    // Полные дубликаты остаются самостоятельными записями: одинаковы
+    // участники, дата и выполнение, различаются только идентификаторы.
+    expect(
+      items
+          .map(
+            (item) =>
+                (item.source.id, item.selected.id, item.date, item.isCompleted),
+          )
+          .toSet(),
+      hasLength(1),
+    );
+
+    // Каждое чтение строк и количества ограничено выбранным днём, порция
+    // строк — пятьюдесятью и признаком продолжения, а пути проверяются
+    // только для строк порции.
+    final dayReads = probe.matching('FROM daily_choices');
+    expect(dayReads, hasLength(4));
+    for (final read in dayReads) {
+      expect(read.sql, contains('choice_date = ?'));
+      expect(read.arguments.first, '2026-09-23');
+    }
+    expect(probe.matching('COUNT(*) AS total_count'), hasLength(1));
+    expect(
+      probe
+          .matching('ORDER BY choice_date DESC')
+          .map((read) => read.arguments.last),
+      [51, 51, 51],
+    );
+    final steps = probe.matching('FROM daily_choice_path_steps');
+    expect(steps.map((read) => read.arguments.length), [50, 50, 20]);
+    for (final read in steps) {
+      expect(read.sql, contains('WHERE daily_choice_id IN'));
+    }
+    expect({for (final read in steps) ...read.arguments}, created.toSet());
+    expect([
+      for (final read in probe.matching('FROM long_term_relations')) read.sql,
+      for (final read in probe.matching('FROM intentions')) read.sql,
+    ], everyElement(contains('WHERE id IN')));
+    expect(probe.matching('WITH RECURSIVE'), isEmpty);
+
+    // Продолжение выбранного дня не продолжает другой день или выдачу без
+    // даты.
+    for (final foreign in [
+      DailyChoiceCatalogQuery(
+        date: CalendarDate.fromParts(2026, 9, 24),
+        cursor: pages.first.nextCursor,
+      ),
+      DailyChoiceCatalogQuery(cursor: pages.first.nextCursor),
+    ]) {
+      expect(
+        await repository.getDailyChoiceCatalogPage(foreign),
+        isA<DailyChoiceCatalogPageError>().having(
+          (result) => result.failure.category,
+          'категория',
+          GraphFailureCategory.validation,
+        ),
+      );
+    }
+
+    // Внутренний запрос без даты по-прежнему охватывает все дни.
+    final undated = page(
+      await repository.getDailyChoiceCatalogPage(DailyChoiceCatalogQuery()),
+    ) as DailyChoiceCatalogFirstPage;
+    expect(undated.totalCount, 120 + neighbours.length);
+    expect(undated.items.first.id.toCanonicalString(), _uuid(910));
+  });
+
+  test('прошлые и будущие дни, выполненные записи и записи с архивными '
+      'участниками и шагами доступны выбором дня и выполнения', () async {
+    // Намерение 2 и обе связи пути архивированы: в коротком пути архивно
+    // выбранное действие, в длинном — промежуточный шаг.
+    addChoice(201, date: '2026-09-22', completed: 1);
+    addChoice(202, date: '2026-09-22');
+    addChoice(203, date: '2027-01-01', longPath: true);
+    addChoice(204, date: '2027-01-01', completed: 1, longPath: true);
+    final past = CalendarDate.fromParts(2026, 9, 22);
+    final future = CalendarDate.fromParts(2027, 1, 1);
+
+    for (final (date, completion, expected) in [
+      (past, null, [202, 201]),
+      (past, true, [201]),
+      (past, false, [202]),
+      (future, null, [204, 203]),
+      (future, true, [204]),
+      (future, false, [203]),
+      (CalendarDate.fromParts(2026, 9, 23), null, <int>[]),
+    ]) {
+      final result = page(
+        await repository.getDailyChoiceCatalogPage(
+          DailyChoiceCatalogQuery(date: date, isCompleted: completion),
+        ),
+      ) as DailyChoiceCatalogFirstPage;
+      expect(
+        result.items.map((item) => item.id.toCanonicalString()),
+        expected.map(_uuid),
+        reason: 'день $date, выполнение $completion',
+      );
+      expect(result.totalCount, expected.length);
+      expect(result.nextCursor, isNull);
+      expect(result.items.map((item) => item.date), everyElement(date));
+      if (completion != null) {
+        expect(
+          result.items.map((item) => item.isCompleted),
+          everyElement(completion),
+        );
+      }
+    }
+
+    final archivedAction = page(
+      await repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(date: past, isCompleted: true),
+      ),
+    ).items.single;
+    expect(archivedAction.selected.title, 'Намерение 2');
+    expect(
+      archivedAction.selected.archiveState,
+      IntentionArchiveState.archived,
+    );
+    expect(archivedAction.source.archiveState, IntentionArchiveState.active);
+    final archivedStep = page(
+      await repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(date: future, isCompleted: false),
+      ),
+    ).items.single;
+    expect(archivedStep.selected.title, 'Намерение 3');
+    expect(archivedStep.selected.archiveState, IntentionArchiveState.active);
+    expect(archivedStep.selected.readiness, IntentionReadiness.notReady);
   });
 }

@@ -6,6 +6,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
@@ -26,6 +27,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/daily_choice_catalog_controls.dart';
+import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -46,6 +49,10 @@ const _dailyChoicePageSize = 50;
 const _relation = 1001;
 const _firstChoice = 2001;
 const _firstPathStep = 4001;
+
+/// Локальное сегодня приложения и день всех дневных выборов фикстуры:
+/// каталог дневных выборов открывается на дне со всей выдачей.
+final _today = CalendarDate.fromParts(2026, 9, 25);
 
 /// Системные вставки окна, как их сообщает платформа.
 final class _Insets {
@@ -342,7 +349,7 @@ void main() {
           final page = find.byType(DailyChoiceCatalogPage);
 
           if (insets.keyboard > 0) {
-            await _focusDateFilter(tester, insets);
+            _expectDateControlAboveKeyboard(tester, insets);
           }
 
           await _scrollToEnd(tester, page);
@@ -382,8 +389,8 @@ void main() {
           await tester.tap(lastRow);
           await _until(tester, find.byType(DailyChoiceDetailsPage));
           await tester.pumpAndSettle();
-          // Порядок — от поздних дат к ранним: первый дневной выбор стоит
-          // последним.
+          // Записи одного дня идут от поздних к ранним по созданию: первый
+          // дневной выбор стоит последним.
           expect(
             tester
                 .widget<DailyChoiceDetailsPage>(
@@ -418,7 +425,7 @@ void main() {
           );
           final page = find.byType(DailyChoiceCatalogPage);
           if (insets.keyboard > 0) {
-            await _focusDateFilter(tester, insets);
+            _expectDateControlAboveKeyboard(tester, insets);
           }
           await _scrollToEnd(tester, page);
 
@@ -642,8 +649,6 @@ const _mainActions = <AppDestination, ({Key key, Type opens})>{
 
 final _titleFilter = find.byKey(const ValueKey('catalog-filter-field'));
 
-final _dateFilter = find.byKey(const ValueKey('daily-choice-date-filter'));
-
 final _createDailyChoice = find.byKey(
   const ValueKey('daily-choice-create-from-action'),
 );
@@ -792,6 +797,7 @@ Future<_App> _start(
       };
     },
     diagnosticsSink: InMemoryDiagnosticsSink(),
+    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_today).read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -806,7 +812,7 @@ Future<_App> _start(
 }
 
 /// Намерения, одна отметка избранного, связь и дневные выборы по ней на
-/// разные даты: каждая корневая страница получает содержимое.
+/// локальное сегодня: каждая корневая страница получает содержимое.
 void _seed(
   sqlite.Database database, {
   required int intentions,
@@ -825,9 +831,7 @@ void _seed(
     'VALUES (?, ?, ?, ?, ?, ?)',
     [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
   );
-  final firstDate = DateTime.utc(2026);
   for (var index = 0; index < dailyChoices; index++) {
-    final date = firstDate.add(Duration(days: index));
     database.execute(
       'INSERT INTO daily_choices (id, source_intention_id, '
       'selected_intention_id, choice_date, is_completed) '
@@ -836,7 +840,7 @@ void _seed(
         tagFixtureId(_firstChoice + index),
         tagFixtureId(1),
         tagFixtureId(2),
-        date.toIso8601String().substring(0, 10),
+        _today.toCanonicalString(),
         0,
       ],
     );
@@ -963,25 +967,16 @@ Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
   );
 }
 
-/// Ставит фокус в поле фильтра даты каталога дневных выборов: поле видно над
-/// клавиатурой и не закрыто созданием дневного выбора.
-Future<void> _focusDateFilter(WidgetTester tester, _Insets insets) async {
-  await tester.showKeyboard(_dateFilter);
-  await tester.pump();
-  expect(
-    tester
-        .widget<EditableText>(
-          find.descendant(of: _dateFilter, matching: find.byType(EditableText)),
-        )
-        .focusNode
-        .hasFocus,
-    isTrue,
-  );
-  expect(_dateFilter.hitTestable(), findsOneWidget);
-  _expectFullyVisible(tester, _dateFilter, insets);
+/// Выбор дня в начале каталога дневных выборов виден над клавиатурой,
+/// принимает нажатия и не закрыт созданием дневного выбора.
+void _expectDateControlAboveKeyboard(WidgetTester tester, _Insets insets) {
+  expect(dailyChoiceCatalogDay(_today).hitTestable(), findsOneWidget);
+  _expectFullyVisible(tester, dailyChoiceCatalogDateControl, insets);
   _expectMainAction(tester, _createDailyChoice, insets);
   expect(
-    tester.getRect(_dateFilter).overlaps(tester.getRect(_createDailyChoice)),
+    tester
+        .getRect(dailyChoiceCatalogDateControl)
+        .overlaps(tester.getRect(_createDailyChoice)),
     isFalse,
   );
 }

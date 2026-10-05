@@ -14,6 +14,7 @@ import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice.dart';
 import '../../domain/daily_choice_id.dart';
 import 'daily_choice_catalog_state.dart';
+import 'daily_choice_local_date_provider.dart';
 
 part 'daily_choice_catalog_view_model.g.dart';
 
@@ -25,7 +26,13 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
   late PersonalGraphRepository _repository;
   late GraphCommandCoordinator _coordinator;
   StreamSubscription<GraphCommandCompletion>? _completions;
-  var _selection = const DailyChoiceCatalogSelection();
+
+  /// Выбор появляется при первом построении, до первого чтения каталога:
+  /// локальное сегодня со всеми состояниями выполнения. Перестроения модели
+  /// сохраняют текущий выбор и часы не перечитывают.
+  late var _selection = DailyChoiceCatalogSelection(
+    date: ref.read(dailyChoiceLocalDateSourceProvider)().date,
+  );
   var _generation = 0;
   var _invalidation = 0;
   GraphRevision? _requiredRevision;
@@ -43,11 +50,14 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
       scheduleMicrotask(() => _onCompletion(completion));
     });
     ref.onDispose(() => unawaited(_completions?.cancel()));
+    final selection = _selection;
     unawaited(_loadFirst(++_generation));
-    return DailyChoiceCatalogInitialLoad(_selection);
+    return DailyChoiceCatalogInitialLoad(selection);
   }
 
-  void selectDate(CalendarDate? date) {
+  /// Новый день сохраняет охват выполнения и начинает выдачу с первой
+  /// порции; повторный выбор того же дня ничего не читает.
+  void selectDate(CalendarDate date) {
     if (_selection.date == date) return;
     _restart(_selection.withDate(date));
   }
@@ -57,10 +67,9 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     _restart(_selection.withCompletion(isCompleted));
   }
 
-  void clearFilters() {
-    if (_selection.date == null && _selection.isCompleted == null) return;
-    _restart(const DailyChoiceCatalogSelection());
-  }
+  /// Возвращает охват всех состояний выполнения за тот же день: выбранный
+  /// день сброс не снимает.
+  void clearFilters() => selectCompletion(null);
 
   Future<void> retryFirstPage() {
     final current = state;
@@ -347,6 +356,8 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     );
   }
 
+  /// Единственная точка построения запросов модели: первые порции,
+  /// продолжения, пересборка и повторы ограничены выбранным днём.
   Future<DailyChoiceCatalogPageResult> _readPage({
     DailyChoiceCatalogCursor? cursor,
   }) async {
@@ -434,7 +445,7 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
 
   bool _matches(DailyChoice? choice) =>
       choice != null &&
-      (_selection.date == null || choice.date == _selection.date) &&
+      choice.date == _selection.date &&
       (_selection.isCompleted == null ||
           choice.isCompleted == _selection.isCompleted);
 
@@ -468,7 +479,7 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     final combined = [...loaded];
     for (final item in page) {
       if (!ids.add(item.id) ||
-          (_selection.date != null && item.date != _selection.date) ||
+          item.date != _selection.date ||
           (_selection.isCompleted != null &&
               item.isCompleted != _selection.isCompleted)) {
         return null;

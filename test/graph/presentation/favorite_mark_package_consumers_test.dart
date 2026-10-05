@@ -72,6 +72,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
+        packageConsumersLocalDate(),
       ],
       retry: (retryCount, error) => null,
     );
@@ -109,10 +110,10 @@ void main() {
       () => probes.allLoaded,
       diagnostics: probes.describe,
     );
-    // Выбор фильтра каталога дневных выборов не должен пострадать от пакета.
-    container
-        .read(dailyChoiceCatalogViewModelProvider.notifier)
-        .selectCompletion(true);
+    // Выбор фильтров каталога дневных выборов не должен пострадать от пакета.
+    container.read(dailyChoiceCatalogViewModelProvider.notifier)
+      ..selectDate(durabilityChoiceDate)
+      ..selectCompletion(true);
     await settlePackageConsumersUntil(
       () => probes.allLoaded && probes.dailyCatalogSelected,
       diagnostics: probes.describe,

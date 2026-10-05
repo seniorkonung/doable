@@ -9,7 +9,9 @@ import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
@@ -43,6 +45,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/favorite_read_contract_test_fallback.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
@@ -88,6 +91,51 @@ void main() {
         final repeated = await runtime.bootstrap();
         expect(repeated, same(ready));
         expect(repositoryFactoryCalls, 1);
+      },
+    );
+
+    test('по умолчанию предоставляет каталогу часы устройства', () async {
+      final runtime = AppRuntime(
+        connectionFactory: openInMemoryLocalDatabase,
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+        repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
+      );
+      addTearDown(runtime.shutdown);
+
+      final ready = await runtime.bootstrap() as AppRuntimeReady;
+
+      expect(
+        ready.container.read(dailyChoiceLocalDateSourceProvider),
+        same(readDeviceLocalDay),
+      );
+    });
+
+    test(
+      'передаёт каталогу подставленный источник даты без чтения при запуске',
+      () async {
+        final localDate = ControlledDailyChoiceLocalDate(
+          CalendarDate.fromParts(2026, 10, 5),
+        );
+        final runtime = AppRuntime(
+          connectionFactory: openInMemoryLocalDatabase,
+          diagnosticsSink: InMemoryDiagnosticsSink(),
+          repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
+          dailyChoiceLocalDateSource: localDate.read,
+        );
+        addTearDown(runtime.shutdown);
+
+        final ready = await runtime.bootstrap() as AppRuntimeReady;
+        final source = ready.container.read(dailyChoiceLocalDateSourceProvider);
+
+        expect(localDate.readCount, 0);
+        expect(source().date, CalendarDate.fromParts(2026, 10, 5));
+
+        localDate.today = CalendarDate.fromParts(2026, 10, 6);
+        expect(
+          ready.container.read(dailyChoiceLocalDateSourceProvider)().date,
+          CalendarDate.fromParts(2026, 10, 6),
+        );
+        expect(localDate.readCount, 2);
       },
     );
 
