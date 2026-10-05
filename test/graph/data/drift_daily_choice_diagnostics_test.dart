@@ -4,7 +4,9 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -16,6 +18,7 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/daily_choice_durability_fixture.dart';
 
@@ -477,6 +480,152 @@ void main() {
     },
   );
 
+  test('чтение каталога одного дня сообщает начало, исход и длительность '
+      'каждой категории отказа без даты и содержимого', () async {
+    expect(
+      await repository.execute(durabilityCreate()),
+      isA<GraphCommandSucceeded>(),
+    );
+    await database.customStatement(
+      '''INSERT INTO daily_choices
+           (id, source_intention_id, selected_intention_id, choice_date,
+            description, is_completed)
+           VALUES (?, ?, ?, ?, 'Секретное описание №202', 0)''',
+      [
+        durabilityUuid(202),
+        durabilityUuid(1),
+        durabilityUuid(2),
+        durabilityChoiceDate.toCanonicalString(),
+      ],
+    );
+    await database.customStatement(
+      '''INSERT INTO daily_choice_path_steps
+           (id, daily_choice_id, long_term_relation_id, previous_step_id)
+           VALUES (?, ?, ?, NULL)''',
+      [durabilityUuid(401), durabilityUuid(202), durabilityUuid(101)],
+    );
+    diagnostics.events.clear();
+    diagnostics.logs.clear();
+
+    final first = (await repository.getDailyChoiceCatalogPage(
+      DailyChoiceCatalogQuery(date: durabilityChoiceDate, pageSize: 1),
+    ) as DailyChoiceCatalogPageSuccess).value;
+    expect(first.items.single.id, durabilityChoice(202));
+    final cursor = first.nextCursor;
+    expect(cursor, isNotNull);
+    expect(
+      await repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(
+          date: durabilityChoiceDate,
+          pageSize: 1,
+          cursor: cursor,
+        ),
+      ),
+      isA<DailyChoiceCatalogPageSuccess>(),
+    );
+    expect(_catalogReads(diagnostics.events), [
+      'first:1:started',
+      'first:1:succeeded',
+      'continuation:1:started',
+      'continuation:1:succeeded',
+    ]);
+
+    Future<void> expectFailedRead(
+      DailyChoiceCatalogQuery query,
+      GraphFailureCategory category,
+      String read,
+    ) async {
+      diagnostics.events.clear();
+      final result = await repository.getDailyChoiceCatalogPage(query);
+      expect(
+        (result as DailyChoiceCatalogPageError).failure.category,
+        category,
+      );
+      expect(_catalogReads(diagnostics.events), [
+        '$read:started',
+        '$read:failed:${category.name}',
+      ]);
+    }
+
+    // Продолжение выбранного дня не подходит для другого дня.
+    await expectFailedRead(
+      DailyChoiceCatalogQuery(
+        date: CalendarDate.fromParts(2026, 9, 24),
+        pageSize: 1,
+        cursor: cursor,
+      ),
+      GraphFailureCategory.validation,
+      'continuation:1',
+    );
+    probe.arm(_FailurePoint.catalogRead);
+    await expectFailedRead(
+      DailyChoiceCatalogQuery(date: durabilityChoiceDate, pageSize: 1),
+      GraphFailureCategory.unexpected,
+      'first:1',
+    );
+    expect(probe.didFail, isTrue);
+    probe.arm(_FailurePoint.catalogUnavailable);
+    await expectFailedRead(
+      DailyChoiceCatalogQuery(date: durabilityChoiceDate, pageSize: 1),
+      GraphFailureCategory.unavailable,
+      'first:1',
+    );
+    expect(probe.didFail, isTrue);
+    expect(
+      await repository.execute(
+        UpdateDailyChoiceFields(
+          choiceId: durabilityChoice(202),
+          patch: const DailyChoiceFieldsPatch(
+            isCompleted: DailyChoiceFieldSet(true),
+          ),
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    await expectFailedRead(
+      DailyChoiceCatalogQuery(
+        date: durabilityChoiceDate,
+        pageSize: 1,
+        cursor: cursor,
+      ),
+      GraphFailureCategory.conflict,
+      'continuation:1',
+    );
+    await database.customStatement(
+      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+      [durabilityUuid(202)],
+    );
+    await expectFailedRead(
+      DailyChoiceCatalogQuery(date: durabilityChoiceDate),
+      GraphFailureCategory.corruption,
+      'first:50',
+    );
+
+    // Начало не имеет длительности, а каждый исход сообщает её; ни дата, ни
+    // описание и подписи личного графа в журнал не попадают.
+    final catalogLogs = [
+      for (final line in diagnostics.logs)
+        if ((jsonDecode(line) as Map<String, dynamic>)['operation'] ==
+            'dailyChoiceCatalogPageRead')
+          jsonDecode(line) as Map<String, dynamic>,
+    ];
+    expect(catalogLogs, hasLength(14));
+    for (final event in catalogLogs) {
+      if (event['outcome'] == 'started') {
+        expect(event.containsKey('durationMicros'), isFalse);
+      } else {
+        expect(event['durationMicros'], isA<int>());
+        expect(event['durationMicros'] as int, greaterThanOrEqualTo(0));
+      }
+    }
+    for (final line in diagnostics.logs) {
+      expect(line, isNot(contains('2026-09-24')));
+      expect(line, isNot(contains('Секретное описание №202')));
+      expect(line, isNot(contains(durabilityUuid(401))));
+    }
+    _expectSafeLogs(diagnostics.logs);
+  });
+
   test('нижняя проверка сообщает конфликт до чтения продолжений', () async {
     final result = await repository.getChoicePathContinuations(
       ChoicePathContinuationQuery(
@@ -695,6 +844,14 @@ List<String> _commandStages(Iterable<DiagnosticsEvent> events) => [
     '${event.stage.name}:${_status(event.status)}',
 ];
 
+/// Чтения каталога в виде `порция:размер:исход`.
+List<String> _catalogReads(Iterable<DiagnosticsEvent> events) => [
+  for (final event
+      in events.whereType<DailyChoiceCatalogPageReadDiagnosticsEvent>())
+    '${event.isContinuation ? 'continuation' : 'first'}:'
+        '${event.pageSize}:${_status(event.status)}',
+];
+
 List<String> _pathStatuses(Iterable<DiagnosticsEvent> events) => [
   for (final event
       in events.whereType<DailyChoicePathValidationDiagnosticsEvent>())
@@ -770,6 +927,7 @@ enum _FailurePoint {
   write('записи'),
   resultRead('чтения результата'),
   catalogRead('каталога'),
+  catalogUnavailable('недоступного каталога'),
   groupRead('дневной группы'),
   continuationRead('продолжений пути'),
   suggestionSelection('отбора подсказок'),
@@ -798,7 +956,7 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
       _FailurePoint.resultRead => sql.contains(
         'FROM daily_choices WHERE id = ?',
       ),
-      _FailurePoint.catalogRead =>
+      _FailurePoint.catalogRead || _FailurePoint.catalogUnavailable =>
         sql.contains('FROM daily_choices') &&
             sql.contains('ORDER BY choice_date'),
       _FailurePoint.groupRead => sql.contains('FROM daily_choices INDEXED BY'),
@@ -814,6 +972,12 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
     };
     if (targeted) {
       didFail = true;
+      if (_point == _FailurePoint.catalogUnavailable) {
+        throw sqlite.SqliteException(
+          extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+          message: 'Управляемый отказ: Секретный текст SQL.',
+        );
+      }
       throw StateError('Управляемый отказ: Секретный текст SQL.');
     }
   }
