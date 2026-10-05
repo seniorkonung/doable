@@ -84,9 +84,22 @@ Future<void> selectDailyChoiceCatalogDate(
   }
   // Нажатие сценария доводит до видимости сам элемент через все объемлющие
   // прокрутки, и прокрутка к дню перелистнула бы заодно страницы календаря.
-  // Поэтому к дню прокручивается только страница каталога.
-  await Scrollable.of(tester.element(dailyChoiceCatalogDateControl)).position
-      .ensureVisible(day.evaluate().single.renderObject!);
+  // Поэтому к дню прокручивается только страница каталога. Ближайший к дню
+  // viewport — страницы календаря, поэтому смещение страницы каталога
+  // считается от календаря с областью дня, и только когда день не виден.
+  final page = Scrollable.of(tester.element(dailyChoiceCatalogDateControl))
+      .position;
+  final calendar = dailyChoiceCatalogDateControl.evaluate().single;
+  for (final policy in [
+    ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+    ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+  ]) {
+    await page.ensureVisible(
+      calendar.renderObject!,
+      targetRenderObject: day.evaluate().single.renderObject,
+      alignmentPolicy: policy,
+    );
+  }
   await tester.pump();
   await tester.tap(day);
   await tester.pump();
