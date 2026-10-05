@@ -1,4 +1,6 @@
 import '../../graph/application/graph_command_result.dart';
+import '../../tag/domain/tag_id.dart';
+import '../domain/intention.dart';
 import '../domain/intention_id.dart';
 import 'intention_catalog.dart';
 import 'intention_result.dart';
@@ -8,11 +10,55 @@ sealed class IntentionCommand
   const IntentionCommand();
 }
 
+/// Создаёт новое активное намерение вместе с его полным начальным состоянием.
+///
+/// Намерение, назначения всех тегов [tagIds] и отметка избранного
+/// сохраняются одной атомарной операцией с начальной готовностью
+/// [readiness]: при любом отказе не остаётся ни намерения, ни части его
+/// назначений, ни отметки или места в порядке избранных. Успех подтверждается
+/// одним [IntentionSaved] по правилам результата создания.
+///
+/// Выбранные теги определяются только идентификаторами. Если хотя бы один из
+/// них отсутствует на момент атомарной проверки, всё создание отклоняется
+/// [IntentionCreationTagsMissingFailure] без пропуска тега и без подмены его
+/// одноимённым.
+///
+/// Принятую отправку до результата удерживает координатор команд графа:
+/// уход инициатора не отменяет и не повторяет её.
 final class CreateIntention extends IntentionCommand {
-  const CreateIntention({required this.title, required this.description});
+  /// Минимальные данные: намерение создаётся неготовым, без отметки
+  /// избранного и без тегов.
+  const CreateIntention({required this.title, required this.description})
+    : readiness = IntentionReadiness.notReady,
+      favoriteMark = FavoriteMark.notFavorite,
+      tagIds = const {};
+
+  /// Полное начальное состояние, подготовленное до создания намерения.
+  ///
+  /// Команда хранит собственную неизменяемую копию [tagIds]: изменение
+  /// переданной коллекции не меняет уже созданную команду, а повторы одного
+  /// идентификатора дают одно назначение.
+  CreateIntention.withInitialState({
+    required this.title,
+    required this.description,
+    required this.readiness,
+    required this.favoriteMark,
+    required Iterable<TagId> tagIds,
+  }) : tagIds = Set.unmodifiable(tagIds);
 
   final String title;
   final String? description;
+
+  /// Начальная готовность к действию, выбранная явным решением человека.
+  final IntentionReadiness readiness;
+
+  /// Начальная отметка избранного. Отмеченное намерение занимает последнее
+  /// место всего порядка избранных на момент сохранения.
+  final FavoriteMark favoriteMark;
+
+  /// Неизменяемый набор тегов будущих назначений; пустой набор означает
+  /// создание без тегов.
+  final Set<TagId> tagIds;
 }
 
 sealed class ExistingIntentionCommand extends IntentionCommand {

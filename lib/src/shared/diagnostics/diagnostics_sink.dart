@@ -62,8 +62,30 @@ enum IntentionCommandDiagnosticsType {
   unmarkFavorite,
 }
 
+/// Этап команды намерения, на котором она завершилась.
+///
+/// Закрытое семейство этапов отдельных видов команды: какой вид этапа
+/// допустим для вида команды, определяют конструкторы
+/// [IntentionCommandDiagnosticsEvent].
+sealed class IntentionCommandDiagnosticsStage implements Enum {}
+
+/// Этап создания намерения вместе с его начальными готовностью, отметкой
+/// избранного и назначениями тегов.
+enum IntentionCreationCommandDiagnosticsStage
+    implements IntentionCommandDiagnosticsStage {
+  /// Проверка текста и наличия выбранных тегов до любой записи.
+  validation,
+
+  /// Запись намерения, назначений тегов и места избранного.
+  write,
+
+  /// Чтение и проверка окончательного результата и подтверждение транзакции.
+  resultRead,
+}
+
 /// Этап команды отметки избранного или её снятия.
-enum FavoriteMarkCommandDiagnosticsStage {
+enum FavoriteMarkCommandDiagnosticsStage
+    implements IntentionCommandDiagnosticsStage {
   /// Проверка существования намерения и его текущей отметки.
   validation,
 
@@ -418,19 +440,44 @@ final class SelectedRelationsReadDiagnosticsEvent extends DiagnosticsEvent {
 
 /// Команда намерения.
 ///
+/// Событие несёт только вид команды, этап, исход, длительность и безопасную
+/// категорию отказа: текста, идентификаторов, тегов, состава избранного,
+/// SQL и места хранения в нём нет.
+///
 /// Конструкторы допускают только согласованные сочетания вида команды и
-/// этапа: этап есть ровно у отметки избранного и её снятия.
+/// этапа: этап есть ровно у создания, отметки избранного и её снятия, и его
+/// вид соответствует виду команды.
 final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
-  /// Команда намерения, кроме отметки избранного и её снятия.
+  /// Команда намерения, кроме создания, отметки избранного и её снятия.
   const IntentionCommandDiagnosticsEvent({
     required this.commandType,
     required DiagnosticsStatus status,
   }) : assert(
-         commandType != IntentionCommandDiagnosticsType.markFavorite &&
+         commandType != IntentionCommandDiagnosticsType.create &&
+             commandType != IntentionCommandDiagnosticsType.markFavorite &&
              commandType != IntentionCommandDiagnosticsType.unmarkFavorite,
-         'Отметка избранного и её снятие несут этап.',
+         'Создание, отметка избранного и её снятие несут этап.',
        ),
        stage = null,
+       super(status);
+
+  /// Окончательный исход создания намерения на этапе [stage].
+  ///
+  /// Событие описывает единственный исход команды, а не её начало. Успешное
+  /// создание проходит все этапы, поэтому завершается проверкой результата.
+  const IntentionCommandDiagnosticsEvent.create({
+    required IntentionCreationCommandDiagnosticsStage this.stage,
+    required DiagnosticsStatus status,
+  }) : assert(
+         status is! DiagnosticsStarted,
+         'Событие создания описывает окончательный исход.',
+       ),
+       assert(
+         status is! DiagnosticsSucceeded ||
+             stage == IntentionCreationCommandDiagnosticsStage.resultRead,
+         'Успешное создание завершается проверкой результата.',
+       ),
+       commandType = IntentionCommandDiagnosticsType.create,
        super(status);
 
   const IntentionCommandDiagnosticsEvent.markFavorite({
@@ -446,7 +493,7 @@ final class IntentionCommandDiagnosticsEvent extends DiagnosticsEvent {
        super(status);
 
   final IntentionCommandDiagnosticsType commandType;
-  final FavoriteMarkCommandDiagnosticsStage? stage;
+  final IntentionCommandDiagnosticsStage? stage;
 }
 
 final class LongTermRelationCommandDiagnosticsEvent extends DiagnosticsEvent {

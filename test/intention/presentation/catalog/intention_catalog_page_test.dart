@@ -1198,9 +1198,8 @@ void main() {
     expect(repository.queries, hasLength(2));
   });
 
-  testWidgets('сохраняет порции и позицию после типизированного перехода', (
-    tester,
-  ) async {
+  testWidgets('сохраняет порции и позицию под панелью создания и после её '
+      'закрытия нажатием вне панели', (tester) async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(
       repository,
@@ -1274,8 +1273,23 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
     await tester.pumpAndSettle();
     expect(router.current.name, IntentionEditorRoute.name);
+    // Панель открыта над тем же каталогом: его выдача и прокрутка на месте,
+    // а результат маршрута не запрашивает выдачу повторно.
+    expect(find.byType(IntentionCatalogPage), findsOneWidget);
+    expect(
+      _catalogScrollPosition(tester).pixels,
+      moreOrLessEquals(beforePosition, epsilon: 0.01),
+    );
 
-    await tester.pageBack();
+    // Нажатие вне неизменённой панели над шапкой каталога закрывает её.
+    await tester.tapAt(
+      tester.getCenter(
+        find.descendant(
+          of: find.byType(IntentionCatalogPage),
+          matching: find.byType(AppBar),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     final afterState =
@@ -1298,6 +1312,46 @@ void main() {
       _catalogScrollPosition(tester).pixels,
       moreOrLessEquals(beforePosition, epsilon: 0.01),
     );
+  });
+
+  testWidgets('кнопка создания показывает только «+», а подсказка и экранный '
+      'диктор называют действие', (tester) async {
+    final semantics = tester.ensureSemantics();
+    for (final (locale, action) in [
+      (const Locale('en'), 'Create intention'),
+      (const Locale('ru'), 'Создать намерение'),
+    ]) {
+      final repository = ControlledCatalogRepository();
+      await tester.pumpWidget(_testApp(repository, locale: locale));
+      repository.queryAt(0);
+      final create = find.byKey(const ValueKey('catalog-create-intention'));
+
+      expect(
+        find.descendant(of: create, matching: find.byIcon(Icons.add)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: create, matching: find.byType(Text)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: create, matching: find.byTooltip(action)),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(create),
+        isSemantics(
+          tooltip: action,
+          isButton: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+    semantics.dispose();
   });
 
   testWidgets('локализует параметры каталога на русский язык', (tester) async {

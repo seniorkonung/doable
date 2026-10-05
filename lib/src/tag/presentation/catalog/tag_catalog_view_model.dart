@@ -332,34 +332,52 @@ final class TagCatalogViewModel extends _$TagCatalogViewModel {
     return current.items.any((tag) => tag.id == id);
   }
 
+  /// Выбранный тег, подтверждённый наблюдением и актуальным снимком. Только
+  /// над ним контекст общего выбора разрешает явное действие.
+  Tag? get actionableCandidate => switch (_selection) {
+    TagCatalogSelectionReady(:final tag) when canActOn(tag.id) => tag,
+    _ => null,
+  };
+
+  /// Разрешено ли постоянное назначение выбранного тега намерению режима
+  /// выбора: статус пары подтверждён свободным, а назначение этого открытия
+  /// не выполняется. Неизвестный статус пары назначение не разрешает.
+  bool get canAssignSelected => _assignableSelection() != null;
+
   /// Назначение начинается только после явного вызова для выбранного TagId.
   /// Уже назначенная строка не отправляется повторно; выбор вне снимка
   /// сохраняет идентичность и проверяется командой в хранилище.
   TagCommandStart? assignSelected() {
-    final current = state;
-    final selection = _selection;
-    if (current is! TagCatalogLoaded ||
-        current.mode is! TagCatalogSelectionMode ||
-        selection is! TagCatalogSelectionReady ||
-        !canActOn(selection.id) ||
-        _selectedAssignment != TagCatalogSelectedAssignment.available ||
-        _assignmentStatus is! TagCatalogAssignmentIdle) {
-      return null;
-    }
-    final mode = current.mode as TagCatalogSelectionMode;
+    final assignable = _assignableSelection();
+    if (assignable == null) return null;
+    final (:loaded, :tagId, :intentionId) = assignable;
     final start = _coordinator.acceptTagAssign(
-      AssignTag(tagId: selection.id, intentionId: mode.intentionId),
+      AssignTag(tagId: tagId, intentionId: intentionId),
     );
     switch (start) {
       case TagCommandAccepted(:final token):
-        _assignmentStatus = TagCatalogAssignmentSubmitting(selection.id, token);
+        _assignmentStatus = TagCatalogAssignmentSubmitting(tagId, token);
       case TagCommandAlreadyRunning():
-        _assignmentStatus = TagCatalogAssignmentKeysBusy(selection.id);
+        _assignmentStatus = TagCatalogAssignmentKeysBusy(tagId);
       case GraphCommandCoordinatorDraining():
         break;
     }
-    state = current.withStatus(assignmentStatus: _assignmentStatus);
+    state = loaded.withStatus(assignmentStatus: _assignmentStatus);
     return start;
+  }
+
+  ({TagCatalogLoaded loaded, TagId tagId, IntentionId intentionId})?
+  _assignableSelection() {
+    final current = state;
+    final candidate = actionableCandidate;
+    if (current
+        case TagCatalogLoaded(mode: TagCatalogSelectionMode(:final intentionId))
+        when candidate != null &&
+            _selectedAssignment == TagCatalogSelectedAssignment.available &&
+            _assignmentStatus is TagCatalogAssignmentIdle) {
+      return (loaded: current, tagId: candidate.id, intentionId: intentionId);
+    }
+    return null;
   }
 
   void _onSelectedRead(TagId id, int generation, TagReadResult result) {

@@ -176,6 +176,11 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     }
   }
 
+  /// Переименование, удаление тега и снятие назначения показываются сразу.
+  /// Факты назначения, в том числе начальные назначения созданного намерения,
+  /// локально не применяются: весь набор с актуальными названиями даёт
+  /// перечитанный снимок, поэтому частичный набор не публикуется. Снимок не
+  /// старше пакета уже включает его и нового чтения не требует.
   void _onChange(ConfirmedGraphChangePackage package) {
     if (!ref.mounted) return;
     final required = _requiredRevision;

@@ -16,11 +16,19 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/favorite/presentation/home/home_page.dart';
 import 'package:doable/src/favorite/presentation/home/home_state.dart';
 import 'package:doable/src/favorite/presentation/home/home_view_model.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart'
+    show IntentionSaved;
+import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
+import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,6 +83,10 @@ const _openChoice = 201;
 
 /// Идентификатор, которому не соответствует ни одно намерение.
 const _missing = 99;
+
+/// Тег «Дом», который получает намерение, созданное с полным начальным
+/// состоянием.
+const _homeTag = 301;
 
 const _favoriteControl = ValueKey('intention-details-favorite-mark');
 const _message = ValueKey('graph-operation-message');
@@ -469,6 +481,156 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+
+    for (final mark in FavoriteMark.values) {
+      testWidgets(
+        switch (mark) {
+          FavoriteMark.favorite =>
+            'намерение, созданное сразу избранным, пока Главная не выбрана, '
+                'встаёт в её конец после архивированного места без отдельной '
+                'отметки ещё до возврата на Главную на $code',
+          FavoriteMark.notFavorite =>
+            'намерение, созданное без отметки, пока Главная не выбрана, не '
+                'появляется на ней и не вызывает её чтения на $code',
+        },
+        (tester) async {
+          final install = await _install(tester, locale);
+          final l10n = install.l10n;
+          // Единый порядок: «Гулять», архивированное «Читать», «Плавать».
+          final app = await _launch(
+            tester,
+            install,
+            seed: (database) {
+              _seedGraph(database, favorites: const [_walk, _read, _swim]);
+              database.execute(
+                'UPDATE intentions SET is_archived = 1 WHERE id = ?',
+                [tagFixtureId(_read)],
+              );
+              database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+                tagFixtureId(_homeTag),
+                'Дом',
+              ]);
+            },
+          );
+          await _expectHome(tester, l10n, const [_walk, _swim]);
+          final marks = [
+            (tagFixtureId(_walk), 1),
+            (tagFixtureId(_read), 2),
+            (tagFixtureId(_swim), 3),
+          ];
+          expect(storedFavoriteMarks(app.raw), marks);
+
+          await _select(tester, AppDestination.intentionGraph);
+          await _settleStorage(tester);
+          final shown = _homeState(app);
+          final reads = install.faults.reads;
+          final events = app.diagnostics.events.length;
+          final completions = <GraphCommandCompletion>[];
+          final subscription = app.coordinator.completions.listen(
+            completions.add,
+          );
+          addTearDown(subscription.cancel);
+
+          // Всё начальное состояние принимается координатором одной командой,
+          // как её отправит форма создания.
+          final accepted = app.coordinator.acceptCreation(
+            IntentionCreationFormKey(),
+            CreateIntention.withInitialState(
+              title: 'Рисовать',
+              description: null,
+              readiness: IntentionReadiness.ready,
+              favoriteMark: mark,
+              tagIds: [
+                (TagId.decode(
+                  tagFixtureId(_homeTag),
+                ) as TagIdDecodingSuccess).id,
+              ],
+            ),
+          ) as IntentionCommandAccepted;
+          IntentionCommandCompletion? completion;
+          unawaited(accepted.future.then((value) => completion = value));
+          await _waitFor(tester, () => completion != null);
+          final created = switch (completion!.result) {
+            GraphResultSuccess(value: IntentionSaved(:final intention)) =>
+              intention.id.toCanonicalString(),
+            final result => fail('Создание не подтверждено: $result'),
+          };
+
+          switch (mark) {
+            case FavoriteMark.favorite:
+              // Скрытая Главная согласуется до закрытия сообщения об успехе.
+              await _waitFor(
+                tester,
+                () => switch (_homeState(app)) {
+                  final HomeList state =>
+                    listEquals(_titlesOf(state), [
+                          'Гулять',
+                          'Плавать',
+                          'Рисовать',
+                        ]) &&
+                        state.freshness is HomeFreshnessCurrent,
+                  _ => false,
+                },
+              );
+              final list = _homeState(app) as HomeList;
+              expect(
+                [for (final row in list.items) row.id.toCanonicalString()],
+                [tagFixtureId(_walk), tagFixtureId(_swim), created],
+              );
+              expect(list.items.last.readiness, IntentionReadiness.ready);
+              expect(install.faults.reads, greaterThan(reads));
+              expect(storedFavoriteMarks(app.raw), [...marks, (created, 4)]);
+            case FavoriteMark.notFavorite:
+              await _settleStorage(tester);
+              expect(_homeState(app), same(shown));
+              expect(install.faults.reads, reads);
+              expect(storedFavoriteMarks(app.raw), marks);
+          }
+          expect(_selected(tester), AppDestination.intentionGraph);
+
+          // Создание — одна команда с одним исходом: самостоятельные отметка,
+          // готовность и назначение тега не выполнялись.
+          expect(completions, [same(completion)]);
+          expect(
+            app.diagnostics.events
+                .skip(events)
+                .where(
+                  (event) =>
+                      event is IntentionCommandDiagnosticsEvent ||
+                      event is TagCommandDiagnosticsEvent ||
+                      event is FavoriteOrderCommandDiagnosticsEvent,
+                ),
+            [
+              isA<IntentionCommandDiagnosticsEvent>()
+                  .having(
+                    (event) => event.commandType,
+                    'команда',
+                    IntentionCommandDiagnosticsType.create,
+                  )
+                  .having(
+                    (event) => event.status,
+                    'статус',
+                    isA<DiagnosticsSucceeded>(),
+                  ),
+            ],
+          );
+          await _acceptMessage(tester);
+
+          // Возврат на Главную показывает согласованный список без нового
+          // чтения.
+          final readsBeforeReturn = install.faults.reads;
+          await _select(tester, AppDestination.home);
+          expect(_shownHome(tester), switch (mark) {
+            FavoriteMark.favorite => ['Гулять', 'Плавать', 'Рисовать'],
+            FavoriteMark.notFavorite => ['Гулять', 'Плавать'],
+          });
+          _expectCurrent(tester, l10n);
+          await _settleStorage(tester);
+          expect(install.faults.reads, readsBeforeReturn);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 }
 
@@ -497,13 +659,17 @@ Future<_Install> _install(WidgetTester tester, Locale locale) async {
 
 /// Один запуск приложения на хранилище установки.
 final class _Launch {
-  _Launch(this.runtime, this.raw, this.container);
+  _Launch(this.runtime, this.raw, this.container, this.diagnostics);
 
   final AppRuntime runtime;
   final sqlite.Database raw;
   final ProviderContainer container;
+  final InMemoryDiagnosticsSink diagnostics;
 
   AppRouter get router => container.read(appRouterProvider);
+
+  GraphCommandCoordinator get coordinator =>
+      container.read(graphCommandCoordinatorProvider.notifier);
 
   /// Полное завершение: дерево приложения снято, хранилище закрыто.
   Future<void> shutdown(WidgetTester tester) async {
@@ -520,6 +686,7 @@ Future<_Launch> _launch(
   void Function(sqlite.Database database)? seed,
 }) async {
   late sqlite.Database raw;
+  final diagnostics = InMemoryDiagnosticsSink();
   final runtime = AppRuntime(
     connectionFactory: () => observeConfiguredLocalDatabaseConnection(
       openFileBackedLocalDatabase(
@@ -528,7 +695,7 @@ Future<_Launch> _launch(
       ),
       install.faults,
     ),
-    diagnosticsSink: InMemoryDiagnosticsSink(),
+    diagnosticsSink: diagnostics,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -543,7 +710,7 @@ Future<_Launch> _launch(
     () => find.text(install.l10n.homeLoading).evaluate().isEmpty,
   );
   await tester.pumpAndSettle();
-  return _Launch(runtime, raw, ready.container);
+  return _Launch(runtime, raw, ready.container, diagnostics);
 }
 
 /// Шесть активных намерений, связи «Бегать» и его невыполненный дневной

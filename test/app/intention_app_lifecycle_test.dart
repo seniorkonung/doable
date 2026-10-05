@@ -1,15 +1,23 @@
 import 'dart:async';
 
+import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart'
-    show openInMemoryLocalDatabase;
+    show
+        LocalDatabaseConnectionObserver,
+        LocalDatabaseSqlOperation,
+        LocalDatabaseSqlStatement,
+        observeConfiguredLocalDatabaseConnection,
+        openInMemoryLocalDatabase;
 import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -22,19 +30,25 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/favorite_read_contract_test_fallback.dart';
+import '../support/favorite_storage_fixture.dart';
 import '../support/tag_read_contract_test_fallback.dart';
 import '../support/catalog_reconciliation_test_fallback.dart';
+import '../support/tag_storage_fixture.dart';
 
 void main() {
   testWidgets(
@@ -418,10 +432,21 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
       await tester.pump();
       expect(repository.commands.single, isA<CreateIntention>());
-      expect(find.text('Creating…'), findsOneWidget);
+      expect(find.text('Saving…'), findsOneWidget);
 
-      await tester.pageBack();
+      // Уход во время принятой отправки подтверждается и её не отменяет.
+      await tester.tap(find.byKey(const ValueKey('intention-editor-close')));
       await tester.pumpAndSettle();
+      expect(find.text('Close the form?'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('intention-editor-close-discard')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('intention-editor-title')),
+        findsNothing,
+      );
+      expect(repository.commands, hasLength(1));
       final created = _intention(
         title: 'Быть здоровым',
         description: '  Пользовательское описание\n',
@@ -639,6 +664,974 @@ void main() {
       expect(find.text('No active intentions yet.'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'подтверждение закрытия на настоящем маршруте сохраняет черновик при '
+    'продолжении, сброс ничего не создаёт, а уход во время записи не отменяет '
+    'сохранение',
+    (tester) async {
+      const create = ValueKey('catalog-create-intention');
+      const title = ValueKey('intention-editor-title');
+      String? titleText() =>
+          tester.widget<TextField>(find.byKey(title)).controller?.text;
+      final writeGate = _CreationWriteGate();
+      final app = await _RealStorageApp.start(
+        tester,
+        const Locale('ru'),
+        observer: writeGate,
+      );
+      final before = _storedGraph(app.raw);
+
+      await tester.tap(find.byKey(create));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(title), '  Черновик  ');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Сбросить черновик?'), findsOneWidget);
+      await tester.tap(find.text('Продолжить ввод'));
+      await tester.pumpAndSettle();
+      expect(titleText(), '  Черновик  ');
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Сбросить'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(title), findsNothing);
+      expect(find.byKey(create), findsOneWidget);
+      expect(_storedGraph(app.raw), before);
+
+      await tester.tap(find.byKey(create));
+      await tester.pumpAndSettle();
+      expect(titleText(), isEmpty);
+
+      writeGate.hold();
+      addTearDown(writeGate.release);
+      await tester.enterText(find.byKey(title), 'Сохранённое намерение');
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await _waitForStorage(tester, () => writeGate.isHolding);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Закрыть форму?'), findsOneWidget);
+      await tester.tap(find.text('Закрыть'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(title), findsNothing);
+      expect(find.byKey(create), findsOneWidget);
+      expect(_storedIntentionCount(app.raw), 0);
+
+      writeGate.release();
+      await _waitForStorage(
+        tester,
+        () => find.byKey(_operationMessage).evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Создание — «Сохранённое намерение»: Намерение создано.'),
+        findsOneWidget,
+      );
+      expect(_storedIntentionCount(app.raw), 1);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(_storedIntentionCount(app.raw), 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'принятое полное создание завершается настоящим хранилищем после ухода '
+    'инициатора и предъявляется общей поверхностью один раз',
+    (tester) async {
+      final writeGate = _CreationWriteGate();
+      final app = await _RealStorageApp.start(
+        tester,
+        const Locale('en'),
+        observer: writeGate,
+      );
+      final completions = <IntentionCommandCompletion>[];
+      final subscription = app.coordinator.intentionCompletions.listen(
+        completions.add,
+      );
+      addTearDown(subscription.cancel);
+      final formKey = IntentionCreationFormKey();
+
+      writeGate.hold();
+      addTearDown(writeGate.release);
+      final accepted = app.coordinator.acceptCreation(
+        formKey,
+        CreateIntention.withInitialState(
+          title: 'Полное намерение',
+          description: null,
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: [_storedTag(_homeTag), _storedTag(_weekendTag)],
+        ),
+      ) as IntentionCommandAccepted;
+      await _waitForStorage(tester, () => writeGate.isHolding);
+
+      // Форма ушла до результата: команда продолжается, повтор той же
+      // формы не принимается, а запись ещё не подтверждена.
+      app.coordinator.releaseInitiatorPresentation(accepted.token);
+      expect(
+        app.coordinator.acceptCreation(
+          formKey,
+          const CreateIntention(title: 'Повтор', description: null),
+        ),
+        isA<IntentionCommandAlreadyRunning>(),
+      );
+      await tester.pump();
+      expect(app.coordinator.isKeyRunning(formKey), isTrue);
+      expect(completions, isEmpty);
+      expect(find.byKey(_operationMessage), findsNothing);
+      expect(_storedIntentionCount(app.raw), 0);
+
+      writeGate.release();
+      await _waitForStorage(
+        tester,
+        () => find.byKey(_operationMessage).evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.text('Create — “Полное намерение”: Intention created.'),
+        findsOneWidget,
+      );
+      expect(app.coordinator.isKeyRunning(formKey), isFalse);
+      expect(completions, hasLength(1));
+      final changes = completions.single.confirmedChange!.changes.toList();
+      expect(changes, [
+        isA<IntentionCatalogCreated>(),
+        isA<TagAssignmentChangedChange>(),
+        isA<TagAssignmentChangedChange>(),
+      ]);
+      expect(
+        changes.map((change) => change.revision),
+        everyElement(same(completions.single.revision)),
+      );
+      final intentionId = app.raw
+          .select('SELECT id, is_action_ready FROM intentions')
+          .single;
+      expect(intentionId['is_action_ready'], 1);
+      expect(
+        app.raw
+            .select(
+              'SELECT tag_id FROM tag_assignments WHERE intention_id = ? '
+              'ORDER BY tag_id',
+              [intentionId['id']],
+            )
+            .map((row) => row['tag_id']),
+        [tagFixtureId(_homeTag), tagFixtureId(_weekendTag)],
+      );
+      expect(storedFavoriteMarks(app.raw), [(intentionId['id'], 1)]);
+
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(completions, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'отказ отсутствующего тега остаётся у живой формы и после её ухода '
+    'предъявляется общей поверхностью один раз без частичной записи',
+    (tester) async {
+      final app = await _RealStorageApp.start(tester, const Locale('ru'));
+      final before = _storedGraph(app.raw);
+      final accepted = app.coordinator.acceptCreation(
+        IntentionCreationFormKey(),
+        CreateIntention.withInitialState(
+          title: 'Полное намерение',
+          description: null,
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: [_storedTag(_homeTag), _storedTag(_missingTag)],
+        ),
+      ) as IntentionCommandAccepted;
+      IntentionCommandCompletion? completion;
+      unawaited(accepted.future.then((value) => completion = value));
+      await _waitForStorage(tester, () => completion != null);
+
+      expect(
+        completion!.result,
+        isA<ResultFailure<IntentionCommandSuccess>>().having(
+          (result) => result.failure,
+          'отказ',
+          isA<IntentionCreationTagsMissingFailure>().having(
+            (failure) => failure.missingTagIds,
+            'отсутствующие теги',
+            {_storedTag(_missingTag)},
+          ),
+        ),
+      );
+      expect(_storedGraph(app.raw), before);
+
+      // Живая форма удерживает право на своё сообщение.
+      final initiatorClaim = app.coordinator.claimInitiatorFailure(
+        accepted.token,
+      );
+      expect(initiatorClaim, isNotNull);
+      await tester.pumpAndSettle();
+      expect(find.byKey(_operationMessage), findsNothing);
+
+      app.coordinator.releaseInitiatorPresentation(accepted.token);
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.text('Создание — «новое намерение»: Проверьте введённые данные.'),
+        findsOneWidget,
+      );
+
+      // Запоздалый кадр закрытой формы не подтверждает право оболочки и не
+      // повторяет сообщение.
+      app.coordinator.confirmPresentation(initiatorClaim!);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(_storedGraph(app.raw), before);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  group('общие сообщения и завершение отправки модальной панели', () {
+    for (final transition in _SheetTransition.values) {
+      testWidgets(
+        '${transition.description} не дублирует и не перезапускает текущее '
+        'сообщение, а следующий исход ждёт его закрытия',
+        (tester) async {
+          final repository = _DelayedPersonalGraphRepository();
+          final runtime = await _pumpCatalog(tester, repository, const []);
+          await transition.prepare(tester);
+          final first = await _failOtherIntentionDelete(
+            tester,
+            runtime,
+            repository,
+            uuid: '018f0000-0000-7000-8000-000000000011',
+            title: 'Первое',
+          );
+          await tester.pumpAndSettle();
+          expect(_visible(first), findsOneWidget);
+          final second = await _failOtherIntentionDelete(
+            tester,
+            runtime,
+            repository,
+            uuid: '018f0000-0000-7000-8000-000000000012',
+            title: 'Второе',
+          );
+          await tester.pumpAndSettle();
+          expect(_anywhere(second), findsNothing);
+
+          await transition.cover(tester);
+          expect(_anywhere(first), findsWidgets);
+          expect(_visible(first).evaluate().length, lessThanOrEqualTo(1));
+          expect(_anywhere(second), findsNothing);
+          await transition.uncover(tester);
+          expect(_visible(first), findsOneWidget);
+          expect(_anywhere(second), findsNothing);
+
+          await _closeOperationMessage(tester);
+          expect(_anywhere(first), findsNothing);
+          expect(_visible(second), findsOneWidget);
+          await _closeOperationMessage(tester);
+          expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+          await _closeOperationMessage(tester);
+          expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+          expect(repository.commands, hasLength(2));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'успех при открытом подтверждении закрывает только свою панель и '
+      'подтверждение, предъявляется один раз и не закрывает новое открытие',
+      (tester) async {
+        final repository = _DelayedPersonalGraphRepository();
+        await _pumpCatalog(tester, repository, const []);
+        await _openPanel(tester);
+        await tester.enterText(find.byKey(_editorTitle), 'Своё намерение');
+        await tester.tap(find.byKey(_submit));
+        await _pumpUntil(tester, () => repository.commands.length == 1);
+        await tester.tap(find.byKey(_close));
+        await tester.pumpAndSettle();
+        expect(find.text('Close the form?'), findsOneWidget);
+
+        final created = _intention(title: 'Своё намерение', description: null);
+        repository.completeCommand(0, _saved(created, revision: 1));
+        await tester.pumpAndSettle();
+
+        const message = 'Create — “Своё намерение”: Intention created.';
+        expect(find.text('Close the form?'), findsNothing);
+        expect(find.byType(IntentionEditorPage), findsNothing);
+        expect(_visible(message), findsOneWidget);
+        expect(find.text(created.title), findsOneWidget);
+        expect(find.text('Total intentions: 1'), findsOneWidget);
+
+        await _openPanel(tester);
+        await tester.enterText(find.byKey(_editorTitle), 'Новое открытие');
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(find.byType(IntentionEditorPage), findsOneWidget);
+        expect(find.text('Close the form?'), findsNothing);
+        expect(_visible(message), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(IntentionEditorPage),
+            matching: _visible(message),
+          ),
+          findsOneWidget,
+        );
+        await _closeOperationMessage(tester);
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+        expect(_fieldText(tester), 'Новое открытие');
+        expect(repository.commands, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('отказ при открытом подтверждении остаётся у живой панели и не '
+        'предъявляется общей поверхностью', (tester) async {
+      final repository = _DelayedPersonalGraphRepository();
+      final runtime = await _pumpCatalog(tester, repository, const []);
+      final completions = _collectCompletions(runtime);
+      await _openPanel(tester);
+      await tester.enterText(find.byKey(_editorTitle), 'Намерение');
+      await tester.tap(find.byKey(_submit));
+      await _pumpUntil(tester, () => repository.commands.length == 1);
+      await tester.tap(find.byKey(_close));
+      await tester.pumpAndSettle();
+      expect(find.text('Close the form?'), findsOneWidget);
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Close the form?'), findsNothing);
+      expect(find.byKey(_pinnedFailure).hitTestable(), findsOneWidget);
+      expect(_fieldText(tester), 'Намерение');
+      expect(
+        runtime.commandCoordinator.claimInitiatorFailure(
+          completions.single.token,
+        ),
+        isNull,
+      );
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+      expect(find.byKey(_pinnedFailure).hitTestable(), findsOneWidget);
+      expect(repository.commands, hasLength(1));
+    });
+
+    for (final overlay in _FormOverlay.values) {
+      testWidgets('${overlay.description} удерживает право ошибки панели до '
+          'возвращения и её пригодного кадра', (tester) async {
+        final repository = _DelayedPersonalGraphRepository();
+        final runtime = await _pumpCatalog(tester, repository, const []);
+        final coordinator = runtime.commandCoordinator;
+        final completions = _collectCompletions(runtime);
+        await _failSubmissionWithoutFocus(tester, repository);
+        final token = completions.single.token;
+        final claim = coordinator.claimInitiatorFailure(token);
+        expect(claim, isNotNull);
+
+        await overlay.cover(tester);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(coordinator.claimInitiatorFailure(token), same(claim));
+        await overlay.uncoverPartly(tester);
+        expect(coordinator.claimInitiatorFailure(token), same(claim));
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+
+        await overlay.uncover(tester);
+        expect(find.byKey(_pinnedFailure).hitTestable(), findsOneWidget);
+        expect(coordinator.claimInitiatorFailure(token), isNull);
+        await _closeOperationMessage(tester);
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+        expect(_fieldText(tester), 'Намерение');
+        expect(repository.commands, hasLength(1));
+      });
+    }
+
+    testWidgets(
+      'удаление панели под выбором тегов без возвращения передаёт полученное '
+      'ею право ошибки общей поверхности ровно один раз',
+      (tester) async {
+        final repository = _DelayedPersonalGraphRepository();
+        final runtime = await _pumpCatalog(tester, repository, const []);
+        final completions = _collectCompletions(runtime);
+        await _failSubmissionWithoutFocus(tester, repository);
+        expect(find.byKey(_pinnedFailure), findsOneWidget);
+        await _FormOverlay.chooser.cover(tester);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+
+        await _removePanelWithoutReturn(tester);
+
+        await _expectCreationFailureOnAppSurfaceOnce(
+          tester,
+          runtime,
+          completions.single.token,
+        );
+        expect(repository.commands, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'удаление перекрытой панели, renderer которой не получал право ошибки, '
+      'передаёт его общей поверхности ровно один раз',
+      (tester) async {
+        final repository = _DelayedPersonalGraphRepository();
+        final runtime = await _pumpCatalog(tester, repository, const []);
+        final completions = _collectCompletions(runtime);
+        await _openPanel(tester);
+        await tester.enterText(find.byKey(_editorTitle), 'Намерение');
+        await tester.tap(find.byKey(_submit));
+        await _pumpUntil(tester, () => repository.commands.length == 1);
+        unawaited(
+          tester
+              .element(find.byType(IntentionEditorPage))
+              .router
+              .push(TagCatalogRoute()),
+        );
+        await tester.pumpAndSettle();
+
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text(_inlineCreationFailure, skipOffstage: false),
+          findsNothing,
+        );
+        expect(
+          runtime.commandCoordinator.claimInitiatorFailure(
+            completions.single.token,
+          ),
+          isNotNull,
+        );
+
+        await _removePanelWithoutReturn(tester);
+
+        await _expectCreationFailureOnAppSurfaceOnce(
+          tester,
+          runtime,
+          completions.single.token,
+        );
+        expect(repository.commands, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'отказ отправки, принятой до ухода, предъявляется над новым открытием '
+      'один раз и не меняет и не закрывает его черновик',
+      (tester) async {
+        final repository = _DelayedPersonalGraphRepository();
+        final runtime = await _pumpCatalog(tester, repository, const []);
+        final completions = _collectCompletions(runtime);
+        await _submitAndLeave(tester, repository, 'Первое');
+        await _openPanel(tester);
+        await tester.enterText(find.byKey(_editorTitle), 'Второе');
+        await tester.pump();
+
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+
+        _expectVisibleOverPanel(tester, _appCreationFailure);
+        expect(find.byKey(_pinnedFailure), findsNothing);
+        expect(_fieldText(tester), 'Второе');
+        expect(find.widgetWithText(FilledButton, 'Save'), findsOneWidget);
+        expect(
+          runtime.commandCoordinator.claimInitiatorFailure(
+            completions.single.token,
+          ),
+          isNull,
+        );
+        await _closeOperationMessage(tester);
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+        await _closeOperationMessage(tester);
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+        expect(find.byType(IntentionEditorPage), findsOneWidget);
+        expect(_fieldText(tester), 'Второе');
+        expect(repository.commands, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'успех отправки, принятой до ухода, предъявляется над новым открытием '
+      'один раз, согласует каталог и не закрывает новую панель',
+      (tester) async {
+        final repository = _DelayedPersonalGraphRepository();
+        await _pumpCatalog(tester, repository, const []);
+        await _submitAndLeave(tester, repository, 'Первое');
+        await _openPanel(tester);
+        await tester.enterText(find.byKey(_editorTitle), 'Второе');
+        await tester.pump();
+
+        final created = _intention(title: 'Первое', description: null);
+        repository.completeCommand(0, _saved(created, revision: 1));
+        await tester.pumpAndSettle();
+
+        _expectVisibleOverPanel(
+          tester,
+          'Create — “Первое”: Intention created.',
+        );
+        expect(find.text(created.title), findsOneWidget);
+        expect(find.text('Total intentions: 1'), findsOneWidget);
+        expect(find.byType(IntentionEditorPage), findsOneWidget);
+        expect(_fieldText(tester), 'Второе');
+        await _closeOperationMessage(tester);
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+        await _closeOperationMessage(tester);
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+        expect(find.byType(IntentionEditorPage), findsOneWidget);
+        expect(_fieldText(tester), 'Второе');
+        expect(repository.commands, hasLength(1));
+      },
+    );
+  });
+}
+
+const _createIntention = ValueKey('catalog-create-intention');
+const _editorTitle = ValueKey('intention-editor-title');
+const _submit = ValueKey('intention-editor-submit');
+const _close = ValueKey('intention-editor-close');
+const _chooseTags = ValueKey('intention-editor-choose-tags');
+const _pinnedFailure = ValueKey('intention-editor-failure');
+
+/// Закреплённое сообщение панели о её отказе сохранения.
+const _inlineCreationFailure = 'The intention couldn’t be created. Try again.';
+
+/// Сообщение общей поверхности о том же отказе после ухода панели.
+const _appCreationFailure =
+    'Create — “new intention”: The intention couldn’t be created. Try again.';
+
+/// Копии текста, доступные человеку: копия под модальным фоном или
+/// непрозрачной страницей нажатий не получает.
+Finder _visible(String text) => find.text(text).hitTestable();
+
+/// Все построенные копии текста, в том числе под непрозрачной страницей.
+Finder _anywhere(String text) => find.text(text, skipOffstage: false);
+
+String? _fieldText(WidgetTester tester) =>
+    tester.widget<TextField>(find.byKey(_editorTitle)).controller?.text;
+
+Future<void> _openPanel(WidgetTester tester) async {
+  await tester.tap(find.byKey(_createIntention));
+  await tester.pumpAndSettle();
+  expect(find.byType(IntentionEditorPage), findsOneWidget);
+}
+
+List<IntentionCommandCompletion> _collectCompletions(AppRuntime runtime) {
+  final completions = <IntentionCommandCompletion>[];
+  final subscription = runtime.commandCoordinator.intentionCompletions.listen(
+    completions.add,
+  );
+  addTearDown(subscription.cancel);
+  return completions;
+}
+
+/// Принимает удаление другого намерения без живого инициатора и завершает его
+/// отказом: результат принадлежит только общей поверхности. Возвращает текст
+/// её сообщения.
+Future<String> _failOtherIntentionDelete(
+  WidgetTester tester,
+  AppRuntime runtime,
+  _DelayedPersonalGraphRepository repository, {
+  required String uuid,
+  required String title,
+}) async {
+  final other = _intention(uuid: uuid, title: title, description: null);
+  final index = repository.commands.length;
+  final accepted = runtime.commandCoordinator.acceptExisting(
+    DeleteIntention(other.id),
+    presentationTitle: other.title,
+  ) as IntentionCommandAccepted;
+  runtime.commandCoordinator.releaseInitiatorPresentation(accepted.token);
+  await _pumpUntil(tester, () => repository.commands.length == index + 1);
+  repository.completeCommand(
+    index,
+    const ResultFailure(IntentionUnavailableFailure()),
+  );
+  return 'Delete — “$title”: The intention couldn’t be deleted. Try again.';
+}
+
+/// Отправляет черновик панели и получает отказ, пока приложение без фокуса:
+/// renderer панели получает право ошибки, но ещё не предъявил её.
+Future<void> _failSubmissionWithoutFocus(
+  WidgetTester tester,
+  _DelayedPersonalGraphRepository repository,
+) async {
+  await _openPanel(tester);
+  await tester.enterText(find.byKey(_editorTitle), 'Намерение');
+  await tester.tap(find.byKey(_submit));
+  await _pumpUntil(tester, () => repository.commands.length == 1);
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+  repository.completeCommand(
+    0,
+    const ResultFailure(IntentionUnavailableFailure()),
+  );
+  await tester.pumpAndSettle();
+  expect(find.text(_inlineCreationFailure), findsOneWidget);
+}
+
+/// Отправляет черновик и подтверждает уход во время принятой отправки.
+Future<void> _submitAndLeave(
+  WidgetTester tester,
+  _DelayedPersonalGraphRepository repository,
+  String title,
+) async {
+  await _openPanel(tester);
+  await tester.enterText(find.byKey(_editorTitle), title);
+  await tester.tap(find.byKey(_submit));
+  await _pumpUntil(tester, () => repository.commands.length == 1);
+  await tester.tap(find.byKey(_close));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byKey(const ValueKey('intention-editor-close-discard')),
+  );
+  await tester.pumpAndSettle();
+  expect(find.byType(IntentionEditorPage), findsNothing);
+}
+
+/// Удаляет панель вместе со страницами над ней, не возвращаясь к ней.
+Future<void> _removePanelWithoutReturn(WidgetTester tester) async {
+  final router = tester
+      .element(find.byType(IntentionEditorPage, skipOffstage: false))
+      .router;
+  router.popUntilRoot();
+  await tester.pumpAndSettle();
+  expect(find.byType(IntentionEditorPage, skipOffstage: false), findsNothing);
+}
+
+/// Общая поверхность предъявляет отказ создания с [token] одним сообщением,
+/// а у ушедшей панели не остаётся права на него.
+Future<void> _expectCreationFailureOnAppSurfaceOnce(
+  WidgetTester tester,
+  AppRuntime runtime,
+  GraphInitiatorOperationToken token,
+) async {
+  expect(_visible(_appCreationFailure), findsOneWidget);
+  expect(find.byType(SnackBar), findsOneWidget);
+  expect(runtime.commandCoordinator.claimInitiatorFailure(token), isNull);
+  await _closeOperationMessage(tester);
+  expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+  await _closeOperationMessage(tester);
+  expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+  expect(tester.takeException(), isNull);
+}
+
+/// Сообщение [text] видно поверх панели одной копией и не перекрывает
+/// сохранение.
+void _expectVisibleOverPanel(WidgetTester tester, String text) {
+  expect(_visible(text), findsOneWidget);
+  final visible = find.descendant(
+    of: find.byType(IntentionEditorPage),
+    matching: _visible(text),
+  );
+  expect(visible, findsOneWidget);
+  final message = tester.getRect(
+    find.ancestor(of: visible, matching: find.byType(SnackBar)),
+  );
+  expect(
+    message.bottom,
+    lessThanOrEqualTo(tester.getRect(find.byKey(_submit)).top),
+  );
+  expect(find.byKey(_submit).hitTestable(), findsOneWidget);
+}
+
+/// Переход, во время которого общая поверхность уже показывает сообщение.
+enum _SheetTransition {
+  panel('открытие и закрытие панели'),
+  confirmation('подтверждение закрытия над панелью'),
+  chooser('выбор тегов над панелью'),
+  editor('редактор тега над выбором');
+
+  const _SheetTransition(this.description);
+
+  final String description;
+
+  /// Состояние до сообщения: каталог или открытая панель с черновиком.
+  Future<void> prepare(WidgetTester tester) async {
+    switch (this) {
+      case _SheetTransition.panel:
+        return;
+      case _SheetTransition.confirmation ||
+          _SheetTransition.chooser ||
+          _SheetTransition.editor:
+        await _openPanel(tester);
+        await tester.enterText(find.byKey(_editorTitle), 'Черновик');
+        await tester.pump();
+        switch (this) {
+          case _SheetTransition.chooser:
+            // Сообщение лежит поверх нижнего края полей компактной панели, а
+            // в развёрнутой действие выбора тегов остаётся над ним.
+            await tester.tap(
+              find.byKey(const ValueKey('intention-creation-sheet-resize')),
+            );
+            await tester.pumpAndSettle();
+          case _SheetTransition.editor:
+            await _FormOverlay.chooser.cover(tester);
+          case _SheetTransition.panel || _SheetTransition.confirmation:
+            break;
+        }
+    }
+  }
+
+  Future<void> cover(WidgetTester tester) async {
+    switch (this) {
+      case _SheetTransition.panel:
+        await _openPanel(tester);
+      case _SheetTransition.confirmation:
+        await tester.tap(find.byKey(_close));
+        await tester.pumpAndSettle();
+        expect(find.text('Discard the draft?'), findsOneWidget);
+      case _SheetTransition.chooser:
+        expect(find.byKey(_chooseTags).hitTestable(), findsOneWidget);
+        await _FormOverlay.chooser.cover(tester);
+      case _SheetTransition.editor:
+        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('tag-editor-name')), findsOneWidget);
+    }
+  }
+
+  Future<void> uncover(WidgetTester tester) async {
+    switch (this) {
+      case _SheetTransition.panel:
+        await tester.tap(find.byKey(_close));
+        await tester.pumpAndSettle();
+        expect(find.byType(IntentionEditorPage), findsNothing);
+      case _SheetTransition.confirmation:
+        await tester.tap(
+          find.byKey(const ValueKey('intention-editor-close-continue')),
+        );
+        await tester.pumpAndSettle();
+        expect(_fieldText(tester), 'Черновик');
+      case _SheetTransition.chooser:
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(_fieldText(tester), 'Черновик');
+      case _SheetTransition.editor:
+        await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('tag-editor-name')), findsNothing);
+    }
+  }
+}
+
+/// Временное перекрытие живой панели.
+enum _FormOverlay {
+  chooser('непрозрачный выбор тегов'),
+  editor('непрозрачный редактор тега над выбором'),
+  dialog('диалог объяснения готовности');
+
+  const _FormOverlay(this.description);
+
+  final String description;
+
+  Future<void> cover(WidgetTester tester) async {
+    switch (this) {
+      case _FormOverlay.chooser:
+        await tester.tap(find.byKey(_chooseTags));
+        await tester.pumpAndSettle();
+        expect(find.byType(BackButton), findsOneWidget);
+      case _FormOverlay.editor:
+        await _FormOverlay.chooser.cover(tester);
+        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('tag-editor-name')), findsOneWidget);
+      case _FormOverlay.dialog:
+        await tester.tap(
+          find.byKey(const ValueKey('intention-editor-readiness')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('intention-editor-readiness-confirmation')),
+          findsOneWidget,
+        );
+    }
+  }
+
+  /// Снимает верхнюю из нескольких перекрывающих страниц, оставляя панель
+  /// перекрытой.
+  Future<void> uncoverPartly(WidgetTester tester) async {
+    switch (this) {
+      case _FormOverlay.chooser || _FormOverlay.dialog:
+        return;
+      case _FormOverlay.editor:
+        await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+        await tester.pumpAndSettle();
+        expect(find.byType(BackButton), findsOneWidget);
+    }
+  }
+
+  Future<void> uncover(WidgetTester tester) async {
+    switch (this) {
+      case _FormOverlay.chooser || _FormOverlay.editor:
+        await tester.tap(find.byType(BackButton));
+      case _FormOverlay.dialog:
+        await tester.tap(
+          find.byKey(const ValueKey('intention-editor-readiness-cancel')),
+        );
+    }
+    await tester.pumpAndSettle();
+    expect(find.byType(IntentionEditorPage), findsOneWidget);
+  }
+}
+
+const _operationMessage = ValueKey('graph-operation-message');
+const _homeTag = 301;
+const _weekendTag = 302;
+
+/// Тег, которого нет в хранилище на момент создания.
+const _missingTag = 303;
+
+TagId _storedTag(int number) =>
+    (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
+
+int _storedIntentionCount(sqlite.Database raw) =>
+    raw.select('SELECT COUNT(*) AS count FROM intentions').single['count']
+        as int;
+
+/// Намерения, назначения, отметки избранного и теги хранилища.
+Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
+  for (final table in [
+    'intentions',
+    'intention_titles_fts',
+    'tags',
+    'tag_assignments',
+    'favorite_intentions',
+  ])
+    table: raw
+        .select('SELECT * FROM $table ORDER BY rowid')
+        .map((row) => row.values.toList())
+        .toList(),
+};
+
+/// Приложение на настоящем адаптере in-memory хранилища с тегами «Дом» и
+/// «Выходные».
+final class _RealStorageApp {
+  _RealStorageApp(this.raw, this.coordinator);
+
+  final sqlite.Database raw;
+  final GraphCommandCoordinator coordinator;
+
+  static Future<_RealStorageApp> start(
+    WidgetTester tester,
+    Locale locale, {
+    LocalDatabaseConnectionObserver? observer,
+  }) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = [locale];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    late sqlite.Database raw;
+    final runtime = AppRuntime(
+      connectionFactory: () {
+        final connection = openInMemoryLocalDatabase(
+          setup: (database) => raw = database,
+        );
+        return switch (observer) {
+          null => connection,
+          final observer => observeConfiguredLocalDatabaseConnection(
+            connection,
+            observer,
+          ),
+        };
+      },
+      diagnosticsSink: InMemoryDiagnosticsSink(),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+    });
+    final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
+    for (final (number, name) in [
+      (_homeTag, 'Дом'),
+      (_weekendTag, 'Выходные'),
+    ]) {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(number),
+        name,
+      ]);
+    }
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(
+      tester,
+      waitFor: (tester, finder) =>
+          _waitForStorage(tester, () => finder.evaluate().isNotEmpty),
+    );
+    // Пустая выдача каталога загружена из хранилища.
+    final emptyCatalog = find.text(
+      lookupAppLocalizations(locale).catalogActiveEmpty,
+    );
+    await _waitForStorage(tester, () => emptyCatalog.evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    return _RealStorageApp(
+      raw,
+      ready.container.read(graphCommandCoordinatorProvider.notifier),
+    );
+  }
+}
+
+/// Задерживает вставку строки намерения после [hold] до [release]: принятое
+/// создание остаётся выполняющимся без подтверждённой записи.
+final class _CreationWriteGate extends LocalDatabaseConnectionObserver {
+  Completer<void>? _release;
+  var isHolding = false;
+
+  void hold() => _release = Completer<void>();
+
+  void release() {
+    final release = _release;
+    _release = null;
+    if (release != null && !release.isCompleted) {
+      release.complete();
+    }
+  }
+
+  @override
+  Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
+    final release = _release;
+    if (release == null ||
+        statement.operation != LocalDatabaseSqlOperation.insert ||
+        !RegExp(
+          r'^\s*INSERT\s+INTO\s+"?intentions"?\s',
+          caseSensitive: false,
+        ).hasMatch(statement.statements.single)) {
+      return;
+    }
+    isHolding = true;
+    await release.future;
+  }
+}
+
+/// Ожидание настоящего хранилища: реальное время для его операций и кадры
+/// для интерфейса.
+Future<void> _waitForStorage(WidgetTester tester, bool Function() done) async {
+  for (var attempt = 0; attempt < 100 && !done(); attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  expect(done(), isTrue);
 }
 
 Future<void> _closeOperationMessage(WidgetTester tester) async {

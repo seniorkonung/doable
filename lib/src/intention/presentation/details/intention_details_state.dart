@@ -177,6 +177,7 @@ final class IntentionDetailsEdit {
         const OperationIdle<Intention>(),
       IntentionGenericValidationFailure() => const OperationIdle<Intention>(),
       IntentionTextInputValidationFailure() ||
+      IntentionCreationTagsMissingFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
       IntentionHasBlockingRelationsFailure() ||

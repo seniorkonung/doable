@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'large_blocking_relations_fixture.dart';
 import 'daily_choice_durability_fixture.dart';
+import 'intention_creation_durability_fixture.dart';
 import 'tag_storage_fixture.dart';
 
 const _operationEnvironment = 'DOABLE_GRAPH_OPERATION';
@@ -156,6 +157,9 @@ void main() {
               _intentionId(tagFixtureId(_favoriteIntentionNumber)),
             ),
           ),
+          _GraphOperation.intentionFullCreate =>
+            await creationDurabilityRepository(database)
+                .execute(creationDurabilityCommand()),
         };
         final succeeded = switch (operation) {
           _GraphOperation.create ||
@@ -172,7 +176,8 @@ void main() {
           _GraphOperation.dailyMixedDelete => result is GraphCommandSucceeded,
           _GraphOperation.cascade ||
           _GraphOperation.favoriteMark ||
-          _GraphOperation.favoriteUnmark => result is ResultSuccess,
+          _GraphOperation.favoriteUnmark ||
+          _GraphOperation.intentionFullCreate => result is ResultSuccess,
         };
         if (!succeeded) {
           throw StateError(
@@ -198,6 +203,9 @@ final class _GraphOperationStopObserver
   final _GraphStopPoint stopPoint;
   var _stepInserts = 0;
 
+  /// Таблицы вставок полного создания намерения в порядке выполнения.
+  final _creationInserts = <String>[];
+
   @override
   Future<void> beforeStatement(LocalDatabaseSqlStatement statement) async {
     if (operation == _GraphOperation.bulkDelete &&
@@ -220,6 +228,10 @@ final class _GraphOperationStopObserver
           (sql) => sql.contains('INSERT INTO daily_choice_path_steps'),
         )) {
       _stepInserts++;
+    }
+    if (operation == _GraphOperation.intentionFullCreate &&
+        statement.operation == LocalDatabaseSqlOperation.insert) {
+      _creationInserts.add(_insertedTable(statement));
     }
     final matches = switch (operation) {
       _GraphOperation.dailyCreate || _GraphOperation.dailyBottomCreate =>
@@ -269,9 +281,38 @@ final class _GraphOperationStopObserver
       _GraphOperation.favoriteUnmark => statement.statements.any(
         (sql) => sql.contains('DELETE FROM favorite_intentions'),
       ),
+      _GraphOperation.intentionFullCreate => _wroteWholeCreation(),
     };
     if (matches) await _reportReadyAndWait();
   }
+
+  /// Транзакция полного создания уже содержит намерение, назначение каждого
+  /// выбранного тега и место избранного, но ещё не подтверждена. Иной
+  /// состав записей к месту избранного прерывает операцию без сигнала
+  /// готовности.
+  bool _wroteWholeCreation() {
+    if (_creationInserts.lastOrNull != 'favorite_intentions') return false;
+    final expected = [
+      'intentions',
+      for (final _ in creationDurabilityCommand().tagIds) 'tag_assignments',
+      'favorite_intentions',
+    ];
+    if (_creationInserts.join(',') != expected.join(',')) {
+      throw StateError(
+        'Записи полного создания до места избранного: $_creationInserts.',
+      );
+    }
+    return true;
+  }
+}
+
+String _insertedTable(LocalDatabaseSqlStatement statement) {
+  final match = RegExp(
+    r'^\s*INSERT\s+INTO\s+"?(\w+)"?',
+    caseSensitive: false,
+  ).firstMatch(statement.statements.single);
+  return match?.group(1) ??
+      (throw StateError('Не удалось определить таблицу вставки.'));
 }
 
 bool _isBulkDelete(LocalDatabaseSqlStatement statement) =>
@@ -302,7 +343,8 @@ enum _GraphOperation {
   delete,
   bulkDelete,
   favoriteMark,
-  favoriteUnmark;
+  favoriteUnmark,
+  intentionFullCreate;
 
   static _GraphOperation parse(String? value) => switch (value) {
     'daily_create' => dailyCreate,
@@ -320,6 +362,7 @@ enum _GraphOperation {
     'bulk_delete' => bulkDelete,
     'favorite_mark' => favoriteMark,
     'favorite_unmark' => favoriteUnmark,
+    'intention_full_create' => intentionFullCreate,
     _ => throw StateError('Неизвестная операция графа: $value.'),
   };
 }

@@ -800,7 +800,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorCreateAction => 'Создать намерение';
 
   @override
-  String get editorCreating => 'Создаём…';
+  String get editorSaveAction => 'Сохранить';
+
+  @override
+  String get editorSaving => 'Сохраняем…';
 
   @override
   String get editorTitleLabel => 'Название';
@@ -846,6 +849,129 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get editorCreated => 'Намерение создано.';
+
+  @override
+  String get editorCloseDiscardTitle => 'Сбросить черновик?';
+
+  @override
+  String get editorCloseDiscardMessage =>
+      'Введённые данные нового намерения не сохранены и будут потеряны.';
+
+  @override
+  String get editorCloseContinueAction => 'Продолжить ввод';
+
+  @override
+  String get editorCloseDiscardAction => 'Сбросить';
+
+  @override
+  String get editorCloseSavingTitle => 'Закрыть форму?';
+
+  @override
+  String get editorCloseSavingMessage =>
+      'Сохранение уже выполняется и продолжится после закрытия формы. Если сохранить не удастся, введённые данные не восстановятся.';
+
+  @override
+  String get editorCloseSavingStayAction => 'Остаться';
+
+  @override
+  String get editorCloseSavingLeaveAction => 'Закрыть';
+
+  @override
+  String get editorCloseFormAction => 'Закрыть форму';
+
+  @override
+  String get editorExpandFormAction => 'Развернуть форму';
+
+  @override
+  String get editorCollapseFormAction => 'Свернуть форму';
+
+  @override
+  String get editorFavoriteOption => 'Создать избранным';
+
+  @override
+  String get editorFavoriteOptionOn => 'Создать избранным: включено';
+
+  @override
+  String get editorFavoriteOptionOff => 'Создать избранным: выключено';
+
+  @override
+  String get editorReadinessOption => 'Создать готовым к действию';
+
+  @override
+  String get editorReadinessOptionOn => 'Создать готовым к действию: включено';
+
+  @override
+  String get editorReadinessOptionOff =>
+      'Создать готовым к действию: выключено';
+
+  @override
+  String get editorReadinessConfirmationTitle => 'Создать готовым к действию?';
+
+  @override
+  String get editorReadinessOneDayCriterion =>
+      'Его можно полностью выполнить в течение одного дня.';
+
+  @override
+  String get editorReadinessClarityCriterion =>
+      'Человеку достаточно понятно, что именно нужно сделать.';
+
+  @override
+  String get editorReadinessCancelAction => 'Отмена';
+
+  @override
+  String get editorReadinessConfirmAction => 'Отметить готовым';
+
+  @override
+  String get editorChooseTags => 'Выбрать теги';
+
+  @override
+  String editorRemoveDraftTag(String tagName) {
+    return 'Убрать тег «$tagName» из черновика';
+  }
+
+  @override
+  String get editorDraftTagChecking => 'Проверяем тег';
+
+  @override
+  String get editorDraftTagMissing => 'Тег удалён';
+
+  @override
+  String get editorDraftTagReadUnavailable => 'Не удалось проверить тег';
+
+  @override
+  String get editorDraftTagReadCorruption => 'Данные тега повреждены';
+
+  @override
+  String get editorDraftTagReadUnexpected =>
+      'Тег не проверен из-за непредвиденной ошибки';
+
+  @override
+  String editorRetryDraftTag(String tagName) {
+    return 'Повторить проверку тега «$tagName»';
+  }
+
+  @override
+  String editorCreateTagsMissing(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Удалено из каталога выбранных тегов: $count. Уберите их из черновика, чтобы сохранить намерение.',
+      one: 'Выбранный тег удалён из каталога. Уберите его из черновика, чтобы сохранить намерение.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String editorRemoveMissingTags(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Убрать удалённые теги',
+      one: 'Убрать удалённый тег',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get graphOperationCreate => 'Создание';
@@ -1128,6 +1254,31 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get tagCatalogAssigning => 'Назначаем тег…';
+
+  @override
+  String get tagCatalogInDraft => 'В черновике';
+
+  @override
+  String get tagCatalogAvailableForDraft => 'Можно добавить';
+
+  @override
+  String get tagCatalogAddToDraft => 'Добавить';
+
+  @override
+  String get tagCatalogAddToDraftSemantic => 'Добавить тег в черновик';
+
+  @override
+  String tagCatalogAddToDraftNamed(String tagName) {
+    return 'Добавить тег «$tagName» в черновик';
+  }
+
+  @override
+  String get tagCatalogDraftSubmitting =>
+      'Намерение сохраняется, поэтому добавить теги сейчас нельзя.';
+
+  @override
+  String get tagCatalogDraftClosed =>
+      'Черновик закрыт, поэтому добавить теги нельзя.';
 
   @override
   String get tagCatalogLoading => 'Загружаем теги…';

@@ -798,7 +798,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCreateAction => 'Create intention';
 
   @override
-  String get editorCreating => 'Creating…';
+  String get editorSaveAction => 'Save';
+
+  @override
+  String get editorSaving => 'Saving…';
 
   @override
   String get editorTitleLabel => 'Title';
@@ -844,6 +847,128 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editorCreated => 'Intention created.';
+
+  @override
+  String get editorCloseDiscardTitle => 'Discard the draft?';
+
+  @override
+  String get editorCloseDiscardMessage =>
+      'The new intention’s entered data hasn’t been saved and will be lost.';
+
+  @override
+  String get editorCloseContinueAction => 'Keep editing';
+
+  @override
+  String get editorCloseDiscardAction => 'Discard';
+
+  @override
+  String get editorCloseSavingTitle => 'Close the form?';
+
+  @override
+  String get editorCloseSavingMessage =>
+      'Saving is already in progress and will continue after the form closes. If saving fails, the entered data won’t be restored.';
+
+  @override
+  String get editorCloseSavingStayAction => 'Stay';
+
+  @override
+  String get editorCloseSavingLeaveAction => 'Close';
+
+  @override
+  String get editorCloseFormAction => 'Close the form';
+
+  @override
+  String get editorExpandFormAction => 'Expand the form';
+
+  @override
+  String get editorCollapseFormAction => 'Collapse the form';
+
+  @override
+  String get editorFavoriteOption => 'Create as favorite';
+
+  @override
+  String get editorFavoriteOptionOn => 'Create as favorite: on';
+
+  @override
+  String get editorFavoriteOptionOff => 'Create as favorite: off';
+
+  @override
+  String get editorReadinessOption => 'Create as ready for action';
+
+  @override
+  String get editorReadinessOptionOn => 'Create as ready for action: on';
+
+  @override
+  String get editorReadinessOptionOff => 'Create as ready for action: off';
+
+  @override
+  String get editorReadinessConfirmationTitle => 'Create as ready for action?';
+
+  @override
+  String get editorReadinessOneDayCriterion =>
+      'It can be completed fully within one day.';
+
+  @override
+  String get editorReadinessClarityCriterion =>
+      'It is clear enough for a person to carry out.';
+
+  @override
+  String get editorReadinessCancelAction => 'Cancel';
+
+  @override
+  String get editorReadinessConfirmAction => 'Mark as ready';
+
+  @override
+  String get editorChooseTags => 'Choose tags';
+
+  @override
+  String editorRemoveDraftTag(String tagName) {
+    return 'Remove tag $tagName from draft';
+  }
+
+  @override
+  String get editorDraftTagChecking => 'Checking tag';
+
+  @override
+  String get editorDraftTagMissing => 'Tag deleted';
+
+  @override
+  String get editorDraftTagReadUnavailable => 'Couldn\'t check tag';
+
+  @override
+  String get editorDraftTagReadCorruption => 'Tag data is corrupted';
+
+  @override
+  String get editorDraftTagReadUnexpected =>
+      'Tag not checked due to an unexpected error';
+
+  @override
+  String editorRetryDraftTag(String tagName) {
+    return 'Check tag $tagName again';
+  }
+
+  @override
+  String editorCreateTagsMissing(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count selected tags were deleted from the catalog. Remove them from the draft to save the intention.',
+      one: 'A selected tag was deleted from the catalog. Remove it from the draft to save the intention.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String editorRemoveMissingTags(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Remove deleted tags',
+      one: 'Remove deleted tag',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get graphOperationCreate => 'Create';
@@ -1127,6 +1252,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagCatalogAssigning => 'Assigning tag…';
+
+  @override
+  String get tagCatalogInDraft => 'In draft';
+
+  @override
+  String get tagCatalogAvailableForDraft => 'Available to add';
+
+  @override
+  String get tagCatalogAddToDraft => 'Add';
+
+  @override
+  String get tagCatalogAddToDraftSemantic => 'Add tag to draft';
+
+  @override
+  String tagCatalogAddToDraftNamed(String tagName) {
+    return 'Add tag $tagName to draft';
+  }
+
+  @override
+  String get tagCatalogDraftSubmitting =>
+      'The intention is being saved, so tags can’t be added now.';
+
+  @override
+  String get tagCatalogDraftClosed =>
+      'This draft is closed, so tags can’t be added.';
 
   @override
   String get tagCatalogLoading => 'Loading tags…';

@@ -563,13 +563,17 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     var favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.validation;
     void onFavoriteMarkWrite() =>
         favoriteMarkStage = FavoriteMarkCommandDiagnosticsStage.write;
+    var creationStage = IntentionCreationCommandDiagnosticsStage.validation;
 
     try {
       _validateCommandText(command);
       final success = await _sequencer.run(() async {
         final committed = await _database.transaction(
           () => switch (command) {
-            CreateIntention() => _createIntention(command),
+            CreateIntention() => _createIntention(
+              command,
+              onStage: (stage) => creationStage = stage,
+            ),
             UpdateIntention() => _updateIntention(command),
             EnableIntentionReadiness() => _changeReadiness(
               command.id,
@@ -613,6 +617,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         _commandDiagnosticsEvent(
           command,
           favoriteMarkStage: favoriteMarkStage,
+          creationStage: creationStage,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
       );
@@ -623,6 +628,7 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
         _commandDiagnosticsEvent(
           command,
           favoriteMarkStage: favoriteMarkStage,
+          creationStage: creationStage,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
             code: _diagnosticsFailureCode(failure),
@@ -675,46 +681,114 @@ final class DriftPersonalGraphRepository implements PersonalGraphRepository {
     _notifySelectedRelationsWatchersFor(stableChanges);
   }
 
+  /// Создаёт намерение вместе с полным начальным состоянием команды.
+  /// Вызывается внутри транзакции команды.
+  ///
+  /// Выбранные теги подтверждаются до генерации идентификатора и показания
+  /// часов: отсутствие хотя бы одного отклоняет всё создание. Окончательный
+  /// снимок читается и сверяется с командой до подтверждения транзакции,
+  /// поэтому любой отказ откатывает намерение, назначения и место избранного
+  /// вместе.
+  ///
+  /// [onStage] сообщает диагностике переход к записи и к проверке
+  /// результата: отказ относится к последнему сообщённому этапу, до первого
+  /// перехода — к проверке.
   Future<_CommittedIntentionCommand> _createIntention(
-    CreateIntention command,
-  ) async {
+    CreateIntention command, {
+    required void Function(IntentionCreationCommandDiagnosticsStage) onStage,
+  }) async {
     final title = IntentionText.normalizeTitle(command.title);
     final description = switch (command.description) {
       null => null,
       final value => IntentionText.normalizeDescription(value),
     };
+    await _requireCreationTags(command.tagIds);
+
+    onStage(IntentionCreationCommandDiagnosticsStage.write);
     final createdAt = domain.IntentionTimestamp(_now());
     final intention = domain.Intention(
       id: _idGenerator.generate(),
       title: title,
       description: description,
-      readiness: domain.IntentionReadiness.notReady,
+      readiness: command.readiness,
       archiveState: domain.IntentionArchiveState.active,
       createdAt: createdAt,
       updatedAt: createdAt,
     );
+    final intentionId = intention.id.toCanonicalString();
 
     await _database
         .into(_database.intentions)
         .insert(
           local.IntentionsCompanion.insert(
-            id: intention.id.toCanonicalString(),
+            id: intentionId,
             title: intention.title,
             description: Value(intention.description),
-            isActionReady: const Value(false),
+            isActionReady: Value(
+              intention.readiness == domain.IntentionReadiness.ready,
+            ),
             isArchived: const Value(false),
             createdAt: intention.createdAt.value.microsecondsSinceEpoch,
             updatedAt: intention.updatedAt.value.microsecondsSinceEpoch,
           ),
         );
+    for (final tagId in command.tagIds) {
+      await _database
+          .into(_database.tagAssignments)
+          .insert(
+            local.TagAssignmentsCompanion.insert(
+              tagId: tagId.toCanonicalString(),
+              intentionId: intentionId,
+            ),
+          );
+    }
+    if (command.favoriteMark == domain.FavoriteMark.favorite) {
+      await _insertFavoritePlace(intention.id);
+    }
+
+    onStage(IntentionCreationCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(intention.id);
     if (stored == null) throw const _StoredIntentionCorruption();
+    final storedIntention = _rehydrateStored(stored.detail);
     final counts = await _readVerifiedRelationCounts(intention.id);
+    final after = await _catalogEntrySnapshot(stored, counts);
+    final assignedTagIds = [for (final tag in after.summary.tags) tag.id];
+    if (!_sameIntention(storedIntention, intention) ||
+        after.summary.favoriteMark != command.favoriteMark ||
+        assignedTagIds.length != command.tagIds.length ||
+        !command.tagIds.containsAll(assignedTagIds)) {
+      throw const _StoredIntentionCorruption();
+    }
     return _CommittedIntentionCreated(
-      intention: _rehydrateStored(stored.detail),
-      after: await _catalogEntrySnapshot(stored, counts),
+      intention: storedIntention,
+      after: after,
+      assignedTagIds: assignedTagIds,
     );
   }
+
+  /// Подтверждает сохранённые данные выбранных тегов создания.
+  /// Вызывается внутри транзакции команды.
+  ///
+  /// Отсутствующие теги собираются полностью и отклоняют создание одним
+  /// отказом; повреждённая строка тега остаётся повреждением.
+  Future<void> _requireCreationTags(Set<TagId> tagIds) async {
+    if (tagIds.isEmpty) return;
+    final found = await _findTagsByIds(tagIds);
+    final missing = [
+      for (final id in tagIds)
+        if (!found.containsKey(id)) id,
+    ];
+    if (missing.isNotEmpty) throw _IntentionCreationTagsMissing(missing);
+  }
+
+  bool _sameIntention(domain.Intention stored, domain.Intention expected) =>
+      stored.id == expected.id &&
+      stored.title == expected.title &&
+      stored.description == expected.description &&
+      stored.readiness == expected.readiness &&
+      stored.archiveState == expected.archiveState &&
+      stored.createdAt == expected.createdAt &&
+      stored.updatedAt == expected.updatedAt;
 
   Future<_CommittedIntentionCommand> _updateIntention(
     UpdateIntention command,
@@ -1780,13 +1854,17 @@ sealed class _CommittedIntentionCommand {
 }
 
 final class _CommittedIntentionCreated extends _CommittedIntentionCommand {
-  const _CommittedIntentionCreated({
+  _CommittedIntentionCreated({
     required this.intention,
     required this.after,
-  });
+    required Iterable<TagId> assignedTagIds,
+  }) : assignedTagIds = List.unmodifiable(assignedTagIds);
 
   final domain.Intention intention;
   final IntentionCatalogEntrySnapshot after;
+
+  /// Созданные назначения в порядке собственных тегов снимка [after].
+  final List<TagId> assignedTagIds;
 
   @override
   IntentionId get intentionId => intention.id;
@@ -1798,6 +1876,14 @@ final class _CommittedIntentionCreated extends _CommittedIntentionCommand {
   IntentionCommandSuccess toSuccess(GraphRevision revision) => IntentionSaved(
     intention,
     catalogMutation: IntentionCatalogCreated(revision: revision, entry: after),
+    additionalChanges: [
+      for (final tagId in assignedTagIds)
+        TagAssignmentChangedChange(
+          revision: revision,
+          assignment: TagAssignment(tagId: tagId, intentionId: intention.id),
+          state: TagAssignmentState.assigned,
+        ),
+    ],
   );
 }
 
@@ -2119,6 +2205,9 @@ IntentionFailure _classifyCommandFailure(
   if (error case _IntentionHasBlockingRelations(:final intentionId)) {
     return IntentionHasBlockingRelationsFailure(intentionId);
   }
+  if (error case _IntentionCreationTagsMissing(:final tagIds)) {
+    return IntentionCreationTagsMissingFailure(tagIds);
+  }
   if (error is _StoredIntentionCorruption) {
     return const IntentionCorruptionFailure();
   }
@@ -2156,10 +2245,12 @@ void _validateCommandText(IntentionCommand command) {
 }
 
 /// Событие диагностики команды намерения. Этап [favoriteMarkStage] несут
-/// только отметка избранного и её снятие.
+/// только отметка избранного и её снятие, этап [creationStage] — только
+/// создание.
 IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
   IntentionCommand command, {
   required FavoriteMarkCommandDiagnosticsStage favoriteMarkStage,
+  required IntentionCreationCommandDiagnosticsStage creationStage,
   required DiagnosticsStatus status,
 }) {
   IntentionCommandDiagnosticsEvent event(
@@ -2170,7 +2261,10 @@ IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
   );
 
   return switch (command) {
-    CreateIntention() => event(IntentionCommandDiagnosticsType.create),
+    CreateIntention() => IntentionCommandDiagnosticsEvent.create(
+      stage: creationStage,
+      status: status,
+    ),
     UpdateIntention() => event(IntentionCommandDiagnosticsType.update),
     EnableIntentionReadiness() => event(
       IntentionCommandDiagnosticsType.enableReadiness,
@@ -2216,4 +2310,12 @@ final class _IntentionHasBlockingRelations implements Exception {
   const _IntentionHasBlockingRelations(this.intentionId);
 
   final IntentionId intentionId;
+}
+
+/// Выбранные теги создания [tagIds] отсутствуют на момент проверки в
+/// транзакции.
+final class _IntentionCreationTagsMissing implements Exception {
+  const _IntentionCreationTagsMissing(this.tagIds);
+
+  final List<TagId> tagIds;
 }

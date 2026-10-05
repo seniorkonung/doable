@@ -59,7 +59,7 @@ final class TagCatalogViewModelProvider
 }
 
 String _$tagCatalogViewModelHash() =>
-    r'7b3b124463aee1114657db1707c41ab8354d333c';
+    r'304b82d2647451376ce13415266a8d44c095f634';
 
 final class TagCatalogViewModelFamily extends $Family
     with

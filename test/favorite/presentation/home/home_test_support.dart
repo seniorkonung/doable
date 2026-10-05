@@ -17,6 +17,11 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -87,7 +92,8 @@ final class HomeHarness {
         ),
     ];
     await _run(
-      command,
+      (coordinator) =>
+          coordinator.acceptExisting(command, presentationTitle: 'Намерение'),
       ResultSuccess(
         ConfirmedGraphResult<IntentionCommandSuccess>(
           revision: graphRevision,
@@ -98,15 +104,7 @@ final class HomeHarness {
                   additionalChanges: counts,
                 )
               : IntentionSaved(
-                  Intention(
-                    id: after.id,
-                    title: after.title,
-                    description: null,
-                    readiness: after.readiness,
-                    archiveState: after.archiveState,
-                    createdAt: after.createdAt,
-                    updatedAt: after.updatedAt,
-                  ),
+                  _intentionOf(after),
                   catalogMutation: mutation,
                   additionalChanges: counts,
                 ),
@@ -115,19 +113,68 @@ final class HomeHarness {
     );
   }
 
+  /// Проводит полное создание намерения [created] через координатор до
+  /// опубликованного подтверждённого пакета ревизии [revision].
+  ///
+  /// Команда несёт готовность, отметку и теги окончательного снимка
+  /// [created], а пакет повторяет настоящее создание: одна
+  /// [IntentionCatalogCreated] с этим снимком и по одному факту назначения на
+  /// каждый его тег, все на одной ревизии. Каждое создание принимается по
+  /// собственному ключу формы, поэтому повтор вызова с тем же снимком и
+  /// ревизией повторно доставляет тот же пакет.
+  Future<void> create(IntentionSummary created, {required int revision}) {
+    final graphRevision = HomeTestRevision(revision);
+    return _run(
+      (coordinator) => coordinator.acceptCreation(
+        IntentionCreationFormKey(),
+        CreateIntention.withInitialState(
+          title: created.title,
+          description: null,
+          readiness: created.readiness,
+          favoriteMark: created.favoriteMark,
+          tagIds: [for (final tag in created.tags) tag.id],
+        ),
+      ),
+      ResultSuccess(
+        ConfirmedGraphResult<IntentionCommandSuccess>(
+          revision: graphRevision,
+          value: IntentionSaved(
+            _intentionOf(created),
+            catalogMutation: IntentionCatalogCreated(
+              revision: graphRevision,
+              entry: _HomeTestEntry(created),
+            ),
+            additionalChanges: [
+              for (final tag in created.tags)
+                TagAssignmentChangedChange(
+                  revision: graphRevision,
+                  assignment: TagAssignment(
+                    tagId: tag.id,
+                    intentionId: created.id,
+                  ),
+                  state: TagAssignmentState.assigned,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Проводит команду намерения до опубликованного отказа: подтверждённого
   /// пакета у такого завершения нет.
-  Future<void> reject(ExistingIntentionCommand command) =>
-      _run(command, const ResultFailure(IntentionUnavailableFailure()));
+  Future<void> reject(ExistingIntentionCommand command) => _run(
+    (coordinator) =>
+        coordinator.acceptExisting(command, presentationTitle: 'Намерение'),
+    const ResultFailure(IntentionUnavailableFailure()),
+  );
 
   Future<void> _run(
-    ExistingIntentionCommand command,
+    IntentionCommandStart Function(GraphCommandCoordinator coordinator) accept,
     Result<ConfirmedGraphResult<IntentionCommandSuccess>> result,
   ) async {
     repository.nextCommandResult = result;
-    final start = container
-        .read(graphCommandCoordinatorProvider.notifier)
-        .acceptExisting(command, presentationTitle: 'Намерение');
+    final start = accept(coordinator);
     await (start as IntentionCommandAccepted).future;
     await pumpEventQueue();
   }
@@ -181,6 +228,9 @@ final class HomeTestRepository extends Fake implements PersonalGraphRepository {
   /// Результат, которым граница завершает следующую команду намерения.
   Object? nextCommandResult;
 
+  /// Исполненные команды, кроме перестановок, в порядке поступления.
+  final commands = <Object>[];
+
   /// Полный порядок избранных, включая архивированные, над которым граница
   /// исполняет перестановку.
   FavoriteOrder favoriteOrder = FavoriteOrder(const []);
@@ -199,6 +249,7 @@ final class HomeTestRepository extends Fake implements PersonalGraphRepository {
       return await move._result.future
           as GraphCommandResult<TSuccess, TFailure>;
     }
+    commands.add(command);
     final result = nextCommandResult;
     nextCommandResult = null;
     return result! as GraphCommandResult<TSuccess, TFailure>;
@@ -322,6 +373,7 @@ IntentionSummary homeTestSummary(
   IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   int activeRelationCount = 0,
+  List<Tag> tags = const [],
 }) {
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 10, 2));
   return IntentionSummary(
@@ -333,9 +385,28 @@ IntentionSummary homeTestSummary(
     activeRelationCount: activeRelationCount,
     createdAt: timestamp,
     updatedAt: timestamp,
+    tags: tags,
     favoriteMark: favoriteMark,
   );
 }
+
+Tag homeTestTag(int number, String name) => Tag(
+  id: (TagId.decode(
+    '018f0000-0000-7000-9000-${number.toRadixString(16).padLeft(12, '0')}',
+  ) as TagIdDecodingSuccess).id,
+  name: TagName.fromInput(name),
+);
+
+/// Намерение подтверждённой команды с полями снимка [summary].
+Intention _intentionOf(IntentionSummary summary) => Intention(
+  id: summary.id,
+  title: summary.title,
+  description: null,
+  readiness: summary.readiness,
+  archiveState: summary.archiveState,
+  createdAt: summary.createdAt,
+  updatedAt: summary.updatedAt,
+);
 
 final class _HomeTestEntry implements IntentionCatalogEntrySnapshot {
   const _HomeTestEntry(this.summary);

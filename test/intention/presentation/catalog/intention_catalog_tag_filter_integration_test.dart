@@ -6,7 +6,10 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
@@ -854,6 +857,282 @@ void main() {
     expect(contents(reread), contents(reconciled));
   });
 
+  group('полное создание через настоящий репозиторий и coordinator', () {
+    final filter = IntentionTagFilter(
+      requiredTagIds: [_tagId(301), _tagId(303)],
+      excludedTagIds: [_tagId(302)],
+    );
+
+    /// Загружает выдачу с названием «ходить» и [filter] в порядке [order];
+    /// [loadAll] догружает её до конца.
+    Future<IntentionCatalogLoaded> loadFiltered(
+      IntentionCatalogViewModelProvider provider, {
+      IntentionCatalogOrder order = IntentionCatalogOrder.createdAtDescending,
+      bool loadAll = false,
+    }) async {
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      await container.read(provider.future);
+      final model = container.read(provider.notifier);
+      model.changeTitleFilter('ходить');
+      model.changeOrder(order);
+      model.changeTagFilter(filter);
+      var loaded =
+          await container.read(provider.future) as IntentionCatalogLoaded;
+      while (loadAll && loaded.nextCursor != null) {
+        await model.loadNextPageIfNeeded(visibleIndex: loaded.items.length - 1);
+        loaded =
+            container.read(provider).requireValue as IntentionCatalogLoaded;
+      }
+      return loaded;
+    }
+
+    for (final (name, order, loadAll, before, after, complete) in [
+      (
+        'частично загруженный префикс',
+        IntentionCatalogOrder.createdAtDescending,
+        false,
+        [10, 2],
+        [_created, 10, 2],
+        [_created, 10, 2, 1],
+      ),
+      (
+        'полностью загруженная выдача',
+        IntentionCatalogOrder.createdAtDescending,
+        true,
+        [10, 2, 1],
+        [_created, 10, 2, 1],
+        [_created, 10, 2, 1],
+      ),
+      (
+        'место за границей загруженной области',
+        IntentionCatalogOrder.createdAtAscending,
+        false,
+        [1, 2],
+        [1, 2],
+        [1, 2, 10, _created],
+      ),
+    ]) {
+      test('подходящее созданное намерение учитывается один раз с точным '
+          'количеством без сброса выдачи: $name', () async {
+        final provider = intentionCatalogViewModelProvider(
+          const BrowseIntentionCatalog(),
+        );
+        final loaded = await loadFiltered(
+          provider,
+          order: order,
+          loadAll: loadAll,
+        );
+        expect(loaded.items.map((item) => item.id), [
+          for (final number in before) _intentionId(number),
+        ]);
+        expect(loaded.totalCount, 3);
+        final eventsBefore = diagnostics.events.length;
+        final states = <AsyncValue<IntentionCatalogState>>[];
+        final observer = container.listen(
+          provider,
+          (_, next) => states.add(next),
+        );
+        addTearDown(observer.close);
+
+        final completion = await _create(
+          container,
+          CreateIntention.withInitialState(
+            title: 'Ходить по лесу',
+            description: 'Тропа у реки',
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+            tagIds: [_tagId(303), _tagId(301)],
+          ),
+        );
+        final current = await _awaitRevisionAfter(
+          container,
+          provider,
+          loaded,
+        ) as IntentionCatalogLoaded;
+
+        final createdId = _createdId(completion);
+        List<IntentionId> ids(List<int> numbers) => [
+          for (final number in numbers)
+            number == _created ? createdId : _intentionId(number),
+        ];
+        expect(current.items.map((item) => item.id), ids(after));
+        expect(current.totalCount, 4);
+        expect(
+          current.revision.compareTo(completion.revision!),
+          GraphRevisionOrder.same,
+        );
+        expect(current.nextCursor, same(loaded.nextCursor));
+        expect(current.query, same(loaded.query));
+        expect(current.selection.titleFilterText, 'ходить');
+        expect(current.selection.order, order);
+        expect(current.selection.tagFilter, filter);
+        expect(current.continuation, isA<IntentionCatalogContinuationIdle>());
+        expect(states.where((state) => state.isLoading), isEmpty);
+        expect(states.map((state) => state.requireValue), [same(current)]);
+        // Выдачу согласует сам пакет создания: без нового чтения каталога и
+        // без самостоятельных команд готовности, отметки или назначения.
+        expect(diagnostics.events.skip(eventsBefore), [_createdSuccessfully]);
+        if (after.contains(_created)) {
+          final row = current.items.singleWhere((item) => item.id == createdId);
+          expect(row.title, 'Ходить по лесу');
+          expect(row.hasDescription, isTrue);
+          expect(row.readiness, IntentionReadiness.ready);
+          expect(row.favoriteMark, FavoriteMark.favorite);
+          expect(row.tags.map((tag) => (tag.id, tag.name.value)), [
+            (_tagId(301), 'Здоровье'),
+            (_tagId(303), 'Отдых'),
+          ]);
+        }
+
+        final model = container.read(provider.notifier);
+        var completed = current;
+        while (completed.nextCursor != null) {
+          await model.loadNextPageIfNeeded(
+            visibleIndex: completed.items.length - 1,
+          );
+          completed =
+              container.read(provider).requireValue as IntentionCatalogLoaded;
+        }
+        expect(completed.items.map((item) => item.id), ids(complete));
+        expect(completed.totalCount, 4);
+        expect(completed.query, same(loaded.query));
+        expect(
+          _contents(completed.items),
+          _contents(await _readWhole(repository, completed.query)),
+        );
+      });
+    }
+
+    for (final (name, title, tagNumbers) in [
+      ('не подходит названию', 'Читать у реки', [301, 303]),
+      ('без обязательного тега', 'Ходить у реки', [301]),
+      ('с исключённым тегом', 'Ходить у реки', [301, 302, 303]),
+    ]) {
+      test('неподходящее созданное намерение не появляется в выдаче и не '
+          'меняет количество: $name', () async {
+        final provider = intentionCatalogViewModelProvider(
+          const BrowseIntentionCatalog(),
+        );
+        final loaded = await loadFiltered(provider);
+        expect(loaded.items.map((item) => item.id), [
+          _intentionId(10),
+          _intentionId(2),
+        ]);
+        expect(loaded.totalCount, 3);
+        final eventsBefore = diagnostics.events.length;
+        final states = <AsyncValue<IntentionCatalogState>>[];
+        final observer = container.listen(
+          provider,
+          (_, next) => states.add(next),
+        );
+        addTearDown(observer.close);
+
+        final completion = await _create(
+          container,
+          CreateIntention.withInitialState(
+            title: title,
+            description: null,
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+            tagIds: [for (final number in tagNumbers) _tagId(number)],
+          ),
+        );
+        final current = await _awaitRevisionAfter(
+          container,
+          provider,
+          loaded,
+        ) as IntentionCatalogLoaded;
+
+        expect(current.items, loaded.items);
+        expect(current.totalCount, 3);
+        expect(
+          current.revision.compareTo(completion.revision!),
+          GraphRevisionOrder.same,
+        );
+        expect(current.nextCursor, same(loaded.nextCursor));
+        expect(current.query, same(loaded.query));
+        expect(current.selection.tagFilter, filter);
+        expect(states.where((state) => state.isLoading), isEmpty);
+        expect(states.map((state) => state.requireValue), [same(current)]);
+        expect(diagnostics.events.skip(eventsBefore), [_createdSuccessfully]);
+
+        await container
+            .read(provider.notifier)
+            .loadNextPageIfNeeded(visibleIndex: current.items.length - 1);
+        final completed =
+            container.read(provider).requireValue as IntentionCatalogLoaded;
+        expect(completed.items.map((item) => item.id), [
+          _intentionId(10),
+          _intentionId(2),
+          _intentionId(1),
+        ]);
+        expect(completed.totalCount, 3);
+        expect(completed.nextCursor, isNull);
+        expect(
+          completed.items.map((item) => item.id),
+          isNot(contains(_createdId(completion))),
+        );
+      });
+    }
+
+    for (final (readiness, after) in [
+      (IntentionReadiness.ready, [_created, 10, 1]),
+      (IntentionReadiness.notReady, [10, 1]),
+    ]) {
+      test('начальная готовность определяет принадлежность выдаче выбора '
+          'действия: ${readiness.name}', () async {
+        final provider = intentionCatalogViewModelProvider(
+          const SelectDailyChoiceAction(),
+        );
+        final loaded = await loadFiltered(provider);
+        expect(loaded.items.map((item) => item.id), [
+          _intentionId(10),
+          _intentionId(1),
+        ]);
+        expect(loaded.totalCount, 2);
+        expect(loaded.nextCursor, isNull);
+        final states = <AsyncValue<IntentionCatalogState>>[];
+        final observer = container.listen(
+          provider,
+          (_, next) => states.add(next),
+        );
+        addTearDown(observer.close);
+
+        final completion = await _create(
+          container,
+          CreateIntention.withInitialState(
+            title: 'Ходить по лесу',
+            description: null,
+            readiness: readiness,
+            favoriteMark: FavoriteMark.notFavorite,
+            tagIds: [_tagId(301), _tagId(303)],
+          ),
+        );
+        final current = await _awaitRevisionAfter(
+          container,
+          provider,
+          loaded,
+        ) as IntentionCatalogLoaded;
+
+        final createdId = _createdId(completion);
+        expect(current.items.map((item) => item.id), [
+          for (final number in after)
+            number == _created ? createdId : _intentionId(number),
+        ]);
+        expect(current.totalCount, after.length);
+        expect(current.nextCursor, isNull);
+        expect(current.query, same(loaded.query));
+        expect(states.where((state) => state.isLoading), isEmpty);
+        expect(states.map((state) => state.requireValue), [same(current)]);
+        expect(
+          _contents(current.items),
+          _contents(await _readWhole(repository, current.query)),
+        );
+      });
+    }
+  });
+
   group('модель выбранных условий по тегам', () {
     const browse = BrowseIntentionCatalog();
     final catalog = intentionCatalogViewModelProvider(browse);
@@ -1295,6 +1574,81 @@ Future<void> _assignTag(
       .acceptTagAssign(AssignTag(tagId: tagId, intentionId: intentionId));
   final completion = await (start as TagCommandAccepted).future;
   expect(completion.isFailure, isFalse);
+}
+
+/// Номер созданного в сценарии намерения в ожидаемой выдаче: его
+/// идентификатор выдаёт настоящий генератор.
+const _created = 0;
+
+/// Создаёт намерение настоящим адаптером через coordinator.
+Future<IntentionCommandCompletion> _create(
+  ProviderContainer container,
+  CreateIntention command,
+) async {
+  final start = container
+      .read(graphCommandCoordinatorProvider.notifier)
+      .acceptCreation(IntentionCreationFormKey(), command);
+  final completion = await (start as IntentionCommandAccepted).future;
+  expect(completion.isFailure, isFalse);
+  return completion;
+}
+
+IntentionId _createdId(IntentionCommandCompletion completion) =>
+    switch (completion.result) {
+      ResultSuccess(value: IntentionSaved(:final intention)) => intention.id,
+      _ => fail('Создание не подтверждено.'),
+    };
+
+/// Единственное диагностическое событие полного создания: успешный исход.
+final _createdSuccessfully = isA<IntentionCommandDiagnosticsEvent>()
+    .having(
+      (event) => event.commandType,
+      'команда',
+      IntentionCommandDiagnosticsType.create,
+    )
+    .having((event) => event.status, 'статус', isA<DiagnosticsSucceeded>());
+
+/// Сопоставимое содержимое строк выдачи вместе с данными начального
+/// состояния.
+List<List<Object?>> _contents(List<IntentionSummary> items) => [
+  for (final item in items)
+    [
+      item.id,
+      item.title,
+      item.readiness,
+      item.favoriteMark,
+      ...item.tags.map((tag) => tag.id),
+    ],
+];
+
+/// Читает всю выдачу [query] заново настоящим адаптером.
+Future<List<IntentionSummary>> _readWhole(
+  DriftPersonalGraphRepository repository,
+  IntentionCatalogQuery query,
+) async {
+  final items = <IntentionSummary>[];
+  IntentionCatalogCursor? cursor;
+  do {
+    final result = await repository.getCatalogPage(
+      IntentionCatalogQuery(
+        scope: query.scope,
+        readinessFilter: query.readinessFilter,
+        titleFilter: query.titleFilter?.map((value) => value),
+        tagFilter: query.tagFilter,
+        excludedIntentionId: query.excludedIntentionId,
+        order: query.order,
+        pageSize: query.pageSize,
+        cursor: cursor,
+      ),
+    );
+    final page = switch (result) {
+      ResultSuccess(:final value) => value,
+      ResultFailure() => fail('Чтение выдачи отказало.'),
+    };
+    items.addAll(page.items);
+    cursor = page.nextCursor;
+  } while (cursor != null);
+  return items;
 }
 
 /// Ждёт публикации явного отказа обновления.

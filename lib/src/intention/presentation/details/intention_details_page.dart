@@ -16,6 +16,7 @@ import '../../../long_term_relation/presentation/editor/relation_editor_state.da
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
+import '../../../tag/presentation/catalog/tag_selection_context.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
@@ -274,7 +275,8 @@ final class _FavoriteMarkFailureBanner extends StatelessWidget {
 
   String _message(AppLocalizations localizations) => switch (failure) {
     IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() =>
+    IntentionTextInputValidationFailure() ||
+    IntentionCreationTagsMissingFailure() =>
       localizations.detailsFavoriteMarkInvalid,
     IntentionNotFoundFailure() => localizations.detailsFavoriteMarkNotFound,
     IntentionConflictFailure() => localizations.detailsFavoriteMarkConflict,
@@ -527,7 +529,11 @@ final class _LoadedDetails extends StatelessWidget {
               isArchived:
                   intention.archiveState == IntentionArchiveState.archived,
               onChooseTag: (intentionId) => unawaited(
-                context.router.push(TagCatalogRoute(intentionId: intentionId)),
+                context.router.push(
+                  TagCatalogRoute(
+                    selectionContext: TagAssignmentContext(intentionId),
+                  ),
+                ),
               ),
               onOpenTag: (tagId) => unawaited(
                 context.router.push<void>(TagNavigationRoute(tagId: tagId)),
@@ -834,7 +840,8 @@ final class _DetailsActions extends StatelessWidget {
     IntentionFailure failure,
   ) => switch (failure) {
     IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() => localizations.detailsDeleteInvalid,
+    IntentionTextInputValidationFailure() ||
+    IntentionCreationTagsMissingFailure() => localizations.detailsDeleteInvalid,
     IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
     IntentionConflictFailure() => localizations.detailsDeleteConflict,
     IntentionHasBlockingRelationsFailure() =>
@@ -849,7 +856,8 @@ final class _DetailsActions extends StatelessWidget {
     IntentionFailure failure,
   ) => switch (failure) {
     IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() =>
+    IntentionTextInputValidationFailure() ||
+    IntentionCreationTagsMissingFailure() =>
       localizations.detailsStateChangeInvalid,
     IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
     IntentionConflictFailure() => localizations.detailsStateChangeConflict,
@@ -1055,7 +1063,8 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
               textFailure.field == IntentionTextField.description =>
         null,
       IntentionGenericValidationFailure() ||
-      IntentionTextInputValidationFailure() =>
+      IntentionTextInputValidationFailure() ||
+      IntentionCreationTagsMissingFailure() =>
         localizations.detailsUpdateInvalidInput,
       IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
       IntentionConflictFailure() => localizations.detailsUpdateConflict,

@@ -859,9 +859,13 @@
   "@editorCreateAction": {
     "description": "Действие создания намерения"
   },
-  "editorCreating": "Creating…",
-  "@editorCreating": {
-    "description": "Состояние выполняющегося создания намерения"
+  "editorSaveAction": "Save",
+  "@editorSaveAction": {
+    "description": "Основное действие панели создания: сохраняет весь черновик нового намерения одной операцией"
+  },
+  "editorSaving": "Saving…",
+  "@editorSaving": {
+    "description": "Индикатор выполняющегося сохранения черновика нового намерения на основном действии панели"
   },
   "editorTitleLabel": "Title",
   "@editorTitleLabel": {
@@ -914,6 +918,154 @@
   "editorCreated": "Intention created.",
   "@editorCreated": {
     "description": "Подтверждение успешного создания намерения"
+  },
+  "editorCloseDiscardTitle": "Discard the draft?",
+  "@editorCloseDiscardTitle": {
+    "description": "Заголовок подтверждения закрытия изменённого черновика создания до отправки"
+  },
+  "editorCloseDiscardMessage": "The new intention’s entered data hasn’t been saved and will be lost.",
+  "@editorCloseDiscardMessage": {
+    "description": "Объяснение потери несохранённого черновика создания при закрытии формы"
+  },
+  "editorCloseContinueAction": "Keep editing",
+  "@editorCloseContinueAction": {
+    "description": "Действие подтверждения закрытия, сохраняющее форму и черновик создания"
+  },
+  "editorCloseDiscardAction": "Discard",
+  "@editorCloseDiscardAction": {
+    "description": "Действие подтверждения закрытия, сбрасывающее черновик и закрывающее форму"
+  },
+  "editorCloseSavingTitle": "Close the form?",
+  "@editorCloseSavingTitle": {
+    "description": "Заголовок подтверждения закрытия формы во время принятого сохранения"
+  },
+  "editorCloseSavingMessage": "Saving is already in progress and will continue after the form closes. If saving fails, the entered data won’t be restored.",
+  "@editorCloseSavingMessage": {
+    "description": "Объяснение, что закрытие формы не отменяет выполняющееся сохранение, а черновик не восстановится после отказа"
+  },
+  "editorCloseSavingStayAction": "Stay",
+  "@editorCloseSavingStayAction": {
+    "description": "Действие подтверждения закрытия во время сохранения, оставляющее форму открытой"
+  },
+  "editorCloseSavingLeaveAction": "Close",
+  "@editorCloseSavingLeaveAction": {
+    "description": "Действие подтверждения закрытия во время сохранения, закрывающее форму без отмены сохранения"
+  },
+  "editorCloseFormAction": "Close the form",
+  "@editorCloseFormAction": {
+    "description": "Подсказка кнопки закрытия панели создания намерения и доступное название её модального фона"
+  },
+  "editorExpandFormAction": "Expand the form",
+  "@editorExpandFormAction": {
+    "description": "Подсказка и доступное название кнопки, разворачивающей компактную панель создания намерения на всю доступную высоту"
+  },
+  "editorCollapseFormAction": "Collapse the form",
+  "@editorCollapseFormAction": {
+    "description": "Подсказка и доступное название кнопки, возвращающей развёрнутую панель создания намерения к компактному виду"
+  },
+  "editorFavoriteOption": "Create as favorite",
+  "@editorFavoriteOption": {
+    "description": "Доступное название быстрой отметки избранного в черновике нового намерения"
+  },
+  "editorFavoriteOptionOn": "Create as favorite: on",
+  "@editorFavoriteOptionOn": {
+    "description": "Подсказка включённой быстрой отметки избранного: новое намерение будет создано избранным, отметка ещё не сохранена"
+  },
+  "editorFavoriteOptionOff": "Create as favorite: off",
+  "@editorFavoriteOptionOff": {
+    "description": "Подсказка выключенной быстрой отметки избранного в черновике нового намерения"
+  },
+  "editorReadinessOption": "Create as ready for action",
+  "@editorReadinessOption": {
+    "description": "Доступное название быстрой отметки начальной готовности к действию в черновике нового намерения"
+  },
+  "editorReadinessOptionOn": "Create as ready for action: on",
+  "@editorReadinessOptionOn": {
+    "description": "Подсказка включённой быстрой отметки готовности: новое намерение будет создано готовым к действию, готовность ещё не сохранена"
+  },
+  "editorReadinessOptionOff": "Create as ready for action: off",
+  "@editorReadinessOptionOff": {
+    "description": "Подсказка выключенной быстрой отметки готовности к действию в черновике нового намерения"
+  },
+  "editorReadinessConfirmationTitle": "Create as ready for action?",
+  "@editorReadinessConfirmationTitle": {
+    "description": "Заголовок объяснения критериев действия перед включением начальной готовности в черновике"
+  },
+  "editorReadinessOneDayCriterion": "It can be completed fully within one day.",
+  "@editorReadinessOneDayCriterion": {
+    "description": "Критерий действия в объяснении начальной готовности: полная выполнимость в рамках одного дня"
+  },
+  "editorReadinessClarityCriterion": "It is clear enough for a person to carry out.",
+  "@editorReadinessClarityCriterion": {
+    "description": "Критерий действия в объяснении начальной готовности: операционная понятность человеку"
+  },
+  "editorReadinessCancelAction": "Cancel",
+  "@editorReadinessCancelAction": {
+    "description": "Отказ от включения начальной готовности; черновик остаётся неготовым"
+  },
+  "editorReadinessConfirmAction": "Mark as ready",
+  "@editorReadinessConfirmAction": {
+    "description": "Явное подтверждение обоих критериев действия, включающее начальную готовность только в черновике"
+  },
+  "editorChooseTags": "Choose tags",
+  "@editorChooseTags": {
+    "description": "Подсказка и доступное название быстрого действия, открывающего общий выбор тегов для черновика нового намерения"
+  },
+  "editorRemoveDraftTag": "Remove tag {tagName} from draft",
+  "@editorRemoveDraftTag": {
+    "description": "Подсказка и доступное название снятия выбранного тега из черновика нового намерения без записи назначений",
+    "placeholders": {
+      "tagName": {
+        "type": "String"
+      }
+    }
+  },
+  "editorDraftTagChecking": "Checking tag",
+  "@editorDraftTagChecking": {
+    "description": "Доступное состояние выбранного тега черновика, пока наблюдение ещё не подтвердило тег"
+  },
+  "editorDraftTagMissing": "Tag deleted",
+  "@editorDraftTagMissing": {
+    "description": "Состояние выбранного тега черновика, отсутствие которого подтверждено; тег остаётся в черновике до явного снятия"
+  },
+  "editorDraftTagReadUnavailable": "Couldn't check tag",
+  "@editorDraftTagReadUnavailable": {
+    "description": "Устранимый отказ чтения выбранного тега черновика; не означает удаление тега"
+  },
+  "editorDraftTagReadCorruption": "Tag data is corrupted",
+  "@editorDraftTagReadCorruption": {
+    "description": "Отказ чтения выбранного тега черновика из-за повреждённых данных; повтор не предлагается"
+  },
+  "editorDraftTagReadUnexpected": "Tag not checked due to an unexpected error",
+  "@editorDraftTagReadUnexpected": {
+    "description": "Непредвиденный отказ чтения выбранного тега черновика; повтор не предлагается"
+  },
+  "editorRetryDraftTag": "Check tag {tagName} again",
+  "@editorRetryDraftTag": {
+    "description": "Подсказка и доступное название повтора проверки выбранного тега черновика после устранимого отказа чтения",
+    "placeholders": {
+      "tagName": {
+        "type": "String"
+      }
+    }
+  },
+  "editorCreateTagsMissing": "{count, plural, =1{A selected tag was deleted from the catalog. Remove it from the draft to save the intention.} other{{count} selected tags were deleted from the catalog. Remove them from the draft to save the intention.}}",
+  "@editorCreateTagsMissing": {
+    "description": "Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; объясняет исправление набора",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "editorRemoveMissingTags": "{count, plural, =1{Remove deleted tag} other{Remove deleted tags}}",
+  "@editorRemoveMissingTags": {
+    "description": "Явное исправление отказа создания: снимает из черновика только выбранные теги, отсутствие которых подтвердило сохранение; сохранение не отправляет",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "graphOperationCreate": "Create",
   "@graphOperationCreate": {
@@ -1124,6 +1276,20 @@
   "@tagCatalogAssignNamed": {"description": "Семантика действия назначения", "placeholders": {"tagName": {"type": "String"}}},
   "tagCatalogAssigning": "Assigning tag…",
   "@tagCatalogAssigning": {"description": "Ожидание подтверждения назначения"},
+  "tagCatalogInDraft": "In draft",
+  "@tagCatalogInDraft": {"description": "Тег уже входит в набор черновика создаваемого намерения; назначение ещё не сохранено"},
+  "tagCatalogAvailableForDraft": "Available to add",
+  "@tagCatalogAvailableForDraft": {"description": "Тег можно явно добавить в набор черновика создаваемого намерения"},
+  "tagCatalogAddToDraft": "Add",
+  "@tagCatalogAddToDraft": {"description": "Видимая подпись явного добавления выбранного тега в черновик"},
+  "tagCatalogAddToDraftSemantic": "Add tag to draft",
+  "@tagCatalogAddToDraftSemantic": {"description": "Доступная подпись добавления в черновик, пока тег не выбран"},
+  "tagCatalogAddToDraftNamed": "Add tag {tagName} to draft",
+  "@tagCatalogAddToDraftNamed": {"description": "Доступная подпись добавления выбранного тега в черновик без сохранения назначения", "placeholders": {"tagName": {"type": "String"}}},
+  "tagCatalogDraftSubmitting": "The intention is being saved, so tags can’t be added now.",
+  "@tagCatalogDraftSubmitting": {"description": "Добавление в черновик недоступно, пока выполняется принятая отправка"},
+  "tagCatalogDraftClosed": "This draft is closed, so tags can’t be added.",
+  "@tagCatalogDraftClosed": {"description": "Добавление недоступно: сессия черновика завершена"},
   "@tagCatalogTitle": { "description": "Заголовок каталога тегов и переход к нему" },
   "tagCatalogLoading": "Loading tags…",
   "@tagCatalogLoading": { "description": "Начальная загрузка каталога тегов" },

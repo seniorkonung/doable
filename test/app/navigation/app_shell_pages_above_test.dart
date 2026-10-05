@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
@@ -92,6 +93,31 @@ void main() {
     }
   });
 
+  test('создание намерения — единственный прозрачный маршрут корневого '
+      'стека: он сохраняет состояние и не закрывается фоном сам, а остальные '
+      'маршруты открываются непрозрачными страницами', () {
+    final router = AppRouter();
+    addTearDown(router.dispose);
+
+    for (final route in router.routes) {
+      if (route.name == IntentionEditorRoute.name) {
+        expect(
+          route.type,
+          isA<CustomRouteType>()
+              .having((type) => type.opaque, 'opaque', isFalse)
+              .having(
+                (type) => type.barrierDismissible,
+                'barrierDismissible',
+                isFalse,
+              ),
+        );
+        expect(route.maintainState, isTrue);
+      } else {
+        expect(route.type?.opaque ?? true, isTrue, reason: route.name);
+      }
+    }
+  });
+
   testWidgets('панель видна на каждой корневой странице', (tester) async {
     final router = await _start(tester);
 
@@ -178,13 +204,13 @@ void main() {
     final router = await _start(tester);
     await _select(tester, graph);
 
-    // Форма создания намерения.
+    // Создание намерения — исключение: модальная панель над каталогом.
     await _open(
       tester,
       find.byKey(const ValueKey('catalog-create-intention')),
       IntentionEditorPage,
     );
-    _expectAboveShell(tester, IntentionEditorPage, graph);
+    _expectCreationSheetAboveCatalog(tester, router);
     await _close(tester, IntentionEditorPage);
     _expectRootPage(tester, router, graph);
 
@@ -583,6 +609,39 @@ void _expectAboveShell(WidgetTester tester, Type page, AppDestination under) {
         .selected,
     under,
     reason: '$page',
+  );
+}
+
+/// Панель создания намерения открыта поверх каталога намерений: каталог и
+/// панель основной навигации остаются видны под её модальным фоном, но не
+/// принимают нажатий и не объявляются экранным диктором, а выбранным
+/// остаётся пункт «Граф намерений».
+void _expectCreationSheetAboveCatalog(WidgetTester tester, AppRouter router) {
+  expect(router.current.name, IntentionEditorRoute.name);
+  final catalog = find.byType(IntentionCatalogPage);
+  expect(catalog, findsOneWidget);
+  // Панель стоит у нижнего края и оставляет шапку каталога видимой.
+  final sheet = tester.getRect(
+    find.byKey(const ValueKey('intention-creation-sheet')),
+  );
+  final catalogBar = tester.getRect(
+    find.descendant(of: catalog, matching: find.byType(AppBar)),
+  );
+  expect(sheet.bottom, _screen(tester).height);
+  expect(sheet.top, greaterThanOrEqualTo(catalogBar.bottom));
+
+  final bar = find.byType(AppNavigationBar);
+  expect(bar, findsOneWidget);
+  expect(
+    tester.widget<AppNavigationBar>(bar).selected,
+    AppDestination.intentionGraph,
+  );
+  expect(_destinations, findsExactly(3));
+  expect(_destinations.hitTestable(), findsNothing);
+  expect(_announcedDestinations, findsNothing);
+  expect(
+    find.byKey(const ValueKey('catalog-filter-field')).hitTestable(),
+    findsNothing,
   );
 }
 

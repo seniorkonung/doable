@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
 import 'package:doable/src/data/local/fts_integrity.dart';
+import 'package:doable/src/data/local/sqlite_tag_functions.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -14,9 +17,15 @@ import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
+import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -573,8 +582,8 @@ void main() {
       expect(await _matchingIds(repository, 'создаваемое'), isEmpty);
       await expectLater(verifyIntentionTitlesFtsIntegrity(database), completes);
       expect(diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(), [
-        _failedCommand(
-          IntentionCommandDiagnosticsType.create,
+        _failedCreation(
+          IntentionCreationCommandDiagnosticsStage.write,
           DiagnosticsFailureCode.unexpected,
         ),
       ]);
@@ -790,6 +799,862 @@ void main() {
     );
   });
 
+  group('DriftPersonalGraphRepository.execute — откат и диагностика полного '
+      'создания', () {
+    final homeTagId = _tagId(tagFixtureId(firstTagNumber));
+    final weekendTagId = _tagId(tagFixtureId(lastTagNumber));
+    final missingTagId = _tagId(tagFixtureId(777));
+    final activeFavoriteId = _id(_firstUuid);
+    final archivedFavoriteId = _id(_archivedUuid);
+    final newId = _id(_secondUuid);
+    late Database raw;
+
+    /// Подменяет хранилище и готовит прежний граф: активное избранное
+    /// намерение, архивированное избранное на последнем месте порядка, теги
+    /// «Дом» и «Выходные» и самостоятельный «Спорт», созданный отдельной
+    /// командой до создания намерения. Возвращает идентификатор «Спорта».
+    ///
+    /// Репозиторий передаёт события диагностики в [diagnosticsSink], по
+    /// умолчанию — в общий записывающий получатель теста.
+    Future<TagId> replaceWithSeededGraph(
+      LocalDatabaseConnectionObserver observer, {
+      DiagnosticsSink? diagnosticsSink,
+      List<IntentionId>? intentionIds,
+    }) async {
+      final replacement = await _replaceDatabase(
+        observer,
+        database,
+        diagnosticsSink ?? diagnostics,
+        setup: (connection) => raw = connection,
+        // Повтор после отката снова получает тот же идентификатор: остаток
+        // прежней попытки отклонил бы его конфликтом первичного ключа.
+        intentionIds: intentionIds ?? [newId, newId],
+      );
+      database = replacement.database;
+      repository = replacement.repository;
+      await _insertIntention(
+        database,
+        id: activeFavoriteId,
+        title: 'Активное избранное',
+        createdAt: DateTime.utc(2026, 9, 1),
+      );
+      await _insertIntention(
+        database,
+        id: archivedFavoriteId,
+        title: 'Архивное избранное',
+        isArchived: true,
+        createdAt: DateTime.utc(2026, 9, 2),
+      );
+      storeFavoriteMark(
+        raw,
+        intentionId: activeFavoriteId.toCanonicalString(),
+        position: 2,
+      );
+      storeFavoriteMark(
+        raw,
+        intentionId: archivedFavoriteId.toCanonicalString(),
+        position: 5,
+      );
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        homeTagId.toCanonicalString(),
+        'Дом',
+      ]);
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        weekendTagId.toCanonicalString(),
+        'Выходные',
+      ]);
+      final created = await repository.execute(
+        CreateTag(TagName.fromInput('Спорт')),
+      );
+      expect(created, isA<TagCommandSucceeded>());
+      return ((created as TagCommandSucceeded).value.value as TagCreated)
+          .tag
+          .id;
+    }
+
+    CreateIntention fullCommand(Iterable<TagId> tagIds) =>
+        CreateIntention.withInitialState(
+          title: 'Полное намерение',
+          description: 'Описание полного намерения',
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: tagIds,
+        );
+
+    /// Отказ не оставил части создания: публичные чтения, поиск, места
+    /// избранного, строки хранилища и ревизия совпадают с [before], FTS
+    /// целостна, а самостоятельный «Спорт» по-прежнему доступен.
+    Future<void> expectRolledBack(
+      _ObservedCreationGraph before, {
+      String? reason,
+    }) async {
+      final after = await _observeCreationGraph(repository, raw);
+      expect(after.facts, before.facts, reason: reason);
+      expect(
+        after.revision.compareTo(before.revision),
+        GraphRevisionOrder.same,
+        reason: reason,
+      );
+      expect(after.tagNames, ['Дом', 'Выходные', 'Спорт'], reason: reason);
+      expect(
+        _watched(await repository.watchIntention(newId).first),
+        isNull,
+        reason: reason,
+      );
+      expect(
+        await repository.getTagAssignments(newId),
+        isA<TagAssignmentsError>().having(
+          (result) => result.failure,
+          'причина',
+          isA<TagAssignmentsIntentionNotFound>(),
+        ),
+        reason: reason,
+      );
+      await expectLater(
+        verifyIntentionTitlesFtsIntegrity(database),
+        completes,
+        reason: reason,
+      );
+    }
+
+    test('отказ после любой операции транзакции откатывает намерение, '
+        'назначения, место избранного и FTS, сохраняя прежний граф, ревизию '
+        'и самостоятельный тег', () async {
+      // Пробное выполнение без отказа фиксирует операции транзакции.
+      final probe = _StatementFaultInjector();
+      final probeSportTagId = await replaceWithSeededGraph(probe);
+      probe.observe();
+      final probed = await repository.execute(
+        fullCommand([homeTagId, weekendTagId, probeSportTagId]),
+      );
+      final operations = probe.stopObserving();
+      expect(
+        probed,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      expect(
+        [
+          for (final operation in operations)
+            if (operation.operation != LocalDatabaseSqlOperation.select)
+              (operation.operation, _writtenTable(operation)),
+        ],
+        [
+          (LocalDatabaseSqlOperation.insert, 'intentions'),
+          for (var index = 0; index < 3; index++)
+            (LocalDatabaseSqlOperation.insert, 'tag_assignments'),
+          (LocalDatabaseSqlOperation.insert, 'favorite_intentions'),
+        ],
+      );
+      // До записей транзакция проверяет выбранные теги, после всех записей —
+      // читает окончательный результат.
+      final firstWrite = operations.indexWhere(
+        (operation) => operation.operation != LocalDatabaseSqlOperation.select,
+      );
+      final lastWrite = operations.lastIndexWhere(
+        (operation) => operation.operation != LocalDatabaseSqlOperation.select,
+      );
+      expect(firstWrite, greaterThan(0));
+      expect(operations.skip(lastWrite + 1), isNotEmpty);
+
+      for (var failAfter = 1; failAfter <= operations.length; failAfter++) {
+        final faulted = operations[failAfter - 1];
+        final reason =
+            'отказ после операции $failAfter: ${faulted.operation.name} '
+            '${_writtenTable(faulted)}';
+        final stage = switch (failAfter - 1) {
+          final index when index < firstWrite =>
+            IntentionCreationCommandDiagnosticsStage.validation,
+          final index when index <= lastWrite =>
+            IntentionCreationCommandDiagnosticsStage.write,
+          _ => IntentionCreationCommandDiagnosticsStage.resultRead,
+        };
+        final injector = _StatementFaultInjector();
+        final sportTagId = await replaceWithSeededGraph(injector);
+        final command = fullCommand([homeTagId, weekendTagId, sportTagId]);
+        final before = await _observeCreationGraph(repository, raw);
+        injector.failAfter(failAfter);
+
+        final result = await repository.execute(command);
+
+        expect(result, _failure<IntentionUnexpectedFailure>(), reason: reason);
+        expect(
+          injector.failedStatement,
+          faulted.statements.single,
+          reason: reason,
+        );
+        await expectRolledBack(before, reason: reason);
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
+          _failedCreation(stage, DiagnosticsFailureCode.unexpected),
+          reason: reason,
+        );
+
+        // Повтор той же команды с тем же идентификатором создаёт весь набор
+        // в конце полного порядка на новой ревизии.
+        final retried = await repository.execute(command);
+        expect(
+          retried,
+          isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+          reason: reason,
+        );
+        final confirmed = _readValue(retried);
+        expect(
+          confirmed.revision.compareTo(before.revision),
+          GraphRevisionOrder.newer,
+          reason: reason,
+        );
+        final summary = confirmed.value.catalogMutation.after!.summary;
+        expect(summary.id, newId, reason: reason);
+        expect(summary.tags.map((tag) => tag.id), [
+          homeTagId,
+          weekendTagId,
+          sportTagId,
+        ], reason: reason);
+        expect(summary.favoriteMark, FavoriteMark.favorite, reason: reason);
+        expect(storedFavoriteMarks(raw), [
+          (activeFavoriteId.toCanonicalString(), 2),
+          (archivedFavoriteId.toCanonicalString(), 5),
+          (newId.toCanonicalString(), 6),
+        ], reason: reason);
+      }
+    });
+
+    test('несогласованный окончательный снимок отклоняется как повреждение '
+        'до подтверждения без частичного результата', () async {
+      final tamper = _FinalAssignmentsReadTamper();
+      final sportTagId = await replaceWithSeededGraph(tamper);
+      final before = await _observeCreationGraph(repository, raw);
+      tamper.arm();
+
+      final result = await repository.execute(
+        fullCommand([homeTagId, weekendTagId, sportTagId]),
+      );
+
+      expect(result, _failure<IntentionCorruptionFailure>());
+      expect(tamper.tampered, isTrue);
+      await expectRolledBack(before);
+      expect(
+        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
+        _failedCreation(
+          IntentionCreationCommandDiagnosticsStage.resultRead,
+          DiagnosticsFailureCode.corruption,
+        ),
+      );
+    });
+
+    test('отказ инфраструктуры при проверке выбранных тегов сохраняет свою '
+        'категорию и не выдаётся за их отсутствие', () async {
+      for (final (error, expected, code)
+          in <(Object, Matcher, DiagnosticsFailureCode)>[
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_BUSY,
+                message: 'CANARY-недоступность',
+              ),
+              isA<IntentionUnavailableFailure>(),
+              DiagnosticsFailureCode.unavailable,
+            ),
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_CORRUPT,
+                message: 'CANARY-повреждение',
+              ),
+              isA<IntentionCorruptionFailure>(),
+              DiagnosticsFailureCode.corruption,
+            ),
+            (
+              StateError('CANARY-неизвестный-отказ'),
+              isA<IntentionUnexpectedFailure>(),
+              DiagnosticsFailureCode.unexpected,
+            ),
+            (
+              SqliteException(
+                extendedResultCode: SqlError.SQLITE_READONLY,
+                message: 'CANARY-неизвестный-SQLite-отказ',
+              ),
+              isA<IntentionUnexpectedFailure>(),
+              DiagnosticsFailureCode.unexpected,
+            ),
+          ]) {
+        final interceptor = _SelectedTagsReadInterceptor(failure: error);
+        final sportTagId = await replaceWithSeededGraph(interceptor);
+        final before = await _observeCreationGraph(repository, raw);
+        interceptor.arm();
+
+        // Набор содержит и действительно отсутствующий тег: отказ чтения
+        // не позволяет судить о наличии и не превращается в его отсутствие.
+        final result = await repository.execute(
+          fullCommand([homeTagId, missingTagId, sportTagId]),
+        );
+
+        expect(
+          result,
+          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+              .having(
+                (result) => result.failure,
+                'причина',
+                allOf(
+                  expected,
+                  isNot(isA<IntentionCreationTagsMissingFailure>()),
+                ),
+              ),
+          reason: '$error',
+        );
+        expect(interceptor.failedReads, 1, reason: '$error');
+        await expectRolledBack(before, reason: '$error');
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
+          _failedCreation(
+            IntentionCreationCommandDiagnosticsStage.validation,
+            code,
+          ),
+          reason: '$error',
+        );
+      }
+    });
+
+    test('повреждённые сохранённые данные выбранного тега остаются '
+        'повреждением и рядом с отсутствующим тегом', () async {
+      final sportTagId = await replaceWithSeededGraph(const _PassiveObserver());
+      // Неканоничное название недостижимо через приложение: для его записи
+      // отключается проверка схемы и подменяется функция ключа названия.
+      raw.execute('PRAGMA ignore_check_constraints = ON');
+      raw.createFunction(
+        functionName: tagNameKeyFunctionName,
+        argumentCount: const AllowedArgumentCount(1),
+        deterministic: true,
+        directOnly: false,
+        function: (_) => 'повреждённый ключ',
+      );
+      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+        ' Дом ',
+        homeTagId.toCanonicalString(),
+      ]);
+      raw.execute('PRAGMA ignore_check_constraints = OFF');
+
+      for (final tagIds in [
+        [homeTagId],
+        [missingTagId, homeTagId, weekendTagId, sportTagId],
+      ]) {
+        final reason = 'набор из ${tagIds.length}';
+        final storedBefore = _storedCreationRows(raw);
+        final revisionBefore = _catalogRevision(
+          await repository.getCatalogPage(_allIntentionsQuery),
+        );
+
+        final result = await repository.execute(fullCommand(tagIds));
+
+        expect(result, _failure<IntentionCorruptionFailure>(), reason: reason);
+        expect(_storedCreationRows(raw), storedBefore, reason: reason);
+        expect(
+          _catalogRevision(await repository.getCatalogPage(_allIntentionsQuery))
+              .compareTo(revisionBefore),
+          GraphRevisionOrder.same,
+          reason: reason,
+        );
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().last,
+          _failedCreation(
+            IntentionCreationCommandDiagnosticsStage.validation,
+            DiagnosticsFailureCode.corruption,
+          ),
+          reason: reason,
+        );
+      }
+    });
+
+    /// Операции транзакции полного создания с тремя тегами и избранным,
+    /// выполненного без отказа на отдельно подготовленном графе.
+    Future<List<LocalDatabaseSqlStatement>> probeFullCreation() async {
+      final probe = _StatementFaultInjector();
+      final sportTagId = await replaceWithSeededGraph(probe);
+      probe.observe();
+      final probed = await repository.execute(
+        fullCommand([homeTagId, weekendTagId, sportTagId]),
+      );
+      expect(
+        probed,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      return probe.stopObserving();
+    }
+
+    test('успешное создание даёт одно событие создания на этапе проверки '
+        'результата без событий самостоятельных команд', () async {
+      for (final (name, build) in <(String, CreateIntention Function(TagId))>[
+        (
+          'минимальное',
+          (_) => const CreateIntention(
+            title: 'Минимальное намерение',
+            description: null,
+          ),
+        ),
+        (
+          'полное',
+          (sportTagId) => fullCommand([homeTagId, weekendTagId, sportTagId]),
+        ),
+      ]) {
+        final sportTagId = await replaceWithSeededGraph(
+          const _PassiveObserver(),
+        );
+        final command = build(sportTagId);
+        final from = diagnostics.events.length;
+
+        final result = await repository.execute(command);
+
+        expect(
+          result,
+          isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+          reason: name,
+        );
+        // Начальные готовность, отметка и назначения не выдаются за
+        // самостоятельные команды намерения, избранного или тегов.
+        expect(diagnostics.events.skip(from), [
+          _succeededCreation(),
+        ], reason: name);
+      }
+    });
+
+    test('отказ текста относится к этапу проверки и категории validation '
+        'без обращения к хранилищу', () async {
+      final probe = _StatementFaultInjector();
+      final sportTagId = await replaceWithSeededGraph(probe);
+      final from = diagnostics.events.length;
+      probe.observe();
+
+      final result = await repository.execute(
+        CreateIntention.withInitialState(
+          title: '   ',
+          description: 'Описание без названия',
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: [homeTagId, sportTagId],
+        ),
+      );
+
+      expect(result, _failure<IntentionTextInputValidationFailure>());
+      expect(probe.stopObserving(), isEmpty);
+      expect(diagnostics.events.skip(from), [
+        _failedCreation(
+          IntentionCreationCommandDiagnosticsStage.validation,
+          DiagnosticsFailureCode.validation,
+        ),
+      ]);
+    });
+
+    test('отсутствие выбранного тега относится к этапу проверки и категории '
+        'validation, а не к сбою записи', () async {
+      final sportTagId = await replaceWithSeededGraph(const _PassiveObserver());
+      final before = await _observeCreationGraph(repository, raw);
+      final from = diagnostics.events.length;
+
+      final result = await repository.execute(
+        fullCommand([homeTagId, missingTagId, sportTagId]),
+      );
+
+      expect(
+        result,
+        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+            .having(
+              (result) => result.failure,
+              'причина',
+              isA<IntentionCreationTagsMissingFailure>().having(
+                (failure) => failure.missingTagIds,
+                'missingTagIds',
+                {missingTagId},
+              ),
+            ),
+      );
+      expect(diagnostics.events.skip(from), [
+        _failedCreation(
+          IntentionCreationCommandDiagnosticsStage.validation,
+          DiagnosticsFailureCode.validation,
+        ),
+      ]);
+      await expectRolledBack(before);
+    });
+
+    test('отказ хранилища при записи и при проверке результата относится к '
+        'своему этапу с фактической категорией', () async {
+      final operations = await probeFullCreation();
+      final firstWrite =
+          operations.indexWhere(
+            (operation) =>
+                operation.operation != LocalDatabaseSqlOperation.select,
+          ) +
+          1;
+
+      for (final (failAfter, stage) in [
+        (firstWrite, IntentionCreationCommandDiagnosticsStage.write),
+        (
+          operations.length,
+          IntentionCreationCommandDiagnosticsStage.resultRead,
+        ),
+      ]) {
+        for (final (error, expected, code)
+            in <(Object, Matcher, DiagnosticsFailureCode)>[
+              (
+                SqliteException(
+                  extendedResultCode: SqlError.SQLITE_BUSY,
+                  message: 'CANARY-недоступность',
+                ),
+                isA<IntentionUnavailableFailure>(),
+                DiagnosticsFailureCode.unavailable,
+              ),
+              (
+                SqliteException(
+                  extendedResultCode: SqlError.SQLITE_CORRUPT,
+                  message: 'CANARY-повреждение',
+                ),
+                isA<IntentionCorruptionFailure>(),
+                DiagnosticsFailureCode.corruption,
+              ),
+              (
+                StateError('CANARY-неизвестный-отказ'),
+                isA<IntentionUnexpectedFailure>(),
+                DiagnosticsFailureCode.unexpected,
+              ),
+            ]) {
+          final reason = '${stage.name}: $error';
+          final injector = _StatementFaultInjector();
+          final sportTagId = await replaceWithSeededGraph(injector);
+          final before = await _observeCreationGraph(repository, raw);
+          final from = diagnostics.events.length;
+          injector.failAfter(failAfter, failure: error);
+
+          final result = await repository.execute(
+            fullCommand([homeTagId, weekendTagId, sportTagId]),
+          );
+
+          expect(
+            result,
+            isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+                .having((result) => result.failure, 'причина', expected),
+            reason: reason,
+          );
+          expect(injector.failedStatement, isNotNull, reason: reason);
+          expect(diagnostics.events.skip(from), [
+            _failedCreation(stage, code),
+          ], reason: reason);
+          await expectRolledBack(before, reason: reason);
+        }
+      }
+    });
+
+    test('конфликт идентификатора при записи относится к этапу записи и '
+        'категории conflict', () async {
+      // Генератор выдаёт идентификатор уже сохранённого намерения.
+      final sportTagId = await replaceWithSeededGraph(
+        const _PassiveObserver(),
+        intentionIds: [activeFavoriteId],
+      );
+      final before = await _observeCreationGraph(repository, raw);
+      final from = diagnostics.events.length;
+
+      final result = await repository.execute(
+        fullCommand([homeTagId, sportTagId]),
+      );
+
+      expect(result, _failure<IntentionConflictFailure>());
+      expect(diagnostics.events.skip(from), [
+        _failedCreation(
+          IntentionCreationCommandDiagnosticsStage.write,
+          DiagnosticsFailureCode.conflict,
+        ),
+      ]);
+      final after = await _observeCreationGraph(repository, raw);
+      expect(after.facts, before.facts);
+      expect(
+        after.revision.compareTo(before.revision),
+        GraphRevisionOrder.same,
+      );
+    });
+
+    test('длительность охватывает всю операцию до окончательного исхода, '
+        'включая проверку результата', () async {
+      const delay = Duration(milliseconds: 15);
+      for (final failure in <Object?>[
+        null,
+        SqliteException(
+          extendedResultCode: SqlError.SQLITE_BUSY,
+          message: 'CANARY-недоступность',
+        ),
+      ]) {
+        final reason = failure == null ? 'успех' : 'отказ';
+        final observer = _ResultReadDelay(delay, failure: failure);
+        final sportTagId = await replaceWithSeededGraph(observer);
+        final from = diagnostics.events.length;
+        observer.arm();
+
+        await repository.execute(
+          fullCommand([homeTagId, weekendTagId, sportTagId]),
+        );
+
+        expect(observer.delayedReads, greaterThan(0), reason: reason);
+        final events = diagnostics.events.skip(from).toList();
+        expect(events, [
+          if (failure == null)
+            _succeededCreation()
+          else
+            _failedCreation(
+              IntentionCreationCommandDiagnosticsStage.resultRead,
+              DiagnosticsFailureCode.unavailable,
+            ),
+        ], reason: reason);
+        final duration = switch (events.single.status) {
+          DiagnosticsSucceeded(:final duration) => duration,
+          DiagnosticsFailed(:final duration) => duration,
+          DiagnosticsStarted() => throw TestFailure(
+            'Нет окончательного исхода.',
+          ),
+        };
+        expect(
+          duration,
+          greaterThanOrEqualTo(delay * observer.delayedReads),
+          reason: reason,
+        );
+      }
+    });
+
+    test('сериализованные события создания не раскрывают текст, '
+        'идентификаторы и названия тегов, состав избранного, SQL и путь '
+        'базы', () async {
+      const titleCanary = 'CANARY-название-намерения';
+      const descriptionCanary = 'CANARY-описание-намерения';
+      const pathCanary = '/CANARY/databases/doable.sqlite';
+      const sqlCanary = 'INSERT INTO intentions /* CANARY-SQL */';
+      final messages = <String>[];
+      final operations = await probeFullCreation();
+      final firstWrite =
+          operations.indexWhere(
+            (operation) =>
+                operation.operation != LocalDatabaseSqlOperation.select,
+          ) +
+          1;
+      final injector = _StatementFaultInjector();
+      final sportTagId = await replaceWithSeededGraph(
+        injector,
+        diagnosticsSink: DeveloperDiagnosticsSink(messages.add),
+        intentionIds: [newId, newId, newId],
+      );
+      CreateIntention command(Iterable<TagId> tagIds) =>
+          CreateIntention.withInitialState(
+            title: titleCanary,
+            description: descriptionCanary,
+            readiness: IntentionReadiness.ready,
+            favoriteMark: FavoriteMark.favorite,
+            tagIds: tagIds,
+          );
+      SqliteException privateFailure(int code) => SqliteException(
+        extendedResultCode: code,
+        message: 'CANARY-отказ $pathCanary',
+        explanation: 'CANARY-пояснение $titleCanary',
+        causingStatement: sqlCanary,
+        parametersToStatement: [titleCanary, descriptionCanary],
+      );
+      final selectedTags = [homeTagId, weekendTagId, sportTagId];
+      messages.clear();
+
+      await repository.execute(
+        CreateIntention.withInitialState(
+          title: '',
+          description: descriptionCanary,
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: selectedTags,
+        ),
+      );
+      await repository.execute(command([...selectedTags, missingTagId]));
+      injector.failAfter(
+        firstWrite,
+        failure: privateFailure(SqlError.SQLITE_BUSY),
+      );
+      await repository.execute(command(selectedTags));
+      injector.failAfter(
+        operations.length,
+        failure: privateFailure(SqlError.SQLITE_CORRUPT),
+      );
+      await repository.execute(command(selectedTags));
+      final created = await repository.execute(command(selectedTags));
+
+      expect(
+        created,
+        isA<ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>>(),
+      );
+      expect(storedFavoriteMarks(raw).last, (newId.toCanonicalString(), 6));
+      expect(
+        [
+          for (final message in messages)
+            jsonDecode(message) as Map<String, Object?>,
+        ],
+        [
+          for (final (stage, outcome, failureCode) in [
+            ('validation', 'failed', 'validation'),
+            ('validation', 'failed', 'validation'),
+            ('write', 'failed', 'unavailable'),
+            ('resultRead', 'failed', 'corruption'),
+            ('resultRead', 'succeeded', null),
+          ])
+            {
+              'operation': 'intentionCommand',
+              'stage': stage,
+              'outcome': outcome,
+              'durationMicros': isA<int>(),
+              'failureCode': ?failureCode,
+              'commandType': 'create',
+            },
+        ],
+      );
+      final written = messages.join('\n');
+      for (final secret in [
+        'CANARY',
+        titleCanary,
+        descriptionCanary,
+        pathCanary,
+        'doable.sqlite',
+        newId.toCanonicalString(),
+        activeFavoriteId.toCanonicalString(),
+        archivedFavoriteId.toCanonicalString(),
+        for (final tagId in [...selectedTags, missingTagId])
+          tagId.toCanonicalString(),
+        'Дом',
+        'Выходные',
+        'Спорт',
+        'favorite_intentions',
+        'tag_assignments',
+        'position',
+        'INSERT',
+        'SELECT',
+        'Exception',
+      ]) {
+        expect(written, isNot(contains(secret)), reason: secret);
+      }
+    });
+
+    test('отказ получателя диагностики не меняет результат, число записей и '
+        'ревизию полного создания', () async {
+      final failing = _ThrowingDiagnosticsSink();
+      final probe = _StatementFaultInjector();
+      final sportTagId = await replaceWithSeededGraph(
+        probe,
+        diagnosticsSink: failing,
+      );
+      final before = await _observeCreationGraph(repository, raw);
+      failing.attemptedEvents.clear();
+      probe.observe();
+
+      final result = await repository.execute(
+        fullCommand([homeTagId, weekendTagId, sportTagId]),
+      );
+      final operations = probe.stopObserving();
+      final attempted = List.of(failing.attemptedEvents);
+
+      final confirmed = _readValue(result);
+      final created = confirmed.value.catalogMutation;
+      expect(created, isA<IntentionCatalogCreated>());
+      expect(created.after!.summary.id, newId);
+      expect(created.after!.summary.readiness, IntentionReadiness.ready);
+      expect(created.after!.summary.favoriteMark, FavoriteMark.favorite);
+      expect(created.after!.summary.tags.map((tag) => tag.id), [
+        homeTagId,
+        weekendTagId,
+        sportTagId,
+      ]);
+      expect(
+        [
+          for (final operation in operations)
+            if (operation.operation != LocalDatabaseSqlOperation.select)
+              (operation.operation, _writtenTable(operation)),
+        ],
+        [
+          (LocalDatabaseSqlOperation.insert, 'intentions'),
+          for (var index = 0; index < 3; index++)
+            (LocalDatabaseSqlOperation.insert, 'tag_assignments'),
+          (LocalDatabaseSqlOperation.insert, 'favorite_intentions'),
+        ],
+      );
+      expect(attempted, [_succeededCreation()]);
+      final after = await _observeCreationGraph(repository, raw);
+      expect(
+        confirmed.revision.compareTo(before.revision),
+        GraphRevisionOrder.newer,
+      );
+      expect(
+        after.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(storedFavoriteMarks(raw), [
+        (activeFavoriteId.toCanonicalString(), 2),
+        (archivedFavoriteId.toCanonicalString(), 5),
+        (newId.toCanonicalString(), 6),
+      ]);
+    });
+
+    test('отказ получателя диагностики не меняет отказ, категорию и откат '
+        'полного создания', () async {
+      final operations = await probeFullCreation();
+      final firstWrite =
+          operations.indexWhere(
+            (operation) =>
+                operation.operation != LocalDatabaseSqlOperation.select,
+          ) +
+          1;
+      final failing = _ThrowingDiagnosticsSink();
+      final injector = _StatementFaultInjector();
+      final sportTagId = await replaceWithSeededGraph(
+        injector,
+        diagnosticsSink: failing,
+      );
+
+      final missingBefore = await _observeCreationGraph(repository, raw);
+      failing.attemptedEvents.clear();
+      final missing = await repository.execute(
+        fullCommand([homeTagId, missingTagId, sportTagId]),
+      );
+      expect(
+        missing,
+        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+            .having(
+              (result) => result.failure,
+              'причина',
+              isA<IntentionCreationTagsMissingFailure>().having(
+                (failure) => failure.missingTagIds,
+                'missingTagIds',
+                {missingTagId},
+              ),
+            ),
+      );
+      expect(failing.attemptedEvents, [
+        _failedCreation(
+          IntentionCreationCommandDiagnosticsStage.validation,
+          DiagnosticsFailureCode.validation,
+        ),
+      ]);
+      await expectRolledBack(missingBefore);
+
+      final writeBefore = await _observeCreationGraph(repository, raw);
+      failing.attemptedEvents.clear();
+      injector.failAfter(
+        firstWrite,
+        failure: SqliteException(
+          extendedResultCode: SqlError.SQLITE_BUSY,
+          message: 'CANARY-недоступность',
+        ),
+      );
+      final unavailable = await repository.execute(
+        fullCommand([homeTagId, weekendTagId, sportTagId]),
+      );
+      expect(unavailable, _failure<IntentionUnavailableFailure>());
+      expect(failing.attemptedEvents, [
+        _failedCreation(
+          IntentionCreationCommandDiagnosticsStage.write,
+          DiagnosticsFailureCode.unavailable,
+        ),
+      ]);
+      await expectRolledBack(writeBefore);
+    });
+  });
+
   group(
     'DriftPersonalGraphRepository.execute — безопасные неизвестные отказы',
     () {
@@ -967,9 +1832,7 @@ void main() {
         final rows = await database.select(database.intentions).get();
         expect(rows, hasLength(1));
         expect(rows.single.title, 'Сохранённое намерение');
-        expect(failingDiagnostics.attemptedEvents, [
-          isA<IntentionCommandDiagnosticsEvent>(),
-        ]);
+        expect(failingDiagnostics.attemptedEvents, [_succeededCreation()]);
       },
     );
 
@@ -1026,8 +1889,9 @@ Future<({AppDatabase database, DriftPersonalGraphRepository repository})>
 _replaceDatabase(
   LocalDatabaseConnectionObserver observer,
   AppDatabase previousDatabase,
-  InMemoryDiagnosticsSink diagnostics, {
+  DiagnosticsSink diagnostics, {
   void Function(Database)? setup,
+  List<IntentionId>? intentionIds,
 }) async {
   await previousDatabase.close();
   final database = AppDatabase(
@@ -1037,15 +1901,19 @@ _replaceDatabase(
     ),
   );
   await database.open();
-  return (database: database, repository: _repository(database, diagnostics));
+  return (
+    database: database,
+    repository: _repository(database, diagnostics, intentionIds: intentionIds),
+  );
 }
 
 DriftPersonalGraphRepository _repository(
   AppDatabase database,
-  DiagnosticsSink diagnostics,
-) => DriftPersonalGraphRepository(
+  DiagnosticsSink diagnostics, {
+  List<IntentionId>? intentionIds,
+}) => DriftPersonalGraphRepository(
   database,
-  _DeterministicIntentionIdGenerator([_id(_secondUuid)]),
+  _DeterministicIntentionIdGenerator(intentionIds ?? [_id(_secondUuid)]),
   () => DateTime.utc(2026, 9, 3, 12),
   diagnostics,
 );
@@ -1167,6 +2035,52 @@ Matcher _failedCommand(
         (status) => status.code,
         'code',
         failureCode,
+      ),
+    );
+
+/// Окончательный отказ создания намерения на этапе [stage] с категорией
+/// [failureCode].
+Matcher _failedCreation(
+  IntentionCreationCommandDiagnosticsStage stage,
+  DiagnosticsFailureCode failureCode,
+) => isA<IntentionCommandDiagnosticsEvent>()
+    .having(
+      (event) => event.commandType,
+      'commandType',
+      IntentionCommandDiagnosticsType.create,
+    )
+    .having((event) => event.stage, 'stage', stage)
+    .having(
+      (event) => event.status,
+      'status',
+      isA<DiagnosticsFailed>()
+          .having((status) => status.code, 'code', failureCode)
+          .having(
+            (status) => status.duration,
+            'duration',
+            greaterThanOrEqualTo(Duration.zero),
+          ),
+    );
+
+/// Успешное создание намерения: оно завершается проверкой результата.
+Matcher _succeededCreation() => isA<IntentionCommandDiagnosticsEvent>()
+    .having(
+      (event) => event.commandType,
+      'commandType',
+      IntentionCommandDiagnosticsType.create,
+    )
+    .having(
+      (event) => event.stage,
+      'stage',
+      IntentionCreationCommandDiagnosticsStage.resultRead,
+    )
+    .having(
+      (event) => event.status,
+      'status',
+      isA<DiagnosticsSucceeded>().having(
+        (status) => status.duration,
+        'duration',
+        greaterThanOrEqualTo(Duration.zero),
       ),
     );
 
@@ -1300,6 +2214,245 @@ final class _FailBeforeDmlInterceptor extends LocalDatabaseConnectionObserver {
   };
 }
 
+/// Наблюдает операции хранилища и по запросу прерывает транзакцию сразу
+/// после выполнения операции с заданным номером: её действие уже внесено в
+/// транзакцию, а результат не доходит до репозитория.
+final class _StatementFaultInjector extends LocalDatabaseConnectionObserver {
+  final List<LocalDatabaseSqlStatement> _observed = [];
+  var _observing = false;
+  int? _failAfter;
+  Object _failure = StateError('CANARY-statement-fault');
+  String? failedStatement;
+
+  void observe() {
+    _observed.clear();
+    _observing = true;
+    _failAfter = null;
+  }
+
+  /// Прерывает транзакцию после операции [number] отказом [failure], по
+  /// умолчанию — неизвестной ошибкой.
+  void failAfter(int number, {Object? failure}) {
+    observe();
+    _failAfter = number;
+    _failure = failure ?? StateError('CANARY-statement-fault');
+  }
+
+  List<LocalDatabaseSqlStatement> stopObserving() {
+    _observing = false;
+    return List.unmodifiable(_observed);
+  }
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (!_observing) return;
+    _observed.add(statement);
+    if (_observed.length == _failAfter) {
+      _observing = false;
+      failedStatement = statement.statements.single;
+      throw _failure;
+    }
+  }
+}
+
+/// После [arm] задерживает на [delay] каждое чтение, выполненное после первой
+/// записи, то есть чтения окончательного результата создания. При заданном
+/// [failure] первое такое чтение после задержки завершается этим отказом.
+final class _ResultReadDelay extends LocalDatabaseConnectionObserver {
+  _ResultReadDelay(this.delay, {this.failure});
+
+  final Duration delay;
+  final Object? failure;
+  var _armed = false;
+  var _wrote = false;
+  var delayedReads = 0;
+
+  void arm() => _armed = true;
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (_armed && statement.operation != LocalDatabaseSqlOperation.select) {
+      _wrote = true;
+    }
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) async {
+    if (!_armed || !_wrote) return rows;
+    delayedReads++;
+    await Future<void>.delayed(delay);
+    if (failure case final failure?) {
+      _armed = false;
+      throw failure;
+    }
+    return rows;
+  }
+}
+
+/// После записей команды убирает последнюю строку первого чтения назначений:
+/// окончательный снимок расходится с записанным набором тегов.
+final class _FinalAssignmentsReadTamper
+    extends LocalDatabaseConnectionObserver {
+  var _armed = false;
+  var _wrote = false;
+  var tampered = false;
+
+  void arm() => _armed = true;
+
+  @override
+  void afterStatement(LocalDatabaseSqlStatement statement) {
+    if (_armed && statement.operation == LocalDatabaseSqlOperation.insert) {
+      _wrote = true;
+    }
+  }
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    if (!_wrote ||
+        tampered ||
+        rows.isEmpty ||
+        !statement.statements.single.contains('tag_assignments')) {
+      return rows;
+    }
+    tampered = true;
+    return rows.sublist(0, rows.length - 1);
+  }
+}
+
+/// Отклоняет первое после [arm] чтение сохранённых тегов, с которого
+/// начинается проверка выбранных тегов создания.
+final class _SelectedTagsReadInterceptor
+    extends LocalDatabaseConnectionObserver {
+  _SelectedTagsReadInterceptor({required this.failure});
+
+  final Object failure;
+  var _armed = false;
+  var failedReads = 0;
+
+  void arm() => _armed = true;
+
+  @override
+  List<Map<String, Object?>> afterSelect(
+    LocalDatabaseSqlStatement statement,
+    List<Map<String, Object?>> rows,
+  ) {
+    if (_armed && statement.statements.single.contains('FROM tags')) {
+      _armed = false;
+      failedReads++;
+      throw failure;
+    }
+    return rows;
+  }
+}
+
+/// Таблица, в которую пишет операция, либо название операции чтения.
+String _writtenTable(LocalDatabaseSqlStatement statement) {
+  final match = RegExp(
+    r'^\s*(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+"?(\w+)"?',
+    caseSensitive: false,
+  ).firstMatch(statement.statements.single);
+  return match?.group(1) ?? statement.operation.name;
+}
+
+/// Состояние графа через публичные чтения и строки хранилища, которые
+/// затрагивает создание намерения.
+typedef _ObservedCreationGraph = ({
+  List<Object?> facts,
+  GraphRevision revision,
+  List<String> tagNames,
+});
+
+final _allIntentionsQuery = IntentionCatalogQuery(
+  scope: IntentionScope.all,
+  titleFilter: null,
+  order: IntentionCatalogOrder.createdAtAscending,
+  pageSize: 100,
+);
+
+Future<_ObservedCreationGraph> _observeCreationGraph(
+  DriftPersonalGraphRepository repository,
+  Database raw,
+) async {
+  final page = _readValue(await repository.getCatalogPage(_allIntentionsQuery));
+  final favorites = _readValue(await repository.getFavoriteIntentions());
+  final tags = _readValue(
+    await repository.getTagCatalog(const TagCatalogBrowseMode()),
+  );
+  return (
+    facts: <Object?>[
+      [
+        for (final item in page.items)
+          [
+            item.id,
+            item.title,
+            item.readiness,
+            item.archiveState,
+            item.favoriteMark,
+            [for (final tag in item.tags) tag.id],
+          ],
+      ],
+      await _matchingIds(repository, 'полное'),
+      [for (final row in favorites.items) row.id],
+      favorites.archivedCount,
+      [
+        for (final tag in tags.items) [tag.id, tag.name.value],
+      ],
+      for (final tag in tags.items)
+        for (final scope in TaggedIntentionsScope.values)
+          [
+            for (final item in _readValue(
+              await repository.getTaggedIntentionsPage(
+                TaggedIntentionsQuery(tagId: tag.id, scope: scope),
+              ),
+            ).items)
+              item.id,
+          ],
+      _storedCreationRows(raw),
+    ],
+    revision: page.revision,
+    tagNames: [for (final tag in tags.items) tag.name.value],
+  );
+}
+
+/// Строки всех таблиц, которые затрагивает создание намерения.
+List<Object?> _storedCreationRows(Database raw) => [
+  for (final table in [
+    'intentions',
+    'tag_assignments',
+    'favorite_intentions',
+    'tags',
+  ])
+    [
+      for (final row in raw.select('SELECT * FROM $table ORDER BY 1')) {...row},
+    ],
+];
+
+T _readValue<T, F extends GraphCommandFailure>(GraphResult<T, F> result) =>
+    switch (result) {
+      GraphResultSuccess(:final value) => value,
+      GraphResultFailure(:final failure) => throw TestFailure(
+        'Ожидался успех чтения, получен отказ $failure.',
+      ),
+    };
+
+GraphRevision _catalogRevision(Result<IntentionCatalogPage> result) =>
+    _readValue(result).revision;
+
+IntentionDetails? _watched(Result<GraphSnapshot<IntentionDetails?>> result) =>
+    _readValue(result).value;
+
+TagId _tagId(String value) => switch (TagId.decode(value)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw ArgumentError.value(value, 'value'),
+};
+
 const _firstUuid = '018f0b5d-6b2e-7c80-8000-000000000401';
 const _secondUuid = '018f0b5d-6b2e-7c80-8000-000000000402';
 const _relationUuid = '018f0b5d-6b2e-7c80-8000-000000000403';
+const _archivedUuid = '018f0b5d-6b2e-7c80-8000-000000000404';

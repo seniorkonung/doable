@@ -1412,11 +1412,17 @@ abstract class AppLocalizations {
   /// **'Create intention'**
   String get editorCreateAction;
 
-  /// Состояние выполняющегося создания намерения
+  /// Основное действие панели создания: сохраняет весь черновик нового намерения одной операцией
   ///
   /// In en, this message translates to:
-  /// **'Creating…'**
-  String get editorCreating;
+  /// **'Save'**
+  String get editorSaveAction;
+
+  /// Индикатор выполняющегося сохранения черновика нового намерения на основном действии панели
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get editorSaving;
 
   /// Подпись поля названия намерения
   ///
@@ -1495,6 +1501,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Intention created.'**
   String get editorCreated;
+
+  /// Заголовок подтверждения закрытия изменённого черновика создания до отправки
+  ///
+  /// In en, this message translates to:
+  /// **'Discard the draft?'**
+  String get editorCloseDiscardTitle;
+
+  /// Объяснение потери несохранённого черновика создания при закрытии формы
+  ///
+  /// In en, this message translates to:
+  /// **'The new intention’s entered data hasn’t been saved and will be lost.'**
+  String get editorCloseDiscardMessage;
+
+  /// Действие подтверждения закрытия, сохраняющее форму и черновик создания
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get editorCloseContinueAction;
+
+  /// Действие подтверждения закрытия, сбрасывающее черновик и закрывающее форму
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get editorCloseDiscardAction;
+
+  /// Заголовок подтверждения закрытия формы во время принятого сохранения
+  ///
+  /// In en, this message translates to:
+  /// **'Close the form?'**
+  String get editorCloseSavingTitle;
+
+  /// Объяснение, что закрытие формы не отменяет выполняющееся сохранение, а черновик не восстановится после отказа
+  ///
+  /// In en, this message translates to:
+  /// **'Saving is already in progress and will continue after the form closes. If saving fails, the entered data won’t be restored.'**
+  String get editorCloseSavingMessage;
+
+  /// Действие подтверждения закрытия во время сохранения, оставляющее форму открытой
+  ///
+  /// In en, this message translates to:
+  /// **'Stay'**
+  String get editorCloseSavingStayAction;
+
+  /// Действие подтверждения закрытия во время сохранения, закрывающее форму без отмены сохранения
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get editorCloseSavingLeaveAction;
+
+  /// Подсказка кнопки закрытия панели создания намерения и доступное название её модального фона
+  ///
+  /// In en, this message translates to:
+  /// **'Close the form'**
+  String get editorCloseFormAction;
+
+  /// Подсказка и доступное название кнопки, разворачивающей компактную панель создания намерения на всю доступную высоту
+  ///
+  /// In en, this message translates to:
+  /// **'Expand the form'**
+  String get editorExpandFormAction;
+
+  /// Подсказка и доступное название кнопки, возвращающей развёрнутую панель создания намерения к компактному виду
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse the form'**
+  String get editorCollapseFormAction;
+
+  /// Доступное название быстрой отметки избранного в черновике нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create as favorite'**
+  String get editorFavoriteOption;
+
+  /// Подсказка включённой быстрой отметки избранного: новое намерение будет создано избранным, отметка ещё не сохранена
+  ///
+  /// In en, this message translates to:
+  /// **'Create as favorite: on'**
+  String get editorFavoriteOptionOn;
+
+  /// Подсказка выключенной быстрой отметки избранного в черновике нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create as favorite: off'**
+  String get editorFavoriteOptionOff;
+
+  /// Доступное название быстрой отметки начальной готовности к действию в черновике нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create as ready for action'**
+  String get editorReadinessOption;
+
+  /// Подсказка включённой быстрой отметки готовности: новое намерение будет создано готовым к действию, готовность ещё не сохранена
+  ///
+  /// In en, this message translates to:
+  /// **'Create as ready for action: on'**
+  String get editorReadinessOptionOn;
+
+  /// Подсказка выключенной быстрой отметки готовности к действию в черновике нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create as ready for action: off'**
+  String get editorReadinessOptionOff;
+
+  /// Заголовок объяснения критериев действия перед включением начальной готовности в черновике
+  ///
+  /// In en, this message translates to:
+  /// **'Create as ready for action?'**
+  String get editorReadinessConfirmationTitle;
+
+  /// Критерий действия в объяснении начальной готовности: полная выполнимость в рамках одного дня
+  ///
+  /// In en, this message translates to:
+  /// **'It can be completed fully within one day.'**
+  String get editorReadinessOneDayCriterion;
+
+  /// Критерий действия в объяснении начальной готовности: операционная понятность человеку
+  ///
+  /// In en, this message translates to:
+  /// **'It is clear enough for a person to carry out.'**
+  String get editorReadinessClarityCriterion;
+
+  /// Отказ от включения начальной готовности; черновик остаётся неготовым
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get editorReadinessCancelAction;
+
+  /// Явное подтверждение обоих критериев действия, включающее начальную готовность только в черновике
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as ready'**
+  String get editorReadinessConfirmAction;
+
+  /// Подсказка и доступное название быстрого действия, открывающего общий выбор тегов для черновика нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Choose tags'**
+  String get editorChooseTags;
+
+  /// Подсказка и доступное название снятия выбранного тега из черновика нового намерения без записи назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Remove tag {tagName} from draft'**
+  String editorRemoveDraftTag(String tagName);
+
+  /// Доступное состояние выбранного тега черновика, пока наблюдение ещё не подтвердило тег
+  ///
+  /// In en, this message translates to:
+  /// **'Checking tag'**
+  String get editorDraftTagChecking;
+
+  /// Состояние выбранного тега черновика, отсутствие которого подтверждено; тег остаётся в черновике до явного снятия
+  ///
+  /// In en, this message translates to:
+  /// **'Tag deleted'**
+  String get editorDraftTagMissing;
+
+  /// Устранимый отказ чтения выбранного тега черновика; не означает удаление тега
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check tag'**
+  String get editorDraftTagReadUnavailable;
+
+  /// Отказ чтения выбранного тега черновика из-за повреждённых данных; повтор не предлагается
+  ///
+  /// In en, this message translates to:
+  /// **'Tag data is corrupted'**
+  String get editorDraftTagReadCorruption;
+
+  /// Непредвиденный отказ чтения выбранного тега черновика; повтор не предлагается
+  ///
+  /// In en, this message translates to:
+  /// **'Tag not checked due to an unexpected error'**
+  String get editorDraftTagReadUnexpected;
+
+  /// Подсказка и доступное название повтора проверки выбранного тега черновика после устранимого отказа чтения
+  ///
+  /// In en, this message translates to:
+  /// **'Check tag {tagName} again'**
+  String editorRetryDraftTag(String tagName);
+
+  /// Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; объясняет исправление набора
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{A selected tag was deleted from the catalog. Remove it from the draft to save the intention.} other{{count} selected tags were deleted from the catalog. Remove them from the draft to save the intention.}}'**
+  String editorCreateTagsMissing(int count);
+
+  /// Явное исправление отказа создания: снимает из черновика только выбранные теги, отсутствие которых подтвердило сохранение; сохранение не отправляет
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Remove deleted tag} other{Remove deleted tags}}'**
+  String editorRemoveMissingTags(int count);
 
   /// Вид операции создания намерения в сообщении оболочки
   ///
@@ -1963,6 +2161,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Assigning tag…'**
   String get tagCatalogAssigning;
+
+  /// Тег уже входит в набор черновика создаваемого намерения; назначение ещё не сохранено
+  ///
+  /// In en, this message translates to:
+  /// **'In draft'**
+  String get tagCatalogInDraft;
+
+  /// Тег можно явно добавить в набор черновика создаваемого намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Available to add'**
+  String get tagCatalogAvailableForDraft;
+
+  /// Видимая подпись явного добавления выбранного тега в черновик
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get tagCatalogAddToDraft;
+
+  /// Доступная подпись добавления в черновик, пока тег не выбран
+  ///
+  /// In en, this message translates to:
+  /// **'Add tag to draft'**
+  String get tagCatalogAddToDraftSemantic;
+
+  /// Доступная подпись добавления выбранного тега в черновик без сохранения назначения
+  ///
+  /// In en, this message translates to:
+  /// **'Add tag {tagName} to draft'**
+  String tagCatalogAddToDraftNamed(String tagName);
+
+  /// Добавление в черновик недоступно, пока выполняется принятая отправка
+  ///
+  /// In en, this message translates to:
+  /// **'The intention is being saved, so tags can’t be added now.'**
+  String get tagCatalogDraftSubmitting;
+
+  /// Добавление недоступно: сессия черновика завершена
+  ///
+  /// In en, this message translates to:
+  /// **'This draft is closed, so tags can’t be added.'**
+  String get tagCatalogDraftClosed;
 
   /// Начальная загрузка каталога тегов
   ///

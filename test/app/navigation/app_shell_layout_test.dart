@@ -20,6 +20,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/presentation/presentation_frame_evidence.dart';
 import 'package:flutter/foundation.dart';
@@ -602,8 +603,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(_builtMessages, findsExactly(3));
 
-      await tester.tap(find.byKey(const ValueKey('catalog-create-intention')));
-      await _until(tester, find.byType(IntentionEditorPage));
+      await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
+      await _until(tester, find.byType(TagCatalogPage));
       await tester.pumpAndSettle();
 
       expect(find.byType(AppNavigationBar), findsNothing);

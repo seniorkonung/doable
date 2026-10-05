@@ -1,27 +1,37 @@
 import 'dart:async';
 
 import 'package:doable/src/data/local/app_database.dart'
-    hide Tag, LongTermRelation;
+    hide Tag, LongTermRelation, TagAssignment;
 import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -673,6 +683,112 @@ void main() {
     },
   );
 
+  for (final scope in TaggedIntentionsScope.values) {
+    test('пакет создания с несколькими начальными тегами обновляет выдачу '
+        'одним чтением без повторов и частичных состояний: $scope', () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      final archived = scope == TaggedIntentionsScope.archived;
+      var index = 0;
+      if (archived) {
+        h.model.setScope(scope);
+        h.reads.page(index++, []);
+        await pumpEventQueue();
+      }
+      final first = _intention(1, archived: archived);
+      final second = _intention(2, archived: archived);
+      h.reads.page(index++, [first], cursor: _Cursor());
+      await pumpEventQueue();
+      final more = h.model.loadMore();
+      h.reads.page(index++, [second]);
+      await more;
+      final before = h.state as TagNavigationLoaded;
+      expect(before.hasReachedEnd, isTrue);
+      final stateOffset = h.states.length;
+      // Созданное намерение всегда активно и помечено обоими тегами.
+      final created = _intention(3);
+      final package = _creation(2, created, tagNumbers: [1, 2]);
+
+      h.changes.add(package);
+      final refreshing = h.state as TagNavigationLoaded;
+      expect(refreshing.items, before.items);
+      expect(refreshing.freshness, TagNavigationFreshness.refreshing);
+      expect(refreshing.nextCursor, isNull);
+      expect(h.model.canActOn(first.id), isFalse);
+      expect(h.model.canActOn(created.id), isFalse);
+      expect(h.reads.queries, hasLength(index + 1));
+      final query = h.reads.queries.last;
+      expect(query.tagId, _tagId(1));
+      expect(query.scope, scope);
+      expect(query.cursor, isNull);
+      expect(query.pageSize, 50);
+      // Повторная доставка того же пакета не начинает ещё одно чтение.
+      h.changes.add(package);
+      expect(h.reads.queries, hasLength(index + 1));
+
+      final expected = archived ? [first, second] : [first, second, created];
+      h.reads.page(index, expected, revision: 2);
+      await pumpEventQueue();
+      final loaded = h.state as TagNavigationLoaded;
+      expect(
+        loaded.items.map((item) => item.id),
+        expected.map((item) => item.id),
+      );
+      expect(loaded.tagId, _tagId(1));
+      expect(loaded.scope, scope);
+      expect(
+        loaded.revision.compareTo(const _Revision(2)),
+        GraphRevisionOrder.same,
+      );
+      expect(loaded.canUseCurrentItems, isTrue);
+      expect(h.model.canActOn(created.id), !archived);
+      // Пакет публикует только начало актуализации и её полный результат.
+      expect(h.states.skip(stateOffset), [same(refreshing), same(loaded)]);
+      expect(h.reads.queries, hasLength(index + 1));
+    });
+  }
+
+  for (final continuation in [false, true]) {
+    test('поздняя ${continuation ? 'подгрузка' : 'первая порция'} до пакета '
+        'создания не заменяет выдачу с созданным намерением', () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      final created = _intention(3);
+      Future<void>? pending;
+      if (continuation) {
+        h.reads.page(0, [_intention(1)], cursor: _Cursor());
+        await pumpEventQueue();
+        pending = h.model.loadMore();
+      }
+      h.changes.add(_creation(2, created, tagNumbers: [1, 2]));
+      expect(h.model.canActOn(_intention(1).id), isFalse);
+      final lateIndex = continuation ? 1 : 0;
+      // Чтение, начатое до создания, завершается прежним снимком.
+      h.reads.page(lateIndex, [_intention(2)]);
+      if (pending != null) await pending;
+      await pumpEventQueue();
+      expect(h.model.canActOn(_intention(2).id), isFalse);
+      expect(h.reads.queries, hasLength(lateIndex + 2));
+      expect(h.reads.queries.last.cursor, isNull);
+
+      h.reads.page(lateIndex + 1, [
+        _intention(1),
+        _intention(2),
+        created,
+      ], revision: 2);
+      await pumpEventQueue();
+      final loaded = h.state as TagNavigationLoaded;
+      expect(loaded.items.map((item) => item.id), [
+        _intention(1).id,
+        _intention(2).id,
+        created.id,
+      ]);
+      expect(loaded.canUseCurrentItems, isTrue);
+      expect(h.model.canActOn(created.id), isTrue);
+      expect(h.reads.queries, hasLength(lateIndex + 2));
+    });
+  }
+
   test('подтверждённое удаление не возвращается поздней страницей', () async {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -1315,19 +1431,56 @@ TaggedIntention _intention(int n, {bool archived = false, String? title}) =>
           : IntentionArchiveState.active,
     );
 
+/// Пакет единого создания: одна каталожная мутация с окончательным снимком и
+/// факты всех начальных назначений на одной ревизии, как в `IntentionSaved`.
+_Package _creation(
+  int revision,
+  TaggedIntention intention, {
+  required List<int> tagNumbers,
+}) {
+  final at = _Revision(revision);
+  return _Package(at, [
+    IntentionCatalogCreated(
+      revision: at,
+      entry: _Entry(
+        intention,
+        readiness: IntentionReadiness.ready,
+        favoriteMark: FavoriteMark.favorite,
+        tags: [
+          for (final number in tagNumbers) _tag('Тег $number', id: number),
+        ],
+      ),
+    ),
+    for (final number in tagNumbers)
+      TagAssignmentChangedChange(
+        revision: at,
+        assignment: TagAssignment(
+          tagId: _tagId(number),
+          intentionId: intention.id,
+        ),
+        state: TagAssignmentState.assigned,
+      ),
+  ]);
+}
+
 final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
-  _Entry(TaggedIntention intention)
-    : summary = IntentionSummary(
-        id: intention.id,
-        title: intention.title,
-        hasDescription: false,
-        readiness: IntentionReadiness.notReady,
-        archiveState: intention.archiveState,
-        activeRelationCount: 0,
-        createdAt: IntentionTimestamp(DateTime.utc(2026)),
-        updatedAt: IntentionTimestamp(DateTime.utc(2026)),
-        favoriteMark: FavoriteMark.notFavorite,
-      );
+  _Entry(
+    TaggedIntention intention, {
+    IntentionReadiness readiness = IntentionReadiness.notReady,
+    FavoriteMark favoriteMark = FavoriteMark.notFavorite,
+    List<Tag> tags = const [],
+  }) : summary = IntentionSummary(
+         id: intention.id,
+         title: intention.title,
+         hasDescription: false,
+         readiness: readiness,
+         archiveState: intention.archiveState,
+         activeRelationCount: 0,
+         createdAt: IntentionTimestamp(DateTime.utc(2026)),
+         updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+         tags: tags,
+         favoriteMark: favoriteMark,
+       );
 
   @override
   final IntentionSummary summary;

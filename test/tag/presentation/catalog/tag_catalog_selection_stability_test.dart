@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
@@ -13,11 +16,13 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  _registerDraftScenarios();
   for (final (intentionNumber, language, scale) in [
     (100, 'ru', 1.0),
     (100, 'en', 2.5),
@@ -298,6 +303,243 @@ void main() {
   }
 }
 
+void _registerDraftScenarios() {
+  for (final (language, scale) in [('ru', 1.0), ('en', 2.5), ('ru', 2.5)]) {
+    final description = '$language, текст $scale';
+
+    testWidgets(
+      'добавление в черновик сразу меняет признаки строк, сохраняя поиск, геометрию и прокрутку: $description',
+      (tester) async {
+        final (:repository, :tagSet) = await _showDraftCatalog(
+          tester,
+          language: language,
+          scale: scale,
+        );
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(TagCatalogView)),
+        );
+        final search = find.byKey(const ValueKey('tag-catalog-search'));
+        await tester.enterText(search, 'Тег 1');
+        await tester.pump();
+        final list = find.byKey(const ValueKey('tag-catalog-list'));
+        final scrollable = find
+            .descendant(of: list, matching: find.byType(Scrollable))
+            .first;
+        final position = tester.state<ScrollableState>(scrollable).position;
+        position.jumpTo(200);
+        await tester.pump();
+        final listBounds = tester.getRect(list);
+        final visible = [
+          for (final row in repository.rows)
+            if (_row(row.tag).evaluate().isNotEmpty &&
+                listBounds.contains(tester.getRect(_row(row.tag)).topLeft) &&
+                listBounds.contains(tester.getRect(_row(row.tag)).bottomLeft))
+              row.tag,
+        ];
+        expect(visible.length, greaterThanOrEqualTo(2));
+        final bounds = {
+          for (final tag in visible) tag.id: tester.getRect(_row(tag)),
+        };
+        final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
+        final actionBounds = tester.getRect(add);
+        final pixels = position.pixels;
+
+        for (final (index, tag) in visible.take(2).indexed) {
+          expect(
+            find.descendant(
+              of: _row(tag),
+              matching: find.text(l10n.tagCatalogAvailableForDraft),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(_row(tag));
+          await tester.pump();
+          await tester.tap(add);
+          for (final duration in [
+            Duration.zero,
+            const Duration(milliseconds: 16),
+          ]) {
+            await tester.pump(duration);
+            expect(tagSet.current.tagIds, [
+              for (final added in visible.take(index + 1)) added.id,
+            ]);
+            expect(
+              find.descendant(
+                of: _row(tag),
+                matching: find.text(l10n.tagCatalogInDraft),
+              ),
+              findsOneWidget,
+            );
+            expect(tester.widget<FilledButton>(add).onPressed, isNull);
+            expect(tester.getRect(list), listBounds);
+            expect(tester.getRect(add), actionBounds);
+            expect(
+              tester.state<ScrollableState>(scrollable).position,
+              same(position),
+            );
+            expect(position.pixels, pixels);
+            for (final visibleTag in visible) {
+              expect(tester.getRect(_row(visibleTag)), bounds[visibleTag.id]);
+            }
+            expect(find.byType(CircularProgressIndicator), findsNothing);
+            expect(repository.catalogModes, [const TagCatalogBrowseMode()]);
+            expect(repository.assignmentReads, 0);
+            expect(repository.commandCount, 0);
+            expect(tester.takeException(), isNull);
+          }
+        }
+
+        // Поле поиска вне видимой области, поэтому его ввод и применённый
+        // фильтр проверяются после возврата к началу того же списка.
+        position.jumpTo(0);
+        await tester.pump();
+        expect(tester.widget<TextField>(search).controller!.text, 'Тег 1');
+        expect(_row(repository.rows[0].tag), findsOneWidget);
+        expect(_row(repository.rows[1].tag), findsNothing);
+        expect(repository.catalogModes, [const TagCatalogBrowseMode()]);
+      },
+    );
+
+    testWidgets(
+      'скрытый поиском кандидат черновика понятен у действия и добавляется явно: $description',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final (:repository, :tagSet) = await _showDraftCatalog(
+            tester,
+            language: language,
+            scale: scale,
+          );
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(TagCatalogView)),
+          );
+          final search = find.byKey(const ValueKey('tag-catalog-search'));
+          final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
+          final hidden = find.byKey(
+            const ValueKey('tag-catalog-hidden-selection'),
+          );
+          final first = repository.rows[0].tag;
+          final second = repository.rows[1].tag;
+          await tester.tap(_row(first));
+          await tester.pump();
+          await tester.tap(add);
+          await tester.pump();
+          await tester.tap(_row(second));
+          await tester.pump();
+          final actionBounds = tester.getRect(add);
+
+          await tester.enterText(search, 'Тег 3');
+          await tester.pump();
+
+          expect(_row(second), findsNothing);
+          expect(hidden, findsOneWidget);
+          final available = tester.getSemantics(hidden).label;
+          expect(available, contains(l10n.tagCatalogSelected));
+          expect(available, contains(second.name.value));
+          expect(available, contains(l10n.tagCatalogAvailableForDraft));
+          expect(
+            find.bySemanticsLabel(
+              l10n.tagCatalogAddToDraftNamed(second.name.value),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.widget<FilledButton>(add).onPressed, isNotNull);
+
+          await tester.tap(add);
+          await tester.pump();
+
+          expect(tagSet.current.tagIds, [first.id, second.id]);
+          expect(
+            tester.getSemantics(hidden).label,
+            contains(l10n.tagCatalogInDraft),
+          );
+          expect(tester.widget<FilledButton>(add).onPressed, isNull);
+          expect(tester.getRect(add), actionBounds);
+          expect(tester.widget<TextField>(search).controller!.text, 'Тег 3');
+          expect(_row(second), findsNothing);
+          expect(_row(first), findsNothing);
+
+          await tester.enterText(search, '');
+          await tester.pump();
+          expect(tagSet.current.tagIds, [first.id, second.id]);
+          for (final tag in [first, second]) {
+            expect(
+              find.descendant(
+                of: _row(tag),
+                matching: find.text(l10n.tagCatalogInDraft),
+              ),
+              findsOneWidget,
+            );
+          }
+          expect(repository.catalogModes, [const TagCatalogBrowseMode()]);
+          expect(repository.commandCount, 0);
+          expect(repository.assignmentReads, 0);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+}
+
+/// Общий выбор в контексте живой сессии черновика на полном каталоге.
+Future<({_ControlledRepository repository, IntentionDraftTagSet tagSet})>
+_showDraftCatalog(
+  WidgetTester tester, {
+  required String language,
+  required double scale,
+}) async {
+  tester.view.physicalSize = const Size(420, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final repository = _ControlledRepository(
+    (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id,
+  );
+  final container = ProviderContainer(
+    overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
+  );
+  addTearDown(container.dispose);
+  final session = intentionEditorViewModelProvider(IntentionCreationFormKey());
+  final subscription = container.listen(session, (_, _) {});
+  addTearDown(subscription.close);
+  final tagSet = container.read(session.notifier).draftTagSet;
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        locale: Locale(language),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+        home: TagCatalogView(
+          selectionContext: TagDraftContext(tagSet),
+          onOpenEditor: (_) async => null,
+          onOpenNavigation: (_) {},
+        ),
+      ),
+    ),
+  );
+  expect(repository.catalogModes, [const TagCatalogBrowseMode()]);
+  repository.catalogRead.complete(
+    TagCatalogSuccess(
+      TagCatalogSnapshot(
+        items: [for (final row in repository.rows) row.tag],
+        revision: const _Revision(),
+      ),
+    ),
+  );
+  await tester.pump();
+  await tester.pump();
+  expect(find.byKey(const ValueKey('tag-catalog-list')), findsOneWidget);
+  expect(find.byType(CircularProgressIndicator), findsNothing);
+  return (repository: repository, tagSet: tagSet);
+}
+
 Future<_ControlledRepository> _showCatalog(
   WidgetTester tester, {
   required int intentionNumber,
@@ -326,7 +568,7 @@ Future<_ControlledRepository> _showCatalog(
           child: child!,
         ),
         home: TagCatalogView(
-          mode: TagCatalogSelectionMode(intentionId),
+          selectionContext: TagAssignmentContext(intentionId),
           onOpenEditor: (_) async => null,
           onOpenNavigation: (_) {},
         ),

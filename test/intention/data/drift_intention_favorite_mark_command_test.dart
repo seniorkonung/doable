@@ -1,4 +1,5 @@
 import 'package:doable/src/data/local/app_database.dart' hide Intention;
+import 'package:doable/src/favorite/application/favorite_intentions.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -125,6 +126,89 @@ void main() {
       await _saved(repository, MarkIntentionFavorite(_id(2)));
 
       expect(_markOrder(raw), [_uuid(3), _uuid(1), _uuid(2)]);
+    });
+  });
+
+  group('Начальная отметка при создании', () {
+    CreateIntention favoriteCreation(String title) =>
+        CreateIntention.withInitialState(
+          title: title,
+          description: null,
+          readiness: IntentionReadiness.notReady,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: const [],
+        );
+
+    test(
+      'созданное избранное встаёт в конец единого порядка после '
+      'архивированного места, а Главная показывает только активные',
+      () async {
+        _insertIntention(raw, number: 1, title: 'А');
+        _insertIntention(raw, number: 2, title: 'Б', isArchived: true);
+        _insertIntention(raw, number: 3, title: 'В');
+        for (final number in [1, 2, 3]) {
+          storeFavoriteMark(raw, intentionId: _uuid(number), position: number);
+        }
+
+        final saved = await _saved(repository, favoriteCreation('Г'));
+
+        final createdId = saved.intention.id;
+        expect(_markOrder(raw), [
+          _uuid(1),
+          _uuid(2),
+          _uuid(3),
+          createdId.toCanonicalString(),
+        ]);
+        final favorites = await repository.getFavoriteIntentions();
+        expect(favorites, isA<FavoriteIntentionsSuccess>());
+        final snapshot = (favorites as FavoriteIntentionsSuccess).value;
+        expect(snapshot.items.map((row) => row.id), [
+          _id(1),
+          _id(3),
+          createdId,
+        ]);
+        expect(snapshot.archivedCount, 1);
+      },
+    );
+
+    test('место следует текущему максимуму с пропусками, а не числу '
+        'избранных', () async {
+      _insertIntention(raw, number: 1, title: 'Активное');
+      _insertIntention(raw, number: 2, title: 'Архивное', isArchived: true);
+      storeFavoriteMark(raw, intentionId: _uuid(1), position: 3);
+      storeFavoriteMark(raw, intentionId: _uuid(2), position: 7);
+
+      final saved = await _saved(repository, favoriteCreation('Новое'));
+
+      expect(_storedMarks(raw), [
+        (_uuid(1), 3),
+        (_uuid(2), 7),
+        (saved.intention.id.toCanonicalString(), 8),
+      ]);
+    });
+
+    test('создание с избранным не выполняет отдельную команду отметки и '
+        'возвращает отметку в снимке создания', () async {
+      await _revision(repository);
+      trace.clear();
+
+      final confirmed = await _confirmed(repository, favoriteCreation('Новое'));
+
+      final saved = confirmed.value as IntentionSaved;
+      final created = saved.catalogMutation as IntentionCatalogCreated;
+      expect(saved.changes, [same(created)]);
+      expect(created.entry.summary.favoriteMark, FavoriteMark.favorite);
+      expect(
+        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().map(
+          (event) => event.commandType,
+        ),
+        [IntentionCommandDiagnosticsType.create],
+      );
+      expect(
+        trace.writes.where((sql) => sql.contains('favorite_intentions')),
+        hasLength(1),
+      );
+      expect(trace.writes.join('\n'), isNot(contains('intentions SET')));
     });
   });
 

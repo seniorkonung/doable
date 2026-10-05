@@ -464,6 +464,14 @@ sealed class IntentionCommandSuccess implements GraphCommandOutcome {
       List.unmodifiable([...catalogMutations, ...additionalChanges]);
 }
 
+/// Подтверждённый результат сохранения намерения.
+///
+/// Для `CreateIntention` это единственный окончательный результат всего
+/// создания: [catalogMutation] — одна [IntentionCatalogCreated] с полным
+/// снимком нового намерения, включая теги, готовность и отметку избранного, а
+/// [additionalChanges] несут по одному `TagAssignmentChangedChange` на каждое
+/// созданное назначение. Все факты принадлежат одной новой ревизии; отдельных
+/// результатов готовности, избранного или назначений создание не порождает.
 final class IntentionSaved extends IntentionCommandSuccess {
   IntentionSaved(
     this.intention, {

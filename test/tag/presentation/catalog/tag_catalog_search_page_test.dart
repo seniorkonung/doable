@@ -8,10 +8,13 @@ import 'package:doable/src/data/local/app_database.dart'
     hide Tag, TagAssignment;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -23,7 +26,9 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +40,7 @@ import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/tag_assignment_changed.dart';
 
+part 'tag_catalog_draft_search_scenarios.dart';
 part 'tag_catalog_search_recovery_scenarios.dart';
 
 final _modes = <(String, IntentionId?)>[
@@ -58,6 +64,7 @@ final _editable = find.descendant(
 
 void main() {
   _registerSearchRecoveryScenarios();
+  _registerDraftSearchScenarios();
   for (final (description, intentionId) in _modes) {
     testWidgets(
       '$description: поиск использует наблюдаемое имя выбранного тега до обновления полного снимка',
@@ -177,7 +184,11 @@ void main() {
         await tester.enterText(_search, 'работ');
         await tester.pump();
         final firstInput = tester.widget<TextField>(_search).controller!;
-        unawaited(router.push<void>(TagCatalogRoute(intentionId: intentionId)));
+        unawaited(
+          router.push<void>(
+            TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
+          ),
+        );
         await tester.pumpAndSettle();
         final secondInput = tester.widget<TextField>(_search).controller!;
         expect(secondInput, isNot(same(firstInput)));
@@ -193,7 +204,11 @@ void main() {
         expect(tester.widget<TextField>(_search).controller, same(firstInput));
         expect(_visibleNames(tester), ['Работа']);
         expect(() => secondInput.addListener(() {}), throwsFlutterError);
-        unawaited(router.push<void>(TagCatalogRoute(intentionId: intentionId)));
+        unawaited(
+          router.push<void>(
+            TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
         expect(_visibleNames(tester), ['Дом', 'Работа']);
@@ -1183,8 +1198,9 @@ Future<AppRouter> _pumpStoredCatalog(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(
-          deepLinkBuilder: (_) =>
-              DeepLink([TagCatalogRoute(intentionId: intentionId)]),
+          deepLinkBuilder: (_) => DeepLink([
+            TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
+          ]),
         ),
       ),
     ),
@@ -1223,11 +1239,14 @@ Future<TagCatalogTestRepository> _pumpCatalog(
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: sessionIntention == null
-                  ? TagCatalogPage(intentionId: intentionId)
+                  ? TagCatalogPage(
+                      selectionContext: _selectionContext(intentionId),
+                    )
                   : ValueListenableBuilder<IntentionId?>(
                       valueListenable: sessionIntention,
-                      builder: (context, currentIntention, _) =>
-                          TagCatalogPage(intentionId: currentIntention),
+                      builder: (context, currentIntention, _) => TagCatalogPage(
+                        selectionContext: _selectionContext(currentIntention),
+                      ),
                     ),
             )
           : MaterialApp.router(
@@ -1235,8 +1254,11 @@ Future<TagCatalogTestRepository> _pumpCatalog(
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               routerConfig: router.config(
-                deepLinkBuilder: (_) =>
-                    DeepLink([TagCatalogRoute(intentionId: intentionId)]),
+                deepLinkBuilder: (_) => DeepLink([
+                  TagCatalogRoute(
+                    selectionContext: _selectionContext(intentionId),
+                  ),
+                ]),
               ),
             ),
     ),
@@ -1295,3 +1317,11 @@ Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
 );
+
+/// Прежний смысл необязательного получателя: без намерения — просмотр
+/// каталога, с намерением — назначение ему.
+TagSelectionContext _selectionContext(IntentionId? intentionId) =>
+    switch (intentionId) {
+      null => const TagBrowseContext(),
+      final intentionId => TagAssignmentContext(intentionId),
+    };

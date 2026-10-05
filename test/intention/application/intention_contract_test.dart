@@ -1217,6 +1217,19 @@ void main() {
           ),
         ),
         const ResultFailure(IntentionGenericValidationFailure()),
+        const ResultFailure(
+          IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(
+              field: IntentionTextField.title,
+              reason: IntentionTextValidationReason.empty,
+            ),
+          ),
+        ),
+        ResultFailure(
+          IntentionCreationTagsMissingFailure([
+            _tagId('00000000-0000-4000-8000-000000000001'),
+          ]),
+        ),
         const ResultFailure(IntentionNotFoundFailure()),
         const ResultFailure(IntentionConflictFailure()),
         ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
@@ -1231,12 +1244,14 @@ void main() {
       );
       expect(
         results.whereType<ResultFailure<IntentionCommandSuccess>>(),
-        hasLength(7),
+        hasLength(9),
       );
       expect(_resultSuccessDescription(results[0]), 'saved');
       expect(_resultSuccessDescription(results[1]), 'deleted');
       expect(results.skip(2).map(_resultFailureDescription), [
         'validation',
+        'textInput',
+        'tagsMissing',
         'notFound',
         'conflict',
         'blockingRelations',
@@ -1283,6 +1298,151 @@ void main() {
       expect(mutations[2].after, isNull);
       expect(mutations[3].before, same(before));
       expect(mutations[3].after, same(before));
+    });
+  });
+
+  group('полное начальное состояние создания намерения', () {
+    final home = _tagId('00000000-0000-4000-8000-000000000001');
+    final weekend = _tagId('00000000-0000-4000-8000-000000000002');
+    final sport = _tagId('00000000-0000-4000-8000-000000000003');
+
+    test('минимальная команда, включая const-вызов, создаёт неготовое '
+        'неизбранное намерение без тегов', () {
+      const minimal = CreateIntention(title: 'Здоровье', description: null);
+
+      expect(minimal.readiness, IntentionReadiness.notReady);
+      expect(minimal.favoriteMark, FavoriteMark.notFavorite);
+      expect(minimal.tagIds, isEmpty);
+      expect(() => minimal.tagIds.add(home), throwsUnsupportedError);
+    });
+
+    test('команда передаёт выбранные готовность, избранное и теги', () {
+      final command = CreateIntention.withInitialState(
+        title: 'Прогулка',
+        description: 'В парке',
+        readiness: IntentionReadiness.ready,
+        favoriteMark: FavoriteMark.favorite,
+        tagIds: [home, weekend],
+      );
+
+      expect(command.title, 'Прогулка');
+      expect(command.description, 'В парке');
+      expect(command.readiness, IntentionReadiness.ready);
+      expect(command.favoriteMark, FavoriteMark.favorite);
+      expect(command.tagIds, {home, weekend});
+    });
+
+    test(
+      'отметки начального состояния выбираются независимо друг от друга',
+      () {
+        final favoriteOnly = CreateIntention.withInitialState(
+          title: 'Гулять',
+          description: null,
+          readiness: IntentionReadiness.notReady,
+          favoriteMark: FavoriteMark.favorite,
+          tagIds: const [],
+        );
+        final readyOnly = CreateIntention.withInitialState(
+          title: 'Позвонить маме',
+          description: null,
+          readiness: IntentionReadiness.ready,
+          favoriteMark: FavoriteMark.notFavorite,
+          tagIds: const [],
+        );
+
+        expect(favoriteOnly.readiness, IntentionReadiness.notReady);
+        expect(favoriteOnly.favoriteMark, FavoriteMark.favorite);
+        expect(favoriteOnly.tagIds, isEmpty);
+        expect(readyOnly.readiness, IntentionReadiness.ready);
+        expect(readyOnly.favoriteMark, FavoriteMark.notFavorite);
+        expect(readyOnly.tagIds, isEmpty);
+      },
+    );
+
+    test('команда не зависит от исходной коллекции и запрещает изменение '
+        'своего набора тегов', () {
+      final selected = [home, weekend];
+      final command = CreateIntention.withInitialState(
+        title: 'Прогулка',
+        description: null,
+        readiness: IntentionReadiness.notReady,
+        favoriteMark: FavoriteMark.notFavorite,
+        tagIds: selected,
+      );
+      selected
+        ..clear()
+        ..add(sport);
+
+      expect(command.tagIds, {home, weekend});
+      expect(() => command.tagIds.add(sport), throwsUnsupportedError);
+      expect(() => command.tagIds.remove(home), throwsUnsupportedError);
+      expect(() => command.tagIds.clear(), throwsUnsupportedError);
+    });
+
+    test('повторные идентификаторы тега не размножают назначения', () {
+      final command = CreateIntention.withInitialState(
+        title: 'Прогулка',
+        description: null,
+        readiness: IntentionReadiness.notReady,
+        favoriteMark: FavoriteMark.notFavorite,
+        tagIds: [home, weekend, _tagId(home.toCanonicalString()), home],
+      );
+
+      expect(command.tagIds, hasLength(2));
+      expect(command.tagIds, {home, weekend});
+    });
+
+    test(
+      'отказ отсутствующих выбранных тегов — validation, отличимый от ошибки '
+      'текста, отсутствия намерения и повреждения данных',
+      () {
+        final failure = IntentionCreationTagsMissingFailure([home]);
+        final otherFailures = <IntentionFailure>[
+          const IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(
+              field: IntentionTextField.title,
+              reason: IntentionTextValidationReason.empty,
+            ),
+          ),
+          const IntentionNotFoundFailure(),
+          const IntentionCorruptionFailure(),
+        ];
+
+        expect(failure, isA<IntentionValidationFailure>());
+        expect(failure.code, IntentionFailureCode.validation);
+        expect(failure.category, GraphFailureCategory.validation);
+        expect(_failureDescription(failure), 'tagsMissing');
+        expect(otherFailures.map(_failureDescription), [
+          'textInput',
+          'notFound',
+          'corruption',
+        ]);
+      },
+    );
+
+    test('отказ фиксирует неизменяемую копию набора отсутствующих тегов '
+        'без повторов', () {
+      final missing = [home, weekend, _tagId(home.toCanonicalString())];
+      final failure = IntentionCreationTagsMissingFailure(missing);
+      missing
+        ..clear()
+        ..add(sport);
+
+      expect(failure.missingTagIds, {home, weekend});
+      expect(failure.missingTagIds, hasLength(2));
+      expect(() => failure.missingTagIds.add(sport), throwsUnsupportedError);
+      expect(() => failure.missingTagIds.clear(), throwsUnsupportedError);
+    });
+
+    test('отказ отсутствующих тегов не создаётся с пустым набором', () {
+      expect(
+        () => IntentionCreationTagsMissingFailure(const <TagId>[]),
+        throwsArgumentError,
+      );
+      expect(
+        () => IntentionCreationTagsMissingFailure(<TagId>{}),
+        throwsArgumentError,
+      );
     });
   });
 
@@ -1569,7 +1729,9 @@ String _commandDescription(IntentionCommand command) => switch (command) {
 };
 
 String _failureDescription(IntentionFailure failure) => switch (failure) {
-  IntentionValidationFailure() => 'validation',
+  IntentionGenericValidationFailure() => 'validation',
+  IntentionTextInputValidationFailure() => 'textInput',
+  IntentionCreationTagsMissingFailure() => 'tagsMissing',
   IntentionNotFoundFailure() => 'notFound',
   IntentionConflictFailure() => 'conflict',
   IntentionHasBlockingRelationsFailure() => 'blockingRelations',

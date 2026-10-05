@@ -13,6 +13,7 @@ import 'package:doable/src/intention/presentation/details/intention_details_stat
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -130,8 +131,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(router.current.name, TagCatalogRoute.name);
         expect(
-          router.current.argsAs<TagCatalogRouteArgs>().intentionId,
-          _intentionId(number),
+          router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
+          TagAssignmentContext(_intentionId(number)),
         );
 
         await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
