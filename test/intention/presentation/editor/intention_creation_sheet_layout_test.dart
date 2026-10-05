@@ -39,6 +39,69 @@ void main() {
   });
 
   group('геометрия и прокрутка компактной панели', () {
+    testWidgets('панель не предоставляет кнопку изменения размера', (
+      tester,
+    ) async {
+      _usePhone(tester, _portrait);
+      final sessions = _EditorSessions();
+      final repository = ControlledCatalogRepository();
+      await _openEditor(tester, repository, sessions);
+
+      expect(
+        find.byKey(const ValueKey('intention-creation-sheet-resize')),
+        findsNothing,
+      );
+      expect(find.byIcon(Icons.open_in_full), findsNothing);
+      expect(find.byIcon(Icons.close_fullscreen), findsNothing);
+      expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
+      _expectSubmitAvailable(tester, _portrait);
+    });
+
+    for (final isFling in [false, true]) {
+      testWidgets(
+        '${isFling ? 'быстрый' : 'медленный'} свайп вверх по ручке сохраняет геометрию, черновик и сессию без отправки и закрытия',
+        (tester) async {
+          _usePhone(tester, _portrait);
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository();
+          final router = await _openEditor(tester, repository, sessions);
+          await tester.enterText(find.byKey(_title), 'Намерение');
+          await tester.enterText(find.byKey(_description), 'Описание');
+          await tester.pumpAndSettle();
+          final session = sessions.single;
+          final draft = sessions.state(tester).draft;
+          final compact = _sheetRect(tester);
+          final stack = router.stack.length;
+          final titleController = _controller(tester, _title);
+          final descriptionController = _controller(tester, _description);
+
+          if (isFling) {
+            await tester.fling(find.byKey(_handle), const Offset(0, -60), 1500);
+          } else {
+            await tester.drag(find.byKey(_handle), const Offset(0, -120));
+          }
+          await tester.pumpAndSettle();
+
+          expect(_sheetRect(tester), compact);
+          expect(sessions.state(tester).draft, same(draft));
+          _expectSameSession(tester, sessions, session);
+          expect(_controller(tester, _title), same(titleController));
+          expect(
+            _controller(tester, _description),
+            same(descriptionController),
+          );
+          expect(_hasFocus(tester, _description), isTrue);
+          expect(router.current.name, IntentionEditorRoute.name);
+          expect(router.stack.length, stack);
+          expect(find.byKey(_closeConfirmation), findsNothing);
+          expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
+          _expectSubmitAvailable(tester, _portrait);
+          expect(repository.commands, isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
     testWidgets(
       'рост и сокращение описания сохраняют сессию, контроллеры, ввод, фокус и маршрут',
       (tester) async {
@@ -200,33 +263,23 @@ void main() {
       'много содержимого в полях прокручивается внутри компактной панели, а отправка остаётся закреплённой',
       (tester) async {
         _usePhone(tester, _portrait);
-        var mode = IntentionCreationSheetMode.compact;
         await tester.pumpWidget(
           MaterialApp(
-            home: StatefulBuilder(
-              builder: (context, setState) => IntentionCreationSheet(
-                mode: mode,
-                onExpand: () =>
-                    setState(() => mode = IntentionCreationSheetMode.expanded),
-                onCollapse: () =>
-                    setState(() => mode = IntentionCreationSheetMode.compact),
-                closeLabel: 'Close the form',
-                expandLabel: 'Expand the form',
-                collapseLabel: 'Collapse the form',
-                onCloseRequested: () {},
-                header: const Text('Create intention'),
-                fields: Wrap(
-                  spacing: 8,
-                  children: [
-                    for (var tag = 1; tag <= 80; tag++)
-                      Chip(label: Text('Тег $tag')),
-                  ],
-                ),
-                footer: FilledButton(
-                  key: _submit,
-                  onPressed: () {},
-                  child: const Text('Save'),
-                ),
+            home: IntentionCreationSheet(
+              closeLabel: 'Close the form',
+              onCloseRequested: () {},
+              header: const Text('Create intention'),
+              fields: Wrap(
+                spacing: 8,
+                children: [
+                  for (var tag = 1; tag <= 80; tag++)
+                    Chip(label: Text('Тег $tag')),
+                ],
+              ),
+              footer: FilledButton(
+                key: _submit,
+                onPressed: () {},
+                child: const Text('Save'),
               ),
             ),
           ),

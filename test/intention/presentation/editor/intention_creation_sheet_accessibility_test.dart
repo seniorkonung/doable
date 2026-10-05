@@ -493,13 +493,12 @@ void main() {
         await tester.pumpAndSettle();
 
         // Порядок обхода совпадает с порядком чтения и замыкается в панели.
-        expect(await _tabOrder(tester, steps: 9), [
+        expect(await _tabOrder(tester, steps: 8), [
           _description,
           _chooseTags,
           _favorite,
           _readiness,
           _submit,
-          _resize,
           _closeButton,
           _title,
           _description,
@@ -731,7 +730,6 @@ const _readiness = ValueKey('intention-editor-readiness');
 const _submit = ValueKey('intention-editor-submit');
 const _failure = ValueKey('intention-editor-failure');
 const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
-const _resize = ValueKey('intention-creation-sheet-resize');
 const _closeButton = ValueKey('intention-editor-close');
 const _readinessConfirmation = ValueKey(
   'intention-editor-readiness-confirmation',
@@ -774,11 +772,10 @@ void _usePhone(WidgetTester tester, {Size size = _phone, double keyboard = 0}) {
 }
 
 /// Что экранный диктор объявляет по порядку обхода компактной панели с
-/// выбранными тегами [tags]: модальный фон, размер и закрытие, заголовок,
+/// выбранными тегами [tags]: модальный фон, закрытие, заголовок,
 /// поля, теги со снятием, быстрые действия и сохранение.
 List<String> _panel(AppLocalizations l10n, {List<String> tags = const []}) => [
   l10n.editorCloseFormAction,
-  l10n.editorExpandFormAction,
   l10n.editorCloseFormAction,
   l10n.editorTitle,
   l10n.editorTitleLabel,
@@ -904,7 +901,6 @@ const _focusTargets = [
   _favorite,
   _readiness,
   _submit,
-  _resize,
   _closeButton,
   _readinessCancel,
   _readinessConfirm,

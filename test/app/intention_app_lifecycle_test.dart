@@ -39,6 +39,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -1379,16 +1380,11 @@ enum _SheetTransition {
         await tester.enterText(find.byKey(_editorTitle), 'Черновик');
         await tester.pump();
         switch (this) {
-          case _SheetTransition.chooser:
-            // Сообщение лежит поверх нижнего края полей компактной панели, а
-            // в развёрнутой действие выбора тегов остаётся над ним.
-            await tester.tap(
-              find.byKey(const ValueKey('intention-creation-sheet-resize')),
-            );
-            await tester.pumpAndSettle();
           case _SheetTransition.editor:
             await _FormOverlay.chooser.cover(tester);
-          case _SheetTransition.panel || _SheetTransition.confirmation:
+          case _SheetTransition.panel ||
+              _SheetTransition.confirmation ||
+              _SheetTransition.chooser:
             break;
         }
     }
@@ -1403,8 +1399,16 @@ enum _SheetTransition {
         await tester.pumpAndSettle();
         expect(find.text('Discard the draft?'), findsOneWidget);
       case _SheetTransition.chooser:
-        expect(find.byKey(_chooseTags).hitTestable(), findsOneWidget);
-        await _FormOverlay.chooser.cover(tester);
+        // Сообщение временно перекрывает нижний край полей. Из названия
+        // переходим через описание к выбору тегов клавиатурой, сохраняя
+        // сообщение на экране и его место в очереди.
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(find.byType(BackButton), findsOneWidget);
       case _SheetTransition.editor:
         await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
         await tester.pumpAndSettle();

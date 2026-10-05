@@ -33,10 +33,6 @@ part 'intention_editor_view_model.g.dart';
 /// редактор тегов сессию не завершают. Закрытие не отменяет принятую отправку:
 /// её будущий результат переходит общей поверхности.
 ///
-/// Сессия владеет и режимом размера своей панели. Новая сессия компактна;
-/// разворачивание и сворачивание доступны до её завершения, в том числе во
-/// время отправки, и не меняют черновик, отправку и ход закрытия.
-///
 /// Отказ сохраняет весь черновик без нормализации. Право предъявления
 /// ошибки, выданное координатором, принадлежит сессии: пока отказ действует,
 /// она публикует право в состоянии, а renderer формы подтверждает его по
@@ -157,12 +153,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   void confirmReadiness() => _changeReadiness(IntentionReadiness.ready);
 
   void disableReadiness() => _changeReadiness(IntentionReadiness.notReady);
-
-  /// Разворачивает панель сессии на всю доступную высоту.
-  void expandSheet() => _changeSheetMode(IntentionCreationSheetMode.expanded);
-
-  /// Возвращает панель сессии к компактному режиму.
-  void collapseSheet() => _changeSheetMode(IntentionCreationSheetMode.compact);
 
   /// Передаёт координатору весь черновик одной командой.
   ///
@@ -521,14 +511,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   void _changeReadiness(IntentionReadiness value) {
     if (_acceptsDraftChanges) {
       state = state.withReadiness(value);
-    }
-  }
-
-  /// Режим размера меняется, пока сессия не завершена: завершённая сессия
-  /// сохраняет своё последнее состояние.
-  void _changeSheetMode(IntentionCreationSheetMode value) {
-    if (_isOpen) {
-      state = state.withSheetMode(value);
     }
   }
 }
