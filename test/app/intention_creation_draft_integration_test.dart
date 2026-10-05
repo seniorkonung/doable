@@ -65,9 +65,6 @@ import '../support/favorite_storage_fixture.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
 
-// Названия намерений и тегов — данные человека: они одинаковы в обеих
-// локалях.
-
 /// «Гулять» — активное готовое избранное на месте 1 с тегом «Работа».
 const _walk = 1;
 
@@ -108,11 +105,12 @@ final _editorSubmit = find.byKey(const ValueKey('tag-editor-submit'));
 /// успехе и при отказе.
 ///
 /// Намерение создаёт только отправка сессии: проверка не передаёт
-/// координатору заранее подготовленную команду создания. Команды и чтения
-/// наблюдаются прозрачной обёрткой настоящего адаптера, граф — по строкам
-/// хранилища, ревизия — публичным чтением каталога тегов, а результат — по
-/// завершениям координатора, праву предъявления сессии и общей поверхности
-/// сообщений.
+/// координатору заранее подготовленную команду создания. Команды и
+/// наблюдения тегов видны через прозрачную обёртку настоящего адаптера,
+/// граф — по строкам хранилища, ревизия — по публичному чтению каталога
+/// тегов, а результат — по завершениям координатора, праву предъявления
+/// сессии и общей поверхности сообщений. Управляемые отказы записи вносит
+/// существующий hook соединения локального хранилища.
 void main() {
   testWidgets(
     'подготовка всех пяти полей через общий выбор и настоящий редактор тега '
@@ -199,11 +197,12 @@ void main() {
         session.tagSet.add(_tag(_gardenTag)),
         IntentionDraftTagAddition.sessionClosed,
       );
+      // Завершение сессии освобождает её наблюдения ещё до ухода владельца.
+      expect(app.graph.observations(home), 0);
+      expect(app.graph.observations(sport), 0);
       session.release();
       await _settle(tester);
 
-      expect(app.graph.observations(home), 0);
-      expect(app.graph.observations(sport), 0);
       _expectSameCreationTables(app.raw, graphBefore);
       expect(_storedTagNames(app.raw), ['Дом', 'Сад', 'Работа', _sport]);
       expect(
@@ -682,6 +681,204 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final outcome in _LateOutcome.values) {
+    testWidgets('задержанная отправка сессии, закрытой подтверждённым сбросом, '
+        'завершается один раз — ${outcome.description} — и предъявляется общей '
+        'поверхностью, а новое открытие с собственным выбором остаётся '
+        'независимым', (tester) async {
+      final app = await _launch(tester);
+      final l10n = app.l10n;
+      final home = _tagId(_homeTag);
+      final garden = _tagId(_gardenTag);
+      final work = _tagId(_workTag);
+      final marks = storedFavoriteMarks(app.raw);
+
+      final first = app.openSession();
+      _prepareText(first);
+      await _openChooser(tester, app, first);
+      await _addToDraft(tester, home);
+      await _closeChooser(tester);
+      await _waitFor(
+        tester,
+        () => _isProjected(first, {home: 'Дом'}),
+        reason: () => '${first.state.selectedTags}',
+      );
+      final graphBefore = _storedGraph(app.raw);
+      final revisionBefore = await _revision(tester, app);
+      final events = app.diagnostics.events.length;
+
+      // Координатор принял отправку, а хранилище её ещё не выполнило.
+      app.graph.holdNextCreation();
+      first.editor.submit();
+      await _waitFor(tester, () => app.graph.isHoldingCreation);
+      expect(
+        first.state.draftAvailability,
+        IntentionDraftAvailability.submitting,
+      );
+
+      // Сессия закрывается подтверждённым сбросом, сохранение продолжается,
+      // а владелец освобождает сессию вместе с её наблюдениями.
+      final confirmation = _confirmationOf(first.editor.requestClose());
+      expect(
+        confirmation.savingOnClose,
+        IntentionCreationSavingOnClose.continues,
+      );
+      expect(
+        first.editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.closed,
+      );
+      expect(
+        first.tagSet.current.availability,
+        IntentionDraftAvailability.closed,
+      );
+      expect(app.graph.observations(home), 0);
+      first.release();
+      await _settle(tester);
+      expect(app.graph.isHoldingCreation, isTrue);
+      expect(_creations(app), isEmpty);
+
+      // Новое открытие начинается с начального черновика и собственного
+      // открытия выбора.
+      final second = app.openSession();
+      expect(second.state.draft.isChanged, isFalse);
+      expect(second.tagSet.current.tagIds, isEmpty);
+      second.editor.changeTitle('Позвонить маме');
+      await _openChooser(tester, app, second);
+      expect(_searchText(tester), isEmpty);
+      expect(
+        _rowStatus(home, l10n.tagCatalogAvailableForDraft),
+        findsOneWidget,
+      );
+      await _addToDraft(tester, garden);
+      await tester.enterText(_search, 'раб');
+      await tester.pump();
+      await _tap(tester, _row(work));
+      await _waitFor(tester, () => _isCandidate(tester, work));
+      await _waitFor(
+        tester,
+        () => _isProjected(second, {garden: 'Сад'}),
+        reason: () => '${second.state.selectedTags}',
+      );
+      await _settle(tester);
+      final published = <IntentionDraftTagSetSnapshot>[];
+      final changes = second.tagSet.changes.listen(published.add);
+      addTearDown(changes.cancel);
+      final before = second.state;
+
+      if (outcome == _LateOutcome.storageFailure) {
+        app.faults.failAfterFavoritePlaceInsert();
+      }
+      app.graph.releaseCreation();
+      final completion = await _creation(tester, app);
+
+      // Закрытая сессия передала результат общей поверхности: он
+      // предъявляется ровно один раз поверх нового открытия выбора.
+      await _acceptMessage(tester, switch (outcome) {
+        _LateOutcome.success => l10n.graphOperationMessage(
+          l10n.graphOperationCreate,
+          _title,
+          l10n.editorCreated,
+        ),
+        _LateOutcome.storageFailure => l10n.graphOperationMessage(
+          l10n.graphOperationCreate,
+          l10n.graphOperationNewIntention,
+          l10n.editorCreateUnavailable,
+        ),
+      });
+      await _settle(tester);
+      expect(find.byKey(_message), findsNothing);
+      expect(_creations(app), [same(completion)]);
+      final creationCommands = app.graph.commands.whereType<CreateIntention>();
+      expect(creationCommands, hasLength(1));
+      _expectDraftCommand(creationCommands.single, tagIds: {home});
+
+      switch (outcome) {
+        case _LateOutcome.success:
+          final created = switch (completion.result) {
+            ResultSuccess(value: IntentionSaved(:final intention)) =>
+              intention.id,
+            final result => fail('Создание не подтверждено: $result'),
+          };
+          _expectCreatedIntention(app.raw, created, tagIds: [home]);
+          expect(storedFavoriteMarks(app.raw), [
+            ...marks,
+            (created.toCanonicalString(), 2),
+          ]);
+          expect(
+            (await _revision(tester, app)).compareTo(completion.revision!),
+            GraphRevisionOrder.same,
+          );
+          expect(_commandEvents(app, since: events), [
+            _createEvent(
+              IntentionCreationCommandDiagnosticsStage.resultRead,
+              isA<DiagnosticsSucceeded>(),
+            ),
+          ]);
+          _expectPrivateDataHidden(app, [created.toCanonicalString()]);
+        case _LateOutcome.storageFailure:
+          expect(
+            completion.result,
+            isA<ResultFailure<IntentionCommandSuccess>>().having(
+              (result) => result.failure,
+              'отказ',
+              isA<IntentionUnavailableFailure>(),
+            ),
+          );
+          expect(app.faults.faultPoint?.inTransaction, isTrue);
+          expect(_storedGraph(app.raw), graphBefore);
+          expect(
+            (await _revision(tester, app)).compareTo(revisionBefore),
+            GraphRevisionOrder.same,
+          );
+          expect(_commandEvents(app, since: events), [
+            _createEvent(
+              IntentionCreationCommandDiagnosticsStage.write,
+              _failedWith(DiagnosticsFailureCode.unavailable),
+            ),
+          ]);
+      }
+
+      // Новое открытие сессии и его выбор результат не изменил.
+      expect(second.state, same(before));
+      expect(published, isEmpty);
+      expect(second.tagSet.current.tagIds, [garden]);
+      expect(
+        second.tagSet.current.availability,
+        IntentionDraftAvailability.editable,
+      );
+      expect(app.router.current.name, TagCatalogRoute.name);
+      expect(_searchText(tester), 'раб');
+      expect(_isCandidate(tester, work), isTrue);
+      expect(
+        _rowStatus(work, l10n.tagCatalogAvailableForDraft),
+        findsOneWidget,
+      );
+      _expectPrivateDataHidden(app, [
+        _title,
+        _description,
+        'Позвонить маме',
+        ..._tagNames.values,
+        home.toCanonicalString(),
+        garden.toCanonicalString(),
+        work.toCanonicalString(),
+      ]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+}
+
+/// Окончательный исход задержанной отправки сессии, закрытой до него.
+enum _LateOutcome {
+  success('успех'),
+  storageFailure('отказ записи');
+
+  const _LateOutcome(this.description);
+
+  final String description;
 }
 
 /// Удаление тега, выбранного в черновике, до отправки.
@@ -927,7 +1124,10 @@ Future<_App> _launch(WidgetTester tester) async {
     ),
   );
   addTearDown(() async {
-    graph.releaseCreation();
+    // Сценарий, прерванный во время задержанного создания, не должен
+    // оставить остановку ждать принятую команду: освобождённое создание
+    // успевает завершиться до неё.
+    if (graph.releaseCreation()) await _settle(tester);
     await tester.pumpWidget(const SizedBox.shrink());
     await runtime.shutdown();
   });
@@ -1059,6 +1259,12 @@ Future<TagCommandCompletion> _runTagCommand(
 
 Finder _row(TagId id) =>
     find.byKey(ValueKey('tag-catalog-row-${id.toCanonicalString()}'));
+
+String _searchText(WidgetTester tester) =>
+    tester.widget<TextField>(_search).controller!.text;
+
+bool _isCandidate(WidgetTester tester, TagId id) =>
+    tester.widget<Semantics>(_row(id)).properties.selected ?? false;
 
 Finder _rowStatus(TagId id, String status) =>
     find.descendant(of: _row(id), matching: find.text(status));
@@ -1284,9 +1490,12 @@ final class _ObservedGraph implements PersonalGraphRepository {
 
   void holdNextCreation() => _creationGate = Completer<void>();
 
-  void releaseCreation() {
+  /// Освобождает задержанное создание; `true`, если оно ещё ждало.
+  bool releaseCreation() {
     final gate = _creationGate;
-    if (gate != null && !gate.isCompleted) gate.complete();
+    if (gate == null || gate.isCompleted) return false;
+    gate.complete();
+    return true;
   }
 
   @override
