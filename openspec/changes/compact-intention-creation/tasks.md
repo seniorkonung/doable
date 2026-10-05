@@ -333,7 +333,7 @@
   - **Files likely touched:** `lib/src/tag/presentation/catalog/tag_catalog_page.dart`, `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`, `test/app/tag_app_flow_test.dart`; производный `lib/src/app/routing/app_router.gr.dart`.
   - **Estimated scope:** M.
 
-- [ ] 2.12 Подтвердить независимые жизненные циклы черновика, открытия выбора и самостоятельного редактора тега
+- [x] 2.12 Подтвердить независимые жизненные циклы черновика, открытия выбора и самостоятельного редактора тега
   - **Acceptance criteria:**
     - Поиск и редактор не теряют ввод сессии, разные открытия не смешиваются, а решение о закрытии принадлежит сессии. Успех, отказ и запоздалое подтверждение не меняют новое открытие.
     - Общий выбор собран с существующими маршрутами тегов, прежнее назначение работает; локализации, анализ и целевые проверки проходят. Гарантии модальной геометрии и реальных способов закрытия ещё не объявляются доказанными.
