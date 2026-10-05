@@ -6,6 +6,8 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
@@ -48,7 +50,7 @@ final _android = TargetPlatformVariant.only(TargetPlatform.android);
 
 void main() {
   testWidgets('«назад» с каталога дневных выборов выбирает Главную и '
-      'сохраняет состояние каталога', (tester) async {
+      'сохраняет состояние каталога и его календаря', (tester) async {
     final app = await _start(tester);
     await _select(tester, AppDestination.dailyChoices);
     await selectDailyChoiceCatalogDate(tester, _earlierDate, tap: _tap);
@@ -58,7 +60,18 @@ void main() {
           _dailyRows.evaluate().length == 1 &&
           _dailyRowOn(_earlierDate).evaluate().length == 1,
     );
+    // Раскрытый календарь показывает предыдущий месяц.
+    await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
+    await showDailyChoiceCatalogPeriod(
+      tester,
+      CalendarDate.fromParts(2026, 8, 15),
+      tap: _tap,
+    );
     final catalog = tester.state(find.byType(DailyChoiceCatalogPage));
+    final calendar = tester.state(_built(DailyChoiceCalendar));
+    final viewport = shownDailyChoiceCatalogViewport(tester);
+    expect(viewport.mode, DailyChoiceCalendarMode.month);
+    expect(viewport.focusedDate.month, 8);
 
     // Framework готов обработать «назад»: платформа передаст его приложению.
     expect(app.platform.frameworkHandlesBack, isTrue);
@@ -73,7 +86,9 @@ void main() {
     await _select(tester, AppDestination.dailyChoices);
 
     expect(tester.state(find.byType(DailyChoiceCatalogPage)), same(catalog));
+    expect(tester.state(_built(DailyChoiceCalendar)), same(calendar));
     expect(shownDailyChoiceCatalogDate(tester), _earlierDate);
+    expect(shownDailyChoiceCatalogViewport(tester), viewport);
     expect(_dailyRows, findsOneWidget);
     expect(_dailyRowOn(_earlierDate), findsOneWidget);
     expect(app.platform.frameworkHandlesBack, isTrue);
