@@ -527,80 +527,100 @@ void main() {
   });
 
   group('ошибки сохранения', () {
-    for (final (name, field, reason, fieldKey, message) in _fieldFailures) {
-      testWidgets(
-        'ошибка $name доводит своё поле и собственный текст до видимости в прокрученных полях над клавиатурой, а право ошибки подтверждается только по кадру с видимым сообщением',
-        (tester) async {
-          _usePhone(tester, _portrait, keyboard: true);
-          final sessions = _EditorSessions();
-          final repository = ControlledCatalogRepository();
-          await _openEditor(tester, repository, sessions);
-          await tester.enterText(find.byKey(_title), ' Намерение ');
-          await tester.enterText(find.byKey(_description), _lines(40));
-          await tester.pumpAndSettle();
-          await _scrollAwayFrom(tester, fieldKey);
-          final draft = sessions.state(tester).draft;
+    for (final mode in IntentionCreationSheetMode.values) {
+      for (final (name, field, reason, fieldKey, message) in _fieldFailures) {
+        testWidgets(
+          'в ${_modeName(mode)} панели ошибка $name доводит своё поле и собственный текст до видимости в прокрученных полях над клавиатурой, право ошибки подтверждается только по кадру с видимым сообщением, а исправление поля разрешает новую отправку',
+          (tester) async {
+            _usePhone(tester, _portrait, keyboard: true);
+            final sessions = _EditorSessions();
+            final repository = ControlledCatalogRepository();
+            await _openEditor(tester, repository, sessions);
+            await _useMode(tester, mode);
+            await tester.enterText(find.byKey(_title), ' Намерение ');
+            await tester.enterText(find.byKey(_description), _lines(40));
+            await tester.pumpAndSettle();
+            await _scrollAwayFrom(tester, fieldKey);
+            final draft = sessions.state(tester).draft;
 
-          await tester.tap(find.byKey(_submit));
-          await tester.pump();
-          repository.completeCommand(0, _textFailure(field, reason));
-          await tester.idle();
-          await tester.pump();
+            await tester.tap(find.byKey(_submit));
+            await tester.pump();
+            repository.completeCommand(0, _textFailure(field, reason));
+            await tester.idle();
+            await tester.pump();
 
-          final claim = _failureClaim(tester);
-          for (var frame = 0; _isClaimPending(tester, claim); frame++) {
-            expect(frame, lessThan(60), reason: 'сообщение становится видимым');
-            await tester.pump(const Duration(milliseconds: 16));
-          }
-          _expectInsideFields(tester, find.text(message));
-          await tester.pumpAndSettle();
+            final claim = _failureClaim(tester);
+            for (var frame = 0; _isClaimPending(tester, claim); frame++) {
+              expect(
+                frame,
+                lessThan(60),
+                reason: 'сообщение становится видимым',
+              );
+              await tester.pump(const Duration(milliseconds: 16));
+            }
+            _expectInsideFields(tester, find.text(message));
+            await tester.pumpAndSettle();
 
-          _expectInsideFields(tester, find.text(message));
-          _expectFieldEndVisible(tester, fieldKey);
-          expect(find.byType(SnackBar), findsNothing);
-          expect(sessions.state(tester).draft, same(draft));
-          expect(_controller(tester, _title).text, ' Намерение ');
-          expect(_controller(tester, _description).text, _lines(40));
-          expect(sessions.state(tester).sheetMode, _compactMode);
-          expect(repository.commands, hasLength(1));
-          expect(tester.takeException(), isNull);
-        },
-      );
+            _expectInsideFields(tester, find.text(message));
+            _expectFieldEndVisible(tester, fieldKey);
+            expect(find.byType(SnackBar), findsNothing);
+            expect(sessions.state(tester).draft, same(draft));
+            expect(_controller(tester, _title).text, ' Намерение ');
+            expect(_controller(tester, _description).text, _lines(40));
+            expect(sessions.state(tester).sheetMode, mode);
+            expect(_submitButton(tester).onPressed, isNull);
+            expect(repository.commands, hasLength(1));
+            expect(tester.takeException(), isNull);
 
-      testWidgets(
-        'ошибка $name остаётся видимой, когда скрытая на время отправки клавиатура возвращается',
-        (tester) async {
-          _usePhone(tester, _portrait, keyboard: true);
-          final sessions = _EditorSessions();
-          final repository = ControlledCatalogRepository();
-          await _openEditor(tester, repository, sessions);
-          await tester.enterText(find.byKey(_title), 'Намерение');
-          await tester.enterText(find.byKey(_description), _lines(40));
-          await tester.pumpAndSettle();
-          await _scrollAwayFrom(tester, fieldKey);
+            // Исправление видимого поля снимает его ошибку и само не
+            // отправляет команду.
+            await tester.enterText(find.byKey(fieldKey), 'Исправлено');
+            await tester.pumpAndSettle();
 
-          await tester.tap(find.byKey(_submit));
-          await tester.pump();
-          // Поля только для чтения во время отправки закрывают соединение
-          // ввода, и платформа скрывает клавиатуру.
-          _usePhone(tester, _portrait);
-          await tester.pumpAndSettle();
-          repository.completeCommand(0, _textFailure(field, reason));
-          await tester.pumpAndSettle();
-          _expectInsideFields(tester, find.text(message));
+            expect(find.text(message), findsNothing);
+            expect(_submitButton(tester).onPressed, isNotNull);
+            expect(sessions.state(tester).sheetMode, mode);
+            expect(repository.commands, hasLength(1));
+            expect(tester.takeException(), isNull);
+          },
+        );
 
-          // Поле снова принимает ввод, и клавиатура возвращается к нему.
-          _usePhone(tester, _portrait, keyboard: true);
-          await tester.pumpAndSettle();
+        testWidgets(
+          'в ${_modeName(mode)} панели ошибка $name остаётся видимой, когда скрытая на время отправки клавиатура возвращается',
+          (tester) async {
+            _usePhone(tester, _portrait, keyboard: true);
+            final sessions = _EditorSessions();
+            final repository = ControlledCatalogRepository();
+            await _openEditor(tester, repository, sessions);
+            await _useMode(tester, mode);
+            await tester.enterText(find.byKey(_title), 'Намерение');
+            await tester.enterText(find.byKey(_description), _lines(40));
+            await tester.pumpAndSettle();
+            await _scrollAwayFrom(tester, fieldKey);
 
-          _expectInsideFields(tester, find.text(message));
-          _expectFieldEndVisible(tester, fieldKey);
-          expect(_hasFocus(tester, _description), isTrue);
-          expect(sessions.state(tester).sheetMode, _compactMode);
-          expect(repository.commands, hasLength(1));
-          expect(tester.takeException(), isNull);
-        },
-      );
+            await tester.tap(find.byKey(_submit));
+            await tester.pump();
+            // Поля только для чтения во время отправки закрывают соединение
+            // ввода, и платформа скрывает клавиатуру.
+            _usePhone(tester, _portrait);
+            await tester.pumpAndSettle();
+            repository.completeCommand(0, _textFailure(field, reason));
+            await tester.pumpAndSettle();
+            _expectInsideFields(tester, find.text(message));
+
+            // Поле снова принимает ввод, и клавиатура возвращается к нему.
+            _usePhone(tester, _portrait, keyboard: true);
+            await tester.pumpAndSettle();
+
+            _expectInsideFields(tester, find.text(message));
+            _expectFieldEndVisible(tester, fieldKey);
+            expect(_hasFocus(tester, _description), isTrue);
+            expect(sessions.state(tester).sheetMode, mode);
+            expect(repository.commands, hasLength(1));
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
     }
 
     for (final (interruption, interrupt)
@@ -655,111 +675,122 @@ void main() {
       );
     }
 
-    for (final (failure, message, recovery) in _pinnedFailures) {
-      testWidgets(
-        'отказ «$message» с исправлением и повтором закреплён рядом с сохранением над клавиатурой при масштабе текста 200%, не сдвигая прокрученные поля',
-        (tester) async {
-          _usePhone(tester, _portrait, keyboard: true);
-          tester.platformDispatcher.textScaleFactorTestValue =
-              _androidMaxTextScale;
-          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
-          final sessions = _EditorSessions();
-          final repository = ControlledCatalogRepository()
-            ..tagObservations = _observedTags(tags);
-          await _openEditor(tester, repository, sessions);
-          sessions.notifier(tester)
-            ..draftTagSet.add(tags[0])
-            ..draftTagSet.add(tags[1])
-            ..markFavorite()
-            ..confirmReadiness();
-          await tester.enterText(find.byKey(_title), 'Намерение');
-          await tester.enterText(find.byKey(_description), _lines(12));
-          await tester.pumpAndSettle();
-          final draft = sessions.state(tester).draft;
-          final pixels = _fieldsPosition(tester).pixels;
-          expect(pixels, greaterThan(0));
+    for (final mode in IntentionCreationSheetMode.values) {
+      for (final (failure, message, recovery) in _pinnedFailures) {
+        testWidgets(
+          'в ${_modeName(mode)} панели отказ «$message» с исправлением и повтором закреплён рядом с сохранением над клавиатурой при масштабе текста 200%, не сдвигая прокрученные поля',
+          (tester) async {
+            _usePhone(tester, _portrait, keyboard: true);
+            tester.platformDispatcher.textScaleFactorTestValue =
+                _androidMaxTextScale;
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
+            final sessions = _EditorSessions();
+            final repository = ControlledCatalogRepository()
+              ..tagObservations = _observedTags(tags);
+            await _openEditor(tester, repository, sessions);
+            await _useMode(tester, mode);
+            sessions.notifier(tester)
+              ..draftTagSet.add(tags[0])
+              ..draftTagSet.add(tags[1])
+              ..markFavorite()
+              ..confirmReadiness();
+            await tester.enterText(find.byKey(_title), 'Намерение');
+            await tester.enterText(find.byKey(_description), _lines(12));
+            await tester.pumpAndSettle();
+            final draft = sessions.state(tester).draft;
+            final pixels = _fieldsPosition(tester).pixels;
+            expect(pixels, greaterThan(0));
 
-          await tester.tap(find.byKey(_submit));
-          await tester.pump();
-          repository.completeCommand(0, ResultFailure(failure));
-          await tester.pumpAndSettle();
+            await tester.tap(find.byKey(_submit));
+            await tester.pump();
+            repository.completeCommand(0, ResultFailure(failure));
+            await tester.pumpAndSettle();
 
-          _expectPinned(tester, recovery);
-          expect(_fieldsPosition(tester).pixels, pixels);
-          expect(_isClaimPending(tester, _failureClaim(tester)), isFalse);
-          expect(find.byType(SnackBar), findsNothing);
-          expect(sessions.state(tester).draft, same(draft));
-          expect(sessions.state(tester).sheetMode, _compactMode);
-          expect(repository.commands, hasLength(1));
-          expect(tester.takeException(), isNull);
+            _expectPinned(tester, recovery);
+            expect(_fieldsPosition(tester).pixels, pixels);
+            expect(_isClaimPending(tester, _failureClaim(tester)), isFalse);
+            expect(find.byType(SnackBar), findsNothing);
+            expect(sessions.state(tester).draft, same(draft));
+            expect(sessions.state(tester).sheetMode, mode);
+            expect(repository.commands, hasLength(1));
+            expect(tester.takeException(), isNull);
 
-          switch (recovery) {
-            case _Recovery.removeMissingTags:
-              expect(_submitButton(tester).onPressed, isNull);
-              await tester.tap(find.byKey(_removeMissing));
-              await tester.pumpAndSettle();
+            switch (recovery) {
+              case _Recovery.removeMissingTags:
+                expect(_submitButton(tester).onPressed, isNull);
+                await tester.tap(find.byKey(_removeMissing));
+                await tester.pumpAndSettle();
 
-              // Исправление меняет только набор и само не отправляет.
-              expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
-              expect(find.byKey(_failure), findsNothing);
-              expect(_submitButton(tester).onPressed, isNotNull);
-              expect(repository.commands, hasLength(1));
-            case _Recovery.retry:
-              final first = _failureClaim(tester);
-              await tester.tap(find.byKey(_submit));
-              await tester.pump();
+                // Исправление меняет только набор и само не отправляет.
+                expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
+                expect(find.byKey(_failure), findsNothing);
+                expect(_submitButton(tester).onPressed, isNotNull);
+                expect(repository.commands, hasLength(1));
+              case _Recovery.retry:
+                final first = _failureClaim(tester);
+                await tester.tap(find.byKey(_submit));
+                await tester.pump();
 
-              expect(repository.commands, hasLength(2));
-              expect(
-                repository.commands.last,
-                isA<CreateIntention>()
-                    .having((command) => command.title, 'название', 'Намерение')
-                    .having(
-                      (command) => command.description,
-                      'описание',
-                      _lines(12),
-                    )
-                    .having((command) => command.tagIds, 'теги', [
-                      _tagId(1),
-                      _tagId(2),
-                    ])
-                    .having(
-                      (command) => command.favoriteMark,
-                      'избранное',
-                      FavoriteMark.favorite,
-                    )
-                    .having(
-                      (command) => command.readiness,
-                      'готовность',
-                      IntentionReadiness.ready,
-                    ),
-              );
-              expect(find.byKey(_failure), findsNothing);
-              repository.completeCommand(1, ResultFailure(failure));
-              await tester.pumpAndSettle();
+                expect(repository.commands, hasLength(2));
+                expect(
+                  repository.commands.last,
+                  isA<CreateIntention>()
+                      .having(
+                        (command) => command.title,
+                        'название',
+                        'Намерение',
+                      )
+                      .having(
+                        (command) => command.description,
+                        'описание',
+                        _lines(12),
+                      )
+                      .having((command) => command.tagIds, 'теги', [
+                        _tagId(1),
+                        _tagId(2),
+                      ])
+                      .having(
+                        (command) => command.favoriteMark,
+                        'избранное',
+                        FavoriteMark.favorite,
+                      )
+                      .having(
+                        (command) => command.readiness,
+                        'готовность',
+                        IntentionReadiness.ready,
+                      ),
+                );
+                expect(find.byKey(_failure), findsNothing);
+                repository.completeCommand(1, ResultFailure(failure));
+                await tester.pumpAndSettle();
 
-              // Повтор принят той же сессией как новая операция.
-              final second = _failureClaim(tester);
-              expect(second.token, isNot(same(first.token)));
-              expect(_isClaimPending(tester, second), isFalse);
-              expect(sessions.added, hasLength(1));
-              expect(find.byType(SnackBar), findsNothing);
-            case _Recovery.none:
-              expect(_submitButton(tester).onPressed, isNull);
-              // Правки, не устраняющие причину, отказ не снимают.
-              await tester.ensureVisible(find.byKey(_favorite));
-              await tester.pumpAndSettle();
-              await tester.tap(find.byKey(_favorite));
-              await tester.enterText(find.byKey(_title), 'Другое намерение');
-              await tester.pumpAndSettle();
+                // Повтор принят той же сессией как новая операция.
+                final second = _failureClaim(tester);
+                expect(second.token, isNot(same(first.token)));
+                expect(_isClaimPending(tester, second), isFalse);
+                expect(sessions.added, hasLength(1));
+                expect(find.byType(SnackBar), findsNothing);
+              case _Recovery.none:
+                expect(_submitButton(tester).onPressed, isNull);
+                // Правки, не устраняющие причину, отказ не снимают.
+                await tester.ensureVisible(find.byKey(_favorite));
+                await tester.pumpAndSettle();
+                await tester.tap(find.byKey(_favorite));
+                await tester.enterText(find.byKey(_title), 'Другое намерение');
+                await tester.pumpAndSettle();
 
-              expect(find.byKey(_failure), findsOneWidget);
-              expect(_submitButton(tester).onPressed, isNull);
-              expect(repository.commands, hasLength(1));
-          }
-        },
-      );
+                expect(find.byKey(_failure), findsOneWidget);
+                expect(_submitButton(tester).onPressed, isNull);
+                expect(repository.commands, hasLength(1));
+            }
+            expect(sessions.state(tester).sheetMode, mode);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
     }
 
     testWidgets(
@@ -1028,6 +1059,27 @@ const _closeDiscard = ValueKey('intention-editor-close-discard');
 
 const _compactMode = IntentionCreationSheetMode.compact;
 const _expandedMode = IntentionCreationSheetMode.expanded;
+
+/// Режим панели в описании проверки.
+String _modeName(IntentionCreationSheetMode mode) => switch (mode) {
+  IntentionCreationSheetMode.compact => 'компактной',
+  IntentionCreationSheetMode.expanded => 'развёрнутой',
+};
+
+/// Переводит только что открытую компактную панель в режим [mode] кнопкой
+/// размера.
+Future<void> _useMode(
+  WidgetTester tester,
+  IntentionCreationSheetMode mode,
+) async {
+  switch (mode) {
+    case IntentionCreationSheetMode.compact:
+      return;
+    case IntentionCreationSheetMode.expanded:
+      await tester.tap(find.byKey(_resize));
+      await tester.pumpAndSettle();
+  }
+}
 
 /// Участок страницы под строкой состояния, видимый над компактной панелью.
 const _visibleContextExtent = 72.0;
