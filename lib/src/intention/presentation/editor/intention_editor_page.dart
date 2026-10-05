@@ -42,6 +42,9 @@ final class _IntentionEditorPageState
   /// Маршрут формы уже закрывается после завершения сессии.
   var _isRouteClosing = false;
 
+  /// Объяснение критериев действия уже открыто.
+  var _isConfirmingReadiness = false;
+
   IntentionEditorViewModelProvider get _provider =>
       intentionEditorViewModelProvider(_formKey);
 
@@ -158,6 +161,16 @@ final class _IntentionEditorPageState
                 ),
                 onChanged: notifier.changeDescription,
               ),
+              const SizedBox(height: 8),
+              _DraftOptions(
+                favoriteMark: editor.draft.favoriteMark,
+                readiness: editor.draft.readiness,
+                enabled: !isDraftFixed,
+                onMarkFavorite: notifier.markFavorite,
+                onUnmarkFavorite: notifier.unmarkFavorite,
+                onEnableReadiness: () => unawaited(_confirmReadiness()),
+                onDisableReadiness: notifier.disableReadiness,
+              ),
               if (generalFailure != null) ...[
                 const SizedBox(height: 12),
                 OperationFailurePresentation(
@@ -223,6 +236,30 @@ final class _IntentionEditorPageState
     }
   }
 
+  /// Объясняет оба критерия действия и включает начальную готовность
+  /// черновика только по явному подтверждению.
+  ///
+  /// Отказ, нажатие вне объяснения и «назад» оставляют готовность
+  /// выключенной. Подтверждение принимает только эта сессия и только пока её
+  /// черновик редактируется: запоздалый ответ не меняет отправленный или
+  /// закрытый черновик.
+  Future<void> _confirmReadiness() async {
+    if (_isConfirmingReadiness) {
+      return;
+    }
+    _isConfirmingReadiness = true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      // Объяснение живёт в стеке маршрута своей формы и закрывается с ним.
+      useRootNavigator: false,
+      builder: (_) => _ReadinessConfirmationDialog(provider: _provider),
+    ).whenComplete(() => _isConfirmingReadiness = false);
+    if (!mounted || !(confirmed ?? false)) {
+      return;
+    }
+    ref.read(_provider.notifier).confirmReadiness();
+  }
+
   /// Закрывает только маршрут этой формы, минуя повторное обращение к уже
   /// завершённой сессии.
   void _closeRoute() {
@@ -237,12 +274,12 @@ final class _IntentionEditorPageState
     AppLocalizations localizations,
     IntentionEditorState editor,
   ) => switch (editor.operation) {
-    OperationRunning<Intention>() => localizations.editorCreating,
+    OperationRunning<Intention>() => localizations.editorSaving,
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) =>
       localizations.commonRetry,
     OperationIdle<Intention>() ||
     OperationSucceeded<Intention>() ||
-    OperationFailed<Intention>() => localizations.editorCreateAction,
+    OperationFailed<Intention>() => localizations.editorSaveAction,
   };
 
   String? _fieldFailure(
@@ -402,6 +439,215 @@ final class _CloseConfirmationDialogState
   void _answer(IntentionCreationCloseChoice? choice) {
     if (ModalRoute.of(context)?.isCurrent ?? false) {
       Navigator.of(context).pop(choice);
+    }
+  }
+
+  void _dismissOutdated() {
+    if (_isDismissing) {
+      return;
+    }
+    _isDismissing = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _answer(null);
+      }
+    });
+  }
+}
+
+/// Быстрые отметки избранного и начальной готовности черновика.
+///
+/// Отметки меняют только черновик сессии и не отправляют команд графа.
+/// Включённое состояние отличается формой значка и признаком включения для
+/// экранного диктора, а подсказка называет назначение и состояние, не выдавая
+/// черновик за сохранённое намерение.
+final class _DraftOptions extends StatelessWidget {
+  const _DraftOptions({
+    required this.favoriteMark,
+    required this.readiness,
+    required this.enabled,
+    required this.onMarkFavorite,
+    required this.onUnmarkFavorite,
+    required this.onEnableReadiness,
+    required this.onDisableReadiness,
+  });
+
+  final FavoriteMark favoriteMark;
+  final IntentionReadiness readiness;
+
+  /// Черновик принимает правки: во время отправки и после завершения сессии
+  /// отметки недоступны.
+  final bool enabled;
+  final VoidCallback onMarkFavorite;
+  final VoidCallback onUnmarkFavorite;
+
+  /// Начинает включение готовности с объяснения критериев действия.
+  final VoidCallback onEnableReadiness;
+  final VoidCallback onDisableReadiness;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    // Нажатия отметок не считаются нажатием вне поля ввода: ввод
+    // продолжается с прежним фокусом.
+    return TextFieldTapRegion(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          switch (favoriteMark) {
+            FavoriteMark.favorite => _DraftOptionButton(
+              optionKey: const ValueKey('intention-editor-favorite'),
+              label: localizations.editorFavoriteOption,
+              tooltip: localizations.editorFavoriteOptionOn,
+              isOn: true,
+              icon: Icons.star,
+              onPressed: enabled ? onUnmarkFavorite : null,
+            ),
+            FavoriteMark.notFavorite => _DraftOptionButton(
+              optionKey: const ValueKey('intention-editor-favorite'),
+              label: localizations.editorFavoriteOption,
+              tooltip: localizations.editorFavoriteOptionOff,
+              isOn: false,
+              icon: Icons.star_border,
+              onPressed: enabled ? onMarkFavorite : null,
+            ),
+          },
+          switch (readiness) {
+            IntentionReadiness.ready => _DraftOptionButton(
+              optionKey: const ValueKey('intention-editor-readiness'),
+              label: localizations.editorReadinessOption,
+              tooltip: localizations.editorReadinessOptionOn,
+              isOn: true,
+              icon: Icons.check_circle,
+              onPressed: enabled ? onDisableReadiness : null,
+            ),
+            IntentionReadiness.notReady => _DraftOptionButton(
+              optionKey: const ValueKey('intention-editor-readiness'),
+              label: localizations.editorReadinessOption,
+              tooltip: localizations.editorReadinessOptionOff,
+              isOn: false,
+              icon: Icons.check_circle_outline,
+              onPressed: enabled ? onEnableReadiness : null,
+            ),
+          },
+        ],
+      ),
+    );
+  }
+}
+
+/// Переключатель одной быстрой отметки черновика.
+///
+/// Экранный диктор получает назначение [label] и признак включения [isOn];
+/// подсказка [tooltip] показывает их же текстом и потому не повторяется в
+/// семантике.
+final class _DraftOptionButton extends StatelessWidget {
+  const _DraftOptionButton({
+    required this.optionKey,
+    required this.label,
+    required this.tooltip,
+    required this.isOn,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final Key optionKey;
+  final String label;
+  final String tooltip;
+  final bool isOn;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    excludeFromSemantics: true,
+    child: MergeSemantics(
+      child: Semantics(
+        label: label,
+        toggled: isOn,
+        child: IconButton(
+          key: optionKey,
+          onPressed: onPressed,
+          color: isOn ? Theme.of(context).colorScheme.primary : null,
+          icon: Icon(icon),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Объяснение обоих критериев действия перед включением начальной
+/// готовности черновика.
+///
+/// Подтверждение действует, пока черновик сессии редактируется и остаётся
+/// неготовым. Иначе оно становится недоступным, а объяснение закрывается без
+/// ответа, поэтому запоздалое нажатие не меняет черновик.
+final class _ReadinessConfirmationDialog extends ConsumerStatefulWidget {
+  const _ReadinessConfirmationDialog({required this.provider});
+
+  final IntentionEditorViewModelProvider provider;
+
+  @override
+  ConsumerState<_ReadinessConfirmationDialog> createState() =>
+      _ReadinessConfirmationDialogState();
+}
+
+final class _ReadinessConfirmationDialogState
+    extends ConsumerState<_ReadinessConfirmationDialog> {
+  var _isDismissing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final isPending = ref.watch(
+      widget.provider.select(
+        (editor) =>
+            editor.draft.readiness == IntentionReadiness.notReady &&
+            switch (editor.draftAvailability) {
+              IntentionDraftAvailability.editable => true,
+              IntentionDraftAvailability.submitting ||
+              IntentionDraftAvailability.closed => false,
+            },
+      ),
+    );
+    if (!isPending) {
+      _dismissOutdated();
+    }
+    return AlertDialog(
+      key: const ValueKey('intention-editor-readiness-confirmation'),
+      scrollable: true,
+      title: Text(localizations.editorReadinessConfirmationTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(localizations.editorReadinessOneDayCriterion),
+          const SizedBox(height: 12),
+          Text(localizations.editorReadinessClarityCriterion),
+        ],
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('intention-editor-readiness-cancel'),
+          onPressed: () => _answer(false),
+          child: Text(localizations.editorReadinessCancelAction),
+        ),
+        FilledButton(
+          key: const ValueKey('intention-editor-readiness-confirm'),
+          onPressed: isPending ? () => _answer(true) : null,
+          child: Text(localizations.editorReadinessConfirmAction),
+        ),
+      ],
+    );
+  }
+
+  /// Закрывает объяснение с ответом [confirmed], только пока оно остаётся
+  /// верхним маршрутом: ответ не может закрыть форму или другой маршрут.
+  void _answer(bool? confirmed) {
+    if (ModalRoute.of(context)?.isCurrent ?? false) {
+      Navigator.of(context).pop(confirmed);
     }
   }
 

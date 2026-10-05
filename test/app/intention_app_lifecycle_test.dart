@@ -429,7 +429,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
       await tester.pump();
       expect(repository.commands.single, isA<CreateIntention>());
-      expect(find.text('Creating…'), findsOneWidget);
+      expect(find.text('Saving…'), findsOneWidget);
 
       // Уход во время принятой отправки подтверждается и её не отменяет.
       await tester.tap(find.byKey(const ValueKey('intention-editor-close')));

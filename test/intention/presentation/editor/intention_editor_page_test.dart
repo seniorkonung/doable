@@ -41,9 +41,7 @@ void main() {
     );
   });
 
-  testWidgets('открывает generated route формы из каталога без readiness', (
-    tester,
-  ) async {
+  testWidgets('открывает generated route формы из каталога', (tester) async {
     final repository = ControlledCatalogRepository();
     final router = await _openEditor(tester, repository);
 
@@ -54,7 +52,7 @@ void main() {
     expect(find.text('Create intention'), findsWidgets);
     expect(find.text('Title'), findsOneWidget);
     expect(find.text('Description (optional)'), findsOneWidget);
-    expect(find.text('Ready for action'), findsNothing);
+    // Готовность выбирается быстрой отметкой, а не переключателем формы.
     expect(find.byType(Switch), findsNothing);
   });
 
@@ -107,7 +105,7 @@ void main() {
               '  Сохранить буквально\n',
             ),
       );
-      expect(find.text('Creating…'), findsOneWidget);
+      expect(find.text('Saving…'), findsOneWidget);
       expect(
         tester
             .widget<FilledButton>(
@@ -812,10 +810,13 @@ void main() {
           ),
           'набор тегов': (tester, sessions) async =>
               sessions.notifier(tester).draftTagSet.add(_tag(1, 'Дом')),
-          'избранное': (tester, sessions) async =>
-              sessions.notifier(tester).markFavorite(),
-          'готовность': (tester, sessions) async =>
-              sessions.notifier(tester).confirmReadiness(),
+          'избранное': (tester, _) => tester.tap(find.byKey(_favorite)),
+          'готовность': (tester, _) async {
+            await tester.tap(find.byKey(_readiness));
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(_readinessConfirm));
+            await tester.pumpAndSettle();
+          },
         };
     for (final MapEntry(key: field, value: change) in changes.entries) {
       testWidgets(
@@ -956,7 +957,7 @@ void main() {
         await tester.tap(find.byKey(_closeContinue));
         await tester.pumpAndSettle();
         expect(router.current.name, IntentionEditorRoute.name);
-        expect(find.text('Creating…'), findsOneWidget);
+        expect(find.text('Saving…'), findsOneWidget);
 
         await _tapClose(tester);
         await tester.pumpAndSettle();
@@ -1417,6 +1418,546 @@ void main() {
       },
     );
   });
+
+  group('быстрые отметки избранного и готовности', () {
+    testWidgets(
+      'новая панель показывает выключенные отметки с локализованными назначением и состоянием и действие «Сохранить»',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        for (final (
+              locale,
+              favorite,
+              favoriteOff,
+              readiness,
+              readinessOff,
+              save,
+            )
+            in [
+              (
+                const Locale('en'),
+                'Create as favorite',
+                'Create as favorite: off',
+                'Create as ready for action',
+                'Create as ready for action: off',
+                'Save',
+              ),
+              (
+                const Locale('ru'),
+                'Создать избранным',
+                'Создать избранным: выключено',
+                'Создать готовым к действию',
+                'Создать готовым к действию: выключено',
+                'Сохранить',
+              ),
+            ]) {
+          final repository = ControlledCatalogRepository();
+          await _openEditor(tester, repository, locale: locale);
+
+          expect(_iconOf(tester, _favorite), Icons.star_border);
+          expect(_tooltipOf(tester, _favorite), favoriteOff);
+          expect(
+            tester.getSemantics(find.byKey(_favorite)),
+            isSemantics(
+              label: favorite,
+              isButton: true,
+              hasToggledState: true,
+              isToggled: false,
+              hasEnabledState: true,
+              isEnabled: true,
+              hasTapAction: true,
+            ),
+          );
+          expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+          expect(_tooltipOf(tester, _readiness), readinessOff);
+          expect(
+            tester.getSemantics(find.byKey(_readiness)),
+            isSemantics(
+              label: readiness,
+              isButton: true,
+              hasToggledState: true,
+              isToggled: false,
+              hasEnabledState: true,
+              isEnabled: true,
+              hasTapAction: true,
+            ),
+          );
+          expect(find.widgetWithText(FilledButton, save), findsOneWidget);
+          expect(repository.commands, isEmpty);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'избранное переключается только в черновике, отличается формой и семантикой и сохраняется одной командой',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository, observers: [sessions]);
+
+        await tester.tap(find.byKey(_favorite));
+        await tester.pump();
+
+        expect(
+          sessions.state(tester).draft.favoriteMark,
+          FavoriteMark.favorite,
+        );
+        expect(_iconOf(tester, _favorite), Icons.star);
+        expect(_tooltipOf(tester, _favorite), 'Create as favorite: on');
+        expect(
+          tester.getSemantics(find.byKey(_favorite)),
+          isSemantics(
+            label: 'Create as favorite',
+            hasToggledState: true,
+            isToggled: true,
+          ),
+        );
+        // Включение отметки не трогает готовность и не пишет в граф.
+        expect(
+          sessions.state(tester).draft.readiness,
+          IntentionReadiness.notReady,
+        );
+        expect(find.byKey(_readinessConfirmation), findsNothing);
+        expect(repository.commands, isEmpty);
+
+        await tester.tap(find.byKey(_favorite));
+        await tester.pump();
+        expect(
+          sessions.state(tester).draft.favoriteMark,
+          FavoriteMark.notFavorite,
+        );
+        expect(_iconOf(tester, _favorite), Icons.star_border);
+        expect(_tooltipOf(tester, _favorite), 'Create as favorite: off');
+        expect(sessions.state(tester).draft.isChanged, isFalse);
+        expect(repository.commands, isEmpty);
+
+        await tester.tap(find.byKey(_favorite));
+        await tester.enterText(find.byKey(_title), 'Гулять');
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+
+        expect(
+          repository.commands.single,
+          isA<CreateIntention>()
+              .having((command) => command.title, 'название', 'Гулять')
+              .having(
+                (command) => command.favoriteMark,
+                'избранное',
+                FavoriteMark.favorite,
+              )
+              .having(
+                (command) => command.readiness,
+                'готовность',
+                IntentionReadiness.notReady,
+              )
+              .having((command) => command.tagIds, 'теги', isEmpty),
+        );
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await tester.pumpAndSettle();
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'готовность включается только явным подтверждением после объяснения обоих критериев, а отказ и выключение остаются в черновике',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+        );
+        IntentionReadiness readiness() =>
+            sessions.state(tester).draft.readiness;
+        await tester.enterText(find.byKey(_title), '  Позвонить врачу  ');
+        await tester.tap(find.byKey(_resize));
+        await tester.pumpAndSettle();
+        final session = sessions.latest;
+
+        // Отмена кнопкой, нажатием вне диалога и системным «назад» оставляет
+        // готовность выключенной и панель открытой.
+        final dismissals = <String, Future<void> Function()>{
+          'кнопка отмены': () => tester.tap(find.byKey(_readinessCancel)),
+          'нажатие вне диалога': () => tester.tapAt(const Offset(8, 8)),
+          'системное «назад»': () async {
+            await tester.binding.handlePopRoute();
+          },
+        };
+        for (final MapEntry(key: way, value: dismiss) in dismissals.entries) {
+          await tester.tap(find.byKey(_readiness));
+          await tester.pumpAndSettle();
+
+          expect(find.byKey(_readinessConfirmation), findsOneWidget);
+          expect(find.text('Create as ready for action?'), findsOneWidget);
+          expect(
+            find.text('It can be completed fully within one day.'),
+            findsOneWidget,
+          );
+          expect(
+            find.text('It is clear enough for a person to carry out.'),
+            findsOneWidget,
+          );
+          expect(readiness(), IntentionReadiness.notReady, reason: way);
+
+          await dismiss();
+          await tester.pumpAndSettle();
+
+          expect(find.byKey(_readinessConfirmation), findsNothing, reason: way);
+          expect(router.current.name, IntentionEditorRoute.name, reason: way);
+          expect(find.byKey(_closeConfirmation), findsNothing, reason: way);
+          expect(readiness(), IntentionReadiness.notReady, reason: way);
+          expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+        }
+
+        await tester.tap(find.byKey(_readiness));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_readinessConfirm));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_readinessConfirmation), findsNothing);
+        expect(readiness(), IntentionReadiness.ready);
+        expect(_iconOf(tester, _readiness), Icons.check_circle);
+        expect(
+          _tooltipOf(tester, _readiness),
+          'Create as ready for action: on',
+        );
+        expect(
+          tester.getSemantics(find.byKey(_readiness)),
+          isSemantics(
+            label: 'Create as ready for action',
+            hasToggledState: true,
+            isToggled: true,
+          ),
+        );
+        // Подтверждение сохраняет ту же сессию, черновик и режим панели.
+        expect(sessions.latest, same(session));
+        expect(
+          sessions.state(tester).sheetMode,
+          IntentionCreationSheetMode.expanded,
+        );
+        expect(
+          _fieldText(tester, 'intention-editor-title'),
+          '  Позвонить врачу  ',
+        );
+        expect(
+          sessions.state(tester).draft.favoriteMark,
+          FavoriteMark.notFavorite,
+        );
+        expect(repository.commands, isEmpty);
+
+        // Выключение не требует объяснения и меняет только черновик.
+        await tester.tap(find.byKey(_readiness));
+        await tester.pump();
+        expect(find.byKey(_readinessConfirmation), findsNothing);
+        expect(readiness(), IntentionReadiness.notReady);
+        expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+        expect(repository.commands, isEmpty);
+
+        await tester.tap(find.byKey(_readiness));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_readinessConfirm));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+
+        expect(
+          repository.commands.single,
+          isA<CreateIntention>()
+              .having(
+                (command) => command.title,
+                'название',
+                '  Позвонить врачу  ',
+              )
+              .having(
+                (command) => command.readiness,
+                'готовность',
+                IntentionReadiness.ready,
+              )
+              .having(
+                (command) => command.favoriteMark,
+                'избранное',
+                FavoriteMark.notFavorite,
+              ),
+        );
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await tester.pumpAndSettle();
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'локализует объяснение готовности на русском и сохраняет доступность его действий',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository, locale: const Locale('ru'));
+
+        await tester.tap(find.byKey(_readiness));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Создать готовым к действию?'), findsOneWidget);
+        expect(
+          find.text('Его можно полностью выполнить в течение одного дня.'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Человеку достаточно понятно, что именно нужно сделать.'),
+          findsOneWidget,
+        );
+        expect(find.text('Отмена'), findsOneWidget);
+        expect(find.text('Отметить готовым'), findsOneWidget);
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+
+        await tester.tap(find.byKey(_readinessConfirm));
+        await tester.pumpAndSettle();
+        expect(
+          _tooltipOf(tester, _readiness),
+          'Создать готовым к действию: включено',
+        );
+        await tester.tap(find.byKey(_favorite));
+        await tester.pump();
+        expect(_tooltipOf(tester, _favorite), 'Создать избранным: включено');
+        expect(repository.commands, isEmpty);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'во время отправки поля, отметки и повторное сохранение недоступны, индикатор виден, а закрытие доступно',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+        );
+        await tester.enterText(find.byKey(_title), 'Намерение');
+        await tester.tap(find.byKey(_favorite));
+        await tester.tap(find.byKey(_readiness));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_readinessConfirm));
+        await tester.pumpAndSettle();
+        final draft = sessions.state(tester).draft;
+
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+
+        expect(repository.commands, hasLength(1));
+        expect(find.widgetWithText(FilledButton, 'Saving…'), findsOneWidget);
+        expect(
+          tester.widget<FilledButton>(find.byKey(_submit)).onPressed,
+          isNull,
+        );
+        expect(tester.widget<TextField>(find.byKey(_title)).readOnly, isTrue);
+        expect(
+          tester.widget<TextField>(find.byKey(_description)).readOnly,
+          isTrue,
+        );
+        for (final option in [_favorite, _readiness]) {
+          expect(
+            tester.widget<IconButton>(find.byKey(option)).onPressed,
+            isNull,
+          );
+          expect(
+            tester.getSemantics(find.byKey(option)),
+            isSemantics(
+              hasToggledState: true,
+              isToggled: true,
+              hasEnabledState: true,
+              isEnabled: false,
+            ),
+          );
+        }
+
+        // Повторные нажатия отметок и сохранения ничего не меняют и не
+        // отправляют вторую команду.
+        await tester.tap(find.byKey(_favorite), warnIfMissed: false);
+        await tester.tap(find.byKey(_readiness), warnIfMissed: false);
+        await tester.tap(find.byKey(_submit), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(find.byKey(_readinessConfirmation), findsNothing);
+        expect(sessions.state(tester).draft, same(draft));
+        expect(repository.commands, hasLength(1));
+
+        // Закрытие по правилам сессии остаётся доступным.
+        expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
+        await _tapClose(tester);
+        await tester.pumpAndSettle();
+        expect(find.text('Close the form?'), findsOneWidget);
+        await tester.tap(find.byKey(_closeContinue));
+        await tester.pumpAndSettle();
+        expect(router.current.name, IntentionEditorRoute.name);
+
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+
+        // Отказ возвращает доступ к отметкам с прежними состояниями.
+        expect(_iconOf(tester, _favorite), Icons.star);
+        expect(_iconOf(tester, _readiness), Icons.check_circle);
+        expect(
+          tester.widget<IconButton>(find.byKey(_favorite)).onPressed,
+          isNotNull,
+        );
+        expect(
+          tester.widget<IconButton>(find.byKey(_readiness)).onPressed,
+          isNotNull,
+        );
+        await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
+        await tester.pump();
+
+        expect(repository.commands, hasLength(2));
+        expect(
+          repository.commands.last,
+          isA<CreateIntention>()
+              .having(
+                (command) => command.favoriteMark,
+                'избранное',
+                FavoriteMark.favorite,
+              )
+              .having(
+                (command) => command.readiness,
+                'готовность',
+                IntentionReadiness.ready,
+              ),
+        );
+        repository.completeCommand(
+          1,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await tester.pumpAndSettle();
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'запоздалое подтверждение готовности не меняет черновик уже принятой отправки',
+      (tester) async {
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository, observers: [sessions]);
+        await tester.enterText(find.byKey(_title), 'Намерение');
+        await tester.tap(find.byKey(_readiness));
+        await tester.pumpAndSettle();
+        expect(find.byKey(_readinessConfirmation), findsOneWidget);
+
+        // Человек уже нажимает подтверждение, когда срабатывает отправка,
+        // поставленная в очередь интерфейсом до открытия объяснения.
+        final confirmGesture = await tester.startGesture(
+          tester.getCenter(find.byKey(_readinessConfirm)),
+        );
+        sessions.notifier(tester).submit();
+        await tester.pump();
+        expect(repository.commands, hasLength(1));
+        expect(
+          tester.widget<FilledButton>(find.byKey(_readinessConfirm)).onPressed,
+          isNull,
+        );
+        await confirmGesture.up();
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_readinessConfirmation), findsNothing);
+        expect(
+          sessions.state(tester).draft.readiness,
+          IntentionReadiness.notReady,
+        );
+        expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+        expect(
+          tester.widget<IconButton>(find.byKey(_readiness)).onPressed,
+          isNull,
+        );
+        expect(
+          repository.commands.single,
+          isA<CreateIntention>().having(
+            (command) => command.readiness,
+            'готовность',
+            IntentionReadiness.notReady,
+          ),
+        );
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          sessions.state(tester).draft.readiness,
+          IntentionReadiness.notReady,
+        );
+      },
+    );
+
+    testWidgets(
+      'объяснение готовности закрывается без ответа при завершении сессии и не меняет новое открытие',
+      (tester) async {
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+        );
+        final firstSession = sessions.latest;
+        await tester.tap(find.byKey(_readiness));
+        await tester.pumpAndSettle();
+        final confirmGesture = await tester.startGesture(
+          tester.getCenter(find.byKey(_readinessConfirm)),
+        );
+
+        // Запрос закрытия неизменённого черновика, поставленный в очередь
+        // интерфейсом, завершает сессию под открытым объяснением.
+        expect(
+          sessions.notifier(tester).requestClose(),
+          isA<IntentionCreationClosedImmediately>(),
+        );
+        await tester.pump();
+        await confirmGesture.up();
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_readinessConfirmation), findsNothing);
+        expect(
+          sessions.state(tester).draft.readiness,
+          IntentionReadiness.notReady,
+        );
+        expect(
+          sessions.state(tester).draftAvailability,
+          IntentionDraftAvailability.closed,
+        );
+
+        await _tapClose(tester);
+        await tester.pumpAndSettle();
+        expectIntentionGraphRootPage(router);
+        await tester.tap(
+          find.byKey(const ValueKey('catalog-create-intention')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(sessions.latest, isNot(firstSession));
+        expect(find.byKey(_readinessConfirmation), findsNothing);
+        expect(
+          sessions.state(tester).draft.readiness,
+          IntentionReadiness.notReady,
+        );
+        expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+        expect(repository.commands, isEmpty);
+      },
+    );
+  });
 }
 
 const _sheet = ValueKey('intention-creation-sheet');
@@ -1425,6 +1966,30 @@ const _closeButton = ValueKey('intention-editor-close');
 const _title = ValueKey('intention-editor-title');
 const _description = ValueKey('intention-editor-description');
 const _submit = ValueKey('intention-editor-submit');
+const _resize = ValueKey('intention-creation-sheet-resize');
+const _favorite = ValueKey('intention-editor-favorite');
+const _readiness = ValueKey('intention-editor-readiness');
+const _readinessConfirmation = ValueKey(
+  'intention-editor-readiness-confirmation',
+);
+const _readinessConfirm = ValueKey('intention-editor-readiness-confirm');
+const _readinessCancel = ValueKey('intention-editor-readiness-cancel');
+
+/// Значок быстрой отметки: форма значка отличает включённое состояние.
+IconData? _iconOf(WidgetTester tester, Key option) => tester
+    .widget<Icon>(
+      find.descendant(of: find.byKey(option), matching: find.byType(Icon)),
+    )
+    .icon;
+
+/// Видимая подсказка быстрой отметки.
+String? _tooltipOf(WidgetTester tester, Key option) => tester
+    .widget<Tooltip>(
+      find
+          .ancestor(of: find.byKey(option), matching: find.byType(Tooltip))
+          .first,
+    )
+    .message;
 
 final _catalogBar = find.descendant(
   of: find.byType(IntentionCatalogPage),
@@ -1485,9 +2050,9 @@ const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
 const _closeDiscard = ValueKey('intention-editor-close-discard');
 
-/// Последняя построенная сессия формы создания. Набор тегов и отметки ещё
-/// не имеют элементов формы, поэтому проверки закрытия меняют их через
-/// сессию; новое открытие формы получает новую сессию.
+/// Последняя построенная сессия формы создания. Набор тегов ещё не имеет
+/// элементов формы, поэтому проверки закрытия меняют его через сессию; новое
+/// открытие формы получает новую сессию.
 final class _EditorSessions extends ProviderObserver {
   IntentionEditorViewModelProvider? _latest;
 

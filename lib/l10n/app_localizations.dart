@@ -1412,11 +1412,17 @@ abstract class AppLocalizations {
   /// **'Create intention'**
   String get editorCreateAction;
 
-  /// Состояние выполняющегося создания намерения
+  /// Основное действие панели создания: сохраняет весь черновик нового намерения одной операцией
   ///
   /// In en, this message translates to:
-  /// **'Creating…'**
-  String get editorCreating;
+  /// **'Save'**
+  String get editorSaveAction;
+
+  /// Индикатор выполняющегося сохранения черновика нового намерения на основном действии панели
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get editorSaving;
 
   /// Подпись поля названия намерения
   ///
@@ -1561,6 +1567,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Collapse the form'**
   String get editorCollapseFormAction;
+
+  /// Доступное название быстрой отметки избранного в черновике нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create as favorite'**
+  String get editorFavoriteOption;
+
+  /// Подсказка включённой быстрой отметки избранного: новое намерение будет создано избранным, отметка ещё не сохранена
+  ///
+  /// In en, this message translates to:
+  /// **'Create as favorite: on'**
+  String get editorFavoriteOptionOn;
+
+  /// Подсказка выключенной быстрой отметки избранного в черновике нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create as favorite: off'**
+  String get editorFavoriteOptionOff;
+
+  /// Доступное название быстрой отметки начальной готовности к действию в черновике нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create as ready for action'**
+  String get editorReadinessOption;
+
+  /// Подсказка включённой быстрой отметки готовности: новое намерение будет создано готовым к действию, готовность ещё не сохранена
+  ///
+  /// In en, this message translates to:
+  /// **'Create as ready for action: on'**
+  String get editorReadinessOptionOn;
+
+  /// Подсказка выключенной быстрой отметки готовности к действию в черновике нового намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Create as ready for action: off'**
+  String get editorReadinessOptionOff;
+
+  /// Заголовок объяснения критериев действия перед включением начальной готовности в черновике
+  ///
+  /// In en, this message translates to:
+  /// **'Create as ready for action?'**
+  String get editorReadinessConfirmationTitle;
+
+  /// Критерий действия в объяснении начальной готовности: полная выполнимость в рамках одного дня
+  ///
+  /// In en, this message translates to:
+  /// **'It can be completed fully within one day.'**
+  String get editorReadinessOneDayCriterion;
+
+  /// Критерий действия в объяснении начальной готовности: операционная понятность человеку
+  ///
+  /// In en, this message translates to:
+  /// **'It is clear enough for a person to carry out.'**
+  String get editorReadinessClarityCriterion;
+
+  /// Отказ от включения начальной готовности; черновик остаётся неготовым
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get editorReadinessCancelAction;
+
+  /// Явное подтверждение обоих критериев действия, включающее начальную готовность только в черновике
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as ready'**
+  String get editorReadinessConfirmAction;
 
   /// Вид операции создания намерения в сообщении оболочки
   ///

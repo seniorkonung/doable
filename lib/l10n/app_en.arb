@@ -859,9 +859,13 @@
   "@editorCreateAction": {
     "description": "Действие создания намерения"
   },
-  "editorCreating": "Creating…",
-  "@editorCreating": {
-    "description": "Состояние выполняющегося создания намерения"
+  "editorSaveAction": "Save",
+  "@editorSaveAction": {
+    "description": "Основное действие панели создания: сохраняет весь черновик нового намерения одной операцией"
+  },
+  "editorSaving": "Saving…",
+  "@editorSaving": {
+    "description": "Индикатор выполняющегося сохранения черновика нового намерения на основном действии панели"
   },
   "editorTitleLabel": "Title",
   "@editorTitleLabel": {
@@ -958,6 +962,50 @@
   "editorCollapseFormAction": "Collapse the form",
   "@editorCollapseFormAction": {
     "description": "Подсказка и доступное название кнопки, возвращающей развёрнутую панель создания намерения к компактному виду"
+  },
+  "editorFavoriteOption": "Create as favorite",
+  "@editorFavoriteOption": {
+    "description": "Доступное название быстрой отметки избранного в черновике нового намерения"
+  },
+  "editorFavoriteOptionOn": "Create as favorite: on",
+  "@editorFavoriteOptionOn": {
+    "description": "Подсказка включённой быстрой отметки избранного: новое намерение будет создано избранным, отметка ещё не сохранена"
+  },
+  "editorFavoriteOptionOff": "Create as favorite: off",
+  "@editorFavoriteOptionOff": {
+    "description": "Подсказка выключенной быстрой отметки избранного в черновике нового намерения"
+  },
+  "editorReadinessOption": "Create as ready for action",
+  "@editorReadinessOption": {
+    "description": "Доступное название быстрой отметки начальной готовности к действию в черновике нового намерения"
+  },
+  "editorReadinessOptionOn": "Create as ready for action: on",
+  "@editorReadinessOptionOn": {
+    "description": "Подсказка включённой быстрой отметки готовности: новое намерение будет создано готовым к действию, готовность ещё не сохранена"
+  },
+  "editorReadinessOptionOff": "Create as ready for action: off",
+  "@editorReadinessOptionOff": {
+    "description": "Подсказка выключенной быстрой отметки готовности к действию в черновике нового намерения"
+  },
+  "editorReadinessConfirmationTitle": "Create as ready for action?",
+  "@editorReadinessConfirmationTitle": {
+    "description": "Заголовок объяснения критериев действия перед включением начальной готовности в черновике"
+  },
+  "editorReadinessOneDayCriterion": "It can be completed fully within one day.",
+  "@editorReadinessOneDayCriterion": {
+    "description": "Критерий действия в объяснении начальной готовности: полная выполнимость в рамках одного дня"
+  },
+  "editorReadinessClarityCriterion": "It is clear enough for a person to carry out.",
+  "@editorReadinessClarityCriterion": {
+    "description": "Критерий действия в объяснении начальной готовности: операционная понятность человеку"
+  },
+  "editorReadinessCancelAction": "Cancel",
+  "@editorReadinessCancelAction": {
+    "description": "Отказ от включения начальной готовности; черновик остаётся неготовым"
+  },
+  "editorReadinessConfirmAction": "Mark as ready",
+  "@editorReadinessConfirmAction": {
+    "description": "Явное подтверждение обоих критериев действия, включающее начальную готовность только в черновике"
   },
   "graphOperationCreate": "Create",
   "@graphOperationCreate": {

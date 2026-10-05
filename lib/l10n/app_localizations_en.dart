@@ -798,7 +798,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCreateAction => 'Create intention';
 
   @override
-  String get editorCreating => 'Creating…';
+  String get editorSaveAction => 'Save';
+
+  @override
+  String get editorSaving => 'Saving…';
 
   @override
   String get editorTitleLabel => 'Title';
@@ -879,6 +882,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editorCollapseFormAction => 'Collapse the form';
+
+  @override
+  String get editorFavoriteOption => 'Create as favorite';
+
+  @override
+  String get editorFavoriteOptionOn => 'Create as favorite: on';
+
+  @override
+  String get editorFavoriteOptionOff => 'Create as favorite: off';
+
+  @override
+  String get editorReadinessOption => 'Create as ready for action';
+
+  @override
+  String get editorReadinessOptionOn => 'Create as ready for action: on';
+
+  @override
+  String get editorReadinessOptionOff => 'Create as ready for action: off';
+
+  @override
+  String get editorReadinessConfirmationTitle => 'Create as ready for action?';
+
+  @override
+  String get editorReadinessOneDayCriterion =>
+      'It can be completed fully within one day.';
+
+  @override
+  String get editorReadinessClarityCriterion =>
+      'It is clear enough for a person to carry out.';
+
+  @override
+  String get editorReadinessCancelAction => 'Cancel';
+
+  @override
+  String get editorReadinessConfirmAction => 'Mark as ready';
 
   @override
   String get graphOperationCreate => 'Create';

@@ -800,7 +800,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorCreateAction => 'Создать намерение';
 
   @override
-  String get editorCreating => 'Создаём…';
+  String get editorSaveAction => 'Сохранить';
+
+  @override
+  String get editorSaving => 'Сохраняем…';
 
   @override
   String get editorTitleLabel => 'Название';
@@ -881,6 +884,42 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get editorCollapseFormAction => 'Свернуть форму';
+
+  @override
+  String get editorFavoriteOption => 'Создать избранным';
+
+  @override
+  String get editorFavoriteOptionOn => 'Создать избранным: включено';
+
+  @override
+  String get editorFavoriteOptionOff => 'Создать избранным: выключено';
+
+  @override
+  String get editorReadinessOption => 'Создать готовым к действию';
+
+  @override
+  String get editorReadinessOptionOn => 'Создать готовым к действию: включено';
+
+  @override
+  String get editorReadinessOptionOff =>
+      'Создать готовым к действию: выключено';
+
+  @override
+  String get editorReadinessConfirmationTitle => 'Создать готовым к действию?';
+
+  @override
+  String get editorReadinessOneDayCriterion =>
+      'Его можно полностью выполнить в течение одного дня.';
+
+  @override
+  String get editorReadinessClarityCriterion =>
+      'Человеку достаточно понятно, что именно нужно сделать.';
+
+  @override
+  String get editorReadinessCancelAction => 'Отмена';
+
+  @override
+  String get editorReadinessConfirmAction => 'Отметить готовым';
 
   @override
   String get graphOperationCreate => 'Создание';
