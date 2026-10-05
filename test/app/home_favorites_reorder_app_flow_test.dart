@@ -10,6 +10,7 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 import 'package:doable/src/daily_choice/application/choice_path_suggestions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
@@ -55,6 +56,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/daily_choice_local_date.dart';
 import '../support/favorite_storage_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -100,6 +102,10 @@ const _openChoice = 201;
 
 /// Тег «Здоровье».
 const _healthTag = 301;
+
+/// День дневных выборов фикстур — локальное сегодня приложения: каталог
+/// дневных выборов открывается на нём.
+final _choiceDay = CalendarDate.fromParts(2026, 9, 25);
 
 /// Намерение так, как его показывает строка Главной.
 typedef _Intention = ({String title, bool isReady, int relations});
@@ -581,6 +587,8 @@ final class _App {
         faults,
       ),
       diagnosticsSink: diagnostics,
+      dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_choiceDay)
+          .read,
       repositoryFactory: (database) => repository = _HeldMoves(
         DriftPersonalGraphRepository(
           database,
@@ -612,7 +620,7 @@ final class _App {
 }
 
 /// Длинный список избранных намерений без связей, два неизбранных намерения
-/// со связью и их дневные выборы: невыполненный и выполненный.
+/// со связью и их дневные выборы одного дня: невыполненный и выполненный.
 void _seedLongList(sqlite.Database database) {
   for (var number = 1; number <= _longFavoriteCount; number++) {
     database.execute(
@@ -642,17 +650,14 @@ void _seedLongList(sqlite.Database database) {
       0,
     ],
   );
-  for (final (number, date, completed) in [
-    (_openChoice, '2026-09-25', 0),
-    (_openChoice + 1, '2026-09-24', 1),
-  ]) {
+  for (final (number, completed) in [(_openChoice, 0), (_openChoice + 1, 1)]) {
     database.execute(
       'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
       [
         tagFixtureId(number),
         tagFixtureId(_longRun),
         tagFixtureId(_longSleep),
-        date,
+        _choiceDay.toCanonicalString(),
         completed,
       ],
     );
@@ -708,7 +713,7 @@ void _seedGraph(sqlite.Database database, {required List<int> favorites}) {
       tagFixtureId(_openChoice),
       tagFixtureId(_run),
       tagFixtureId(_sleep),
-      '2026-09-25',
+      _choiceDay.toCanonicalString(),
       0,
     ],
   );

@@ -10,8 +10,12 @@ import '../../../intention/domain/intention_id.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 import '../path/choice_path_page.dart';
+import 'daily_choice_calendar.dart';
+import 'daily_choice_calendar_viewport.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
+import 'daily_choice_local_date_provider.dart';
+import 'daily_choice_local_day_observer.dart';
 
 /// Высота кнопки создания дневного выбора вместе с отступами над нижним краем.
 const _createActionExtent = 56 + 2 * kFloatingActionButtonMargin;
@@ -27,12 +31,38 @@ final class DailyChoiceCatalogPage extends ConsumerStatefulWidget {
 
 final class _DailyChoiceCatalogPageState
     extends ConsumerState<DailyChoiceCatalogPage> {
-  final _dateController = TextEditingController();
-  String? _dateError;
+  /// Просматриваемый период календаря.
+  ///
+  /// Выбранной датой владеет модель, а просмотром — страница: он один раз
+  /// начинается с недели выбранной даты. Выбор дня переносит в этот день дату
+  /// просмотра, сохраняя представление; ответы хранилища и ошибки просмотр не
+  /// меняют.
+  late DailyChoiceCalendarViewport _viewport;
+
+  /// Текущий местный день, отмеченный в календаре.
+  ///
+  /// Страница перечитывает его при создании, возвращении приложения в
+  /// активное состояние и наступлении следующей местной даты. Новый день
+  /// только перестраивает календарь: выбранная дата, просмотр, фильтры и
+  /// выдача остаются прежними.
+  late final DailyChoiceLocalDayObserver _localDay;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewport = DailyChoiceCalendarViewport(
+      focusedDate: ref.read(dailyChoiceCatalogViewModelProvider).selection.date,
+      mode: DailyChoiceCalendarMode.week,
+    );
+    _localDay = DailyChoiceLocalDayObserver(
+      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+      onTodayChanged: () => setState(() {}),
+    );
+  }
 
   @override
   void dispose() {
-    _dateController.dispose();
+    _localDay.dispose();
     super.dispose();
   }
 
@@ -49,12 +79,32 @@ final class _DailyChoiceCatalogPageState
         icon: const Icon(Icons.add),
         label: Text(l10n.dailyChoiceCreateFromAction),
       ),
-      // Фильтры, количество, полосы обновления и выдача прокручиваются
-      // вместе: прокрученная до конца выдача получает всю высоту тела
-      // страницы, а место под кнопкой создания остаётся последним элементом.
+      // Календарь, фильтры, количество, полосы обновления и выдача
+      // прокручиваются вместе: прокрученная до конца выдача получает всю
+      // высоту тела страницы, а место под кнопкой создания остаётся последним
+      // элементом. Календарь стоит вне ветвления по состоянию выдачи и
+      // доступен при загрузке, пустоте и любом отказе.
       body: SafeArea(
         child: CustomScrollView(
+          // Как прокрутки других корневых страниц, общая прокрутка хранит
+          // смещение в хранилище страниц маршрута под постоянным ключом.
+          // Страницы календаря хранятся в его собственном хранилище и эту
+          // запись не заменяют.
+          key: const PageStorageKey<String>('daily-choice-catalog'),
           slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: DailyChoiceCalendar(
+                  selectedDate: state.selection.date,
+                  viewport: _viewport,
+                  today: _localDay.today,
+                  onDateSelected: (date) => _selectDate(model, date),
+                  onViewportChanged: (viewport) =>
+                      setState(() => _viewport = viewport),
+                ),
+              ),
+            ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -63,35 +113,15 @@ final class _DailyChoiceCatalogPageState
                   runSpacing: 12,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    SizedBox(
-                      width: 190,
-                      child: TextField(
-                        key: const ValueKey('daily-choice-date-filter'),
-                        controller: _dateController,
-                        keyboardType: TextInputType.datetime,
-                        decoration: InputDecoration(
-                          labelText: l10n.dailyChoiceCatalogDateFilter,
-                          hintText: l10n.dailyChoiceCreationDateHint,
-                          errorText: _dateError,
-                        ),
-                        onSubmitted: (_) => _applyDate(model, l10n),
-                      ),
-                    ),
-                    OutlinedButton(
-                      key: const ValueKey('daily-choice-apply-date'),
-                      onPressed: () => _applyDate(model, l10n),
-                      child: Text(l10n.dailyChoiceCatalogApplyDate),
-                    ),
-                    SizedBox(
-                      key: const ValueKey('daily-choice-completion-filter'),
-                      width: 240,
-                      child: DropdownButtonFormField<bool?>(
+                    _CompletionFilter(
+                      label: l10n.dailyChoiceCatalogCompletionFilter,
+                      field: DropdownButtonFormField<bool?>(
                         key: ValueKey(state.selection.isCompleted),
                         initialValue: state.selection.isCompleted,
                         isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: l10n.dailyChoiceCatalogCompletionFilter,
-                        ),
+                        // Выбранное состояние переносится и растягивает поле
+                        // по высоте вместо обрезки по одной строке.
+                        isDense: false,
                         items: [
                           DropdownMenuItem<bool?>(
                             value: null,
@@ -111,11 +141,7 @@ final class _DailyChoiceCatalogPageState
                     ),
                     TextButton(
                       key: const ValueKey('daily-choice-clear-filters'),
-                      onPressed: () {
-                        _dateController.clear();
-                        setState(() => _dateError = null);
-                        model.clearFilters();
-                      },
+                      onPressed: model.clearFilters,
                       child: Text(l10n.dailyChoiceCatalogClearFilters),
                     ),
                   ],
@@ -141,20 +167,12 @@ final class _DailyChoiceCatalogPageState
     );
   }
 
-  void _applyDate(DailyChoiceCatalogViewModel model, AppLocalizations l10n) {
-    final input = _dateController.text.trim();
-    if (input.isEmpty) {
-      setState(() => _dateError = null);
-      model.selectDate(null);
-      return;
-    }
-    try {
-      final date = CalendarDate.parseCanonical(input);
-      setState(() => _dateError = null);
-      model.selectDate(date);
-    } on CalendarDateValidationException {
-      setState(() => _dateError = l10n.dailyChoiceCatalogDateInvalid);
-    }
+  /// Нажатый день становится и датой просмотра в прежнем представлении, и
+  /// выбранной датой модели — синхронно, до следующего кадра. Повторный выбор
+  /// того же дня только возвращает к нему просмотр.
+  void _selectDate(DailyChoiceCatalogViewModel model, CalendarDate date) {
+    setState(() => _viewport = _viewport.withFocusedDate(date));
+    model.selectDate(date);
   }
 
   /// Слайверы выдачи под фильтрами.
@@ -301,6 +319,47 @@ final class _DailyChoiceCatalogPageState
     DailyChoiceCatalogValidationFailure() => l10n.dailyChoiceCatalogInvalid,
     DailyChoiceCatalogUnexpectedFailure() => l10n.dailyChoiceCatalogUnexpected,
   };
+}
+
+/// Фильтр выполнения: название фильтра над полем выбора состояния.
+///
+/// Плавающая подпись поля ввода рассчитана на одну строку и при крупном
+/// тексте обрезается, поэтому название стоит отдельной переносимой строкой.
+/// Для вспомогательных технологий название и выбранное состояние — одна
+/// кнопка выбора. Ширина при обычном тексте вмещает самое длинное состояние
+/// в одну строку и растёт вместе с системным размером текста до ширины
+/// страницы; дальше название и состояние переносятся.
+final class _CompletionFilter extends StatelessWidget {
+  const _CompletionFilter({required this.label, required this.field});
+
+  final String label;
+  final Widget field;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MergeSemantics(
+      child: SizedBox(
+        // Ширина больше доступной ограничивается шириной ряда фильтров.
+        width: MediaQuery.textScalerOf(context).scale(280),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            KeyedSubtree(
+              key: const ValueKey('daily-choice-completion-filter'),
+              child: field,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Состояние без строк выдачи занимает остаток высоты под фильтрами и стоит

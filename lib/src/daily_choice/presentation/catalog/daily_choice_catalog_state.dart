@@ -2,13 +2,19 @@ import '../../../graph/application/graph_revision.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 
+/// Условия пользовательского каталога: ровно один день и охват выполнения.
+///
+/// Каталог без выбранного дня непредставим: просмотр всех дат пользователю
+/// недоступен.
 final class DailyChoiceCatalogSelection {
-  const DailyChoiceCatalogSelection({this.date, this.isCompleted});
+  const DailyChoiceCatalogSelection({required this.date, this.isCompleted});
 
-  final CalendarDate? date;
+  final CalendarDate date;
+
+  /// `null` охватывает все состояния выполнения.
   final bool? isCompleted;
 
-  DailyChoiceCatalogSelection withDate(CalendarDate? value) =>
+  DailyChoiceCatalogSelection withDate(CalendarDate value) =>
       DailyChoiceCatalogSelection(date: value, isCompleted: isCompleted);
 
   DailyChoiceCatalogSelection withCompletion(bool? value) =>

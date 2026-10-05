@@ -77,6 +77,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
+        packageConsumersLocalDate(),
       ],
       retry: (retryCount, error) => null,
     );
@@ -114,13 +115,13 @@ void main() {
       () => probes.allLoaded,
       diagnostics: probes.describe,
     );
-    // Незавершённая форма и выбор фильтра не должны пострадать от пакета.
+    // Незавершённая форма и выбор фильтров не должны пострадать от пакета.
     container.read(intentionDetailsViewModelProvider(observed).notifier)
       ..beginEditing()
       ..changeTitle('Черновик названия');
-    container
-        .read(dailyChoiceCatalogViewModelProvider.notifier)
-        .selectCompletion(true);
+    container.read(dailyChoiceCatalogViewModelProvider.notifier)
+      ..selectDate(durabilityChoiceDate)
+      ..selectCompletion(true);
     await settlePackageConsumersUntil(
       () => probes.allLoaded && probes.dailyCatalogSelected,
       diagnostics: probes.describe,

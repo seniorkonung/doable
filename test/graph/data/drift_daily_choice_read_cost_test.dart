@@ -222,12 +222,13 @@ final class _Fixture {
     int selected,
     List<int> path, {
     required int stepBase,
+    String date = '2026-09-24',
   }) {
     raw.execute(
       '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
-          description, is_completed) VALUES (?, ?, ?, '2026-09-24', NULL, 0)''',
-      [_uuid(id), _uuid(source), _uuid(selected)],
+          description, is_completed) VALUES (?, ?, ?, ?, NULL, 0)''',
+      [_uuid(id), _uuid(source), _uuid(selected), date],
     );
     for (var index = 0; index < path.length; index++) {
       raw.execute(
@@ -319,6 +320,16 @@ _MeasuredSelect _boundedPage(
     isEmpty,
   );
   return rows.single;
+}
+
+/// Каждое чтение строк и количества дневных выборов ограничено днём [day].
+void _expectDayBound(List<_MeasuredSelect> selects, String day) {
+  final reads = _matching(selects, 'FROM daily_choices');
+  expect(reads, isNotEmpty);
+  for (final read in reads) {
+    expect(read.sql, contains('choice_date = ?'));
+    expect(read.arguments.first, day);
+  }
 }
 
 _MeasuredSelect _boundedSuggestions(
@@ -943,6 +954,195 @@ void main() {
       'план каталога=$catalogPlan; план счётчика=$countPlan; '
       'план группы=$groupPlan; план выбранной роли=$selectedPlan; '
       'план сводки=$aggregatePlan',
+    );
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test('каталог одного дня читает по индексу даты только этот день и порции по 50', () async {
+    // Сотни записей соседних дней созданы после записей выбранного дня.
+    fixture.raw.execute('BEGIN');
+    for (var number = 40000; number < 40300; number++) {
+      fixture._addChoice(
+        number,
+        1,
+        2,
+        [900],
+        stepBase: number + 10000,
+        date: '2026-09-23',
+      );
+      fixture._addChoice(
+        number + 1000,
+        1,
+        2,
+        [900],
+        stepBase: number + 11000,
+        date: '2026-09-25',
+      );
+    }
+    fixture.raw.execute('COMMIT');
+    final day = CalendarDate.fromParts(2026, 9, 24);
+    const dayChoices = _catalogChoices + _otherGroupChoices;
+    const pageSize = DailyChoiceCatalogQuery.defaultPageSize;
+
+    fixture.trace.clear();
+    final firstWatch = Stopwatch()..start();
+    final first =
+        (await fixture.repository.getDailyChoiceCatalogPage(
+              DailyChoiceCatalogQuery(date: day),
+            ) as DailyChoiceCatalogPageSuccess).value
+            as DailyChoiceCatalogFirstPage;
+    firstWatch.stop();
+    expect(first.totalCount, dayChoices);
+    expect(first.items, hasLength(pageSize));
+    expect(first.items.first.id, durabilityChoice(10400));
+    final firstSql = _boundedPage(
+      fixture.trace.selects,
+      expectedSteps: _pathLength + pageSize - 1,
+      expectedCountReads: 1,
+      group: false,
+      pageSize: pageSize,
+    );
+    _expectDayBound(fixture.trace.selects, '2026-09-24');
+    final dayPlan = fixture.plan(firstSql).join(' | ');
+    expect(
+      dayPlan,
+      contains(
+        'SEARCH daily_choices USING INDEX daily_choices_date_creation_order '
+        '(choice_date=?)',
+      ),
+    );
+    final dayCountPlan = fixture
+        .plan(
+          _matching(fixture.trace.selects, 'COUNT(*) AS total_count').single,
+        )
+        .join(' | ');
+    expect(
+      dayCountPlan,
+      contains(
+        'SEARCH daily_choices USING COVERING INDEX '
+        'daily_choices_date_creation_order (choice_date=?)',
+      ),
+    );
+
+    // Продолжения проходят весь день без нового подсчёта и без строк
+    // соседних дней.
+    final ids = {for (final item in first.items) item.id};
+    var cursor = first.nextCursor;
+    var continuations = 0;
+    String? continuationPlan;
+    final continuationWatch = Stopwatch()..start();
+    while (cursor != null) {
+      fixture.trace.clear();
+      final next = (await fixture.repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(date: day, cursor: cursor),
+      ) as DailyChoiceCatalogPageSuccess).value;
+      expect(next, isA<DailyChoiceCatalogContinuationPage>());
+      expect(next.items.map((item) => item.date), everyElement(day));
+      final nextSql = _boundedPage(
+        fixture.trace.selects,
+        expectedSteps: next.items.length,
+        expectedCountReads: 0,
+        group: false,
+        pageSize: next.items.length,
+      );
+      _expectDayBound(fixture.trace.selects, '2026-09-24');
+      continuationPlan ??= fixture.plan(nextSql).join(' | ');
+      ids.addAll(next.items.map((item) => item.id));
+      cursor = next.nextCursor;
+      continuations++;
+    }
+    continuationWatch.stop();
+    expect(continuations, (dayChoices - 1) ~/ pageSize);
+    expect(ids, hasLength(dayChoices));
+    expect(
+      continuationPlan,
+      contains('daily_choices_date_creation_order (choice_date=?'),
+    );
+
+    // Охват выполнения остаётся внутри выбранного дня.
+    fixture.raw.execute(
+      'UPDATE daily_choices SET is_completed = 1 WHERE source_intention_id = ?',
+      [_uuid(200)],
+    );
+    fixture.trace.clear();
+    final completed =
+        (await fixture.repository.getDailyChoiceCatalogPage(
+              DailyChoiceCatalogQuery(date: day, isCompleted: true),
+            ) as DailyChoiceCatalogPageSuccess).value
+            as DailyChoiceCatalogFirstPage;
+    expect(completed.totalCount, _otherGroupChoices);
+    expect(completed.items.map((item) => item.isCompleted), everyElement(true));
+    final completedSql = _boundedPage(
+      fixture.trace.selects,
+      expectedSteps: pageSize,
+      expectedCountReads: 1,
+      group: false,
+      pageSize: pageSize,
+    );
+    _expectDayBound(fixture.trace.selects, '2026-09-24');
+    expect(
+      fixture.plan(completedSql).join(' | '),
+      contains('daily_choices_date_creation_order (choice_date=?)'),
+    );
+
+    // Перенос записи меняет количество обоих дней, а пересборка снова
+    // читает только первую порцию выбранного дня.
+    expect(
+      await fixture.repository.execute(
+        UpdateDailyChoiceFields(
+          choiceId: durabilityChoice(10399),
+          patch: DailyChoiceFieldsPatch(
+            date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 9, 25)),
+          ),
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    fixture.trace.clear();
+    final rebuildWatch = Stopwatch()..start();
+    final rebuilt =
+        (await fixture.repository.getDailyChoiceCatalogPage(
+              DailyChoiceCatalogQuery(date: day),
+            ) as DailyChoiceCatalogPageSuccess).value
+            as DailyChoiceCatalogFirstPage;
+    rebuildWatch.stop();
+    expect(rebuilt.totalCount, dayChoices - 1);
+    expect(rebuilt.items.first.id, durabilityChoice(10400));
+    expect(rebuilt.items[1].id, durabilityChoice(10398));
+    _boundedPage(
+      fixture.trace.selects,
+      expectedSteps: _pathLength + pageSize - 1,
+      expectedCountReads: 1,
+      group: false,
+      pageSize: pageSize,
+    );
+    _expectDayBound(fixture.trace.selects, '2026-09-24');
+    fixture.trace.clear();
+    final nextDay =
+        (await fixture.repository.getDailyChoiceCatalogPage(
+              DailyChoiceCatalogQuery(
+                date: CalendarDate.fromParts(2026, 9, 25),
+              ),
+            ) as DailyChoiceCatalogPageSuccess).value
+            as DailyChoiceCatalogFirstPage;
+    expect(nextDay.totalCount, 301);
+    _boundedPage(
+      fixture.trace.selects,
+      expectedSteps: pageSize,
+      expectedCountReads: 1,
+      group: false,
+      pageSize: pageSize,
+    );
+    _expectDayBound(fixture.trace.selects, '2026-09-25');
+
+    // ignore: avoid_print
+    print(
+      'Чтения одного дня 2.13: день=$dayChoices, соседние дни=600, '
+      'путь=$_pathLength, порция=$pageSize, продолжений=$continuations; '
+      'первая=${firstWatch.elapsedMicroseconds} мкс, '
+      'все продолжения=${continuationWatch.elapsedMicroseconds} мкс, '
+      'пересборка=${rebuildWatch.elapsedMicroseconds} мкс; '
+      'план дня=$dayPlan; план счётчика дня=$dayCountPlan; '
+      'план продолжения=$continuationPlan',
     );
   }, timeout: const Timeout(Duration(minutes: 3)));
 

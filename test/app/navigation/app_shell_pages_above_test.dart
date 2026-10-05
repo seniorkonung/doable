@@ -6,8 +6,11 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
@@ -37,6 +40,8 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/daily_choice_catalog_controls.dart';
+import '../../support/daily_choice_local_date.dart';
 import '../../support/favorite_storage_fixture.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -53,6 +58,10 @@ const _run = 2;
 const _relation = 101;
 const _choice = 201;
 const _tag = 301;
+
+/// День дневного выбора — локальное сегодня приложения: каталог дневных
+/// выборов открывается на дне с его строкой.
+final _choiceDate = CalendarDate.fromParts(2026, 9, 25);
 
 void main() {
   test('дочерние маршруты оболочки — только три корневые страницы без '
@@ -306,10 +315,29 @@ void main() {
   });
 
   testWidgets('страницы, открытые из каталога дневных выборов, занимают весь '
-      'экран без панели', (tester) async {
+      'экран без панели, а их закрытие сохраняет выбранный день и календарь '
+      'каталога', (tester) async {
     const daily = AppDestination.dailyChoices;
     final router = await _start(tester);
     await _select(tester, daily);
+    // Раскрытый календарь показывает следующий месяц.
+    await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
+    await showDailyChoiceCatalogPeriod(
+      tester,
+      CalendarDate.fromParts(2026, 10, 15),
+      tap: _tap,
+    );
+    final catalog = _dailyChoiceCatalog(tester);
+    expect(
+      catalog['просмотр календаря'],
+      isA<DailyChoiceCalendarViewport>()
+          .having(
+            (viewport) => viewport.mode,
+            'представление',
+            DailyChoiceCalendarMode.month,
+          )
+          .having((viewport) => viewport.focusedDate.month, 'месяц', 10),
+    );
 
     // Подробный просмотр дневного выбора и форма его изменения.
     await _open(
@@ -371,6 +399,7 @@ void main() {
 
     await _closeAll(tester);
     _expectRootPage(tester, router, daily);
+    expect(_dailyChoiceCatalog(tester), catalog);
 
     // Создание дневного выбора: выбор пути и форма создания открываются
     // прямо из корневой страницы и тоже закрывают панель.
@@ -392,6 +421,7 @@ void main() {
 
     await _closeAll(tester);
     _expectRootPage(tester, router, daily);
+    expect(_dailyChoiceCatalog(tester), catalog);
     expect(tester.takeException(), isNull);
   });
 
@@ -518,6 +548,18 @@ Finder _summary(Type page, String title) => find.descendant(
   ),
 );
 
+/// Каталог дневных выборов, как он сохраняется под страницами поверх
+/// оболочки: его страница и календарь, выбранный день и просматриваемый
+/// период.
+Map<String, Object?> _dailyChoiceCatalog(WidgetTester tester) => {
+  'страница': tester.state(find.byType(DailyChoiceCatalogPage)),
+  'календарь': tester.state(
+    find.byType(DailyChoiceCalendar, skipOffstage: false),
+  ),
+  'выбранный день': shownDailyChoiceCatalogDate(tester),
+  'просмотр календаря': shownDailyChoiceCatalogViewport(tester),
+};
+
 /// Размер экрана в логических пикселях.
 Size _screen(WidgetTester tester) =>
     tester.view.physicalSize / tester.view.devicePixelRatio;
@@ -618,6 +660,8 @@ Future<AppRouter> _start(WidgetTester tester) async {
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
+    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_choiceDate)
+        .read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -661,7 +705,7 @@ void _seed(sqlite.Database database) {
       tagFixtureId(_choice),
       tagFixtureId(_read),
       tagFixtureId(_run),
-      '2026-09-25',
+      _choiceDate.toCanonicalString(),
       0,
     ],
   );

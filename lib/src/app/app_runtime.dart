@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/local/app_database.dart';
 import '../data/local/bootstrap/local_data_bootstrap.dart';
 import '../data/local/bootstrap/local_data_bootstrap_result.dart';
+import '../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../graph/application/graph_command_coordinator.dart';
 import '../graph/application/personal_graph_repository.dart';
 import '../graph/application/personal_graph_repository_provider.dart';
@@ -50,10 +51,14 @@ final class AppRuntimeIncompatibleSchema extends AppRuntimeBootstrapResult {
 }
 
 final class AppRuntime {
+  /// [dailyChoiceLocalDateSource] заменяет часы устройства как источник
+  /// локального сегодня каталога дневных выборов во всём контейнере приложения;
+  /// без него используется [readDeviceLocalDay].
   factory AppRuntime({
     required LocalDataConnectionFactory connectionFactory,
     required DiagnosticsSink diagnosticsSink,
     AppPersonalGraphRepositoryFactory? repositoryFactory,
+    DailyChoiceLocalDateSource? dailyChoiceLocalDateSource,
   }) {
     final resolvedRepositoryFactory =
         repositoryFactory ??
@@ -70,6 +75,7 @@ final class AppRuntime {
         diagnosticsSink: diagnosticsSink,
       ),
       resolvedRepositoryFactory,
+      dailyChoiceLocalDateSource ?? readDeviceLocalDay,
     );
   }
 
@@ -81,10 +87,15 @@ final class AppRuntime {
     );
   }
 
-  AppRuntime._(this._localDataBootstrap, this._repositoryFactory);
+  AppRuntime._(
+    this._localDataBootstrap,
+    this._repositoryFactory,
+    this._dailyChoiceLocalDateSource,
+  );
 
   final LocalDataBootstrap _localDataBootstrap;
   final AppPersonalGraphRepositoryFactory _repositoryFactory;
+  final DailyChoiceLocalDateSource _dailyChoiceLocalDateSource;
   var _lifecycle = _AppRuntimeLifecycle.running;
   Future<AppRuntimeBootstrapResult>? _bootstrapping;
   AppRuntimeReady? _ready;
@@ -150,6 +161,9 @@ final class AppRuntime {
       container = ProviderContainer(
         overrides: [
           personalGraphRepositoryProvider.overrideWithValue(repository),
+          dailyChoiceLocalDateSourceProvider.overrideWithValue(
+            _dailyChoiceLocalDateSource,
+          ),
         ],
         retry: (retryCount, error) => null,
       );

@@ -17,6 +17,19 @@ void main() {
       expect(CalendarDate.parseCanonical('2000-02-29').day, 29);
     });
 
+    test('крайние даты совпадают с пределами проверки частей', () {
+      expect(CalendarDate.earliest, CalendarDate.fromParts(1, 1, 1));
+      expect(CalendarDate.latest, CalendarDate.fromParts(9999, 12, 31));
+      expect(
+        () => CalendarDate.fromParts(0, 12, 31),
+        _throwsDateFailure(CalendarDateValidationReason.invalidDate),
+      );
+      expect(
+        () => CalendarDate.fromParts(10000, 1, 1),
+        _throwsDateFailure(CalendarDateValidationReason.invalidDate),
+      );
+    });
+
     test('отклоняет годы вне диапазона и невозможные дни', () {
       for (final parts in [
         [0, 1, 1],

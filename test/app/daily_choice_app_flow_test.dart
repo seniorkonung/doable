@@ -23,8 +23,13 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
+import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+
+/// Дата дневных выборов, которые сценарии создают через форму. Она же —
+/// локальное сегодня каталога: каталог открывается на дне этих записей.
+final _formChoiceDate = CalendarDate.fromParts(2026, 9, 24);
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
   for (var attempt = 0; attempt < 500; attempt++) {
@@ -76,7 +81,7 @@ Future<void> _createFromPath(WidgetTester tester) async {
   );
   final date = find.byKey(const ValueKey('daily-choice-date'));
   await _until(tester, date);
-  await tester.enterText(date, '2026-09-24');
+  await tester.enterText(date, _formChoiceDate.toCanonicalString());
   await tester.enterText(
     find.byKey(const ValueKey('daily-choice-description')),
     'Выбранный путь',
@@ -141,10 +146,13 @@ void main() {
       [durabilityUuid(105), durabilityUuid(5), durabilityUuid(4)],
     );
     await harness.closePersistenceObjectGraph();
+    // Каталог открывается на дне дневного выбора фикстуры и его повтора.
+    final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
     final runtime = AppRuntime(
       connectionFactory: () =>
           openFileBackedLocalDatabase(harness.databaseFile),
       diagnosticsSink: InMemoryDiagnosticsSink(),
+      dailyChoiceLocalDateSource: localDate.read,
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -378,10 +386,13 @@ void main() {
       final seeded = await harness.openReadyDatabase();
       await seedDurabilityGraph(seeded);
       await harness.closePersistenceObjectGraph();
+      // Каждый запуск открывает каталог на дне создаваемых записей.
+      final localDate = ControlledDailyChoiceLocalDate(_formChoiceDate);
       AppRuntime start() => AppRuntime(
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: localDate.read,
       );
       var runtime = start();
       addTearDown(() async {
@@ -429,7 +440,7 @@ void main() {
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final repository = ready.container.read(personalGraphRepositoryProvider);
       final persisted = await _read(repository, editedId);
-      expect(persisted.choice.date, CalendarDate.fromParts(2026, 9, 24));
+      expect(persisted.choice.date, _formChoiceDate);
       expect(persisted.choice.description?.value, 'Выбранный путь');
       expect(persisted.choice.isCompleted, isTrue);
       expect(persisted.path.map((step) => step.relation.id), [
@@ -583,10 +594,13 @@ void main() {
       final seeded = await harness.openReadyDatabase();
       await seedDurabilityGraph(seeded);
       await harness.closePersistenceObjectGraph();
+      // Каждый запуск открывает каталог на дне создаваемых записей.
+      final localDate = ControlledDailyChoiceLocalDate(_formChoiceDate);
       AppRuntime start() => AppRuntime(
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: localDate.read,
       );
       var runtime = start();
       addTearDown(() async {
@@ -622,7 +636,7 @@ void main() {
         );
         final date = find.byKey(const ValueKey('daily-choice-date'));
         await _until(tester, date);
-        await tester.enterText(date, '2026-09-24');
+        await tester.enterText(date, _formChoiceDate.toCanonicalString());
         await tester.enterText(
           find.byKey(const ValueKey('daily-choice-description')),
           'Нижний выбор',
@@ -652,7 +666,7 @@ void main() {
       final persisted = await _read(repository, ids.last);
       expect(persisted.choice.sourceIntentionId, durabilityIntention(1));
       expect(persisted.choice.selectedIntentionId, durabilityIntention(3));
-      expect(persisted.choice.date, CalendarDate.fromParts(2026, 9, 24));
+      expect(persisted.choice.date, _formChoiceDate);
       expect(persisted.choice.description?.value, 'Нижний выбор');
       expect(persisted.choice.isCompleted, isTrue);
       expect(persisted.path.map((step) => step.relation.id), [
