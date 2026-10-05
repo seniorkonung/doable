@@ -380,6 +380,318 @@ void main() {
     ]);
     expect(tester.takeException(), isNull);
   });
+
+  for (final deletion in _SelectedTagDeletion.values) {
+    testWidgets(
+      '${deletion.description} отклоняет весь подготовленный набор, сохраняет '
+      'черновик и прежний граф без продвижения ревизии, а новая проверка '
+      'возможна только после явного снятия отсутствующего тега',
+      (tester) async {
+        final app = await _launch(tester);
+        final l10n = app.l10n;
+        final home = _tagId(_homeTag);
+        final garden = _tagId(_gardenTag);
+        final marks = storedFavoriteMarks(app.raw);
+
+        final session = app.openSession();
+        _prepareText(session);
+        await _openChooser(tester, app, session);
+        await _addToDraft(tester, home);
+        await _addToDraft(tester, garden);
+        await _closeChooser(tester);
+        await _waitFor(
+          tester,
+          () => _isProjected(session, {home: 'Дом', garden: 'Сад'}),
+          reason: () => '${session.state.selectedTags}',
+        );
+
+        // Выбранный тег удаляют самостоятельной командой; одноимённая замена
+        // получает новый идентификатор.
+        await _runTagCommand(
+          tester,
+          app,
+          app.coordinator.acceptTagDelete(DeleteTag(home)),
+          l10n.graphOperationMessage(
+            l10n.graphOperationDelete,
+            l10n.graphOperationTag,
+            l10n.tagDeleted,
+          ),
+        );
+        TagId? replacement;
+        if (deletion == _SelectedTagDeletion.withSameNameReplacement) {
+          final created = await _runTagCommand(
+            tester,
+            app,
+            app.coordinator.acceptTagCreation(
+              TagCreationFormKey(),
+              CreateTag(TagName.fromInput('Дом')),
+            ),
+            l10n.graphOperationMessage(
+              l10n.graphOperationCreate,
+              l10n.graphOperationTag,
+              l10n.tagCreated,
+            ),
+          );
+          replacement = switch (created.result) {
+            GraphResultSuccess(value: TagCreated(:final tag)) => tag.id,
+            final result => fail('Замена не создана: $result'),
+          };
+          expect(replacement, isNot(home));
+        }
+
+        // Проекция показывает удалённый тег недоступным с последним
+        // названием, но не снимает его из набора.
+        await _waitFor(
+          tester,
+          () =>
+              session.state.selectedTags[home]?.status
+                  is IntentionDraftTagMissing,
+          reason: () => '${session.state.selectedTags}',
+        );
+        expect(session.state.selectedTags[home]!.name.value, 'Дом');
+        _expectPreparedDraft(session.state.draft, tagIds: [home, garden]);
+        final graphBefore = _storedGraph(app.raw);
+        final revisionBefore = await _revision(tester, app);
+        final events = app.diagnostics.events.length;
+
+        // Отправка проверяет набор в транзакции и отклоняет его целиком.
+        session.editor.submit();
+        final rejected = await _creation(tester, app);
+        expect(
+          rejected.result,
+          isA<ResultFailure<IntentionCommandSuccess>>().having(
+            (result) => result.failure,
+            'отказ',
+            isA<IntentionCreationTagsMissingFailure>().having(
+              (failure) => failure.missingTagIds,
+              'отсутствующие теги',
+              {home},
+            ),
+          ),
+        );
+        expect(rejected.confirmedChange, isNull);
+        _expectDraftCommand(app.graph.commands.last, tagIds: {home, garden});
+        await _settle(tester);
+        expect(_storedGraph(app.raw), graphBefore);
+        expect(
+          (await _revision(tester, app)).compareTo(revisionBefore),
+          GraphRevisionOrder.same,
+        );
+        expect(_commandEvents(app, since: events), [
+          _createEvent(
+            IntentionCreationCommandDiagnosticsStage.validation,
+            _failedWith(DiagnosticsFailureCode.validation),
+          ),
+        ]);
+
+        // Сессия сохраняет весь черновик и право предъявить отказ, поэтому
+        // общая поверхность его не показывает.
+        final failed = session.state;
+        _expectPreparedDraft(failed.draft, tagIds: [home, garden]);
+        expect(failed.draftAvailability, IntentionDraftAvailability.editable);
+        expect(failed.missingTagIds, {home});
+        expect(failed.canSubmit, isFalse);
+        expect(failed.failurePresentation?.completion, same(rejected));
+        expect(find.byKey(_message), findsNothing);
+
+        if (replacement != null) {
+          // Одноимённая замена — другой тег: его явное добавление не снимает
+          // отказ и не подменяет отсутствующий выбор.
+          await _openChooser(tester, app, session);
+          expect(_row(home), findsNothing);
+          expect(
+            _rowStatus(replacement, l10n.tagCatalogAvailableForDraft),
+            findsOneWidget,
+          );
+          await _addToDraft(tester, replacement);
+          await _closeChooser(tester);
+          final replaced = session.state;
+          expect(replaced.draft.tagIds, [home, garden, replacement]);
+          expect(replaced.missingTagIds, {home});
+          expect(replaced.canSubmit, isFalse);
+          expect(replaced.failurePresentation?.completion, same(rejected));
+        }
+
+        // Явное снятие отсутствующего тега разрешает новую проверку, но сама
+        // сессия её не запускает.
+        final kept = [garden, ?replacement];
+        session.editor.removeTag(home);
+        final corrected = session.state;
+        expect(corrected.canSubmit, isTrue);
+        expect(corrected.missingTagIds, isEmpty);
+        _expectPreparedDraft(corrected.draft, tagIds: kept);
+        await _settle(tester);
+        expect(app.graph.observations(home), 0);
+        expect(_creations(app), [same(rejected)]);
+
+        session.editor.submit();
+        final accepted = await _creation(tester, app, count: 2);
+        final created = switch (accepted.result) {
+          ResultSuccess(value: IntentionSaved(:final intention)) =>
+            intention.id,
+          final result => fail('Создание не подтверждено: $result'),
+        };
+        _expectDraftCommand(app.graph.commands.last, tagIds: kept.toSet());
+        _expectCreatedIntention(app.raw, created, tagIds: kept);
+        expect(storedFavoriteMarks(app.raw), [
+          ...marks,
+          (created.toCanonicalString(), 2),
+        ]);
+        await _acceptMessage(
+          tester,
+          l10n.graphOperationMessage(
+            l10n.graphOperationCreate,
+            _title,
+            l10n.editorCreated,
+          ),
+        );
+        await _settle(tester);
+        expect(find.byKey(_message), findsNothing);
+        expect(_creations(app), hasLength(2));
+        _expectPrivateDataHidden(app, [
+          _title,
+          _description,
+          ..._tagNames.values,
+          home.toCanonicalString(),
+          garden.toCanonicalString(),
+          ?replacement?.toCanonicalString(),
+          created.toCanonicalString(),
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'отказ записи после всего начального состояния сохраняет черновик, '
+    'прежний граф и ревизию, а созданный редактором тег переживает отказ; '
+    'явный повтор с новым токеном даёт полный результат',
+    (tester) async {
+      final app = await _launch(tester);
+      final l10n = app.l10n;
+      final home = _tagId(_homeTag);
+      final marks = storedFavoriteMarks(app.raw);
+
+      final session = app.openSession();
+      _prepareText(session);
+      await _openChooser(tester, app, session);
+      await _addToDraft(tester, home);
+      final sport = await _createTagInEditor(tester, app, _sport);
+      await _addToDraft(tester, sport);
+      await _closeChooser(tester);
+      await _waitFor(
+        tester,
+        () => _isProjected(session, {home: 'Дом', sport: _sport}),
+        reason: () => '${session.state.selectedTags}',
+      );
+      final graphBefore = _storedGraph(app.raw);
+      final revisionBefore = await _revision(tester, app);
+      final events = app.diagnostics.events.length;
+
+      // Хранилище отказывает внутри транзакции, когда в ней уже записаны
+      // намерение, оба назначения и место избранного.
+      app.faults.failAfterFavoritePlaceInsert();
+      session.editor.submit();
+      final failed = await _creation(tester, app);
+      expect(
+        failed.result,
+        isA<ResultFailure<IntentionCommandSuccess>>().having(
+          (result) => result.failure,
+          'отказ',
+          isA<IntentionUnavailableFailure>(),
+        ),
+      );
+      expect(failed.confirmedChange, isNull);
+      final fault = app.faults.faultPoint;
+      expect(fault, isNotNull, reason: 'Отказ хранилища не сработал');
+      expect(fault!.inTransaction, isTrue);
+      expect(fault.inserts, [
+        'intentions',
+        'tag_assignments',
+        'tag_assignments',
+        'favorite_intentions',
+      ]);
+
+      // Ни части записи и ни новой ревизии; самостоятельный тег остаётся.
+      await _settle(tester);
+      expect(_storedGraph(app.raw), graphBefore);
+      expect(_storedTagNames(app.raw), ['Дом', 'Сад', 'Работа', _sport]);
+      expect(
+        (await _revision(tester, app)).compareTo(revisionBefore),
+        GraphRevisionOrder.same,
+      );
+      expect(_commandEvents(app, since: events), [
+        _createEvent(
+          IntentionCreationCommandDiagnosticsStage.write,
+          _failedWith(DiagnosticsFailureCode.unavailable),
+        ),
+      ]);
+
+      // Черновик сохранён целиком, отказ принадлежит сессии и предлагает
+      // только явный повтор.
+      final kept = session.state;
+      _expectPreparedDraft(kept.draft, tagIds: [home, sport]);
+      expect(kept.draftAvailability, IntentionDraftAvailability.editable);
+      expect(kept.canRetry, isTrue);
+      expect(kept.canSubmit, isTrue);
+      expect(kept.failurePresentation?.completion, same(failed));
+      expect(find.byKey(_message), findsNothing);
+      expect(_creations(app), [same(failed)]);
+
+      session.editor.submit();
+      final retried = await _creation(tester, app, count: 2);
+      expect(retried.token, isNot(same(failed.token)));
+      final created = switch (retried.result) {
+        ResultSuccess(value: IntentionSaved(:final intention)) => intention.id,
+        final result => fail('Повтор не подтверждён: $result'),
+      };
+      final creationCommands = app.graph.commands.whereType<CreateIntention>();
+      expect(creationCommands, hasLength(2));
+      for (final command in creationCommands) {
+        _expectDraftCommand(command, tagIds: {home, sport});
+      }
+      _expectCreatedIntention(app.raw, created, tagIds: [home, sport]);
+      expect(storedFavoriteMarks(app.raw), [
+        ...marks,
+        (created.toCanonicalString(), 2),
+      ]);
+      expect(
+        (await _revision(tester, app)).compareTo(retried.revision!),
+        GraphRevisionOrder.same,
+      );
+      await _acceptMessage(
+        tester,
+        l10n.graphOperationMessage(
+          l10n.graphOperationCreate,
+          _title,
+          l10n.editorCreated,
+        ),
+      );
+      await _settle(tester);
+      expect(find.byKey(_message), findsNothing);
+      expect(_creations(app), hasLength(2));
+      _expectPrivateDataHidden(app, [
+        _title,
+        _description,
+        ..._tagNames.values,
+        _sport,
+        home.toCanonicalString(),
+        sport.toCanonicalString(),
+        created.toCanonicalString(),
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+/// Удаление тега, выбранного в черновике, до отправки.
+enum _SelectedTagDeletion {
+  alone('удаление выбранного тега'),
+  withSameNameReplacement('удаление выбранного тега с одноимённой заменой');
+
+  const _SelectedTagDeletion(this.description);
+
+  final String description;
 }
 
 TagId _tagId(int number) => _decodeTagId(tagFixtureId(number));
