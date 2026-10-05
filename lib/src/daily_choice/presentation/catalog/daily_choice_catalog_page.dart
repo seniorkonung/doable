@@ -15,6 +15,7 @@ import 'daily_choice_calendar_viewport.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
 import 'daily_choice_local_date_provider.dart';
+import 'daily_choice_local_day_observer.dart';
 
 /// Высота кнопки создания дневного выбора вместе с отступами над нижним краем.
 const _createActionExtent = 56 + 2 * kFloatingActionButtonMargin;
@@ -38,9 +39,13 @@ final class _DailyChoiceCatalogPageState
   /// меняют.
   late DailyChoiceCalendarViewport _viewport;
 
-  /// Текущий локальный день, отмеченный в календаре; прочитан при создании
-  /// страницы.
-  late final CalendarDate _today;
+  /// Текущий местный день, отмеченный в календаре.
+  ///
+  /// Страница перечитывает его при создании, возвращении приложения в
+  /// активное состояние и наступлении следующей местной даты. Новый день
+  /// только перестраивает календарь: выбранная дата, просмотр, фильтры и
+  /// выдача остаются прежними.
+  late final DailyChoiceLocalDayObserver _localDay;
 
   @override
   void initState() {
@@ -49,7 +54,16 @@ final class _DailyChoiceCatalogPageState
       focusedDate: ref.read(dailyChoiceCatalogViewModelProvider).selection.date,
       mode: DailyChoiceCalendarMode.week,
     );
-    _today = ref.read(dailyChoiceLocalDateSourceProvider)().date;
+    _localDay = DailyChoiceLocalDayObserver(
+      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+      onTodayChanged: () => setState(() {}),
+    );
+  }
+
+  @override
+  void dispose() {
+    _localDay.dispose();
+    super.dispose();
   }
 
   @override
@@ -79,7 +93,7 @@ final class _DailyChoiceCatalogPageState
                 child: DailyChoiceCalendar(
                   selectedDate: state.selection.date,
                   viewport: _viewport,
-                  today: _today,
+                  today: _localDay.today,
                   onDateSelected: (date) => _selectDate(model, date),
                   onViewportChanged: (viewport) =>
                       setState(() => _viewport = viewport),
