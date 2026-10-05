@@ -307,7 +307,8 @@ void main() {
         ),
         (
           IntentionCreationTagsMissingFailure([_tagId(1)]),
-          'Check the entered data.',
+          'A selected tag was deleted from the catalog. Remove it from the '
+              'draft to save the intention.',
         ),
       ];
 

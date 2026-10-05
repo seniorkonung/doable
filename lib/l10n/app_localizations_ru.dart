@@ -930,6 +930,50 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get editorDraftTagChecking => 'Проверяем тег';
+
+  @override
+  String get editorDraftTagMissing => 'Тег удалён';
+
+  @override
+  String get editorDraftTagReadUnavailable => 'Не удалось проверить тег';
+
+  @override
+  String get editorDraftTagReadCorruption => 'Данные тега повреждены';
+
+  @override
+  String get editorDraftTagReadUnexpected =>
+      'Тег не проверен из-за непредвиденной ошибки';
+
+  @override
+  String editorRetryDraftTag(String tagName) {
+    return 'Повторить проверку тега «$tagName»';
+  }
+
+  @override
+  String editorCreateTagsMissing(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Удалено из каталога выбранных тегов: $count. Уберите их из черновика, чтобы сохранить намерение.',
+      one: 'Выбранный тег удалён из каталога. Уберите его из черновика, чтобы сохранить намерение.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String editorRemoveMissingTags(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Убрать удалённые теги',
+      one: 'Убрать удалённый тег',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get graphOperationCreate => 'Создание';
 
   @override

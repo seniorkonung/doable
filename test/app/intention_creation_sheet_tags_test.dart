@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
@@ -6,9 +8,14 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
@@ -49,6 +56,12 @@ final _createTag = find.byKey(const ValueKey('tag-catalog-create'));
 final _tagEditorName = find.byKey(const ValueKey('tag-editor-name'));
 final _tagEditorSubmit = find.byKey(const ValueKey('tag-editor-submit'));
 final _tagEditorCancel = find.byKey(const ValueKey('tag-editor-cancel'));
+final _submit = find.byKey(const ValueKey('intention-editor-submit'));
+final _failure = find.byKey(const ValueKey('intention-editor-failure'));
+final _removeMissing = find.byKey(
+  const ValueKey('intention-editor-remove-missing-tags'),
+);
+final _message = find.byKey(const ValueKey('graph-operation-message'));
 
 /// Теги панели создания и общий выбор тегов на настоящих маршрутах
 /// приложения, настоящем редакторе тега и Drift-адаптере in-memory
@@ -339,15 +352,106 @@ void main() {
       expect(app.storedTable('tag_assignments'), isEmpty);
     },
   );
+
+  testWidgets(
+    'панель показывает переименование и удаление выбранного тега другим '
+    'экраном, отказ сохранения сохраняет набор с объяснением, а явное '
+    'исправление снимает только удалённый тег и не отправляет сохранение',
+    (tester) async {
+      final app = await _App.start(tester);
+      final l10n = app.l10n;
+      final home = _tagId(_homeTag);
+      final work = _tagId(_workTag);
+
+      await app.openPanel(tester);
+      await tester.enterText(_field('intention-editor-title'), _rawTitle);
+      await app.openChooser(tester);
+      await _tap(tester, _row(home));
+      await _tap(tester, _addToDraft);
+      await _tap(tester, _row(work));
+      await _tap(tester, _addToDraft);
+      await _tap(tester, find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(_chipNames(tester), ['Дом', 'Работа']);
+
+      // Подтверждённое переименование меняет только название выбранного
+      // тега.
+      await app.runTagCommand(
+        tester,
+        app.coordinator.acceptTagRename(
+          RenameTag(tagId: home, name: TagName.fromInput('Быт')),
+        ),
+      );
+      await _waitForStorage(tester, () => _chipNames(tester).first == 'Быт');
+      expect(_chipStatus(home), findsNothing);
+
+      // Удалённый тег остаётся в черновике с последним названием, а
+      // одноимённый новый тег его не заменяет.
+      await app.runTagCommand(
+        tester,
+        app.coordinator.acceptTagDelete(DeleteTag(home)),
+      );
+      await app.runTagCommand(
+        tester,
+        app.coordinator.acceptTagCreation(
+          TagCreationFormKey(),
+          CreateTag(TagName.fromInput('Быт')),
+        ),
+      );
+      await _until(tester, _chipStatus(home));
+      await tester.pumpAndSettle();
+      expect(_chipNames(tester), ['Быт', 'Работа']);
+      expect(
+        tester.widget<Text>(_chipStatus(home)).data,
+        l10n.editorDraftTagMissing,
+      );
+      final graphBefore = app.storedGraph();
+
+      // Сохранение отклоняется целиком и объясняет исправление набора.
+      await _tap(tester, _submit);
+      await _until(tester, _failure);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(_failure),
+        isSemantics(label: l10n.editorCreateTagsMissing(1)),
+      );
+      expect(_chipNames(tester), ['Быт', 'Работа']);
+      expect(tester.widget<FilledButton>(_submit).onPressed, isNull);
+      expect(app.storedGraph(), graphBefore);
+
+      // Исправление снимает только удалённый тег и само не сохраняет.
+      await _tap(tester, _removeMissing);
+      await tester.pumpAndSettle();
+      expect(_chipNames(tester), ['Работа']);
+      expect(_failure, findsNothing);
+      await _letStorageRun(tester);
+      expect(app.storedGraph(), graphBefore);
+
+      // Явное сохранение создаёт намерение только с оставшимся тегом.
+      await _tap(tester, _submit);
+      await _waitForStorage(tester, () => _sheet.evaluate().isEmpty);
+      expect(app.storedTable('intentions'), hasLength(1));
+      expect(
+        [
+          for (final row in app.raw.select(
+            'SELECT tag_id FROM tag_assignments ORDER BY rowid',
+          ))
+            row['tag_id'],
+        ],
+        [work.toCanonicalString()],
+      );
+    },
+  );
 }
 
 /// Приложение на Drift-адаптере in-memory хранилища с тегами «Дом»,
 /// «Работа» и «Сад» и пустым каталогом намерений.
 final class _App {
-  _App(this.raw, this.router, this.l10n);
+  _App(this.raw, this.router, this.coordinator, this.l10n);
 
   final sqlite.Database raw;
   final StackRouter router;
+  final GraphCommandCoordinator coordinator;
   final AppLocalizations l10n;
 
   static Future<_App> start(WidgetTester tester) async {
@@ -385,7 +489,12 @@ final class _App {
     await openIntentionGraph(tester, waitFor: _until);
     await _until(tester, find.text(l10n.catalogActiveEmpty));
     await tester.pumpAndSettle();
-    return _App(raw, ready.container.read(appRouterProvider), l10n);
+    return _App(
+      raw,
+      ready.container.read(appRouterProvider),
+      ready.container.read(graphCommandCoordinatorProvider.notifier),
+      l10n,
+    );
   }
 
   /// Открывает панель создания кнопкой каталога.
@@ -402,6 +511,23 @@ final class _App {
     await _until(tester, _row(_tagId(_homeTag)));
     await tester.pumpAndSettle();
     expect(router.current.name, TagCatalogRoute.name);
+  }
+
+  /// Дожидается успеха команды тега другого экрана и закрывает её сообщение
+  /// общей поверхности, чтобы оно не перекрывало панель.
+  Future<void> runTagCommand(WidgetTester tester, TagCommandStart start) async {
+    final accepted = start as TagCommandAccepted;
+    TagCommandCompletion? completion;
+    unawaited(accepted.future.then((value) => completion = value));
+    await _waitForStorage(tester, () => completion != null);
+    expect(
+      completion!.result,
+      isA<GraphResultSuccess<TagCommandSuccess, TagCommandFailure>>(),
+    );
+    await _until(tester, _message);
+    await tester.pumpAndSettle();
+    ScaffoldMessenger.of(tester.element(_message)).hideCurrentSnackBar();
+    await tester.pumpAndSettle();
   }
 
   /// Набор черновика, который панель передала открытому выбору.
@@ -455,31 +581,28 @@ Finder _row(TagId id) =>
 Finder _rowStatus(TagId id, String status) =>
     find.descendant(of: _row(id), matching: find.text(status));
 
+Finder _chipStatus(TagId id) => find.byKey(
+  ValueKey('intention-editor-tag-status-${id.toCanonicalString()}'),
+);
+
 Finder _chipRemove(TagId id) => find.byKey(
   ValueKey('intention-editor-tag-remove-${id.toCanonicalString()}'),
 );
 
 /// Названия выбранных тегов панели в показанном порядке.
 List<String> _chipNames(WidgetTester tester) => [
-  for (final chip
+  for (final name
       in find
           .byWidgetPredicate(
             (widget) => switch (widget.key) {
-              ValueKey<String>(:final value) =>
-                value.startsWith('intention-editor-tag-') &&
-                    !value.startsWith('intention-editor-tag-remove-'),
+              ValueKey<String>(:final value) => value.startsWith(
+                'intention-editor-tag-name-',
+              ),
               _ => false,
             },
           )
           .evaluate())
-    tester
-        .widget<Text>(
-          find.descendant(
-            of: find.byWidget(chip.widget),
-            matching: find.byType(Text),
-          ),
-        )
-        .data!,
+    (name.widget as Text).data!,
 ];
 
 String _text(WidgetTester tester, String key) =>
@@ -513,6 +636,16 @@ Future<void> _waitForStorage(WidgetTester tester, bool Function() done) async {
     await tester.pump(const Duration(milliseconds: 20));
   }
   expect(done(), isTrue);
+}
+
+/// Даёт хранилищу время: запущенная запись успела бы завершиться.
+Future<void> _letStorageRun(WidgetTester tester) async {
+  for (var attempt = 0; attempt < 5; attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+  }
 }
 
 Future<void> _until(WidgetTester tester, Finder finder) =>

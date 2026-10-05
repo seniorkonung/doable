@@ -927,6 +927,50 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get editorDraftTagChecking => 'Checking tag';
+
+  @override
+  String get editorDraftTagMissing => 'Tag deleted';
+
+  @override
+  String get editorDraftTagReadUnavailable => 'Couldn\'t check tag';
+
+  @override
+  String get editorDraftTagReadCorruption => 'Tag data is corrupted';
+
+  @override
+  String get editorDraftTagReadUnexpected =>
+      'Tag not checked due to an unexpected error';
+
+  @override
+  String editorRetryDraftTag(String tagName) {
+    return 'Check tag $tagName again';
+  }
+
+  @override
+  String editorCreateTagsMissing(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count selected tags were deleted from the catalog. Remove them from the draft to save the intention.',
+      one: 'A selected tag was deleted from the catalog. Remove it from the draft to save the intention.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String editorRemoveMissingTags(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Remove deleted tags',
+      one: 'Remove deleted tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get graphOperationCreate => 'Create';
 
   @override

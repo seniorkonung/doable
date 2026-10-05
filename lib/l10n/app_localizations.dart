@@ -1646,6 +1646,54 @@ abstract class AppLocalizations {
   /// **'Remove tag {tagName} from draft'**
   String editorRemoveDraftTag(String tagName);
 
+  /// Доступное состояние выбранного тега черновика, пока наблюдение ещё не подтвердило тег
+  ///
+  /// In en, this message translates to:
+  /// **'Checking tag'**
+  String get editorDraftTagChecking;
+
+  /// Состояние выбранного тега черновика, отсутствие которого подтверждено; тег остаётся в черновике до явного снятия
+  ///
+  /// In en, this message translates to:
+  /// **'Tag deleted'**
+  String get editorDraftTagMissing;
+
+  /// Устранимый отказ чтения выбранного тега черновика; не означает удаление тега
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check tag'**
+  String get editorDraftTagReadUnavailable;
+
+  /// Отказ чтения выбранного тега черновика из-за повреждённых данных; повтор не предлагается
+  ///
+  /// In en, this message translates to:
+  /// **'Tag data is corrupted'**
+  String get editorDraftTagReadCorruption;
+
+  /// Непредвиденный отказ чтения выбранного тега черновика; повтор не предлагается
+  ///
+  /// In en, this message translates to:
+  /// **'Tag not checked due to an unexpected error'**
+  String get editorDraftTagReadUnexpected;
+
+  /// Подсказка и доступное название повтора проверки выбранного тега черновика после устранимого отказа чтения
+  ///
+  /// In en, this message translates to:
+  /// **'Check tag {tagName} again'**
+  String editorRetryDraftTag(String tagName);
+
+  /// Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; объясняет исправление набора
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{A selected tag was deleted from the catalog. Remove it from the draft to save the intention.} other{{count} selected tags were deleted from the catalog. Remove them from the draft to save the intention.}}'**
+  String editorCreateTagsMissing(int count);
+
+  /// Явное исправление отказа создания: снимает из черновика только выбранные теги, отсутствие которых подтвердило сохранение; сохранение не отправляет
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Remove deleted tag} other{Remove deleted tags}}'**
+  String editorRemoveMissingTags(int count);
+
   /// Вид операции создания намерения в сообщении оболочки
   ///
   /// In en, this message translates to:

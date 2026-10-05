@@ -26,7 +26,10 @@ import 'intention_editor_view_model.dart';
 /// существующий маршрут выбора с контекстом набора своей сессии полноэкранно
 /// над панелью в том же корневом стеке. Маршрут панели остаётся под выбором
 /// и редактором тега и удерживает сессию; закрытие выбора возвращает ту же
-/// панель с её вводом, режимом и прокруткой.
+/// панель с её вводом, режимом и прокруткой. Выбранные теги показываются с
+/// актуальностью из проекции сессии. Отказ сохранения из-за удалённых тегов
+/// сохраняет набор: панель отмечает эти теги и предлагает явное исправление,
+/// которое снимает только их и само сохранение не отправляет.
 ///
 /// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
 /// «назад» и программный `maybePop` — сначала обращается к единому решению
@@ -89,6 +92,7 @@ final class _IntentionEditorPageState
       IntentionDraftAvailability.closed => true,
     };
     final generalFailure = _generalFailure(localizations, editor.operation);
+    final missingTagIds = editor.missingTagIds;
     final titleFailure = _fieldFailure(
       localizations,
       editor.operation,
@@ -177,8 +181,10 @@ final class _IntentionEditorPageState
                 const SizedBox(height: 12),
                 IntentionCreationTags(
                   tags: editor.selectedTags,
+                  missingTagIds: missingTagIds,
                   enabled: !isDraftFixed,
                   onRemove: notifier.removeTag,
+                  onRetryObservation: notifier.retryTagObservation,
                 ),
               ],
               const SizedBox(height: 8),
@@ -198,6 +204,30 @@ final class _IntentionEditorPageState
                   claim: editor.failurePresentation,
                   message: generalFailure,
                   messageKey: const ValueKey('intention-editor-failure'),
+                ),
+              ],
+              if (missingTagIds.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                // Исправление снимает только теги, отсутствие которых
+                // подтвердил отказ, и не отправляет сохранение. Как и снятие
+                // отдельного тега, оно не уводит фокус из поля ввода.
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextFieldTapRegion(
+                    child: OutlinedButton(
+                      key: const ValueKey(
+                        'intention-editor-remove-missing-tags',
+                      ),
+                      onPressed: isDraftFixed
+                          ? null
+                          : () => missingTagIds.forEach(notifier.removeTag),
+                      child: Text(
+                        localizations.editorRemoveMissingTags(
+                          missingTagIds.length,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ],
@@ -380,9 +410,12 @@ final class _IntentionEditorPageState
           when textFailure.field == IntentionTextField.title ||
               textFailure.field == IntentionTextField.description =>
         null,
+      // Объяснение описывает проверку при сохранении; исправление снимает
+      // оставшиеся в черновике отсутствующие теги.
+      IntentionCreationTagsMissingFailure(:final missingTagIds) =>
+        localizations.editorCreateTagsMissing(missingTagIds.length),
       IntentionGenericValidationFailure() ||
-      IntentionTextInputValidationFailure() ||
-      IntentionCreationTagsMissingFailure() => localizations.editorInvalidInput,
+      IntentionTextInputValidationFailure() => localizations.editorInvalidInput,
       IntentionConflictFailure() => localizations.editorCreateConflict,
       IntentionHasBlockingRelationsFailure() =>
         localizations.editorCreateUnexpected,

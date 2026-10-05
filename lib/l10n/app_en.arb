@@ -1020,6 +1020,53 @@
       }
     }
   },
+  "editorDraftTagChecking": "Checking tag",
+  "@editorDraftTagChecking": {
+    "description": "Доступное состояние выбранного тега черновика, пока наблюдение ещё не подтвердило тег"
+  },
+  "editorDraftTagMissing": "Tag deleted",
+  "@editorDraftTagMissing": {
+    "description": "Состояние выбранного тега черновика, отсутствие которого подтверждено; тег остаётся в черновике до явного снятия"
+  },
+  "editorDraftTagReadUnavailable": "Couldn't check tag",
+  "@editorDraftTagReadUnavailable": {
+    "description": "Устранимый отказ чтения выбранного тега черновика; не означает удаление тега"
+  },
+  "editorDraftTagReadCorruption": "Tag data is corrupted",
+  "@editorDraftTagReadCorruption": {
+    "description": "Отказ чтения выбранного тега черновика из-за повреждённых данных; повтор не предлагается"
+  },
+  "editorDraftTagReadUnexpected": "Tag not checked due to an unexpected error",
+  "@editorDraftTagReadUnexpected": {
+    "description": "Непредвиденный отказ чтения выбранного тега черновика; повтор не предлагается"
+  },
+  "editorRetryDraftTag": "Check tag {tagName} again",
+  "@editorRetryDraftTag": {
+    "description": "Подсказка и доступное название повтора проверки выбранного тега черновика после устранимого отказа чтения",
+    "placeholders": {
+      "tagName": {
+        "type": "String"
+      }
+    }
+  },
+  "editorCreateTagsMissing": "{count, plural, =1{A selected tag was deleted from the catalog. Remove it from the draft to save the intention.} other{{count} selected tags were deleted from the catalog. Remove them from the draft to save the intention.}}",
+  "@editorCreateTagsMissing": {
+    "description": "Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; объясняет исправление набора",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "editorRemoveMissingTags": "{count, plural, =1{Remove deleted tag} other{Remove deleted tags}}",
+  "@editorRemoveMissingTags": {
+    "description": "Явное исправление отказа создания: снимает из черновика только выбранные теги, отсутствие которых подтвердило сохранение; сохранение не отправляет",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "graphOperationCreate": "Create",
   "@graphOperationCreate": {
     "description": "Вид операции создания намерения в сообщении оболочки"
