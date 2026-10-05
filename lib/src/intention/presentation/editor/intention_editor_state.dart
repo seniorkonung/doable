@@ -7,8 +7,10 @@ import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
+import 'intention_creation_close.dart';
 import 'intention_draft_tag_set.dart';
 
+export 'intention_creation_close.dart';
 export 'intention_draft_tag_set.dart';
 
 sealed class IntentionEditorEvent {
@@ -154,6 +156,7 @@ final class IntentionEditorState {
     required this.operation,
     required this.event,
     required this.failurePresentation,
+    required this.closing,
   });
 
   const IntentionEditorState.initial()
@@ -161,7 +164,8 @@ final class IntentionEditorState {
       selectedTags = const {},
       operation = const OperationIdle<Intention>(),
       event = null,
-      failurePresentation = null;
+      failurePresentation = null,
+      closing = const IntentionCreationCloseNotRequested();
 
   final IntentionCreationDraft draft;
 
@@ -176,11 +180,19 @@ final class IntentionEditorState {
   /// только по кадру с видимым сообщением.
   final GraphInitiatorPresentationClaim? failurePresentation;
 
-  IntentionDraftAvailability get draftAvailability => switch (operation) {
-    OperationSucceeded<Intention>() => IntentionDraftAvailability.closed,
-    OperationRunning<Intention>() => IntentionDraftAvailability.submitting,
-    OperationIdle<Intention>() ||
-    OperationFailed<Intention>() => IntentionDraftAvailability.editable,
+  /// Ход закрытия сессии. Ожидающее подтверждение связано с текущим
+  /// состоянием отправки: его смена делает подтверждение недействительным.
+  final IntentionCreationClosing closing;
+
+  IntentionDraftAvailability get draftAvailability => switch (closing) {
+    IntentionCreationClosedOnRequest() => IntentionDraftAvailability.closed,
+    IntentionCreationCloseNotRequested() ||
+    IntentionCreationCloseConfirming() => switch (operation) {
+      OperationSucceeded<Intention>() => IntentionDraftAvailability.closed,
+      OperationRunning<Intention>() => IntentionDraftAvailability.submitting,
+      OperationIdle<Intention>() ||
+      OperationFailed<Intention>() => IntentionDraftAvailability.editable,
+    },
   };
 
   IntentionDraftTagSetSnapshot get draftTagSet => IntentionDraftTagSetSnapshot(
@@ -210,7 +222,14 @@ final class IntentionEditorState {
     OperationFailed<Intention>() => false,
   };
 
-  bool get canSubmit => operation is OperationIdle<Intention> || canRetry;
+  /// Отправка недоступна, пока ожидается ответ на подтверждение закрытия
+  /// или после завершения сессии.
+  bool get canSubmit => switch (closing) {
+    IntentionCreationCloseNotRequested() =>
+      operation is OperationIdle<Intention> || canRetry,
+    IntentionCreationCloseConfirming() ||
+    IntentionCreationClosedOnRequest() => false,
+  };
 
   IntentionEditorState withTitle(String value) => _withEditedText(
     draft: draft.withTitle(value),
@@ -256,6 +275,7 @@ final class IntentionEditorState {
           operation: operation,
           event: event,
           failurePresentation: failurePresentation,
+          closing: closing,
         )
       : this;
 
@@ -267,6 +287,8 @@ final class IntentionEditorState {
       ? this
       : _withDraft(draft.withFavoriteMark(value));
 
+  /// Меняет состояние отправки. Ожидающее подтверждение закрытия объясняло
+  /// прежнее состояние отправки и потому перестаёт действовать.
   IntentionEditorState withOperation(
     OperationState<Intention> value, {
     IntentionEditorEvent? event,
@@ -277,6 +299,12 @@ final class IntentionEditorState {
     operation: value,
     event: event,
     failurePresentation: failurePresentation,
+    closing: switch (closing) {
+      IntentionCreationCloseConfirming() =>
+        const IntentionCreationCloseNotRequested(),
+      IntentionCreationCloseNotRequested() ||
+      IntentionCreationClosedOnRequest() => closing,
+    },
   );
 
   IntentionEditorState withoutEvent() => IntentionEditorState._(
@@ -285,7 +313,32 @@ final class IntentionEditorState {
     operation: operation,
     event: null,
     failurePresentation: failurePresentation,
+    closing: closing,
   );
+
+  /// Ожидает ответа на [confirmation]; черновик и отправка не меняются.
+  IntentionEditorState withCloseConfirmation(
+    IntentionCreationCloseConfirmation confirmation,
+  ) => _withClosing(IntentionCreationCloseConfirming(confirmation));
+
+  /// Продолжает сессию после ответа на подтверждение закрытия.
+  IntentionEditorState withoutCloseConfirmation() =>
+      _withClosing(const IntentionCreationCloseNotRequested());
+
+  /// Завершает сессию запросом закрытия. Черновик больше не меняется, а право
+  /// предъявления ошибки остаётся у её renderer до его удаления.
+  IntentionEditorState closedOnRequest() =>
+      _withClosing(const IntentionCreationClosedOnRequest());
+
+  IntentionEditorState _withClosing(IntentionCreationClosing value) =>
+      IntentionEditorState._(
+        draft: draft,
+        selectedTags: selectedTags,
+        operation: operation,
+        event: event,
+        failurePresentation: failurePresentation,
+        closing: value,
+      );
 
   IntentionEditorState _withDraft(IntentionCreationDraft draft) =>
       IntentionEditorState._(
@@ -294,6 +347,7 @@ final class IntentionEditorState {
         operation: operation,
         event: event,
         failurePresentation: failurePresentation,
+        closing: closing,
       );
 
   IntentionEditorState _withEditedText({
@@ -309,6 +363,7 @@ final class IntentionEditorState {
       failurePresentation: nextOperation is OperationFailed<Intention>
           ? failurePresentation
           : null,
+      closing: closing,
     );
   }
 
@@ -327,6 +382,7 @@ final class IntentionEditorState {
       failurePresentation: nextOperation is OperationFailed<Intention>
           ? failurePresentation
           : null,
+      closing: closing,
     );
   }
 

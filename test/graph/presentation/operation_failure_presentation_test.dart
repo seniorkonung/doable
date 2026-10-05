@@ -16,6 +16,9 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
+import 'package:doable/src/intention/presentation/operation/operation_state.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -889,6 +892,226 @@ void main() {
       expect(fallback?.token, same(repeatClaim.token));
     },
   );
+
+  group('закрытие сессии создания', () {
+    testWidgets(
+      'отказ под подтверждением закрытия остаётся у живой формы, а запоздалый сброс её не закрывает',
+      (tester) async {
+        final harness = _FailureHarness();
+        addTearDown(harness.dispose);
+        final provider = intentionEditorViewModelProvider(
+          IntentionCreationFormKey(),
+        );
+        GraphAppPresentationClaim? fallback;
+        unawaited(
+          harness.registration.nextClaim().then((value) => fallback = value),
+        );
+        await _openCreationSession(tester, harness, provider);
+        harness.container.read(provider.notifier)
+          ..changeTitle('Намерение')
+          ..submit();
+
+        await tester.tap(find.text('Закрыть'));
+        await tester.pumpAndSettle();
+        expect(find.text(_savingContinuesWarning), findsOneWidget);
+
+        harness.repository.completeCommand(
+          harness.repository.commands.length - 1,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+
+        // Временное перекрытие подтверждением сохраняет право renderer.
+        final claim = harness.container.read(provider).failurePresentation!;
+        expect(find.text(_creationFailureMessage), findsOneWidget);
+        expect(harness.claimAgain(claim), same(claim));
+        expect(fallback, isNull);
+
+        await tester.tap(find.text('Сбросить'));
+        await tester.pumpAndSettle();
+
+        expect(find.text(_savingContinuesWarning), findsNothing);
+        expect(find.text('Закрыть'), findsOneWidget);
+        expect(harness.claimAgain(claim), isNull);
+        expect(fallback, isNull);
+        expect(harness.container.read(provider).draft.title, 'Намерение');
+      },
+    );
+
+    testWidgets(
+      'сброс сессии до предъявления отказа передаёт его право общей поверхности тем же token',
+      (tester) async {
+        final harness = _FailureHarness();
+        addTearDown(harness.dispose);
+        final provider = intentionEditorViewModelProvider(
+          IntentionCreationFormKey(),
+        );
+        GraphAppPresentationClaim? fallback;
+        unawaited(
+          harness.registration.nextClaim().then((value) => fallback = value),
+        );
+        await _openCreationSession(tester, harness, provider);
+        harness.container.read(provider.notifier)
+          ..changeTitle('Намерение')
+          ..submit();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        harness.repository.completeCommand(
+          harness.repository.commands.length - 1,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+        final claim = harness.container.read(provider).failurePresentation!;
+        expect(harness.claimAgain(claim), same(claim));
+
+        await tester.tap(find.text('Закрыть'));
+        await tester.pumpAndSettle();
+        expect(find.text(_draftLossWarning), findsOneWidget);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+
+        // Подтверждение перекрывает живой renderer: право остаётся у него.
+        expect(harness.claimAgain(claim), same(claim));
+        expect(fallback, isNull);
+
+        await tester.tap(find.text('Сбросить'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Закрыть'), findsNothing);
+        expect(find.text(_creationFailureMessage), findsNothing);
+        expect(fallback?.token, same(claim.token));
+        expect(
+          fallback?.completion,
+          isA<IntentionCommandCompletion>().having(
+            (completion) => completion.result,
+            'исход',
+            isA<ResultFailure<IntentionCommandSuccess>>().having(
+              (result) => result.failure,
+              'отказ',
+              isA<IntentionUnavailableFailure>(),
+            ),
+          ),
+        );
+        expect(harness.claimAgain(claim), isNull);
+        harness.coordinator.confirmPresentation(fallback!);
+      },
+    );
+  });
+}
+
+const _creationFailureMessage = 'Не удалось создать намерение';
+const _draftLossWarning = 'Несохранённый черновик будет потерян';
+const _savingContinuesWarning =
+    'Несохранённый черновик будет потерян, сохранение продолжится';
+
+/// Открывает управляемую сессию создания на собственном маршруте поверх
+/// исходной страницы.
+Future<void> _openCreationSession(
+  WidgetTester tester,
+  _FailureHarness harness,
+  IntentionEditorViewModelProvider provider,
+) async {
+  await tester.pumpWidget(
+    harness.app(
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => _CreationSessionRoute(provider),
+            ),
+          ),
+          child: const Text('Создать'),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('Создать'));
+  await tester.pumpAndSettle();
+}
+
+/// Управляемая сессия создания: рисует её отказ общим renderer и закрывает
+/// свой маршрут только по решению сессии после её единственного
+/// подтверждения.
+final class _CreationSessionRoute extends ConsumerWidget {
+  const _CreationSessionRoute(this.provider);
+
+  final IntentionEditorViewModelProvider provider;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(provider);
+    return Scaffold(
+      body: Column(
+        children: [
+          TextButton(
+            onPressed: () =>
+                _requestClose(context, ref.read(provider.notifier)),
+            child: const Text('Закрыть'),
+          ),
+          if (session.operation case OperationFailed<Intention>())
+            OperationFailurePresentation(
+              claim: session.failurePresentation,
+              message: _creationFailureMessage,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _requestClose(
+    BuildContext context,
+    IntentionEditorViewModel session,
+  ) async {
+    final navigator = Navigator.of(context);
+    switch (session.requestClose()) {
+      case IntentionCreationClosedImmediately():
+        navigator.pop();
+      case IntentionCreationCloseNeedsConfirmation(:final confirmation):
+        final choice = await showDialog<IntentionCreationCloseChoice>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            content: Text(switch (confirmation.savingOnClose) {
+              IntentionCreationSavingOnClose.notStarted => _draftLossWarning,
+              IntentionCreationSavingOnClose.continues =>
+                _savingContinuesWarning,
+            }),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(
+                  dialogContext,
+                  IntentionCreationCloseChoice.continueEditing,
+                ),
+                child: const Text('Продолжить'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(
+                  dialogContext,
+                  IntentionCreationCloseChoice.discardDraft,
+                ),
+                child: const Text('Сбросить'),
+              ),
+            ],
+          ),
+        );
+        final resolution = session.resolveClose(
+          confirmation,
+          choice ?? IntentionCreationCloseChoice.continueEditing,
+        );
+        switch (resolution) {
+          case IntentionCreationCloseResolution.closed:
+            navigator.pop();
+          case IntentionCreationCloseResolution.continued ||
+              IntentionCreationCloseResolution.outdated:
+            return;
+        }
+      case IntentionCreationCloseAwaitingConfirmation() ||
+          IntentionCreationCloseSessionEnded():
+        return;
+    }
+  }
 }
 
 final class _FailureHarness {

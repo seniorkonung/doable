@@ -1929,7 +1929,799 @@ void main() {
       expect(completions, hasLength(1));
     });
   });
+
+  group('решение о закрытии сессии', () {
+    test('неизменённая сессия завершается сразу без подтверждения, а повторный запрос ничего не закрывает', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final formKey = IntentionCreationFormKey();
+      final provider = intentionEditorViewModelProvider(formKey);
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier);
+      final tagSetClosed = Completer<void>();
+      editor.draftTagSet.changes.listen((_) {}, onDone: tagSetClosed.complete);
+
+      final decision = editor.requestClose();
+
+      expect(
+        decision,
+        isA<IntentionCreationClosedImmediately>().having(
+          (decision) => decision.savingOnClose,
+          'отправка',
+          IntentionCreationSavingOnClose.notStarted,
+        ),
+      );
+      final closed = container.read(provider);
+      expect(closed.closing, isA<IntentionCreationClosedOnRequest>());
+      expect(closed.draftAvailability, IntentionDraftAvailability.closed);
+      expect(closed.canSubmit, isFalse);
+      expect(editor.requestClose(), isA<IntentionCreationCloseSessionEnded>());
+
+      editor
+        ..changeTitle('После закрытия')
+        ..markFavorite()
+        ..submit();
+      expect(
+        editor.draftTagSet.add(_tag(1, 'Дом')),
+        IntentionDraftTagAddition.sessionClosed,
+      );
+      await _deliverEvents(container);
+
+      expect(tagSetClosed.isCompleted, isTrue);
+      expect(container.read(provider), same(closed));
+      expect(closed.draft.isChanged, isFalse);
+      expect(repository.commands, isEmpty);
+      expect(
+        container
+            .read(graphCommandCoordinatorProvider.notifier)
+            .isKeyRunning(formKey),
+        isFalse,
+      );
+    });
+
+    test('возврат всех полей к начальным значениям позволяет закрыть сессию без подтверждения', () {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('  ')
+        ..changeDescription('Описание')
+        ..markFavorite()
+        ..confirmReadiness();
+      editor.draftTagSet.add(_tag(1, 'Дом'));
+      editor
+        ..changeTitle('')
+        ..changeDescription('')
+        ..unmarkFavorite()
+        ..disableReadiness()
+        ..removeTag(_tagId(1));
+
+      expect(editor.requestClose(), isA<IntentionCreationClosedImmediately>());
+      expect(
+        container.read(provider).draftAvailability,
+        IntentionDraftAvailability.closed,
+      );
+      expect(repository.commands, isEmpty);
+    });
+
+    test('изменение каждого поля требует одного подтверждения, связанного с ключом сессии', () {
+      final edits = <String, void Function(IntentionEditorViewModel)>{
+        'название': (editor) => editor.changeTitle('Намерение'),
+        'пробельное название': (editor) => editor.changeTitle('   '),
+        'описание': (editor) => editor.changeDescription('Описание'),
+        'набор тегов': (editor) => editor.draftTagSet.add(_tag(1, 'Дом')),
+        'готовность': (editor) => editor.confirmReadiness(),
+        'избранное': (editor) => editor.markFavorite(),
+      };
+      for (final MapEntry(key: name, value: edit) in edits.entries) {
+        final repository = ControlledCatalogRepository();
+        final container = _container(repository);
+        final formKey = IntentionCreationFormKey();
+        final provider = intentionEditorViewModelProvider(formKey);
+        final subscription = container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        final editor = container.read(provider.notifier);
+        edit(editor);
+        final draft = container.read(provider).draft;
+
+        final decision = editor.requestClose();
+        final repeated = editor.requestClose();
+
+        final confirmation = _confirmationOf(decision);
+        expect(confirmation.formKey, same(formKey), reason: name);
+        expect(
+          confirmation.savingOnClose,
+          IntentionCreationSavingOnClose.notStarted,
+          reason: name,
+        );
+        expect(
+          repeated,
+          isA<IntentionCreationCloseAwaitingConfirmation>(),
+          reason: name,
+        );
+        final confirming = container.read(provider);
+        expect(
+          confirming.closing,
+          isA<IntentionCreationCloseConfirming>().having(
+            (closing) => closing.confirmation,
+            'подтверждение',
+            same(confirmation),
+          ),
+          reason: name,
+        );
+        expect(confirming.draft, same(draft), reason: name);
+        expect(
+          confirming.draftAvailability,
+          IntentionDraftAvailability.editable,
+          reason: name,
+        );
+        expect(repository.commands, isEmpty, reason: name);
+      }
+    });
+
+    test('продолжение сохраняет весь черновик и сессию, а прежнее подтверждение больше не действует', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle(_rawTitle)
+        ..changeDescription(_rawDescription)
+        ..markFavorite()
+        ..confirmReadiness();
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'));
+      await _deliverEvents(container);
+      final before = container.read(provider);
+      final confirmation = _confirmationOf(editor.requestClose());
+
+      final resolution = editor.resolveClose(
+        confirmation,
+        IntentionCreationCloseChoice.continueEditing,
+      );
+
+      expect(resolution, IntentionCreationCloseResolution.continued);
+      final continued = container.read(provider);
+      expect(continued.draft, same(before.draft));
+      expect(_tagNames(continued), {_tagId(1): 'Дом', _tagId(2): 'Выходные'});
+      expect(continued.closing, isA<IntentionCreationCloseNotRequested>());
+      expect(continued.draftAvailability, IntentionDraftAvailability.editable);
+      expect(continued.canSubmit, isTrue);
+      expect(watches.single(_tagId(1)).isReleased, isFalse);
+      expect(watches.single(_tagId(2)).isReleased, isFalse);
+      expect(
+        editor.draftTagSet.current.availability,
+        IntentionDraftAvailability.editable,
+      );
+
+      expect(
+        editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.outdated,
+      );
+      expect(container.read(provider), same(continued));
+      final renewed = _confirmationOf(editor.requestClose());
+      expect(renewed, isNot(same(confirmation)));
+
+      // Прежнее подтверждение не отвечает за новое ожидающее.
+      expect(
+        editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.outdated,
+      );
+      final pending = container.read(provider);
+      expect(
+        pending.closing,
+        isA<IntentionCreationCloseConfirming>().having(
+          (closing) => closing.confirmation,
+          'подтверждение',
+          same(renewed),
+        ),
+      );
+      expect(pending.draftAvailability, IntentionDraftAvailability.editable);
+      expect(watches.single(_tagId(1)).isReleased, isFalse);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('подтверждённый сброс до отправки завершает сессию без записи и освобождает наблюдения', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final completions = <GraphCommandCompletion>[];
+      final completionSubscription = coordinator.completions.listen(
+        completions.add,
+      );
+      addTearDown(completionSubscription.cancel);
+      final formKey = IntentionCreationFormKey();
+      final provider = intentionEditorViewModelProvider(formKey);
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение')
+        ..markFavorite()
+        ..confirmReadiness();
+      editor.draftTagSet.add(_tag(1, 'Дом'));
+      final tagSetClosed = Completer<void>();
+      editor.draftTagSet.changes.listen((_) {}, onDone: tagSetClosed.complete);
+      await _deliverEvents(container);
+      final confirmation = _confirmationOf(editor.requestClose());
+
+      final resolution = editor.resolveClose(
+        confirmation,
+        IntentionCreationCloseChoice.discardDraft,
+      );
+
+      expect(resolution, IntentionCreationCloseResolution.closed);
+      final closed = container.read(provider);
+      expect(closed.closing, isA<IntentionCreationClosedOnRequest>());
+      expect(closed.draftAvailability, IntentionDraftAvailability.closed);
+      expect(closed.canSubmit, isFalse);
+      expect(watches.single(_tagId(1)).isReleased, isTrue);
+
+      editor
+        ..changeTitle('После сброса')
+        ..unmarkFavorite()
+        ..submit();
+      expect(
+        editor.draftTagSet.add(_tag(2, 'Спорт')),
+        IntentionDraftTagAddition.sessionClosed,
+      );
+      await _deliverEvents(container);
+
+      expect(tagSetClosed.isCompleted, isTrue);
+      expect(container.read(provider), same(closed));
+      expect(editor.requestClose(), isA<IntentionCreationCloseSessionEnded>());
+      expect(
+        editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.outdated,
+      );
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+      expect(completions, isEmpty);
+      expect(coordinator.isKeyRunning(formKey), isFalse);
+    });
+
+    test('переходы в общий выбор тегов и обратно не завершают сессию и не запрашивают сброс', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение')
+        ..markFavorite();
+
+      // Каждое открытие выбора наблюдает набор, добавляет тег и закрывается,
+      // не затрагивая владельца сессии.
+      for (final tag in [_tag(1, 'Дом'), _tag(2, 'Спорт')]) {
+        final opening = editor.draftTagSet.changes.listen((_) {});
+        expect(editor.draftTagSet.add(tag), IntentionDraftTagAddition.added);
+        await _deliverEvents(container);
+        await opening.cancel();
+      }
+
+      final returned = container.read(provider);
+      expect(returned.closing, isA<IntentionCreationCloseNotRequested>());
+      expect(returned.draftAvailability, IntentionDraftAvailability.editable);
+      expect(returned.draft.title, 'Намерение');
+      expect(returned.draft.favoriteMark, FavoriteMark.favorite);
+      expect(returned.draft.tagIds, [_tagId(1), _tagId(2)]);
+      expect(
+        editor.draftTagSet.current.availability,
+        IntentionDraftAvailability.editable,
+      );
+      expect(
+        editor.requestClose(),
+        isA<IntentionCreationCloseNeedsConfirmation>(),
+      );
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('отправка во время ожидания подтверждения не принимается и не меняет подтверждение', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение');
+      final confirmation = _confirmationOf(editor.requestClose());
+
+      editor.submit();
+
+      final confirming = container.read(provider);
+      expect(repository.commands, isEmpty);
+      expect(confirming.operation, isA<OperationIdle<Intention>>());
+      expect(confirming.canSubmit, isFalse);
+      expect(
+        confirming.closing,
+        isA<IntentionCreationCloseConfirming>().having(
+          (closing) => closing.confirmation,
+          'подтверждение',
+          same(confirmation),
+        ),
+      );
+
+      expect(
+        editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.continueEditing,
+        ),
+        IntentionCreationCloseResolution.continued,
+      );
+      expect(container.read(provider).canSubmit, isTrue);
+      editor.submit();
+
+      expect(
+        repository.commands.single,
+        isA<CreateIntention>().having(
+          (command) => command.title,
+          'название',
+          'Намерение',
+        ),
+      );
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await _settle(container);
+    });
+
+    test('во время принятой отправки решение сообщает о продолжении сохранения, а подтверждённое закрытие не отменяет операцию', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
+      addTearDown(presenter.release);
+      final formKey = IntentionCreationFormKey();
+      final provider = intentionEditorViewModelProvider(formKey);
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Полное намерение')
+        ..markFavorite();
+      editor.draftTagSet.add(_tag(1, 'Дом'));
+      editor.submit();
+      final command = repository.commands.single;
+
+      final confirmation = _confirmationOf(editor.requestClose());
+      expect(
+        confirmation.savingOnClose,
+        IntentionCreationSavingOnClose.continues,
+      );
+      final resolution = editor.resolveClose(
+        confirmation,
+        IntentionCreationCloseChoice.discardDraft,
+      );
+
+      expect(resolution, IntentionCreationCloseResolution.closed);
+      final closed = container.read(provider);
+      expect(closed.draftAvailability, IntentionDraftAvailability.closed);
+      expect(watches.single(_tagId(1)).isReleased, isTrue);
+      expect(coordinator.isKeyRunning(formKey), isTrue);
+      expect(editor.requestClose(), isA<IntentionCreationCloseSessionEnded>());
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await _settle(container);
+
+      final fallback = await presenter.nextClaim();
+      expect(
+        fallback!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'результат',
+          isA<ResultFailure<IntentionCommandSuccess>>().having(
+            (result) => result.failure,
+            'отказ',
+            isA<IntentionUnavailableFailure>(),
+          ),
+        ),
+      );
+      coordinator.confirmPresentation(fallback);
+      expect(container.read(provider), same(closed));
+      expect(closed.failurePresentation, isNull);
+      expect(closed.event, isNull);
+      expect(coordinator.isKeyRunning(formKey), isFalse);
+      expect(repository.commands, [same(command)]);
+    });
+
+    test('неизменённая сессия во время принятой отправки закрывается сразу с продолжением сохранения', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
+      addTearDown(presenter.release);
+      final formKey = IntentionCreationFormKey();
+      final provider = intentionEditorViewModelProvider(formKey);
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)..submit();
+      expect(repository.commands, hasLength(1));
+
+      final decision = editor.requestClose();
+
+      expect(
+        decision,
+        isA<IntentionCreationClosedImmediately>().having(
+          (decision) => decision.savingOnClose,
+          'отправка',
+          IntentionCreationSavingOnClose.continues,
+        ),
+      );
+      expect(coordinator.isKeyRunning(formKey), isTrue);
+      final closed = container.read(provider);
+      repository.completeCommand(
+        0,
+        const ResultFailure(
+          IntentionTextInputValidationFailure(
+            IntentionTextValidationFailure(
+              field: IntentionTextField.title,
+              reason: IntentionTextValidationReason.empty,
+            ),
+          ),
+        ),
+      );
+      await _settle(container);
+
+      final fallback = await presenter.nextClaim();
+      expect(fallback!.completion, isA<IntentionCommandCompletion>());
+      coordinator.confirmPresentation(fallback);
+      expect(container.read(provider), same(closed));
+      expect(repository.commands, hasLength(1));
+    });
+
+    test('успех при ожидающем подтверждении завершает только свою сессию и делает её прежний ответ недействительным', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
+      addTearDown(presenter.release);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final otherProvider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final events = <IntentionEditorEvent>[];
+      final subscription = container.listen(provider, (previous, next) {
+        final event = next.event;
+        if (event != null && previous?.event == null) {
+          events.add(event);
+        }
+      });
+      addTearDown(subscription.close);
+      final otherSubscription = container.listen(otherProvider, (_, _) {});
+      addTearDown(otherSubscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение')
+        ..submit();
+      final otherEditor = container.read(otherProvider.notifier)
+        ..changeTitle('Другое намерение');
+      final confirmation = _confirmationOf(editor.requestClose());
+      final otherConfirmation = _confirmationOf(otherEditor.requestClose());
+
+      repository.completeCommand(0, _savedResult());
+      await _settle(container);
+
+      final succeeded = container.read(provider);
+      expect(events, [isA<IntentionEditorCreated>()]);
+      expect(succeeded.operation, isA<OperationSucceeded<Intention>>());
+      expect(succeeded.closing, isA<IntentionCreationCloseNotRequested>());
+      expect(succeeded.draftAvailability, IntentionDraftAvailability.closed);
+      for (final choice in IntentionCreationCloseChoice.values) {
+        expect(
+          editor.resolveClose(confirmation, choice),
+          IntentionCreationCloseResolution.outdated,
+        );
+      }
+      expect(editor.requestClose(), isA<IntentionCreationCloseSessionEnded>());
+      expect(container.read(provider), same(succeeded));
+
+      expect(
+        otherEditor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.outdated,
+      );
+      final other = container.read(otherProvider);
+      expect(
+        other.closing,
+        isA<IntentionCreationCloseConfirming>().having(
+          (closing) => closing.confirmation,
+          'подтверждение',
+          same(otherConfirmation),
+        ),
+      );
+      expect(other.draftAvailability, IntentionDraftAvailability.editable);
+      expect(other.event, isNull);
+      expect(
+        otherEditor.resolveClose(
+          otherConfirmation,
+          IntentionCreationCloseChoice.continueEditing,
+        ),
+        IntentionCreationCloseResolution.continued,
+      );
+      expect(container.read(otherProvider).draft.title, 'Другое намерение');
+
+      final success = await presenter.nextClaim();
+      expect(
+        success!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'результат',
+          isA<ResultSuccess<IntentionCommandSuccess>>(),
+        ),
+      );
+      coordinator.confirmPresentation(success);
+      expect(repository.commands, hasLength(1));
+    });
+
+    test('отказ при ожидающем подтверждении сохраняет черновик и право живой формы и требует нового решения', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
+      addTearDown(presenter.release);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle(_rawTitle)
+        ..markFavorite()
+        ..submit();
+      final confirmation = _confirmationOf(editor.requestClose());
+      expect(
+        confirmation.savingOnClose,
+        IntentionCreationSavingOnClose.continues,
+      );
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await _settle(container);
+
+      final failed = container.read(provider);
+      final claim = failed.failurePresentation!;
+      expect(failed.operation, isA<OperationFailed<Intention>>());
+      expect(failed.closing, isA<IntentionCreationCloseNotRequested>());
+      expect(
+        editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.outdated,
+      );
+      final kept = container.read(provider);
+      expect(kept, same(failed));
+      expect(kept.draftAvailability, IntentionDraftAvailability.editable);
+      expect(kept.draft.title, _rawTitle);
+      expect(kept.draft.favoriteMark, FavoriteMark.favorite);
+      expect(kept.canRetry, isTrue);
+      expect(coordinator.claimInitiatorFailure(claim.token), same(claim));
+      GraphAppPresentationClaim? fallback;
+      unawaited(presenter.nextClaim().then((value) => fallback = value));
+      await _settle(container);
+      expect(fallback, isNull);
+
+      final renewed = _confirmationOf(editor.requestClose());
+      expect(renewed, isNot(same(confirmation)));
+      expect(renewed.savingOnClose, IntentionCreationSavingOnClose.notStarted);
+      expect(repository.commands, hasLength(1));
+    });
+
+    test('сброс после отказа оставляет непредъявленное право renderer и не подтверждает его во ViewModel', () async {
+      final session = await _failedFullDraftSession(
+        const IntentionUnavailableFailure(),
+      );
+      final presenter = session.coordinator.registerAppPresentation();
+      addTearDown(presenter.release);
+      final claim = session.state.failurePresentation!;
+      final confirmation = _confirmationOf(session.editor.requestClose());
+      expect(
+        confirmation.savingOnClose,
+        IntentionCreationSavingOnClose.notStarted,
+      );
+
+      expect(
+        session.editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.closed,
+      );
+      GraphAppPresentationClaim? fallback;
+      unawaited(presenter.nextClaim().then((value) => fallback = value));
+      await _settle(session.container);
+
+      final closed = session.state;
+      expect(closed.draftAvailability, IntentionDraftAvailability.closed);
+      expect(closed.failurePresentation, same(claim));
+      expect(
+        session.coordinator.claimInitiatorFailure(claim.token),
+        same(claim),
+      );
+      expect(fallback, isNull);
+
+      // Окончательное удаление renderer до предъявления передаёт право
+      // общей поверхности по протоколу renderer.
+      session.coordinator.releaseInitiatorClaim(claim);
+      await _settle(session.container);
+
+      expect(fallback?.token, same(claim.token));
+      session.coordinator.confirmPresentation(fallback!);
+      expect(session.repository.commands, hasLength(1));
+    });
+
+    test('новое открытие после сброса пусто и не получает данные или событие прежней команды', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
+      addTearDown(presenter.release);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Оставленный черновик')
+        ..changeDescription('Описание')
+        ..markFavorite()
+        ..confirmReadiness();
+      editor.draftTagSet.add(_tag(1, 'Дом'));
+      editor.submit();
+      expect(
+        editor.resolveClose(
+          _confirmationOf(editor.requestClose()),
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.closed,
+      );
+      subscription.close();
+      await _settle(container);
+
+      final reopenedProvider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final reopenedEvents = <IntentionEditorEvent>[];
+      final reopenedSubscription = container.listen(reopenedProvider, (
+        previous,
+        next,
+      ) {
+        final event = next.event;
+        if (event != null) {
+          reopenedEvents.add(event);
+        }
+      });
+      addTearDown(reopenedSubscription.close);
+      final reopened = container.read(reopenedProvider);
+
+      expect(reopened.draft.title, isEmpty);
+      expect(reopened.draft.description, isEmpty);
+      expect(reopened.draft.tagIds, isEmpty);
+      expect(reopened.draft.readiness, IntentionReadiness.notReady);
+      expect(reopened.draft.favoriteMark, FavoriteMark.notFavorite);
+      expect(reopened.selectedTags, isEmpty);
+      expect(reopened.closing, isA<IntentionCreationCloseNotRequested>());
+      expect(reopened.draftAvailability, IntentionDraftAvailability.editable);
+
+      repository.completeCommand(0, _savedResult());
+      await _settle(container);
+
+      expect(container.read(reopenedProvider), same(reopened));
+      expect(reopenedEvents, isEmpty);
+      expect(watches.count, 1);
+      final success = await presenter.nextClaim();
+      expect(
+        success!.completion,
+        isA<IntentionCommandCompletion>().having(
+          (completion) => completion.result,
+          'результат',
+          isA<ResultSuccess<IntentionCommandSuccess>>(),
+        ),
+      );
+      coordinator.confirmPresentation(success);
+      expect(repository.commands, hasLength(1));
+    });
+
+    test('освобождение сессии делает ожидающее подтверждение недействительным и для нового построения того же ключа', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final firstSubscription = container.listen(provider, (_, _) {});
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение');
+      final confirmation = _confirmationOf(editor.requestClose());
+
+      firstSubscription.close();
+      await _settle(container);
+
+      expect(
+        editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.outdated,
+      );
+      expect(editor.requestClose(), isA<IntentionCreationCloseSessionEnded>());
+      final reopenedSubscription = container.listen(provider, (_, _) {});
+      addTearDown(reopenedSubscription.close);
+      final rebuilt = container.read(provider.notifier);
+      for (final choice in IntentionCreationCloseChoice.values) {
+        expect(
+          rebuilt.resolveClose(confirmation, choice),
+          IntentionCreationCloseResolution.outdated,
+        );
+      }
+      final reopened = container.read(provider);
+      expect(reopened.closing, isA<IntentionCreationCloseNotRequested>());
+      expect(reopened.draftAvailability, IntentionDraftAvailability.editable);
+      expect(reopened.draft.isChanged, isFalse);
+      expect(repository.commands, isEmpty);
+    });
+  });
 }
+
+IntentionCreationCloseConfirmation _confirmationOf(
+  IntentionCreationCloseDecision decision,
+) => switch (decision) {
+  IntentionCreationCloseNeedsConfirmation(:final confirmation) => confirmation,
+  IntentionCreationClosedImmediately() ||
+  IntentionCreationCloseAwaitingConfirmation() ||
+  IntentionCreationCloseSessionEnded() => throw TestFailure(
+    'Ожидалось подтверждение закрытия, получено $decision.',
+  ),
+};
 
 enum _Recovery {
   /// Правка устранила причину: возможна новая проверка всей команды.

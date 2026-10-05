@@ -24,8 +24,15 @@ part 'intention_editor_view_model.g.dart';
 /// координатору одну команду с неизменяемым снимком всех пяти полей и до
 /// результата отвергает правки черновика и повторную отправку. Принятую
 /// отправку удерживает координатор: освобождение сессии её не отменяет и не
-/// снимает ограничение ключа формы. Сессия закрыта после успешного создания
-/// или освобождения и отвергает правки черновика.
+/// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
+/// закрытия по запросу или освобождения и отвергает правки черновика.
+///
+/// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
+/// черновик закрывается сразу, изменённый — после одного подтверждения,
+/// связанного с ключом сессии и состоянием отправки. Переходы в выбор и
+/// редактор тегов сессию не завершают. Закрытие не отменяет принятую отправку:
+/// её результат переходит общей поверхности, а право уже полученной ошибки
+/// остаётся у её renderer до его окончательного удаления.
 ///
 /// Отказ сохраняет весь черновик без нормализации и передаёт право
 /// предъявления ошибки renderer страницы. Новая отправка становится доступна
@@ -169,6 +176,75 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     }
   }
 
+  /// Решает запрос закрытия сессии от любого способа ухода.
+  ///
+  /// Неизменённый черновик завершает сессию сразу. Изменённый требует одного
+  /// подтверждения; повторный запрос до ответа второго не создаёт. Решение
+  /// сообщает, продолжится ли принятая отправка после закрытия. Запрос к
+  /// завершённой сессии ничего не закрывает.
+  IntentionCreationCloseDecision requestClose() {
+    if (!ref.mounted) {
+      return const IntentionCreationCloseSessionEnded();
+    }
+    switch (state.closing) {
+      case IntentionCreationClosedOnRequest():
+        return const IntentionCreationCloseSessionEnded();
+      case IntentionCreationCloseConfirming():
+        return const IntentionCreationCloseAwaitingConfirmation();
+      case IntentionCreationCloseNotRequested():
+        break;
+    }
+    final IntentionCreationSavingOnClose savingOnClose;
+    switch (state.draftAvailability) {
+      case IntentionDraftAvailability.closed:
+        return const IntentionCreationCloseSessionEnded();
+      case IntentionDraftAvailability.submitting:
+        savingOnClose = IntentionCreationSavingOnClose.continues;
+      case IntentionDraftAvailability.editable:
+        savingOnClose = IntentionCreationSavingOnClose.notStarted;
+    }
+    if (!state.draft.isChanged) {
+      _endOnRequest();
+      return IntentionCreationClosedImmediately(savingOnClose);
+    }
+    final confirmation = IntentionCreationCloseConfirmation(
+      formKey: _formKey,
+      savingOnClose: savingOnClose,
+    );
+    state = state.withCloseConfirmation(confirmation);
+    return IntentionCreationCloseNeedsConfirmation(confirmation);
+  }
+
+  /// Применяет ответ [choice] на подтверждение [confirmation].
+  ///
+  /// Ответ действует, только пока [confirmation] остаётся ожидающим
+  /// подтверждением этого построения сессии; иначе он ничего не меняет.
+  IntentionCreationCloseResolution resolveClose(
+    IntentionCreationCloseConfirmation confirmation,
+    IntentionCreationCloseChoice choice,
+  ) {
+    if (!ref.mounted || !identical(confirmation.formKey, _formKey)) {
+      return IntentionCreationCloseResolution.outdated;
+    }
+    final isPending = switch (state.closing) {
+      IntentionCreationCloseConfirming(confirmation: final pending) =>
+        identical(pending, confirmation),
+      IntentionCreationCloseNotRequested() ||
+      IntentionCreationClosedOnRequest() => false,
+    };
+    if (!isPending) {
+      return IntentionCreationCloseResolution.outdated;
+    }
+    switch (choice) {
+      case IntentionCreationCloseChoice.continueEditing:
+        state = state.withoutCloseConfirmation();
+        return IntentionCreationCloseResolution.continued;
+      case IntentionCreationCloseChoice.discardDraft:
+        _endOnRequest();
+        return IntentionCreationCloseResolution.closed;
+    }
+  }
+
   void consumeEvent() {
     if (state.event != null) {
       state = state.withoutEvent();
@@ -199,7 +275,8 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         ),
       };
     } on Object {
-      if (!ref.mounted) {
+      // Закрытая по запросу сессия уже передала результат общей поверхности.
+      if (!ref.mounted || state.closing is IntentionCreationClosedOnRequest) {
         return;
       }
       final token = _activeToken;
@@ -211,6 +288,22 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         const OperationFailed<Intention>(IntentionUnexpectedFailure()),
       );
     }
+  }
+
+  /// Завершает сессию по запросу закрытия, не отменяя принятую отправку.
+  ///
+  /// Результат выполняющейся отправки переходит общей поверхности. Право уже
+  /// полученной ошибки остаётся у её renderer: временное перекрытие его
+  /// сохраняет, а удаление renderer до предъявления передаёт общей
+  /// поверхности. Наблюдения тегов и контракт набора освобождаются при
+  /// переходе в закрытое состояние.
+  void _endOnRequest() {
+    final token = _activeToken;
+    _activeToken = null;
+    if (token != null) {
+      _coordinator.releaseInitiatorPresentation(token);
+    }
+    state = state.closedOnRequest();
   }
 
   GraphInitiatorPresentationClaim? _claimFailure(
