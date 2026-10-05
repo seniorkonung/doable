@@ -14,7 +14,7 @@
   - **Files likely touched:** `test/intention/presentation/editor/intention_creation_sheet_layout_test.dart`, `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.2 Сохранить сквозные проверки выбора тегов и отказов записи в компактной панели
+- [x] 1.2 Сохранить сквозные проверки выбора тегов и отказов записи в компактной панели
   - **Acceptance criteria:**
     - Существующие сценарии с настоящим маршрутизатором и хранилищем проходят через компактную панель, общий выбор и редактор тегов. Сохраняются проверки поиска тегов, полного черновика, прокрутки и возвращения в ту же сессию по [ADR-0018](../../../docs/adr/0018-manage-modal-creation-sessions-in-root-stack.md) и [ADR-0019](../../../docs/adr/0019-separate-tag-selection-context-from-persistence.md).
     - Сценарий отказа файлового хранилища сохраняет проверки атомарного отката, доступного сообщения, полного черновика и явного повтора. Удаляется только зависимость подготовки и ожидаемой геометрии от разворачивания; обязательства [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md) и [ADR-0012](../../../docs/adr/0012-centralize-graph-operation-result-presentation.md) продолжают проверяться.

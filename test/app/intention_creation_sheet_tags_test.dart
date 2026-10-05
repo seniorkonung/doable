@@ -34,7 +34,7 @@ const _gardenTag = 303;
 const _rawTitle = '  Купить семена ';
 const _description = 'Для грядок у дома';
 
-/// Описание, которое не помещается в развёрнутую панель и прокручивается.
+/// Описание, которое не помещается в компактную панель и прокручивается.
 final _longDescription = [for (var line = 1; line <= 40; line++) 'Строка $line']
     .join('\n');
 
@@ -48,7 +48,6 @@ const _creationTables = [
 
 final _sheet = find.byKey(const ValueKey('intention-creation-sheet'));
 final _chooseTags = find.byKey(const ValueKey('intention-editor-choose-tags'));
-final _resize = find.byKey(const ValueKey('intention-creation-sheet-resize'));
 final _favorite = find.byKey(const ValueKey('intention-editor-favorite'));
 final _readiness = find.byKey(const ValueKey('intention-editor-readiness'));
 final _readinessConfirmation = find.byKey(
@@ -148,7 +147,7 @@ void main() {
       expect(_text(tester, 'intention-editor-title'), _rawTitle);
       expect(_text(tester, 'intention-editor-description'), _description);
       expect(_iconOf(tester, _favorite), Icons.star);
-      expect(_iconOf(tester, _resize), Icons.open_in_full);
+      _expectCompactPanel(tester);
       expect(_chipNames(tester), ['Дом', 'Работа']);
       expect(
         find.byTooltip(l10n.editorRemoveDraftTag('Работа')),
@@ -180,9 +179,9 @@ void main() {
   );
 
   testWidgets(
-    'выбор из развёрнутой панели сохраняет поиск при сохранении и отмене '
+    'выбор из компактной панели сохраняет поиск при сохранении и отмене '
     'настоящего редактора, не включает новый тег без явного добавления, '
-    'возвращает режим и прокрутку панели, а сброс черновика сохраняет '
+    'возвращает ту же панель и её прокрутку, а сброс черновика сохраняет '
     'созданный тег',
     (tester) async {
       final app = await _App.start(tester);
@@ -196,17 +195,19 @@ void main() {
         _field('intention-editor-description'),
         _longDescription,
       );
-      await _tap(tester, _resize);
-      await tester.pumpAndSettle();
-      expect(_iconOf(tester, _resize), Icons.close_fullscreen);
       final graphBefore = app.storedGraph();
 
-      // Действие выбора лежит в конце прокрученных полей.
+      // Завершаем ввод перед прокруткой: возврат фокуса к каретке не должен
+      // подменять выбранную позицию. Выбор лежит в конце прокрученных полей.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
       await tester.ensureVisible(_chooseTags);
       await tester.pumpAndSettle();
       final fieldsOffset = _fieldsScroll(tester).pixels;
       expect(fieldsOffset, greaterThan(0));
+      _expectCompactPanel(tester);
       final sheetRect = tester.getRect(_sheet);
+      final sheetElement = tester.element(_sheet);
 
       await app.openChooser(tester);
       final tagSet = app.chooserTagSet();
@@ -267,11 +268,12 @@ void main() {
       await _tap(tester, _addToDraft);
       expect(tagSet.current.tagIds, [home, shed]);
 
-      // Возврат показывает ту же развёрнутую панель с прежней прокруткой.
+      // Возврат показывает ту же компактную панель с прежней прокруткой.
       await _tap(tester, find.byType(BackButton));
       await tester.pumpAndSettle();
       expect(app.stackNames(), [AppShellRoute.name, IntentionEditorRoute.name]);
-      expect(_iconOf(tester, _resize), Icons.close_fullscreen);
+      expect(tester.element(_sheet), same(sheetElement));
+      _expectCompactPanel(tester);
       expect(tester.getRect(_sheet), sheetRect);
       expect(_fieldsScroll(tester).pixels, fieldsOffset);
       expect(_text(tester, 'intention-editor-title'), _rawTitle);
@@ -306,7 +308,7 @@ void main() {
       // Новое открытие панели начинает пустой набор новой сессии.
       await app.openPanel(tester);
       expect(_chipNames(tester), isEmpty);
-      expect(_iconOf(tester, _resize), Icons.open_in_full);
+      _expectCompactPanel(tester);
       await app.openChooser(tester);
       final nextTagSet = app.chooserTagSet();
       expect(nextTagSet, isNot(same(tagSet)));
@@ -320,7 +322,7 @@ void main() {
 
   testWidgets(
     'все пять полей, подготовленные в панели и общем выборе, переживают '
-    'объяснение готовности, разворачивание и сворачивание, переходы в выбор '
+    'объяснение готовности, переходы из компактной панели в выбор '
     'и настоящий редактор тега и продолжение после запроса закрытия, а '
     'намерение, назначения и избранное записывает только «Сохранить»',
     (tester) async {
@@ -360,16 +362,10 @@ void main() {
       expectPreparedFields([]);
       expect(app.storedGraph(), graphBefore);
 
-      // Разворачивание меняет только размер той же панели.
-      final compactHeight = tester.getRect(_sheet).height;
-      await _tap(tester, _resize);
-      await tester.pumpAndSettle();
-      expect(_iconOf(tester, _resize), Icons.close_fullscreen);
-      final expandedRect = tester.getRect(_sheet);
-      expect(expandedRect.height, greaterThan(compactHeight));
-      expectPreparedFields([]);
+      _expectCompactPanel(tester);
+      final sheetElement = tester.element(_sheet);
 
-      // Выбор и настоящий редактор над развёрнутой панелью: существующий тег
+      // Выбор и настоящий редактор над компактной панелью: существующий тег
       // и созданный самостоятельной операцией входят в набор только явным
       // добавлением.
       await app.openChooser(tester);
@@ -392,22 +388,16 @@ void main() {
       await _tap(tester, find.byType(BackButton));
       await tester.pumpAndSettle();
 
-      // Возврат показывает ту же развёрнутую панель со всеми пятью полями;
+      // Возврат показывает ту же компактную панель со всеми пятью полями;
       // граф получил только самостоятельный тег.
       expect(app.stackNames(), [AppShellRoute.name, IntentionEditorRoute.name]);
-      expect(_iconOf(tester, _resize), Icons.close_fullscreen);
-      expect(tester.getRect(_sheet), expandedRect);
+      expect(tester.element(_sheet), same(sheetElement));
+      _expectCompactPanel(tester);
       expectPreparedFields(['Дом', 'Сарай']);
       expect(app.storedGraph(), graphBefore);
       expect(app.storedTagNames(), ['Дом', 'Работа', 'Сад', 'Сарай']);
 
-      // Сворачивание сохраняет черновик без подтверждения потери данных.
-      await _tap(tester, _resize);
-      await tester.pumpAndSettle();
-      expect(_iconOf(tester, _resize), Icons.open_in_full);
-      expect(tester.getRect(_sheet).height, lessThan(expandedRect.height));
       expect(_closeConfirmation, findsNothing);
-      expectPreparedFields(['Дом', 'Сарай']);
 
       // Продолжение после запроса закрытия оставляет ту же сессию.
       await _tap(tester, _close);
@@ -417,6 +407,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(_closeConfirmation, findsNothing);
       expect(app.stackNames(), [AppShellRoute.name, IntentionEditorRoute.name]);
+      expect(tester.element(_sheet), same(sheetElement));
+      _expectCompactPanel(tester);
       expectPreparedFields(['Дом', 'Сарай']);
       expect(tagSet.current.tagIds, [home, shed]);
       expect(tagSet.current.availability, IntentionDraftAvailability.editable);
@@ -757,6 +749,13 @@ TagId _tagId(int number) => switch (TagId.decode(tagFixtureId(number))) {
 
 Size _screen(WidgetTester tester) =>
     tester.view.physicalSize / tester.view.devicePixelRatio;
+
+/// Панель оставляет видимую часть каталога и прилегает к низу экрана.
+void _expectCompactPanel(WidgetTester tester) {
+  final rect = tester.getRect(_sheet);
+  expect(rect.top, greaterThanOrEqualTo(72));
+  expect(rect.bottom, _screen(tester).height);
+}
 
 Finder _field(String key) => find.byKey(ValueKey(key));
 

@@ -232,18 +232,16 @@ void main() {
   }
 
   testWidgets('отказ файлового хранилища после всех записей полного черновика '
-      'откатывает граф, FTS, порядок и ревизию; панель предъявляет один отказ '
-      'и явный повтор сохраняет одно намерение даже при отказе диагностики', (
-    tester,
-  ) async {
+      'откатывает граф, FTS, порядок и ревизию; компактная панель '
+      'предъявляет один отказ и явный повтор сохраняет одно намерение '
+      'даже при отказе диагностики', (tester) async {
     final app = await _launch(tester);
     final sport = await _prepare(tester, app);
     final before = _storedGraph(app.raw);
     final revision = await _revision(tester, app);
     final marks = storedFavoriteMarks(app.raw);
-    await _tap(tester, _key('intention-creation-sheet-resize'));
-    await tester.pumpAndSettle();
-    final expandedHeight = tester.getSize(_sheet).height;
+    final sheetElement = tester.element(_sheet);
+    expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
     app.storage.observeCreation(fail: true);
     app.diagnostics.throwOnIntentionCommand = true;
     await _tap(tester, _submit);
@@ -258,6 +256,7 @@ void main() {
         isA<IntentionUnavailableFailure>(),
       ),
     );
+    expect(failed.confirmedChange, isNull);
     _expectFaultPoint(app, [_home, sport]);
     expect(_storedGraph(app.raw), before);
     expect(storedFavoriteMarks(app.raw), marks);
@@ -266,8 +265,14 @@ void main() {
       GraphRevisionOrder.same,
     );
     _expectDraft(tester, [_home, sport]);
-    expect(tester.getSize(_sheet).height, expandedHeight);
+    expect(tester.element(_sheet), same(sheetElement));
+    expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
     _expectInlineFailure(tester, app, failed, app.l10n.editorCreateUnavailable);
+    expect(
+      tester.getSemantics(_failure),
+      isSemantics(label: app.l10n.editorCreateUnavailable),
+    );
+    expect(_submit.hitTestable(), findsOneWidget);
     expect(tester.widget<FilledButton>(_submit).onPressed, isNotNull);
     expect(_intentionEvents(app), [
       _createEvent(
@@ -279,6 +284,8 @@ void main() {
 
     // Одноразовый hook уже снял отказ. Сами поля и исправления не
     // отправляют новую команду: повтор выполняется только кнопкой панели.
+    expect(app.creations, [same(failed)]);
+    expect(app.storage.creationAttempts, 1);
     await _tap(tester, _submit);
     final saved = await _creation(tester, app, count: 2);
     await _wait(tester, () => _sheet.evaluate().isEmpty);
