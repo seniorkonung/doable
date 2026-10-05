@@ -75,6 +75,7 @@ void main() {
               _panel(l10n, tags: [for (final tag in tags) tag.name.value]),
               reason: '$size, клавиатура $keyboard, тегов: ${tags.length}',
             );
+            _expectNoSizeActions();
           }
         }
         semantics.dispose();
@@ -143,6 +144,7 @@ void main() {
         await tester.enterText(find.byKey(_title), _userTitle);
         await tester.enterText(find.byKey(_description), _userDescription);
         await tester.pumpAndSettle();
+        _expectNoSizeActions();
         expect(
           find.semantics.byLabel(l10n.editorTitleLabel).evaluate().single,
           isSemantics(value: _userTitle, isTextField: true, isMultiline: true),
@@ -190,6 +192,7 @@ void main() {
         _expectSameSession(sessions, session);
         expect(_isFocusedIn(tester, find.byKey(_description)), isTrue);
         expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
+        _expectNoSizeActions();
 
         tester.semantics.tap(_nodeOf(tester, find.byKey(_favorite)));
         await tester.pumpAndSettle();
@@ -490,6 +493,15 @@ void main() {
         expect(router.current.name, IntentionEditorRoute.name);
         expect(_isFocusedIn(tester, find.byKey(_title)), isTrue);
         await tester.enterText(find.byKey(_title), _userTitle);
+        await tester.pumpAndSettle();
+
+        // Действие экранной клавиатуры ведёт из растущего названия в
+        // описание, сохраняя точный текст без дополнительных переносов.
+        await tester.testTextInput.receiveAction(TextInputAction.next);
+        await tester.pumpAndSettle();
+        expect(_isFocusedIn(tester, find.byKey(_description)), isTrue);
+        expect(sessions.state(tester).draft.title, _userTitle);
+        await tester.tap(find.byKey(_title));
         await tester.pumpAndSettle();
 
         // Порядок обхода совпадает с порядком чтения и замыкается в панели.
@@ -812,6 +824,41 @@ List<String> _traversal(WidgetTester tester) => [
       SemanticsData(:final tooltip) => tooltip,
     },
 ];
+
+/// Старые действия отсутствуют в тексте, подсказках и всём семантическом
+/// дереве, включая названия и подсказки дополнительных действий диктора.
+/// https://api.flutter.dev/flutter/semantics/SemanticsData/customSemanticsActionIds.html
+void _expectNoSizeActions() {
+  for (final label in const [
+    'Развернуть форму',
+    'Свернуть форму',
+    'Expand the form',
+    'Collapse the form',
+  ]) {
+    expect(find.text(label), findsNothing);
+    expect(find.byTooltip(label), findsNothing);
+    expect(
+      find.semantics.byPredicate((node) {
+        final data = node.getSemanticsData();
+        final descriptions = [data.label, data.hint, data.tooltip];
+        for (final id in data.customSemanticsActionIds ?? const <int>[]) {
+          if (CustomSemanticsAction.getAction(id) case final action?) {
+            descriptions.addAll([action.label ?? '', action.hint ?? '']);
+          }
+        }
+        return descriptions.any((text) => text.contains(label));
+      }, describeMatch: (_) => 'действие изменения размера «$label»'),
+      findsNothing,
+    );
+  }
+  expect(
+    find.semantics.byAnyAction([
+      SemanticsAction.increase,
+      SemanticsAction.decrease,
+    ]),
+    findsNothing,
+  );
+}
 
 /// Узел экранного диктора, которым объявлен виджет [finder].
 FinderBase<SemanticsNode> _nodeOf(WidgetTester tester, Finder finder) {

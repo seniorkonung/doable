@@ -50,7 +50,7 @@
   - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_page.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/intention/presentation/editor/intention_creation_sheet_layout_test.dart`, `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 1.5 Завершить доступность адаптивной формы и удалить локализации изменения размера
+- [x] 1.5 Завершить доступность адаптивной формы и удалить локализации изменения размера
   - **Acceptance criteria:**
     - В RU/EN среди видимых действий, подсказок и семантических действий отсутствуют разворачивание и сворачивание формы. Сохранены порядок чтения, доступное закрытие, названия полей, объяснения состояний иконок и недоступность каталога под модальной панелью.
     - Удалены только строки и метаданные `editorExpandFormAction` и `editorCollapseFormAction`; производные локализации получены генератором. Назначение и многострочное представление названия, клавиатурный обход и доступность сохранения соответствуют итоговому интерфейсу.

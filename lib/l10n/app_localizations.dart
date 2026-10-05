@@ -1556,18 +1556,6 @@ abstract class AppLocalizations {
   /// **'Close the form'**
   String get editorCloseFormAction;
 
-  /// Подсказка и доступное название кнопки, разворачивающей компактную панель создания намерения на всю доступную высоту
-  ///
-  /// In en, this message translates to:
-  /// **'Expand the form'**
-  String get editorExpandFormAction;
-
-  /// Подсказка и доступное название кнопки, возвращающей развёрнутую панель создания намерения к компактному виду
-  ///
-  /// In en, this message translates to:
-  /// **'Collapse the form'**
-  String get editorCollapseFormAction;
-
   /// Доступное название быстрой отметки избранного в черновике нового намерения
   ///
   /// In en, this message translates to:
