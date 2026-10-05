@@ -16,6 +16,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -247,8 +248,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(h.router.current.name, TagCatalogRoute.name);
         expect(
-          h.router.current.argsAs<TagCatalogRouteArgs>().intentionId,
-          intentionId,
+          h.router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
+          TagAssignmentContext(intentionId),
         );
         expect(_tagData(h.raw), before);
         final assign = find.byKey(const ValueKey('tag-catalog-assign'));
@@ -336,8 +337,9 @@ _pumpCatalog(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(
-          deepLinkBuilder: (_) =>
-              DeepLink([TagCatalogRoute(intentionId: intentionId)]),
+          deepLinkBuilder: (_) => DeepLink([
+            TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
+          ]),
         ),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
@@ -354,3 +356,11 @@ _pumpCatalog(
   );
   return (router: router, raw: raw, container: container);
 }
+
+/// Прежний смысл необязательного получателя: без намерения — просмотр
+/// каталога, с намерением — назначение ему.
+TagSelectionContext _selectionContext(IntentionId? intentionId) =>
+    switch (intentionId) {
+      null => const TagBrowseContext(),
+      final intentionId => TagAssignmentContext(intentionId),
+    };

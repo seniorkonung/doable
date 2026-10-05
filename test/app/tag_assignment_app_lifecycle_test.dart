@@ -24,6 +24,7 @@ import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.da
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
+import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -89,8 +90,11 @@ void main() {
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               routerConfig: router.config(
-                deepLinkBuilder: (_) =>
-                    DeepLink([TagCatalogRoute(intentionId: target)]),
+                deepLinkBuilder: (_) => DeepLink([
+                  TagCatalogRoute(
+                    selectionContext: TagAssignmentContext(target),
+                  ),
+                ]),
               ),
             ),
           ),
@@ -236,7 +240,11 @@ void main() {
         final nextProvider = tagCatalogViewModelProvider(
           mode: TagCatalogSelectionMode(nextTarget),
         );
-        unawaited(router.push<void>(TagCatalogRoute(intentionId: nextTarget)));
+        unawaited(
+          router.push<void>(
+            TagCatalogRoute(selectionContext: TagAssignmentContext(nextTarget)),
+          ),
+        );
         await _pumpUntil(
           tester,
           () => ready.container.read(nextProvider) is TagCatalogLoaded,

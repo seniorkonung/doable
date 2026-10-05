@@ -184,7 +184,11 @@ void main() {
         await tester.enterText(_search, 'работ');
         await tester.pump();
         final firstInput = tester.widget<TextField>(_search).controller!;
-        unawaited(router.push<void>(TagCatalogRoute(intentionId: intentionId)));
+        unawaited(
+          router.push<void>(
+            TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
+          ),
+        );
         await tester.pumpAndSettle();
         final secondInput = tester.widget<TextField>(_search).controller!;
         expect(secondInput, isNot(same(firstInput)));
@@ -200,7 +204,11 @@ void main() {
         expect(tester.widget<TextField>(_search).controller, same(firstInput));
         expect(_visibleNames(tester), ['Работа']);
         expect(() => secondInput.addListener(() {}), throwsFlutterError);
-        unawaited(router.push<void>(TagCatalogRoute(intentionId: intentionId)));
+        unawaited(
+          router.push<void>(
+            TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
         expect(_visibleNames(tester), ['Дом', 'Работа']);
@@ -1190,8 +1198,9 @@ Future<AppRouter> _pumpStoredCatalog(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router.config(
-          deepLinkBuilder: (_) =>
-              DeepLink([TagCatalogRoute(intentionId: intentionId)]),
+          deepLinkBuilder: (_) => DeepLink([
+            TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
+          ]),
         ),
       ),
     ),
@@ -1230,11 +1239,14 @@ Future<TagCatalogTestRepository> _pumpCatalog(
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: sessionIntention == null
-                  ? TagCatalogPage(intentionId: intentionId)
+                  ? TagCatalogPage(
+                      selectionContext: _selectionContext(intentionId),
+                    )
                   : ValueListenableBuilder<IntentionId?>(
                       valueListenable: sessionIntention,
-                      builder: (context, currentIntention, _) =>
-                          TagCatalogPage(intentionId: currentIntention),
+                      builder: (context, currentIntention, _) => TagCatalogPage(
+                        selectionContext: _selectionContext(currentIntention),
+                      ),
                     ),
             )
           : MaterialApp.router(
@@ -1242,8 +1254,11 @@ Future<TagCatalogTestRepository> _pumpCatalog(
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               routerConfig: router.config(
-                deepLinkBuilder: (_) =>
-                    DeepLink([TagCatalogRoute(intentionId: intentionId)]),
+                deepLinkBuilder: (_) => DeepLink([
+                  TagCatalogRoute(
+                    selectionContext: _selectionContext(intentionId),
+                  ),
+                ]),
               ),
             ),
     ),
@@ -1302,3 +1317,11 @@ Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
 );
+
+/// Прежний смысл необязательного получателя: без намерения — просмотр
+/// каталога, с намерением — назначение ему.
+TagSelectionContext _selectionContext(IntentionId? intentionId) =>
+    switch (intentionId) {
+      null => const TagBrowseContext(),
+      final intentionId => TagAssignmentContext(intentionId),
+    };

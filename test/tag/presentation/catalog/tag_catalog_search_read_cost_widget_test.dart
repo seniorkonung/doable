@@ -57,9 +57,11 @@ void main() {
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: TagCatalogPage(
-                intentionId: mode is TagCatalogSelectionMode
-                    ? mode.intentionId
-                    : null,
+                selectionContext: switch (mode) {
+                  TagCatalogBrowseMode() => const TagBrowseContext(),
+                  TagCatalogSelectionMode(:final intentionId) =>
+                    TagAssignmentContext(intentionId),
+                },
               ),
             ),
           ),

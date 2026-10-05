@@ -408,7 +408,19 @@ Future<void> _showAccessibleSearch(
   addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
   await openIntentionGraph(tester, waitFor: _until);
   await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
-  unawaited(router.push(TagCatalogRoute(intentionId: intentionId)));
+  unawaited(
+    router.push(
+      TagCatalogRoute(selectionContext: _selectionContext(intentionId)),
+    ),
+  );
   await _until(tester, readyMarker ?? find.text(tagName ?? 'Работа'));
   await tester.pumpAndSettle();
 }
+
+/// Прежний смысл необязательного получателя: без намерения — просмотр
+/// каталога, с намерением — назначение ему.
+TagSelectionContext _selectionContext(IntentionId? intentionId) =>
+    switch (intentionId) {
+      null => const TagBrowseContext(),
+      final intentionId => TagAssignmentContext(intentionId),
+    };
