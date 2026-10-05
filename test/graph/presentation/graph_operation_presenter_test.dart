@@ -83,6 +83,71 @@ void main() {
   );
 
   testWidgets(
+    'Scaffold модальной панели, появившийся и снятый во время показа, '
+    'получает текущее сообщение без повтора, перезапуска и вытеснения '
+    'следующим результатом',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final first = harness.startDelete(index: 1, title: 'Первое');
+      final second = harness.startDelete(index: 2, title: 'Второе');
+      harness.completeDeleted(first);
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Первое')), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 3));
+      const sheet = ValueKey('modal-sheet');
+      final navigator = Navigator.of(tester.element(find.byType(Scaffold)));
+      unawaited(
+        navigator.push(
+          PageRouteBuilder<void>(
+            opaque: false,
+            pageBuilder: (_, _, _) => const Scaffold(
+              key: sheet,
+              backgroundColor: Colors.transparent,
+              body: SizedBox.expand(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Модальная поверхность показывает то же сообщение, а не второе.
+      expect(
+        find.descendant(
+          of: find.byKey(sheet),
+          matching: find.text(_deleted('Первое')),
+        ),
+        findsOneWidget,
+      );
+      harness.completeDeleted(second);
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Второе')), findsNothing);
+
+      // Появление поверхности не перезапустило срок текущего сообщения.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Первое')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(sheet),
+          matching: find.text(_deleted('Второе')),
+        ),
+        findsOneWidget,
+      );
+
+      // Снятие модальной поверхности не повторяет и не перезапускает
+      // следующее сообщение.
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.text(_deleted('Второе')), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
     'success с живым инициатором и fallback-ошибка используют одну очередь',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
