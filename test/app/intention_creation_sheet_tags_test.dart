@@ -278,6 +278,8 @@ void main() {
       expect(_text(tester, 'intention-editor-description'), _longDescription);
       expect(_chipNames(tester), ['Дом', 'Сарай']);
       expect(app.storedGraph(), graphBefore);
+      // Сообщение о созданном теге видно и над вернувшейся панелью.
+      await app.closeMessage(tester);
 
       // Повторное открытие выбора начинает новый поиск над тем же набором.
       await app.openChooser(tester);
@@ -700,9 +702,16 @@ final class _App {
       completion!.result,
       isA<GraphResultSuccess<TagCommandSuccess, TagCommandFailure>>(),
     );
+    await closeMessage(tester);
+  }
+
+  /// Закрывает текущее сообщение общей поверхности. Над панелью оно лежит
+  /// поверх нижнего края её полей и перехватывает нажатия на них.
+  Future<void> closeMessage(WidgetTester tester) async {
     await _until(tester, _message);
     await tester.pumpAndSettle();
-    ScaffoldMessenger.of(tester.element(_message)).hideCurrentSnackBar();
+    // Все копии сообщения принадлежат одной общей поверхности.
+    ScaffoldMessenger.of(tester.element(_message.first)).hideCurrentSnackBar();
     await tester.pumpAndSettle();
   }
 

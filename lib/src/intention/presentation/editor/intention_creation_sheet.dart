@@ -28,6 +28,10 @@ import 'intention_creation_sheet_mode.dart';
 /// остаётся видимым при любой прокрутке полей. По запросу [reveal] панель
 /// доводит часть полей до видимости и удерживает её видимой при пересчёте
 /// своей геометрии.
+///
+/// Поля лежат в собственном `Scaffold` панели, поэтому сообщение общей
+/// поверхности приложения видно поверх нижнего края полей и не перекрывает
+/// закреплённое сообщение и нижнюю часть.
 final class IntentionCreationSheet extends StatefulWidget {
   const IntentionCreationSheet({
     required this.mode,
@@ -353,13 +357,16 @@ final class _IntentionCreationSheetState extends State<IntentionCreationSheet>
                               onDragUpdate: _updateDrag,
                               onDragEnd: _endDrag,
                             ),
-                            body: SingleChildScrollView(
-                              key: const ValueKey(
-                                'intention-creation-sheet-fields',
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [widget.header, widget.fields],
+                            body: _FieldsScaffold(
+                              child: SingleChildScrollView(
+                                key: const ValueKey(
+                                  'intention-creation-sheet-fields',
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [widget.header, widget.fields],
+                                ),
                               ),
                             ),
                             status: switch (widget.status) {
@@ -473,6 +480,137 @@ final class _TopBar extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Собственный `Scaffold` панели вокруг её прокручиваемых полей.
+///
+/// Через него панель участвует в общем `ScaffoldMessenger` приложения:
+/// сообщение общей поверхности появляется поверх полей у их нижнего края —
+/// над закреплённым сообщением и нижней частью с основным действием, которые
+/// оно не перекрывает. Собственного messenger у панели нет.
+///
+/// `Scaffold` занимает всю данную ему высоту, поэтому при ограничении только
+/// сверху область, как и сами поля, следует за высотой полей.
+final class _FieldsScaffold extends StatefulWidget {
+  const _FieldsScaffold({required this.child});
+
+  /// Прокручиваемые поля панели.
+  final Widget child;
+
+  @override
+  State<_FieldsScaffold> createState() => _FieldsScaffoldState();
+}
+
+final class _FieldsScaffoldState extends State<_FieldsScaffold> {
+  final _fields = _FieldsExtent();
+
+  @override
+  Widget build(BuildContext context) => _FieldsFrame(
+    fields: _fields,
+    child: Scaffold(
+      backgroundColor: Colors.transparent,
+      // Клавиатуру и безопасные отступы уже учла раскладка панели.
+      resizeToAvoidBottomInset: false,
+      body: _FieldsProbe(fields: _fields, child: widget.child),
+    ),
+  );
+}
+
+/// Высота полей при их последней раскладке внутри `Scaffold`.
+final class _FieldsExtent {
+  var height = 0.0;
+}
+
+/// Запоминает высоту, которую заняли поля в теле `Scaffold`.
+final class _FieldsProbe extends SingleChildRenderObjectWidget {
+  const _FieldsProbe({required this.fields, required super.child});
+
+  final _FieldsExtent fields;
+
+  @override
+  _RenderFieldsProbe createRenderObject(BuildContext context) =>
+      _RenderFieldsProbe(fields);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderFieldsProbe renderObject,
+  ) => renderObject.fields = fields;
+}
+
+final class _RenderFieldsProbe extends RenderProxyBox {
+  _RenderFieldsProbe(this.fields);
+
+  _FieldsExtent fields;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    fields.height = size.height;
+  }
+}
+
+/// Ограничивает `Scaffold` полей высотой самих полей, когда высота задана
+/// только сверху.
+///
+/// Сначала `Scaffold` раскладывается во всю доступную высоту, и тело
+/// получает поля по их высоте; затем — повторно в высоту полей. Оба
+/// ограничения нестрогие, поэтому рост и уменьшение полей снова доходят до
+/// раскладки панели.
+final class _FieldsFrame extends SingleChildRenderObjectWidget {
+  const _FieldsFrame({required this.fields, required super.child});
+
+  final _FieldsExtent fields;
+
+  @override
+  _RenderFieldsFrame createRenderObject(BuildContext context) =>
+      _RenderFieldsFrame(fields);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderFieldsFrame renderObject,
+  ) => renderObject.fields = fields;
+}
+
+final class _RenderFieldsFrame extends RenderProxyBox {
+  _RenderFieldsFrame(this._fields);
+
+  _FieldsExtent _fields;
+
+  set fields(_FieldsExtent value) {
+    if (identical(value, _fields)) {
+      return;
+    }
+    _fields = value;
+    markNeedsLayout();
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    assert(
+      debugCannotComputeDryLayout(
+        reason: 'Высота области полей зависит от их раскладки.',
+      ),
+    );
+    return Size.zero;
+  }
+
+  @override
+  void performLayout() {
+    final scaffold = child!;
+    scaffold.layout(constraints, parentUsesSize: true);
+    if (!constraints.hasTightHeight) {
+      final height = constraints.constrainHeight(_fields.height);
+      if (height < scaffold.size.height) {
+        scaffold.layout(
+          constraints.copyWith(maxHeight: height),
+          parentUsesSize: true,
+        );
+      }
+    }
+    size = scaffold.size;
   }
 }
 

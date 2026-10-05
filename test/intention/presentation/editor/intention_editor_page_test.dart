@@ -686,7 +686,9 @@ void main() {
         const ResultFailure(IntentionUnavailableFailure()),
       );
       await tester.pumpAndSettle();
-      expect(find.text(busyMessage), findsOneWidget);
+      // Над панелью видна одна копия сообщения; копия каталога лежит под
+      // модальным фоном.
+      expect(find.text(busyMessage).hitTestable(), findsOneWidget);
 
       await tester.enterText(
         find.byKey(const ValueKey('intention-editor-title')),
@@ -2173,6 +2175,110 @@ void main() {
       },
     );
   });
+
+  group('общие сообщения над панелью создания', () {
+    for (final scenario in [
+      (name: 'компактная панель', expand: false, insets: _phoneInsets),
+      (name: 'развёрнутая панель', expand: true, insets: _phoneInsets),
+      (
+        name: 'компактная панель над клавиатурой',
+        expand: false,
+        insets: _keyboardInsets,
+      ),
+    ]) {
+      testWidgets('общее сообщение видно поверх панели (${scenario.name}) и не '
+          'перекрывает закреплённый отказ и сохранение', (tester) async {
+        final semantics = tester.ensureSemantics();
+        _usePhone(tester, scenario.insets);
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository);
+        if (scenario.expand) {
+          await tester.tap(find.byKey(_resize));
+          await tester.pumpAndSettle();
+        }
+        await tester.enterText(find.byKey(_title), 'Намерение');
+        await tester.tap(find.byKey(_submit));
+        await tester.pump();
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(_pinnedFailure).hitTestable(), findsOneWidget);
+
+        // Общая поверхность получает результат операции другого экрана.
+        _showAppSurfaceFailure(tester, repository, commandIndex: 1);
+        await tester.pumpAndSettle();
+
+        final visible = find.byKey(_operationMessage).hitTestable();
+        expect(visible, findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(IntentionEditorPage),
+            matching: visible,
+          ),
+          findsOneWidget,
+        );
+        final message = tester.getRect(
+          find.ancestor(of: visible, matching: find.byType(SnackBar)),
+        );
+        final sheet = tester.getRect(find.byKey(_sheet));
+        expect(message.top, greaterThanOrEqualTo(sheet.top));
+        expect(message.left, greaterThanOrEqualTo(sheet.left));
+        expect(message.right, lessThanOrEqualTo(sheet.right));
+        expect(
+          message.bottom,
+          lessThanOrEqualTo(tester.getRect(find.byKey(_pinnedFailure)).top),
+        );
+        expect(
+          message.bottom,
+          lessThanOrEqualTo(tester.getRect(find.byKey(_submit)).top),
+        );
+        expect(find.byKey(_submit).hitTestable(), findsOneWidget);
+        // Экранный диктор получает одно сообщение: копия под модальным
+        // фоном ему недоступна.
+        expect(
+          find.semantics.byPredicate(
+            (node) =>
+                node.label == _otherFailureMessage &&
+                node.flagsCollection.isLiveRegion,
+          ),
+          findsOne,
+        );
+        semantics.dispose();
+      });
+    }
+  });
+}
+
+const _operationMessage = ValueKey('graph-operation-message');
+const _pinnedFailure = ValueKey('intention-editor-failure');
+
+/// Сообщение общей поверхности об отказе удаления другого намерения.
+const _otherFailureMessage =
+    'Delete — “Другое намерение”: The intention couldn’t be deleted. '
+    'Try again.';
+
+/// Принимает удаление другого намерения без живого инициатора и завершает его
+/// отказом: результат предъявляет только общая поверхность.
+void _showAppSurfaceFailure(
+  WidgetTester tester,
+  ControlledCatalogRepository repository, {
+  required int commandIndex,
+}) {
+  final coordinator = ProviderScope.containerOf(
+    tester.element(find.byType(MaterialApp)),
+  ).read(graphCommandCoordinatorProvider.notifier);
+  final other = testIntention(index: 40, title: 'Другое намерение');
+  final accepted = coordinator.acceptExisting(
+    DeleteIntention(other.id),
+    presentationTitle: other.title,
+  ) as IntentionCommandAccepted;
+  coordinator.releaseInitiatorPresentation(accepted.token);
+  repository.completeCommand(
+    commandIndex,
+    const ResultFailure(IntentionUnavailableFailure()),
+  );
 }
 
 const _sheet = ValueKey('intention-creation-sheet');
