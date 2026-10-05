@@ -545,9 +545,8 @@ final class _CloseConfirmationDialogState
       ),
     };
     final colors = Theme.of(context).colorScheme;
-    return AlertDialog(
+    return _ScrollableAlertDialog(
       key: const ValueKey('intention-editor-close-confirmation'),
-      scrollable: true,
       title: Text(title),
       content: Text(message),
       actions: [
@@ -763,9 +762,8 @@ final class _ReadinessConfirmationDialogState
     if (!isPending) {
       _dismissOutdated();
     }
-    return AlertDialog(
+    return _ScrollableAlertDialog(
       key: const ValueKey('intention-editor-readiness-confirmation'),
-      scrollable: true,
       title: Text(localizations.editorReadinessConfirmationTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -810,4 +808,48 @@ final class _ReadinessConfirmationDialogState
       }
     });
   }
+}
+
+/// Диалог над панелью, в котором заголовок, текст и действия прокручиваются
+/// вместе.
+///
+/// Стандартный [AlertDialog] прокручивает только заголовок и текст, а
+/// действия держит отдельно. Диалог открывается из поля ввода, и пока
+/// платформа скрывает клавиатуру, над ней при увеличенном тексте остаётся
+/// меньше высоты, чем занимают сами действия: они переполняли бы диалог и
+/// становились недоступными. Здесь действия стоят в той же прокрутке после
+/// стандартного отступа от текста и с прежней раскладкой, поэтому любая
+/// высота оставляет их доступными прокруткой.
+final class _ScrollableAlertDialog extends StatelessWidget {
+  const _ScrollableAlertDialog({
+    required this.title,
+    required this.content,
+    required this.actions,
+    super.key,
+  });
+
+  final Widget title;
+  final Widget content;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: title,
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        content,
+        // Отступ между текстом и действиями стандартного диалога.
+        const SizedBox(height: 24),
+        OverflowBar(
+          alignment: MainAxisAlignment.end,
+          spacing: 8,
+          overflowAlignment: OverflowBarAlignment.end,
+          children: actions,
+        ),
+      ],
+    ),
+  );
 }

@@ -406,6 +406,42 @@ void main() {
         );
       }
     }
+
+    for (final (device, minFieldsHeight) in [
+      // Высоты над клавиатурой хватает только на часть области полей.
+      (_landscape, 1.0),
+      (_wideLandscape, kMinInteractiveDimension),
+    ]) {
+      testWidgets(
+        'компактная панель над клавиатурой на ${device.name} уменьшает видимый участок страницы не ниже минимума ради видимой области полей, а название доступно касанию и экранному диктору',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          _usePhone(tester, device, keyboard: true);
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository();
+          await _openEditor(tester, repository, sessions);
+          await tester.enterText(find.byKey(_description), _lines(12));
+          await tester.pumpAndSettle();
+
+          expect(sessions.state(tester).sheetMode, _compactMode);
+          _expectCompact(tester, _sheetRect(tester), device, keyboard: true);
+          _expectSubmitAvailable(tester, device, keyboard: true);
+          expect(
+            tester.getRect(find.byKey(_fields)).height,
+            greaterThanOrEqualTo(minFieldsHeight),
+          );
+          await _scrollToCenter(tester, _title);
+          expect(find.byKey(_title).hitTestable(), findsOneWidget);
+          expect([
+            for (final node
+                in tester.semantics.simulatedAccessibilityTraversal())
+              node.label,
+          ], containsAll(['Title', 'Description (optional)']));
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        },
+      );
+    }
   });
 
   group('сохранение сессии', () {
@@ -849,6 +885,419 @@ void main() {
       },
     );
   });
+
+  group('полный заполненный сценарий на тесном экране', () {
+    for (final device in [_narrowPortrait, _narrowLandscape]) {
+      for (final textScale in [_androidMaxTextScale, _beyondMaxTextScale]) {
+        // До максимума Android «Сохранить» видно целиком, а сообщение отказа
+        // читается без клавиатуры; сверх него кнопки остаются нажимаемыми, а
+        // остаток закреплённой части прокручивается.
+        final isWithinPlatformTextScale = textScale <= _androidMaxTextScale;
+        testWidgets(
+          'на ${device.name} с безопасными отступами, клавиатурой и масштабом текста ${(textScale * 100).round()}% все пять полей, размер, закрытие, объяснения, сохранение и исправление отказов доступны без переполнений',
+          (tester) async {
+            final semantics = tester.ensureSemantics();
+            _usePhone(tester, device, keyboard: true);
+            tester.platformDispatcher.textScaleFactorTestValue = textScale;
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final tags = [
+              _tag(1, 'Дом'),
+              _tag(2, 'Очень длинное название тега, которое переносится'),
+            ];
+            final sessions = _EditorSessions();
+            final repository = ControlledCatalogRepository()
+              ..tagObservations = _observedTags(tags);
+            await _openEditor(tester, repository, sessions);
+            const title = 'Длинное название намерения, которое переносится';
+            await tester.enterText(find.byKey(_title), title);
+            await tester.enterText(find.byKey(_description), _lines(8));
+            sessions.notifier(tester)
+              ..draftTagSet.add(tags[0])
+              ..draftTagSet.add(tags[1]);
+            await tester.pumpAndSettle();
+
+            Future<void> expectUsable({required bool keyboard}) async {
+              for (final mode in IntentionCreationSheetMode.values) {
+                await _switchMode(tester, sessions, mode);
+                await _expectPanelUsable(
+                  tester,
+                  device,
+                  mode,
+                  tagIds: sessions.state(tester).draft.tagIds,
+                  keyboard: keyboard,
+                  fullyVisibleSubmit: isWithinPlatformTextScale,
+                );
+              }
+            }
+
+            await expectUsable(keyboard: true);
+
+            // Отметки включаются действиями панели; объяснение готовности
+            // забирает фокус у поля, и платформа скрывает клавиатуру.
+            await _tapInFields(tester, _favorite);
+            await _tapInFields(tester, _readiness);
+            _usePhone(tester, device);
+            await tester.pumpAndSettle();
+            await _expectDialogUsable(tester, [
+              _readinessCancel,
+              _readinessConfirm,
+            ]);
+            await _tapDialogAction(tester, _readinessConfirm);
+            _usePhone(tester, device, keyboard: true);
+            await tester.pumpAndSettle();
+            expect(
+              sessions.state(tester).draft.favoriteMark,
+              FavoriteMark.favorite,
+            );
+            expect(
+              sessions.state(tester).draft.readiness,
+              IntentionReadiness.ready,
+            );
+            await expectUsable(keyboard: true);
+
+            // Скрытие клавиатуры возвращает полям место в обоих режимах.
+            _usePhone(tester, device);
+            await tester.pumpAndSettle();
+            await expectUsable(keyboard: false);
+
+            // Подтверждение закрытия появляется, пока платформа скрывает
+            // клавиатуру; продолжение сохраняет черновик и возвращает её.
+            _usePhone(tester, device, keyboard: true);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(_closeButton));
+            await tester.pumpAndSettle();
+            _usePhone(tester, device);
+            await tester.pumpAndSettle();
+            await _expectDialogUsable(tester, [_closeContinue, _closeDiscard]);
+            await _tapDialogAction(tester, _closeContinue);
+            expect(sessions.state(tester).draft.title, title);
+            _usePhone(tester, device, keyboard: true);
+            await tester.pumpAndSettle();
+
+            // Отказ из-за удалённого тега: поля только для чтения на время
+            // отправки скрывают клавиатуру, а после отказа она возвращается.
+            await tester.tap(find.byKey(_submit));
+            await tester.pump();
+            _usePhone(tester, device);
+            repository.completeCommand(
+              0,
+              ResultFailure(IntentionCreationTagsMissingFailure([_tagId(1)])),
+            );
+            await tester.pumpAndSettle();
+            _usePhone(tester, device, keyboard: true);
+            await tester.pumpAndSettle();
+            await _expectFailureRecoverable(
+              tester,
+              sessions,
+              device,
+              _removeMissing,
+              'A selected tag was deleted from the catalog. Remove it from '
+              'the draft to save the intention.',
+              isMessageVisible: isWithinPlatformTextScale,
+            );
+            await tester.tapAt(
+              _expectTappable(tester, find.byKey(_removeMissing)),
+            );
+            await tester.pumpAndSettle();
+            expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
+            if (isWithinPlatformTextScale) {
+              // Панель сама показала отказ: общая поверхность его не
+              // повторяет.
+              expect(find.byType(SnackBar), findsNothing);
+            } else {
+              // Сообщение не поместилось в панель ни в одном кадре, поэтому
+              // после исправления его предъявляет общая поверхность.
+              await _waitForOperationMessages(tester);
+            }
+            await expectUsable(keyboard: true);
+
+            // Устранимый отказ: повтор доступен в обоих режимах.
+            await tester.tap(find.byKey(_submit));
+            await tester.pump();
+            repository.completeCommand(
+              1,
+              const ResultFailure(IntentionUnavailableFailure()),
+            );
+            await tester.pumpAndSettle();
+            await _expectFailureRecoverable(
+              tester,
+              sessions,
+              device,
+              _submit,
+              'The intention couldn’t be created. Try again.',
+              isMessageVisible: isWithinPlatformTextScale,
+            );
+            await tester.tap(find.byKey(_submit));
+            await tester.pump();
+
+            expect(repository.commands, hasLength(3));
+            expect(
+              repository.commands.last,
+              isA<CreateIntention>()
+                  .having((command) => command.title, 'название', title)
+                  .having(
+                    (command) => command.description,
+                    'описание',
+                    _lines(8),
+                  )
+                  .having((command) => command.tagIds, 'теги', [_tagId(2)])
+                  .having(
+                    (command) => command.favoriteMark,
+                    'избранное',
+                    FavoriteMark.favorite,
+                  )
+                  .having(
+                    (command) => command.readiness,
+                    'готовность',
+                    IntentionReadiness.ready,
+                  ),
+            );
+            expect(sessions.added, hasLength(1));
+            expect(tester.takeException(), isNull);
+            semantics.dispose();
+          },
+        );
+      }
+    }
+  });
+}
+
+/// Переводит панель в режим [mode] кнопкой размера.
+Future<void> _switchMode(
+  WidgetTester tester,
+  _EditorSessions sessions,
+  IntentionCreationSheetMode mode,
+) async {
+  if (sessions.state(tester).sheetMode != mode) {
+    await tester.tap(find.byKey(_resize));
+    await tester.pumpAndSettle();
+  }
+  expect(sessions.state(tester).sheetMode, mode);
+}
+
+/// Панель в режиме [mode] на [device] не переполняется, а её действия
+/// доступны.
+///
+/// Изменение размера, закрытие и «Сохранить» нажимаются в любом режиме и
+/// не заходят под системные отступы. Каждое поле и действие черновика
+/// доводится прокруткой полей до места, где оно нажимается. Только
+/// компактная панель над клавиатурой может отдать всю высоту закреплённым
+/// частям: когда над тесной клавиатурой при увеличенном тексте даже
+/// наименьший видимый участок страницы, полоса и сохранение не оставляют
+/// места полям, они доступны после явного разворачивания той же панели.
+Future<void> _expectPanelUsable(
+  WidgetTester tester,
+  _Device device,
+  IntentionCreationSheetMode mode, {
+  required Iterable<TagId> tagIds,
+  required bool keyboard,
+  required bool fullyVisibleSubmit,
+}) async {
+  final reason = '${_modeName(mode)} панель, клавиатура: $keyboard';
+  expect(tester.takeException(), isNull, reason: reason);
+  switch (mode) {
+    case IntentionCreationSheetMode.compact:
+      _expectCompact(tester, _sheetRect(tester), device, keyboard: keyboard);
+    case IntentionCreationSheetMode.expanded:
+      expect(
+        _sheetRect(tester),
+        _expandedArea(device, keyboard: keyboard),
+        reason: reason,
+      );
+  }
+  _expectSubmitAvailable(
+    tester,
+    device,
+    keyboard: keyboard,
+    fullyVisible: fullyVisibleSubmit || !keyboard,
+  );
+  for (final action in [_resize, _closeButton, _submit]) {
+    expect(find.byKey(action).hitTestable(), findsOneWidget, reason: reason);
+    _expectInsideSafeArea(tester, device, action, keyboard: keyboard);
+  }
+  final fields = tester.getRect(find.byKey(_fields));
+  if (fields.height == 0) {
+    expect(
+      (mode, keyboard),
+      (IntentionCreationSheetMode.compact, true),
+      reason: 'полям не осталось места: $reason',
+    );
+    return;
+  }
+  for (final control in [
+    _title,
+    _description,
+    for (final id in tagIds)
+      ValueKey('intention-editor-tag-remove-${id.toCanonicalString()}'),
+    _chooseTags,
+    _favorite,
+    _readiness,
+  ]) {
+    await _scrollToCenter(tester, control);
+    expect(
+      find.byKey(control).hitTestable(),
+      findsOneWidget,
+      reason: '$control: $reason',
+    );
+    _expectInsideSafeArea(tester, device, control, keyboard: keyboard);
+  }
+  expect(tester.takeException(), isNull, reason: reason);
+}
+
+/// Прокручивает поля так, что середина [key] оказывается в середине их
+/// видимой области.
+Future<void> _scrollToCenter(WidgetTester tester, Key key) async {
+  await Scrollable.ensureVisible(
+    tester.element(find.byKey(key)),
+    alignment: 0.5,
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Нажимает действие полей в развёрнутой панели, доведя его до видимости.
+Future<void> _tapInFields(WidgetTester tester, Key key) async {
+  if (tester.getRect(find.byKey(_fields)).height == 0) {
+    await tester.tap(find.byKey(_resize));
+    await tester.pumpAndSettle();
+  }
+  await _scrollToCenter(tester, key);
+  await tester.tap(find.byKey(key));
+  await tester.pumpAndSettle();
+}
+
+/// Цель [key] не уходит под системные отступы: по горизонтали она целиком
+/// между боковыми отступами, а середина её видимой части — в безопасной
+/// области над клавиатурой. Видимая часть цели в полях ограничена их
+/// видимой областью.
+void _expectInsideSafeArea(
+  WidgetTester tester,
+  _Device device,
+  Key key, {
+  required bool keyboard,
+}) {
+  final fields = tester.getRect(find.byKey(_fields));
+  var rect = tester.getRect(find.byKey(key));
+  if (rect.overlaps(fields)) {
+    rect = rect.intersect(fields);
+  }
+  final safe = Rect.fromLTRB(
+    device.padding.left,
+    device.padding.top,
+    device.size.width - device.padding.right,
+    device.size.height - (keyboard ? device.keyboard : device.padding.bottom),
+  );
+  expect(safe.contains(rect.center), isTrue, reason: '$key: $rect вне $safe');
+  expect(rect.left, greaterThanOrEqualTo(safe.left), reason: '$key');
+  expect(rect.right, lessThanOrEqualTo(safe.right), reason: '$key');
+}
+
+/// Действия диалога над панелью доводятся до видимости и нажимаются, а
+/// диалог не переполняется.
+Future<void> _expectDialogUsable(WidgetTester tester, List<Key> actions) async {
+  expect(tester.takeException(), isNull);
+  expect(find.byType(AlertDialog), findsOneWidget);
+  for (final action in actions) {
+    await tester.ensureVisible(find.byKey(action));
+    await tester.pumpAndSettle();
+    _expectTappable(tester, find.byKey(action));
+  }
+  expect(tester.takeException(), isNull);
+}
+
+Future<void> _tapDialogAction(WidgetTester tester, Key action) async {
+  await tester.ensureVisible(find.byKey(action));
+  await tester.pumpAndSettle();
+  await tester.tapAt(_expectTappable(tester, find.byKey(action)));
+  await tester.pumpAndSettle();
+  expect(find.byType(AlertDialog), findsNothing);
+}
+
+/// Видимую часть [finder] можно нажать: касание середины этой части
+/// попадает в цель. Возвращает точку касания.
+///
+/// Видимая часть — пересечение цели с экраном над клавиатурой и с областью
+/// ближайшей прокрутки, внутри которой она лежит.
+Offset _expectTappable(WidgetTester tester, Finder finder) {
+  var visible = tester
+      .getRect(finder)
+      .intersect(
+        Rect.fromLTRB(
+          0,
+          0,
+          tester.view.physicalSize.width / tester.view.devicePixelRatio,
+          _visibleBottom(tester),
+        ),
+      );
+  final viewport = find.ancestor(of: finder, matching: find.byType(Scrollable));
+  if (viewport.evaluate().isNotEmpty) {
+    visible = visible.intersect(tester.getRect(viewport.first));
+  }
+  expect(visible.isEmpty, isFalse, reason: '$finder не видна');
+  final target = tester.renderObject(finder);
+  expect(
+    tester
+        .hitTestOnBinding(visible.center)
+        .path
+        .any((entry) => identical(entry.target, target)),
+    isTrue,
+    reason: 'касание видимой части $finder попадает в цель',
+  );
+  return visible.center;
+}
+
+/// Отказ сохранения над клавиатурой: в обоих режимах предложенное
+/// исправление или повтор нажимается, а экранный диктор получает сообщение.
+///
+/// При [isMessageVisible] после скрытия клавиатуры начало сообщения видно в
+/// развёрнутой панели. Сверх максимума системного шрифта Android действия
+/// исправления могут занять всю высоту: они остаются доступными, а
+/// сообщение слышно экранному диктору.
+Future<void> _expectFailureRecoverable(
+  WidgetTester tester,
+  _EditorSessions sessions,
+  _Device device,
+  Key recovery,
+  String message, {
+  required bool isMessageVisible,
+}) async {
+  final failure = find.byKey(_failure);
+  for (final mode in IntentionCreationSheetMode.values) {
+    await _switchMode(tester, sessions, mode);
+    expect(tester.takeException(), isNull);
+    _expectTappable(tester, find.byKey(recovery));
+    expect(find.byKey(_resize).hitTestable(), findsOneWidget);
+    expect(find.byKey(_closeButton).hitTestable(), findsOneWidget);
+    expect(
+      tester.getSemantics(failure),
+      isSemantics(label: message, isLiveRegion: true),
+    );
+  }
+  _usePhone(tester, device);
+  await tester.pumpAndSettle();
+  if (isMessageVisible) {
+    final status = tester.getRect(find.byKey(_status));
+    final text = tester.getRect(failure);
+    expect(text.top, greaterThanOrEqualTo(status.top));
+    expect(text.top, lessThan(status.bottom));
+  }
+  _expectTappable(tester, find.byKey(recovery));
+  _usePhone(tester, device, keyboard: true);
+  await tester.pumpAndSettle();
+  await _switchMode(tester, sessions, IntentionCreationSheetMode.compact);
+}
+
+/// Дожидается, пока общая поверхность закроет свои сообщения.
+Future<void> _waitForOperationMessages(WidgetTester tester) async {
+  for (var attempt = 0; attempt < 5; attempt++) {
+    if (find.byType(SnackBar).evaluate().isEmpty) {
+      return;
+    }
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+  }
+  expect(find.byType(SnackBar), findsNothing);
 }
 
 /// Способ восстановления после общего отказа, который предлагает панель.
@@ -1052,6 +1501,10 @@ const _status = ValueKey('intention-creation-sheet-status');
 const _failure = ValueKey('intention-editor-failure');
 const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
 const _favorite = ValueKey('intention-editor-favorite');
+const _readiness = ValueKey('intention-editor-readiness');
+const _chooseTags = ValueKey('intention-editor-choose-tags');
+const _readinessCancel = ValueKey('intention-editor-readiness-cancel');
+const _readinessConfirm = ValueKey('intention-editor-readiness-confirm');
 const _catalogCreate = ValueKey('catalog-create-intention');
 const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
@@ -1124,6 +1577,38 @@ const _Device _landscape = (
   size: Size(740, 360),
   padding: EdgeInsets.only(top: 24, right: 48),
   keyboard: 180,
+  visibleContextWithKeyboard: _minVisibleContextExtent,
+);
+
+/// Распространённый телефон в альбомной ориентации: над клавиатурой
+/// остаётся высота для закреплённых частей, наименьшей области полей и
+/// части видимого участка страницы.
+const _Device _wideLandscape = (
+  name: 'распространённом телефоне в альбомной ориентации',
+  size: Size(915, 412),
+  padding: EdgeInsets.only(top: 24, right: 48),
+  keyboard: 190,
+  visibleContextWithKeyboard: _minVisibleContextExtent,
+);
+
+/// Узкий и низкий телефон: меньше обычного портретного экрана по обеим
+/// сторонам, с отступами строки состояния и жестовой навигации.
+const _Device _narrowPortrait = (
+  name: 'узком и низком телефоне в портретной ориентации',
+  size: Size(320, 568),
+  padding: EdgeInsets.only(top: 24, bottom: 24),
+  keyboard: 260,
+  visibleContextWithKeyboard: _visibleContextExtent,
+);
+
+/// Тот же телефон в альбомной ориентации: панель навигации сбоку, а над
+/// клавиатурой остаётся так мало высоты, что видимый участок страницы
+/// уступает место закреплённым частям панели.
+const _Device _narrowLandscape = (
+  name: 'узком и низком телефоне в альбомной ориентации',
+  size: Size(568, 320),
+  padding: EdgeInsets.only(top: 24, right: 48),
+  keyboard: 160,
   visibleContextWithKeyboard: _minVisibleContextExtent,
 );
 

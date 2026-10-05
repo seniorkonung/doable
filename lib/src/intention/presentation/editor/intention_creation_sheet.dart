@@ -117,8 +117,9 @@ final class _IntentionCreationSheetState extends State<IntentionCreationSheet>
   static const _visibleContextExtent = 72.0;
 
   /// Наименьший видимый участок страницы над компактной панелью. До него
-  /// участок уступает место закреплённым частям панели, когда клавиатура и
-  /// увеличенный текст оставляют слишком мало высоты.
+  /// участок уступает место закреплённым частям панели и наименьшей видимой
+  /// области полей, когда клавиатура, альбомная ориентация или увеличенный
+  /// текст оставляют слишком мало высоты.
   static const _minVisibleContextExtent = 24.0;
 
   /// Наибольшая ширина панели на широком экране.
@@ -293,97 +294,111 @@ final class _IntentionCreationSheetState extends State<IntentionCreationSheet>
       children: [
         // Фон закрывает страницу под панелью от нажатий, а модальный барьер
         // маршрута — от фокуса и экранного диктора.
-        FadeTransition(
-          opacity: animation,
-          child: ModalBarrier(
-            color: colors.scrim.withValues(alpha: 0.32),
-            semanticsLabel: widget.closeLabel,
-            onDismiss: widget.onCloseRequested,
+        //
+        // Фон во весь экран и панель — отдельные узлы экранного диктора с
+        // явным порядком. Иначе фон собирает узлы панели вместе с собой в
+        // одну группу обхода, и диктор упорядочивает их по углам между
+        // центрами: от высоты панели зависело бы, прочтёт ли он закрытие до
+        // полей или после них.
+        Semantics(
+          container: true,
+          sortKey: const OrdinalSortKey(0),
+          child: FadeTransition(
+            opacity: animation,
+            child: ModalBarrier(
+              color: colors.scrim.withValues(alpha: 0.32),
+              semanticsLabel: widget.closeLabel,
+              onDismiss: widget.onCloseRequested,
+            ),
           ),
         ),
-        Padding(
-          // Доступная панели область — над клавиатурой и под строкой
-          // состояния.
-          padding: EdgeInsets.only(
-            top: media.padding.top,
-            bottom: media.viewInsets.bottom,
-          ),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: SlideTransition(
-              position: animation.drive(
-                Tween(
-                  begin: const Offset(0, 1),
-                  end: Offset.zero,
-                ).chain(CurveTween(curve: Curves.easeOutCubic)),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: _maxWidth),
-                child: Material(
-                  key: const ValueKey('intention-creation-sheet'),
-                  color: colors.surfaceContainerLow,
-                  elevation: 1,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(28),
+        Semantics(
+          container: true,
+          sortKey: const OrdinalSortKey(1),
+          child: Padding(
+            // Доступная панели область — над клавиатурой и под строкой
+            // состояния.
+            padding: EdgeInsets.only(
+              top: media.padding.top,
+              bottom: media.viewInsets.bottom,
+            ),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: SlideTransition(
+                position: animation.drive(
+                  Tween(
+                    begin: const Offset(0, 1),
+                    end: Offset.zero,
+                  ).chain(CurveTween(curve: Curves.easeOutCubic)),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _maxWidth),
+                  child: Material(
+                    key: const ValueKey('intention-creation-sheet'),
+                    color: colors.surfaceContainerLow,
+                    elevation: 1,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(28),
+                      ),
                     ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  // Клавиатура и строка состояния уже учтены положением
-                  // панели; внутри остаётся только нижний безопасный отступ.
-                  child: MediaQuery(
-                    data: media
-                        .removePadding(removeTop: true)
-                        .removeViewInsets(removeBottom: true),
-                    child: SafeArea(
-                      top: false,
-                      child: NotificationListener<ScrollMetricsNotification>(
-                        onNotification: _handleScrollMetrics,
-                        child: NotificationListener<ScrollNotification>(
-                          onNotification: _handleScroll,
-                          child: _SheetLayout(
-                            expansion: _expansion,
-                            visibleContextExtent: _visibleContextExtent,
-                            minVisibleContextExtent: _minVisibleContextExtent,
-                            topBar: _TopBar(
-                              isExpanded: isExpanded,
-                              resizeLabel: isExpanded
-                                  ? widget.collapseLabel
-                                  : widget.expandLabel,
-                              closeLabel: widget.closeLabel,
-                              onResize: _toggleMode,
-                              onClose: widget.onCloseRequested,
-                              onDragStart: _startDrag,
-                              onDragUpdate: _updateDrag,
-                              onDragEnd: _endDrag,
-                            ),
-                            body: _FieldsScaffold(
-                              child: SingleChildScrollView(
-                                key: const ValueKey(
-                                  'intention-creation-sheet-fields',
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [widget.header, widget.fields],
+                    clipBehavior: Clip.antiAlias,
+                    // Клавиатура и строка состояния уже учтены положением
+                    // панели; внутри остаётся только нижний безопасный отступ.
+                    child: MediaQuery(
+                      data: media
+                          .removePadding(removeTop: true)
+                          .removeViewInsets(removeBottom: true),
+                      child: SafeArea(
+                        top: false,
+                        child: NotificationListener<ScrollMetricsNotification>(
+                          onNotification: _handleScrollMetrics,
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: _handleScroll,
+                            child: _SheetLayout(
+                              expansion: _expansion,
+                              visibleContextExtent: _visibleContextExtent,
+                              minVisibleContextExtent: _minVisibleContextExtent,
+                              topBar: _TopBar(
+                                isExpanded: isExpanded,
+                                resizeLabel: isExpanded
+                                    ? widget.collapseLabel
+                                    : widget.expandLabel,
+                                closeLabel: widget.closeLabel,
+                                onResize: _toggleMode,
+                                onClose: widget.onCloseRequested,
+                                onDragStart: _startDrag,
+                                onDragUpdate: _updateDrag,
+                                onDragEnd: _endDrag,
+                              ),
+                              body: _FieldsScaffold(
+                                child: SingleChildScrollView(
+                                  key: const ValueKey(
+                                    'intention-creation-sheet-fields',
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [widget.header, widget.fields],
+                                  ),
                                 ),
                               ),
-                            ),
-                            status: switch (widget.status) {
-                              final status? => SingleChildScrollView(
-                                key: const ValueKey(
-                                  'intention-creation-sheet-status',
+                              status: switch (widget.status) {
+                                final status? => SingleChildScrollView(
+                                  key: const ValueKey(
+                                    'intention-creation-sheet-status',
+                                  ),
+                                  primary: false,
+                                  child: status,
                                 ),
+                                null => null,
+                              },
+                              // Прокручивается, только если сама не помещается в
+                              // тесную доступную область, и не переполняет панель.
+                              footer: SingleChildScrollView(
                                 primary: false,
-                                child: status,
+                                child: widget.footer,
                               ),
-                              null => null,
-                            },
-                            // Прокручивается, только если сама не помещается в
-                            // тесную доступную область, и не переполняет панель.
-                            footer: SingleChildScrollView(
-                              primary: false,
-                              child: widget.footer,
                             ),
                           ),
                         ),
@@ -626,10 +641,11 @@ enum _SheetSlot { topBar, body, status, footer }
 /// занимает всю доступную высоту. Промежуточные значения плавно переводят
 /// высоту между ними.
 ///
-/// Если закреплённые части не помещаются в компактное ограничение, видимый
-/// участок страницы уменьшается ради них, но не меньше чем до
-/// [minVisibleContextExtent]: основное действие и управление размером
-/// остаются доступными, а поля — прокручиваемыми.
+/// Если закреплённые части вместе с наименьшей видимой областью полей не
+/// помещаются в компактное ограничение, видимый участок страницы
+/// уменьшается ради них, но не меньше чем до [minVisibleContextExtent]:
+/// основное действие и управление размером остаются доступными, а поля —
+/// видимыми и прокручиваемыми, пока высоты хватает хотя бы на часть из них.
 ///
 /// Сообщение получает свою высоту, пока полям остаётся нужное им место; при
 /// нехватке полям остаётся не меньше половины места, а сообщение
@@ -727,6 +743,10 @@ final class _RenderSheetLayout extends RenderBox
     markNeedsLayout();
   }
 
+  /// Наименьшая высота полей, которую компактная панель оставляет видимой,
+  /// уменьшая ради неё видимый участок страницы: одна цель нажатия.
+  static const _minBodyExtent = kMinInteractiveDimension;
+
   RenderBox get _topBar => childForSlot(_SheetSlot.topBar)!;
 
   RenderBox get _body => childForSlot(_SheetSlot.body)!;
@@ -785,12 +805,16 @@ final class _RenderSheetLayout extends RenderBox
       width,
       maxHeight: math.max(0, available - topHeight),
     );
+    // Наименьшая видимая область полей: без неё над тесной клавиатурой
+    // закреплённые части забирали бы всю компактную высоту, и поля исчезали
+    // бы и для касания, и для экранного диктора.
+    final minBodyHeight = _layoutChild(_body, width, maxHeight: _minBodyExtent);
     final compactLimit = math.max(
       0.0,
       math.max(
         available - _visibleContextExtent,
         math.min(
-          topHeight + footerHeight,
+          topHeight + footerHeight + minBodyHeight,
           available - _minVisibleContextExtent,
         ),
       ),
