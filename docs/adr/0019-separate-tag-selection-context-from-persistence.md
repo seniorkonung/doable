@@ -1,6 +1,6 @@
 # ADR-0019: Отделить контекст выбора тегов от постоянных назначений
 
-- Status: proposed
+- Status: accepted
 - Originating change: compact-intention-creation
 - Date: 2026-10-04
 

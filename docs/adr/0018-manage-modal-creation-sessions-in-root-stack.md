@@ -1,6 +1,6 @@
 # ADR-0018: Вести модальные сессии создания в общем корневом стеке
 
-- Status: proposed
+- Status: accepted
 - Originating change: compact-intention-creation
 - Date: 2026-10-04
 
