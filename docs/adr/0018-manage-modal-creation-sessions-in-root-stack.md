@@ -1,4 +1,4 @@
-# ADR-0017: Вести модальные сессии создания в общем корневом стеке
+# ADR-0018: Вести модальные сессии создания в общем корневом стеке
 
 - Status: proposed
 - Originating change: compact-intention-creation
