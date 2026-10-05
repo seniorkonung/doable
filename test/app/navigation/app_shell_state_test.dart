@@ -271,7 +271,7 @@ void main() {
       final calendar = tester.state(
         find.byType(DailyChoiceCalendar, skipOffstage: false),
       );
-      final scroll = _dailyChoicePosition(tester);
+      final scroll = _dailyChoiceScrollable(tester);
       final loaded = app.dailyChoiceCatalog.items.length;
       final before = _dailyChoiceParameters(tester, app);
       final states = _recordDailyChoiceCatalogStates(app);
@@ -332,7 +332,7 @@ void main() {
         tester.state(find.byType(DailyChoiceCalendar, skipOffstage: false)),
         same(calendar),
       );
-      expect(_dailyChoicePosition(tester), same(scroll));
+      expect(_dailyChoiceScrollable(tester), same(scroll));
       expect(_dailyChoiceParameters(tester, app), {
         ...before,
         'всего': expected.length,
@@ -421,7 +421,7 @@ void main() {
       final calendar = tester.state(
         find.byType(DailyChoiceCalendar, skipOffstage: false),
       );
-      final scroll = _dailyChoicePosition(tester);
+      final scroll = _dailyChoiceScrollable(tester);
       final before = _dailyChoiceParameters(tester, app);
       final states = _recordDailyChoiceCatalogStates(app);
 
@@ -465,9 +465,83 @@ void main() {
         tester.state(find.byType(DailyChoiceCalendar, skipOffstage: false)),
         same(calendar),
       );
-      expect(_dailyChoicePosition(tester), same(scroll));
+      expect(_dailyChoiceScrollable(tester), same(scroll));
       expect(_dailyChoiceParameters(tester, app), before);
       expect(states.whereType<DailyChoiceCatalogInitialLoad>(), isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('смена языка интерфейса', () {
+    testWidgets('русский, английский и английский fallback переводят только '
+        'системные подписи каталога дневных выборов, а календарь, фильтры, '
+        'выдача, пользовательский текст и позиция сохраняются без новых '
+        'чтений', (tester) async {
+      final app = await _start(tester);
+      await _prepareDailyChoiceCatalog(tester, app);
+      final before = _languageIndependent(_dailyChoiceCatalogView(tester, app));
+
+      for (final (platform, resolved) in [
+        (const Locale('ru', 'RU'), const Locale('ru')),
+        (const Locale('en', 'GB'), const Locale('en')),
+        (const Locale('de', 'DE'), const Locale('en')),
+      ]) {
+        tester.binding.platformDispatcher.localesTestValue = [platform];
+        await tester.pumpAndSettle();
+
+        final reason = '$platform';
+        final page = find.byType(daily_page.DailyChoiceCatalogPage);
+        expect(Localizations.localeOf(tester.element(page)), resolved);
+        for (final (locale, labels) in _catalogLabels.entries.map(
+          (entry) => (entry.key, entry.value),
+        )) {
+          for (final label in labels) {
+            expect(
+              find.descendant(
+                of: page,
+                matching: find.text(label, skipOffstage: false),
+                skipOffstage: false,
+              ),
+              locale == resolved ? findsOneWidget : findsNothing,
+              reason: '$reason: «$label»',
+            );
+          }
+        }
+        for (final (locale, commands) in _calendarCommands.entries.map(
+          (entry) => (entry.key, entry.value),
+        )) {
+          for (final command in commands) {
+            expect(
+              find.descendant(
+                of: page,
+                matching: find.byTooltip(command, skipOffstage: false),
+                skipOffstage: false,
+              ),
+              locale == resolved ? findsOneWidget : findsNothing,
+              reason: '$reason: «$command»',
+            );
+          }
+        }
+        // Формулировка строки собирается из системных слов языка и прежних
+        // названий намерений.
+        expect(
+          find.descendant(
+            of: _dailyChoiceRows.hitTestable().first,
+            matching: find.text(
+              lookupAppLocalizations(
+                resolved,
+              ).dailyChoiceDetailsPhrase(_favoriteTitle(1), _favoriteTitle(2)),
+            ),
+          ),
+          findsOneWidget,
+          reason: reason,
+        );
+        expect(
+          _languageIndependent(_dailyChoiceCatalogView(tester, app)),
+          before,
+          reason: reason,
+        );
+      }
       expect(tester.takeException(), isNull);
     });
   });
@@ -1009,7 +1083,7 @@ Map<String, Object?> _dailyChoiceCatalogView(WidgetTester tester, _App app) {
     'календарь': tester.state(
       find.byType(DailyChoiceCalendar, skipOffstage: false),
     ),
-    'прокрутка': _dailyChoicePosition(tester),
+    'прокрутка': _dailyChoiceScrollable(tester),
     'выдача': catalog,
     ..._dailyChoiceParameters(tester, app),
     'загруженные записи': [
@@ -1041,6 +1115,39 @@ Map<String, Object?> _dailyChoiceParameters(WidgetTester tester, _App app) => {
   'всего': app.dailyChoiceCatalog.totalCount,
   'позиция прокрутки': _dailyChoicePosition(tester).pixels,
   'сохранённая позиция прокрутки': _storedDailyChoiceOffset(tester),
+};
+
+/// Наблюдаемое состояние каталога дневных выборов без подписей фильтра
+/// выполнения, которые следуют языку интерфейса.
+Map<String, Object?> _languageIndependent(Map<String, Object?> view) =>
+    Map.of(view)..remove('фильтр выполнения');
+
+/// Системные подписи подготовленного каталога дневных выборов на каждом
+/// языке: выбранный день, месяц и дни недели календаря, название фильтра
+/// выполнения и количество.
+final _catalogLabels = {
+  Locale('ru'): [
+    'Выбранная дата: пятница, 25 сентября 2026\u202Fг.',
+    'август 2026\u202Fг.',
+    'пн',
+    'вс',
+    'Выполнение',
+    'Всего дневных выборов: 120',
+  ],
+  Locale('en'): [
+    'Selected date: Friday, September 25, 2026',
+    'August 2026',
+    'Mon',
+    'Sun',
+    'Completion',
+    'Total daily choices: 120',
+  ],
+};
+
+/// Названия команд раскрытого календаря на каждом языке.
+final _calendarCommands = {
+  Locale('ru'): ['Предыдущий месяц', 'Следующий месяц', 'Свернуть календарь'],
+  Locale('en'): ['Previous month', 'Next month', 'Collapse calendar'],
 };
 
 /// Наблюдаемое состояние Главной.
@@ -1118,8 +1225,19 @@ final _dailyChoiceScrollView = find.descendant(
   matching: find.byType(CustomScrollView),
 );
 
+/// Владелец общей прокрутки каталога дневных выборов.
+///
+/// Позицию прокрутки владелец создаёт заново при смене зависимостей, например
+/// языка, и переносит в неё смещение; сам он живёт столько же, сколько
+/// страница.
+ScrollableState _dailyChoiceScrollable(WidgetTester tester) => tester.state(
+  find
+      .descendant(of: _dailyChoiceScrollView, matching: find.byType(Scrollable))
+      .first,
+);
+
 ScrollPosition _dailyChoicePosition(WidgetTester tester) =>
-    _positionOf(tester, _dailyChoiceScrollView);
+    _dailyChoiceScrollable(tester).position;
 
 /// Смещение, которое общая прокрутка каталога дневных выборов сохранила в
 /// хранилище страниц маршрута под своим ключом.
@@ -1127,14 +1245,7 @@ ScrollPosition _dailyChoicePosition(WidgetTester tester) =>
 /// Без ключа прокрутка смещение не сохраняет, а календарь, деливший бы с ней
 /// запись, заменил бы его номером своей страницы.
 Object? _storedDailyChoiceOffset(WidgetTester tester) {
-  final scrollable = tester.element(
-    find
-        .descendant(
-          of: _dailyChoiceScrollView,
-          matching: find.byType(Scrollable),
-        )
-        .first,
-  );
+  final scrollable = _dailyChoiceScrollable(tester).context;
   return PageStorage.of(scrollable).readState(scrollable);
 }
 
