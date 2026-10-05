@@ -385,7 +385,7 @@
   - **Files likely touched:** `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_state.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/graph/presentation/operation_failure_presentation_test.dart`; виджетный хост сессии — в одном из этих тестов или в `test/intention/presentation/editor/intention_editor_page_test.dart`.
   - **Estimated scope:** M.
 
-- [ ] 2.16 Повторно подтвердить готовность полного черновика и общего выбора к подключению управляемой модальной панели после исправления передачи права ошибки
+- [x] 2.16 Повторно подтвердить готовность полного черновика и общего выбора к подключению управляемой модальной панели после исправления передачи права ошибки
   - **Acceptance criteria:**
     - `Ready to advance` фазы 2 подтверждён на коммите с исправлением 2.15. Результаты 2.4, 2.8, 2.12, 2.13 и новые проверки 2.15 проходят; отказ создания предъявляется ровно одним владельцем при возвращении на форму, подтверждённом закрытии и удалении хоста без возвращения.
     - Генерация согласована с источниками; общие проверки, сборка и строгая валидация изменения проходят. Оценка готовности не включает ещё не реализованные геометрию панели, жесты и её маршрут из фазы 3.
