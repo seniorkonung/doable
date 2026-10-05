@@ -270,7 +270,7 @@
   - **Вероятные файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`; сгенерированный companion модели — только штатной генерацией при необходимости.
   - **Оценка объёма:** M.
 
-- [ ] 2.7 Подключить настоящий календарь к каталогу с независимыми выбором дня и просмотром периода
+- [x] 2.7 Подключить настоящий календарь к каталогу с независимыми выбором дня и просмотром периода
   - **Критерии приёмки:**
     - `DailyChoiceCalendar` расположен первым `SliverToBoxAdapter` общей прокрутки и доступен при загрузке, пустоте и любом отказе. Текстовое поле, отдельная кнопка применения, их контроллер и обработчик удалены. Страница один раз создаёт viewport выбранной даты в недельном режиме; выбранная дата принадлежит только модели.
     - Нажатие дня синхронно обновляет viewport и вызывает `selectDate` до следующего кадра, сохраняя режим. Выбор другого дня начинает ровно одно получение первой порции; повторный выбор текущего дня возвращает фокус к нему без чтения и не заменяет отдельный повтор после ошибки.

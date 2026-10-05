@@ -2056,16 +2056,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCatalogLoading => 'Loading daily choices…';
 
   @override
-  String get dailyChoiceCatalogDateFilter => 'Date';
-
-  @override
-  String get dailyChoiceCatalogApplyDate => 'Apply date';
-
-  @override
-  String get dailyChoiceCatalogDateInvalid =>
-      'Enter a valid date as YYYY-MM-DD.';
-
-  @override
   String dailyChoiceCalendarSelectedDate(String date) {
     return 'Selected date: $date';
   }

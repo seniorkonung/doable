@@ -2057,16 +2057,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCatalogLoading => 'Загружаем дневные выборы…';
 
   @override
-  String get dailyChoiceCatalogDateFilter => 'Дата';
-
-  @override
-  String get dailyChoiceCatalogApplyDate => 'Применить дату';
-
-  @override
-  String get dailyChoiceCatalogDateInvalid =>
-      'Введите корректную дату в формате ГГГГ-ММ-ДД.';
-
-  @override
   String dailyChoiceCalendarSelectedDate(String date) {
     return 'Выбранная дата: $date';
   }

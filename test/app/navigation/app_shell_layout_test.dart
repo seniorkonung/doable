@@ -970,7 +970,7 @@ Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
 /// Выбор дня в начале каталога дневных выборов виден над клавиатурой,
 /// принимает нажатия и не закрыт созданием дневного выбора.
 void _expectDateControlAboveKeyboard(WidgetTester tester, _Insets insets) {
-  expect(dailyChoiceCatalogDateControl.hitTestable(), findsOneWidget);
+  expect(dailyChoiceCatalogDay(_today).hitTestable(), findsOneWidget);
   _expectFullyVisible(tester, dailyChoiceCatalogDateControl, insets);
   _expectMainAction(tester, _createDailyChoice, insets);
   expect(

@@ -10,8 +10,11 @@ import '../../../intention/domain/intention_id.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 import '../path/choice_path_page.dart';
+import 'daily_choice_calendar.dart';
+import 'daily_choice_calendar_viewport.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
+import 'daily_choice_local_date_provider.dart';
 
 /// Высота кнопки создания дневного выбора вместе с отступами над нижним краем.
 const _createActionExtent = 56 + 2 * kFloatingActionButtonMargin;
@@ -27,23 +30,26 @@ final class DailyChoiceCatalogPage extends ConsumerStatefulWidget {
 
 final class _DailyChoiceCatalogPageState
     extends ConsumerState<DailyChoiceCatalogPage> {
-  /// Поле показывает применённый день каталога; отклонённый ввод его не
-  /// меняет.
-  late final TextEditingController _dateController;
-  String? _dateError;
+  /// Просматриваемый период календаря.
+  ///
+  /// Выбранной датой владеет модель, а просмотром — страница: он один раз
+  /// начинается с недели выбранной даты. Выбор дня переносит в этот день дату
+  /// просмотра, сохраняя представление; ответы хранилища и ошибки просмотр не
+  /// меняют.
+  late DailyChoiceCalendarViewport _viewport;
+
+  /// Текущий локальный день, отмеченный в календаре; прочитан при создании
+  /// страницы.
+  late final CalendarDate _today;
 
   @override
   void initState() {
     super.initState();
-    _dateController = TextEditingController(
-      text: _selectedDate().toCanonicalString(),
+    _viewport = DailyChoiceCalendarViewport(
+      focusedDate: ref.read(dailyChoiceCatalogViewModelProvider).selection.date,
+      mode: DailyChoiceCalendarMode.week,
     );
-  }
-
-  @override
-  void dispose() {
-    _dateController.dispose();
-    super.dispose();
+    _today = ref.read(dailyChoiceLocalDateSourceProvider)();
   }
 
   @override
@@ -59,12 +65,27 @@ final class _DailyChoiceCatalogPageState
         icon: const Icon(Icons.add),
         label: Text(l10n.dailyChoiceCreateFromAction),
       ),
-      // Фильтры, количество, полосы обновления и выдача прокручиваются
-      // вместе: прокрученная до конца выдача получает всю высоту тела
-      // страницы, а место под кнопкой создания остаётся последним элементом.
+      // Календарь, фильтры, количество, полосы обновления и выдача
+      // прокручиваются вместе: прокрученная до конца выдача получает всю
+      // высоту тела страницы, а место под кнопкой создания остаётся последним
+      // элементом. Календарь стоит вне ветвления по состоянию выдачи и
+      // доступен при загрузке, пустоте и любом отказе.
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: DailyChoiceCalendar(
+                  selectedDate: state.selection.date,
+                  viewport: _viewport,
+                  today: _today,
+                  onDateSelected: (date) => _selectDate(model, date),
+                  onViewportChanged: (viewport) =>
+                      setState(() => _viewport = viewport),
+                ),
+              ),
+            ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -73,25 +94,6 @@ final class _DailyChoiceCatalogPageState
                   runSpacing: 12,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    SizedBox(
-                      width: 190,
-                      child: TextField(
-                        key: const ValueKey('daily-choice-date-filter'),
-                        controller: _dateController,
-                        keyboardType: TextInputType.datetime,
-                        decoration: InputDecoration(
-                          labelText: l10n.dailyChoiceCatalogDateFilter,
-                          hintText: l10n.dailyChoiceCreationDateHint,
-                          errorText: _dateError,
-                        ),
-                        onSubmitted: (_) => _applyDate(model, l10n),
-                      ),
-                    ),
-                    OutlinedButton(
-                      key: const ValueKey('daily-choice-apply-date'),
-                      onPressed: () => _applyDate(model, l10n),
-                      child: Text(l10n.dailyChoiceCatalogApplyDate),
-                    ),
                     SizedBox(
                       key: const ValueKey('daily-choice-completion-filter'),
                       width: 240,
@@ -121,12 +123,7 @@ final class _DailyChoiceCatalogPageState
                     ),
                     TextButton(
                       key: const ValueKey('daily-choice-clear-filters'),
-                      onPressed: () {
-                        model.clearFilters();
-                        _dateController.text = _selectedDate()
-                            .toCanonicalString();
-                        setState(() => _dateError = null);
-                      },
+                      onPressed: model.clearFilters,
                       child: Text(l10n.dailyChoiceCatalogClearFilters),
                     ),
                   ],
@@ -152,18 +149,12 @@ final class _DailyChoiceCatalogPageState
     );
   }
 
-  CalendarDate _selectedDate() =>
-      ref.read(dailyChoiceCatalogViewModelProvider).selection.date;
-
-  /// Пустой или некорректный ввод отклоняется: день каталога обязателен.
-  void _applyDate(DailyChoiceCatalogViewModel model, AppLocalizations l10n) {
-    try {
-      final date = CalendarDate.parseCanonical(_dateController.text.trim());
-      setState(() => _dateError = null);
-      model.selectDate(date);
-    } on CalendarDateValidationException {
-      setState(() => _dateError = l10n.dailyChoiceCatalogDateInvalid);
-    }
+  /// Нажатый день становится и датой просмотра в прежнем представлении, и
+  /// выбранной датой модели — синхронно, до следующего кадра. Повторный выбор
+  /// того же дня только возвращает к нему просмотр.
+  void _selectDate(DailyChoiceCatalogViewModel model, CalendarDate date) {
+    setState(() => _viewport = _viewport.withFocusedDate(date));
+    model.selectDate(date);
   }
 
   /// Слайверы выдачи под фильтрами.

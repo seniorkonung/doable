@@ -3527,24 +3527,6 @@ abstract class AppLocalizations {
   /// **'Loading daily choices…'**
   String get dailyChoiceCatalogLoading;
 
-  /// Фильтр по календарной дате
-  ///
-  /// In en, this message translates to:
-  /// **'Date'**
-  String get dailyChoiceCatalogDateFilter;
-
-  /// Применить фильтр даты
-  ///
-  /// In en, this message translates to:
-  /// **'Apply date'**
-  String get dailyChoiceCatalogApplyDate;
-
-  /// Некорректная дата фильтра
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a valid date as YYYY-MM-DD.'**
-  String get dailyChoiceCatalogDateInvalid;
-
   /// Подпись выбранной даты фильтра календаря, видимая и при просмотре другого периода
   ///
   /// In en, this message translates to:
