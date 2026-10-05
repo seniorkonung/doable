@@ -86,6 +86,11 @@ final class _DailyChoiceCatalogPageState
       // доступен при загрузке, пустоте и любом отказе.
       body: SafeArea(
         child: CustomScrollView(
+          // Как прокрутки других корневых страниц, общая прокрутка хранит
+          // смещение в хранилище страниц маршрута под постоянным ключом.
+          // Страницы календаря хранятся в его собственном хранилище и эту
+          // запись не заменяют.
+          key: const PageStorageKey<String>('daily-choice-catalog'),
           slivers: [
             SliverToBoxAdapter(
               child: Padding(

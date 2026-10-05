@@ -11,6 +11,8 @@ import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
@@ -97,6 +99,11 @@ final _choiceDate = CalendarDate.fromParts(2026, 9, 25);
 /// прошлый день дневных выборов, отличный от начального.
 final _today = CalendarDate.fromParts(2026, 9, 26);
 
+/// Дата просмотра подготовленного календаря каталога дневных выборов: за
+/// четыре недели до выбранного дня. Раскрытый календарь показывает её месяц,
+/// а сама она не совпадает ни с выбранным днём, ни с началом месяца.
+final _viewedDate = CalendarDate.fromParts(2026, 8, 28);
+
 /// Размеры порций каталога намерений и каталога дневных выборов.
 const _intentionPageSize = 100;
 const _dailyChoicePageSize = 50;
@@ -121,8 +128,11 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('каталог дневных выборов сохраняет фильтры, загруженные '
-        'записи и позицию прокрутки', (tester) async {
+    testWidgets('каталог дневных выборов сохраняет выбранный день, '
+        'просматриваемый месяц раскрытого календаря, фильтр выполнения, '
+        'загруженные записи и позицию прокрутки без повторного получения', (
+      tester,
+    ) async {
       final app = await _start(tester);
       await _prepareDailyChoiceCatalog(tester, app);
       final before = _dailyChoiceCatalogView(tester, app);
@@ -130,6 +140,23 @@ void main() {
       await _select(tester, AppDestination.intentionGraph);
       await _select(tester, AppDestination.home);
       await _select(tester, AppDestination.dailyChoices);
+
+      expect(_dailyChoiceCatalogView(tester, app), before);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('возврат из подробного просмотра дневного выбора сохраняет '
+        'календарь, фильтры, загруженные записи и позицию прокрутки каталога '
+        'без повторного получения', (tester) async {
+      final app = await _start(tester);
+      await _prepareDailyChoiceCatalog(tester, app);
+      final before = _dailyChoiceCatalogView(tester, app);
+
+      // Строка в видимой части открывается нажатием без прокрутки страницы.
+      await tester.tap(_dailyChoiceRows.hitTestable().first);
+      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await tester.pumpAndSettle();
+      await _closeTop(tester, DailyChoiceDetailsPage);
 
       expect(_dailyChoiceCatalogView(tester, app), before);
       expect(tester.takeException(), isNull);
@@ -738,8 +765,9 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   expect(page.pixels, greaterThan(0));
 }
 
-/// Каталог дневных выборов: прошлый день и невыполненные, две загруженные
-/// порции из трёх и прокрутка внутри них.
+/// Каталог дневных выборов: прошлый день и невыполненные, календарь раскрыт
+/// на месяце другой даты просмотра, две загруженные порции из трёх и
+/// прокрутка внутри них.
 Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   final incomplete = _choiceCount ~/ 2;
   await _select(tester, AppDestination.dailyChoices);
@@ -755,7 +783,14 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   );
   await tester.pumpAndSettle();
 
+  // Неделя даты просмотра раскрывается в её месяц.
+  await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
+  await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
   final position = _dailyChoicePosition(tester);
+  // Календарь перелистывал страницы после последнего сдвига общей прокрутки,
+  // но её сохранённое смещение не заменил.
+  expect(_storedDailyChoiceOffset(tester), position.pixels);
+
   position.jumpTo(position.maxScrollExtent);
   await tester.pumpAndSettle();
   await _tap(tester, find.byKey(const ValueKey('daily-choice-load-more')));
@@ -771,12 +806,20 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
 
   final catalog = app.dailyChoiceCatalog;
   expect(shownDailyChoiceCatalogDate(tester), _choiceDate);
+  expect(
+    shownDailyChoiceCatalogViewport(tester),
+    DailyChoiceCalendarViewport(
+      focusedDate: _viewedDate,
+      mode: DailyChoiceCalendarMode.month,
+    ),
+  );
   expect(catalog.selection.date, _choiceDate);
   expect(catalog.totalCount, incomplete);
   expect(catalog.nextCursor, isNotNull);
   expect(catalog.selection.isCompleted, isFalse);
   expect(catalog.items.every((item) => !item.isCompleted), isTrue);
   expect(position.pixels, greaterThan(0));
+  expect(_storedDailyChoiceOffset(tester), position.pixels);
 }
 
 /// Главная, прокрученная внутри списка избранных намерений.
@@ -822,11 +865,17 @@ Map<String, Object?> _intentionCatalogParameters(
   'позиция прокрутки страницы': _catalogPagePosition(tester).pixels,
 };
 
-/// Наблюдаемое состояние каталога дневных выборов.
+/// Наблюдаемое состояние каталога дневных выборов: страница, календарь и
+/// общая прокрутка, выдача, параметры, позиция и число обращений к выдаче в
+/// хранилище.
 Map<String, Object?> _dailyChoiceCatalogView(WidgetTester tester, _App app) {
   final catalog = app.dailyChoiceCatalog;
   return {
     'страница': tester.state(find.byType(daily_page.DailyChoiceCatalogPage)),
+    'календарь': tester.state(
+      find.byType(DailyChoiceCalendar, skipOffstage: false),
+    ),
+    'прокрутка': _dailyChoicePosition(tester),
     'выдача': catalog,
     ..._dailyChoiceParameters(tester, app),
     'загруженные записи': [
@@ -837,12 +886,14 @@ Map<String, Object?> _dailyChoiceCatalogView(WidgetTester tester, _App app) {
   };
 }
 
-/// Фильтры и позиция каталога дневных выборов, как их видит человек.
+/// Календарь, фильтры и позиция каталога дневных выборов, как их видит
+/// человек.
 ///
-/// Фильтры прокручиваются вместе с выдачей, поэтому на прокрученной странице
-/// они могут стоять за верхним краем.
+/// Календарь и фильтры прокручиваются вместе с выдачей, поэтому на
+/// прокрученной странице они могут стоять за верхним краем.
 Map<String, Object?> _dailyChoiceParameters(WidgetTester tester, _App app) => {
   'выбранный день': shownDailyChoiceCatalogDate(tester),
+  'просмотр календаря': shownDailyChoiceCatalogViewport(tester),
   'фильтр выполнения': _texts(
     find.byKey(
       const ValueKey('daily-choice-completion-filter'),
@@ -855,6 +906,7 @@ Map<String, Object?> _dailyChoiceParameters(WidgetTester tester, _App app) => {
   'загружено': app.dailyChoiceCatalog.items.length,
   'всего': app.dailyChoiceCatalog.totalCount,
   'позиция прокрутки': _dailyChoicePosition(tester).pixels,
+  'сохранённая позиция прокрутки': _storedDailyChoiceOffset(tester),
 };
 
 /// Наблюдаемое состояние Главной.
@@ -925,14 +977,39 @@ ScrollPosition _catalogPagePosition(WidgetTester tester) => _positionOf(
   ),
 );
 
-/// Позиция прокрутки страницы каталога дневных выборов: фильтры и выдача
-/// прокручиваются вместе.
-ScrollPosition _dailyChoicePosition(WidgetTester tester) => _positionOf(
-  tester,
-  find.descendant(
-    of: find.byType(daily_page.DailyChoiceCatalogPage),
-    matching: find.byType(CustomScrollView),
-  ),
+/// Общая прокрутка страницы каталога дневных выборов: календарь, фильтры и
+/// выдача прокручиваются вместе.
+final _dailyChoiceScrollView = find.descendant(
+  of: find.byType(daily_page.DailyChoiceCatalogPage),
+  matching: find.byType(CustomScrollView),
+);
+
+ScrollPosition _dailyChoicePosition(WidgetTester tester) =>
+    _positionOf(tester, _dailyChoiceScrollView);
+
+/// Смещение, которое общая прокрутка каталога дневных выборов сохранила в
+/// хранилище страниц маршрута под своим ключом.
+///
+/// Без ключа прокрутка смещение не сохраняет, а календарь, деливший бы с ней
+/// запись, заменил бы его номером своей страницы.
+Object? _storedDailyChoiceOffset(WidgetTester tester) {
+  final scrollable = tester.element(
+    find
+        .descendant(
+          of: _dailyChoiceScrollView,
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  return PageStorage.of(scrollable).readState(scrollable);
+}
+
+/// Строки выдачи каталога дневных выборов.
+final _dailyChoiceRows = find.byWidgetPredicate(
+  (widget) => switch (widget.key) {
+    ValueKey<String>(:final value) => value.startsWith('daily-choice-row-'),
+    _ => false,
+  },
 );
 
 ScrollPosition _homePosition(WidgetTester tester) => _positionOf(

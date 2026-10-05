@@ -1,7 +1,8 @@
 /// Общие шаги управления каталогом дневных выборов в сценариях приложения.
 ///
 /// Сценарий называет только намерение человека — «выбрать день каталога»,
-/// «какой день каталог показывает выбранным», «где выбирается день» — и не
+/// «какой день каталог показывает выбранным», «где выбирается день»,
+/// «перелистать или раскрыть календарь», «какой период он показывает» — и не
 /// знает, каким элементом страница позволяет выбрать дату. Шаги действуют и
 /// наблюдают через интерфейс каталога и не обращаются к его модели.
 ///
@@ -14,6 +15,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -113,6 +115,139 @@ CalendarDate shownDailyChoiceCatalogDate(WidgetTester tester) {
     fail('Каталог дневных выборов не называет выбранный день $selected.');
   }
   return selected;
+}
+
+/// Перелистывает календарь открытого каталога дневных выборов командами шапки
+/// в текущем представлении, пока он не покажет [date], и день не выбирает.
+///
+/// Календарь прокручивается вместе с выдачей, поэтому шаг сначала возвращает
+/// его на экран. [tap] — нажатие сценария для команд календаря; по умолчанию
+/// [tapWhenFound].
+Future<void> showDailyChoiceCatalogPeriod(
+  WidgetTester tester,
+  CalendarDate date, {
+  RootPageTap tap = tapWhenFound,
+}) async {
+  await _revealCalendar(tester);
+  final texts = AppLocalizations.of(
+    tester.element(dailyChoiceCatalogDateControl),
+  );
+  final collapsed = find
+      .byTooltip(texts.dailyChoiceCalendarExpand)
+      .evaluate()
+      .isNotEmpty;
+  await _turnUntilShown(
+    tester,
+    date,
+    tap,
+    previous: collapsed
+        ? texts.dailyChoiceCalendarPreviousWeek
+        : texts.dailyChoiceCalendarPreviousMonth,
+    next: collapsed
+        ? texts.dailyChoiceCalendarNextWeek
+        : texts.dailyChoiceCalendarNextMonth,
+  );
+}
+
+/// Раскрывает свёрнутый календарь открытого каталога дневных выборов в месяц
+/// просматриваемой даты.
+///
+/// Календарь прокручивается вместе с выдачей, поэтому шаг сначала возвращает
+/// его на экран. [tap] — нажатие сценария для команды календаря; по умолчанию
+/// [tapWhenFound].
+Future<void> expandDailyChoiceCatalogCalendar(
+  WidgetTester tester, {
+  RootPageTap tap = tapWhenFound,
+}) async {
+  await _revealCalendar(tester);
+  final texts = AppLocalizations.of(
+    tester.element(dailyChoiceCatalogDateControl),
+  );
+  await _runCommand(
+    tester,
+    tap,
+    find.byTooltip(texts.dailyChoiceCalendarExpand),
+  );
+}
+
+/// Период, который показывает календарь открытого каталога дневных выборов:
+/// дата просмотра и представление.
+///
+/// Шапка календаря называет месяц и год даты просмотра, видны неделя или весь
+/// месяц с этой датой, а команда представления предлагает обратное:
+/// раскрыть неделю или свернуть месяц. Календарь, который показывает другой
+/// период, проваливает проверку. Как и выбранный день, период читается и за
+/// краем видимой части страницы.
+DailyChoiceCalendarViewport shownDailyChoiceCatalogViewport(
+  WidgetTester tester,
+) {
+  final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
+  final viewport = tester.widget<DailyChoiceCalendar>(calendar).viewport;
+  final context = tester.element(calendar);
+  final texts = AppLocalizations.of(context);
+  final focused = viewport.focusedDate;
+  final title = MaterialLocalizations.of(context)
+      .formatMonthYear(DateTime.utc(focused.year, focused.month, focused.day));
+  final toggle = switch (viewport.mode) {
+    DailyChoiceCalendarMode.week => texts.dailyChoiceCalendarExpand,
+    DailyChoiceCalendarMode.month => texts.dailyChoiceCalendarCollapse,
+  };
+  final days = {
+    for (final element
+        in find
+            .descendant(
+              of: calendar,
+              matching: find.byType(
+                DailyChoiceCalendarDay,
+                skipOffstage: false,
+              ),
+            )
+            .evaluate())
+      (element.widget as DailyChoiceCalendarDay).date,
+  };
+  final periodShown = switch (viewport.mode) {
+    DailyChoiceCalendarMode.week =>
+      days.length == DateTime.daysPerWeek && days.contains(focused),
+    DailyChoiceCalendarMode.month => [
+      for (
+        var day = 1;
+        day <= DateTime.utc(focused.year, focused.month + 1, 0).day;
+        day++
+      )
+        CalendarDate.fromParts(focused.year, focused.month, day),
+    ].every(days.contains),
+  };
+  final titleShown = find
+      .descendant(of: calendar, matching: find.text(title, skipOffstage: false))
+      .evaluate()
+      .isNotEmpty;
+  final toggleShown = find
+      .descendant(
+        of: calendar,
+        matching: find.byTooltip(toggle, skipOffstage: false),
+      )
+      .evaluate()
+      .isNotEmpty;
+  if (!periodShown || !titleShown || !toggleShown) {
+    fail(
+      'Календарь каталога дневных выборов не показывает период $viewport: '
+      'дни $days, шапка «$title» ${titleShown ? 'видна' : 'не видна'}, '
+      'команда «$toggle» ${toggleShown ? 'видна' : 'не видна'}.',
+    );
+  }
+  return viewport;
+}
+
+/// Возвращает на экран календарь, ушедший с выдачей за верхний край страницы.
+Future<void> _revealCalendar(WidgetTester tester) async {
+  final calendar = find.byType(DailyChoiceCalendar, skipOffstage: false);
+  await pumpUntilFound(tester, calendar);
+  await Scrollable.of(tester.element(calendar)).position.ensureVisible(
+    calendar.evaluate().single.renderObject!,
+    alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+  );
+  await tester.pump();
+  await pumpUntilFound(tester, dailyChoiceCatalogDateControl);
 }
 
 /// Наибольшее число перелистываний к одному дню: далёкий день календарь
