@@ -50,6 +50,20 @@ final _sheet = find.byKey(const ValueKey('intention-creation-sheet'));
 final _chooseTags = find.byKey(const ValueKey('intention-editor-choose-tags'));
 final _resize = find.byKey(const ValueKey('intention-creation-sheet-resize'));
 final _favorite = find.byKey(const ValueKey('intention-editor-favorite'));
+final _readiness = find.byKey(const ValueKey('intention-editor-readiness'));
+final _readinessConfirmation = find.byKey(
+  const ValueKey('intention-editor-readiness-confirmation'),
+);
+final _readinessConfirm = find.byKey(
+  const ValueKey('intention-editor-readiness-confirm'),
+);
+final _close = find.byKey(const ValueKey('intention-editor-close'));
+final _closeConfirmation = find.byKey(
+  const ValueKey('intention-editor-close-confirmation'),
+);
+final _closeContinue = find.byKey(
+  const ValueKey('intention-editor-close-continue'),
+);
 final _search = find.byKey(const ValueKey('tag-catalog-search'));
 final _addToDraft = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
 final _createTag = find.byKey(const ValueKey('tag-catalog-create'));
@@ -275,7 +289,7 @@ void main() {
 
       // Сброс черновика не создаёт намерение и назначения, а созданный
       // выбором тег остаётся самостоятельной меткой.
-      await _tap(tester, find.byKey(const ValueKey('intention-editor-close')));
+      await _tap(tester, _close);
       await tester.pumpAndSettle();
       await _tap(
         tester,
@@ -303,6 +317,168 @@ void main() {
   );
 
   testWidgets(
+    'все пять полей, подготовленные в панели и общем выборе, переживают '
+    'объяснение готовности, разворачивание и сворачивание, переходы в выбор '
+    'и настоящий редактор тега и продолжение после запроса закрытия, а '
+    'намерение, назначения и избранное записывает только «Сохранить»',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _App.start(tester);
+      final l10n = app.l10n;
+      final home = _tagId(_homeTag);
+
+      /// Панель показывает текст, обе включённые отметки и набор [tags].
+      void expectPreparedFields(List<String> tags) {
+        expect(_text(tester, 'intention-editor-title'), _rawTitle);
+        expect(_text(tester, 'intention-editor-description'), _description);
+        expect(_iconOf(tester, _favorite), Icons.star);
+        expect(_iconOf(tester, _readiness), Icons.check_circle);
+        expect(_chipNames(tester), tags);
+      }
+
+      await app.openPanel(tester);
+      await tester.enterText(_field('intention-editor-title'), _rawTitle);
+      await tester.enterText(
+        _field('intention-editor-description'),
+        _description,
+      );
+      await _tap(tester, _favorite);
+      final graphBefore = app.storedGraph();
+
+      // Объяснение готовности — временная поверхность над той же панелью:
+      // подтверждение меняет только черновик.
+      await _tap(tester, _readiness);
+      await tester.pumpAndSettle();
+      expect(_readinessConfirmation, findsOneWidget);
+      expect(_text(tester, 'intention-editor-title'), _rawTitle);
+      await _tap(tester, _readinessConfirm);
+      await tester.pumpAndSettle();
+      expect(_readinessConfirmation, findsNothing);
+      expect(app.stackNames(), [AppShellRoute.name, IntentionEditorRoute.name]);
+      expectPreparedFields([]);
+      expect(app.storedGraph(), graphBefore);
+
+      // Разворачивание меняет только размер той же панели.
+      final compactHeight = tester.getRect(_sheet).height;
+      await _tap(tester, _resize);
+      await tester.pumpAndSettle();
+      expect(_iconOf(tester, _resize), Icons.close_fullscreen);
+      final expandedRect = tester.getRect(_sheet);
+      expect(expandedRect.height, greaterThan(compactHeight));
+      expectPreparedFields([]);
+
+      // Выбор и настоящий редактор над развёрнутой панелью: существующий тег
+      // и созданный самостоятельной операцией входят в набор только явным
+      // добавлением.
+      await app.openChooser(tester);
+      final tagSet = app.chooserTagSet();
+      await _tap(tester, _row(home));
+      await _tap(tester, _addToDraft);
+      await _tap(tester, _createTag);
+      await _until(tester, _tagEditorName);
+      await tester.pumpAndSettle();
+      await tester.enterText(_tagEditorName, 'Сарай');
+      await _tap(tester, _tagEditorSubmit);
+      await _waitForStorage(tester, () => _tagEditorName.evaluate().isEmpty);
+      final shed = app.storedTagId('Сарай');
+      await _until(tester, _row(shed));
+      await tester.pumpAndSettle();
+      expect(tagSet.current.tagIds, [home]);
+      await _tap(tester, _row(shed));
+      await _tap(tester, _addToDraft);
+      expect(tagSet.current.tagIds, [home, shed]);
+      await _tap(tester, find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      // Возврат показывает ту же развёрнутую панель со всеми пятью полями;
+      // граф получил только самостоятельный тег.
+      expect(app.stackNames(), [AppShellRoute.name, IntentionEditorRoute.name]);
+      expect(_iconOf(tester, _resize), Icons.close_fullscreen);
+      expect(tester.getRect(_sheet), expandedRect);
+      expectPreparedFields(['Дом', 'Сарай']);
+      expect(app.storedGraph(), graphBefore);
+      expect(app.storedTagNames(), ['Дом', 'Работа', 'Сад', 'Сарай']);
+
+      // Сворачивание сохраняет черновик без подтверждения потери данных.
+      await _tap(tester, _resize);
+      await tester.pumpAndSettle();
+      expect(_iconOf(tester, _resize), Icons.open_in_full);
+      expect(tester.getRect(_sheet).height, lessThan(expandedRect.height));
+      expect(_closeConfirmation, findsNothing);
+      expectPreparedFields(['Дом', 'Сарай']);
+
+      // Продолжение после запроса закрытия оставляет ту же сессию.
+      await _tap(tester, _close);
+      await tester.pumpAndSettle();
+      expect(_closeConfirmation, findsOneWidget);
+      await _tap(tester, _closeContinue);
+      await tester.pumpAndSettle();
+      expect(_closeConfirmation, findsNothing);
+      expect(app.stackNames(), [AppShellRoute.name, IntentionEditorRoute.name]);
+      expectPreparedFields(['Дом', 'Сарай']);
+      expect(tagSet.current.tagIds, [home, shed]);
+      expect(tagSet.current.availability, IntentionDraftAvailability.editable);
+      expect(app.storedGraph(), graphBefore);
+
+      // Отметки сообщают назначение и включённое состояние черновика.
+      expect(
+        tester.getSemantics(_favorite),
+        isSemantics(
+          label: l10n.editorFavoriteOption,
+          hasToggledState: true,
+          isToggled: true,
+        ),
+      );
+      expect(
+        tester.getSemantics(_readiness),
+        isSemantics(
+          label: l10n.editorReadinessOption,
+          hasToggledState: true,
+          isToggled: true,
+        ),
+      );
+      expect(find.byTooltip(l10n.editorFavoriteOptionOn), findsOneWidget);
+      expect(find.byTooltip(l10n.editorReadinessOptionOn), findsOneWidget);
+
+      // Только «Сохранить» записывает намерение со всеми пятью полями.
+      await _tap(tester, _submit);
+      await _waitForStorage(tester, () => _sheet.evaluate().isEmpty);
+      expectIntentionGraphRootPage(app.router);
+      expect(tagSet.current.availability, IntentionDraftAvailability.closed);
+      final created = app.raw
+          .select(
+            'SELECT id, title, description, is_action_ready FROM intentions',
+          )
+          .single;
+      expect(created['title'], _rawTitle.trim());
+      expect(created['description'], _description);
+      expect(created['is_action_ready'], 1);
+      expect(
+        [
+          for (final row in app.raw.select(
+            'SELECT intention_id FROM favorite_intentions',
+          ))
+            row['intention_id'],
+        ],
+        [created['id']],
+      );
+      expect(
+        [
+          for (final row in app.raw.select(
+            'SELECT intention_id, tag_id FROM tag_assignments ORDER BY rowid',
+          ))
+            (row['intention_id'], row['tag_id']),
+        ],
+        [
+          (created['id'], home.toCanonicalString()),
+          (created['id'], shed.toCanonicalString()),
+        ],
+      );
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
     'выбор, открытый одновременно с закрытием неизменённой панели, не меняет '
     'закрытую сессию и не влияет на новое открытие панели',
     (tester) async {
@@ -312,7 +488,7 @@ void main() {
 
       await app.openPanel(tester);
       await tester.tap(_chooseTags);
-      await tester.tap(find.byKey(const ValueKey('intention-editor-close')));
+      await tester.tap(_close);
       await tester.pump();
       await _until(tester, _row(home));
       await tester.pumpAndSettle();
