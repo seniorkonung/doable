@@ -1583,9 +1583,9 @@ void main() {
         IntentionReadiness readiness() =>
             sessions.state(tester).draft.readiness;
         await tester.enterText(find.byKey(_title), '  Позвонить врачу  ');
-        await tester.tap(find.byKey(_resize));
         await tester.pumpAndSettle();
         final session = sessions.latest;
+        final sheet = tester.getRect(find.byKey(_sheet));
 
         // Отмена кнопкой, нажатием вне диалога и системным «назад» оставляет
         // готовность выключенной и панель открытой.
@@ -1642,12 +1642,9 @@ void main() {
             isToggled: true,
           ),
         );
-        // Подтверждение сохраняет ту же сессию, черновик и режим панели.
+        // Подтверждение сохраняет ту же сессию, черновик и геометрию панели.
         expect(sessions.latest, same(session));
-        expect(
-          sessions.state(tester).sheetMode,
-          IntentionCreationSheetMode.expanded,
-        );
+        expect(tester.getRect(find.byKey(_sheet)), sheet);
         expect(
           _fieldText(tester, 'intention-editor-title'),
           '  Позвонить врачу  ',
@@ -2178,13 +2175,8 @@ void main() {
 
   group('общие сообщения над панелью создания', () {
     for (final scenario in [
-      (name: 'компактная панель', expand: false, insets: _phoneInsets),
-      (name: 'развёрнутая панель', expand: true, insets: _phoneInsets),
-      (
-        name: 'компактная панель над клавиатурой',
-        expand: false,
-        insets: _keyboardInsets,
-      ),
+      (name: 'компактная панель', insets: _phoneInsets),
+      (name: 'компактная панель над клавиатурой', insets: _keyboardInsets),
     ]) {
       testWidgets('общее сообщение видно поверх панели (${scenario.name}) и не '
           'перекрывает закреплённый отказ и сохранение', (tester) async {
@@ -2192,10 +2184,6 @@ void main() {
         _usePhone(tester, scenario.insets);
         final repository = ControlledCatalogRepository();
         await _openEditor(tester, repository);
-        if (scenario.expand) {
-          await tester.tap(find.byKey(_resize));
-          await tester.pumpAndSettle();
-        }
         await tester.enterText(find.byKey(_title), 'Намерение');
         await tester.tap(find.byKey(_submit));
         await tester.pump();
@@ -2287,7 +2275,6 @@ const _closeButton = ValueKey('intention-editor-close');
 const _title = ValueKey('intention-editor-title');
 const _description = ValueKey('intention-editor-description');
 const _submit = ValueKey('intention-editor-submit');
-const _resize = ValueKey('intention-creation-sheet-resize');
 const _favorite = ValueKey('intention-editor-favorite');
 const _readiness = ValueKey('intention-editor-readiness');
 const _readinessConfirmation = ValueKey(
