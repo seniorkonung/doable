@@ -572,10 +572,10 @@ final class _CloseConfirmationDialogState
     );
   }
 
-  /// Закрывает диалог с ответом [choice], только пока он остаётся верхним
-  /// маршрутом: ответ не может закрыть форму или другой маршрут под ним.
+  /// Закрывает диалог с ответом [choice], только пока он смонтирован и
+  /// остаётся верхним маршрутом: запоздалый ответ не трогает другую сессию.
   void _answer(IntentionCreationCloseChoice? choice) {
-    if (ModalRoute.of(context)?.isCurrent ?? false) {
+    if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
       Navigator.of(context).pop(choice);
     }
   }
