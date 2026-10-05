@@ -846,6 +846,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCreated => 'Intention created.';
 
   @override
+  String get editorCloseDiscardTitle => 'Discard the draft?';
+
+  @override
+  String get editorCloseDiscardMessage =>
+      'The new intention’s entered data hasn’t been saved and will be lost.';
+
+  @override
+  String get editorCloseContinueAction => 'Keep editing';
+
+  @override
+  String get editorCloseDiscardAction => 'Discard';
+
+  @override
+  String get editorCloseSavingTitle => 'Close the form?';
+
+  @override
+  String get editorCloseSavingMessage =>
+      'Saving is already in progress and will continue after the form closes. If saving fails, the entered data won’t be restored.';
+
+  @override
+  String get editorCloseSavingStayAction => 'Stay';
+
+  @override
+  String get editorCloseSavingLeaveAction => 'Close';
+
+  @override
   String get graphOperationCreate => 'Create';
 
   @override

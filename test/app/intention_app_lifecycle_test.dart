@@ -431,8 +431,19 @@ void main() {
       expect(repository.commands.single, isA<CreateIntention>());
       expect(find.text('Creating…'), findsOneWidget);
 
+      // Уход во время принятой отправки подтверждается и её не отменяет.
       await tester.pageBack();
       await tester.pumpAndSettle();
+      expect(find.text('Close the form?'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('intention-editor-close-discard')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('intention-editor-title')),
+        findsNothing,
+      );
+      expect(repository.commands, hasLength(1));
       final created = _intention(
         title: 'Быть здоровым',
         description: '  Пользовательское описание\n',
@@ -648,6 +659,83 @@ void main() {
       );
       expect(find.text(restored.title), findsNothing);
       expect(find.text('No active intentions yet.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'подтверждение закрытия на настоящем маршруте сохраняет черновик при '
+    'продолжении, сброс ничего не создаёт, а уход во время записи не отменяет '
+    'сохранение',
+    (tester) async {
+      const create = ValueKey('catalog-create-intention');
+      const title = ValueKey('intention-editor-title');
+      String? titleText() =>
+          tester.widget<TextField>(find.byKey(title)).controller?.text;
+      final writeGate = _CreationWriteGate();
+      final app = await _RealStorageApp.start(
+        tester,
+        const Locale('ru'),
+        observer: writeGate,
+      );
+      final before = _storedGraph(app.raw);
+
+      await tester.tap(find.byKey(create));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(title), '  Черновик  ');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Сбросить черновик?'), findsOneWidget);
+      await tester.tap(find.text('Продолжить ввод'));
+      await tester.pumpAndSettle();
+      expect(titleText(), '  Черновик  ');
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Сбросить'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(title), findsNothing);
+      expect(find.byKey(create), findsOneWidget);
+      expect(_storedGraph(app.raw), before);
+
+      await tester.tap(find.byKey(create));
+      await tester.pumpAndSettle();
+      expect(titleText(), isEmpty);
+
+      writeGate.hold();
+      addTearDown(writeGate.release);
+      await tester.enterText(find.byKey(title), 'Сохранённое намерение');
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await _waitForStorage(tester, () => writeGate.isHolding);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Закрыть форму?'), findsOneWidget);
+      await tester.tap(find.text('Закрыть'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(title), findsNothing);
+      expect(find.byKey(create), findsOneWidget);
+      expect(_storedIntentionCount(app.raw), 0);
+
+      writeGate.release();
+      await _waitForStorage(
+        tester,
+        () => find.byKey(_operationMessage).evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Создание — «Сохранённое намерение»: Намерение создано.'),
+        findsOneWidget,
+      );
+      expect(_storedIntentionCount(app.raw), 1);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(_storedIntentionCount(app.raw), 1);
+      expect(tester.takeException(), isNull);
     },
   );
 

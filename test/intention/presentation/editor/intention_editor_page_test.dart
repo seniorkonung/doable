@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -12,7 +14,11 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
+import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,55 +71,58 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('блокирует повторную отправку, сохраняя доступный Back', (
-    tester,
-  ) async {
-    final repository = ControlledCatalogRepository();
-    final router = await _openEditor(tester, repository);
+  testWidgets(
+    'блокирует повторную отправку, сохраняя доступный уход с подтверждением',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      final router = await _openEditor(tester, repository);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('intention-editor-title')),
-      '  Быть здоровым  ',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('intention-editor-description')),
-      '  Сохранить буквально\n',
-    );
-    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
-    await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        '  Быть здоровым  ',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-description')),
+        '  Сохранить буквально\n',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await tester.pump();
 
-    expect(repository.commands, hasLength(1));
-    expect(
-      repository.commands.single,
-      isA<CreateIntention>()
-          .having((command) => command.title, 'title', '  Быть здоровым  ')
-          .having(
-            (command) => command.description,
-            'description',
-            '  Сохранить буквально\n',
-          ),
-    );
-    expect(find.text('Creating…'), findsOneWidget);
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const ValueKey('intention-editor-submit')),
-          )
-          .onPressed,
-      isNull,
-    );
+      expect(repository.commands, hasLength(1));
+      expect(
+        repository.commands.single,
+        isA<CreateIntention>()
+            .having((command) => command.title, 'title', '  Быть здоровым  ')
+            .having(
+              (command) => command.description,
+              'description',
+              '  Сохранить буквально\n',
+            ),
+      );
+      expect(find.text('Creating…'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const ValueKey('intention-editor-submit')),
+            )
+            .onPressed,
+        isNull,
+      );
 
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_closeDiscard));
+      await tester.pumpAndSettle();
 
-    expectIntentionGraphRootPage(router);
-    expect(repository.commands, hasLength(1));
-    repository.completeCommand(
-      0,
-      const ResultFailure(IntentionUnexpectedFailure()),
-    );
-    await tester.pump();
-  });
+      expectIntentionGraphRootPage(router);
+      expect(repository.commands, hasLength(1));
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnexpectedFailure()),
+      );
+      await tester.pump();
+    },
+  );
 
   testWidgets(
     'не даёт менять текст выполняющейся отправки и повторяет отправку с показанным текстом',
@@ -493,6 +502,8 @@ void main() {
       );
       await tester.pageBack();
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_closeDiscard));
+      await tester.pumpAndSettle();
 
       expect(
         find.text('The intention couldn’t be created. Try again.'),
@@ -512,6 +523,8 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
       await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_closeDiscard));
       await tester.pumpAndSettle();
 
       repository.completeCommand(
@@ -547,6 +560,8 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
     await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(_closeDiscard));
     await tester.pumpAndSettle();
 
     repository.completeCommand(0, _savedResult(title: 'Позднее намерение'));
@@ -723,6 +738,8 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_closeDiscard));
+      await tester.pumpAndSettle();
       expectIntentionGraphRootPage(router);
       expect(find.textContaining(failure), findsNothing);
 
@@ -735,7 +752,449 @@ void main() {
       expect(find.textContaining(failure), findsNothing);
     },
   );
+
+  group('закрытие формы создания', () {
+    testWidgets(
+      'неизменённая и возвращённая к исходным значениям форма закрывается «назад» без подтверждения',
+      (tester) async {
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository);
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expectIntentionGraphRootPage(router);
+
+        await tester.tap(
+          find.byKey(const ValueKey('catalog-create-intention')),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          'Намерение',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          '',
+        );
+        await tester.pump();
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expectIntentionGraphRootPage(router);
+        expect(repository.commands, isEmpty);
+      },
+    );
+
+    final changes =
+        <
+          String,
+          Future<void> Function(WidgetTester tester, _EditorSessions sessions)
+        >{
+          'название из одних пробелов': (tester, _) => tester.enterText(
+            find.byKey(const ValueKey('intention-editor-title')),
+            '   ',
+          ),
+          'описание': (tester, _) => tester.enterText(
+            find.byKey(const ValueKey('intention-editor-description')),
+            '  Описание\n',
+          ),
+          'набор тегов': (tester, sessions) async =>
+              sessions.notifier(tester).draftTagSet.add(_tag(1, 'Дом')),
+          'избранное': (tester, sessions) async =>
+              sessions.notifier(tester).markFavorite(),
+          'готовность': (tester, sessions) async =>
+              sessions.notifier(tester).confirmReadiness(),
+        };
+    for (final MapEntry(key: field, value: change) in changes.entries) {
+      testWidgets(
+        'изменённое поле «$field» требует подтверждения: продолжение сохраняет черновик, а сброс закрывает форму',
+        (tester) async {
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository();
+          final router = await _openEditor(
+            tester,
+            repository,
+            observers: [sessions],
+          );
+          await change(tester, sessions);
+          await tester.pump();
+          final draft = sessions.state(tester).draft;
+          final title = _fieldText(tester, 'intention-editor-title');
+          final description = _fieldText(
+            tester,
+            'intention-editor-description',
+          );
+          expect(draft.isChanged, isTrue);
+
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+
+          expect(find.byKey(_closeConfirmation), findsOneWidget);
+          expect(find.text('Discard the draft?'), findsOneWidget);
+          expect(
+            find.text(
+              'The new intention’s entered data hasn’t been saved and will be lost.',
+            ),
+            findsOneWidget,
+          );
+          expect(router.current.name, IntentionEditorRoute.name);
+
+          await tester.tap(find.byKey(_closeContinue));
+          await tester.pumpAndSettle();
+
+          expect(find.byKey(_closeConfirmation), findsNothing);
+          expect(router.current.name, IntentionEditorRoute.name);
+          expect(sessions.state(tester).draft, same(draft));
+          expect(_fieldText(tester, 'intention-editor-title'), title);
+          expect(
+            _fieldText(tester, 'intention-editor-description'),
+            description,
+          );
+
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(_closeDiscard));
+          await tester.pumpAndSettle();
+
+          expect(find.byKey(_closeConfirmation), findsNothing);
+          expectIntentionGraphRootPage(router);
+          expect(repository.commands, isEmpty);
+
+          await tester.tap(
+            find.byKey(const ValueKey('catalog-create-intention')),
+          );
+          await tester.pumpAndSettle();
+
+          expect(router.current.name, IntentionEditorRoute.name);
+          expect(sessions.state(tester).draft.isChanged, isFalse);
+          expect(_fieldText(tester, 'intention-editor-title'), isEmpty);
+          expect(_fieldText(tester, 'intention-editor-description'), isEmpty);
+        },
+      );
+    }
+
+    testWidgets(
+      'системное «назад», программный уход и закрытие диалога без выбора сохраняют черновик и не создают второе подтверждение',
+      (tester) async {
+        final sessions = _EditorSessions();
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(
+          tester,
+          repository,
+          observers: [sessions],
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          '  Намерение  ',
+        );
+        await tester.pump();
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(_closeConfirmation), findsOneWidget);
+
+        // Нажатие на затемнение вне диалога закрывает только его.
+        await tester.tapAt(const Offset(8, 8));
+        await tester.pumpAndSettle();
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(_fieldText(tester, 'intention-editor-title'), '  Намерение  ');
+
+        unawaited(router.maybePop());
+        unawaited(router.maybePop());
+        await tester.pumpAndSettle();
+        expect(find.byKey(_closeConfirmation), findsOneWidget);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(_fieldText(tester, 'intention-editor-title'), '  Намерение  ');
+        expect(sessions.state(tester).draft.title, '  Намерение  ');
+        expect(repository.commands, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'во время принятой отправки объясняет продолжение сохранения, а уход не отменяет и не повторяет её',
+      (tester) async {
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository);
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          'Позднее намерение',
+        );
+        await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+        await tester.pump();
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        expect(find.text('Close the form?'), findsOneWidget);
+        expect(
+          find.text(
+            'Saving is already in progress and will continue after the form '
+            'closes. If saving fails, the entered data won’t be restored.',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(_closeContinue));
+        await tester.pumpAndSettle();
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(find.text('Creating…'), findsOneWidget);
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(_closeDiscard));
+        await tester.pumpAndSettle();
+        expectIntentionGraphRootPage(router);
+        expect(repository.commands, hasLength(1));
+
+        repository.completeCommand(0, _savedResult(title: 'Позднее намерение'));
+        await tester.pump();
+        await tester.pump();
+        _completeCatalogRefresh(repository);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Create — “Позднее намерение”: Intention created.'),
+          findsOneWidget,
+        );
+        expect(repository.commands, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'успех при открытом подтверждении закрывает свою форму и диалог, а его поздний ответ не закрывает новое открытие',
+      (tester) async {
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository);
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          'Новое намерение',
+        );
+        await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+        await tester.pump();
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.byKey(_closeConfirmation), findsOneWidget);
+
+        repository.completeCommand(0, _savedResult(title: 'Новое намерение'));
+        await tester.pump();
+        await tester.pump();
+        _completeCatalogRefresh(repository);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expectIntentionGraphRootPage(router);
+        expect(
+          find.text('Create — “Новое намерение”: Intention created.'),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byKey(const ValueKey('catalog-create-intention')),
+        );
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
+
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(_fieldText(tester, 'intention-editor-title'), isEmpty);
+      },
+    );
+
+    testWidgets(
+      'отказ при открытом подтверждении снимает устаревший диалог и сохраняет форму с черновиком',
+      (tester) async {
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository);
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          'Намерение',
+        );
+        await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+        await tester.pump();
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.text('Close the form?'), findsOneWidget);
+
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(
+          find.text('The intention couldn’t be created. Try again.'),
+          findsOneWidget,
+        );
+        expect(_fieldText(tester, 'intention-editor-title'), 'Намерение');
+
+        // Новый запрос объясняет текущее состояние: отправки больше нет.
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.text('Discard the draft?'), findsOneWidget);
+        await tester.tap(find.byKey(_closeContinue));
+        await tester.pumpAndSettle();
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(find.widgetWithText(FilledButton, 'Try again'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'запоздалый ответ подтверждения после смены состояния отправки не закрывает форму',
+      (tester) async {
+        final repository = ControlledCatalogRepository();
+        final router = await _openEditor(tester, repository);
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          'Намерение',
+        );
+        await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+        await tester.pump();
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        // Человек уже нажимает «Закрыть», когда отправка завершается
+        // отказом: подтверждение больше не описывает состояние формы.
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byKey(_closeDiscard)),
+        );
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await tester.pump();
+        await gesture.up();
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(_closeConfirmation), findsNothing);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(_fieldText(tester, 'intention-editor-title'), 'Намерение');
+        expect(
+          find.text('The intention couldn’t be created. Try again.'),
+          findsOneWidget,
+        );
+        expect(repository.commands, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'локализует подтверждение закрытия на русском и сохраняет доступность его действий',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledCatalogRepository();
+        await _openEditor(tester, repository, locale: const Locale('ru'));
+        await tester.enterText(
+          find.byKey(const ValueKey('intention-editor-title')),
+          'Намерение',
+        );
+
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Сбросить черновик?'), findsOneWidget);
+        expect(
+          find.text(
+            'Введённые данные нового намерения не сохранены и будут потеряны.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Продолжить ввод'), findsOneWidget);
+        expect(find.text('Сбросить'), findsOneWidget);
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+
+        await tester.tap(find.byKey(_closeContinue));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+        await tester.pump();
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Закрыть форму?'), findsOneWidget);
+        expect(
+          find.text(
+            'Сохранение уже выполняется и продолжится после закрытия формы. '
+            'Если сохранить не удастся, введённые данные не восстановятся.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Остаться'), findsOneWidget);
+        expect(find.text('Закрыть'), findsOneWidget);
+
+        await tester.tap(find.byKey(_closeContinue));
+        await tester.pumpAndSettle();
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnexpectedFailure()),
+        );
+        await tester.pumpAndSettle();
+        semantics.dispose();
+      },
+    );
+  });
 }
+
+const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
+const _closeContinue = ValueKey('intention-editor-close-continue');
+const _closeDiscard = ValueKey('intention-editor-close-discard');
+
+/// Последняя построенная сессия формы создания. Набор тегов и отметки ещё
+/// не имеют элементов формы, поэтому проверки закрытия меняют их через
+/// сессию.
+final class _EditorSessions extends ProviderObserver {
+  IntentionEditorViewModelProvider? _latest;
+
+  @override
+  void didAddProvider(ProviderObserverContext context, Object? value) {
+    if (context.provider case final IntentionEditorViewModelProvider provider) {
+      _latest = provider;
+    }
+  }
+
+  IntentionEditorViewModel notifier(WidgetTester tester) =>
+      _container(tester).read(_latest!.notifier);
+
+  IntentionEditorState state(WidgetTester tester) =>
+      _container(tester).read(_latest!);
+
+  ProviderContainer _container(WidgetTester tester) =>
+      ProviderScope.containerOf(
+        tester.element(find.byType(IntentionEditorPage)),
+      );
+}
+
+String? _fieldText(WidgetTester tester, String key) =>
+    tester.widget<TextField>(find.byKey(ValueKey(key))).controller?.text;
+
+/// Отвечает на обновление каталога после подтверждённого создания.
+void _completeCatalogRefresh(ControlledCatalogRepository repository) {
+  if (repository.queries.length > 1) {
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+  }
+}
+
+Tag _tag(int number, String name) =>
+    Tag(id: _tagId(number), name: TagName.fromInput(name));
 
 Future<void> _closeOperationMessage(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 5));
@@ -746,6 +1205,7 @@ Future<AppRouter> _openEditor(
   WidgetTester tester,
   ControlledCatalogRepository repository, {
   Locale locale = const Locale('en'),
+  List<ProviderObserver> observers = const [],
 }) async {
   final router = AppRouter();
   addTearDown(router.dispose);
@@ -754,6 +1214,7 @@ Future<AppRouter> _openEditor(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
+      observers: observers,
       retry: (retryCount, error) => null,
       child: MaterialApp.router(
         locale: locale,

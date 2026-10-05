@@ -1496,6 +1496,54 @@ abstract class AppLocalizations {
   /// **'Intention created.'**
   String get editorCreated;
 
+  /// Заголовок подтверждения закрытия изменённого черновика создания до отправки
+  ///
+  /// In en, this message translates to:
+  /// **'Discard the draft?'**
+  String get editorCloseDiscardTitle;
+
+  /// Объяснение потери несохранённого черновика создания при закрытии формы
+  ///
+  /// In en, this message translates to:
+  /// **'The new intention’s entered data hasn’t been saved and will be lost.'**
+  String get editorCloseDiscardMessage;
+
+  /// Действие подтверждения закрытия, сохраняющее форму и черновик создания
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get editorCloseContinueAction;
+
+  /// Действие подтверждения закрытия, сбрасывающее черновик и закрывающее форму
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get editorCloseDiscardAction;
+
+  /// Заголовок подтверждения закрытия формы во время принятого сохранения
+  ///
+  /// In en, this message translates to:
+  /// **'Close the form?'**
+  String get editorCloseSavingTitle;
+
+  /// Объяснение, что закрытие формы не отменяет выполняющееся сохранение, а черновик не восстановится после отказа
+  ///
+  /// In en, this message translates to:
+  /// **'Saving is already in progress and will continue after the form closes. If saving fails, the entered data won’t be restored.'**
+  String get editorCloseSavingMessage;
+
+  /// Действие подтверждения закрытия во время сохранения, оставляющее форму открытой
+  ///
+  /// In en, this message translates to:
+  /// **'Stay'**
+  String get editorCloseSavingStayAction;
+
+  /// Действие подтверждения закрытия во время сохранения, закрывающее форму без отмены сохранения
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get editorCloseSavingLeaveAction;
+
   /// Вид операции создания намерения в сообщении оболочки
   ///
   /// In en, this message translates to:

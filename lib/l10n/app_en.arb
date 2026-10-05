@@ -915,6 +915,38 @@
   "@editorCreated": {
     "description": "Подтверждение успешного создания намерения"
   },
+  "editorCloseDiscardTitle": "Discard the draft?",
+  "@editorCloseDiscardTitle": {
+    "description": "Заголовок подтверждения закрытия изменённого черновика создания до отправки"
+  },
+  "editorCloseDiscardMessage": "The new intention’s entered data hasn’t been saved and will be lost.",
+  "@editorCloseDiscardMessage": {
+    "description": "Объяснение потери несохранённого черновика создания при закрытии формы"
+  },
+  "editorCloseContinueAction": "Keep editing",
+  "@editorCloseContinueAction": {
+    "description": "Действие подтверждения закрытия, сохраняющее форму и черновик создания"
+  },
+  "editorCloseDiscardAction": "Discard",
+  "@editorCloseDiscardAction": {
+    "description": "Действие подтверждения закрытия, сбрасывающее черновик и закрывающее форму"
+  },
+  "editorCloseSavingTitle": "Close the form?",
+  "@editorCloseSavingTitle": {
+    "description": "Заголовок подтверждения закрытия формы во время принятого сохранения"
+  },
+  "editorCloseSavingMessage": "Saving is already in progress and will continue after the form closes. If saving fails, the entered data won’t be restored.",
+  "@editorCloseSavingMessage": {
+    "description": "Объяснение, что закрытие формы не отменяет выполняющееся сохранение, а черновик не восстановится после отказа"
+  },
+  "editorCloseSavingStayAction": "Stay",
+  "@editorCloseSavingStayAction": {
+    "description": "Действие подтверждения закрытия во время сохранения, оставляющее форму открытой"
+  },
+  "editorCloseSavingLeaveAction": "Close",
+  "@editorCloseSavingLeaveAction": {
+    "description": "Действие подтверждения закрытия во время сохранения, закрывающее форму без отмены сохранения"
+  },
   "graphOperationCreate": "Create",
   "@graphOperationCreate": {
     "description": "Вид операции создания намерения в сообщении оболочки"

@@ -848,6 +848,32 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorCreated => 'Намерение создано.';
 
   @override
+  String get editorCloseDiscardTitle => 'Сбросить черновик?';
+
+  @override
+  String get editorCloseDiscardMessage =>
+      'Введённые данные нового намерения не сохранены и будут потеряны.';
+
+  @override
+  String get editorCloseContinueAction => 'Продолжить ввод';
+
+  @override
+  String get editorCloseDiscardAction => 'Сбросить';
+
+  @override
+  String get editorCloseSavingTitle => 'Закрыть форму?';
+
+  @override
+  String get editorCloseSavingMessage =>
+      'Сохранение уже выполняется и продолжится после закрытия формы. Если сохранить не удастся, введённые данные не восстановятся.';
+
+  @override
+  String get editorCloseSavingStayAction => 'Остаться';
+
+  @override
+  String get editorCloseSavingLeaveAction => 'Закрыть';
+
+  @override
   String get graphOperationCreate => 'Создание';
 
   @override
