@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show clampDouble, lerpDouble;
 
@@ -22,6 +23,11 @@ import 'intention_creation_sheet_mode.dart';
 /// режима, нажатие вне панели, кнопка закрытия и действие экранного диктора
 /// передаются через [onCloseRequested]. Сама панель свой маршрут не
 /// закрывает. Прокрутка полей режим не меняет и панель не закрывает.
+///
+/// Закреплённое сообщение [status] стоит между полями и нижней частью и
+/// остаётся видимым при любой прокрутке полей. По запросу [reveal] панель
+/// доводит часть полей до видимости и удерживает её видимой при пересчёте
+/// своей геометрии.
 final class IntentionCreationSheet extends StatefulWidget {
   const IntentionCreationSheet({
     required this.mode,
@@ -34,6 +40,8 @@ final class IntentionCreationSheet extends StatefulWidget {
     required this.header,
     required this.fields,
     required this.footer,
+    this.status,
+    this.reveal,
     super.key,
   });
 
@@ -69,8 +77,32 @@ final class IntentionCreationSheet extends StatefulWidget {
   /// Закреплённая нижняя часть с основным действием формы.
   final Widget footer;
 
+  /// Закреплённое над нижней частью сообщение, например общий отказ
+  /// сохранения. При нехватке высоты полям остаётся всё нужное им место, но
+  /// не больше половины, а сообщение занимает остальное и прокручивается
+  /// само, начиная с первой строки.
+  final Widget? status;
+
+  /// Запрос держать видимой часть полей, например поле с ошибкой.
+  ///
+  /// Панель доводит цель до видимости после ближайшего кадра и снова — при
+  /// каждом изменении размеров своих прокручиваемых областей: при появлении
+  /// клавиатуры, смене режима или росте содержимого. Запрос действует, пока
+  /// владелец его не сменит или не снимет и пока человек сам не прокрутит
+  /// панель; обычная прокрутка к каретке поля его не прекращает.
+  final IntentionCreationSheetReveal? reveal;
+
   @override
   State<IntentionCreationSheet> createState() => _IntentionCreationSheetState();
+}
+
+/// Запрос держать видимой часть полей панели. Каждый новый объект — новый
+/// запрос, даже для той же цели.
+final class IntentionCreationSheetReveal {
+  IntentionCreationSheetReveal(this.target);
+
+  /// Ключ виджета внутри полей панели.
+  final GlobalKey target;
 }
 
 final class _IntentionCreationSheetState extends State<IntentionCreationSheet>
@@ -107,9 +139,26 @@ final class _IntentionCreationSheetState extends State<IntentionCreationSheet>
 
   var _dragDistance = 0.0;
 
+  /// Запрос видимости, который панель ещё выполняет.
+  IntentionCreationSheetReveal? _activeReveal;
+
+  /// Последние размеры области и содержимого каждой прокручиваемой области
+  /// панели: доведение до видимости повторяется при их изменении, но не при
+  /// прокрутке.
+  final _scrollExtents = Expando<(double, double)>();
+
+  @override
+  void initState() {
+    super.initState();
+    _startReveal();
+  }
+
   @override
   void didUpdateWidget(IntentionCreationSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(widget.reveal, oldWidget.reveal)) {
+      _startReveal();
+    }
     if (widget.mode != oldWidget.mode) {
       final target = _expansionOf(widget.mode);
       if (MediaQuery.disableAnimationsOf(context)) {
@@ -124,6 +173,64 @@ final class _IntentionCreationSheetState extends State<IntentionCreationSheet>
   void dispose() {
     _expansion.dispose();
     super.dispose();
+  }
+
+  void _startReveal() {
+    final reveal = _activeReveal = widget.reveal;
+    if (reveal != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _keepVisible(reveal));
+    }
+  }
+
+  void _keepVisible(IntentionCreationSheetReveal reveal) {
+    final target = reveal.target.currentContext;
+    if (!mounted || !identical(reveal, _activeReveal) || target == null) {
+      return;
+    }
+    // Сначала начало цели, затем её конец: цель выше видимой области
+    // показывается с начала, а не помещающаяся целиком — концом, где у поля
+    // находится текст ошибки.
+    for (final policy in const [
+      ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+    ]) {
+      unawaited(Scrollable.ensureVisible(target, alignmentPolicy: policy));
+    }
+  }
+
+  /// Прокрутка человеком прекращает запрос видимости. Программная прокрутка,
+  /// например к каретке поля, его не прекращает.
+  bool _handleScroll(ScrollNotification notification) {
+    final isUserScroll = switch (notification) {
+      ScrollStartNotification(:final dragDetails) => dragDetails != null,
+      UserScrollNotification(:final direction) =>
+        direction != ScrollDirection.idle,
+      _ => false,
+    };
+    if (isUserScroll) {
+      _activeReveal = null;
+    }
+    return false;
+  }
+
+  /// Повторяет доведение до видимости после изменения размеров области или
+  /// содержимого. Уведомление приходит после кадра, поэтому повтор идёт
+  /// после прокрутки к каретке поля, которую в том же кадре запускает
+  /// появление клавиатуры.
+  bool _handleScrollMetrics(ScrollMetricsNotification notification) {
+    final metrics = notification.metrics;
+    final extents = (
+      metrics.viewportDimension,
+      metrics.maxScrollExtent - metrics.minScrollExtent,
+    );
+    final previous = _scrollExtents[notification.context];
+    _scrollExtents[notification.context] = extents;
+    if (previous != null && previous != extents) {
+      if (_activeReveal case final reveal?) {
+        _keepVisible(reveal);
+      }
+    }
+    return false;
   }
 
   static double _expansionOf(IntentionCreationSheetMode mode) => switch (mode) {
@@ -226,36 +333,52 @@ final class _IntentionCreationSheetState extends State<IntentionCreationSheet>
                         .removeViewInsets(removeBottom: true),
                     child: SafeArea(
                       top: false,
-                      child: _SheetLayout(
-                        expansion: _expansion,
-                        visibleContextExtent: _visibleContextExtent,
-                        minVisibleContextExtent: _minVisibleContextExtent,
-                        topBar: _TopBar(
-                          isExpanded: isExpanded,
-                          resizeLabel: isExpanded
-                              ? widget.collapseLabel
-                              : widget.expandLabel,
-                          closeLabel: widget.closeLabel,
-                          onResize: _toggleMode,
-                          onClose: widget.onCloseRequested,
-                          onDragStart: _startDrag,
-                          onDragUpdate: _updateDrag,
-                          onDragEnd: _endDrag,
-                        ),
-                        body: SingleChildScrollView(
-                          key: const ValueKey(
-                            'intention-creation-sheet-fields',
+                      child: NotificationListener<ScrollMetricsNotification>(
+                        onNotification: _handleScrollMetrics,
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: _handleScroll,
+                          child: _SheetLayout(
+                            expansion: _expansion,
+                            visibleContextExtent: _visibleContextExtent,
+                            minVisibleContextExtent: _minVisibleContextExtent,
+                            topBar: _TopBar(
+                              isExpanded: isExpanded,
+                              resizeLabel: isExpanded
+                                  ? widget.collapseLabel
+                                  : widget.expandLabel,
+                              closeLabel: widget.closeLabel,
+                              onResize: _toggleMode,
+                              onClose: widget.onCloseRequested,
+                              onDragStart: _startDrag,
+                              onDragUpdate: _updateDrag,
+                              onDragEnd: _endDrag,
+                            ),
+                            body: SingleChildScrollView(
+                              key: const ValueKey(
+                                'intention-creation-sheet-fields',
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [widget.header, widget.fields],
+                              ),
+                            ),
+                            status: switch (widget.status) {
+                              final status? => SingleChildScrollView(
+                                key: const ValueKey(
+                                  'intention-creation-sheet-status',
+                                ),
+                                primary: false,
+                                child: status,
+                              ),
+                              null => null,
+                            },
+                            // Прокручивается, только если сама не помещается в
+                            // тесную доступную область, и не переполняет панель.
+                            footer: SingleChildScrollView(
+                              primary: false,
+                              child: widget.footer,
+                            ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [widget.header, widget.fields],
-                          ),
-                        ),
-                        // Прокручивается, только если сама не помещается в
-                        // тесную доступную область, и не переполняет панель.
-                        footer: SingleChildScrollView(
-                          primary: false,
-                          child: widget.footer,
                         ),
                       ),
                     ),
@@ -353,21 +476,26 @@ final class _TopBar extends StatelessWidget {
   }
 }
 
-enum _SheetSlot { topBar, body, footer }
+enum _SheetSlot { topBar, body, status, footer }
 
-/// Раскладка панели: закреплённые верхняя полоса и нижняя часть и
+/// Раскладка панели: закреплённые верхняя полоса, сообщение и нижняя часть и
 /// прокручиваемые между ними поля.
 ///
 /// Нижняя часть с основным действием получает своё место первой после
-/// полосы, поля — оставшееся. В компактном режиме ([expansion] = 0) высота
-/// полей следует за содержимым в пределах доступной высоты за вычетом
-/// [visibleContextExtent]; в развёрнутом (1) панель занимает всю доступную
-/// высоту. Промежуточные значения плавно переводят высоту между ними.
+/// полосы, поля и сообщение делят оставшееся. В компактном режиме
+/// ([expansion] = 0) высота полей следует за содержимым в пределах доступной
+/// высоты за вычетом [visibleContextExtent]; в развёрнутом (1) панель
+/// занимает всю доступную высоту. Промежуточные значения плавно переводят
+/// высоту между ними.
 ///
 /// Если закреплённые части не помещаются в компактное ограничение, видимый
 /// участок страницы уменьшается ради них, но не меньше чем до
 /// [minVisibleContextExtent]: основное действие и управление размером
 /// остаются доступными, а поля — прокручиваемыми.
+///
+/// Сообщение получает свою высоту, пока полям остаётся нужное им место; при
+/// нехватке полям остаётся не меньше половины места, а сообщение
+/// прокручивается в остальном.
 final class _SheetLayout
     extends SlottedMultiChildRenderObjectWidget<_SheetSlot, RenderBox> {
   const _SheetLayout({
@@ -376,6 +504,7 @@ final class _SheetLayout
     required this.minVisibleContextExtent,
     required this.topBar,
     required this.body,
+    required this.status,
     required this.footer,
   });
 
@@ -384,15 +513,17 @@ final class _SheetLayout
   final double minVisibleContextExtent;
   final Widget topBar;
   final Widget body;
+  final Widget? status;
   final Widget footer;
 
   @override
   Iterable<_SheetSlot> get slots => _SheetSlot.values;
 
   @override
-  Widget childForSlot(_SheetSlot slot) => switch (slot) {
+  Widget? childForSlot(_SheetSlot slot) => switch (slot) {
     _SheetSlot.topBar => topBar,
     _SheetSlot.body => body,
+    _SheetSlot.status => status,
     _SheetSlot.footer => footer,
   };
 
@@ -461,6 +592,8 @@ final class _RenderSheetLayout extends RenderBox
   RenderBox get _topBar => childForSlot(_SheetSlot.topBar)!;
 
   RenderBox get _body => childForSlot(_SheetSlot.body)!;
+
+  RenderBox? get _status => childForSlot(_SheetSlot.status);
 
   RenderBox get _footer => childForSlot(_SheetSlot.footer)!;
 
@@ -535,27 +668,48 @@ final class _RenderSheetLayout extends RenderBox
       );
     }
     final fixedHeight = topHeight + footerHeight;
-    final expandedBodyHeight = math.max(0.0, available - fixedHeight);
+    final status = _status;
+    final statusExtent = status?.getMaxIntrinsicHeight(width) ?? 0;
+    final compactSpace = math.max(0.0, compactLimit - fixedHeight);
+    final expandedSpace = math.max(0.0, available - fixedHeight);
     final double bodyHeight;
+    final double statusHeight;
     if (expansion == 1) {
+      statusHeight = _statusShare(expandedSpace, statusExtent, width);
       bodyHeight = _layoutChild(
         _body,
         width,
-        minHeight: expandedBodyHeight,
-        maxHeight: expandedBodyHeight,
+        minHeight: expandedSpace - statusHeight,
+        maxHeight: expandedSpace - statusHeight,
       );
     } else {
+      final compactStatusHeight = _statusShare(
+        compactSpace,
+        statusExtent,
+        width,
+      );
       final compactBodyHeight = _layoutChild(
         _body,
         width,
-        maxHeight: math.max(0, compactLimit - fixedHeight),
+        maxHeight: compactSpace - compactStatusHeight,
       );
       if (expansion == 0) {
+        statusHeight = compactStatusHeight;
         bodyHeight = compactBodyHeight;
       } else {
+        final expandedStatusHeight = _statusShare(
+          expandedSpace,
+          statusExtent,
+          width,
+        );
+        statusHeight = lerpDouble(
+          compactStatusHeight,
+          expandedStatusHeight,
+          expansion,
+        )!;
         final height = lerpDouble(
           compactBodyHeight,
-          expandedBodyHeight,
+          expandedSpace - expandedStatusHeight,
           expansion,
         )!;
         bodyHeight = _layoutChild(
@@ -566,12 +720,32 @@ final class _RenderSheetLayout extends RenderBox
         );
       }
     }
+    if (status != null) {
+      _layoutChild(
+        status,
+        width,
+        minHeight: statusHeight,
+        maxHeight: statusHeight,
+      );
+      _position(status, topHeight + bodyHeight);
+    }
 
     _position(_body, topHeight);
-    _position(_footer, topHeight + bodyHeight);
+    _position(_footer, topHeight + bodyHeight + statusHeight);
     size = constraints.constrain(
-      Size(width, topHeight + bodyHeight + footerHeight),
+      Size(width, topHeight + bodyHeight + statusHeight + footerHeight),
     );
+  }
+
+  /// Высота сообщения в месте [space], которое оно делит с полями: полям
+  /// остаётся нужное им место, но не больше половины, а сообщению — остальное
+  /// в пределах его высоты [statusExtent].
+  double _statusShare(double space, double statusExtent, double width) {
+    if (statusExtent == 0) {
+      return 0;
+    }
+    final bodyNeed = _layoutChild(_body, width, maxHeight: space / 2);
+    return math.min(statusExtent, space - bodyNeed);
   }
 
   double _layoutChild(

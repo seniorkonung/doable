@@ -3,16 +3,27 @@ import 'dart:math' as math;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_creation_sheet.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
+import 'package:doable/src/intention/presentation/operation/operation_state.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -514,7 +525,489 @@ void main() {
       },
     );
   });
+
+  group('ошибки сохранения', () {
+    for (final (name, field, reason, fieldKey, message) in _fieldFailures) {
+      testWidgets(
+        'ошибка $name доводит своё поле и собственный текст до видимости в прокрученных полях над клавиатурой, а право ошибки подтверждается только по кадру с видимым сообщением',
+        (tester) async {
+          _usePhone(tester, _portrait, keyboard: true);
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository();
+          await _openEditor(tester, repository, sessions);
+          await tester.enterText(find.byKey(_title), ' Намерение ');
+          await tester.enterText(find.byKey(_description), _lines(40));
+          await tester.pumpAndSettle();
+          await _scrollAwayFrom(tester, fieldKey);
+          final draft = sessions.state(tester).draft;
+
+          await tester.tap(find.byKey(_submit));
+          await tester.pump();
+          repository.completeCommand(0, _textFailure(field, reason));
+          await tester.idle();
+          await tester.pump();
+
+          final claim = _failureClaim(tester);
+          for (var frame = 0; _isClaimPending(tester, claim); frame++) {
+            expect(frame, lessThan(60), reason: 'сообщение становится видимым');
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          _expectInsideFields(tester, find.text(message));
+          await tester.pumpAndSettle();
+
+          _expectInsideFields(tester, find.text(message));
+          _expectFieldEndVisible(tester, fieldKey);
+          expect(find.byType(SnackBar), findsNothing);
+          expect(sessions.state(tester).draft, same(draft));
+          expect(_controller(tester, _title).text, ' Намерение ');
+          expect(_controller(tester, _description).text, _lines(40));
+          expect(sessions.state(tester).sheetMode, _compactMode);
+          expect(repository.commands, hasLength(1));
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'ошибка $name остаётся видимой, когда скрытая на время отправки клавиатура возвращается',
+        (tester) async {
+          _usePhone(tester, _portrait, keyboard: true);
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository();
+          await _openEditor(tester, repository, sessions);
+          await tester.enterText(find.byKey(_title), 'Намерение');
+          await tester.enterText(find.byKey(_description), _lines(40));
+          await tester.pumpAndSettle();
+          await _scrollAwayFrom(tester, fieldKey);
+
+          await tester.tap(find.byKey(_submit));
+          await tester.pump();
+          // Поля только для чтения во время отправки закрывают соединение
+          // ввода, и платформа скрывает клавиатуру.
+          _usePhone(tester, _portrait);
+          await tester.pumpAndSettle();
+          repository.completeCommand(0, _textFailure(field, reason));
+          await tester.pumpAndSettle();
+          _expectInsideFields(tester, find.text(message));
+
+          // Поле снова принимает ввод, и клавиатура возвращается к нему.
+          _usePhone(tester, _portrait, keyboard: true);
+          await tester.pumpAndSettle();
+
+          _expectInsideFields(tester, find.text(message));
+          _expectFieldEndVisible(tester, fieldKey);
+          expect(_hasFocus(tester, _description), isTrue);
+          expect(sessions.state(tester).sheetMode, _compactMode);
+          expect(repository.commands, hasLength(1));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final (interruption, interrupt)
+        in <(String, Future<void> Function(WidgetTester))>[
+          (
+            'прокрутка полей человеком',
+            (tester) =>
+                tester.fling(find.byKey(_fields), const Offset(0, -400), 3000),
+          ),
+          (
+            'правка черновика',
+            (tester) => tester.enterText(
+              find.byKey(_description),
+              '${_lines(40)}\nЕщё строка',
+            ),
+          ),
+        ]) {
+      testWidgets(
+        '$interruption прекращает доведение ошибки до видимости при смене размеров полей',
+        (tester) async {
+          _usePhone(tester, _portrait, keyboard: true);
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository();
+          await _openEditor(tester, repository, sessions);
+          await tester.enterText(find.byKey(_description), _lines(40));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(_submit));
+          await tester.pump();
+          repository.completeCommand(
+            0,
+            _textFailure(
+              IntentionTextField.title,
+              IntentionTextValidationReason.empty,
+            ),
+          );
+          await tester.pumpAndSettle();
+          _expectInsideFields(tester, find.text('Enter a title.'));
+
+          await interrupt(tester);
+          await tester.pumpAndSettle();
+          _expectAboveFields(tester, find.text('Enter a title.'));
+
+          _usePhone(tester, _portrait);
+          await tester.pumpAndSettle();
+          _usePhone(tester, _portrait, keyboard: true);
+          await tester.pumpAndSettle();
+
+          _expectAboveFields(tester, find.text('Enter a title.'));
+          expect(find.text('Enter a title.'), findsOneWidget);
+          expect(repository.commands, hasLength(1));
+        },
+      );
+    }
+
+    for (final (failure, message, recovery) in _pinnedFailures) {
+      testWidgets(
+        'отказ «$message» с исправлением и повтором закреплён рядом с сохранением над клавиатурой при масштабе текста 200%, не сдвигая прокрученные поля',
+        (tester) async {
+          _usePhone(tester, _portrait, keyboard: true);
+          tester.platformDispatcher.textScaleFactorTestValue =
+              _androidMaxTextScale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final tags = [_tag(1, 'Дом'), _tag(2, 'Работа')];
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository()
+            ..tagObservations = _observedTags(tags);
+          await _openEditor(tester, repository, sessions);
+          sessions.notifier(tester)
+            ..draftTagSet.add(tags[0])
+            ..draftTagSet.add(tags[1])
+            ..markFavorite()
+            ..confirmReadiness();
+          await tester.enterText(find.byKey(_title), 'Намерение');
+          await tester.enterText(find.byKey(_description), _lines(12));
+          await tester.pumpAndSettle();
+          final draft = sessions.state(tester).draft;
+          final pixels = _fieldsPosition(tester).pixels;
+          expect(pixels, greaterThan(0));
+
+          await tester.tap(find.byKey(_submit));
+          await tester.pump();
+          repository.completeCommand(0, ResultFailure(failure));
+          await tester.pumpAndSettle();
+
+          _expectPinned(tester, recovery);
+          expect(_fieldsPosition(tester).pixels, pixels);
+          expect(_isClaimPending(tester, _failureClaim(tester)), isFalse);
+          expect(find.byType(SnackBar), findsNothing);
+          expect(sessions.state(tester).draft, same(draft));
+          expect(sessions.state(tester).sheetMode, _compactMode);
+          expect(repository.commands, hasLength(1));
+          expect(tester.takeException(), isNull);
+
+          switch (recovery) {
+            case _Recovery.removeMissingTags:
+              expect(_submitButton(tester).onPressed, isNull);
+              await tester.tap(find.byKey(_removeMissing));
+              await tester.pumpAndSettle();
+
+              // Исправление меняет только набор и само не отправляет.
+              expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
+              expect(find.byKey(_failure), findsNothing);
+              expect(_submitButton(tester).onPressed, isNotNull);
+              expect(repository.commands, hasLength(1));
+            case _Recovery.retry:
+              final first = _failureClaim(tester);
+              await tester.tap(find.byKey(_submit));
+              await tester.pump();
+
+              expect(repository.commands, hasLength(2));
+              expect(
+                repository.commands.last,
+                isA<CreateIntention>()
+                    .having((command) => command.title, 'название', 'Намерение')
+                    .having(
+                      (command) => command.description,
+                      'описание',
+                      _lines(12),
+                    )
+                    .having((command) => command.tagIds, 'теги', [
+                      _tagId(1),
+                      _tagId(2),
+                    ])
+                    .having(
+                      (command) => command.favoriteMark,
+                      'избранное',
+                      FavoriteMark.favorite,
+                    )
+                    .having(
+                      (command) => command.readiness,
+                      'готовность',
+                      IntentionReadiness.ready,
+                    ),
+              );
+              expect(find.byKey(_failure), findsNothing);
+              repository.completeCommand(1, ResultFailure(failure));
+              await tester.pumpAndSettle();
+
+              // Повтор принят той же сессией как новая операция.
+              final second = _failureClaim(tester);
+              expect(second.token, isNot(same(first.token)));
+              expect(_isClaimPending(tester, second), isFalse);
+              expect(sessions.added, hasLength(1));
+              expect(find.byType(SnackBar), findsNothing);
+            case _Recovery.none:
+              expect(_submitButton(tester).onPressed, isNull);
+              // Правки, не устраняющие причину, отказ не снимают.
+              await tester.ensureVisible(find.byKey(_favorite));
+              await tester.pumpAndSettle();
+              await tester.tap(find.byKey(_favorite));
+              await tester.enterText(find.byKey(_title), 'Другое намерение');
+              await tester.pumpAndSettle();
+
+              expect(find.byKey(_failure), findsOneWidget);
+              expect(_submitButton(tester).onPressed, isNull);
+              expect(repository.commands, hasLength(1));
+          }
+        },
+      );
+    }
+
+    testWidgets(
+      'любой отказ сохраняет все пять полей черновика и развёрнутый режим',
+      (tester) async {
+        _usePhone(tester, _portrait);
+        final failures = [
+          for (final (name, field, reason, _, _) in _fieldFailures)
+            (name, _textFailure(field, reason)),
+          for (final (failure, message, _) in _pinnedFailures)
+            (message, ResultFailure<IntentionCommandSuccess>(failure)),
+        ];
+        for (final (name, failure) in failures) {
+          final tags = [_tag(1, 'Дом')];
+          final sessions = _EditorSessions();
+          final repository = ControlledCatalogRepository()
+            ..tagObservations = _observedTags(tags);
+          await _openEditor(tester, repository, sessions);
+          sessions.notifier(tester)
+            ..draftTagSet.add(tags.single)
+            ..markFavorite()
+            ..confirmReadiness();
+          await tester.enterText(find.byKey(_title), '  Намерение');
+          await tester.enterText(find.byKey(_description), 'Описание\n');
+          await tester.tap(find.byKey(_resize));
+          await tester.pumpAndSettle();
+          final draft = sessions.state(tester).draft;
+
+          await tester.tap(find.byKey(_submit));
+          await tester.pump();
+          repository.completeCommand(0, failure);
+          await tester.pumpAndSettle();
+
+          final state = sessions.state(tester);
+          expect(
+            state.operation,
+            isA<OperationFailed<Intention>>(),
+            reason: name,
+          );
+          expect(state.draft, same(draft), reason: name);
+          expect(state.draft.tagIds, [_tagId(1)], reason: name);
+          expect(state.draft.favoriteMark, FavoriteMark.favorite, reason: name);
+          expect(state.draft.readiness, IntentionReadiness.ready, reason: name);
+          expect(_controller(tester, _title).text, '  Намерение', reason: name);
+          expect(
+            _controller(tester, _description).text,
+            'Описание\n',
+            reason: name,
+          );
+          expect(find.byKey(_tagChip(1)), findsOneWidget, reason: name);
+          expect(state.sheetMode, _expandedMode, reason: name);
+          expect(_sheetRect(tester), _expandedArea(_portrait), reason: name);
+          expect(repository.commands, hasLength(1), reason: name);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+      },
+    );
+  });
 }
+
+/// Способ восстановления после общего отказа, который предлагает панель.
+enum _Recovery { removeMissingTags, retry, none }
+
+/// Ошибки полей: название поля в описании проверки, поле и причина отказа,
+/// ключ поля и текст ошибки.
+const _fieldFailures =
+    <(String, IntentionTextField, IntentionTextValidationReason, Key, String)>[
+      (
+        'названия',
+        IntentionTextField.title,
+        IntentionTextValidationReason.empty,
+        _title,
+        'Enter a title.',
+      ),
+      (
+        'описания',
+        IntentionTextField.description,
+        IntentionTextValidationReason.tooLong,
+        _description,
+        'Use no more than 4096 characters.',
+      ),
+    ];
+
+/// Общие отказы сохранения: причина, сообщение и предлагаемое восстановление.
+final _pinnedFailures = <(IntentionFailure, String, _Recovery)>[
+  (
+    IntentionCreationTagsMissingFailure([_tagId(1)]),
+    'A selected tag was deleted from the catalog. Remove it from the draft '
+        'to save the intention.',
+    _Recovery.removeMissingTags,
+  ),
+  (
+    const IntentionUnavailableFailure(),
+    'The intention couldn’t be created. Try again.',
+    _Recovery.retry,
+  ),
+  (
+    const IntentionConflictFailure(),
+    'The intention couldn’t be created because of a conflict.',
+    _Recovery.none,
+  ),
+  (
+    const IntentionCorruptionFailure(),
+    'Stored data is damaged. The intention wasn’t created.',
+    _Recovery.none,
+  ),
+  (
+    const IntentionUnexpectedFailure(),
+    'The intention couldn’t be created because of an unexpected error.',
+    _Recovery.none,
+  ),
+];
+
+ResultFailure<IntentionCommandSuccess> _textFailure(
+  IntentionTextField field,
+  IntentionTextValidationReason reason,
+) => ResultFailure(
+  IntentionTextInputValidationFailure(
+    IntentionTextValidationFailure(field: field, reason: reason),
+  ),
+);
+
+/// Прокручивает поля так, что место будущей ошибки поля [field] оказывается
+/// вне видимой области: к концу полей для названия и к их началу для
+/// описания, которое длиннее области полей.
+Future<void> _scrollAwayFrom(WidgetTester tester, Key field) async {
+  final position = _fieldsPosition(tester);
+  position.jumpTo(field == _title ? position.maxScrollExtent : 0);
+  await tester.pumpAndSettle();
+  final viewport = tester.getRect(find.byKey(_fields));
+  final rect = tester.getRect(find.byKey(field));
+  expect(
+    rect.bottom <= viewport.top || rect.bottom > viewport.bottom,
+    isTrue,
+    reason: 'конец поля вне видимой области полей',
+  );
+}
+
+/// Нижняя граница экрана над клавиатурой.
+double _visibleBottom(WidgetTester tester) =>
+    tester.view.physicalSize.height / tester.view.devicePixelRatio -
+    tester.view.viewInsets.bottom / tester.view.devicePixelRatio;
+
+/// [finder] целиком виден в области полей над клавиатурой.
+void _expectInsideFields(WidgetTester tester, Finder finder) {
+  final viewport = tester.getRect(find.byKey(_fields));
+  final rect = tester.getRect(finder);
+  expect(rect.top, greaterThanOrEqualTo(viewport.top));
+  expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
+  expect(viewport.bottom, lessThanOrEqualTo(_visibleBottom(tester)));
+}
+
+/// [finder] прокручен выше видимой области полей.
+void _expectAboveFields(WidgetTester tester, Finder finder) => expect(
+  tester.getRect(finder).bottom,
+  lessThanOrEqualTo(tester.getRect(find.byKey(_fields)).top),
+);
+
+/// Поле [field] видно вместе со своим концом, где находится текст ошибки;
+/// поле, которое помещается в области полей, видно целиком.
+void _expectFieldEndVisible(WidgetTester tester, Key field) {
+  final viewport = tester.getRect(find.byKey(_fields));
+  final rect = tester.getRect(find.byKey(field));
+  expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
+  expect(rect.bottom, greaterThan(viewport.top));
+  if (rect.height <= viewport.height) {
+    expect(rect.top, greaterThanOrEqualTo(viewport.top));
+  }
+}
+
+/// Общий отказ закреплён между полями и действиями: поля остаются видимыми,
+/// начало сообщения видно над клавиатурой, а предложенные действия
+/// нажимаются.
+void _expectPinned(WidgetTester tester, _Recovery recovery) {
+  final fields = tester.getRect(find.byKey(_fields));
+  final status = tester.getRect(find.byKey(_status));
+  final message = tester.getRect(find.byKey(_failure));
+  final actions = [
+    _submit,
+    if (recovery == _Recovery.removeMissingTags) _removeMissing,
+  ];
+  expect(fields.height, greaterThan(0));
+  expect(status.top, greaterThanOrEqualTo(fields.bottom));
+  expect(message.top, greaterThanOrEqualTo(status.top));
+  expect(message.top, lessThan(status.bottom));
+  for (final action in actions) {
+    final rect = tester.getRect(find.byKey(action));
+    expect(rect.top, greaterThanOrEqualTo(status.bottom));
+    expect(rect.bottom, lessThanOrEqualTo(_visibleBottom(tester)));
+    expect(find.byKey(action).hitTestable(), findsOneWidget);
+  }
+  expect(
+    find.widgetWithText(FilledButton, 'Try again'),
+    recovery == _Recovery.retry ? findsOneWidget : findsNothing,
+  );
+  expect(
+    find.byKey(_removeMissing),
+    recovery == _Recovery.removeMissingTags ? findsOneWidget : findsNothing,
+  );
+}
+
+GraphInitiatorPresentationClaim _failureClaim(WidgetTester tester) => tester
+    .widget<OperationFailurePresentation>(
+      find.byType(OperationFailurePresentation),
+    )
+    .claim!;
+
+/// Право ошибки ещё у формы: не подтверждено и не передано общей
+/// поверхности.
+bool _isClaimPending(
+  WidgetTester tester,
+  GraphInitiatorPresentationClaim claim,
+) => identical(
+  ProviderScope.containerOf(tester.element(find.byType(IntentionEditorPage)))
+      .read(graphCommandCoordinatorProvider.notifier)
+      .claimInitiatorFailure(claim.token),
+  claim,
+);
+
+FilledButton _submitButton(WidgetTester tester) =>
+    tester.widget<FilledButton>(find.byKey(_submit));
+
+Tag _tag(int number, String name) =>
+    Tag(id: _tagId(number), name: TagName.fromInput(name));
+
+TagId _tagId(int number) => switch (TagId.decode(
+  '018f47c2-6b7d-7abc-8def-${number.toString().padLeft(12, '0')}',
+)) {
+  TagIdDecodingSuccess(:final id) => id,
+  InvalidTagIdDecoding() => throw StateError('Некорректный UUID тега.'),
+};
+
+ValueKey<String> _tagChip(int number) =>
+    ValueKey('intention-editor-tag-${_tagId(number).toCanonicalString()}');
+
+/// Наблюдение подтверждает тег из [tags] и не завершается, пока наблюдатель
+/// не освободит подписку.
+Stream<TagReadResult> Function(TagId) _observedTags(List<Tag> tags) =>
+    (id) => Stream.multi(
+      (controller) => controller.add(
+        TagReadSuccess(
+          GraphSnapshot(
+            value: tags.where((tag) => tag.id == id).firstOrNull,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      ),
+    );
 
 const _sheet = ValueKey('intention-creation-sheet');
 const _handle = ValueKey('intention-creation-sheet-handle');
@@ -524,6 +1017,10 @@ const _closeButton = ValueKey('intention-editor-close');
 const _title = ValueKey('intention-editor-title');
 const _description = ValueKey('intention-editor-description');
 const _submit = ValueKey('intention-editor-submit');
+const _status = ValueKey('intention-creation-sheet-status');
+const _failure = ValueKey('intention-editor-failure');
+const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
+const _favorite = ValueKey('intention-editor-favorite');
 const _catalogCreate = ValueKey('catalog-create-intention');
 const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
@@ -727,6 +1224,11 @@ final class _EditorSessions extends ProviderObserver {
   IntentionEditorState state(WidgetTester tester) => ProviderScope.containerOf(
     tester.element(find.byType(IntentionEditorPage)),
   ).read(latest);
+
+  IntentionEditorViewModel notifier(WidgetTester tester) =>
+      ProviderScope.containerOf(
+        tester.element(find.byType(IntentionEditorPage)),
+      ).read(latest.notifier);
 }
 
 Future<AppRouter> _openEditor(

@@ -31,6 +31,12 @@ import 'intention_editor_view_model.dart';
 /// сохраняет набор: панель отмечает эти теги и предлагает явное исправление,
 /// которое снимает только их и само сохранение не отправляет.
 ///
+/// Ошибка поля показывается под своим полем: после отказа панель доводит
+/// поле и текст ошибки до видимости и удерживает их видимыми, пока человек
+/// не прокрутит панель или не изменит черновик. Общий отказ, исправление
+/// набора тегов и допустимый повтор закреплены рядом с сохранением и видны
+/// при любой прокрутке полей.
+///
 /// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
 /// «назад» и программный `maybePop` — сначала обращается к единому решению
 /// сессии о закрытии и не удаляет маршрут сам. Маршрут формы закрывается
@@ -50,6 +56,16 @@ final class _IntentionEditorPageState
   final _formKey = IntentionCreationFormKey();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+
+  /// Поля, которые панель доводит до видимости вместе с их ошибкой.
+  final _titleField = GlobalKey(debugLabel: 'intention-editor-title');
+  final _descriptionField = GlobalKey(
+    debugLabel: 'intention-editor-description',
+  );
+
+  /// Запрос держать видимым поле с текущей ошибкой. Действует, пока отказ и
+  /// черновик остаются прежними.
+  IntentionCreationSheetReveal? _failureReveal;
 
   /// Маршрут формы уже закрывается после завершения сессии.
   var _isRouteClosing = false;
@@ -77,6 +93,8 @@ final class _IntentionEditorPageState
     final editor = ref.watch(provider);
     final notifier = ref.read(provider.notifier);
     ref.listen(provider, (previous, next) {
+      // Страница следит за сессией и перестраивается с новым запросом.
+      _failureReveal = _failureRevealAfter(previous, next);
       if (next.event case IntentionEditorCreated()) {
         notifier.consumeEvent();
         // Сообщение об успехе предъявляет общий presenter оболочки.
@@ -91,18 +109,21 @@ final class _IntentionEditorPageState
       IntentionDraftAvailability.submitting ||
       IntentionDraftAvailability.closed => true,
     };
-    final generalFailure = _generalFailure(localizations, editor.operation);
+    final failure = switch (editor.operation) {
+      OperationFailed<Intention>(:final failure) => (
+        place: _failurePlace(failure),
+        message: _failureMessage(localizations, failure),
+      ),
+      OperationIdle<Intention>() ||
+      OperationRunning<Intention>() ||
+      OperationSucceeded<Intention>() => null,
+    };
+    String? failureAt(_FailurePlace place) =>
+        failure?.place == place ? failure?.message : null;
+    final titleFailure = failureAt(_FailurePlace.title);
+    final descriptionFailure = failureAt(_FailurePlace.description);
+    final pinnedFailure = failureAt(_FailurePlace.pinned);
     final missingTagIds = editor.missingTagIds;
-    final titleFailure = _fieldFailure(
-      localizations,
-      editor.operation,
-      IntentionTextField.title,
-    );
-    final descriptionFailure = _fieldFailure(
-      localizations,
-      editor.operation,
-      IntentionTextField.description,
-    );
     return PopScope<Object?>(
       // Маршрут не закрывается сам: решение принимает сессия.
       canPop: false,
@@ -121,6 +142,7 @@ final class _IntentionEditorPageState
         expandLabel: localizations.editorExpandFormAction,
         collapseLabel: localizations.editorCollapseFormAction,
         onCloseRequested: () => unawaited(_requestClose()),
+        reveal: _failureReveal,
         header: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Semantics(
@@ -139,43 +161,49 @@ final class _IntentionEditorPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextField(
-                key: const ValueKey('intention-editor-title'),
-                controller: _titleController,
-                readOnly: isDraftFixed,
-                autofocus: true,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: localizations.editorTitleLabel,
-                  error: titleFailure == null
-                      ? null
-                      : OperationFailurePresentation(
-                          claim: editor.failurePresentation,
-                          message: titleFailure,
-                        ),
+              KeyedSubtree(
+                key: _titleField,
+                child: TextField(
+                  key: const ValueKey('intention-editor-title'),
+                  controller: _titleController,
+                  readOnly: isDraftFixed,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: localizations.editorTitleLabel,
+                    error: titleFailure == null
+                        ? null
+                        : OperationFailurePresentation(
+                            claim: editor.failurePresentation,
+                            message: titleFailure,
+                          ),
+                  ),
+                  onChanged: notifier.changeTitle,
                 ),
-                onChanged: notifier.changeTitle,
               ),
               const SizedBox(height: 12),
               // Описание начинается одной строкой и растёт с текстом; то, что
               // не помещается в панель, доступно прокруткой полей.
-              TextField(
-                key: const ValueKey('intention-editor-description'),
-                controller: _descriptionController,
-                readOnly: isDraftFixed,
-                minLines: 1,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-                decoration: InputDecoration(
-                  labelText: localizations.editorDescriptionLabel,
-                  error: descriptionFailure == null
-                      ? null
-                      : OperationFailurePresentation(
-                          claim: editor.failurePresentation,
-                          message: descriptionFailure,
-                        ),
+              KeyedSubtree(
+                key: _descriptionField,
+                child: TextField(
+                  key: const ValueKey('intention-editor-description'),
+                  controller: _descriptionController,
+                  readOnly: isDraftFixed,
+                  minLines: 1,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  decoration: InputDecoration(
+                    labelText: localizations.editorDescriptionLabel,
+                    error: descriptionFailure == null
+                        ? null
+                        : OperationFailurePresentation(
+                            claim: editor.failurePresentation,
+                            message: descriptionFailure,
+                          ),
+                  ),
+                  onChanged: notifier.changeDescription,
                 ),
-                onChanged: notifier.changeDescription,
               ),
               if (editor.selectedTags.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -198,54 +226,80 @@ final class _IntentionEditorPageState
                 onEnableReadiness: () => unawaited(_confirmReadiness()),
                 onDisableReadiness: notifier.disableReadiness,
               ),
-              if (generalFailure != null) ...[
-                const SizedBox(height: 12),
-                OperationFailurePresentation(
+            ],
+          ),
+        ),
+        status: pinnedFailure == null
+            ? null
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: OperationFailurePresentation(
                   claim: editor.failurePresentation,
-                  message: generalFailure,
+                  message: pinnedFailure,
                   messageKey: const ValueKey('intention-editor-failure'),
                 ),
-              ],
-              if (missingTagIds.isNotEmpty) ...[
-                const SizedBox(height: 8),
+              ),
+        // Исправление набора и повтор стоят вместе с сохранением и при
+        // нехватке ширины переносятся друг под друга.
+        footer: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          child: OverflowBar(
+            alignment: MainAxisAlignment.end,
+            overflowAlignment: OverflowBarAlignment.end,
+            spacing: 8,
+            overflowSpacing: 8,
+            children: [
+              if (missingTagIds.isNotEmpty)
                 // Исправление снимает только теги, отсутствие которых
                 // подтвердил отказ, и не отправляет сохранение. Как и снятие
                 // отдельного тега, оно не уводит фокус из поля ввода.
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: TextFieldTapRegion(
-                    child: OutlinedButton(
-                      key: const ValueKey(
-                        'intention-editor-remove-missing-tags',
-                      ),
-                      onPressed: isDraftFixed
-                          ? null
-                          : () => missingTagIds.forEach(notifier.removeTag),
-                      child: Text(
-                        localizations.editorRemoveMissingTags(
-                          missingTagIds.length,
-                        ),
+                TextFieldTapRegion(
+                  child: OutlinedButton(
+                    key: const ValueKey('intention-editor-remove-missing-tags'),
+                    onPressed: isDraftFixed
+                        ? null
+                        : () => missingTagIds.forEach(notifier.removeTag),
+                    child: Text(
+                      localizations.editorRemoveMissingTags(
+                        missingTagIds.length,
                       ),
                     ),
                   ),
                 ),
-              ],
+              FilledButton(
+                key: const ValueKey('intention-editor-submit'),
+                onPressed: editor.canSubmit ? notifier.submit : null,
+                child: Text(_submitLabel(localizations, editor)),
+              ),
             ],
-          ),
-        ),
-        footer: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-          child: Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: FilledButton(
-              key: const ValueKey('intention-editor-submit'),
-              onPressed: editor.canSubmit ? notifier.submit : null,
-              child: Text(_submitLabel(localizations, editor)),
-            ),
           ),
         ),
       ),
     );
+  }
+
+  /// Запрос видимости после перехода сессии от [previous] к [next].
+  ///
+  /// Новая ошибка поля получает новый запрос; запрос действует, пока отказ и
+  /// черновик остаются прежними. Общий отказ закреплён и запроса не требует.
+  IntentionCreationSheetReveal? _failureRevealAfter(
+    IntentionEditorState? previous,
+    IntentionEditorState next,
+  ) {
+    final operation = next.operation;
+    if (operation is! OperationFailed<Intention>) {
+      return null;
+    }
+    if (previous != null && identical(previous.operation, operation)) {
+      return identical(previous.draft, next.draft) ? _failureReveal : null;
+    }
+    return switch (_failurePlace(operation.failure)) {
+      _FailurePlace.title => IntentionCreationSheetReveal(_titleField),
+      _FailurePlace.description => IntentionCreationSheetReveal(
+        _descriptionField,
+      ),
+      _FailurePlace.pinned => null,
+    };
   }
 
   /// Передаёт запрос ухода сессии и выполняет её решение.
@@ -360,72 +414,69 @@ final class _IntentionEditorPageState
     OperationSucceeded<Intention>() ||
     OperationFailed<Intention>() => localizations.editorSaveAction,
   };
-
-  String? _fieldFailure(
-    AppLocalizations localizations,
-    OperationState<Intention> operation,
-    IntentionTextField field,
-  ) {
-    if (operation
-        case OperationFailed<Intention>(
-          failure: IntentionTextInputValidationFailure(:final textFailure),
-        )
-        when textFailure.field == field) {
-      return switch ((field, textFailure.reason)) {
-        (IntentionTextField.title, IntentionTextValidationReason.empty) =>
-          localizations.editorTitleEmpty,
-        (IntentionTextField.title, IntentionTextValidationReason.tooLong) =>
-          localizations.editorTitleTooLong,
-        (
-          IntentionTextField.title,
-          IntentionTextValidationReason.invalidUnicodeRepertoire,
-        ) =>
-          localizations.editorTitleInvalidUnicode,
-        (
-          IntentionTextField.description,
-          IntentionTextValidationReason.tooLong,
-        ) =>
-          localizations.editorDescriptionTooLong,
-        (
-          IntentionTextField.description,
-          IntentionTextValidationReason.invalidUnicodeRepertoire,
-        ) =>
-          localizations.editorDescriptionInvalidUnicode,
-        (IntentionTextField.description, IntentionTextValidationReason.empty) ||
-        (IntentionTextField.titleFilter, _) => localizations.editorInvalidInput,
-      };
-    }
-    return null;
-  }
-
-  String? _generalFailure(
-    AppLocalizations localizations,
-    OperationState<Intention> operation,
-  ) => switch (operation) {
-    OperationIdle<Intention>() ||
-    OperationRunning<Intention>() ||
-    OperationSucceeded<Intention>() => null,
-    OperationFailed<Intention>(:final failure) => switch (failure) {
-      IntentionTextInputValidationFailure(:final textFailure)
-          when textFailure.field == IntentionTextField.title ||
-              textFailure.field == IntentionTextField.description =>
-        null,
-      // Объяснение описывает проверку при сохранении; исправление снимает
-      // оставшиеся в черновике отсутствующие теги.
-      IntentionCreationTagsMissingFailure(:final missingTagIds) =>
-        localizations.editorCreateTagsMissing(missingTagIds.length),
-      IntentionGenericValidationFailure() ||
-      IntentionTextInputValidationFailure() => localizations.editorInvalidInput,
-      IntentionConflictFailure() => localizations.editorCreateConflict,
-      IntentionHasBlockingRelationsFailure() =>
-        localizations.editorCreateUnexpected,
-      IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
-      IntentionCorruptionFailure() => localizations.editorCreateCorruption,
-      IntentionNotFoundFailure() ||
-      IntentionUnexpectedFailure() => localizations.editorCreateUnexpected,
-    },
-  };
 }
+
+/// Где панель показывает отказ сохранения: под своим полем в прокручиваемых
+/// полях или в закреплённой области рядом с сохранением.
+enum _FailurePlace { title, description, pinned }
+
+_FailurePlace _failurePlace(IntentionFailure failure) => switch (failure) {
+  IntentionTextInputValidationFailure(:final textFailure) =>
+    switch (textFailure.field) {
+      IntentionTextField.title => _FailurePlace.title,
+      IntentionTextField.description => _FailurePlace.description,
+      IntentionTextField.titleFilter => _FailurePlace.pinned,
+    },
+  IntentionGenericValidationFailure() ||
+  IntentionCreationTagsMissingFailure() ||
+  IntentionNotFoundFailure() ||
+  IntentionConflictFailure() ||
+  IntentionHasBlockingRelationsFailure() ||
+  IntentionUnavailableFailure() ||
+  IntentionCorruptionFailure() ||
+  IntentionUnexpectedFailure() => _FailurePlace.pinned,
+};
+
+String _failureMessage(
+  AppLocalizations localizations,
+  IntentionFailure failure,
+) => switch (failure) {
+  IntentionTextInputValidationFailure(:final textFailure) => switch ((
+    textFailure.field,
+    textFailure.reason,
+  )) {
+    (IntentionTextField.title, IntentionTextValidationReason.empty) =>
+      localizations.editorTitleEmpty,
+    (IntentionTextField.title, IntentionTextValidationReason.tooLong) =>
+      localizations.editorTitleTooLong,
+    (
+      IntentionTextField.title,
+      IntentionTextValidationReason.invalidUnicodeRepertoire,
+    ) =>
+      localizations.editorTitleInvalidUnicode,
+    (IntentionTextField.description, IntentionTextValidationReason.tooLong) =>
+      localizations.editorDescriptionTooLong,
+    (
+      IntentionTextField.description,
+      IntentionTextValidationReason.invalidUnicodeRepertoire,
+    ) =>
+      localizations.editorDescriptionInvalidUnicode,
+    (IntentionTextField.description, IntentionTextValidationReason.empty) ||
+    (IntentionTextField.titleFilter, _) => localizations.editorInvalidInput,
+  },
+  // Объяснение описывает проверку при сохранении; исправление снимает
+  // оставшиеся в черновике отсутствующие теги.
+  IntentionCreationTagsMissingFailure(:final missingTagIds) =>
+    localizations.editorCreateTagsMissing(missingTagIds.length),
+  IntentionGenericValidationFailure() => localizations.editorInvalidInput,
+  IntentionConflictFailure() => localizations.editorCreateConflict,
+  IntentionHasBlockingRelationsFailure() =>
+    localizations.editorCreateUnexpected,
+  IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
+  IntentionCorruptionFailure() => localizations.editorCreateCorruption,
+  IntentionNotFoundFailure() ||
+  IntentionUnexpectedFailure() => localizations.editorCreateUnexpected,
+};
 
 /// Подтверждение закрытия изменённого черновика одной сессии.
 ///
