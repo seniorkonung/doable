@@ -875,6 +875,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCloseFormAction => 'Close the form';
 
   @override
+  String get editorExpandFormAction => 'Expand the form';
+
+  @override
+  String get editorCollapseFormAction => 'Collapse the form';
+
+  @override
   String get graphOperationCreate => 'Create';
 
   @override

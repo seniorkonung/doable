@@ -248,6 +248,8 @@
   "editorCloseSavingStayAction": "Остаться",
   "editorCloseSavingLeaveAction": "Закрыть",
   "editorCloseFormAction": "Закрыть форму",
+  "editorExpandFormAction": "Развернуть форму",
+  "editorCollapseFormAction": "Свернуть форму",
   "graphOperationCreate": "Создание",
   "graphOperationUpdate": "Изменение",
   "graphOperationEnableReadiness": "Включение готовности",

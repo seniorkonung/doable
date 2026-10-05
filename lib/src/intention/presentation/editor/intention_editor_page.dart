@@ -15,8 +15,9 @@ import 'intention_creation_sheet.dart';
 import 'intention_editor_state.dart';
 import 'intention_editor_view_model.dart';
 
-/// Хост сессии создания намерения в компактной модальной нижней панели над
-/// исходным каталогом.
+/// Хост сессии создания намерения в модальной нижней панели над исходным
+/// каталогом. Панель открывается компактной; человек явно разворачивает и
+/// сворачивает ту же панель, а режим размера хранит сессия.
 ///
 /// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
 /// «назад» и программный `maybePop` — сначала обращается к единому решению
@@ -92,31 +93,26 @@ final class _IntentionEditorPageState
         }
       },
       child: IntentionCreationSheet(
+        // Размер панели — режим этой сессии: смена режима не меняет черновик
+        // и не запрашивает закрытие.
+        mode: editor.sheetMode,
+        onExpand: notifier.expandSheet,
+        onCollapse: notifier.collapseSheet,
         closeLabel: localizations.editorCloseFormAction,
+        expandLabel: localizations.editorExpandFormAction,
+        collapseLabel: localizations.editorCollapseFormAction,
         onCloseRequested: () => unawaited(_requestClose()),
         header: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(24, 8, 8, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Semantics(
-                  container: true,
-                  header: true,
-                  namesRoute: true,
-                  child: Text(
-                    localizations.editorTitle,
-                    key: const ValueKey('intention-editor-heading'),
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-              ),
-              IconButton(
-                key: const ValueKey('intention-editor-close'),
-                tooltip: localizations.editorCloseFormAction,
-                onPressed: () => unawaited(_requestClose()),
-                icon: const Icon(Icons.close),
-              ),
-            ],
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Semantics(
+            container: true,
+            header: true,
+            namesRoute: true,
+            child: Text(
+              localizations.editorTitle,
+              key: const ValueKey('intention-editor-heading'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
         ),
         fields: Padding(
