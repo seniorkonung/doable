@@ -2724,6 +2724,142 @@ void main() {
     });
   });
 
+  group('режим размера панели', () {
+    test('новая сессия компактна, а разворачивание и сворачивание меняют только режим без изменённости черновика и записи', () {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier);
+      final initial = container.read(provider);
+      expect(initial.sheetMode, IntentionCreationSheetMode.compact);
+
+      editor.expandSheet();
+
+      final expanded = container.read(provider);
+      expect(expanded.sheetMode, IntentionCreationSheetMode.expanded);
+      expect(expanded.draft, same(initial.draft));
+      expect(expanded.draft.isChanged, isFalse);
+      expect(expanded.operation, isA<OperationIdle<Intention>>());
+      expect(expanded.closing, isA<IntentionCreationCloseNotRequested>());
+      expect(expanded.canSubmit, isTrue);
+
+      // Повторное разворачивание уже развёрнутой панели ничего не публикует.
+      editor.expandSheet();
+      expect(container.read(provider), same(expanded));
+
+      editor.collapseSheet();
+      final collapsed = container.read(provider);
+      expect(collapsed.sheetMode, IntentionCreationSheetMode.compact);
+      expect(collapsed.draft, same(initial.draft));
+
+      // Изменённый размер не делает черновик изменённым: панель закрывается
+      // без подтверждения.
+      editor.expandSheet();
+      expect(editor.requestClose(), isA<IntentionCreationClosedImmediately>());
+
+      // Завершённая сессия сохраняет своё последнее состояние.
+      final closed = container.read(provider);
+      editor.collapseSheet();
+      expect(container.read(provider), same(closed));
+      expect(closed.sheetMode, IntentionCreationSheetMode.expanded);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
+    test('режим меняется во время принятой отправки и ожидающего подтверждения, не трогая черновик, отправку и подтверждение', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение')
+        ..markFavorite()
+        ..submit();
+      final command = repository.commands.single;
+      final confirmation = _confirmationOf(editor.requestClose());
+      final confirming = container.read(provider);
+
+      editor.expandSheet();
+
+      final expanded = container.read(provider);
+      expect(expanded.sheetMode, IntentionCreationSheetMode.expanded);
+      expect(expanded.draft, same(confirming.draft));
+      expect(expanded.operation, same(confirming.operation));
+      expect(expanded.draftAvailability, IntentionDraftAvailability.submitting);
+      expect(
+        expanded.closing,
+        isA<IntentionCreationCloseConfirming>().having(
+          (closing) => closing.confirmation,
+          'подтверждение',
+          same(confirmation),
+        ),
+      );
+      expect(
+        editor.resolveClose(
+          confirmation,
+          IntentionCreationCloseChoice.continueEditing,
+        ),
+        IntentionCreationCloseResolution.continued,
+      );
+
+      editor.collapseSheet();
+      expect(
+        container.read(provider).sheetMode,
+        IntentionCreationSheetMode.compact,
+      );
+      expect(repository.commands, [same(command)]);
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await _settle(container);
+      editor.expandSheet();
+      final failed = container.read(provider);
+      expect(failed.sheetMode, IntentionCreationSheetMode.expanded);
+      expect(failed.draft.title, 'Намерение');
+      expect(failed.draft.favoriteMark, FavoriteMark.favorite);
+      expect(failed.canRetry, isTrue);
+      expect(repository.commands, [same(command)]);
+    });
+
+    test(
+      'новое открытие начинается компактным независимо от режима другой сессии',
+      () {
+        final repository = ControlledCatalogRepository();
+        final container = _container(repository);
+        final first = intentionEditorViewModelProvider(
+          IntentionCreationFormKey(),
+        );
+        final firstSubscription = container.listen(first, (_, _) {});
+        addTearDown(firstSubscription.close);
+        container.read(first.notifier).expandSheet();
+
+        final second = intentionEditorViewModelProvider(
+          IntentionCreationFormKey(),
+        );
+        final secondSubscription = container.listen(second, (_, _) {});
+        addTearDown(secondSubscription.close);
+
+        expect(
+          container.read(first).sheetMode,
+          IntentionCreationSheetMode.expanded,
+        );
+        expect(
+          container.read(second).sheetMode,
+          IntentionCreationSheetMode.compact,
+        );
+      },
+    );
+  });
+
   group('передача права ошибки общей поверхности', () {
     test('освобождение сессии без renderer передаёт непредъявленное право общей поверхности ровно один раз', () async {
       final session = await _failedFullDraftSession(
